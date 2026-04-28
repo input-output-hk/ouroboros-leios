@@ -12,7 +12,7 @@ const getHighestPriorityMessageType = (counts: {
     EMessageType.RB, // Highest priority
     EMessageType.EB,
     EMessageType.Votes,
-    EMessageType.TX, // Lowest priority
+    EMessageType.Txs, // Lowest priority
   ];
 
   for (const messageType of MESSAGE_PRIORITY_ORDER) {
@@ -135,8 +135,8 @@ export const useHandlers = () => {
         );
         if (highestPriorityType) {
           switch (highestPriorityType) {
-            case EMessageType.TX:
-              context.strokeStyle = EMessageColor.TX;
+            case EMessageType.Txs:
+              context.strokeStyle = EMessageColor.TXS;
               break;
             case EMessageType.EB:
               context.strokeStyle = EMessageColor.EB;
@@ -190,8 +190,8 @@ export const useHandlers = () => {
         if (highestPriorityType) {
           // Node has active messages - color by highest priority
           switch (highestPriorityType) {
-            case EMessageType.TX:
-              context.fillStyle = EMessageColor.TX;
+            case EMessageType.Txs:
+              context.fillStyle = EMessageColor.TXS;
               break;
             case EMessageType.EB:
               context.fillStyle = EMessageColor.EB;
@@ -233,8 +233,8 @@ export const useHandlers = () => {
         senderNode.fy + (recipientNode.fy - senderNode.fy) * message.progress;
 
       switch (message.type) {
-        case EMessageType.TX:
-          context.fillStyle = EMessageColor.TX;
+        case EMessageType.Txs:
+          context.fillStyle = EMessageColor.TXS;
           break;
         case EMessageType.EB:
           context.fillStyle = EMessageColor.EB;

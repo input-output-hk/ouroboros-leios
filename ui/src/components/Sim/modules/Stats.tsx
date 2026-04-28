@@ -5,9 +5,9 @@ import { EServerMessageType } from "../types";
 import { EMessageColor } from "@/utils/colors";
 
 const EVENT_TYPE_COLOR: Partial<Record<EServerMessageType, string>> = {
-  [EServerMessageType.TransactionGenerated]: EMessageColor.TX,
-  [EServerMessageType.TransactionSent]: EMessageColor.TX,
-  [EServerMessageType.TransactionReceived]: EMessageColor.TX,
+  [EServerMessageType.TxsGenerated]: EMessageColor.TXS,
+  [EServerMessageType.TxsSent]: EMessageColor.TXS,
+  [EServerMessageType.TxsReceived]: EMessageColor.TXS,
   [EServerMessageType.EBGenerated]: EMessageColor.EB,
   [EServerMessageType.EBSent]: EMessageColor.EB,
   [EServerMessageType.EBReceived]: EMessageColor.EB,
@@ -60,8 +60,6 @@ export const Stats: FC = () => {
                 })
                 .map((eventType) => {
                   const count = aggregatedData.eventCounts.byType[eventType];
-                  const isTxReceived =
-                    eventType === EServerMessageType.TransactionReceived;
 
                   return (
                     <div
@@ -76,14 +74,6 @@ export const Stats: FC = () => {
                           />
                         )}
                         {eventType}:
-                        {isTxReceived && (
-                          <span
-                            className="text-yellow-600 text-xs font-bold cursor-help"
-                            title="Transaction IDs are incomplete and may lead to inaccurate numbers and visualization"
-                          >
-                            ⚠️
-                          </span>
-                        )}
                       </span>
                       <span>{count || 0}</span>
                     </div>

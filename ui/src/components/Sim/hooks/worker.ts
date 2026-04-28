@@ -83,6 +83,9 @@ const LEGACY_MESSAGE_TYPE_MAP: Record<string, EServerMessageType> = {
   VTBundleGenerated: EServerMessageType.VotesGenerated,
   VTBundleSent: EServerMessageType.VotesSent,
   VTBundleReceived: EServerMessageType.VotesReceived,
+  TXGenerated: EServerMessageType.TxsGenerated,
+  TXSent: EServerMessageType.TxsSent,
+  TXReceived: EServerMessageType.TxsReceived,
 };
 
 const normalizeMessageType = (event: IServerMessage): IServerMessage => {
@@ -106,11 +109,11 @@ const BASE_VISUALIZATION_EVENTS = new Set([
   EServerMessageType.VotesReceived,
 ]);
 
-// Transaction events (optional)
+// Txs events (optional)
 const TRANSACTION_EVENTS = new Set([
-  EServerMessageType.TransactionGenerated,
-  EServerMessageType.TransactionSent,
-  EServerMessageType.TransactionReceived,
+  EServerMessageType.TxsGenerated,
+  EServerMessageType.TxsSent,
+  EServerMessageType.TxsReceived,
 ]);
 
 const consumeStream = async (

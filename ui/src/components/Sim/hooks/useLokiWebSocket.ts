@@ -8,8 +8,8 @@ import {
   IEndorserBlockGenerated,
   IEndorserBlockSent,
   IEndorserBlockReceived,
-  ITransactionSent,
-  ITransactionReceived,
+  ITxsSent,
+  ITxsReceived,
   IVotesSent,
   IVotesReceived,
 } from "@/components/Sim/types";
@@ -291,22 +291,19 @@ const parseEndorserBlockReceived = (
   return null;
 };
 
-// HACK: plain enumeration of txs to emulate a sequence number on these messages
-const nextTxId: Record<string, number> = {};
+const txsId = (msg: any): string => {
+  const bitmapStr = (msg.bitmaps || []).join(",");
+  return `txs-${msg.ebHash}-${bitmapStr}`;
+};
 
-const parseTransactionSent = (
+const parseTxsSent = (
   timestamp: number,
   logLine: string,
 ): IServerMessage | null => {
   try {
     const log = JSON.parse(logLine);
 
-    // TODO: indicate this is many transactions or visualize as a very big transaction
-
-    // From immdb-server (no ns)
-    // {"at":"2025-12-15T15:19:01.5108Z","connectionId":"0.0.0.0:3001 10.0.0.2:3002","direction":"Send","msg":{"kind":"MsgLeiosBlockTxs","numTxs":30,"txs":"<elided>","txsBytesSize":491520},"mux_at":"2025-12-15T15:19:01.5107Z","prevCount":235}
-    // From cardano-node ns=LeiosFetch.Remote.Send.BlockTxs
-    // {"kind":"Send","msg":{"kind":"MsgLeiosBlockTxs","numTxs":30,"txs":"\u003celided\u003e","txsBytesSize":491520},"mux_at":"2025-12-05T14:06:12.52467535Z","peer":{"connectionId":"127.0.0.1:3002 127.0.0.1:3003"}}
+    // {"kind":"Send","msg":{"kind":"MsgLeiosBlockTxs","numTxs":1200,"txsBytesSize":241200,"bitmaps":[...],"ebHash":"...","ebSlot":1221},"peer":{"connectionId":"..."}}
     if (
       (log.direction || log.kind) === "Send" &&
       log.msg &&
@@ -316,11 +313,44 @@ const parseTransactionSent = (
         log.peer?.connectionId || log.connectionId,
       );
 
-      const txId = `${log.msg.ebHash}-${log.msg.bitmaps.reduce((acc: string, bitmap: any) => acc + bitmap, "")}`;
+      const message: ITxsSent = {
+        type: EServerMessageType.TxsSent,
+        id: txsId(log.msg),
+        sender,
+        recipient,
+        num_txs: log.msg.numTxs || 0,
+        msg_size_bytes: log.msg.txsBytesSize,
+      };
 
-      const message: ITransactionSent = {
-        type: EServerMessageType.TransactionSent,
-        id: txId,
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.error("Failed to parse TxsSent log line:", logLine, error);
+  }
+
+  return null;
+};
+
+const parseTxsReceived = (
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // {"kind":"Recv","msg":{"kind":"MsgLeiosBlockTxs","numTxs":1200,"txsBytesSize":241200,"bitmaps":[...],"ebHash":"...","ebSlot":1221},"peer":{"connectionId":"..."}}
+    if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlockTxs") {
+      const [recipient, sender] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
+
+      const message: ITxsReceived = {
+        type: EServerMessageType.TxsReceived,
+        id: txsId(log.msg),
+        num_txs: log.msg.numTxs || 0,
         sender,
         recipient,
         msg_size_bytes: log.msg.txsBytesSize,
@@ -332,48 +362,7 @@ const parseTransactionSent = (
       };
     }
   } catch (error) {
-    console.error("Failed to parse TransactionSent log line:", logLine, error);
-  }
-
-  return null;
-};
-
-const parseTransactionReceived = (
-  timestamp: number,
-  logLine: string,
-): IServerMessage | null => {
-  try {
-    const log = JSON.parse(logLine);
-
-    // From cardano-node ns=LeiosFetch.Remote.Receive.BlockTxs
-    // {"mux_at":"2025-12-05T14:06:12.52499731Z","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"},"kind":"Recv","msg":{"txsBytesSize":491520,"kind":"MsgLeiosBlockTxs","numTxs":30,"txs":"\u003celided\u003e"}}
-    if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlockTxs") {
-      const [recipient, sender] = getNodesFromConnection(
-        log.peer?.connectionId,
-      );
-
-      // FIXME: msg.txs is always elided
-      const txId = nextTxId[recipient] || 0;
-      nextTxId[recipient] = txId + 1;
-
-      const message: ITransactionReceived = {
-        type: EServerMessageType.TransactionReceived,
-        id: txId.toString(),
-        sender,
-        recipient,
-      };
-
-      return {
-        time_s: timestamp,
-        message,
-      };
-    }
-  } catch (error) {
-    console.warn(
-      "Failed to parse TransactionReceived log line:",
-      logLine,
-      error,
-    );
+    console.warn("Failed to parse TxsReceived log line:", logLine, error);
   }
 
   return null;
@@ -519,8 +508,8 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
                     parseEndorserBlockGenerated(stream.stream, ts, logLine) ||
                     parseEndorserBlockSent(ts, logLine) ||
                     parseEndorserBlockReceived(ts, logLine) ||
-                    parseTransactionSent(ts, logLine) ||
-                    parseTransactionReceived(ts, logLine) ||
+                    parseTxsSent(ts, logLine) ||
+                    parseTxsReceived(ts, logLine) ||
                     parseVotesSent(ts, logLine) ||
                     parseVotesReceived(ts, logLine);
                   if (event) {
