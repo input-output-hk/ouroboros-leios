@@ -57,9 +57,9 @@ export interface ITransformedNodeMap {
 }
 
 export enum EServerMessageType {
-  TransactionGenerated = "TXGenerated",
-  TransactionReceived = "TXReceived",
-  TransactionSent = "TXSent",
+  TxsGenerated = "TxsGenerated",
+  TxsReceived = "TxsReceived",
+  TxsSent = "TxsSent",
   EBGenerated = "EBGenerated",
   EBReceived = "EBReceived",
   EBSent = "EBSent",
@@ -71,25 +71,28 @@ export enum EServerMessageType {
   RBSent = "RBSent",
 }
 
-export interface ITransactionGenerated {
-  type: EServerMessageType.TransactionGenerated;
+export interface ITxsGenerated {
+  type: EServerMessageType.TxsGenerated;
   id: string;
   publisher: string;
   size_bytes: number;
 }
 
-export interface ITransactionReceived {
-  type: EServerMessageType.TransactionReceived;
+export interface ITxsReceived {
+  type: EServerMessageType.TxsReceived;
   id: string;
   sender: string;
   recipient: string;
+  num_txs: number;
+  msg_size_bytes: number;
 }
 
-export interface ITransactionSent {
-  type: EServerMessageType.TransactionSent;
+export interface ITxsSent {
+  type: EServerMessageType.TxsSent;
   id: string;
   sender: string;
   recipient: string;
+  num_txs: number;
   msg_size_bytes: number;
 }
 
@@ -200,9 +203,9 @@ export type TServerMessageType =
   | IVotesGenerated
   | IVotesReceived
   | IVotesSent
-  | ITransactionGenerated
-  | ITransactionReceived
-  | ITransactionSent
+  | ITxsGenerated
+  | ITxsReceived
+  | ITxsSent
   | IUnknown;
 
 export interface IServerMessage<T = TServerMessageType> {

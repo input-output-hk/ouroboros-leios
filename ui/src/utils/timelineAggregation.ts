@@ -19,7 +19,7 @@ const MESSAGE_PRIORITY_ORDER = [
   EMessageType.RB, // Highest priority
   EMessageType.EB,
   EMessageType.Votes,
-  EMessageType.TX, // Lowest priority
+  EMessageType.Txs, // Lowest priority
 ];
 
 export const getHighestPriorityMessageType = (
@@ -37,7 +37,7 @@ const createEmptyMessageTypeCounts = (): IMessageTypeCounts => ({
   [EMessageType.RB]: 0,
   [EMessageType.EB]: 0,
   [EMessageType.Votes]: 0,
-  [EMessageType.TX]: 0,
+  [EMessageType.Txs]: 0,
 });
 
 const getTotalActiveCount = (counts: IMessageTypeCounts): number => {
@@ -266,7 +266,7 @@ export const computeAggregatedDataAtTime = (
   ): { sender: string; recipient: string } => {
     const { message } = event;
     switch (message.type) {
-      case EServerMessageType.TransactionSent:
+      case EServerMessageType.TxsSent:
       case EServerMessageType.EBSent:
       case EServerMessageType.RBSent:
       case EServerMessageType.VotesSent:
@@ -325,9 +325,9 @@ export const computeAggregatedDataAtTime = (
 
       // Check if this is a matching received event
       const isMatchingReceived =
-        (messageType === EServerMessageType.TransactionSent &&
+        (messageType === EServerMessageType.TxsSent &&
           futureEvent.message.type ===
-            EServerMessageType.TransactionReceived) ||
+            EServerMessageType.TxsReceived) ||
         (messageType === EServerMessageType.EBSent &&
           futureEvent.message.type === EServerMessageType.EBReceived) ||
         (messageType === EServerMessageType.RBSent &&
@@ -356,35 +356,42 @@ export const computeAggregatedDataAtTime = (
 
     const { message } = event;
 
-    // Accumulate event counts
-    eventCount++;
+    // Accumulate event counts (use num_txs for txs messages)
     const type = message.type;
-    eventCountsByType[type] = (eventCountsByType[type] || 0) + 1;
+    const eventWeight =
+      (type === EServerMessageType.TxsSent ||
+        type === EServerMessageType.TxsReceived) &&
+      "num_txs" in message
+        ? (message as any).num_txs || 1
+        : 1;
+    eventCount += eventWeight;
+    eventCountsByType[type] = (eventCountsByType[type] || 0) + eventWeight;
 
     switch (message.type) {
-      case EServerMessageType.TransactionGenerated: {
-        setMessageBytes(EMessageType.TX, message.id, message.size_bytes);
+      case EServerMessageType.TxsGenerated: {
+        setMessageBytes(EMessageType.Txs, message.id, message.size_bytes);
         const stats = nodeStats.get(message.publisher);
         if (stats) {
           stats.generated.set(
-            EMessageType.TX,
-            (stats.generated.get(EMessageType.TX) || 0) + 1,
+            EMessageType.Txs,
+            (stats.generated.get(EMessageType.Txs) || 0) + 1,
           );
         }
         break;
       }
 
-      case EServerMessageType.TransactionSent: {
+      case EServerMessageType.TxsSent: {
         const msgBytes = message.msg_size_bytes;
-        // XXX: needed because TransactionReceived does not have a size
-        setMessageBytes(EMessageType.TX, message.id, msgBytes);
+        const numTxs = message.num_txs || 1;
+        // Also set on sent so size is available when processing received events
+        setMessageBytes(EMessageType.Txs, message.id, msgBytes);
         const stats = nodeStats.get(message.sender);
         if (stats) {
-          if (!stats.sent.has(EMessageType.TX)) {
-            stats.sent.set(EMessageType.TX, { count: 0, bytes: 0 });
+          if (!stats.sent.has(EMessageType.Txs)) {
+            stats.sent.set(EMessageType.Txs, { count: 0, bytes: 0 });
           }
-          const sentStats = stats.sent.get(EMessageType.TX)!;
-          sentStats.count += 1;
+          const sentStats = stats.sent.get(EMessageType.Txs)!;
+          sentStats.count += numTxs;
           sentStats.bytes += msgBytes;
           stats.bytesSent += msgBytes;
         }
@@ -399,7 +406,7 @@ export const computeAggregatedDataAtTime = (
         // Create transaction animation with calculated travel time
         createMessageAnimation(
           result,
-          EMessageType.TX,
+          EMessageType.Txs,
           message.id,
           message.sender,
           message.recipient,
@@ -411,15 +418,16 @@ export const computeAggregatedDataAtTime = (
         break;
       }
 
-      case EServerMessageType.TransactionReceived: {
+      case EServerMessageType.TxsReceived: {
+        const numTxs = message.num_txs || 1;
         const stats = nodeStats.get(message.recipient);
         if (stats) {
-          const msgBytes = getMessageBytes(EMessageType.TX, message.id);
-          if (!stats.received.has(EMessageType.TX)) {
-            stats.received.set(EMessageType.TX, { count: 0, bytes: 0 });
+          const msgBytes = getMessageBytes(EMessageType.Txs, message.id);
+          if (!stats.received.has(EMessageType.Txs)) {
+            stats.received.set(EMessageType.Txs, { count: 0, bytes: 0 });
           }
-          const receivedStats = stats.received.get(EMessageType.TX)!;
-          receivedStats.count += 1;
+          const receivedStats = stats.received.get(EMessageType.Txs)!;
+          receivedStats.count += numTxs;
           receivedStats.bytes += msgBytes;
           stats.bytesReceived += msgBytes;
         }

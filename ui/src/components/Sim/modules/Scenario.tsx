@@ -145,7 +145,7 @@ export const Scenario: FC = () => {
               onChange={(e) => setIncludeTransactions(e.target.checked)}
               disabled={isConnecting || isLoaded}
             />
-            Include Transactions
+            Include Txs
           </label>
         </div>
       )}
