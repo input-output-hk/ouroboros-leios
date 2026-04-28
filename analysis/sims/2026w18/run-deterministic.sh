@@ -18,6 +18,8 @@ Options:
   --turbo                  Use turbo mode (default: sequential, 6-shard zero-latency-clusters)
   --quorum-fraction FRAC   Quorum fraction for vote threshold (default: 0.75)
   --stake-fraction FRAC    Stake fraction for top-stake-fraction mode (default: 0.99)
+  --topology NAME          Topology file basename in data/simulation/pseudo-mainnet/
+                           (default: topology-v2; e.g. topology-v2-1500 for 1500 nodes)
   -h, --help               Show this help
 USAGE
   exit "${1:-0}"
@@ -30,6 +32,7 @@ QUORUM_FRACTION=0.75
 STAKE_FRACTION=0.99
 USE_MEMORY_LIMIT=false
 ENGINE=turbo
+NETWORK=topology-v2
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -41,6 +44,7 @@ while [[ $# -gt 0 ]]; do
     --turbo)              ENGINE=turbo; shift ;;
     --quorum-fraction)    QUORUM_FRACTION="$2"; shift 2 ;;
     --stake-fraction)     STAKE_FRACTION="$2"; shift 2 ;;
+    --topology)           NETWORK="$2"; shift 2 ;;
     -h|--help)            usage 0 ;;
     *)                    echo "ERROR: unknown option '$1'" >&2; usage 1 ;;
   esac
@@ -51,7 +55,6 @@ TX_STOP=960
 SIM_STOP=1500
 BW=10
 CPU_COUNT=4
-NETWORK=topology-v2
 VARIANT=linear-with-tx-references
 BLOCK_SIZE=12
 TX_SIZE=1500
@@ -80,7 +83,7 @@ fi
 mkfifo sim.log
 
 # Create output subdirectory up front (before config generation)
-OUTDIR="$VOTING_MODE/seed-$SEED"
+OUTDIR="$VOTING_MODE/$NETWORK/seed-$SEED"
 mkdir -p "$OUTDIR"
 
 sed -e 's/"bandwidth-bytes-per-second":125000000/"bandwidth-bytes-per-second":'"$((125000 * BW))"'/g' \
