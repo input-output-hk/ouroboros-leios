@@ -63,9 +63,9 @@ export enum EServerMessageType {
   EBGenerated = "EBGenerated",
   EBReceived = "EBReceived",
   EBSent = "EBSent",
-  VTBundleGenerated = "VTBundleGenerated",
-  VTBundleReceived = "VTBundleReceived",
-  VTBundleSent = "VTBundleSent",
+  VotesGenerated = "VotesGenerated",
+  VotesReceived = "VotesReceived",
+  VotesSent = "VotesSent",
   RBGenerated = "RBGenerated",
   RBReceived = "RBReceived",
   RBSent = "RBSent",
@@ -162,7 +162,7 @@ export interface IEndorserBlockSent {
 }
 
 export interface IVotesGenerated {
-  type: EServerMessageType.VTBundleGenerated;
+  type: EServerMessageType.VotesGenerated;
   id: string;
   slot: number;
   producer: string;
@@ -171,7 +171,7 @@ export interface IVotesGenerated {
 }
 
 export interface IVotesReceived {
-  type: EServerMessageType.VTBundleReceived;
+  type: EServerMessageType.VotesReceived;
   id: string;
   slot: number;
   sender: string;
@@ -179,7 +179,7 @@ export interface IVotesReceived {
 }
 
 export interface IVotesSent {
-  type: EServerMessageType.VTBundleSent;
+  type: EServerMessageType.VotesSent;
   slot: number;
   id: string;
   sender: string;

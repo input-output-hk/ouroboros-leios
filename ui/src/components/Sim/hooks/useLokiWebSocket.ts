@@ -401,7 +401,7 @@ const parseVotesSent = (
       const voteId = `vote-${firstVote.electionId}-${firstVote.voterId}-${firstVote.ebHash}`;
 
       const message: IVotesSent = {
-        type: EServerMessageType.VTBundleSent,
+        type: EServerMessageType.VotesSent,
         slot: firstVote.electionId || 0,
         id: voteId,
         sender,
@@ -438,7 +438,7 @@ const parseVotesReceived = (
       const voteId = `vote-${firstVote.electionId}-${firstVote.voterId}-${firstVote.ebHash}`;
 
       const message: IVotesReceived = {
-        type: EServerMessageType.VTBundleReceived,
+        type: EServerMessageType.VotesReceived,
         slot: firstVote.electionId || 0,
         id: voteId,
         sender,
