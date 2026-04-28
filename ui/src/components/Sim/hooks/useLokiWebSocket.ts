@@ -10,6 +10,8 @@ import {
   IEndorserBlockReceived,
   ITransactionSent,
   ITransactionReceived,
+  IVotesSent,
+  IVotesReceived,
 } from "@/components/Sim/types";
 import { useRef } from "react";
 import { EConnectionState } from "@/contexts/SimContext/types";
@@ -377,6 +379,84 @@ const parseTransactionReceived = (
   return null;
 };
 
+const parseVotesSent = (
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // {"kind":"Send","msg":{"kind":"MsgLeiosVotes","votes":[{"ebHash":"...","electionId":301,"voterId":228}]},"mux_at":"...","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"}}
+    if (
+      (log.direction || log.kind) === "Send" &&
+      log.msg &&
+      log.msg.kind === "MsgLeiosVotes"
+    ) {
+      const [sender, recipient] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
+
+      const votes = log.msg.votes || [];
+      const firstVote = votes[0] || {};
+      const voteId = `vote-${firstVote.electionId}-${firstVote.voterId}-${firstVote.ebHash}`;
+
+      const message: IVotesSent = {
+        type: EServerMessageType.VTBundleSent,
+        slot: firstVote.electionId || 0,
+        id: voteId,
+        sender,
+        recipient,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.error("Failed to parse VotesSent log line:", logLine, error);
+  }
+
+  return null;
+};
+
+const parseVotesReceived = (
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // {"kind":"Recv","msg":{"kind":"MsgLeiosVotes","votes":[{"voterId":228,"ebHash":"...","electionId":301}]},"mux_at":"...","peer":{"connectionId":"127.0.0.1:3001 127.0.0.1:3002"}}
+    if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosVotes") {
+      const [recipient, sender] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
+
+      const votes = log.msg.votes || [];
+      const firstVote = votes[0] || {};
+      const voteId = `vote-${firstVote.electionId}-${firstVote.voterId}-${firstVote.ebHash}`;
+
+      const message: IVotesReceived = {
+        type: EServerMessageType.VTBundleReceived,
+        slot: firstVote.electionId || 0,
+        id: voteId,
+        sender,
+        recipient,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to parse VotesReceived log line:", logLine, error);
+  }
+
+  return null;
+};
+
 function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
   // NOTE: Single websocket is essential because:
   // 1. Timeline aggregation assumes events are chronologically ordered
@@ -384,7 +464,7 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
   // 3. Loki naturally returns results in chronological order within a single stream
   // 4. Sorting large event arrays in the reducer is too expensive for dense simulation data
   const query =
-    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock"';
+    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|MsgLeiosVotes"';
   const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${encodeURIComponent(query)}&limit=5000`;
 
   let hasAutoStartedPlayback = false;
@@ -440,7 +520,9 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
                     parseEndorserBlockSent(ts, logLine) ||
                     parseEndorserBlockReceived(ts, logLine) ||
                     parseTransactionSent(ts, logLine) ||
-                    parseTransactionReceived(ts, logLine);
+                    parseTransactionReceived(ts, logLine) ||
+                    parseVotesSent(ts, logLine) ||
+                    parseVotesReceived(ts, logLine);
                   if (event) {
                     console.warn(
                       "Parsed",

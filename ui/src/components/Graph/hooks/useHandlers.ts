@@ -232,7 +232,31 @@ export const useHandlers = () => {
       const y =
         senderNode.fy + (recipientNode.fy - senderNode.fy) * message.progress;
 
-      // Draw colored rectangle based on message type (consistent with pie chart colors)
+      switch (message.type) {
+        case EMessageType.TX:
+          context.fillStyle = EMessageColor.TX;
+          break;
+        case EMessageType.EB:
+          context.fillStyle = EMessageColor.EB;
+          break;
+        case EMessageType.Votes:
+          context.fillStyle = EMessageColor.VOTES;
+          break;
+        case EMessageType.RB:
+          context.fillStyle = EMessageColor.RB;
+          break;
+      }
+
+      // Votes: draw as small circles (fixed size, no bandwidth scaling)
+      if (message.type === EMessageType.Votes) {
+        const radius = Math.min((0.4 / canvasScale) * 6, 0.4);
+        context.beginPath();
+        context.arc(x, y, radius, 0, 2 * Math.PI);
+        context.fill();
+        return;
+      }
+
+      // Other message types: draw as oriented rectangles scaled by bandwidth
       const rectHeight = Math.min((0.8 / canvasScale) * 6, 0.8);
 
       // Scale length by transmission time relative to travel time:
@@ -252,21 +276,6 @@ export const useHandlers = () => {
       if (message.sizeBytes > 0 && bandwidth && bandwidth > 0 && travelTime > 0) {
         const transmissionFraction = message.sizeBytes / bandwidth / travelTime;
         rectLength = Math.max(rectHeight, edgeLength * transmissionFraction);
-      }
-
-      switch (message.type) {
-        case EMessageType.TX:
-          context.fillStyle = EMessageColor.TX;
-          break;
-        case EMessageType.EB:
-          context.fillStyle = EMessageColor.EB;
-          break;
-        case EMessageType.Votes:
-          context.fillStyle = EMessageColor.VOTES;
-          break;
-        case EMessageType.RB:
-          context.fillStyle = EMessageColor.RB;
-          break;
       }
 
       // Orient rectangle along travel direction, clipped to edge bounds
