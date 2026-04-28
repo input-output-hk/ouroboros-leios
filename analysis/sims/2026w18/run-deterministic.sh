@@ -77,7 +77,12 @@ PARAMS_DIR="$REPO_ROOT/sim-rs/parameters"
 TURBO="$PARAMS_DIR/turbo.yaml"
 TOPO_SOURCE="$REPO_ROOT/data/simulation/pseudo-mainnet/$NETWORK.yaml"
 
-ulimit -S -m 96000000 -v 96000000
+# Address-space limit. Was 96 GB but that cap bites on 1500-node topologies
+# even when physical RAM + swap is fine, because the Rust+tokio allocator
+# reserves large virtual arenas that don't fully commit to physical memory.
+# 256 GB matches the motherboard's max physical RAM ceiling; the real
+# commit ceiling is enforced by the kernel via RAM + swap.
+ulimit -S -v 256000000
 
 if [[ -e sim.log ]]
 then
@@ -221,7 +226,7 @@ function cleanup() {
 }
 trap cleanup EXIT
 
-grep -E -v '(Slot|CpuTask|Lottery)' sim.log | pigz -p 3 -1c > "$OUTDIR/sim.log.gz" &
+grep -E -v '(Slot|CpuTask|Lottery)' sim.log | pigz -p 3 -9c > "$OUTDIR/sim.log.gz" &
 
 /usr/bin/time -v -o "$OUTDIR/time.txt" ../../sim-cli "${SIM_PARAMS[@]}" network.yaml --slots "$SIM_STOP" --conformance-events sim.log > "$OUTDIR/stdout" 2> "$OUTDIR/stderr"
 
