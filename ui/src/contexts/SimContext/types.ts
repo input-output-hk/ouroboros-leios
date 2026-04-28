@@ -5,7 +5,7 @@ import { Dispatch, RefObject } from "react";
 export enum EMessageType {
   EB = "eb",
   RB = "rb",
-  TX = "tx",
+  Txs = "txs",
   Votes = "votes",
 }
 
@@ -48,7 +48,7 @@ export interface IMessageTypeCounts {
   [EMessageType.RB]: number;
   [EMessageType.EB]: number;
   [EMessageType.Votes]: number;
-  [EMessageType.TX]: number;
+  [EMessageType.Txs]: number;
 }
 
 export interface IEdgeState {
