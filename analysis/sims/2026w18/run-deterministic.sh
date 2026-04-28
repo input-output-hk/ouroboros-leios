@@ -12,7 +12,9 @@ Run a deterministic turbo-mode simulation in the current experiment directory.
 Options:
   -m, --voting-mode MODE   wfa-ls | everyone | top-stake-fraction (default: wfa-ls)
   -s, --seed N             RNG seed (default: 0)
-  --memory-limit           Apply backlog memory limits
+  --memory-limit           Apply backlog memory limits (uses memory-limit.yaml)
+  --memory-limit-file PATH Use a specific memory-limit YAML (relative to
+                           sim-rs/parameters/, e.g. memory-limit-safe.yaml)
   --actor                  Use actor engine (async, non-deterministic)
   --sequential             Use sequential DES engine (deterministic, single shard)
   --turbo                  Use turbo mode (default: sequential, 6-shard zero-latency-clusters)
@@ -31,6 +33,7 @@ VOTING_MODE=wfa-ls
 QUORUM_FRACTION=0.75
 STAKE_FRACTION=0.99
 USE_MEMORY_LIMIT=false
+MEMORY_LIMIT_FILE=memory-limit.yaml
 ENGINE=turbo
 NETWORK=topology-v2
 
@@ -39,6 +42,7 @@ while [[ $# -gt 0 ]]; do
     -m|--voting-mode)     VOTING_MODE="$2"; shift 2 ;;
     -s|--seed)            SEED="$2"; shift 2 ;;
     --memory-limit)       USE_MEMORY_LIMIT=true; shift ;;
+    --memory-limit-file)  USE_MEMORY_LIMIT=true; MEMORY_LIMIT_FILE="$2"; shift 2 ;;
     --actor)              ENGINE=actor; shift ;;
     --sequential)         ENGINE=sequential; shift ;;
     --turbo)              ENGINE=turbo; shift ;;
@@ -203,8 +207,8 @@ EOF
 esac
 SIM_PARAMS+=(-p voting.yaml)
 if [[ "$USE_MEMORY_LIMIT" == "true" ]]; then
-  SIM_PARAMS+=(-p "$PARAMS_DIR/memory-limit.yaml")
-  echo "Memory limits: enabled" >&2
+  SIM_PARAMS+=(-p "$PARAMS_DIR/$MEMORY_LIMIT_FILE")
+  echo "Memory limits: $MEMORY_LIMIT_FILE" >&2
 else
   echo "Memory limits: disabled" >&2
 fi
@@ -217,7 +221,7 @@ function cleanup() {
 }
 trap cleanup EXIT
 
-grep -E -v '(Slot|CpuTask|Lottery)' sim.log | pigz -p 3 -9c > "$OUTDIR/sim.log.gz" &
+grep -E -v '(Slot|CpuTask|Lottery)' sim.log | pigz -p 3 -1c > "$OUTDIR/sim.log.gz" &
 
 /usr/bin/time -v -o "$OUTDIR/time.txt" ../../sim-cli "${SIM_PARAMS[@]}" network.yaml --slots "$SIM_STOP" --conformance-events sim.log > "$OUTDIR/stdout" 2> "$OUTDIR/stderr"
 
@@ -263,5 +267,8 @@ pigz -p 3 -9f "$OUTDIR"/{cpus,lifecycle,receipts,resources,sizes}.csv
 cat "$OUTDIR/case.csv"
 
 ansifilter "$OUTDIR/stdout" | grep -E '^ INFO (praos|leios|network): ' > "$OUTDIR/summary.txt"
+
+# Marker that the full pipeline completed; combine-results checks for this.
+touch "$OUTDIR/done"
 
 echo "Outputs saved to $OUTDIR/" >&2

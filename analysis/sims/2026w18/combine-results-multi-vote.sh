@@ -92,8 +92,8 @@ do
         echo "Skipping $exp/$MODE: directory not found" >&2
         continue
       fi
-      if [ ! -e "$g/stderr" ]; then
-        echo "Skipping $exp/$MODE: no stderr" >&2
+      if [ ! -e "$g/done" ]; then
+        echo "Skipping $exp/$MODE: run did not complete (no done marker)" >&2
         continue
       fi
       if [ -s "$g/stderr" ]; then

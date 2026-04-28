@@ -39,6 +39,7 @@ echo "Running ${#EXPERIMENTS[@]} experiments"
 echo "Args: ${PASSTHROUGH[*]}"
 echo ""
 
+FAILED=()
 for exp in "${EXPERIMENTS[@]}"; do
   dir="$SCRIPT_DIR/experiments/$exp"
   if [[ ! -d "$dir" ]]; then
@@ -47,10 +48,21 @@ for exp in "${EXPERIMENTS[@]}"; do
   fi
   echo "=== $exp ==="
   start=$(date +%s)
-  (cd "$dir" && bash "$SCRIPT_DIR/run-deterministic.sh" "${PASSTHROUGH[@]}")
-  end=$(date +%s)
-  echo "=== $exp done in $((end - start))s ==="
+  if (cd "$dir" && bash "$SCRIPT_DIR/run-deterministic.sh" "${PASSTHROUGH[@]}"); then
+    end=$(date +%s)
+    echo "=== $exp done in $((end - start))s ==="
+  else
+    rc=$?
+    end=$(date +%s)
+    echo "=== $exp FAILED (exit $rc) after $((end - start))s — continuing ===" >&2
+    FAILED+=("$exp")
+  fi
   echo ""
 done
 
-echo "All experiments complete."
+if [[ ${#FAILED[@]} -gt 0 ]]; then
+  echo "All experiments processed. ${#FAILED[@]} failed: ${FAILED[*]}"
+  exit 1
+else
+  echo "All experiments complete."
+fi

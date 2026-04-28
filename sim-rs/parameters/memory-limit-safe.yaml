@@ -1,0 +1,16 @@
+# Behaviour-preserving memory caps for high-throughput / Plutus runs.
+#
+# - generated-backlog: null disables source-side TX drops. The default
+#   value of 10 in memory-limit.yaml drops locally-generated TXs at the
+#   producer when downstream is briefly congested, costing ~17% TX
+#   finalisation at 0.350 TxMB/s.
+# - peer-backlog: 20000 acts as honest backpressure. Test at 0.350
+#   TxMB/s saw ~2k drops out of 130M peer TX messages — negligible.
+# - max-tx-age: 600 covers the +3σ envelope of TX->EB inclusion time
+#   on the heaviest case (NA,0.350: avg 167s, stddev 81s -> ~410s).
+#   Bounds the per-node `txs` map (the dominant memory consumer
+#   during the sim phase, ~15 GB at 750 nodes when uncapped).
+
+leios-tx-generated-backlog-max-size: null
+leios-tx-peer-backlog-max-size: 20000
+linear-tx-max-age-slots: 600
