@@ -43,6 +43,7 @@ and saves all outputs into a `{voting-mode}/seed-{N}/` subdirectory.
 | `--memory-limit` | off | Apply backlog caps (generated=10, peer=10000, max-age=24) |
 | `--quorum-fraction F` | `0.75` | Quorum fraction for vote threshold |
 | `--stake-fraction F` | `0.99` | Stake fraction for top-stake-fraction mode |
+| `--topology NAME` | `topology-v2` | Basename of topology file under `data/simulation/pseudo-mainnet/` (e.g. `topology-v2-1500` for 1500 nodes) |
 
 **Output directory structure:**
 ```
@@ -51,25 +52,31 @@ NA,0.200/
 ├── config.yaml           # original CIP config (git-tracked)
 ├── summary.txt           # original CIP summary (git-tracked)
 ├── wfa-ls/
-│   ├── seed-0/
-│   │   ├── config.yaml   # generated per-run config
-│   │   ├── case.csv
-│   │   ├── summary.txt
-│   │   ├── stdout / stderr
-│   │   ├── sim.log.gz
-│   │   ├── lifecycle.csv.gz
-│   │   ├── cpus.csv.gz
-│   │   ├── receipts.csv.gz
-│   │   ├── resources.csv.gz
-│   │   └── sizes.csv.gz
-│   └── seed-1/
-│       └── ...
+│   ├── topology-v2/
+│   │   ├── seed-0/
+│   │   │   ├── config.yaml   # generated per-run config
+│   │   │   ├── case.csv
+│   │   │   ├── summary.txt
+│   │   │   ├── stdout / stderr
+│   │   │   ├── sim.log.gz
+│   │   │   ├── lifecycle.csv.gz
+│   │   │   ├── cpus.csv.gz
+│   │   │   ├── receipts.csv.gz
+│   │   │   ├── resources.csv.gz
+│   │   │   └── sizes.csv.gz
+│   │   └── seed-1/
+│   │       └── ...
+│   └── topology-v2-1500/
+│       └── seed-0/
+│           └── ...
 ├── everyone/
-│   └── seed-0/
-│       └── ...
+│   └── topology-v2/
+│       └── seed-0/
+│           └── ...
 └── top-stake-fraction/
-    └── seed-0/
-        └── ...
+    └── topology-v2/
+        └── seed-0/
+            └── ...
 ```
 
 ### run-sweep.sh
@@ -113,12 +120,13 @@ and sweep log status.
 
 ### combine-results-multi-vote.sh
 
-Collects results from a specific voting mode and seed into the `results/`
-directory format expected by `analysis.ipynb`.
+Collects results from a specific voting mode, topology, and seed into
+`results/<MODE>/<TOPOLOGY>/` for `analysis.ipynb`.
 
 ```sh
-bash combine-results-multi-vote.sh -m wfa-ls -s 0
-# then open analysis.ipynb
+bash combine-results-multi-vote.sh -m wfa-ls -s 0                          # default topology-v2
+bash combine-results-multi-vote.sh -m wfa-ls -s 0 --topology topology-v2-1500
+# then open analysis.ipynb (set MODE and TOPOLOGY in cell 5)
 ```
 
 ## Configuration
