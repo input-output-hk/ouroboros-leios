@@ -269,7 +269,7 @@ export const computeAggregatedDataAtTime = (
       case EServerMessageType.TransactionSent:
       case EServerMessageType.EBSent:
       case EServerMessageType.RBSent:
-      case EServerMessageType.VTBundleSent:
+      case EServerMessageType.VotesSent:
         return {
           sender: (message as any).sender,
           recipient: (message as any).recipient,
@@ -332,8 +332,8 @@ export const computeAggregatedDataAtTime = (
           futureEvent.message.type === EServerMessageType.EBReceived) ||
         (messageType === EServerMessageType.RBSent &&
           futureEvent.message.type === EServerMessageType.RBReceived) ||
-        (messageType === EServerMessageType.VTBundleSent &&
-          futureEvent.message.type === EServerMessageType.VTBundleReceived);
+        (messageType === EServerMessageType.VotesSent &&
+          futureEvent.message.type === EServerMessageType.VotesReceived);
 
       if (
         isMatchingReceived &&
@@ -605,7 +605,7 @@ export const computeAggregatedDataAtTime = (
         break;
       }
 
-      case EServerMessageType.VTBundleGenerated: {
+      case EServerMessageType.VotesGenerated: {
         setMessageBytes(EMessageType.Votes, message.id, message.size_bytes);
         const stats = nodeStats.get(message.producer);
         if (stats) {
@@ -617,7 +617,7 @@ export const computeAggregatedDataAtTime = (
         break;
       }
 
-      case EServerMessageType.VTBundleSent: {
+      case EServerMessageType.VotesSent: {
         const msgBytes = getMessageBytes(EMessageType.Votes, message.id);
         const stats = nodeStats.get(message.sender);
         if (stats) {
@@ -652,7 +652,7 @@ export const computeAggregatedDataAtTime = (
         break;
       }
 
-      case EServerMessageType.VTBundleReceived: {
+      case EServerMessageType.VotesReceived: {
         const msgBytes = getMessageBytes(EMessageType.Votes, message.id);
         const stats = nodeStats.get(message.recipient);
         if (stats) {

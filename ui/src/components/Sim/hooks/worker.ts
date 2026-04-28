@@ -78,6 +78,21 @@ const createCborTransformer = <T>(): TransformStream<Uint8Array, T> => {
   });
 };
 
+// Map legacy trace message type strings to current enum values
+const LEGACY_MESSAGE_TYPE_MAP: Record<string, EServerMessageType> = {
+  VTBundleGenerated: EServerMessageType.VotesGenerated,
+  VTBundleSent: EServerMessageType.VotesSent,
+  VTBundleReceived: EServerMessageType.VotesReceived,
+};
+
+const normalizeMessageType = (event: IServerMessage): IServerMessage => {
+  const mapped = LEGACY_MESSAGE_TYPE_MAP[event.message.type];
+  if (mapped) {
+    return { ...event, message: { ...event.message, type: mapped } };
+  }
+  return event;
+};
+
 // Base event types (always included)
 const BASE_VISUALIZATION_EVENTS = new Set([
   EServerMessageType.EBGenerated,
@@ -86,9 +101,9 @@ const BASE_VISUALIZATION_EVENTS = new Set([
   EServerMessageType.RBGenerated,
   EServerMessageType.RBSent,
   EServerMessageType.RBReceived,
-  EServerMessageType.VTBundleGenerated,
-  EServerMessageType.VTBundleSent,
-  EServerMessageType.VTBundleReceived,
+  EServerMessageType.VotesGenerated,
+  EServerMessageType.VotesSent,
+  EServerMessageType.VotesReceived,
 ]);
 
 // Transaction events (optional)
@@ -130,8 +145,9 @@ const consumeStream = async (
     }
   };
 
-  for await (const serverMessage of stream) {
+  for await (const rawMessage of stream) {
     eventCount++;
+    const serverMessage = normalizeMessageType(rawMessage);
     const { message } = serverMessage;
 
     // Filter only visualization-relevant events
