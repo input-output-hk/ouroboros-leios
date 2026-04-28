@@ -14,9 +14,9 @@ const EVENT_TYPE_COLOR: Partial<Record<EServerMessageType, string>> = {
   [EServerMessageType.RBGenerated]: EMessageColor.RB,
   [EServerMessageType.RBSent]: EMessageColor.RB,
   [EServerMessageType.RBReceived]: EMessageColor.RB,
-  [EServerMessageType.VTBundleGenerated]: EMessageColor.VOTES,
-  [EServerMessageType.VTBundleSent]: EMessageColor.VOTES,
-  [EServerMessageType.VTBundleReceived]: EMessageColor.VOTES,
+  [EServerMessageType.VotesGenerated]: EMessageColor.VOTES,
+  [EServerMessageType.VotesSent]: EMessageColor.VOTES,
+  [EServerMessageType.VotesReceived]: EMessageColor.VOTES,
 };
 
 export const Stats: FC = () => {
