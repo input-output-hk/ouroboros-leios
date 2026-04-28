@@ -10,6 +10,7 @@ import {
   IEndorserBlockReceived,
   ITxsSent,
   ITxsReceived,
+  IVotesGenerated,
   IVotesSent,
   IVotesReceived,
 } from "@/components/Sim/types";
@@ -368,6 +369,37 @@ const parseTxsReceived = (
   return null;
 };
 
+const parseVotesGenerated = (
+  streamLabels: any,
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // {"hash":"...","kind":"LeiosVoted","slot":2245,"voter":228}
+    if (log.kind === "LeiosVoted") {
+      const message: IVotesGenerated = {
+        type: EServerMessageType.VotesGenerated,
+        id: `vote-${log.slot}-${log.voter}-${log.hash}`,
+        slot: log.slot,
+        producer: streamLabels.process,
+        size_bytes: 100,
+        votes: [],
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to parse LeiosVoted log line:", logLine, error);
+  }
+
+  return null;
+};
+
 const parseVotesSent = (
   timestamp: number,
   logLine: string,
@@ -453,7 +485,7 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
   // 3. Loki naturally returns results in chronological order within a single stream
   // 4. Sorting large event arrays in the reducer is too expensive for dense simulation data
   const query =
-    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|MsgLeiosVotes"';
+    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|MsgLeiosVotes|LeiosVoted"';
   const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${encodeURIComponent(query)}&limit=5000`;
 
   let hasAutoStartedPlayback = false;
@@ -510,6 +542,7 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
                     parseEndorserBlockReceived(ts, logLine) ||
                     parseTxsSent(ts, logLine) ||
                     parseTxsReceived(ts, logLine) ||
+                    parseVotesGenerated(stream.stream, ts, logLine) ||
                     parseVotesSent(ts, logLine) ||
                     parseVotesReceived(ts, logLine);
                   if (event) {
