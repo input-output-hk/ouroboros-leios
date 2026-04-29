@@ -166,7 +166,10 @@ impl LeiosStore {
 
     /// Record the ordered tx-hash list of an EB's manifest. Pairs with a
     /// `TxBodyResolver` so receivers can serve `MsgLeiosBlockTxsRequest`
-    /// without keeping the bodies in this store.
+    /// without keeping the bodies in this store. Also pushes a
+    /// `BlockTxsOffer` notification so this node advertises tx availability
+    /// to downstream peers — that's how epidemic flooding extends beyond
+    /// the original producer.
     pub fn record_eb_manifest(&self, point: Point, tx_hashes: Vec<[u8; 32]>) {
         let (slot, hash) = match &point {
             Point::Specific { slot, hash } => (*slot, *hash),
@@ -176,6 +179,9 @@ impl LeiosStore {
         inner
             .eb_tx_hashes
             .insert(BlockKey { slot, hash }, tx_hashes);
+        inner
+            .notifications
+            .push(LeiosNotification::BlockTxsOffer { point });
         self.bump_version(&mut inner);
     }
 
