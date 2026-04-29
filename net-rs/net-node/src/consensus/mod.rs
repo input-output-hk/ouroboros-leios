@@ -17,7 +17,7 @@ use crate::config::{CommitteeSelection, DynamicConfig, StakeEntry};
 use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerOutcome, Validator};
 
-pub use leios::{LeiosConsensus, PipelineConfig};
+pub use leios::{EbTxMatchOutcome, LeiosConsensus, PipelineConfig};
 pub use praos::PraosConsensus;
 
 /// Top-level consensus, composing Praos and Leios sub-layers.
@@ -97,6 +97,13 @@ impl Consensus {
             | NetworkEvent::LeiosBlockTxsReceived { .. } => self.leios.handle_event(event).await,
             _ => self.praos.handle_event(event).await,
         }
+    }
+
+    /// Verify a `LeiosBlockTxsReceived` response against the cached
+    /// EB manifest. Returns the bodies whose hash lies in the manifest,
+    /// in manifest-index order, plus how many indices were requested.
+    pub fn match_eb_tx_response(&mut self, point: &Point, bodies: &[Vec<u8>]) -> EbTxMatchOutcome {
+        self.leios.match_eb_tx_response(point, bodies)
     }
 
     /// Periodic retry for lagging nodes — evicts stale fetches and
