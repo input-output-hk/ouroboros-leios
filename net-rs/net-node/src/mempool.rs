@@ -425,4 +425,28 @@ mod tests {
         let peeked = pool.peek_up_to(10);
         assert_eq!(peeked.len(), 2);
     }
+
+    // -- spawn_tx_validator tests --
+
+    #[tokio::test]
+    async fn validator_pushes_received_body_into_mempool_with_hash_id() {
+        let pool = new_mempool(100);
+        let (tx, rx) = mpsc::channel::<Vec<u8>>(8);
+        let _h = spawn_tx_validator(0.0, 0.0, pool.clone(), rx);
+
+        let body = vec![0xDE, 0xAD, 0xBE, 0xEF];
+        tx.send(body.clone()).await.unwrap();
+
+        // Validator runs validation in a child task; poll briefly.
+        for _ in 0..50 {
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            if pool.lock().unwrap().len() == 1 {
+                break;
+            }
+        }
+        let pool_locked = pool.lock().unwrap();
+        assert_eq!(pool_locked.len(), 1);
+        let expected = tx_from_received_bytes(body);
+        assert_eq!(pool_locked.txs.front().unwrap().tx_id, expected.tx_id);
+    }
 }
