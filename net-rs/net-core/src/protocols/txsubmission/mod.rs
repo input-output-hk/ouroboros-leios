@@ -502,17 +502,9 @@ mod tests {
     }
 
     fn make_test_tx(id_byte: u8, size: usize) -> PendingTx {
-        let mut id_buf = Vec::new();
-        let mut e = minicbor::Encoder::new(&mut id_buf);
-        e.bytes(&[id_byte; 32]).unwrap();
-
-        let mut body_buf = Vec::new();
-        let mut e = minicbor::Encoder::new(&mut body_buf);
-        e.bytes(&vec![id_byte; size]).unwrap();
-
         PendingTx {
-            tx_id: TxId(id_buf),
-            body: TxBody(body_buf),
+            tx_id: TxId(vec![id_byte; 32]),
+            body: TxBody(vec![id_byte; size]),
             size: size as u32,
         }
     }
