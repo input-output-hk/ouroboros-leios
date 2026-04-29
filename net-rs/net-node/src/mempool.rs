@@ -238,19 +238,14 @@ pub fn spawn_tx_validator(
     })
 }
 
-/// Build a fake transaction with random id and body.
+/// Build a fake transaction. The `tx_id` is `blake2b256(body)` so it
+/// matches what `tx_from_received_bytes` would compute on a peer; the
+/// EB manifest carries this hash, and receivers hash bodies the same
+/// way to match them back to manifest indices.
 fn make_fake_tx(rng: &mut StdRng, size: usize) -> PendingTx {
-    let mut id_buf = vec![0u8; 32];
-    rng.fill(&mut id_buf[..]);
-
     let mut body_buf = vec![0u8; size];
     rng.fill(&mut body_buf[..]);
-
-    PendingTx {
-        tx_id: TxId(id_buf),
-        body: TxBody(body_buf),
-        size: size as u32,
-    }
+    tx_from_received_bytes(body_buf)
 }
 
 /// Sample an exponential inter-arrival time: -ln(U) / lambda.
@@ -334,6 +329,16 @@ mod tests {
             Some(vec![0x01, 0x02, 0x03])
         );
         assert_eq!(pool.get_body_by_id(&[0x00; 32]), None);
+    }
+
+    #[test]
+    fn make_fake_tx_id_equals_body_hash() {
+        // Locally-produced txs must hash identically to peer-received ones
+        // so that EB manifest matching works on the receiver side.
+        let mut rng = StdRng::seed_from_u64(7);
+        let tx = make_fake_tx(&mut rng, 256);
+        let recomputed = tx_from_received_bytes(tx.body.0.clone());
+        assert_eq!(tx.tx_id, recomputed.tx_id);
     }
 
     #[tokio::test]
