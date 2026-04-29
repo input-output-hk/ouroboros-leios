@@ -4,6 +4,7 @@
 //! pipelineable. Supports fetching individual EBs, selective transactions
 //! via bitmap addressing, votes, and certified EB ranges.
 
+pub mod bitmap;
 pub mod codec;
 
 use std::collections::BTreeMap;
