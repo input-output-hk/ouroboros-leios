@@ -7,7 +7,7 @@
 //! `spawn_tx_generator` runs a background Poisson process that pushes fake
 //! transactions into the mempool and broadcasts them via the coordinator.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -16,6 +16,7 @@ use rand::{Rng, SeedableRng};
 use tokio::sync::{mpsc, watch};
 use tracing::info;
 
+use net_core::peer::PeerId;
 use net_core::protocols::txsubmission::{PendingTx, TxBody, TxId};
 
 use crate::config::{DynamicConfig, TxConfig};
@@ -27,10 +28,16 @@ pub type SharedMempool = Arc<Mutex<Mempool>>;
 ///
 /// Collects pending transactions from local generation and peer receipt.
 /// The block producer drains it on each RB production attempt.
+///
+/// Per-peer "already advertised" sets live alongside the queue so we never
+/// re-announce the same tx_id to the same peer. Whenever a tx leaves the
+/// mempool (capacity eviction, drain_up_to, drain_all) it is purged from
+/// every peer set automatically — bounding total state by mempool size.
 pub struct Mempool {
     txs: VecDeque<PendingTx>,
     total_bytes: usize,
     capacity: usize,
+    peer_advertised: HashMap<PeerId, HashSet<Vec<u8>>>,
 }
 
 impl Mempool {
@@ -40,6 +47,16 @@ impl Mempool {
             txs: VecDeque::new(),
             total_bytes: 0,
             capacity,
+            peer_advertised: HashMap::new(),
+        }
+    }
+
+    /// Drop `tx_id` from every per-peer advertised set. Called whenever a
+    /// tx leaves the mempool so peer state never outlives the txs it
+    /// references.
+    fn prune_from_peer_sets(&mut self, tx_id: &[u8]) {
+        for set in self.peer_advertised.values_mut() {
+            set.remove(tx_id);
         }
     }
 
@@ -48,6 +65,9 @@ impl Mempool {
         if self.txs.len() >= self.capacity {
             if let Some(old) = self.txs.pop_front() {
                 self.total_bytes -= old.size as usize;
+                let evicted_id = old.tx_id.0.clone();
+                drop(old);
+                self.prune_from_peer_sets(&evicted_id);
             }
         }
         self.total_bytes += tx.size as usize;
@@ -68,7 +88,11 @@ impl Mempool {
     /// Drain all transactions (for EB overflow path).
     pub fn drain_all(&mut self) -> Vec<PendingTx> {
         self.total_bytes = 0;
-        self.txs.drain(..).collect()
+        let drained: Vec<PendingTx> = self.txs.drain(..).collect();
+        for tx in &drained {
+            self.prune_from_peer_sets(&tx.tx_id.0);
+        }
+        drained
     }
 
     /// Peek at up to `max_count` transactions without removing them.
@@ -78,9 +102,35 @@ impl Mempool {
         self.txs.iter().take(max_count).cloned().collect()
     }
 
+    /// Like `peek_up_to`, but only returns txs not yet advertised to
+    /// `peer_id`, and records the returned ids so subsequent calls skip
+    /// them. The set is pruned automatically when txs leave the mempool.
+    pub fn peek_unannounced_for_peer(
+        &mut self,
+        peer_id: PeerId,
+        max_count: usize,
+    ) -> Vec<PendingTx> {
+        let mut result = Vec::with_capacity(max_count);
+        let advertised = self.peer_advertised.entry(peer_id).or_default();
+        for tx in &self.txs {
+            if result.len() >= max_count {
+                break;
+            }
+            if advertised.insert(tx.tx_id.0.clone()) {
+                result.push(tx.clone());
+            }
+        }
+        result
+    }
+
+    /// Drop all per-peer advertised state for a peer that has disconnected.
+    pub fn forget_peer(&mut self, peer_id: PeerId) {
+        self.peer_advertised.remove(&peer_id);
+    }
+
     /// Snapshot of all current `tx_id` byte vectors. Used by the Leios
     /// receiver to decide which EB transactions need to be fetched.
-    pub fn current_tx_ids(&self) -> std::collections::HashSet<Vec<u8>> {
+    pub fn current_tx_ids(&self) -> HashSet<Vec<u8>> {
         self.txs.iter().map(|tx| tx.tx_id.0.clone()).collect()
     }
 
@@ -108,6 +158,9 @@ impl Mempool {
             if bytes >= max_bytes {
                 break;
             }
+        }
+        for tx in &result {
+            self.prune_from_peer_sets(&tx.tx_id.0);
         }
         result
     }
@@ -432,6 +485,116 @@ mod tests {
         let tx1 = tx_from_received_bytes(vec![0xAA; 100]);
         let tx2 = tx_from_received_bytes(vec![0xBB; 100]);
         assert_ne!(tx1.tx_id.0, tx2.tx_id.0);
+    }
+
+    // -- Per-peer announced state tests --
+
+    #[test]
+    fn peek_unannounced_returns_each_tx_once_per_peer() {
+        let mut pool = Mempool::new(100);
+        pool.push(make_tx_with_id(1, 100));
+        pool.push(make_tx_with_id(2, 100));
+        pool.push(make_tx_with_id(3, 100));
+
+        let peer = PeerId(0);
+        let first = pool.peek_unannounced_for_peer(peer, 10);
+        assert_eq!(first.len(), 3);
+
+        // Second call returns nothing — all three already advertised.
+        let second = pool.peek_unannounced_for_peer(peer, 10);
+        assert!(second.is_empty());
+    }
+
+    #[test]
+    fn peek_unannounced_independent_per_peer() {
+        let mut pool = Mempool::new(100);
+        pool.push(make_tx_with_id(1, 100));
+        pool.push(make_tx_with_id(2, 100));
+
+        let a = PeerId(0);
+        let b = PeerId(1);
+        let to_a = pool.peek_unannounced_for_peer(a, 10);
+        let to_b = pool.peek_unannounced_for_peer(b, 10);
+        assert_eq!(to_a.len(), 2);
+        assert_eq!(to_b.len(), 2);
+    }
+
+    #[test]
+    fn peek_unannounced_returns_only_new_txs_after_push() {
+        let mut pool = Mempool::new(100);
+        pool.push(make_tx_with_id(1, 100));
+        let peer = PeerId(0);
+        assert_eq!(pool.peek_unannounced_for_peer(peer, 10).len(), 1);
+
+        // New tx arrives — peek returns just the new one.
+        pool.push(make_tx_with_id(2, 100));
+        let next = pool.peek_unannounced_for_peer(peer, 10);
+        assert_eq!(next.len(), 1);
+        assert_eq!(next[0].tx_id.0, vec![2; 32]);
+    }
+
+    #[test]
+    fn drain_up_to_prunes_peer_sets() {
+        let mut pool = Mempool::new(100);
+        pool.push(make_tx_with_id(1, 100));
+        pool.push(make_tx_with_id(2, 100));
+        let peer = PeerId(0);
+        let _ = pool.peek_unannounced_for_peer(peer, 10);
+
+        // Drain takes both txs. Their ids should be removed from the
+        // peer-advertised set so the same ids can be re-advertised if
+        // they ever return to the mempool.
+        let drained = pool.drain_up_to(10_000);
+        assert_eq!(drained.len(), 2);
+        assert!(pool
+            .peer_advertised
+            .get(&peer)
+            .map(|s| s.is_empty())
+            .unwrap_or(true));
+    }
+
+    #[test]
+    fn drain_all_prunes_peer_sets() {
+        let mut pool = Mempool::new(100);
+        pool.push(make_tx_with_id(1, 100));
+        let peer = PeerId(0);
+        let _ = pool.peek_unannounced_for_peer(peer, 10);
+
+        let _ = pool.drain_all();
+        assert!(pool
+            .peer_advertised
+            .get(&peer)
+            .map(|s| s.is_empty())
+            .unwrap_or(true));
+    }
+
+    #[test]
+    fn capacity_eviction_prunes_peer_sets() {
+        let mut pool = Mempool::new(2);
+        pool.push(make_tx_with_id(1, 100));
+        pool.push(make_tx_with_id(2, 100));
+        let peer = PeerId(0);
+        let _ = pool.peek_unannounced_for_peer(peer, 10);
+
+        // Pushing a third tx evicts the oldest (id=1). Its peer record
+        // must be cleaned up so the same id can be advertised again if
+        // it ever re-enters the mempool.
+        pool.push(make_tx_with_id(3, 100));
+        let advertised = pool.peer_advertised.get(&peer).unwrap();
+        assert!(!advertised.contains(&vec![1u8; 32]));
+        assert!(advertised.contains(&vec![2u8; 32]));
+    }
+
+    #[test]
+    fn forget_peer_drops_state() {
+        let mut pool = Mempool::new(10);
+        pool.push(make_tx_with_id(1, 100));
+        let peer = PeerId(0);
+        let _ = pool.peek_unannounced_for_peer(peer, 10);
+        assert!(pool.peer_advertised.contains_key(&peer));
+
+        pool.forget_peer(peer);
+        assert!(!pool.peer_advertised.contains_key(&peer));
     }
 
     // -- Existing generator tests --

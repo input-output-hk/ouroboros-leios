@@ -269,10 +269,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             }
                         }
                         // Pull-model TxSubmission: provide txs from mempool on demand.
+                        // peek_unannounced_for_peer returns only txs we have
+                        // not already advertised to this peer, preventing the
+                        // hot-loop where every cycle re-clones and re-ships
+                        // the same head-of-mempool txs.
                         if let NetworkEvent::TxsRequested { peer_id, count } = &event {
                             let txs = {
-                                let pool = mempool.lock().unwrap();
-                                pool.peek_up_to(*count as usize)
+                                let mut pool = mempool.lock().unwrap();
+                                pool.peek_unannounced_for_peer(*peer_id, *count as usize)
                             };
                             if !txs.is_empty() {
                                 let _ = commands
@@ -282,6 +286,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     })
                                     .await;
                             }
+                        }
+                        // Drop per-peer advertised state when a peer goes away.
+                        if let NetworkEvent::PeerDisconnected { peer_id, .. } = &event {
+                            mempool.lock().unwrap().forget_peer(*peer_id);
                         }
                         record_network_event(&mut telem, &node_id, &event, &consensus).await;
                         if !consensus.handle_event(&event).await {
