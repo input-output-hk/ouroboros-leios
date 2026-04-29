@@ -2,6 +2,11 @@
   width: 100%;
   border: none;
   display: block;
+  contain: paint;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+
+  background-color: #200830;
 }
 
 .heroBanner {
