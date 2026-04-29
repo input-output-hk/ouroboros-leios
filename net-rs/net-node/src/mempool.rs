@@ -78,6 +78,12 @@ impl Mempool {
         self.txs.iter().take(max_count).cloned().collect()
     }
 
+    /// Snapshot of all current `tx_id` byte vectors. Used by the Leios
+    /// receiver to decide which EB transactions need to be fetched.
+    pub fn current_tx_ids(&self) -> std::collections::HashSet<Vec<u8>> {
+        self.txs.iter().map(|tx| tx.tx_id.0.clone()).collect()
+    }
+
     /// Drain transactions up to a byte limit (for RB body path).
     pub fn drain_up_to(&mut self, max_bytes: usize) -> Vec<PendingTx> {
         let mut result = Vec::new();
@@ -274,6 +280,17 @@ mod tests {
         pool.push(make_tx_with_id(4, 400));
         assert_eq!(pool.len(), 3);
         assert_eq!(pool.total_bytes(), 900); // 200 + 300 + 400
+    }
+
+    #[test]
+    fn current_tx_ids_returns_pushed_ids() {
+        let mut pool = Mempool::new(100);
+        pool.push(make_tx_with_id(1, 50));
+        pool.push(make_tx_with_id(2, 50));
+        let ids = pool.current_tx_ids();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&vec![1u8; 32]));
+        assert!(ids.contains(&vec![2u8; 32]));
     }
 
     #[test]

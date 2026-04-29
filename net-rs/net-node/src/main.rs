@@ -88,6 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         config.node_id.clone(),
         commands.clone(),
         validator,
+        mempool.clone(),
         config.security_param_k,
         consensus::PipelineConfig {
             delta_hdr: config.production.leios_delta_hdr_slots,
