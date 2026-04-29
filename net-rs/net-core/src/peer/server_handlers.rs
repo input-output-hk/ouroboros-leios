@@ -447,9 +447,9 @@ pub async fn serve_leios_fetch(lf_send: CodecSend, lf_recv: CodecRecv, store: Ar
                     break;
                 }
             }
-            LfMsg::MsgLeiosBlockTxsRequest { point, bitmap: _ } => {
+            LfMsg::MsgLeiosBlockTxsRequest { point, bitmap } => {
                 let transactions = match &point {
-                    Point::Specific { slot, hash } => store.get_block_txs(*slot, hash),
+                    Point::Specific { slot, hash } => store.get_block_txs(*slot, hash, &bitmap),
                     Point::Origin => None,
                 };
                 let Some(transactions) = transactions else {
@@ -793,6 +793,48 @@ mod tests {
             "expected error from disconnect, got {result:?}"
         );
 
+        server_handle.await.ok();
+        mux_a.abort();
+        mux_b.abort();
+    }
+
+    #[tokio::test]
+    async fn leios_fetch_returns_bitmap_subset_of_block_txs() {
+        let lf_proto = ProtocolConfig {
+            id: leios_fetch::PROTOCOL_ID,
+            traffic_class: TrafficClass::Priority,
+            ingress_limit: leios_fetch::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        };
+
+        let ((client_send, client_recv), (server_send, server_recv), mux_a, mux_b) =
+            mux_pair_for_protocol(&lf_proto);
+
+        // Inject 100 transactions for one EB.
+        let (store, _rx) = LeiosStore::new(100);
+        let hash = [0x77u8; 32];
+        let point = Point::Specific { slot: 50, hash };
+        let txs: Vec<Vec<u8>> = (0..100u8).map(|i| vec![i, i, i]).collect();
+        store.inject_block_txs(point.clone(), txs);
+
+        let server_handle =
+            tokio::spawn(serve_leios_fetch(server_send, server_recv, store.clone()));
+
+        // Client: ask for indices 0, 5, 64, 99.
+        let mut client = Runner::<LeiosFetch>::new(Role::Client, client_send, client_recv);
+        let bitmap = crate::protocols::leios_fetch::bitmap::from_indices(&[0, 5, 64, 99]);
+        let got = leios_fetch::fetch_block_txs(&mut client, point, bitmap)
+            .await
+            .expect("server should respond");
+
+        // Server returns those four in ascending order.
+        assert_eq!(got.len(), 4);
+        assert_eq!(got[0], vec![0, 0, 0]);
+        assert_eq!(got[1], vec![5, 5, 5]);
+        assert_eq!(got[2], vec![64, 64, 64]);
+        assert_eq!(got[3], vec![99, 99, 99]);
+
+        let _ = leios_fetch::done(&mut client).await;
         server_handle.await.ok();
         mux_a.abort();
         mux_b.abort();
