@@ -84,6 +84,15 @@ impl Mempool {
         self.txs.iter().map(|tx| tx.tx_id.0.clone()).collect()
     }
 
+    /// Look up a transaction body by its `tx_id`. Linear scan; for the
+    /// mempool sizes this prototype targets that's acceptable.
+    pub fn get_body_by_id(&self, id: &[u8]) -> Option<Vec<u8>> {
+        self.txs
+            .iter()
+            .find(|tx| tx.tx_id.0 == id)
+            .map(|tx| tx.body.0.clone())
+    }
+
     /// Drain transactions up to a byte limit (for RB body path).
     pub fn drain_up_to(&mut self, max_bytes: usize) -> Vec<PendingTx> {
         let mut result = Vec::new();
@@ -107,6 +116,23 @@ impl Mempool {
 /// Create a new shared mempool.
 pub fn new_mempool(capacity: usize) -> SharedMempool {
     Arc::new(Mutex::new(Mempool::new(capacity)))
+}
+
+/// Mempool-backed `TxBodyResolver`. Wraps `SharedMempool` and exposes
+/// the body-by-hash lookup that the Leios store uses when receivers
+/// re-serve EB tx requests for EBs whose manifests they cache.
+pub struct MempoolTxBodyResolver(SharedMempool);
+
+impl MempoolTxBodyResolver {
+    pub fn new(mempool: SharedMempool) -> Self {
+        Self(mempool)
+    }
+}
+
+impl net_core::store::leios_store::TxBodyResolver for MempoolTxBodyResolver {
+    fn resolve_body(&self, tx_id: &[u8]) -> Option<Vec<u8>> {
+        self.0.lock().unwrap().get_body_by_id(tx_id)
+    }
 }
 
 /// Build a `PendingTx` from raw bytes received from a peer.
@@ -291,6 +317,40 @@ mod tests {
         assert_eq!(ids.len(), 2);
         assert!(ids.contains(&vec![1u8; 32]));
         assert!(ids.contains(&vec![2u8; 32]));
+    }
+
+    #[test]
+    fn get_body_by_id_round_trip() {
+        let mut pool = Mempool::new(100);
+        let tx = PendingTx {
+            tx_id: TxId(vec![0xAB; 32]),
+            body: TxBody(vec![0x01, 0x02, 0x03]),
+            size: 3,
+        };
+        pool.push(tx);
+
+        assert_eq!(
+            pool.get_body_by_id(&[0xAB; 32]),
+            Some(vec![0x01, 0x02, 0x03])
+        );
+        assert_eq!(pool.get_body_by_id(&[0x00; 32]), None);
+    }
+
+    #[tokio::test]
+    async fn mempool_resolver_serves_body_through_trait() {
+        use net_core::store::leios_store::TxBodyResolver;
+        let pool = new_mempool(100);
+        {
+            let mut p = pool.lock().unwrap();
+            p.push(PendingTx {
+                tx_id: TxId(vec![0xCC; 32]),
+                body: TxBody(vec![0xDE, 0xAD]),
+                size: 2,
+            });
+        }
+        let resolver = MempoolTxBodyResolver::new(pool);
+        assert_eq!(resolver.resolve_body(&[0xCC; 32]), Some(vec![0xDE, 0xAD]));
+        assert_eq!(resolver.resolve_body(&[0x99; 32]), None);
     }
 
     #[test]

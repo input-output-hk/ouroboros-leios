@@ -16,6 +16,14 @@ use tokio::sync::watch;
 use crate::protocols::leios_fetch::bitmap;
 use crate::types::Point;
 
+/// Resolves a transaction body by its 32-byte hash. The Leios store calls
+/// this when a peer asks for an EB's txs and only the manifest is cached
+/// locally — typically the host application's mempool answers.
+pub trait TxBodyResolver: Send + Sync {
+    /// Return the body for `tx_id`, or `None` if unknown.
+    fn resolve_body(&self, tx_id: &[u8]) -> Option<Vec<u8>>;
+}
+
 /// A notification about available Leios data, served by LeiosNotify.
 #[derive(Debug, Clone)]
 pub enum LeiosNotification {
@@ -37,8 +45,13 @@ struct BlockKey {
 struct LeiosStoreInner {
     /// Endorser blocks keyed by (slot, hash).
     blocks: HashMap<BlockKey, Vec<u8>>,
-    /// Transactions per EB, keyed by (slot, hash).
+    /// Full transaction bodies per EB. Populated by the producer of an EB
+    /// (it has every body in hand) — gives a fast direct lookup path.
     block_txs: HashMap<BlockKey, Vec<Vec<u8>>>,
+    /// Per-EB ordered tx hash list. Populated by receivers after decoding
+    /// a fetched EB manifest. Pairs with `tx_body_resolver` to serve the
+    /// bodies indirectly without keeping a duplicate copy.
+    eb_tx_hashes: HashMap<BlockKey, Vec<[u8; 32]>>,
     /// Votes keyed by (slot, voter_id).
     votes: HashMap<(u64, Vec<u8>), Vec<u8>>,
     /// Notification queue for the LeiosNotify server.
@@ -55,6 +68,10 @@ struct LeiosStoreInner {
 pub struct LeiosStore {
     inner: Mutex<LeiosStoreInner>,
     notify: watch::Sender<u64>,
+    /// Optional callback that resolves a tx body by its hash. Used to
+    /// serve EB tx requests for EBs whose manifest is cached locally
+    /// but whose full bodies aren't (i.e. receivers, not producers).
+    tx_body_resolver: Option<Arc<dyn TxBodyResolver>>,
 }
 
 impl LeiosStore {
@@ -63,17 +80,28 @@ impl LeiosStore {
     /// Returns the store (wrapped in `Arc`) and a subscription receiver
     /// for change notifications.
     pub fn new(capacity: usize) -> (Arc<Self>, watch::Receiver<u64>) {
+        Self::new_with_resolver(capacity, None)
+    }
+
+    /// Create a Leios store with an optional `TxBodyResolver` for serving
+    /// EB tx requests on receiver nodes that cache only the manifest.
+    pub fn new_with_resolver(
+        capacity: usize,
+        tx_body_resolver: Option<Arc<dyn TxBodyResolver>>,
+    ) -> (Arc<Self>, watch::Receiver<u64>) {
         let (notify_sender, notify_receiver) = watch::channel(0u64);
         let store = Arc::new(Self {
             inner: Mutex::new(LeiosStoreInner {
                 blocks: HashMap::new(),
                 block_txs: HashMap::new(),
+                eb_tx_hashes: HashMap::new(),
                 votes: HashMap::new(),
                 notifications: Vec::new(),
                 capacity,
                 version: 0,
             }),
             notify: notify_sender,
+            tx_body_resolver,
         });
         (store, notify_receiver)
     }
@@ -136,21 +164,55 @@ impl LeiosStore {
         inner.blocks.get(&key).cloned()
     }
 
+    /// Record the ordered tx-hash list of an EB's manifest. Pairs with a
+    /// `TxBodyResolver` so receivers can serve `MsgLeiosBlockTxsRequest`
+    /// without keeping the bodies in this store.
+    pub fn record_eb_manifest(&self, point: Point, tx_hashes: Vec<[u8; 32]>) {
+        let (slot, hash) = match &point {
+            Point::Specific { slot, hash } => (*slot, *hash),
+            Point::Origin => return,
+        };
+        let mut inner = self.inner.lock().unwrap();
+        inner
+            .eb_tx_hashes
+            .insert(BlockKey { slot, hash }, tx_hashes);
+        self.bump_version(&mut inner);
+    }
+
     /// Look up transactions for an endorser block, filtered by the
     /// CIP-0164 sparse bitmap. Returns `None` if the EB is unknown.
     /// Returns transactions in ascending index order; out-of-range
-    /// bits in the bitmap are silently ignored.
+    /// bits in the bitmap are silently ignored. Indices whose body
+    /// the resolver cannot supply are silently dropped (partial response).
     pub fn get_block_txs(
         &self,
         slot: u64,
         hash: &[u8; 32],
         bitmap: &BTreeMap<u16, u64>,
     ) -> Option<Vec<Vec<u8>>> {
-        let inner = self.inner.lock().unwrap();
         let key = BlockKey { slot, hash: *hash };
-        let stored = inner.block_txs.get(&key)?;
+        // Producer path: full bodies cached directly.
+        {
+            let inner = self.inner.lock().unwrap();
+            if let Some(stored) = inner.block_txs.get(&key) {
+                let selected: Vec<Vec<u8>> = bitmap::iter_indices(bitmap)
+                    .filter_map(|i| stored.get(i as usize).cloned())
+                    .collect();
+                return Some(selected);
+            }
+        }
+        // Receiver path: manifest cached, bodies resolved via callback.
+        let manifest = {
+            let inner = self.inner.lock().unwrap();
+            inner.eb_tx_hashes.get(&key).cloned()
+        };
+        let manifest = manifest?;
+        let resolver = self.tx_body_resolver.as_ref()?;
         let selected: Vec<Vec<u8>> = bitmap::iter_indices(bitmap)
-            .filter_map(|i| stored.get(i as usize).cloned())
+            .filter_map(|i| {
+                let h = manifest.get(i as usize)?;
+                resolver.resolve_body(h)
+            })
             .collect();
         Some(selected)
     }
@@ -268,6 +330,89 @@ mod tests {
         let bitmap = bitmap::from_indices(&[65, 0, 63]);
         let got = store.get_block_txs(1, &hash, &bitmap).unwrap();
         assert_eq!(got, vec![vec![0u8], vec![63u8], vec![65u8]]);
+    }
+
+    struct StubResolver(HashMap<Vec<u8>, Vec<u8>>);
+    impl TxBodyResolver for StubResolver {
+        fn resolve_body(&self, tx_id: &[u8]) -> Option<Vec<u8>> {
+            self.0.get(tx_id).cloned()
+        }
+    }
+
+    #[test]
+    fn get_block_txs_resolves_via_manifest_and_resolver() {
+        let h0 = [0x10u8; 32];
+        let h1 = [0x20u8; 32];
+        let h2 = [0x30u8; 32];
+        let bodies = HashMap::from([
+            (h0.to_vec(), vec![1u8]),
+            (h1.to_vec(), vec![2u8]),
+            (h2.to_vec(), vec![3u8]),
+        ]);
+        let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(bodies));
+        let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
+
+        let eb_hash = [0xEEu8; 32];
+        let point = Point::Specific {
+            slot: 5,
+            hash: eb_hash,
+        };
+        store.record_eb_manifest(point, vec![h0, h1, h2]);
+
+        // Bitmap selects indices 0 and 2.
+        let bitmap = bitmap::from_indices(&[0, 2]);
+        let got = store.get_block_txs(5, &eb_hash, &bitmap).unwrap();
+        assert_eq!(got, vec![vec![1u8], vec![3u8]]);
+    }
+
+    #[test]
+    fn get_block_txs_resolver_partial_drops_unknown_bodies() {
+        let h0 = [0x40u8; 32];
+        let h1 = [0x50u8; 32];
+        // Only h0 is resolvable.
+        let resolver: Arc<dyn TxBodyResolver> =
+            Arc::new(StubResolver(HashMap::from([(h0.to_vec(), vec![0xAA])])));
+        let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
+
+        let eb_hash = [0xCCu8; 32];
+        let point = Point::Specific {
+            slot: 7,
+            hash: eb_hash,
+        };
+        store.record_eb_manifest(point, vec![h0, h1]);
+
+        let bitmap = bitmap::from_indices(&[0, 1]);
+        let got = store.get_block_txs(7, &eb_hash, &bitmap).unwrap();
+        assert_eq!(got, vec![vec![0xAA]]);
+    }
+
+    #[test]
+    fn get_block_txs_block_txs_takes_precedence_over_manifest() {
+        // Producer-style store with both block_txs (full bodies) and a
+        // manifest cache. The direct path should win.
+        let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(HashMap::new()));
+        let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
+        let eb_hash = [0xABu8; 32];
+        let point = Point::Specific {
+            slot: 1,
+            hash: eb_hash,
+        };
+        store.inject_block_txs(point.clone(), vec![vec![100u8], vec![200u8]]);
+        // Pretend we also have manifest hashes (would normally be set
+        // separately; here we make sure the block_txs path wins).
+        store.record_eb_manifest(point, vec![[0; 32], [0; 32]]);
+
+        let bitmap = bitmap::from_indices(&[0, 1]);
+        let got = store.get_block_txs(1, &eb_hash, &bitmap).unwrap();
+        assert_eq!(got, vec![vec![100u8], vec![200u8]]);
+    }
+
+    #[test]
+    fn get_block_txs_returns_none_when_neither_path_has_eb() {
+        let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(HashMap::new()));
+        let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
+        let bitmap = bitmap::from_indices(&[0]);
+        assert!(store.get_block_txs(99, &[0xFF; 32], &bitmap).is_none());
     }
 
     #[test]

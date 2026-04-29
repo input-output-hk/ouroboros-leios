@@ -37,6 +37,7 @@ pub async fn run(
         max_handshaking,
         max_connections_per_ip,
         peer_delays: std::collections::HashMap::new(),
+        tx_body_resolver: None,
     };
 
     let mut handle = spawn_coordinator(config);

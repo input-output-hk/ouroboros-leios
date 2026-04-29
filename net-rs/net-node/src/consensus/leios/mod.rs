@@ -300,7 +300,17 @@ impl LeiosConsensus {
                 self.in_flight.remove(point);
                 if let Point::Specific { hash, .. } = point {
                     if let Some((_slot, hashes)) = crate::production::decode_overflow_eb(block) {
-                        self.eb_tx_hashes.insert(*hash, hashes);
+                        self.eb_tx_hashes.insert(*hash, hashes.clone());
+                        // Tell the coordinator's LeiosStore so this node
+                        // can re-serve EB tx requests via the mempool-
+                        // backed resolver.
+                        let _ = self
+                            .commands
+                            .send(NetworkCommand::RecordLeiosEbManifest {
+                                point: point.clone(),
+                                tx_hashes: hashes,
+                            })
+                            .await;
                     }
                 }
                 self.validator
@@ -1122,6 +1132,18 @@ mod tests {
         (data, eb_hash)
     }
 
+    /// Drain the consensus command channel until a FetchLeiosBlockTxs
+    /// arrives. Skips the RecordLeiosEbManifest emitted earlier on
+    /// LeiosBlockReceived so the assertion can focus on the fetch.
+    async fn next_fetch_cmd(rx: &mut mpsc::Receiver<NetworkCommand>) -> NetworkCommand {
+        loop {
+            let cmd = rx.recv().await.expect("command emitted");
+            if matches!(cmd, NetworkCommand::FetchLeiosBlockTxs { .. }) {
+                return cmd;
+            }
+        }
+    }
+
     fn push_tx_with_id(mempool: &crate::mempool::SharedMempool, id: [u8; 32]) {
         let tx = PendingTx {
             tx_id: TxId(id.to_vec()),
@@ -1166,7 +1188,7 @@ mod tests {
             })
             .await;
 
-        let cmd = rx.recv().await.expect("fetch command emitted");
+        let cmd = next_fetch_cmd(&mut rx).await;
         match cmd {
             NetworkCommand::FetchLeiosBlockTxs { point, bitmap } => {
                 assert_eq!(point, eb_point);
@@ -1193,7 +1215,7 @@ mod tests {
             .handle_event(&NetworkEvent::LeiosBlockTxsOffered { point: eb_point })
             .await;
 
-        let cmd = rx.recv().await.expect("fetch command emitted");
+        let cmd = next_fetch_cmd(&mut rx).await;
         match cmd {
             NetworkCommand::FetchLeiosBlockTxs { bitmap, .. } => {
                 // Spec-faithful fallback: select_all up to the protocol's
@@ -1236,7 +1258,7 @@ mod tests {
             .handle_event(&NetworkEvent::LeiosBlockTxsOffered { point: eb_point })
             .await;
 
-        let cmd = rx.recv().await.expect("fetch command emitted");
+        let cmd = next_fetch_cmd(&mut rx).await;
         match cmd {
             NetworkCommand::FetchLeiosBlockTxs { bitmap, .. } => {
                 assert!(bitmap.is_empty(), "every tx is local; nothing to request");

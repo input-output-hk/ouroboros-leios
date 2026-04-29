@@ -2,11 +2,13 @@
 //! spawns the coordinator, and issues AddPeer commands for configured peers.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use net_core::multi_peer::types::NetworkCommand;
 use net_core::multi_peer::{spawn_coordinator, CoordinatorConfig, CoordinatorHandle};
 use net_core::mux::scheduler::SchedulerType;
+use net_core::store::leios_store::TxBodyResolver;
 
 use crate::config::NodeConfig;
 
@@ -23,9 +25,13 @@ fn parse_scheduler(name: &str) -> Result<SchedulerType, Box<dyn std::error::Erro
     }
 }
 
-/// Start the multi-peer coordinator and add configured peers.
+/// Start the multi-peer coordinator and add configured peers. The
+/// optional `tx_body_resolver` lets the coordinator's `LeiosStore` serve
+/// EB tx requests from the application's mempool when only the manifest
+/// is cached locally.
 pub async fn start(
     config: &NodeConfig,
+    tx_body_resolver: Option<Arc<dyn TxBodyResolver>>,
 ) -> Result<CoordinatorHandle, Box<dyn std::error::Error + Send + Sync>> {
     // Build per-peer delay map from config.
     let peer_delays: HashMap<String, Duration> = config
@@ -53,6 +59,7 @@ pub async fn start(
         max_handshaking: config.max_handshaking,
         max_connections_per_ip: config.max_connections_per_ip,
         peer_delays,
+        tx_body_resolver,
     };
 
     let handle = spawn_coordinator(coordinator_config);

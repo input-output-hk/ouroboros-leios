@@ -171,6 +171,15 @@ pub enum NetworkCommand {
         transactions: Vec<Vec<u8>>,
     },
 
+    /// Record the ordered tx-hash list of an EB whose body the receiver
+    /// has already fetched and decoded. Lets the responder side serve
+    /// `MsgLeiosBlockTxsRequest` by resolving each requested hash via the
+    /// configured `TxBodyResolver` (typically the local mempool).
+    RecordLeiosEbManifest {
+        point: Point,
+        tx_hashes: Vec<[u8; 32]>,
+    },
+
     /// Inject votes into the Leios store (for responder peers to serve).
     InjectLeiosVotes {
         votes: Vec<(u64, Vec<u8>)>,
