@@ -79,7 +79,7 @@ consensus/
 ```
 
 ### Test coverage
-173 tests across the workspace. Key Leios tests:
+558 tests across the workspace. Key Leios tests:
 - Pipeline phase boundaries (pure function)
 - Election lifecycle (create → advance through phases → prune)
 - Voting (PV-only, NPV-only, PV+NPV emission)
@@ -129,7 +129,9 @@ every certified RB. Zero peer evictions, 100% EB propagation, no rollbacks.
 
 Once EBs carry real transactions (mempool-driven production above), some form
 of transaction validation and conflict detection is needed. Currently there is
-no ledger state concept beyond fake validation delays. Work needed:
+no ledger state concept beyond fake validation delays. Direction here is to
+merge with Acropolis (which has a full ledger) rather than reimplement; the
+work below is scoped accordingly:
 - Track spent transaction inputs to detect double-spends across EBs
 - Validate EB transaction closures against ledger state from the prior RB
 - Decide whether certified EB transactions skip re-validation (per CIP-0164)
@@ -155,12 +157,41 @@ When multiple EBs reach CertEligible, `has_certified_eb()` returns
 strategy (e.g. oldest-first to minimize latency, or per-slot to avoid
 starvation).
 
-### TX bitmap selection policy
+### TX bitmap selection policy (complete)
 
-`FetchLeiosBlockTxs` carries a `BTreeMap<u16, u64>` bitmap for selective TX
-addressing, plumbed end-to-end. Consensus always sends `BTreeMap::new()` (i.e.
-fetch all txs). No policy yet for "fetch only txs not already in mempool" — the
-intended saving the bitmap is meant to enable.
+The CIP-0164 sparse `BTreeMap<u16, u64>` bitmap is in use end-to-end:
+
+- **Helpers** (`net-core/src/protocols/leios_fetch/bitmap.rs`): `from_indices`,
+  `select_all`, `contains`, `iter_indices`. Empty bitmap selects nothing,
+  matching the wire-format semantics.
+- **Server filter**: `LeiosStore::get_block_txs` takes the bitmap and returns
+  the selected subset in ascending index order. Two paths:
+  - Producer side: `block_txs` (full bodies), used directly.
+  - Receiver side: `eb_tx_hashes` manifest cache + `TxBodyResolver` callback;
+    bodies resolved against the application's mempool, no body duplication.
+- **Producer**: `BlockProducer` injects both the manifest (`InjectLeiosBlock`)
+  and the tx bodies (`InjectLeiosBlockTxs`) so peers can fetch them.
+- **Receiver**: on `LeiosBlockReceived`, the consensus layer decodes the
+  manifest, sends `RecordLeiosEbManifest` to the coordinator's `LeiosStore`
+  (so this node can re-serve), and on `LeiosBlockTxsOffered` builds a sparse
+  bitmap from "manifest hashes minus mempool ids" and issues
+  `FetchLeiosBlockTxs`.
+- **Hash-verified responses**: the wire format gives no per-body index, so
+  `LeiosConsensus::match_eb_tx_response` hashes each received body and looks
+  it up against the cached manifest, restricted to the indices we requested.
+  Bogus or unrelated bodies are dropped silently.
+- **Multi-peer retry on partial**: when matched < requested, the leftover
+  bitmap is recomputed and `retry_eb_tx_fetch` issues another
+  `FetchLeiosBlockTxs`. The coordinator's `leios_tracker` tracks attempted
+  peers per EB (`txs_attempts`) and `pick_txs_fetch_peer` excludes them, so
+  the retry lands on a different candidate. The cycle terminates when fully
+  satisfied or the offering peer set is exhausted.
+- **Validation path**: matched bodies are fed through the same `tx_valid_tx`
+  channel as `TransactionReceived`, then pushed to the mempool with
+  `tx_id = blake2b256(body)`.
+
+Open: bitmap *partitioning* across multiple peers (split a single request
+across the offering set for parallelism). Single-flight to lowest-RTT today.
 
 ### Per-epoch refresh of the wFA committee
 
