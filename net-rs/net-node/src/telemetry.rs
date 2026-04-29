@@ -6,6 +6,7 @@
 use std::io::Write;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use async_trait::async_trait;
 use net_core::multi_peer::types::PeerInfo;
 use serde::Serialize;
 use tracing::info;
@@ -160,13 +161,15 @@ impl PeerStatsEntry {
 // Sink traits
 // ---------------------------------------------------------------------------
 
+#[async_trait]
 pub trait EventSink: Send {
-    fn emit(&mut self, event: &OutputEvent);
-    fn flush(&mut self);
+    async fn emit(&mut self, event: &OutputEvent);
+    async fn flush(&mut self);
 }
 
+#[async_trait]
 pub trait StatsSink: Send {
-    fn emit(&mut self, stats: &StatsSnapshot);
+    async fn emit(&mut self, stats: &StatsSnapshot);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,8 +191,9 @@ impl FileEventSink {
     }
 }
 
+#[async_trait]
 impl EventSink for FileEventSink {
-    fn emit(&mut self, event: &OutputEvent) {
+    async fn emit(&mut self, event: &OutputEvent) {
         let _ = serde_json::to_writer(&mut self.writer, event);
         let _ = self.writer.write_all(b"\n");
         self.count_since_flush += 1;
@@ -200,7 +204,7 @@ impl EventSink for FileEventSink {
         }
     }
 
-    fn flush(&mut self) {
+    async fn flush(&mut self) {
         let _ = self.writer.flush();
         self.count_since_flush = 0;
     }
@@ -224,18 +228,13 @@ impl HttpEventSink {
     }
 }
 
+#[async_trait]
 impl EventSink for HttpEventSink {
-    fn emit(&mut self, event: &OutputEvent) {
-        if let Ok(value) = serde_json::to_value(event) {
-            let client = self.client.clone();
-            let url = self.url.clone();
-            tokio::spawn(async move {
-                let _ = client.post(&url).json(&[value]).send().await;
-            });
-        }
+    async fn emit(&mut self, event: &OutputEvent) {
+        let _ = self.client.post(&self.url).json(&[event]).send().await;
     }
 
-    fn flush(&mut self) {}
+    async fn flush(&mut self) {}
 }
 
 // ---------------------------------------------------------------------------
@@ -244,8 +243,9 @@ impl EventSink for HttpEventSink {
 
 pub struct LogStatsSink;
 
+#[async_trait]
 impl StatsSink for LogStatsSink {
-    fn emit(&mut self, stats: &StatsSnapshot) {
+    async fn emit(&mut self, stats: &StatsSnapshot) {
         info!(
             node = %stats.node_id,
             slot = stats.slot,
@@ -290,14 +290,10 @@ impl HttpStatsSink {
     }
 }
 
+#[async_trait]
 impl StatsSink for HttpStatsSink {
-    fn emit(&mut self, stats: &StatsSnapshot) {
-        let client = self.client.clone();
-        let url = self.url.clone();
-        let stats = stats.clone();
-        tokio::spawn(async move {
-            let _ = client.post(&url).json(&stats).send().await;
-        });
+    async fn emit(&mut self, stats: &StatsSnapshot) {
+        let _ = self.client.post(&self.url).json(stats).send().await;
     }
 }
 
@@ -386,8 +382,10 @@ impl TelemetryHandle {
         now.as_secs_f64() - self.genesis_time_unix as f64
     }
 
-    /// Record a telemetry event.
-    pub fn record(&mut self, event: NodeEvent) {
+    /// Record a telemetry event. Awaits each sink's `emit` so backpressure
+    /// from a slow sink (e.g. an overloaded aggregator) propagates up the
+    /// caller chain instead of accumulating spawned tasks.
+    pub async fn record(&mut self, event: NodeEvent) {
         if self.event_sinks.is_empty() {
             return;
         }
@@ -396,7 +394,7 @@ impl TelemetryHandle {
             message: event,
         };
         for sink in &mut self.event_sinks {
-            sink.emit(&output);
+            sink.emit(&output).await;
         }
     }
 
@@ -405,7 +403,7 @@ impl TelemetryHandle {
     /// `tip_block_no` and `tip_hash` are taken from the consensus adopted tip
     /// (not the speculative peer-announced tip) so they're always consistent
     /// with the chain_tree snapshot.
-    pub fn emit_stats(
+    pub async fn emit_stats(
         &mut self,
         peers: &[PeerInfo],
         chain_tree: Vec<ChainTreeEntry>,
@@ -430,14 +428,14 @@ impl TelemetryHandle {
             chain_tree,
         };
         for sink in &mut self.stats_sinks {
-            sink.emit(&snapshot);
+            sink.emit(&snapshot).await;
         }
     }
 
     /// Flush all sinks.
-    pub fn flush(&mut self) {
+    pub async fn flush(&mut self) {
         for sink in &mut self.event_sinks {
-            sink.flush();
+            sink.flush().await;
         }
     }
 }
@@ -493,8 +491,8 @@ mod tests {
         assert!(json.contains("\"chain_tree\":[]"));
     }
 
-    #[test]
-    fn file_sink_writes_jsonl() {
+    #[tokio::test]
+    async fn file_sink_writes_jsonl() {
         let path = std::env::temp_dir().join("net-node-test-events.jsonl");
         let path_str = path.to_str().unwrap();
 
@@ -506,7 +504,8 @@ mod tests {
                     node: "test".into(),
                     slot: 1,
                 },
-            });
+            })
+            .await;
             sink.emit(&OutputEvent {
                 time_s: 1.0,
                 message: NodeEvent::RBGenerated {
@@ -514,8 +513,9 @@ mod tests {
                     slot: 1,
                     size_bytes: 100,
                 },
-            });
-            sink.flush();
+            })
+            .await;
+            sink.flush().await;
         }
 
         let content = std::fs::read_to_string(&path).unwrap();
@@ -525,5 +525,37 @@ mod tests {
         assert!(lines[1].contains("\"type\":\"RBGenerated\""));
 
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[tokio::test]
+    async fn http_event_sink_does_not_spawn_per_emit() {
+        // Regression: HttpEventSink used to `tokio::spawn` per event,
+        // unbounded — under high event load this leaked tasks and
+        // memory. With the async trait, emit awaits the POST inline so
+        // backpressure flows back to the caller.
+        //
+        // The test points at a closed port so the request fails fast.
+        // The contract we care about: emit returns *some* result
+        // (success or error) on its own future, with no spawned task
+        // outliving the call.
+        let mut sink = HttpEventSink::new("http://127.0.0.1:1/never");
+        let before = tokio::runtime::Handle::current()
+            .metrics()
+            .num_alive_tasks();
+        sink.emit(&OutputEvent {
+            time_s: 0.0,
+            message: NodeEvent::Slot {
+                node: "test".into(),
+                slot: 1,
+            },
+        })
+        .await;
+        let after = tokio::runtime::Handle::current()
+            .metrics()
+            .num_alive_tasks();
+        assert!(
+            after <= before,
+            "emit must not leave background tasks behind: before={before} after={after}"
+        );
     }
 }
