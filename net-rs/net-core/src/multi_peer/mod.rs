@@ -25,6 +25,7 @@ pub mod types;
 pub use coordinator::spawn_coordinator;
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::mpsc;
@@ -32,9 +33,10 @@ pub use types::{NetworkCommand, NetworkEvent};
 
 use crate::mux::scheduler::{SchedulerType, TrafficClass};
 use crate::mux::ProtocolId;
+use crate::store::leios_store::TxBodyResolver;
 
 /// Configuration for the coordinator.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CoordinatorConfig {
     /// Network magic for handshake (e.g. 764824073 for mainnet).
     pub network_magic: u64,
@@ -68,6 +70,10 @@ pub struct CoordinatorConfig {
     /// are delayed by the specified duration before processing. Default: empty
     /// (no delay). Used for local network simulation.
     pub peer_delays: HashMap<String, Duration>,
+    /// Resolver for tx bodies by hash. Lets receiver-side EB tx fetches
+    /// be served from the application's mempool rather than a duplicate
+    /// `LeiosStore::block_txs`. None = receivers cannot re-serve EB txs.
+    pub tx_body_resolver: Option<Arc<dyn TxBodyResolver>>,
 }
 
 impl Default for CoordinatorConfig {
@@ -87,6 +93,7 @@ impl Default for CoordinatorConfig {
             max_handshaking: 64,
             max_connections_per_ip: 3,
             peer_delays: HashMap::new(),
+            tx_body_resolver: None,
         }
     }
 }

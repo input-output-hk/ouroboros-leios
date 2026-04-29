@@ -752,6 +752,12 @@ impl Coordinator {
                 }
             }
 
+            NetworkCommand::RecordLeiosEbManifest { point, tx_hashes } => {
+                if let Some(ref store) = self.leios_store {
+                    store.record_eb_manifest(point, tx_hashes);
+                }
+            }
+
             NetworkCommand::InjectLeiosVotes { votes, data } => {
                 if let Some(ref store) = self.leios_store {
                     store.inject_votes(votes, data);
@@ -1284,7 +1290,10 @@ pub fn spawn_coordinator(config: CoordinatorConfig) -> CoordinatorHandle {
     let (chain_store, _chain_rx) = ChainStore::new(config.chain_store_capacity);
 
     let leios_store = if config.leios_enabled {
-        let (store, _leios_rx) = LeiosStore::new(config.chain_store_capacity);
+        let (store, _leios_rx) = LeiosStore::new_with_resolver(
+            config.chain_store_capacity,
+            config.tx_body_resolver.clone(),
+        );
         Some(store)
     } else {
         None
@@ -2377,6 +2386,80 @@ mod tests {
 
         // Drain the receiver for cleanup.
         drop(net_event_receiver);
+    }
+
+    /// After `RecordLeiosEbManifest`, the LeiosStore should be able to
+    /// serve `get_block_txs` by resolving each requested hash through
+    /// the configured `TxBodyResolver`.
+    #[tokio::test]
+    async fn record_leios_eb_manifest_enables_resolver_backed_serve() {
+        use crate::store::leios_store::TxBodyResolver;
+
+        struct StubResolver(std::collections::HashMap<Vec<u8>, Vec<u8>>);
+        impl TxBodyResolver for StubResolver {
+            fn resolve_body(&self, tx_id: &[u8]) -> Option<Vec<u8>> {
+                self.0.get(tx_id).cloned()
+            }
+        }
+
+        let h0 = [0x01u8; 32];
+        let h1 = [0x02u8; 32];
+        let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(
+            [(h0.to_vec(), vec![10u8]), (h1.to_vec(), vec![20u8])]
+                .into_iter()
+                .collect(),
+        ));
+
+        let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
+        let (net_event_sender, _net_event_receiver) = mpsc::channel(NETWORK_EVENTS_CAPACITY);
+        let (net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
+        let config = CoordinatorConfig::default();
+        let (chain_store, _chain_rx) = ChainStore::new(100);
+        let (leios_store, _leios_rx) = LeiosStore::new_with_resolver(100, Some(resolver.clone()));
+        let coordinator = Coordinator::new(
+            config,
+            peer_event_sender,
+            peer_event_receiver,
+            net_event_sender,
+            net_cmd_receiver,
+            chain_store,
+            Some(leios_store.clone()),
+        );
+
+        let handle = tokio::spawn(coordinator.run());
+
+        let eb_hash = [0xEE; 32];
+        let point = Point::Specific {
+            slot: 4,
+            hash: eb_hash,
+        };
+        net_cmd_sender
+            .send(NetworkCommand::RecordLeiosEbManifest {
+                point,
+                tx_hashes: vec![h0, h1],
+            })
+            .await
+            .expect("command should accept");
+
+        // Poll until the manifest is stored.
+        let bitmap = crate::protocols::leios_fetch::bitmap::from_indices(&[0, 1]);
+        let mut got = None;
+        for _ in 0..50 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+            if let Some(stored) = leios_store.get_block_txs(4, &eb_hash, &bitmap) {
+                if !stored.is_empty() {
+                    got = Some(stored);
+                    break;
+                }
+            }
+        }
+        assert_eq!(got, Some(vec![vec![10u8], vec![20u8]]));
+
+        net_cmd_sender
+            .send(NetworkCommand::Shutdown)
+            .await
+            .expect("shutdown");
+        let _ = tokio::time::timeout(Duration::from_secs(2), handle).await;
     }
 
     /// `InjectLeiosBlockTxs` must reach the LeiosStore so peers can serve

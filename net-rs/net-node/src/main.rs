@@ -48,14 +48,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     );
 
     let mut slot_clock = clock::SlotClock::new(config.genesis_time_unix, config.slot_duration_ms);
-    let mut handle = network::start(&config).await?;
+
+    // Mempool: shared between tx generator, block producer, and the Leios
+    // store's TxBodyResolver (so receiver-side EB tx requests can be served
+    // from the mempool).
+    let mempool = mempool::new_mempool(config.transactions.mempool_capacity);
+    let tx_body_resolver: std::sync::Arc<dyn net_core::store::leios_store::TxBodyResolver> =
+        std::sync::Arc::new(mempool::MempoolTxBodyResolver::new(mempool.clone()));
+
+    let mut handle = network::start(&config, Some(tx_body_resolver)).await?;
     let commands = handle.commands.clone();
 
     // Dynamic config watch channel (hot-reloadable parameters).
     let (dyn_tx, dyn_rx) = tokio::sync::watch::channel(config.dynamic_config());
-
-    // Mempool: shared between tx generator and block producer.
-    let mempool = mempool::new_mempool(config.transactions.mempool_capacity);
 
     // Block producer.
     let mut producer =

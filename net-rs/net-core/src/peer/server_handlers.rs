@@ -841,6 +841,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn leios_fetch_serves_bitmap_via_manifest_and_resolver() {
+        use crate::store::leios_store::TxBodyResolver;
+        use std::sync::Arc;
+
+        struct StubResolver(std::collections::HashMap<Vec<u8>, Vec<u8>>);
+        impl TxBodyResolver for StubResolver {
+            fn resolve_body(&self, tx_id: &[u8]) -> Option<Vec<u8>> {
+                self.0.get(tx_id).cloned()
+            }
+        }
+
+        let lf_proto = ProtocolConfig {
+            id: leios_fetch::PROTOCOL_ID,
+            traffic_class: TrafficClass::Priority,
+            ingress_limit: leios_fetch::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        };
+
+        let ((client_send, client_recv), (server_send, server_recv), mux_a, mux_b) =
+            mux_pair_for_protocol(&lf_proto);
+
+        let h0 = [0xA0u8; 32];
+        let h1 = [0xA1u8; 32];
+        let h2 = [0xA2u8; 32];
+        let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(
+            [
+                (h0.to_vec(), vec![0xB0]),
+                (h1.to_vec(), vec![0xB1]),
+                (h2.to_vec(), vec![0xB2]),
+            ]
+            .into_iter()
+            .collect(),
+        ));
+        // Receiver-style store: only the manifest is recorded; bodies
+        // come from the resolver.
+        let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
+        let hash = [0xEFu8; 32];
+        let point = Point::Specific { slot: 33, hash };
+        store.record_eb_manifest(point.clone(), vec![h0, h1, h2]);
+
+        let server_handle =
+            tokio::spawn(serve_leios_fetch(server_send, server_recv, store.clone()));
+
+        let mut client = Runner::<LeiosFetch>::new(Role::Client, client_send, client_recv);
+        let bitmap = crate::protocols::leios_fetch::bitmap::from_indices(&[0, 2]);
+        let got = leios_fetch::fetch_block_txs(&mut client, point, bitmap)
+            .await
+            .expect("server should respond");
+        assert_eq!(got, vec![vec![0xB0u8], vec![0xB2u8]]);
+
+        let _ = leios_fetch::done(&mut client).await;
+        server_handle.await.ok();
+        mux_a.abort();
+        mux_b.abort();
+    }
+
+    #[tokio::test]
     async fn leios_fetch_disconnects_on_missing_block_txs() {
         let lf_proto = ProtocolConfig {
             id: leios_fetch::PROTOCOL_ID,
