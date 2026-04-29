@@ -19,6 +19,10 @@ use minicbor::{Decoder, Encoder};
 use super::{Message, TxBody, TxId, TxIdAndSize, MAX_TX_ID_SIZE, MAX_TX_SIZE, MAX_UNACKED};
 
 // --- TxId encode/decode ---
+//
+// `TxId(_)` carries the raw transaction-id bytes (e.g. the blake2b-256 hash).
+// The codec wraps them as CBOR `bytes(N)` on the wire so the receiver can
+// recover the same bytes on decode.
 
 impl minicbor::Encode<()> for TxId {
     fn encode<W: minicbor::encode::Write>(
@@ -26,33 +30,28 @@ impl minicbor::Encode<()> for TxId {
         e: &mut Encoder<W>,
         _ctx: &mut (),
     ) -> Result<(), EncodeError<W::Error>> {
-        e.writer_mut()
-            .write_all(&self.0)
-            .map_err(EncodeError::write)?;
+        e.bytes(&self.0)?;
         Ok(())
     }
 }
 
 impl<'a> minicbor::Decode<'a, ()> for TxId {
     fn decode(d: &mut Decoder<'a>, _ctx: &mut ()) -> Result<Self, DecodeError> {
-        let start = d.position();
-        d.skip()?;
-        let end = d.position();
-        let len = end - start;
-        if len > MAX_TX_ID_SIZE {
+        let raw = d.bytes()?;
+        if raw.len() > MAX_TX_ID_SIZE {
             return Err(DecodeError::message(format!(
-                "tx id too large: {len} bytes exceeds limit {MAX_TX_ID_SIZE}"
+                "tx id too large: {} bytes exceeds limit {MAX_TX_ID_SIZE}",
+                raw.len()
             )));
         }
-        let raw = d
-            .input()
-            .get(start..end)
-            .ok_or_else(|| DecodeError::message("failed to extract tx id bytes"))?;
         Ok(TxId(raw.to_vec()))
     }
 }
 
 // --- TxBody encode/decode ---
+//
+// `TxBody(_)` carries the raw transaction bytes; same wrapping pattern as
+// `TxId`.
 
 impl minicbor::Encode<()> for TxBody {
     fn encode<W: minicbor::encode::Write>(
@@ -60,28 +59,20 @@ impl minicbor::Encode<()> for TxBody {
         e: &mut Encoder<W>,
         _ctx: &mut (),
     ) -> Result<(), EncodeError<W::Error>> {
-        e.writer_mut()
-            .write_all(&self.0)
-            .map_err(EncodeError::write)?;
+        e.bytes(&self.0)?;
         Ok(())
     }
 }
 
 impl<'a> minicbor::Decode<'a, ()> for TxBody {
     fn decode(d: &mut Decoder<'a>, _ctx: &mut ()) -> Result<Self, DecodeError> {
-        let start = d.position();
-        d.skip()?;
-        let end = d.position();
-        let len = end - start;
-        if len > MAX_TX_SIZE {
+        let raw = d.bytes()?;
+        if raw.len() > MAX_TX_SIZE {
             return Err(DecodeError::message(format!(
-                "tx body too large: {len} bytes exceeds limit {MAX_TX_SIZE}"
+                "tx body too large: {} bytes exceeds limit {MAX_TX_SIZE}",
+                raw.len()
             )));
         }
-        let raw = d
-            .input()
-            .get(start..end)
-            .ok_or_else(|| DecodeError::message("failed to extract tx body bytes"))?;
         Ok(TxBody(raw.to_vec()))
     }
 }
@@ -273,18 +264,11 @@ mod tests {
     }
 
     fn make_tx_id() -> TxId {
-        // CBOR bytes(32): 0x5820 + 32 zero bytes
-        let mut buf = Vec::new();
-        let mut e = minicbor::Encoder::new(&mut buf);
-        e.bytes(&[0xaa; 32]).unwrap();
-        TxId(buf)
+        TxId(vec![0xaa; 32])
     }
 
     fn make_tx_body(payload: &[u8]) -> TxBody {
-        let mut buf = Vec::new();
-        let mut e = minicbor::Encoder::new(&mut buf);
-        e.bytes(payload).unwrap();
-        TxBody(buf)
+        TxBody(payload.to_vec())
     }
 
     #[test]
@@ -403,6 +387,49 @@ mod tests {
         let truncated = &encoded[..3];
         let result: Result<Message, _> = minicbor::decode(truncated);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn raw_hash_tx_id_round_trips_preserving_bytes() {
+        // Production constructs `TxId(blake2b256(body))` with the raw 32-byte
+        // hash, not pre-encoded CBOR. The codec must wrap on send and unwrap
+        // on receive so the same bytes survive a round trip.
+        let raw_hash: Vec<u8> = (0..32).collect();
+        let msg = Message::MsgReplyTxIds {
+            tx_ids: vec![TxIdAndSize {
+                tx_id: TxId(raw_hash.clone()),
+                size: 1234,
+            }],
+        };
+        let decoded = round_trip(&msg);
+        match decoded {
+            Message::MsgReplyTxIds { tx_ids } => {
+                assert_eq!(tx_ids.len(), 1);
+                assert_eq!(tx_ids[0].tx_id.0, raw_hash);
+                assert_eq!(tx_ids[0].size, 1234);
+            }
+            other => panic!("expected MsgReplyTxIds, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn raw_tx_body_round_trips_preserving_bytes() {
+        // Bodies arrive from peers as raw transaction bytes; the codec
+        // must CBOR-wrap them on the wire and recover the originals.
+        let body_a: Vec<u8> = (0..200).map(|i| (i * 7) as u8).collect();
+        let body_b: Vec<u8> = (0..1500).map(|i| (i * 31) as u8).collect();
+        let msg = Message::MsgReplyTxs {
+            txs: vec![TxBody(body_a.clone()), TxBody(body_b.clone())],
+        };
+        let decoded = round_trip(&msg);
+        match decoded {
+            Message::MsgReplyTxs { txs } => {
+                assert_eq!(txs.len(), 2);
+                assert_eq!(txs[0].0, body_a);
+                assert_eq!(txs[1].0, body_b);
+            }
+            other => panic!("expected MsgReplyTxs, got {other:?}"),
+        }
     }
 
     #[test]
