@@ -42,6 +42,9 @@ export interface IMessageAnimation {
   receivedTime: number;
   progress: number; // 0-1, calculated based on current timeline position
   sizeBytes: number; // payload size for visual scaling
+  slot?: number;
+  votes?: Array<{ voterId: number; ebHash: string; electionId: number }>;
+  numTxs?: number;
 }
 
 export interface IMessageTypeCounts {
