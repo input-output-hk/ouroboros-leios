@@ -112,6 +112,35 @@ export const Playback: FC = () => {
     [handleStep, handleStepForSeeking, stopSeeking, isPlaying, dispatch],
   );
 
+  // Skip to next/previous event
+  const handleSkipEvent = useCallback(
+    (direction: 1 | -1) => {
+      if (isPlaying) {
+        dispatch({ type: "SET_TIMELINE_PLAYING", payload: false });
+      }
+      if (events.length === 0) return;
+
+      if (direction === 1) {
+        // Find first event after currentTime
+        for (let i = 0; i < events.length; i++) {
+          if (events[i].time_s > currentTime) {
+            dispatch({ type: "SET_TIMELINE_TIME", payload: events[i].time_s });
+            return;
+          }
+        }
+      } else {
+        // Find last event before currentTime
+        for (let i = events.length - 1; i >= 0; i--) {
+          if (events[i].time_s < currentTime) {
+            dispatch({ type: "SET_TIMELINE_TIME", payload: events[i].time_s });
+            return;
+          }
+        }
+      }
+    },
+    [dispatch, events, currentTime, isPlaying],
+  );
+
   // Timeline playback effect - handles automatic advancement when playing
   useEffect(() => {
     if (isPlaying && events.length > 0) {
@@ -175,10 +204,10 @@ export const Playback: FC = () => {
 
   // Button refs for focus management
   const playPauseRef = useRef<HTMLButtonElement>(null);
-  const stepSmallBackwardRef = useRef<HTMLButtonElement>(null);
-  const stepBigBackwardRef = useRef<HTMLButtonElement>(null);
-  const stepSmallForwardRef = useRef<HTMLButtonElement>(null);
-  const stepBigForwardRef = useRef<HTMLButtonElement>(null);
+  const stepBackwardRef = useRef<HTMLButtonElement>(null);
+  const stepForwardRef = useRef<HTMLButtonElement>(null);
+  const skipBackwardRef = useRef<HTMLButtonElement>(null);
+  const skipForwardRef = useRef<HTMLButtonElement>(null);
   const speedSelectRef = useRef<HTMLSelectElement>(null);
 
   const focusButton = (ref: React.RefObject<HTMLElement | null>) => {
@@ -187,6 +216,8 @@ export const Playback: FC = () => {
       ref.current?.blur();
     }, 200); // Show focus for 200ms
   };
+
+  const stepSize = speedMultiplier;
 
   // Keyboard event handler
   useEffect(() => {
@@ -202,21 +233,21 @@ export const Playback: FC = () => {
         case "ArrowRight":
           event.preventDefault();
           if (event.ctrlKey) {
-            focusButton(stepBigForwardRef);
-            handleStep(1.0 * speedMultiplier); // 10x forward (big step)
+            focusButton(skipForwardRef);
+            handleSkipEvent(1);
           } else {
-            focusButton(stepSmallForwardRef);
-            handleStep(0.1 * speedMultiplier); // 1x forward (small step)
+            focusButton(stepForwardRef);
+            handleStep(stepSize);
           }
           break;
         case "ArrowLeft":
           event.preventDefault();
           if (event.ctrlKey) {
-            focusButton(stepBigBackwardRef);
-            handleStep(-1.0 * speedMultiplier); // 10x backward (big step)
+            focusButton(skipBackwardRef);
+            handleSkipEvent(-1);
           } else {
-            focusButton(stepSmallBackwardRef);
-            handleStep(-0.1 * speedMultiplier); // 1x backward (small step)
+            focusButton(stepBackwardRef);
+            handleStep(-stepSize);
           }
           break;
         case "ArrowUp":
@@ -252,7 +283,7 @@ export const Playback: FC = () => {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [disabled, handlePlayPause, handleStep, speedMultiplier, dispatch]);
+  }, [disabled, handlePlayPause, handleStep, handleSkipEvent, stepSize, speedMultiplier, dispatch]);
 
   return (
     <div className="flex items-center gap-2">
@@ -268,28 +299,20 @@ export const Playback: FC = () => {
       </Button>
 
       <Button
-        ref={stepBigBackwardRef}
-        onMouseDown={(e) => {
-          e.preventDefault();
-          startSeeking(-1.0 * speedMultiplier);
-        }}
-        onMouseUp={(e) => {
-          e.preventDefault();
-          stopSeeking();
-        }}
-        onMouseLeave={stopSeeking}
+        ref={skipBackwardRef}
+        onClick={() => handleSkipEvent(-1)}
         disabled={disabled}
         variant="secondary"
-        title={`Step backward ${1.0 * speedMultiplier}s (Ctrl + ←)`}
+        title="Skip to previous event (Ctrl + ←)"
       >
-        ◀◀
+        ⏮
       </Button>
 
       <Button
-        ref={stepSmallBackwardRef}
+        ref={stepBackwardRef}
         onMouseDown={(e) => {
           e.preventDefault();
-          startSeeking(-0.1 * speedMultiplier);
+          startSeeking(-stepSize);
         }}
         onMouseUp={(e) => {
           e.preventDefault();
@@ -298,16 +321,16 @@ export const Playback: FC = () => {
         onMouseLeave={stopSeeking}
         disabled={disabled}
         variant="secondary"
-        title={`Step backward ${0.1 * speedMultiplier}s (←)`}
+        title={`Step backward ${stepSize}s (←)`}
       >
         ◀
       </Button>
 
       <Button
-        ref={stepSmallForwardRef}
+        ref={stepForwardRef}
         onMouseDown={(e) => {
           e.preventDefault();
-          startSeeking(0.1 * speedMultiplier);
+          startSeeking(stepSize);
         }}
         onMouseUp={(e) => {
           e.preventDefault();
@@ -316,27 +339,19 @@ export const Playback: FC = () => {
         onMouseLeave={stopSeeking}
         disabled={disabled}
         variant="secondary"
-        title={`Step forward ${0.1 * speedMultiplier}s (→)`}
+        title={`Step forward ${stepSize}s (→)`}
       >
         ▶
       </Button>
 
       <Button
-        ref={stepBigForwardRef}
-        onMouseDown={(e) => {
-          e.preventDefault();
-          startSeeking(1.0 * speedMultiplier);
-        }}
-        onMouseUp={(e) => {
-          e.preventDefault();
-          stopSeeking();
-        }}
-        onMouseLeave={stopSeeking}
+        ref={skipForwardRef}
+        onClick={() => handleSkipEvent(1)}
         disabled={disabled}
         variant="secondary"
-        title={`Step forward ${1.0 * speedMultiplier}s (Ctrl + →)`}
+        title="Skip to next event (Ctrl + →)"
       >
-        ▶▶
+        ⏭
       </Button>
 
       <select
