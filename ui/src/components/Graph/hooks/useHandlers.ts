@@ -73,6 +73,7 @@ export const useHandlers = () => {
         canvasRef,
         canvasScale,
         currentNode,
+        currentEdge,
       },
       maxTime,
       topography,
@@ -125,8 +126,11 @@ export const useHandlers = () => {
       const edgeKey = `${edgeIds[0]}|${edgeIds[1]}`;
       const edgeState = aggregatedData.edges.get(edgeKey);
 
-      // Set edge color based on highest priority message type or default
-      if (link.source === currentNode || link.target === currentNode) {
+      // Set edge color based on selection, highest priority message type, or default
+      if (edgeKey === currentEdge) {
+        context.strokeStyle = ELinkColor.LINK_SELECTED;
+        context.lineWidth = Math.min((0.5 / canvasScale) * 6, 0.5);
+      } else if (link.source === currentNode || link.target === currentNode) {
         context.strokeStyle = ELinkColor.LINK_SELECTED;
       } else if (edgeState) {
         // Get highest priority message type currently traveling
@@ -298,6 +302,7 @@ export const useHandlers = () => {
     topography.nodes,
     topography.links,
     currentNode,
+    currentEdge,
     canvasOffsetX,
     canvasOffsetY,
     canvasScale,

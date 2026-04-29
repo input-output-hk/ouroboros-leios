@@ -80,6 +80,7 @@ export interface IGraphContextState {
   canvasOffsetX: number;
   canvasOffsetY: number;
   currentNode?: string;
+  currentEdge?: string; // Edge key "source|target" (sorted)
 }
 
 export type LayoutMode = "original" | "auto" | "circular" | "mercator";
@@ -132,6 +133,7 @@ export type TSimContextActions =
   | { type: "SET_SCENARIOS"; payload: IScenario[] }
   | { type: "SET_SCENARIO"; payload: string; autoStart?: boolean }
   | { type: "SET_CURRENT_NODE"; payload: string | undefined }
+  | { type: "SET_CURRENT_EDGE"; payload: string | undefined }
   | {
       type: "SET_CANVAS_PROPS";
       payload: Partial<{
