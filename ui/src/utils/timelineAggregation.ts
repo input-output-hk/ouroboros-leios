@@ -142,6 +142,7 @@ const createMessageAnimation = (
   targetTime: number,
   travelTime: number,
   sizeBytes: number,
+  extra?: { slot?: number; votes?: Array<{ voterId: number; ebHash: string; electionId: number }>; numTxs?: number },
 ) => {
   const estimatedReceiveTime = sentTime + travelTime;
 
@@ -190,6 +191,7 @@ const createMessageAnimation = (
       receivedTime: estimatedReceiveTime,
       progress,
       sizeBytes,
+      ...extra,
     });
   }
   // Note: We don't handle the "completed" case here since we need to process
@@ -311,7 +313,7 @@ export const computeAggregatedDataAtTime = (
     startIndex: number,
   ): number | null => {
     const messageType = sentEvent.message.type;
-    const { recipient } = getMessageParticipants(sentEvent);
+    const { sender, recipient } = getMessageParticipants(sentEvent);
     const sentTime = sentEvent.time_s;
     const messageId = (sentEvent.message as any).id;
 
@@ -338,6 +340,7 @@ export const computeAggregatedDataAtTime = (
       if (
         isMatchingReceived &&
         (futureEvent.message as any).id === messageId &&
+        (futureEvent.message as any).sender === sender &&
         (futureEvent.message as any).recipient === recipient &&
         futureEvent.time_s >= sentTime
       ) {
@@ -414,6 +417,7 @@ export const computeAggregatedDataAtTime = (
           targetTime,
           travelTime,
           msgBytes,
+          { numTxs },
         );
         break;
       }
@@ -495,6 +499,7 @@ export const computeAggregatedDataAtTime = (
           targetTime,
           travelTime,
           msgBytes,
+          { slot: message.slot },
         );
         break;
       }
@@ -585,6 +590,7 @@ export const computeAggregatedDataAtTime = (
           targetTime,
           travelTime,
           msgBytes,
+          { slot: message.slot },
         );
         break;
       }
@@ -656,6 +662,7 @@ export const computeAggregatedDataAtTime = (
           targetTime,
           travelTime,
           msgBytes,
+          { slot: message.slot, votes: message.votes },
         );
         break;
       }
