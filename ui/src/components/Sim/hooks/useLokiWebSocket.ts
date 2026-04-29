@@ -385,7 +385,7 @@ const parseVotesGenerated = (
         slot: log.slot,
         producer: streamLabels.process,
         size_bytes: 100,
-        votes: [],
+        votes: [{ voterId: log.voter, ebHash: log.hash, electionId: log.slot }],
       };
 
       return {
@@ -417,7 +417,11 @@ const parseVotesSent = (
         log.peer?.connectionId || log.connectionId,
       );
 
-      const votes = log.msg.votes || [];
+      const votes = (log.msg.votes || []).map((v: any) => ({
+        voterId: v.voterId,
+        ebHash: v.ebHash,
+        electionId: v.electionId,
+      }));
       const firstVote = votes[0] || {};
       const voteId = `vote-${firstVote.electionId}-${firstVote.voterId}-${firstVote.ebHash}`;
 
@@ -427,6 +431,7 @@ const parseVotesSent = (
         id: voteId,
         sender,
         recipient,
+        votes,
       };
 
       return {
@@ -454,7 +459,11 @@ const parseVotesReceived = (
         log.peer?.connectionId || log.connectionId,
       );
 
-      const votes = log.msg.votes || [];
+      const votes = (log.msg.votes || []).map((v: any) => ({
+        voterId: v.voterId,
+        ebHash: v.ebHash,
+        electionId: v.electionId,
+      }));
       const firstVote = votes[0] || {};
       const voteId = `vote-${firstVote.electionId}-${firstVote.voterId}-${firstVote.ebHash}`;
 
@@ -464,6 +473,7 @@ const parseVotesReceived = (
         id: voteId,
         sender,
         recipient,
+        votes,
       };
 
       return {

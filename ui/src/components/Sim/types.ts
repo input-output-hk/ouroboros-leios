@@ -164,13 +164,19 @@ export interface IEndorserBlockSent {
   recipient: string;
 }
 
+export interface IVote {
+  voterId: number;
+  ebHash: string;
+  electionId: number;
+}
+
 export interface IVotesGenerated {
   type: EServerMessageType.VotesGenerated;
   id: string;
   slot: number;
   producer: string;
   size_bytes: number;
-  votes: any[]; // @todo
+  votes: IVote[];
 }
 
 export interface IVotesReceived {
@@ -179,6 +185,7 @@ export interface IVotesReceived {
   slot: number;
   sender: string;
   recipient: string;
+  votes: IVote[];
 }
 
 export interface IVotesSent {
@@ -187,6 +194,7 @@ export interface IVotesSent {
   id: string;
   sender: string;
   recipient: string;
+  votes: IVote[];
 }
 
 export interface IUnknown {

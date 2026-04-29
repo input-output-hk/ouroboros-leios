@@ -1,7 +1,3 @@
-import {
-  EServerMessageType,
-  IServerMessage,
-} from "@/components/Sim/types";
 import { useSimContext } from "@/contexts/SimContext/context";
 import { EMessageType, IMessageAnimation } from "@/contexts/SimContext/types";
 import { EMessageColor } from "@/utils/colors";
@@ -44,90 +40,38 @@ const getMessageId = (animation: IMessageAnimation): string => {
     : animation.id;
 };
 
-// Sent event types by message type
-const sentEventType: Record<EMessageType, EServerMessageType> = {
-  [EMessageType.Txs]: EServerMessageType.TxsSent,
-  [EMessageType.EB]: EServerMessageType.EBSent,
-  [EMessageType.Votes]: EServerMessageType.VotesSent,
-  [EMessageType.RB]: EServerMessageType.RBSent,
-};
-
-const generatedEventType: Record<EMessageType, EServerMessageType> = {
-  [EMessageType.Txs]: EServerMessageType.TxsGenerated,
-  [EMessageType.EB]: EServerMessageType.EBGenerated,
-  [EMessageType.Votes]: EServerMessageType.VotesGenerated,
-  [EMessageType.RB]: EServerMessageType.RBGenerated,
-};
-
 const MessageDetail: FC<{
   animation: IMessageAnimation;
-  events: IServerMessage[];
-}> = ({ animation, events }) => {
+}> = ({ animation }) => {
   const msgId = getMessageId(animation);
-
-  const { sentEvent, generatedEvent } = useMemo(() => {
-    let sentEvent: IServerMessage | undefined;
-    let generatedEvent: IServerMessage | undefined;
-    const targetSentType = sentEventType[animation.type];
-    const targetGenType = generatedEventType[animation.type];
-
-    for (const ev of events) {
-      const msg = ev.message as any;
-      if (msg.id !== msgId) continue;
-      if (ev.message.type === targetSentType && msg.sender === animation.sender && msg.recipient === animation.recipient) {
-        sentEvent = ev;
-      }
-      if (ev.message.type === targetGenType) {
-        generatedEvent = ev;
-      }
-      if (sentEvent && generatedEvent) break;
-    }
-    return { sentEvent, generatedEvent };
-  }, [msgId, animation.type, animation.sender, animation.recipient, events]);
 
   const details: { label: string; value: string }[] = [
     { label: "Id", value: msgId },
+    { label: "Sent at", value: `${animation.sentTime.toFixed(3)}s` },
   ];
 
-  const gen = generatedEvent?.message as any;
-  const sent = sentEvent?.message as any;
-
-  if (sent?.slot != null || gen?.slot != null) {
-    details.push({ label: "Slot", value: String(sent?.slot ?? gen?.slot) });
+  if (animation.type !== EMessageType.Votes && animation.slot) {
+    details.push({ label: "Slot", value: String(animation.slot) });
   }
 
-  if (gen?.producer) {
-    details.push({ label: "Producer", value: gen.producer });
-  } else if (gen?.publisher) {
-    details.push({ label: "Publisher", value: gen.publisher });
+  // Vote-specific details
+  if (animation.votes && animation.votes.length > 0) {
+    const rounds = [...new Set(animation.votes.map((v) => v.electionId))];
+    details.push({ label: "Round", value: rounds.join(", ") });
+
+    const ebHashes = [...new Set(animation.votes.map((v) => v.ebHash))];
+    details.push({ label: "EB hash", value: ebHashes.join(", ") });
+
+    const voterIds = [...new Set(animation.votes.map((v) => v.voterId))];
+    details.push({ label: "Voter", value: voterIds.join(", ") });
+
+    if (animation.votes.length > 1) {
+      details.push({ label: "Num votes", value: String(animation.votes.length) });
+    }
   }
 
-  if (gen?.pipeline != null) {
-    details.push({ label: "Pipeline", value: String(gen.pipeline) });
-  }
-
-  if (gen?.votes && Array.isArray(gen.votes)) {
-    details.push({ label: "Votes", value: String(gen.votes.length) });
-  }
-
-  if (sent?.num_txs != null) {
-    details.push({ label: "Num txs", value: String(sent.num_txs) });
-  }
-
-  if (gen?.transactions && Array.isArray(gen.transactions)) {
-    details.push({ label: "Txs included", value: String(gen.transactions.length) });
-  }
-
-  if (gen?.endorser_blocks && Array.isArray(gen.endorser_blocks)) {
-    details.push({ label: "EBs included", value: String(gen.endorser_blocks.length) });
-  }
-
-  if (gen?.endorsement) {
-    details.push({ label: "Endorses", value: gen.endorsement.eb?.id ?? "?" });
-  }
-
-  if (sentEvent) {
-    details.push({ label: "Sent at", value: `${sentEvent.time_s.toFixed(3)}s` });
+  if (animation.numTxs != null && animation.numTxs > 0) {
+    details.push({ label: "Num txs", value: String(animation.numTxs) });
   }
 
   return (
@@ -146,7 +90,6 @@ export const EdgeStats: FC = () => {
   const {
     state: {
       aggregatedData,
-      events,
       graph: { currentEdge },
       topography,
     },
@@ -266,7 +209,7 @@ export const EdgeStats: FC = () => {
           </table>
 
           {selectedMessage && (
-            <MessageDetail animation={selectedMessage} events={events} />
+            <MessageDetail animation={selectedMessage} />
           )}
         </>
       )}
