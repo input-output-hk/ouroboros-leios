@@ -244,8 +244,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             let _ = tx_valid_tx.try_send(body.clone());
                         }
                         // Same path for Leios EB tx bodies fetched by bitmap.
-                        if let NetworkEvent::LeiosBlockTxsReceived { transactions, .. } = &event {
-                            for body in transactions {
+                        // Hash-verify each body against the cached manifest;
+                        // the wire format gives no per-body index, so the
+                        // server's response order can't be trusted alone.
+                        if let NetworkEvent::LeiosBlockTxsReceived { point, transactions } = &event {
+                            let outcome = consensus.match_eb_tx_response(point, transactions);
+                            if outcome.requested > 0 && outcome.matched_bodies.len() < outcome.requested {
+                                tracing::warn!(
+                                    node_id = %node_id,
+                                    %point,
+                                    requested = outcome.requested,
+                                    matched = outcome.matched_bodies.len(),
+                                    "leios block txs response is partial"
+                                );
+                            }
+                            for body in &outcome.matched_bodies {
                                 let _ = tx_valid_tx.try_send(body.clone());
                             }
                         }

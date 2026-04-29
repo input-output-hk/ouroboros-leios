@@ -35,6 +35,19 @@ pub use pipeline::PipelineConfig;
 use pipeline::PipelinePhase;
 pub use voting::VotingConfig;
 
+/// Result of matching a `LeiosBlockTxsReceived` response against the
+/// cached manifest. Lets the caller forward only verified bodies into
+/// the validator and detect partial responses.
+#[derive(Debug)]
+pub struct EbTxMatchOutcome {
+    /// Bodies whose blake2b hash maps to a requested manifest index,
+    /// in ascending manifest-index order.
+    pub matched_bodies: Vec<Vec<u8>>,
+    /// Number of indices that the original request bitmap selected.
+    /// Zero means "manifest not cached at request time" (fallback path).
+    pub requested: usize,
+}
+
 /// How long an in-flight Leios fetch entry remains active before being
 /// considered stale. Matches the Praos in-flight TTL.
 const IN_FLIGHT_TTL: Duration = Duration::from_secs(15);
@@ -50,6 +63,11 @@ pub struct LeiosConsensus {
     /// `LeiosBlockReceived`. Drives the missing-tx bitmap on
     /// `LeiosBlockTxsOffered`.
     eb_tx_hashes: HashMap<[u8; 32], Vec<[u8; 32]>>,
+    /// Per-EB requested bitmap. Set when a `FetchLeiosBlockTxs` command
+    /// is issued; used at response time to verify which manifest indices
+    /// were actually fulfilled (response[i] semantics aren't recoverable
+    /// from the wire, so we hash each body and look it up in the manifest).
+    pending_eb_tx_fetches: HashMap<[u8; 32], std::collections::BTreeMap<u16, u64>>,
     /// Leios points currently being fetched.
     in_flight: HashMap<Point, Instant>,
     /// Pipeline timing parameters.
@@ -133,6 +151,7 @@ impl LeiosConsensus {
             validator,
             mempool,
             eb_tx_hashes: HashMap::new(),
+            pending_eb_tx_fetches: HashMap::new(),
             in_flight: HashMap::new(),
             pipeline,
             current_slot: 0,
@@ -270,6 +289,9 @@ impl LeiosConsensus {
                         bitmap_segments = bitmap.len(),
                         "fetching leios block txs"
                     );
+                    if let Point::Specific { hash, .. } = point {
+                        self.pending_eb_tx_fetches.insert(*hash, bitmap.clone());
+                    }
                     let _ = self
                         .commands
                         .send(NetworkCommand::FetchLeiosBlockTxs {
@@ -435,6 +457,71 @@ impl LeiosConsensus {
                     voters: formed.voters,
                 });
             }
+        }
+    }
+
+    /// Verify a `LeiosBlockTxsReceived` response against the manifest.
+    /// Each body is hashed and matched against the cached manifest tx
+    /// hashes. Only bodies whose hash maps to a manifest index that we
+    /// requested are returned (in manifest order). Other bodies are
+    /// dropped silently — peer is misbehaving or off-by-one.
+    ///
+    /// Also reports `(matched, requested)` for partial-response detection.
+    pub fn match_eb_tx_response(&mut self, point: &Point, bodies: &[Vec<u8>]) -> EbTxMatchOutcome {
+        use net_core::protocols::leios_fetch::bitmap;
+        let hash = match point {
+            Point::Specific { hash, .. } => *hash,
+            Point::Origin => {
+                return EbTxMatchOutcome {
+                    matched_bodies: Vec::new(),
+                    requested: 0,
+                };
+            }
+        };
+        let Some(manifest) = self.eb_tx_hashes.get(&hash) else {
+            // Manifest unknown — we have no way to verify. Pass bodies
+            // through; the validator will hash them and any unrelated
+            // tx will simply sit in the mempool unused.
+            self.pending_eb_tx_fetches.remove(&hash);
+            return EbTxMatchOutcome {
+                matched_bodies: bodies.to_vec(),
+                requested: 0,
+            };
+        };
+        let requested_bitmap = self.pending_eb_tx_fetches.remove(&hash);
+        let requested: usize = requested_bitmap
+            .as_ref()
+            .map(|b| bitmap::iter_indices(b).count())
+            .unwrap_or(0);
+
+        // Build expected_hash → manifest_index map for the indices we asked
+        // for, restricting to those.
+        let expected: HashMap<[u8; 32], usize> = match &requested_bitmap {
+            Some(b) => bitmap::iter_indices(b)
+                .filter_map(|i| {
+                    let idx = i as usize;
+                    manifest.get(idx).map(|h| (*h, idx))
+                })
+                .collect(),
+            None => manifest.iter().enumerate().map(|(i, h)| (*h, i)).collect(),
+        };
+
+        // For each body, hash and look up.
+        let mut keyed: Vec<(usize, Vec<u8>)> = Vec::new();
+        for body in bodies {
+            let h_arr = blake2b_simd::Params::new().hash_length(32).hash(body);
+            let mut hash_buf = [0u8; 32];
+            hash_buf.copy_from_slice(h_arr.as_bytes());
+            if let Some(&idx) = expected.get(&hash_buf) {
+                keyed.push((idx, body.clone()));
+            }
+        }
+        keyed.sort_by_key(|(i, _)| *i);
+        let matched_bodies: Vec<Vec<u8>> = keyed.into_iter().map(|(_, b)| b).collect();
+
+        EbTxMatchOutcome {
+            matched_bodies,
+            requested,
         }
     }
 
@@ -1144,6 +1231,16 @@ mod tests {
         }
     }
 
+    /// Drain until a RecordLeiosEbManifest arrives.
+    async fn next_record_cmd(rx: &mut mpsc::Receiver<NetworkCommand>) -> NetworkCommand {
+        loop {
+            let cmd = rx.recv().await.expect("command emitted");
+            if matches!(cmd, NetworkCommand::RecordLeiosEbManifest { .. }) {
+                return cmd;
+            }
+        }
+    }
+
     fn push_tx_with_id(mempool: &crate::mempool::SharedMempool, id: [u8; 32]) {
         let tx = PendingTx {
             tx_id: TxId(id.to_vec()),
@@ -1265,6 +1362,119 @@ mod tests {
             }
             other => panic!("expected FetchLeiosBlockTxs, got {other:?}"),
         }
+    }
+
+    // -- Response matching tests --------------------------------------------
+
+    /// Helper: hash a tx body the same way `tx_from_received_bytes` does.
+    fn body_hash(body: &[u8]) -> [u8; 32] {
+        let h = blake2b_simd::Params::new().hash_length(32).hash(body);
+        let mut buf = [0u8; 32];
+        buf.copy_from_slice(h.as_bytes());
+        buf
+    }
+
+    #[tokio::test]
+    async fn match_eb_tx_response_keeps_only_manifest_hashes_in_order() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mempool = crate::mempool::new_mempool(1000);
+        let mut leios = test_leios_with_mempool(tx, validator, mempool);
+
+        // Three bodies → three manifest hashes. We want indices 0 and 2.
+        let body0 = b"body-zero".to_vec();
+        let body1 = b"body-one".to_vec();
+        let body2 = b"body-two".to_vec();
+        let h0 = body_hash(&body0);
+        let h1 = body_hash(&body1);
+        let h2 = body_hash(&body2);
+        let bogus = b"unrelated-tx".to_vec();
+
+        let (manifest, eb_hash) = make_manifest(11, &[h0, h1, h2]);
+        let eb_point = Point::Specific {
+            slot: 11,
+            hash: eb_hash,
+        };
+
+        leios
+            .handle_event(&NetworkEvent::LeiosBlockReceived {
+                point: eb_point.clone(),
+                block: manifest,
+            })
+            .await;
+        leios
+            .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                point: eb_point.clone(),
+            })
+            .await;
+        let _record = next_record_cmd(&mut rx).await; // drain manifest record
+        let cmd = next_fetch_cmd(&mut rx).await;
+        // Sanity: the bitmap was {0,1,2}.
+        if let NetworkCommand::FetchLeiosBlockTxs { bitmap, .. } = cmd {
+            let indices: Vec<u32> = bitmap_helpers::iter_indices(&bitmap).collect();
+            assert_eq!(indices, vec![0, 1, 2]);
+        }
+
+        // Server returns only [body0, body2] plus a bogus tx out of nowhere.
+        let outcome = leios.match_eb_tx_response(&eb_point, &[body0.clone(), body2.clone(), bogus]);
+        assert_eq!(outcome.requested, 3);
+        assert_eq!(outcome.matched_bodies, vec![body0, body2]);
+    }
+
+    #[tokio::test]
+    async fn match_eb_tx_response_with_unknown_manifest_passes_through() {
+        let (tx, _rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mempool = crate::mempool::new_mempool(1000);
+        let mut leios = test_leios_with_mempool(tx, validator, mempool);
+
+        // No EB cached for this point.
+        let eb_point = Point::Specific {
+            slot: 99,
+            hash: [0xAA; 32],
+        };
+        let body = vec![1, 2, 3];
+        let outcome = leios.match_eb_tx_response(&eb_point, &[body.clone()]);
+        // Manifest unknown → requested=0 (we can't verify), bodies forwarded.
+        assert_eq!(outcome.requested, 0);
+        assert_eq!(outcome.matched_bodies, vec![body]);
+    }
+
+    #[tokio::test]
+    async fn match_eb_tx_response_pending_bitmap_cleared_after_match() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mempool = crate::mempool::new_mempool(1000);
+        let mut leios = test_leios_with_mempool(tx, validator, mempool);
+
+        let body = b"x".to_vec();
+        let h = body_hash(&body);
+        let (manifest, eb_hash) = make_manifest(2, &[h]);
+        let eb_point = Point::Specific {
+            slot: 2,
+            hash: eb_hash,
+        };
+
+        leios
+            .handle_event(&NetworkEvent::LeiosBlockReceived {
+                point: eb_point.clone(),
+                block: manifest,
+            })
+            .await;
+        leios
+            .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                point: eb_point.clone(),
+            })
+            .await;
+        let _ = next_record_cmd(&mut rx).await;
+        let _ = next_fetch_cmd(&mut rx).await;
+
+        // First match.
+        let outcome = leios.match_eb_tx_response(&eb_point, &[body.clone()]);
+        assert_eq!(outcome.requested, 1);
+        // Second match — pending bitmap was consumed, so requested=0 now.
+        let outcome2 = leios.match_eb_tx_response(&eb_point, &[body]);
+        assert_eq!(outcome2.requested, 0);
     }
 
     #[tokio::test]
