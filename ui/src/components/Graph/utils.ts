@@ -49,33 +49,70 @@ export const getOffsetCoordinates = (
   };
 };
 
-export const isClickOnNode = (
+export type ClickTarget =
+  | { kind: "node"; id: string }
+  | { kind: "edge"; id: string }
+  | { kind: "background" };
+
+export const findClickTarget = (
   clickX: number,
   clickY: number,
   topography: ITransformedNodeMap,
-  threshold: number = 10,
+  threshold: number,
   offsetX: number,
   offsetY: number,
   scale: number,
-): { node: string | undefined; clicked: boolean } => {
-  let node: string | undefined;
-  let clicked = false;
+): ClickTarget => {
+  const adjustedX = (clickX - offsetX) / scale;
+  const adjustedY = (clickY - offsetY) / scale;
 
-  // Adjust the click coordinates based on the offset
-  const adjustedClickX = (clickX - offsetX) / scale;
-  const adjustedClickY = (clickY - offsetY) / scale;
-
-  // Iterate through nodes to find if the click is within threshold
+  // Find closest node
+  let closestNodeDist = Infinity;
+  let closestNode: string | undefined;
   for (const [, { fx, fy, id }] of topography.nodes) {
-    const xDifference = Math.abs(fx - adjustedClickX);
-    const yDifference = Math.abs(fy - adjustedClickY);
-
-    if (xDifference <= threshold && yDifference <= threshold) {
-      clicked = true;
-      node = id.toString();
-      break;
+    const dist = Math.sqrt((fx - adjustedX) ** 2 + (fy - adjustedY) ** 2);
+    if (dist < closestNodeDist) {
+      closestNodeDist = dist;
+      closestNode = id.toString();
     }
   }
 
-  return { node, clicked };
+  // Find closest edge (by perpendicular distance to line segment)
+  let closestEdgeDist = Infinity;
+  let closestEdge: string | undefined;
+  topography.links.forEach((link, key) => {
+    const a = topography.nodes.get(link.source);
+    const b = topography.nodes.get(link.target);
+    if (!a || !b) return;
+
+    const dx = b.fx - a.fx;
+    const dy = b.fy - a.fy;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return;
+
+    const t = Math.max(
+      0,
+      Math.min(1, ((adjustedX - a.fx) * dx + (adjustedY - a.fy) * dy) / lenSq),
+    );
+    const dist = Math.sqrt(
+      (adjustedX - (a.fx + t * dx)) ** 2 + (adjustedY - (a.fy + t * dy)) ** 2,
+    );
+
+    if (dist < closestEdgeDist) {
+      closestEdgeDist = dist;
+      closestEdge = key;
+    }
+  });
+
+  // Pick whichever is closer, as long as it's within threshold
+  if (closestNodeDist <= threshold && closestNodeDist <= closestEdgeDist) {
+    return { kind: "node", id: closestNode! };
+  }
+  if (closestEdgeDist <= threshold && closestEdge) {
+    return { kind: "edge", id: closestEdge };
+  }
+  if (closestNodeDist <= threshold && closestNode) {
+    return { kind: "node", id: closestNode };
+  }
+  return { kind: "background" };
 };
