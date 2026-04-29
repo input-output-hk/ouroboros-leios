@@ -238,6 +238,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         if let NetworkEvent::TransactionReceived { body, .. } = &event {
                             let _ = tx_valid_tx.try_send(body.clone());
                         }
+                        // Same path for Leios EB tx bodies fetched by bitmap.
+                        if let NetworkEvent::LeiosBlockTxsReceived { transactions, .. } = &event {
+                            for body in transactions {
+                                let _ = tx_valid_tx.try_send(body.clone());
+                            }
+                        }
                         // Pull-model TxSubmission: provide txs from mempool on demand.
                         if let NetworkEvent::TxsRequested { peer_id, count } = &event {
                             let txs = {
