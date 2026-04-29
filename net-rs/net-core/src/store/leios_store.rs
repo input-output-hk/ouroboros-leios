@@ -67,6 +67,19 @@ struct LeiosStoreInner {
     /// EB / vote load (each EB carries ~600 votes; without slot eviction,
     /// receivers accumulate the full history forever).
     retention_slots: u64,
+    /// Log a stats line every Nth `bump_version` call. `0` disables.
+    stats_log_interval: u64,
+}
+
+/// Snapshot of internal map sizes — for memory diagnostics.
+#[derive(Debug, Clone)]
+pub struct LeiosStoreStats {
+    pub blocks: usize,
+    pub block_txs: usize,
+    pub eb_tx_hashes: usize,
+    pub votes: usize,
+    pub notifications: usize,
+    pub max_slot: u64,
 }
 
 /// Default slot-window retention for `LeiosStore`. Sized for the Linear Leios
@@ -103,14 +116,16 @@ impl LeiosStore {
         capacity: usize,
         tx_body_resolver: Option<Arc<dyn TxBodyResolver>>,
     ) -> (Arc<Self>, watch::Receiver<u64>) {
-        Self::new_with_retention(capacity, tx_body_resolver, DEFAULT_RETENTION_SLOTS)
+        Self::new_with_retention(capacity, tx_body_resolver, DEFAULT_RETENTION_SLOTS, 0)
     }
 
-    /// Full constructor: explicit slot-window retention.
+    /// Full constructor: explicit slot-window retention and stats logging
+    /// interval. `stats_log_interval` of `0` disables stats logging.
     pub fn new_with_retention(
         capacity: usize,
         tx_body_resolver: Option<Arc<dyn TxBodyResolver>>,
         retention_slots: u64,
+        stats_log_interval: u64,
     ) -> (Arc<Self>, watch::Receiver<u64>) {
         let (notify_sender, notify_receiver) = watch::channel(0u64);
         let store = Arc::new(Self {
@@ -124,6 +139,7 @@ impl LeiosStore {
                 version: 0,
                 max_slot: 0,
                 retention_slots,
+                stats_log_interval,
             }),
             notify: notify_sender,
             tx_body_resolver,
@@ -262,6 +278,19 @@ impl LeiosStore {
             .collect()
     }
 
+    /// Snapshot of internal map sizes — for memory diagnostics.
+    pub fn stats(&self) -> LeiosStoreStats {
+        let inner = self.inner.lock().unwrap();
+        LeiosStoreStats {
+            blocks: inner.blocks.len(),
+            block_txs: inner.block_txs.len(),
+            eb_tx_hashes: inner.eb_tx_hashes.len(),
+            votes: inner.votes.len(),
+            notifications: inner.notifications.len(),
+            max_slot: inner.max_slot,
+        }
+    }
+
     /// Get notifications after the given index (exclusive).
     /// Index 0 means "from the beginning".
     pub fn notifications_after(&self, after: usize) -> Vec<LeiosNotification> {
@@ -314,6 +343,23 @@ impl LeiosStore {
                 inner.block_txs.remove(&key);
             }
         }
+
+        // Optional diagnostic: emit a stats line every Nth bump so we can
+        // spot unbounded growth from outside. `0` disables.
+        if inner.stats_log_interval > 0 && inner.version % inner.stats_log_interval == 0 {
+            tracing::info!(
+                version = inner.version,
+                max_slot = inner.max_slot,
+                cutoff,
+                blocks = inner.blocks.len(),
+                block_txs = inner.block_txs.len(),
+                eb_tx_hashes = inner.eb_tx_hashes.len(),
+                votes = inner.votes.len(),
+                notifications = inner.notifications.len(),
+                "leios_store: stats"
+            );
+        }
+
         let version = inner.version;
         let _ = self.notify.send(version);
     }
@@ -520,7 +566,7 @@ mod tests {
     #[test]
     fn slot_retention_prunes_old_data() {
         // Tight retention window so the test stays small.
-        let (store, _rx) = LeiosStore::new_with_retention(1000, None, 5);
+        let (store, _rx) = LeiosStore::new_with_retention(1000, None, 5, 0);
 
         // Inject votes/blocks at slot 1, then advance the clock far past
         // the retention window. Old entries must be evicted.

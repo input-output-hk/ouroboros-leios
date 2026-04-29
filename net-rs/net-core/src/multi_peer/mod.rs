@@ -57,6 +57,9 @@ pub struct CoordinatorConfig {
     /// Slot window for Leios announcement deduplication. Offers older than
     /// `max_seen_slot - leios_dedup_window` are pruned. Default: 1000.
     pub leios_dedup_window: u64,
+    /// Log a `LeiosStore` stats line every Nth `bump_version` call. `0`
+    /// disables stats logging (default). Useful for memory diagnostics.
+    pub leios_store_stats_log_interval: u64,
     /// Per-protocol traffic class overrides. Applied on top of defaults
     /// from `client_protocol_configs` / `server_protocol_configs`.
     pub traffic_class_overrides: HashMap<ProtocolId, TrafficClass>,
@@ -88,6 +91,7 @@ impl Default for CoordinatorConfig {
             duplex: false,
             leios_enabled: false,
             leios_dedup_window: 1000,
+            leios_store_stats_log_interval: 0,
             traffic_class_overrides: HashMap::new(),
             scheduler_type: SchedulerType::default(),
             max_handshaking: 64,

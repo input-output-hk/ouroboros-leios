@@ -1290,9 +1290,11 @@ pub fn spawn_coordinator(config: CoordinatorConfig) -> CoordinatorHandle {
     let (chain_store, _chain_rx) = ChainStore::new(config.chain_store_capacity);
 
     let leios_store = if config.leios_enabled {
-        let (store, _leios_rx) = LeiosStore::new_with_resolver(
+        let (store, _leios_rx) = LeiosStore::new_with_retention(
             config.chain_store_capacity,
             config.tx_body_resolver.clone(),
+            crate::store::leios_store::DEFAULT_RETENTION_SLOTS,
+            config.leios_store_stats_log_interval,
         );
         Some(store)
     } else {

@@ -32,6 +32,7 @@ pub async fn run(
         duplex,
         leios_enabled: leios,
         leios_dedup_window: 1000,
+        leios_store_stats_log_interval: 0,
         traffic_class_overrides: scheduler_args.traffic_class_overrides()?,
         scheduler_type: scheduler_args.scheduler,
         max_handshaking,

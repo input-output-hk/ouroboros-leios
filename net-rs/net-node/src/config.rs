@@ -136,6 +136,11 @@ pub struct NodeConfig {
     #[serde(default = "default_leios_dedup_window")]
     pub leios_dedup_window: u64,
 
+    /// Log a `LeiosStore` stats line every Nth `bump_version` call. `0`
+    /// disables stats logging (default). Useful for memory diagnostics.
+    #[serde(default)]
+    pub leios_store_stats_log_interval: u64,
+
     /// Maximum concurrent inbound handshakes.
     #[serde(default = "default_max_handshaking")]
     pub max_handshaking: usize,
@@ -606,6 +611,7 @@ impl Default for NodeConfig {
             keepalive_interval_secs: default_keepalive_interval_secs(),
             chain_store_capacity: default_chain_store_capacity(),
             leios_dedup_window: default_leios_dedup_window(),
+            leios_store_stats_log_interval: 0,
             security_param_k: default_security_param_k(),
             max_handshaking: default_max_handshaking(),
             max_connections_per_ip: default_max_connections_per_ip(),
