@@ -54,6 +54,7 @@ pub async fn start(
         duplex: true,
         leios_enabled: config.leios_enabled,
         leios_dedup_window: config.leios_dedup_window,
+        leios_store_stats_log_interval: config.leios_store_stats_log_interval,
         traffic_class_overrides: HashMap::new(),
         scheduler_type: parse_scheduler(&config.scheduler)?,
         max_handshaking: config.max_handshaking,
