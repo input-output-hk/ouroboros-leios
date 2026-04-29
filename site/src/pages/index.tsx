@@ -49,7 +49,7 @@ function HomepageHeader() {
                 </a>
                 <a
                   className={clsx("secondary-button homepage-button")}
-                  href="/guide"
+                  href="/docs/what-is-leios"
                 >
                   {" "}
                   Explore how it works <ArrowRightIcon height={12} width={12} />
@@ -474,15 +474,31 @@ export default function Home(): React.ReactElement {
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
+    let pending: number | null = null;
+    let lastHeight = 0;
+
     const handler = (event: MessageEvent) => {
-      if (event.data?.type === "dashboard-height" && iframeRef.current) {
-        iframeRef.current.style.height = event.data.height + "px";
-      }
+      if (event.origin !== "https://engineering.iog.io") return;
+      if (event.data?.type !== "dashboard-height" || !iframeRef.current) return;
+      const next = event.data.height;
+      if (next === lastHeight) return;
+      lastHeight = next;
+      if (pending !== null) return;
+      pending = requestAnimationFrame(() => {
+        pending = null;
+        if (iframeRef.current) {
+          iframeRef.current.style.height = lastHeight + "px";
+        }
+      });
     };
 
     window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
+    return () => {
+      window.removeEventListener("message", handler);
+      if (pending !== null) cancelAnimationFrame(pending);
+    };
   }, []);
+
   return (
     <Layout
       title={siteConfig.title}
