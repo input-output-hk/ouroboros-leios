@@ -43,6 +43,13 @@ pub struct LeiosConsensus {
     node_id: String,
     commands: mpsc::Sender<NetworkCommand>,
     validator: Validator,
+    /// Local mempool. Used to compute the bitmap of missing txs when a
+    /// peer announces an EB's transactions.
+    mempool: crate::mempool::SharedMempool,
+    /// Per-EB ordered tx hash list, decoded from the EB manifest on
+    /// `LeiosBlockReceived`. Drives the missing-tx bitmap on
+    /// `LeiosBlockTxsOffered`.
+    eb_tx_hashes: HashMap<[u8; 32], Vec<[u8; 32]>>,
     /// Leios points currently being fetched.
     in_flight: HashMap<Point, Instant>,
     /// Pipeline timing parameters.
@@ -83,6 +90,7 @@ impl LeiosConsensus {
         node_id: String,
         commands: mpsc::Sender<NetworkCommand>,
         validator: Validator,
+        mempool: crate::mempool::SharedMempool,
         pipeline: PipelineConfig,
         committee_selection: CommitteeSelection,
         stake: u64,
@@ -123,6 +131,8 @@ impl LeiosConsensus {
             node_id,
             commands,
             validator,
+            mempool,
+            eb_tx_hashes: HashMap::new(),
             in_flight: HashMap::new(),
             pipeline,
             current_slot: 0,
@@ -253,12 +263,18 @@ impl LeiosConsensus {
                 };
                 if !self.in_flight.contains_key(&key) {
                     self.mark_in_flight(key);
-                    info!(node_id = %self.node_id, %point, "fetching leios block txs");
+                    let bitmap = self.bitmap_for_missing_txs(point);
+                    info!(
+                        node_id = %self.node_id,
+                        %point,
+                        bitmap_segments = bitmap.len(),
+                        "fetching leios block txs"
+                    );
                     let _ = self
                         .commands
                         .send(NetworkCommand::FetchLeiosBlockTxs {
                             point: point.clone(),
-                            bitmap: std::collections::BTreeMap::new(),
+                            bitmap,
                         })
                         .await;
                 }
@@ -280,8 +296,13 @@ impl LeiosConsensus {
                 }
                 true
             }
-            NetworkEvent::LeiosBlockReceived { point, .. } => {
+            NetworkEvent::LeiosBlockReceived { point, block } => {
                 self.in_flight.remove(point);
+                if let Point::Specific { hash, .. } = point {
+                    if let Some((_slot, hashes)) = crate::production::decode_overflow_eb(block) {
+                        self.eb_tx_hashes.insert(*hash, hashes);
+                    }
+                }
                 self.validator
                     .submit(LedgerCommand::ValidateEb {
                         point: point.clone(),
@@ -407,6 +428,41 @@ impl LeiosConsensus {
         }
     }
 
+    /// Build the sparse bitmap of transactions we don't already have for
+    /// a peer's `LeiosBlockTxsOffered` for `point`. If the EB manifest
+    /// is unknown (we haven't received the EB yet, or it failed to
+    /// decode), fall back to selecting all transactions so the request
+    /// is still useful.
+    fn bitmap_for_missing_txs(&self, point: &Point) -> std::collections::BTreeMap<u16, u64> {
+        use net_core::protocols::leios_fetch::bitmap;
+        let hash = match point {
+            Point::Specific { hash, .. } => hash,
+            Point::Origin => return BTreeMap::new(),
+        };
+        let Some(tx_hashes) = self.eb_tx_hashes.get(hash) else {
+            // We learned about txs before fetching/validating the EB
+            // (notification re-flooded ahead of our local EB fetch).
+            // Fall back to "every tx the protocol supports"; the server
+            // returns only what it actually has.
+            let max_txs =
+                (net_core::protocols::leios_fetch::MAX_BITMAP_ENTRIES as u32).saturating_mul(64);
+            return bitmap::select_all(max_txs);
+        };
+        let have = self.mempool.lock().unwrap().current_tx_ids();
+        let missing: Vec<u32> = tx_hashes
+            .iter()
+            .enumerate()
+            .filter_map(|(i, h)| {
+                if have.contains(h.as_slice()) {
+                    None
+                } else {
+                    Some(i as u32)
+                }
+            })
+            .collect();
+        bitmap::from_indices(&missing)
+    }
+
     // -- Queries ------------------------------------------------------------
 
     /// Returns true if any EB election has reached quorum and is in
@@ -522,11 +578,20 @@ mod tests {
     }
 
     fn test_leios(commands: mpsc::Sender<NetworkCommand>, validator: Validator) -> LeiosConsensus {
+        test_leios_with_mempool(commands, validator, crate::mempool::new_mempool(1000))
+    }
+
+    fn test_leios_with_mempool(
+        commands: mpsc::Sender<NetworkCommand>,
+        validator: Validator,
+        mempool: crate::mempool::SharedMempool,
+    ) -> LeiosConsensus {
         let registry = test_registry();
         LeiosConsensus::new(
             "test".into(),
             commands,
             validator,
+            mempool,
             test_pipeline(),
             CommitteeSelection::EveryoneVotes,
             100, // own stake
@@ -1031,6 +1096,153 @@ mod tests {
         // Advance further; both eligible — earliest wins.
         leios.on_slot(18).await;
         assert_eq!(leios.certified_eb_slot(), Some(0));
+    }
+
+    // -- Bitmap construction tests ------------------------------------------
+
+    use net_core::protocols::leios_fetch::bitmap as bitmap_helpers;
+    use net_core::protocols::txsubmission::{PendingTx, TxBody, TxId};
+
+    /// Build the manifest bytes that the producer would emit for a given
+    /// list of 32-byte tx hashes at `slot`. Returns the same CBOR shape as
+    /// `make_overflow_eb` (`[slot, [hash, ...]]`) plus the EB hash.
+    fn make_manifest(slot: u64, hashes: &[[u8; 32]]) -> (Vec<u8>, [u8; 32]) {
+        let mut data = Vec::new();
+        let mut enc = minicbor::Encoder::new(&mut data);
+        let _ = enc
+            .array(2)
+            .and_then(|e| e.u64(slot))
+            .and_then(|e| e.array(hashes.len() as u64));
+        for h in hashes {
+            let _ = minicbor::Encoder::new(&mut data).bytes(h);
+        }
+        let hash_result = blake2b_simd::Params::new().hash_length(32).hash(&data);
+        let mut eb_hash = [0u8; 32];
+        eb_hash.copy_from_slice(hash_result.as_bytes());
+        (data, eb_hash)
+    }
+
+    fn push_tx_with_id(mempool: &crate::mempool::SharedMempool, id: [u8; 32]) {
+        let tx = PendingTx {
+            tx_id: TxId(id.to_vec()),
+            body: TxBody(vec![]),
+            size: 0,
+        };
+        mempool.lock().unwrap().push(tx);
+    }
+
+    #[tokio::test]
+    async fn bitmap_for_offered_txs_skips_ids_already_in_mempool() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mempool = crate::mempool::new_mempool(1000);
+        let mut leios = test_leios_with_mempool(tx, validator, mempool.clone());
+
+        // Three txs in the EB; we already have #0 and #2 in the mempool.
+        let h0 = [0xA0u8; 32];
+        let h1 = [0xA1u8; 32];
+        let h2 = [0xA2u8; 32];
+        push_tx_with_id(&mempool, h0);
+        push_tx_with_id(&mempool, h2);
+
+        let (manifest, eb_hash) = make_manifest(7, &[h0, h1, h2]);
+        let eb_point = Point::Specific {
+            slot: 7,
+            hash: eb_hash,
+        };
+
+        // EB arrives → manifest cached.
+        leios
+            .handle_event(&NetworkEvent::LeiosBlockReceived {
+                point: eb_point.clone(),
+                block: manifest,
+            })
+            .await;
+
+        // Tx availability announcement → should fetch only the missing index (#1).
+        leios
+            .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                point: eb_point.clone(),
+            })
+            .await;
+
+        let cmd = rx.recv().await.expect("fetch command emitted");
+        match cmd {
+            NetworkCommand::FetchLeiosBlockTxs { point, bitmap } => {
+                assert_eq!(point, eb_point);
+                let indices: Vec<u32> = bitmap_helpers::iter_indices(&bitmap).collect();
+                assert_eq!(indices, vec![1]);
+            }
+            other => panic!("expected FetchLeiosBlockTxs, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn bitmap_for_offered_txs_falls_back_to_select_all_when_manifest_unknown() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mempool = crate::mempool::new_mempool(1000);
+        let mut leios = test_leios_with_mempool(tx, validator, mempool.clone());
+
+        // No manifest cached for this EB.
+        let eb_point = Point::Specific {
+            slot: 9,
+            hash: [0xCC; 32],
+        };
+        leios
+            .handle_event(&NetworkEvent::LeiosBlockTxsOffered { point: eb_point })
+            .await;
+
+        let cmd = rx.recv().await.expect("fetch command emitted");
+        match cmd {
+            NetworkCommand::FetchLeiosBlockTxs { bitmap, .. } => {
+                // Spec-faithful fallback: select_all up to the protocol's
+                // max bitmap entries.
+                assert_eq!(
+                    bitmap.len(),
+                    net_core::protocols::leios_fetch::MAX_BITMAP_ENTRIES,
+                    "fallback should fill the bitmap"
+                );
+            }
+            other => panic!("expected FetchLeiosBlockTxs, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn bitmap_is_empty_when_mempool_already_has_every_tx() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mempool = crate::mempool::new_mempool(1000);
+        let mut leios = test_leios_with_mempool(tx, validator, mempool.clone());
+
+        let h0 = [0xB0u8; 32];
+        let h1 = [0xB1u8; 32];
+        push_tx_with_id(&mempool, h0);
+        push_tx_with_id(&mempool, h1);
+
+        let (manifest, eb_hash) = make_manifest(3, &[h0, h1]);
+        let eb_point = Point::Specific {
+            slot: 3,
+            hash: eb_hash,
+        };
+
+        leios
+            .handle_event(&NetworkEvent::LeiosBlockReceived {
+                point: eb_point.clone(),
+                block: manifest,
+            })
+            .await;
+        leios
+            .handle_event(&NetworkEvent::LeiosBlockTxsOffered { point: eb_point })
+            .await;
+
+        let cmd = rx.recv().await.expect("fetch command emitted");
+        match cmd {
+            NetworkCommand::FetchLeiosBlockTxs { bitmap, .. } => {
+                assert!(bitmap.is_empty(), "every tx is local; nothing to request");
+            }
+            other => panic!("expected FetchLeiosBlockTxs, got {other:?}"),
+        }
     }
 
     #[tokio::test]

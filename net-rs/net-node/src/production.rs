@@ -427,6 +427,29 @@ impl BlockProducer {
     }
 }
 
+/// Decode an overflow EB manifest produced by `make_overflow_eb`.
+/// Returns `(slot, tx_hashes)` on success, where each `tx_hash` is 32 bytes.
+pub fn decode_overflow_eb(blob: &[u8]) -> Option<(u64, Vec<[u8; 32]>)> {
+    let mut dec = minicbor::Decoder::new(blob);
+    let outer = dec.array().ok()??;
+    if outer != 2 {
+        return None;
+    }
+    let slot = dec.u64().ok()?;
+    let inner = dec.array().ok()??;
+    let mut hashes = Vec::with_capacity(inner as usize);
+    for _ in 0..inner {
+        let bytes = dec.bytes().ok()?;
+        if bytes.len() != 32 {
+            return None;
+        }
+        let mut h = [0u8; 32];
+        h.copy_from_slice(bytes);
+        hashes.push(h);
+    }
+    Some((slot, hashes))
+}
+
 /// Build an EB manifest from overflow transactions. The EB body is a CBOR
 /// array `[slot, [tx_hash, ...]]` and the point hash is Blake2b-256 of
 /// the manifest bytes (content-addressed).
@@ -685,6 +708,23 @@ mod tests {
             }
             _ => panic!("expected Specific points"),
         }
+    }
+
+    #[test]
+    fn decode_overflow_eb_round_trip() {
+        let txs = vec![make_test_tx(0x10, 50), make_test_tx(0x20, 70)];
+        let eb = make_overflow_eb(99, &txs);
+        let (slot, hashes) = decode_overflow_eb(&eb.data).expect("decode");
+        assert_eq!(slot, 99);
+        assert_eq!(hashes.len(), 2);
+        assert_eq!(hashes[0], [0x10; 32]);
+        assert_eq!(hashes[1], [0x20; 32]);
+    }
+
+    #[test]
+    fn decode_overflow_eb_rejects_garbage() {
+        assert!(decode_overflow_eb(&[0xFF, 0xFF]).is_none());
+        assert!(decode_overflow_eb(&[]).is_none());
     }
 
     #[test]
