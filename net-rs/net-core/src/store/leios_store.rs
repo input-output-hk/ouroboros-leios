@@ -60,7 +60,21 @@ struct LeiosStoreInner {
     capacity: usize,
     /// Monotonically increasing counter for change notifications.
     version: u64,
+    /// Highest slot observed in any inject — drives slot-based eviction.
+    max_slot: u64,
+    /// Slot-window retention. Entries older than `max_slot - retention_slots`
+    /// are evicted on every `bump_version`. Bounds memory under sustained
+    /// EB / vote load (each EB carries ~600 votes; without slot eviction,
+    /// receivers accumulate the full history forever).
+    retention_slots: u64,
 }
+
+/// Default slot-window retention for `LeiosStore`. Sized for the Linear Leios
+/// pipeline (13 slots end-to-end) plus comfortable headroom — peers fetching
+/// EBs / votes / manifests need only a window long enough to complete the
+/// pipeline. Smaller than `LeiosTracker`'s 1000-slot dedup window because
+/// the tracker stores tiny offer IDs while this store holds full bodies.
+pub const DEFAULT_RETENTION_SLOTS: u64 = 100;
 
 /// Thread-safe content-addressed store for Leios data.
 ///
@@ -89,6 +103,15 @@ impl LeiosStore {
         capacity: usize,
         tx_body_resolver: Option<Arc<dyn TxBodyResolver>>,
     ) -> (Arc<Self>, watch::Receiver<u64>) {
+        Self::new_with_retention(capacity, tx_body_resolver, DEFAULT_RETENTION_SLOTS)
+    }
+
+    /// Full constructor: explicit slot-window retention.
+    pub fn new_with_retention(
+        capacity: usize,
+        tx_body_resolver: Option<Arc<dyn TxBodyResolver>>,
+        retention_slots: u64,
+    ) -> (Arc<Self>, watch::Receiver<u64>) {
         let (notify_sender, notify_receiver) = watch::channel(0u64);
         let store = Arc::new(Self {
             inner: Mutex::new(LeiosStoreInner {
@@ -99,6 +122,8 @@ impl LeiosStore {
                 notifications: Vec::new(),
                 capacity,
                 version: 0,
+                max_slot: 0,
+                retention_slots,
             }),
             notify: notify_sender,
             tx_body_resolver,
@@ -121,6 +146,7 @@ impl LeiosStore {
         inner
             .notifications
             .push(LeiosNotification::BlockOffer { point });
+        inner.max_slot = inner.max_slot.max(slot);
         self.bump_version(&mut inner);
     }
 
@@ -139,6 +165,7 @@ impl LeiosStore {
         inner
             .notifications
             .push(LeiosNotification::BlockTxsOffer { point });
+        inner.max_slot = inner.max_slot.max(slot);
         self.bump_version(&mut inner);
     }
 
@@ -148,12 +175,14 @@ impl LeiosStore {
     /// opaque vote blobs (same length).
     pub fn inject_votes(&self, ids: Vec<(u64, Vec<u8>)>, data: Vec<Vec<u8>>) {
         let mut inner = self.inner.lock().unwrap();
+        let max_in_batch = ids.iter().map(|(s, _)| *s).max().unwrap_or(0);
         for (id, blob) in ids.iter().zip(data.iter()) {
             inner.votes.insert(id.clone(), blob.clone());
         }
         inner
             .notifications
             .push(LeiosNotification::VotesOffer { votes: ids });
+        inner.max_slot = inner.max_slot.max(max_in_batch);
         self.bump_version(&mut inner);
     }
 
@@ -182,6 +211,7 @@ impl LeiosStore {
         inner
             .notifications
             .push(LeiosNotification::BlockTxsOffer { point });
+        inner.max_slot = inner.max_slot.max(slot);
         self.bump_version(&mut inner);
     }
 
@@ -259,10 +289,20 @@ impl LeiosStore {
 
     fn bump_version(&self, inner: &mut LeiosStoreInner) {
         inner.version += 1;
-        // Evict oldest blocks if over capacity.
+
+        // Slot-window eviction. Bounds memory under sustained EB / vote
+        // load: receivers were accumulating every vote and every EB
+        // manifest forever, leaking ~70 MB/s on a 25-node cluster.
+        let cutoff = inner.max_slot.saturating_sub(inner.retention_slots);
+        if cutoff > 0 {
+            inner.blocks.retain(|key, _| key.slot >= cutoff);
+            inner.block_txs.retain(|key, _| key.slot >= cutoff);
+            inner.eb_tx_hashes.retain(|key, _| key.slot >= cutoff);
+            inner.votes.retain(|(slot, _), _| *slot >= cutoff);
+        }
+
+        // Capacity backstop on `blocks` (independent of slot window).
         if inner.blocks.len() > inner.capacity {
-            // Simple eviction: just clear half. Fine for a content store.
-            // A real implementation would use LRU.
             let to_remove: Vec<BlockKey> = inner
                 .blocks
                 .keys()
@@ -475,6 +515,62 @@ mod tests {
 
         let after_all = store.notifications_after(2);
         assert!(after_all.is_empty());
+    }
+
+    #[test]
+    fn slot_retention_prunes_old_data() {
+        // Tight retention window so the test stays small.
+        let (store, _rx) = LeiosStore::new_with_retention(1000, None, 5);
+
+        // Inject votes/blocks at slot 1, then advance the clock far past
+        // the retention window. Old entries must be evicted.
+        store.inject_votes(vec![(1, vec![0xAA])], vec![vec![0x01]]);
+        store.inject_block(
+            Point::Specific {
+                slot: 1,
+                hash: [0x11; 32],
+            },
+            vec![0xB0],
+        );
+        store.record_eb_manifest(
+            Point::Specific {
+                slot: 1,
+                hash: [0x22; 32],
+            },
+            vec![[0xCC; 32]],
+        );
+
+        // Pre-eviction sanity.
+        assert_eq!(store.get_votes(&[(1, vec![0xAA])]), vec![vec![0x01]]);
+        assert!(store.get_block(1, &[0x11; 32]).is_some());
+
+        // Inject something far in the future — past the retention cutoff.
+        // max_slot becomes 100; cutoff = 100 - 5 = 95; slot=1 entries evicted.
+        store.inject_block(
+            Point::Specific {
+                slot: 100,
+                hash: [0x33; 32],
+            },
+            vec![0xD0],
+        );
+
+        assert!(
+            store.get_votes(&[(1, vec![0xAA])]).is_empty(),
+            "old vote should be evicted past retention window"
+        );
+        assert!(
+            store.get_block(1, &[0x11; 32]).is_none(),
+            "old block should be evicted past retention window"
+        );
+        assert!(
+            store
+                .get_block_txs(1, &[0x22; 32], &bitmap::select_all(64))
+                .is_none(),
+            "old eb_tx_hashes should be evicted past retention window"
+        );
+
+        // Recent entry stays.
+        assert!(store.get_block(100, &[0x33; 32]).is_some());
     }
 
     #[tokio::test]
