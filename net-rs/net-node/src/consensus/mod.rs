@@ -101,9 +101,22 @@ impl Consensus {
 
     /// Verify a `LeiosBlockTxsReceived` response against the cached
     /// EB manifest. Returns the bodies whose hash lies in the manifest,
-    /// in manifest-index order, plus how many indices were requested.
+    /// in manifest-index order, plus how many indices were requested
+    /// and which indices remain unfilled.
     pub fn match_eb_tx_response(&mut self, point: &Point, bodies: &[Vec<u8>]) -> EbTxMatchOutcome {
         self.leios.match_eb_tx_response(point, bodies)
+    }
+
+    /// Re-issue a `FetchLeiosBlockTxs` for the still-missing indices.
+    /// The coordinator's `pick_txs_fetch_peer` excludes already-tried
+    /// peers, so the retry will land on a different candidate (or no-op
+    /// if all candidates are exhausted).
+    pub async fn retry_eb_tx_fetch(
+        &mut self,
+        point: Point,
+        bitmap: std::collections::BTreeMap<u16, u64>,
+    ) {
+        self.leios.retry_eb_tx_fetch(point, bitmap).await;
     }
 
     /// Periodic retry for lagging nodes — evicts stale fetches and
