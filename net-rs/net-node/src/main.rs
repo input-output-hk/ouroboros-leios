@@ -8,6 +8,13 @@ mod production;
 mod telemetry;
 mod validation;
 
+// Use jemalloc for better behavior under heavy small-allocation churn
+// (tx body clones, mux Bytes traffic). glibc's allocator tends to hold
+// freed pages, inflating RSS even after the heap shrinks; jemalloc
+// returns memory to the OS more aggressively.
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 use clap::Parser;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use tokio::io::AsyncBufReadExt;
