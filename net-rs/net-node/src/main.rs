@@ -255,11 +255,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     %point,
                                     requested = outcome.requested,
                                     matched = outcome.matched_bodies.len(),
-                                    "leios block txs response is partial"
+                                    remaining_segments = outcome.remaining_bitmap.len(),
+                                    "leios block txs response is partial — retrying"
                                 );
                             }
                             for body in &outcome.matched_bodies {
                                 let _ = tx_valid_tx.try_send(body.clone());
+                            }
+                            if !outcome.remaining_bitmap.is_empty() {
+                                consensus
+                                    .retry_eb_tx_fetch(point.clone(), outcome.remaining_bitmap)
+                                    .await;
                             }
                         }
                         // Pull-model TxSubmission: provide txs from mempool on demand.

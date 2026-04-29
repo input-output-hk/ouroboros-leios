@@ -16,7 +16,7 @@ mod pipeline;
 pub(crate) mod voting;
 mod wfa;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
@@ -46,6 +46,10 @@ pub struct EbTxMatchOutcome {
     /// Number of indices that the original request bitmap selected.
     /// Zero means "manifest not cached at request time" (fallback path).
     pub requested: usize,
+    /// Indices we requested but didn't receive a matching body for.
+    /// If non-empty, the caller should issue another `FetchLeiosBlockTxs`
+    /// to a different peer with this bitmap.
+    pub remaining_bitmap: std::collections::BTreeMap<u16, u64>,
 }
 
 /// How long an in-flight Leios fetch entry remains active before being
@@ -358,6 +362,17 @@ impl LeiosConsensus {
                 point,
                 transactions,
             } => {
+                // Drop the in-flight gate so subsequent offers can trigger
+                // fresh fetches. Retries (partial-response handling) issue
+                // their own commands via `retry_eb_tx_fetch` and do not
+                // need the gate.
+                if let Point::Specific { slot, .. } = point {
+                    let gate_key = Point::Specific {
+                        slot: *slot,
+                        hash: [0xFE; 32],
+                    };
+                    self.in_flight.remove(&gate_key);
+                }
                 info!(
                     node_id = %self.node_id,
                     %point,
@@ -475,6 +490,7 @@ impl LeiosConsensus {
                 return EbTxMatchOutcome {
                     matched_bodies: Vec::new(),
                     requested: 0,
+                    remaining_bitmap: BTreeMap::new(),
                 };
             }
         };
@@ -486,13 +502,15 @@ impl LeiosConsensus {
             return EbTxMatchOutcome {
                 matched_bodies: bodies.to_vec(),
                 requested: 0,
+                remaining_bitmap: BTreeMap::new(),
             };
         };
         let requested_bitmap = self.pending_eb_tx_fetches.remove(&hash);
-        let requested: usize = requested_bitmap
+        let requested_indices: Vec<u32> = requested_bitmap
             .as_ref()
-            .map(|b| bitmap::iter_indices(b).count())
-            .unwrap_or(0);
+            .map(|b| bitmap::iter_indices(b).collect())
+            .unwrap_or_default();
+        let requested = requested_indices.len();
 
         // Build expected_hash → manifest_index map for the indices we asked
         // for, restricting to those.
@@ -506,23 +524,59 @@ impl LeiosConsensus {
             None => manifest.iter().enumerate().map(|(i, h)| (*h, i)).collect(),
         };
 
-        // For each body, hash and look up.
+        // For each body, hash and look up. Track which manifest indices
+        // we satisfied so we can compute the remaining bitmap below.
+        let mut satisfied: HashSet<usize> = HashSet::new();
         let mut keyed: Vec<(usize, Vec<u8>)> = Vec::new();
         for body in bodies {
             let h_arr = blake2b_simd::Params::new().hash_length(32).hash(body);
             let mut hash_buf = [0u8; 32];
             hash_buf.copy_from_slice(h_arr.as_bytes());
             if let Some(&idx) = expected.get(&hash_buf) {
-                keyed.push((idx, body.clone()));
+                if satisfied.insert(idx) {
+                    keyed.push((idx, body.clone()));
+                }
             }
         }
         keyed.sort_by_key(|(i, _)| *i);
         let matched_bodies: Vec<Vec<u8>> = keyed.into_iter().map(|(_, b)| b).collect();
 
+        // What did we ask for but not get?
+        let remaining_indices: Vec<u32> = requested_indices
+            .into_iter()
+            .filter(|i| !satisfied.contains(&(*i as usize)))
+            .collect();
+        let remaining_bitmap = bitmap::from_indices(&remaining_indices);
+        if !remaining_bitmap.is_empty() {
+            // Carry forward so the next response can be matched against
+            // exactly the still-missing indices.
+            self.pending_eb_tx_fetches
+                .insert(hash, remaining_bitmap.clone());
+        }
+
         EbTxMatchOutcome {
             matched_bodies,
             requested,
+            remaining_bitmap,
         }
+    }
+
+    /// Issue another `FetchLeiosBlockTxs` for the given EB and bitmap.
+    /// Used by the partial-response handler to retry the still-missing
+    /// indices on a different peer (the coordinator's leios_tracker
+    /// excludes already-attempted peers).
+    pub async fn retry_eb_tx_fetch(
+        &mut self,
+        point: Point,
+        bitmap: std::collections::BTreeMap<u16, u64>,
+    ) {
+        if bitmap.is_empty() {
+            return;
+        }
+        let _ = self
+            .commands
+            .send(NetworkCommand::FetchLeiosBlockTxs { point, bitmap })
+            .await;
     }
 
     /// Build the sparse bitmap of transactions we don't already have for
@@ -1438,6 +1492,85 @@ mod tests {
         // Manifest unknown → requested=0 (we can't verify), bodies forwarded.
         assert_eq!(outcome.requested, 0);
         assert_eq!(outcome.matched_bodies, vec![body]);
+    }
+
+    #[tokio::test]
+    async fn match_eb_tx_response_partial_emits_remaining_bitmap() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mempool = crate::mempool::new_mempool(1000);
+        let mut leios = test_leios_with_mempool(tx, validator, mempool);
+
+        // Three bodies, request all three, server returns only the middle one.
+        let body0 = b"alpha".to_vec();
+        let body1 = b"bravo".to_vec();
+        let body2 = b"charlie".to_vec();
+        let h0 = body_hash(&body0);
+        let h1 = body_hash(&body1);
+        let h2 = body_hash(&body2);
+
+        let (manifest, eb_hash) = make_manifest(20, &[h0, h1, h2]);
+        let eb_point = Point::Specific {
+            slot: 20,
+            hash: eb_hash,
+        };
+
+        leios
+            .handle_event(&NetworkEvent::LeiosBlockReceived {
+                point: eb_point.clone(),
+                block: manifest,
+            })
+            .await;
+        leios
+            .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                point: eb_point.clone(),
+            })
+            .await;
+        let _ = next_record_cmd(&mut rx).await;
+        let _ = next_fetch_cmd(&mut rx).await;
+
+        let outcome = leios.match_eb_tx_response(&eb_point, &[body1.clone()]);
+        assert_eq!(outcome.matched_bodies, vec![body1]);
+        assert_eq!(outcome.requested, 3);
+        let remaining: Vec<u32> = bitmap_helpers::iter_indices(&outcome.remaining_bitmap).collect();
+        assert_eq!(remaining, vec![0, 2]);
+
+        // Retry path: caller issues a fresh fetch with the remaining bitmap.
+        leios
+            .retry_eb_tx_fetch(eb_point.clone(), outcome.remaining_bitmap)
+            .await;
+        let cmd = next_fetch_cmd(&mut rx).await;
+        match cmd {
+            NetworkCommand::FetchLeiosBlockTxs { point, bitmap } => {
+                assert_eq!(point, eb_point);
+                let indices: Vec<u32> = bitmap_helpers::iter_indices(&bitmap).collect();
+                assert_eq!(indices, vec![0, 2]);
+            }
+            other => panic!("expected FetchLeiosBlockTxs, got {other:?}"),
+        }
+
+        // Second response from a different peer fills in the rest.
+        let outcome2 = leios.match_eb_tx_response(&eb_point, &[body0.clone(), body2.clone()]);
+        assert_eq!(outcome2.matched_bodies, vec![body0, body2]);
+        assert_eq!(outcome2.requested, 2);
+        assert!(outcome2.remaining_bitmap.is_empty());
+    }
+
+    #[tokio::test]
+    async fn retry_eb_tx_fetch_with_empty_bitmap_is_noop() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mempool = crate::mempool::new_mempool(1000);
+        let mut leios = test_leios_with_mempool(tx, validator, mempool);
+        let p = Point::Specific {
+            slot: 1,
+            hash: [0; 32],
+        };
+        leios
+            .retry_eb_tx_fetch(p, std::collections::BTreeMap::new())
+            .await;
+        // Channel should have nothing.
+        assert!(rx.try_recv().is_err());
     }
 
     #[tokio::test]

@@ -60,6 +60,11 @@ pub(crate) struct LeiosTracker {
     pending_block_fetches: HashMap<(u64, [u8; 32]), PeerId>,
     /// Pending Leios TX fetches: (slot, hash) -> peer fetching it.
     pending_txs_fetches: HashMap<(u64, [u8; 32]), PeerId>,
+    /// Peers that have been asked for an EB's txs already, across the
+    /// current sequence of attempts. A retry on partial response should
+    /// pick a peer not in this set. Cleared by `clear_txs_attempts` once
+    /// the requester is satisfied (or gives up).
+    txs_attempts: HashMap<(u64, [u8; 32]), HashSet<PeerId>>,
     /// Pending Leios vote fetches: (slot, voter_id) -> peer fetching them.
     pending_vote_fetches: HashMap<(u64, Vec<u8>), PeerId>,
 }
@@ -78,6 +83,7 @@ impl LeiosTracker {
             pending_block_fetches: HashMap::new(),
             pending_txs_fetches: HashMap::new(),
             pending_vote_fetches: HashMap::new(),
+            txs_attempts: HashMap::new(),
         }
     }
 
@@ -92,6 +98,7 @@ impl LeiosTracker {
             self.block_offers.retain(|(s, _), _| *s >= cutoff);
             self.txs_offers.retain(|(s, _), _| *s >= cutoff);
             self.vote_offers.retain(|(s, _), _| *s >= cutoff);
+            self.txs_attempts.retain(|(s, _), _| *s >= cutoff);
         }
     }
 
@@ -213,7 +220,9 @@ impl LeiosTracker {
     }
 
     /// Pick the best peer to fetch Leios TXs from. Returns None if already
-    /// pending or no peer is available.
+    /// pending, or if every offering peer has already been tried (i.e.
+    /// the attempts set covers all candidates). Records the chosen peer
+    /// in `txs_attempts` so a subsequent retry will skip it.
     pub fn pick_txs_fetch_peer(
         &mut self,
         slot: u64,
@@ -224,10 +233,30 @@ impl LeiosTracker {
         if self.pending_txs_fetches.contains_key(&key) {
             return None;
         }
-        let candidates = self.txs_offers.get(&key).cloned().unwrap_or_default();
+        let attempted: HashSet<PeerId> = self.txs_attempts.get(&key).cloned().unwrap_or_default();
+        let candidates: Vec<PeerId> = self
+            .txs_offers
+            .get(&key)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|p| !attempted.contains(p))
+            .collect();
         let best = self.best_peer_by_rtt(&candidates, lookup)?;
         self.pending_txs_fetches.insert(key, best);
+        self.txs_attempts.entry(key).or_default().insert(best);
         Some(best)
+    }
+
+    /// Clear the attempts set for an EB's tx fetches. Call when the
+    /// requester is fully satisfied (every requested index received) or
+    /// has decided to give up. Currently unused by the coordinator —
+    /// stale entries are reaped by `update_slot` once the EB ages out
+    /// of the dedup window. Kept as the eventual hook for an explicit
+    /// "request complete" signal.
+    #[allow(dead_code)]
+    pub fn clear_txs_attempts(&mut self, slot: u64, hash: [u8; 32]) {
+        self.txs_attempts.remove(&(slot, hash));
     }
 
     /// Pick the best peer for each vote and return grouped by peer.
@@ -266,6 +295,9 @@ impl LeiosTracker {
         self.pending_block_fetches.retain(|_, id| *id != peer);
         self.pending_txs_fetches.retain(|_, id| *id != peer);
         self.pending_vote_fetches.retain(|_, id| *id != peer);
+        for attempts in self.txs_attempts.values_mut() {
+            attempts.remove(&peer);
+        }
     }
 
     // --- Test accessors ---
@@ -494,5 +526,87 @@ mod tests {
         let best = tracker.pick_txs_fetch_peer(5, hash, &peers).unwrap();
         assert_eq!(best, peer_b);
         assert!(tracker.pending_txs_fetches().contains_key(&(5, hash)));
+    }
+
+    #[test]
+    fn pick_txs_fetch_peer_skips_already_attempted() {
+        let mut tracker = LeiosTracker::new(1000);
+        let peer_a = PeerId(0);
+        let peer_b = PeerId(1);
+        let peer_c = PeerId(2);
+        let hash = test_hash();
+
+        for p in [peer_a, peer_b, peer_c] {
+            tracker.handle_txs_offer(7, hash, p);
+        }
+        let peers = TestPeers {
+            rtts: HashMap::from([
+                (peer_a, Some(Duration::from_millis(20))),
+                (peer_b, Some(Duration::from_millis(50))),
+                (peer_c, Some(Duration::from_millis(80))),
+            ]),
+        };
+
+        // First pick: peer_a (lowest RTT).
+        let first = tracker.pick_txs_fetch_peer(7, hash, &peers).unwrap();
+        assert_eq!(first, peer_a);
+        // Mark complete so a retry can happen.
+        tracker.complete_txs_fetch(7, hash);
+
+        // Second pick: peer_b (peer_a is in attempts, skipped).
+        let second = tracker.pick_txs_fetch_peer(7, hash, &peers).unwrap();
+        assert_eq!(second, peer_b);
+        tracker.complete_txs_fetch(7, hash);
+
+        // Third pick: peer_c.
+        let third = tracker.pick_txs_fetch_peer(7, hash, &peers).unwrap();
+        assert_eq!(third, peer_c);
+        tracker.complete_txs_fetch(7, hash);
+
+        // Fourth attempt: every peer is in the attempts set → None.
+        assert!(tracker.pick_txs_fetch_peer(7, hash, &peers).is_none());
+    }
+
+    #[test]
+    fn clear_txs_attempts_resets_eligibility() {
+        let mut tracker = LeiosTracker::new(1000);
+        let peer_a = PeerId(0);
+        let hash = test_hash();
+        tracker.handle_txs_offer(3, hash, peer_a);
+        let peers = TestPeers {
+            rtts: HashMap::from([(peer_a, Some(Duration::from_millis(20)))]),
+        };
+
+        let _first = tracker.pick_txs_fetch_peer(3, hash, &peers).unwrap();
+        tracker.complete_txs_fetch(3, hash);
+        // Without clear, the only candidate is in attempts → no pick.
+        assert!(tracker.pick_txs_fetch_peer(3, hash, &peers).is_none());
+
+        // After clear, peer is eligible again.
+        tracker.clear_txs_attempts(3, hash);
+        let again = tracker.pick_txs_fetch_peer(3, hash, &peers).unwrap();
+        assert_eq!(again, peer_a);
+    }
+
+    #[test]
+    fn txs_attempts_pruned_when_slot_ages_out() {
+        let mut tracker = LeiosTracker::new(10);
+        let peer_a = PeerId(0);
+        let hash = test_hash();
+        tracker.handle_txs_offer(1, hash, peer_a);
+        let peers = TestPeers {
+            rtts: HashMap::from([(peer_a, Some(Duration::from_millis(20)))]),
+        };
+        let _ = tracker.pick_txs_fetch_peer(1, hash, &peers).unwrap();
+        tracker.complete_txs_fetch(1, hash);
+
+        // Advance past the dedup window (window=10, cutoff at slot 20 = 10).
+        let hash2 = test_hash2();
+        tracker.handle_txs_offer(20, hash2, peer_a);
+
+        // Re-offer at slot 1 should now find no attempts entry.
+        tracker.handle_txs_offer(1, hash, peer_a);
+        let revived = tracker.pick_txs_fetch_peer(1, hash, &peers).unwrap();
+        assert_eq!(revived, peer_a);
     }
 }
