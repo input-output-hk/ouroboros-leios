@@ -173,7 +173,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 if leios {
                     consensus.on_slot(slot).await;
                     for ev in consensus.drain_leios_telemetry() {
-                        telem.record(ev);
+                        telem.record(ev).await;
                     }
                 }
 
@@ -198,13 +198,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         node: node_id.clone(),
                         slot,
                         size_bytes: produced.body.raw.len(),
-                    });
+                    }).await;
                     if let Some(eb_slot) = certified_eb_slot {
                         telem.record(NodeEvent::RbCertifiedEb {
                             node: node_id.clone(),
                             rb_slot: slot,
                             eb_slot,
-                        });
+                        }).await;
                     }
 
                     // If an EB was produced (overflow path), inject it.
@@ -213,7 +213,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         telem.record(NodeEvent::EBGenerated {
                             node: node_id.clone(),
                             slot,
-                        });
+                        }).await;
                         let _ = commands.send(NetworkCommand::InjectLeiosBlock {
                             point: eb.point.clone(),
                             block: eb.data.clone(),
@@ -283,7 +283,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     .await;
                             }
                         }
-                        record_network_event(&mut telem, &node_id, &event, &consensus);
+                        record_network_event(&mut telem, &node_id, &event, &consensus).await;
                         if !consensus.handle_event(&event).await {
                             log_event(&node_id, &event);
                         }
@@ -301,21 +301,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     telem.record(NodeEvent::BlockValidated {
                         node: node_id.clone(),
                         block_no: telem.blocks_validated,
-                    });
+                    }).await;
                 }
                 let rolled_back = consensus.on_validation_outcome(outcome).await;
                 if rolled_back {
                     telem.record(NodeEvent::RolledBack {
                         node: node_id.clone(),
                         slot: telem.current_slot,
-                    });
+                    }).await;
                 }
                 for ev in consensus.drain_leios_telemetry() {
-                    telem.record(ev);
+                    telem.record(ev).await;
                 }
             }
             _ = stats_tick.tick(), if stats_interval > 0 => {
-                telem.flush();
+                telem.flush().await;
                 let _ = commands.send(NetworkCommand::QueryPeers).await;
             }
             result = stdin_reader.read_line(&mut stdin_line) => {
@@ -342,7 +342,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             }
             _ = &mut shutdown => {
                 info!("shutting down");
-                telem.flush();
+                telem.flush().await;
                 let _ = commands.send(NetworkCommand::Shutdown).await;
                 break;
             }
@@ -353,7 +353,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 
 /// Record network events into telemetry.
-fn record_network_event(
+async fn record_network_event(
     telem: &mut telemetry::TelemetryHandle,
     node_id: &str,
     event: &NetworkEvent,
@@ -361,18 +361,22 @@ fn record_network_event(
 ) {
     match event {
         NetworkEvent::PeerConnected { peer_id, address } => {
-            telem.record(NodeEvent::PeerConnected {
-                node: node_id.into(),
-                peer_id: peer_id.to_string(),
-                address: address.clone(),
-            });
+            telem
+                .record(NodeEvent::PeerConnected {
+                    node: node_id.into(),
+                    peer_id: peer_id.to_string(),
+                    address: address.clone(),
+                })
+                .await;
         }
         NetworkEvent::PeerDisconnected { peer_id, reason } => {
-            telem.record(NodeEvent::PeerDisconnected {
-                node: node_id.into(),
-                peer_id: peer_id.to_string(),
-                reason: reason.clone(),
-            });
+            telem
+                .record(NodeEvent::PeerDisconnected {
+                    node: node_id.into(),
+                    peer_id: peer_id.to_string(),
+                    reason: reason.clone(),
+                })
+                .await;
         }
         NetworkEvent::TipAdvanced { tip, .. } => {
             telem.tip_block_no = Some(tip.block_no);
@@ -382,49 +386,61 @@ fn record_network_event(
                 }
                 _ => None,
             };
-            telem.record(NodeEvent::TipAdvanced {
-                node: node_id.into(),
-                block_no: tip.block_no,
-                slot: match &tip.point {
-                    net_core::types::Point::Specific { slot, .. } => *slot,
-                    _ => 0,
-                },
-            });
+            telem
+                .record(NodeEvent::TipAdvanced {
+                    node: node_id.into(),
+                    block_no: tip.block_no,
+                    slot: match &tip.point {
+                        net_core::types::Point::Specific { slot, .. } => *slot,
+                        _ => 0,
+                    },
+                })
+                .await;
         }
         NetworkEvent::BlockReceived { .. } => {
             telem.blocks_received += 1;
-            telem.record(NodeEvent::RBReceived {
-                node: node_id.into(),
-                slot: telem.current_slot,
-            });
+            telem
+                .record(NodeEvent::RBReceived {
+                    node: node_id.into(),
+                    slot: telem.current_slot,
+                })
+                .await;
         }
         NetworkEvent::TransactionReceived { .. } => {
             telem.txs_generated += 1;
         }
         NetworkEvent::PeerSnapshot { peers } => {
             let (chain_tree, tip_block_no, tip_hash) = consensus.chain_tree_snapshot();
-            telem.emit_stats(peers, chain_tree, tip_block_no, tip_hash);
+            telem
+                .emit_stats(peers, chain_tree, tip_block_no, tip_hash)
+                .await;
         }
         NetworkEvent::LeiosBlockReceived { .. } => {
-            telem.record(NodeEvent::EBReceived {
-                node: node_id.into(),
-                slot: telem.current_slot,
-            });
+            telem
+                .record(NodeEvent::EBReceived {
+                    node: node_id.into(),
+                    slot: telem.current_slot,
+                })
+                .await;
         }
         NetworkEvent::LeiosVotesReceived { ref vote_data, .. } => {
-            telem.record(NodeEvent::VotesReceived {
-                node: node_id.into(),
-                count: vote_data.len(),
-            });
+            telem
+                .record(NodeEvent::VotesReceived {
+                    node: node_id.into(),
+                    count: vote_data.len(),
+                })
+                .await;
         }
         NetworkEvent::RolledBack { point, .. } => {
-            telem.record(NodeEvent::RolledBack {
-                node: node_id.into(),
-                slot: match point {
-                    net_core::types::Point::Specific { slot, .. } => *slot,
-                    _ => 0,
-                },
-            });
+            telem
+                .record(NodeEvent::RolledBack {
+                    node: node_id.into(),
+                    slot: match point {
+                        net_core::types::Point::Specific { slot, .. } => *slot,
+                        _ => 0,
+                    },
+                })
+                .await;
         }
         _ => {}
     }
