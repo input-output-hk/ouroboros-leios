@@ -89,13 +89,13 @@ export const SimWrapper: FC = () => {
 
   return (
     <div className="relative h-screen w-screen">
-      <div className="flex flex-col items-start gap-4 z-10 absolute left-10 top-10">
-        <Scenario />
-        <LayoutSelector />
-        <Stats />
+      <div className="flex flex-col items-start gap-4 z-10 absolute left-10 top-10 pointer-events-none">
+        <div className="pointer-events-auto"><Scenario /></div>
+        <div className="pointer-events-auto"><LayoutSelector /></div>
+        <div className="pointer-events-auto"><Stats /></div>
       </div>
       {topologyLoaded ? <GraphWrapper /> : null}
-      <div className="absolute bottom-10 left-10 right-10 z-10 border-2 rounded-md p-4 border-gray-200 bg-white/80 backdrop-blur-xs flex gap-4">
+      <div className="absolute bottom-10 left-10 right-10 z-10 border-2 rounded-md p-4 border-gray-200 bg-white/80 backdrop-blur-xs flex gap-4 pointer-events-auto">
         <Playback />
         <TimelineSlider />
       </div>

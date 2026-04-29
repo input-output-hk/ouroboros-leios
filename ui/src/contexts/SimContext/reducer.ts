@@ -48,6 +48,7 @@ export const reducer = (
         graph: {
           ...state.graph,
           currentNode: undefined,
+          currentEdge: undefined,
         },
         // Reset timeline when switching scenarios
         events: [],
@@ -64,6 +65,18 @@ export const reducer = (
         graph: {
           ...state.graph,
           currentNode: action.payload,
+          currentEdge: undefined, // Clear edge selection when selecting a node
+        },
+      };
+    }
+
+    case "SET_CURRENT_EDGE": {
+      return {
+        ...state,
+        graph: {
+          ...state.graph,
+          currentEdge: action.payload,
+          currentNode: undefined, // Clear node selection when selecting an edge
         },
       };
     }
