@@ -743,6 +743,15 @@ impl Coordinator {
                 }
             }
 
+            NetworkCommand::InjectLeiosBlockTxs {
+                point,
+                transactions,
+            } => {
+                if let Some(ref store) = self.leios_store {
+                    store.inject_block_txs(point, transactions);
+                }
+            }
+
             NetworkCommand::InjectLeiosVotes { votes, data } => {
                 if let Some(ref store) = self.leios_store {
                     store.inject_votes(votes, data);
@@ -2368,6 +2377,59 @@ mod tests {
 
         // Drain the receiver for cleanup.
         drop(net_event_receiver);
+    }
+
+    /// `InjectLeiosBlockTxs` must reach the LeiosStore so peers can serve
+    /// the producer's overflow tx bodies via `MsgLeiosBlockTxsRequest`.
+    #[tokio::test]
+    async fn inject_leios_block_txs_lands_in_store() {
+        let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
+        let (net_event_sender, _net_event_receiver) = mpsc::channel(NETWORK_EVENTS_CAPACITY);
+        let (net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
+        let config = CoordinatorConfig::default();
+        let (chain_store, _chain_rx) = ChainStore::new(100);
+        let (leios_store, _leios_rx) = LeiosStore::new(100);
+        let coordinator = Coordinator::new(
+            config,
+            peer_event_sender,
+            peer_event_receiver,
+            net_event_sender,
+            net_cmd_receiver,
+            chain_store,
+            Some(leios_store.clone()),
+        );
+
+        let handle = tokio::spawn(coordinator.run());
+
+        let hash = [0xA1u8; 32];
+        let point = Point::Specific { slot: 7, hash };
+        let txs: Vec<Vec<u8>> = vec![vec![1, 2, 3], vec![4, 5, 6]];
+
+        net_cmd_sender
+            .send(NetworkCommand::InjectLeiosBlockTxs {
+                point: point.clone(),
+                transactions: txs.clone(),
+            })
+            .await
+            .expect("command should accept");
+
+        // Wait for the store to see the txs.
+        let mut got = None;
+        for _ in 0..50 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+            let bitmap = crate::protocols::leios_fetch::bitmap::select_all(txs.len() as u32);
+            if let Some(stored) = leios_store.get_block_txs(7, &hash, &bitmap) {
+                got = Some(stored);
+                break;
+            }
+        }
+        assert_eq!(got.as_deref(), Some(txs.as_slice()));
+
+        net_cmd_sender
+            .send(NetworkCommand::Shutdown)
+            .await
+            .expect("shutdown should accept");
+        let _ = tokio::time::timeout(Duration::from_secs(2), handle).await;
     }
 
     /// When a peer's command channel fills (peer task not draining), the

@@ -164,6 +164,13 @@ pub enum NetworkCommand {
     /// Inject a Leios block into the Leios store (for responder peers to serve).
     InjectLeiosBlock { point: Point, block: Vec<u8> },
 
+    /// Inject the transactions of a Leios block into the Leios store
+    /// (for responder peers to serve via `MsgLeiosBlockTxsRequest`).
+    InjectLeiosBlockTxs {
+        point: Point,
+        transactions: Vec<Vec<u8>>,
+    },
+
     /// Inject votes into the Leios store (for responder peers to serve).
     InjectLeiosVotes {
         votes: Vec<(u64, Vec<u8>)>,

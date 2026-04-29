@@ -212,6 +212,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             point: eb.point.clone(),
                             block: eb.data.clone(),
                         }).await;
+                        let _ = commands.send(NetworkCommand::InjectLeiosBlockTxs {
+                            point: eb.point.clone(),
+                            transactions: eb.transactions.clone(),
+                        }).await;
                     }
 
                     consensus

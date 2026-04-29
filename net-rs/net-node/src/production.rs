@@ -16,7 +16,12 @@ use crate::config::{DynamicConfig, ProductionConfig};
 /// A produced Leios endorser block.
 pub struct ProducedEb {
     pub point: Point,
+    /// CBOR-encoded manifest `[slot, [tx_hash, ...]]`.
     pub data: Vec<u8>,
+    /// Transaction bodies referenced by the manifest, in the same order
+    /// as the hashes. Published to the Leios store so peers can fetch
+    /// them via `MsgLeiosBlockTxsRequest`.
+    pub transactions: Vec<Vec<u8>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -441,7 +446,12 @@ fn make_overflow_eb(slot: u64, txs: &[PendingTx]) -> ProducedEb {
     hash.copy_from_slice(hash_result.as_bytes());
     let point = Point::Specific { slot, hash };
 
-    ProducedEb { point, data }
+    let transactions = txs.iter().map(|tx| tx.body.0.clone()).collect();
+    ProducedEb {
+        point,
+        data,
+        transactions,
+    }
 }
 
 #[cfg(test)]
@@ -675,6 +685,16 @@ mod tests {
             }
             _ => panic!("expected Specific points"),
         }
+    }
+
+    #[test]
+    fn overflow_eb_carries_tx_bodies_in_manifest_order() {
+        let txs = vec![make_test_tx(0xAA, 100), make_test_tx(0xBB, 200)];
+        let eb = make_overflow_eb(42, &txs);
+
+        assert_eq!(eb.transactions.len(), 2);
+        assert_eq!(eb.transactions[0], vec![0xAA; 100]);
+        assert_eq!(eb.transactions[1], vec![0xBB; 200]);
     }
 
     #[test]
