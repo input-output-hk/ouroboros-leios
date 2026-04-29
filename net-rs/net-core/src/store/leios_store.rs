@@ -8,11 +8,12 @@
 //! Server-side protocol handlers read (block lookups, vote lookups,
 //! notification subscriptions).
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::watch;
 
+use crate::protocols::leios_fetch::bitmap;
 use crate::types::Point;
 
 /// A notification about available Leios data, served by LeiosNotify.
@@ -135,11 +136,23 @@ impl LeiosStore {
         inner.blocks.get(&key).cloned()
     }
 
-    /// Look up transactions for an endorser block.
-    pub fn get_block_txs(&self, slot: u64, hash: &[u8; 32]) -> Option<Vec<Vec<u8>>> {
+    /// Look up transactions for an endorser block, filtered by the
+    /// CIP-0164 sparse bitmap. Returns `None` if the EB is unknown.
+    /// Returns transactions in ascending index order; out-of-range
+    /// bits in the bitmap are silently ignored.
+    pub fn get_block_txs(
+        &self,
+        slot: u64,
+        hash: &[u8; 32],
+        bitmap: &BTreeMap<u16, u64>,
+    ) -> Option<Vec<Vec<u8>>> {
         let inner = self.inner.lock().unwrap();
         let key = BlockKey { slot, hash: *hash };
-        inner.block_txs.get(&key).cloned()
+        let stored = inner.block_txs.get(&key)?;
+        let selected: Vec<Vec<u8>> = bitmap::iter_indices(bitmap)
+            .filter_map(|i| stored.get(i as usize).cloned())
+            .collect();
+        Some(selected)
     }
 
     /// Look up votes by their `(slot, voter_id)` identifiers.
@@ -216,7 +229,7 @@ mod tests {
     }
 
     #[test]
-    fn inject_and_get_block_txs() {
+    fn get_block_txs_with_select_all_returns_all() {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0xCDu8; 32];
         let txs = vec![vec![10, 20], vec![30, 40]];
@@ -224,8 +237,51 @@ mod tests {
 
         store.inject_block_txs(point, txs.clone());
 
-        assert_eq!(store.get_block_txs(42, &hash), Some(txs));
-        assert_eq!(store.get_block_txs(99, &hash), None);
+        let bitmap = bitmap::select_all(txs.len() as u32);
+        assert_eq!(store.get_block_txs(42, &hash, &bitmap), Some(txs));
+        assert_eq!(store.get_block_txs(99, &hash, &bitmap), None);
+    }
+
+    #[test]
+    fn get_block_txs_empty_bitmap_returns_empty() {
+        let (store, _rx) = LeiosStore::new(100);
+        let hash = [0xCDu8; 32];
+        let txs = vec![vec![10, 20], vec![30, 40]];
+        let point = Point::Specific { slot: 42, hash };
+
+        store.inject_block_txs(point, txs);
+
+        let bitmap = BTreeMap::new();
+        assert_eq!(store.get_block_txs(42, &hash, &bitmap), Some(Vec::new()));
+    }
+
+    #[test]
+    fn get_block_txs_filters_by_bitmap_and_orders_ascending() {
+        let (store, _rx) = LeiosStore::new(100);
+        let hash = [0xEFu8; 32];
+        let txs: Vec<Vec<u8>> = (0..70u8).map(|i| vec![i]).collect();
+        let point = Point::Specific { slot: 1, hash };
+
+        store.inject_block_txs(point, txs);
+
+        // Pick out-of-order indices spanning two segments to check ordering.
+        let bitmap = bitmap::from_indices(&[65, 0, 63]);
+        let got = store.get_block_txs(1, &hash, &bitmap).unwrap();
+        assert_eq!(got, vec![vec![0u8], vec![63u8], vec![65u8]]);
+    }
+
+    #[test]
+    fn get_block_txs_ignores_out_of_range_bits() {
+        let (store, _rx) = LeiosStore::new(100);
+        let hash = [0xAA; 32];
+        let txs = vec![vec![1u8], vec![2u8]];
+        let point = Point::Specific { slot: 5, hash };
+        store.inject_block_txs(point, txs);
+
+        // Bit 99 is past the available 2 txs; should be silently dropped.
+        let bitmap = bitmap::from_indices(&[0, 99]);
+        let got = store.get_block_txs(5, &hash, &bitmap).unwrap();
+        assert_eq!(got, vec![vec![1u8]]);
     }
 
     #[test]
