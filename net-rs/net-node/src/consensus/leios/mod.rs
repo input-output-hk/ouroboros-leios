@@ -65,13 +65,17 @@ pub struct LeiosConsensus {
     mempool: crate::mempool::SharedMempool,
     /// Per-EB ordered tx hash list, decoded from the EB manifest on
     /// `LeiosBlockReceived`. Drives the missing-tx bitmap on
-    /// `LeiosBlockTxsOffered`.
-    eb_tx_hashes: HashMap<[u8; 32], Vec<[u8; 32]>>,
+    /// `LeiosBlockTxsOffered`. Tagged with the EB's announced slot so
+    /// stale entries (manifest received but never validated, or kept
+    /// past pipeline expiry) can be pruned in `on_slot`.
+    eb_tx_hashes: HashMap<[u8; 32], (u64, Vec<[u8; 32]>)>,
     /// Per-EB requested bitmap. Set when a `FetchLeiosBlockTxs` command
     /// is issued; used at response time to verify which manifest indices
     /// were actually fulfilled (response[i] semantics aren't recoverable
     /// from the wire, so we hash each body and look it up in the manifest).
-    pending_eb_tx_fetches: HashMap<[u8; 32], std::collections::BTreeMap<u16, u64>>,
+    /// Tagged with the EB's announced slot for the same reason as
+    /// `eb_tx_hashes`.
+    pending_eb_tx_fetches: HashMap<[u8; 32], (u64, std::collections::BTreeMap<u16, u64>)>,
     /// Leios points currently being fetched.
     in_flight: HashMap<Point, Instant>,
     /// Pipeline timing parameters.
@@ -254,6 +258,20 @@ impl LeiosConsensus {
                 }
             }
         });
+        // Prune EB manifests and in-progress tx-fetch state by slot age.
+        // Done independently of `elections` so a manifest that arrived
+        // but never produced a validated election still expires.
+        let pipeline = self.pipeline;
+        self.eb_tx_hashes.retain(|_, (eb_slot, _)| {
+            pipeline
+                .phase_for_elapsed(slot.saturating_sub(*eb_slot))
+                .is_some()
+        });
+        self.pending_eb_tx_fetches.retain(|_, (eb_slot, _)| {
+            pipeline
+                .phase_for_elapsed(slot.saturating_sub(*eb_slot))
+                .is_some()
+        });
     }
 
     // -- Network event routing ----------------------------------------------
@@ -293,8 +311,9 @@ impl LeiosConsensus {
                         bitmap_segments = bitmap.len(),
                         "fetching leios block txs"
                     );
-                    if let Point::Specific { hash, .. } = point {
-                        self.pending_eb_tx_fetches.insert(*hash, bitmap.clone());
+                    if let Point::Specific { slot, hash } = point {
+                        self.pending_eb_tx_fetches
+                            .insert(*hash, (*slot, bitmap.clone()));
                     }
                     let _ = self
                         .commands
@@ -324,9 +343,9 @@ impl LeiosConsensus {
             }
             NetworkEvent::LeiosBlockReceived { point, block } => {
                 self.in_flight.remove(point);
-                if let Point::Specific { hash, .. } = point {
+                if let Point::Specific { slot, hash } = point {
                     if let Some((_slot, hashes)) = crate::production::decode_overflow_eb(block) {
-                        self.eb_tx_hashes.insert(*hash, hashes.clone());
+                        self.eb_tx_hashes.insert(*hash, (*slot, hashes.clone()));
                         // Tell the coordinator's LeiosStore so this node
                         // can re-serve EB tx requests via the mempool-
                         // backed resolver.
@@ -484,8 +503,8 @@ impl LeiosConsensus {
     /// Also reports `(matched, requested)` for partial-response detection.
     pub fn match_eb_tx_response(&mut self, point: &Point, bodies: &[Vec<u8>]) -> EbTxMatchOutcome {
         use net_core::protocols::leios_fetch::bitmap;
-        let hash = match point {
-            Point::Specific { hash, .. } => *hash,
+        let (eb_slot, hash) = match point {
+            Point::Specific { slot, hash } => (*slot, *hash),
             Point::Origin => {
                 return EbTxMatchOutcome {
                     matched_bodies: Vec::new(),
@@ -494,7 +513,7 @@ impl LeiosConsensus {
                 };
             }
         };
-        let Some(manifest) = self.eb_tx_hashes.get(&hash) else {
+        let Some((_, manifest)) = self.eb_tx_hashes.get(&hash) else {
             // Manifest unknown — we have no way to verify. Pass bodies
             // through; the validator will hash them and any unrelated
             // tx will simply sit in the mempool unused.
@@ -505,7 +524,7 @@ impl LeiosConsensus {
                 remaining_bitmap: BTreeMap::new(),
             };
         };
-        let requested_bitmap = self.pending_eb_tx_fetches.remove(&hash);
+        let requested_bitmap = self.pending_eb_tx_fetches.remove(&hash).map(|(_, b)| b);
         let requested_indices: Vec<u32> = requested_bitmap
             .as_ref()
             .map(|b| bitmap::iter_indices(b).collect())
@@ -551,7 +570,7 @@ impl LeiosConsensus {
             // Carry forward so the next response can be matched against
             // exactly the still-missing indices.
             self.pending_eb_tx_fetches
-                .insert(hash, remaining_bitmap.clone());
+                .insert(hash, (eb_slot, remaining_bitmap.clone()));
         }
 
         EbTxMatchOutcome {
@@ -590,7 +609,7 @@ impl LeiosConsensus {
             Point::Specific { hash, .. } => hash,
             Point::Origin => return BTreeMap::new(),
         };
-        let Some(tx_hashes) = self.eb_tx_hashes.get(hash) else {
+        let Some((_, tx_hashes)) = self.eb_tx_hashes.get(hash) else {
             // We learned about txs before fetching/validating the EB
             // (notification re-flooded ahead of our local EB fetch).
             // Fall back to "every tx the protocol supports"; the server
@@ -1210,6 +1229,44 @@ mod tests {
             assert!(!*had_quorum);
             assert_eq!(*voters, 0);
         }
+    }
+
+    #[tokio::test]
+    async fn pruned_election_drops_eb_manifests() {
+        // Once an election is pruned, eb_tx_hashes and
+        // pending_eb_tx_fetches for that EB hash should also be dropped.
+        // Otherwise a long-running node leaks one manifest per EB seen.
+        let (tx, _rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mut leios = test_leios(tx, validator);
+
+        leios.on_slot(0).await;
+        leios.on_validated_eb(point(0));
+
+        // Simulate the LeiosBlockReceived insert + a pending tx fetch.
+        let hash0 = point_hash(0);
+        leios
+            .eb_tx_hashes
+            .insert(hash0, (0, vec![[0xAAu8; 32], [0xBBu8; 32]]));
+        leios
+            .pending_eb_tx_fetches
+            .insert(hash0, (0, std::collections::BTreeMap::from([(0u16, 1u64)])));
+        assert_eq!(leios.eb_tx_hashes.len(), 1);
+        assert_eq!(leios.pending_eb_tx_fetches.len(), 1);
+
+        // Advance past the pipeline expiry (test pipeline expires at 23).
+        leios.on_slot(23).await;
+
+        assert_eq!(
+            leios.eb_tx_hashes.len(),
+            0,
+            "eb_tx_hashes should drop entries whose election expired"
+        );
+        assert_eq!(
+            leios.pending_eb_tx_fetches.len(),
+            0,
+            "pending_eb_tx_fetches should drop entries whose election expired"
+        );
     }
 
     #[tokio::test]
