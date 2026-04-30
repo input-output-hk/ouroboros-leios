@@ -161,6 +161,8 @@ cmp /tmp/det/T0.350-everyone-turbo-seed0-a.jsonl /tmp/det/T0.350-everyone-turbo-
 
 **Performance notes**: Turbo at 0.350 throughput / 750 nodes / 1500 slots takes ~15 min and ~28GB RSS. The `.jsonl` event stream adds ~15GB memory (unbounded mpsc buffering) and ~60GB disk per run. Do not run two benchmarks simultaneously — they compete for CPU and memory.
 
+On 1500-node topologies the per-node `txs` cache scales linearly, pushing sim-phase RSS to ~50–58 GB at NA,0.350. The end-of-sim flush from the EventMonitor's 1-second timestamp-bucket sort window adds a transient ~5–8 GB on top (the `buffered output events` counter peaks at >10M events for one window). 1500n high-throughput runs require swap to fit on a 60 GB box; see `analysis/sims/2026w18/CLAUDE.md` for the memory budget. Reducing `flush_window` at `sim-cli/src/events.rs:181` from `from_secs(1)` to `from_millis(100)` would cut the spike ~10× without altering correctness (inter-shard skew is bounded by min_latency, typically a few ms).
+
 ## Test Structure
 
 - Clock semantics: `sim-core/src/clock/coordinator.rs`
