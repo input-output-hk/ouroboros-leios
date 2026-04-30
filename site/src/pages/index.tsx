@@ -312,7 +312,7 @@ function MonthlyReviewsSection() {
               <div className={styles.countdownContainer}>
                 <Link
                   className={styles.countdown}
-                  to="https://youtube.com/live/IYDMqkEPLDs"
+                  to="https://youtube.com/live/Z4uA9tRGS7g"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
