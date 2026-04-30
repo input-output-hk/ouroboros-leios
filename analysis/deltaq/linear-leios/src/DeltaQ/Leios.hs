@@ -13,7 +13,6 @@ module DeltaQ.Leios (
   -- * Probabilities
   pValidating,
   pHeaderOnTime,
-  pEBOnTime,
 ) where
 
 import Data.Maybe (fromJust)
@@ -36,16 +35,23 @@ import qualified DeltaQ.PiecewisePolynomial as PW
 import DeltaQ.Praos (
   BlockSize (..),
   blendedDelay,
-  sendRBBody,
   sendRBHeader,
+  sendTxRBBody,
  )
 import qualified Numeric.Measure.Finite.Mixed as M
 
 -- | fetchingEB
 --
 -- TODO: Model FFD
+-- NOTE(SN): EBs may be up to 512kB in size.
 fetchingEB :: DQ
-fetchingEB = choices [(1, blendedDelay B512), (1, blendedDelay B1024), (1, blendedDelay B2048)]
+fetchingEB =
+  choices
+    [ (1, blendedDelay B1)
+    , (1, blendedDelay B64)
+    , (1, blendedDelay B256)
+    , (1, blendedDelay B512)
+    ]
 
 -- | fetchingTx
 --
@@ -75,7 +81,7 @@ fetchingTx :: Double -> DQ
 fetchingTx p =
   choices
     [ (hitRate, wait 0.001)
-    , (1 - hitRate, blendedDelay B1024)
+    , (1 - hitRate, blendedDelay B1) -- NOTE(SN): Current mean of tx size is ~1kB
     ]
  where
   -- Steady-state hit rate
@@ -100,6 +106,7 @@ txCache :: M.Measure Rational
 txCache = M.add (M.scale π_1 blendedDelay') (M.scale π_2 (M.dirac 0.001))
  where
   blendedDelay' :: M.Measure Rational
+  -- FIXME(SN): This is still a 1024kB transaction transfer. But lower values result in a 0 denominator?
   blendedDelay' = fromJust $ M.fromDistribution (PW.distribution (blendedDelay B1024))
   π_1 = (2 - p) / (2 + p)
   π_2 = 2 * p / (2 + p)
@@ -116,10 +123,11 @@ txCache' = measuredDQ pairs
       [0.0, 1.0, 2.0, 5.0, 7.0]
       (\i -> let fi = successWithin dq i in fi * (1 % n) * (1 - fi ^ n) / (1 - fi))
 
+-- REVIEW(SN): An RB may contain txs OR a cert; not both!
 processRBandEB :: DQ
 processRBandEB = processRB ./\. processEB
  where
-  processRB = sendRBBody .>>. applyTxs
+  processRB = sendTxRBBody .>>. applyTxs
   processEB = fetchingEB .>>. fetchingTxs
 
 -- | Distribution of EB validation time
@@ -148,17 +156,6 @@ pHeaderOnTime ::
 pHeaderOnTime lHdr =
   successWithin
     sendRBHeader
-    (fromIntegral lHdr)
-
--- | Probability that 'emitRBHeader' is within \(L_\text{hdr}\)
-pEBOnTime ::
-  -- | \(L_\text{hdr}\)
-  Integer ->
-  -- | Probability that the RB header is within \(L_\text{hdr}\)
-  Probability DQ
-pEBOnTime lHdr =
-  successWithin
-    fetchingEB
     (fromIntegral lHdr)
 
 -- | Probability that 'validateEB' is successful before the end of \(L_\text{vote}\)
