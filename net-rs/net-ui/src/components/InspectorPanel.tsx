@@ -1,0 +1,229 @@
+import { useMemo } from "react";
+import { Box, Typography, Divider, Chip } from "@mui/material";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { useStore } from "@/store";
+import { ChainTreeView } from "./ChainTreeView";
+
+function formatBytes(b: number): string {
+  if (b < 1024) return `${Math.round(b)} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / 1024 / 1024).toFixed(1)} MB`;
+}
+
+const EMPTY_SERIES: never[] = [];
+
+function NodeInspector({ nodeId }: { nodeId: string }) {
+  const stats = useStore((s) => s.latestStats[nodeId]);
+  const topology = useStore((s) => s.topology);
+  const series = useStore((s) => s.nodeTimeSeries[nodeId]) ?? EMPTY_SERIES;
+
+  const addrToNode = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (topology) {
+      for (const n of topology.nodes) {
+        // Map both full address and just the port
+        map[n.listen_address] = n.node_id;
+        map[`127.0.0.1:${n.listen_port}`] = n.node_id;
+      }
+    }
+    return map;
+  }, [topology]);
+
+  const WINDOW = 60;
+  const chartData = useMemo(() => {
+    const raw = series.map((p, i) => ({
+      t: i,
+      bandwidth: p.bandwidth as number | null,
+      messages: p.messages as number | null,
+      blocks: p.blocks as number | null,
+    }));
+    if (raw.length >= WINDOW) return raw;
+    const pad = Array.from({ length: WINDOW - raw.length }, (_, i) => ({
+      t: i,
+      bandwidth: null as number | null,
+      messages: null as number | null,
+      blocks: null as number | null,
+    }));
+    return [...pad, ...raw.map((p, i) => ({ ...p, t: WINDOW - raw.length + i }))];
+  }, [series]);
+
+  return (
+    <Box>
+      <Typography variant="subtitle2" color="primary" gutterBottom>
+        {nodeId}
+      </Typography>
+
+      {stats ? (
+        <Box sx={{ mb: 1 }}>
+          <Typography variant="body2">Slot: {stats.slot}</Typography>
+          <Typography variant="body2">
+            Tip: {stats.tip_block_no ?? "—"}{stats.tip_hash ? ` #${stats.tip_hash}` : ""}
+          </Typography>
+          <Typography variant="body2">
+            Blocks: {stats.blocks_produced} produced, {stats.blocks_received}{" "}
+            received
+          </Typography>
+          <Typography variant="body2">
+            TXs generated: {stats.txs_generated}
+          </Typography>
+          <Typography variant="body2">
+            Uptime: {stats.uptime_secs.toFixed(0)}s
+          </Typography>
+
+          {stats.chain_tree && stats.chain_tree.length > 0 && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="caption" color="text.secondary">
+                Chain
+              </Typography>
+              <ChainTreeView entries={stats.chain_tree} tipHash={stats.tip_hash} />
+            </>
+          )}
+
+          <Divider sx={{ my: 1 }} />
+          <Typography variant="caption" color="text.secondary">
+            Peers ({stats.peer_count})
+          </Typography>
+          {stats.peers.map((p) => {
+            const peerNode = addrToNode[p.address] ?? null;
+            return (
+            <Box key={p.peer_id} sx={{ ml: 1, mb: 0.5 }}>
+              <Typography variant="body2" component="div" fontSize={11}>
+                <Chip label={p.mode} size="small" sx={{ mr: 0.5, height: 16, fontSize: 10 }} />
+                {peerNode ? <><b>{peerNode}</b> ({p.address})</> : p.address}
+                {p.rtt_ms != null && ` (${p.rtt_ms.toFixed(0)}ms RTT)`}
+              </Typography>
+              <Typography variant="body2" fontSize={10} color="text.secondary" sx={{ ml: 1 }}>
+                {formatBytes(p.bytes_sent)} sent / {formatBytes(p.bytes_received)} received
+              </Typography>
+            </Box>
+            );
+          })}
+        </Box>
+      ) : (
+        <Typography variant="body2" color="text.secondary">
+          No stats yet
+        </Typography>
+      )}
+
+      {series.length > 0 && (
+        <>
+          <Divider sx={{ my: 1 }} />
+          <Typography variant="caption" color="text.secondary">
+            Bandwidth
+          </Typography>
+          <ResponsiveContainer width="100%" height={80}>
+            <LineChart data={chartData}>
+              <XAxis dataKey="t" hide />
+              <YAxis hide />
+              <Tooltip
+                formatter={(v: number) => formatBytes(v) + "/s"}
+                contentStyle={{ backgroundColor: "rgba(30,30,30,0.9)", border: "1px solid #555", borderRadius: 4, color: "#fff" }}
+                labelStyle={{ display: "none" }}
+              />
+              <Line
+                type="monotone"
+                dataKey="bandwidth"
+                stroke="#90caf9"
+                dot={false}
+                strokeWidth={1.5}
+                isAnimationActive={false}
+                connectNulls={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+
+          <Typography variant="caption" color="text.secondary">
+            Messages
+          </Typography>
+          <ResponsiveContainer width="100%" height={80}>
+            <LineChart data={chartData}>
+              <XAxis dataKey="t" hide />
+              <YAxis hide />
+              <Tooltip
+                contentStyle={{ backgroundColor: "rgba(30,30,30,0.9)", border: "1px solid #555", borderRadius: 4, color: "#fff" }}
+                labelStyle={{ display: "none" }}
+              />
+              <Line
+                type="monotone"
+                dataKey="messages"
+                stroke="#f48fb1"
+                dot={false}
+                strokeWidth={1.5}
+                isAnimationActive={false}
+                connectNulls={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+
+          <Typography variant="caption" color="text.secondary">
+            Blocks
+          </Typography>
+          <ResponsiveContainer width="100%" height={80}>
+            <LineChart data={chartData}>
+              <XAxis dataKey="t" hide />
+              <YAxis hide />
+              <Tooltip
+                formatter={(v: number) => String(Math.round(v))}
+                contentStyle={{ backgroundColor: "rgba(30,30,30,0.9)", border: "1px solid #555", borderRadius: 4, color: "#fff" }}
+                labelStyle={{ display: "none" }}
+              />
+              <Line
+                type="monotone"
+                dataKey="blocks"
+                stroke="#a5d6a7"
+                dot={false}
+                strokeWidth={1.5}
+                isAnimationActive={false}
+                connectNulls={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </>
+      )}
+    </Box>
+  );
+}
+
+function EdgeInspector({ from, to }: { from: number; to: number }) {
+  const topology = useStore((s) => s.topology);
+  const edge = topology?.edges.find((e) => e.from === from && e.to === to);
+
+  if (!topology || !edge) return null;
+
+  const srcNode = topology.nodes[from];
+  const dstNode = topology.nodes[to];
+
+  return (
+    <Box>
+      <Typography variant="subtitle2" color="primary" gutterBottom>
+        Edge: {srcNode?.node_id} — {dstNode?.node_id}
+      </Typography>
+      <Typography variant="body2">Latency: {edge.latency_ms}ms</Typography>
+      <Typography variant="body2">
+        {srcNode?.listen_address} ↔ {dstNode?.listen_address}
+      </Typography>
+    </Box>
+  );
+}
+
+export function InspectorPanel() {
+  const selectedNodeId = useStore((s) => s.selectedNodeId);
+  const selectedEdge = useStore((s) => s.selectedEdge);
+
+  return (
+    <Box sx={{ p: 2, overflowY: "auto", height: "100%" }}>
+      {selectedNodeId && <NodeInspector nodeId={selectedNodeId} />}
+      {selectedEdge && (
+        <EdgeInspector from={selectedEdge.from} to={selectedEdge.to} />
+      )}
+    </Box>
+  );
+}

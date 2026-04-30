@@ -1,0 +1,79 @@
+//! Coordinator wrapper: translates NodeConfig into CoordinatorConfig,
+//! spawns the coordinator, and issues AddPeer commands for configured peers.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
+
+use net_core::multi_peer::types::NetworkCommand;
+use net_core::multi_peer::{spawn_coordinator, CoordinatorConfig, CoordinatorHandle};
+use net_core::mux::scheduler::SchedulerType;
+use net_core::store::leios_store::TxBodyResolver;
+
+use crate::config::NodeConfig;
+
+/// Parse a scheduler name string into a `SchedulerType`.
+fn parse_scheduler(name: &str) -> Result<SchedulerType, Box<dyn std::error::Error + Send + Sync>> {
+    match name.to_lowercase().as_str() {
+        "round-robin" | "roundrobin" | "rr" => Ok(SchedulerType::RoundRobin),
+        "strict-priority" | "strictpriority" | "sp" => Ok(SchedulerType::StrictPriority),
+        "priority-wfq" | "prioritywfq" | "wfq" => Ok(SchedulerType::PriorityWfq),
+        _ => Err(format!(
+            "unknown scheduler: {name} (expected round-robin, strict-priority, or priority-wfq)"
+        )
+        .into()),
+    }
+}
+
+/// Start the multi-peer coordinator and add configured peers. The
+/// optional `tx_body_resolver` lets the coordinator's `LeiosStore` serve
+/// EB tx requests from the application's mempool when only the manifest
+/// is cached locally.
+pub async fn start(
+    config: &NodeConfig,
+    tx_body_resolver: Option<Arc<dyn TxBodyResolver>>,
+) -> Result<CoordinatorHandle, Box<dyn std::error::Error + Send + Sync>> {
+    // Build per-peer delay map from config.
+    let peer_delays: HashMap<String, Duration> = config
+        .peers
+        .iter()
+        .filter_map(|p| {
+            p.inbound_delay_ms
+                .filter(|&ms| ms > 0)
+                .map(|ms| (p.address.clone(), Duration::from_millis(ms)))
+        })
+        .collect();
+
+    let coordinator_config = CoordinatorConfig {
+        network_magic: config.network_magic,
+        max_peers: config.max_peers,
+        keepalive_interval: Duration::from_secs(config.keepalive_interval_secs),
+        sdu_timeout: Duration::from_secs(900),
+        listen_address: config.listen_address.clone(),
+        chain_store_capacity: config.chain_store_capacity,
+        duplex: true,
+        leios_enabled: config.leios_enabled,
+        leios_dedup_window: config.leios_dedup_window,
+        leios_store_stats_log_interval: config.leios_store_stats_log_interval,
+        traffic_class_overrides: HashMap::new(),
+        scheduler_type: parse_scheduler(&config.scheduler)?,
+        max_handshaking: config.max_handshaking,
+        max_connections_per_ip: config.max_connections_per_ip,
+        peer_delays,
+        tx_body_resolver,
+    };
+
+    let handle = spawn_coordinator(coordinator_config);
+
+    // Add configured outbound peers.
+    for peer in &config.peers {
+        let _ = handle
+            .commands
+            .send(NetworkCommand::AddPeer {
+                address: peer.address.clone(),
+            })
+            .await;
+    }
+
+    Ok(handle)
+}

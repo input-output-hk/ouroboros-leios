@@ -1,0 +1,23 @@
+# Passive follower that connects to a real mainnet relay (no block production)
+#
+# Overlay on top of mainnet.toml:
+#   cargo run -p net-node -- --config configs/mainnet.toml --config configs/follow-real-relay.toml
+
+node_id = "relay-follower"
+seed = 1
+leios_enabled = false
+
+[production]
+stake = 0
+
+[transactions]
+tx_rate = 0.0
+
+[telemetry]
+stats_interval_secs = 10
+
+[[telemetry.stats_sinks]]
+type = "log"
+
+[[peers]]
+address = "backbone.cardano.iog.io:3001"

@@ -1,0 +1,33 @@
+# Base configuration for a local test network.
+#
+# Shared across all nodes — overlay with per-node configs for identity,
+# listen address, peers, and stake.
+#
+# Uses mainnet magic so test nodes can also connect to real Cardano relays
+# (they won't produce real blocks, but they will follow the chain).
+
+network_magic = 764824073
+slot_duration_ms = 1000
+genesis_time_unix = 1654041600   # Vasil-era genesis (2022-06-01T00:00:00Z)
+leios_enabled = true
+scheduler = "priority-wfq"
+security_param_k = 2160
+
+[production]
+total_stake = 1000
+rb_generation_probability = 0.05
+eb_generation_probability = 0.5
+vote_generation_probability = 0.8
+stage_length_slots = 20
+
+[transactions]
+tx_rate = 0.0
+tx_size_min = 250
+tx_size_max = 16384
+
+[validation]
+rb_head_validation_ms = 1.0
+rb_body_validation_ms_constant = 1000.0
+rb_body_validation_ms_per_byte = 0.001
+eb_validation_ms = 2.0
+vote_validation_ms = 1.0

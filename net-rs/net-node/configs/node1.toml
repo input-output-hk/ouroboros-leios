@@ -1,0 +1,26 @@
+# Node 1: block producer with simulated delay
+#
+# Overlay on top of mainnet.toml:
+#   cargo run -p net-node -- --config configs/mainnet.toml --config configs/node1.toml
+
+node_id = "node-1"
+listen_address = "127.0.0.1:30001"
+seed = 99
+
+[production]
+stake = 500
+
+[telemetry]
+stats_interval_secs = 5
+
+[[telemetry.event_sinks]]
+type = "file"
+path = "node1-events.jsonl"
+
+[[telemetry.stats_sinks]]
+type = "log"
+
+# Peer with 50ms simulated inbound delay
+[[peers]]
+address = "127.0.0.1:30000"
+inbound_delay_ms = 50
