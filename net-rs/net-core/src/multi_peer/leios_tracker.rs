@@ -99,6 +99,9 @@ impl LeiosTracker {
             self.txs_offers.retain(|(s, _), _| *s >= cutoff);
             self.vote_offers.retain(|(s, _), _| *s >= cutoff);
             self.txs_attempts.retain(|(s, _), _| *s >= cutoff);
+            self.pending_block_fetches.retain(|(s, _), _| *s >= cutoff);
+            self.pending_txs_fetches.retain(|(s, _), _| *s >= cutoff);
+            self.pending_vote_fetches.retain(|(s, _), _| *s >= cutoff);
         }
     }
 
@@ -586,6 +589,59 @@ mod tests {
         tracker.clear_txs_attempts(3, hash);
         let again = tracker.pick_txs_fetch_peer(3, hash, &peers).unwrap();
         assert_eq!(again, peer_a);
+    }
+
+    #[test]
+    fn pending_fetches_pruned_when_slot_ages_out() {
+        // A pending Leios fetch that never completes (silent peer drop,
+        // decode error, etc.) must not leak the (slot, hash) entry forever.
+        // Once the slot ages out of the dedup window, the entry should be
+        // dropped — the seen set has already been pruned, so a re-offer
+        // would be treated as new anyway.
+        let mut tracker = LeiosTracker::new(10);
+        let peer_a = PeerId(0);
+        let hash = test_hash();
+        let hash2 = test_hash2();
+        let peers = TestPeers {
+            rtts: HashMap::from([(peer_a, Some(Duration::from_millis(20)))]),
+        };
+
+        // Pending block fetch at slot 1.
+        tracker.handle_block_offer(1, hash, peer_a);
+        assert!(tracker.pick_block_fetch_peer(1, hash, &peers).is_some());
+        assert!(tracker.pending_block_fetches().contains_key(&(1, hash)));
+
+        // Pending txs fetch at slot 1.
+        tracker.handle_txs_offer(1, hash, peer_a);
+        assert!(tracker.pick_txs_fetch_peer(1, hash, &peers).is_some());
+        assert!(tracker.pending_txs_fetches().contains_key(&(1, hash)));
+
+        // Pending vote fetch at slot 1.
+        let voter_id = vec![0xAA];
+        tracker.handle_vote_batch(vec![(1, voter_id.clone())], peer_a);
+        let _ = tracker.pick_vote_fetch_peers(vec![(1, voter_id.clone())], &peers);
+
+        // Advance past the dedup window (window=10, cutoff at slot 20 = 10).
+        tracker.handle_block_offer(20, hash2, peer_a);
+
+        // All pending entries at slot 1 should be pruned.
+        assert!(
+            !tracker.pending_block_fetches().contains_key(&(1, hash)),
+            "pending_block_fetches should prune slot 1 once it ages out"
+        );
+        assert!(
+            !tracker.pending_txs_fetches().contains_key(&(1, hash)),
+            "pending_txs_fetches should prune slot 1 once it ages out"
+        );
+        // Direct field access via test cfg helper would be nicer; reuse the
+        // existing pick_vote_fetch_peers semantics — if the entry was
+        // pruned, a re-offer + re-pick would succeed.
+        tracker.handle_vote_batch(vec![(1, voter_id.clone())], peer_a);
+        let picked = tracker.pick_vote_fetch_peers(vec![(1, voter_id)], &peers);
+        assert!(
+            !picked.is_empty(),
+            "stale pending vote entry should not block a re-pick after slot pruning"
+        );
     }
 
     #[test]
