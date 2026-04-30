@@ -37,7 +37,7 @@ pub struct Mempool {
     txs: VecDeque<PendingTx>,
     total_bytes: usize,
     capacity: usize,
-    peer_advertised: HashMap<PeerId, HashSet<Vec<u8>>>,
+    peer_advertised: HashMap<PeerId, HashSet<[u8; 32]>>,
 }
 
 impl Mempool {
@@ -53,10 +53,15 @@ impl Mempool {
 
     /// Drop `tx_id` from every per-peer advertised set. Called whenever a
     /// tx leaves the mempool so peer state never outlives the txs it
-    /// references.
+    /// references. Tx ids that aren't 32 bytes are silently ignored —
+    /// every mempool tx hashes to Blake2b-256, so this can't happen in
+    /// practice.
     fn prune_from_peer_sets(&mut self, tx_id: &[u8]) {
+        let Ok(key): Result<[u8; 32], _> = tx_id.try_into() else {
+            return;
+        };
         for set in self.peer_advertised.values_mut() {
-            set.remove(tx_id);
+            set.remove(&key);
         }
     }
 
@@ -116,7 +121,10 @@ impl Mempool {
             if result.len() >= max_count {
                 break;
             }
-            if advertised.insert(tx.tx_id.0.clone()) {
+            let Ok(key): Result<[u8; 32], _> = tx.tx_id.0.as_slice().try_into() else {
+                continue;
+            };
+            if advertised.insert(key) {
                 result.push(tx.clone());
             }
         }
@@ -581,8 +589,8 @@ mod tests {
         // it ever re-enters the mempool.
         pool.push(make_tx_with_id(3, 100));
         let advertised = pool.peer_advertised.get(&peer).unwrap();
-        assert!(!advertised.contains(&vec![1u8; 32]));
-        assert!(advertised.contains(&vec![2u8; 32]));
+        assert!(!advertised.contains(&[1u8; 32]));
+        assert!(advertised.contains(&[2u8; 32]));
     }
 
     #[test]
