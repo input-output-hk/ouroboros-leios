@@ -16,26 +16,29 @@ import sqlite3
 import sys
 import time
 
+
 def bench(n_iters):
     conn = sqlite3.connect(":memory:")
     cursor = conn.cursor()
     # Same PRAGMAs as queryEbClosures.py, minus journal_mode which is
     # irrelevant for :memory:.
-    cursor.executescript('''
+    cursor.executescript(
+        """
         PRAGMA synchronous=NORMAL;
         PRAGMA cache_size = 1000000;
         PRAGMA locking_mode = EXCLUSIVE;
         PRAGMA temp_store = MEMORY;
-    ''')
+    """
+    )
 
     # A recursive CTE emitting 15000 rows. Matches the row count of
     # the inner query in queryEbClosures.py (txIndex 0..14999).
-    cte = '''
+    cte = """
         WITH RECURSIVE c(x) AS (
             VALUES(0) UNION ALL SELECT x+1 FROM c WHERE x < 14999
         )
         SELECT x FROM c
-    '''
+    """
 
     # Warmup to get statement prep out of the way.
     for _ in cursor.execute(cte):
@@ -68,6 +71,7 @@ def bench(n_iters):
 
     for t in timings:
         print(t)
+
 
 if __name__ == "__main__":
     n_iters = int(sys.argv[1]) if len(sys.argv) > 1 else 10000

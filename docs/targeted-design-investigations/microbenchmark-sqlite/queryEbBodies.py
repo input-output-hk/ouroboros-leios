@@ -1,8 +1,8 @@
-import locale
 import sqlite3
 import subprocess
 import sys
 import time
+
 
 def query_ebs(db_name):
     # Connect to the database
@@ -11,20 +11,24 @@ def query_ebs(db_name):
 
     # Adding the optional ones among these made no difference in the
     # (post-churn) TenThousand.sqlite example.
-    cursor.executescript('''
+    cursor.executescript(
+        """
         PRAGMA journal_mode=WAL;
         PRAGMA synchronous=NORMAL;
         PRAGMA cache_size = 1000000;
         PRAGMA locking_mode = EXCLUSIVE;
         PRAGMA temp_store = MEMORY;
-    ''')
+    """
+    )
 
-    ebPoints = cursor.execute('''
+    ebPoints = cursor.execute(
+        """
         SELECT ebSlot, ebHash FROM EB 
         ORDER BY ebSlot
-    ''').fetchall()
+    """
+    ).fetchall()
 
-    conn.close()   # close it to flush the page cache
+    conn.close()  # close it to flush the page cache
 
     timings1 = [0.1] * len(ebPoints)
     timings2 = [0.2] * len(ebPoints)
@@ -38,7 +42,7 @@ def query_ebs(db_name):
     # We call this _after_ opening the database to undo whatever OS
     # prefetching happened when the connection read the first page of
     # the database file.
-    subprocess.run(['vmtouch', '-e', '-q', db_name], check=True)
+    subprocess.run(["vmtouch", "-e", "-q", db_name], check=True)
 
     # But I still see unexpected cache hits in the first couple
     # iterations. I think maybe those are just in the actual first
@@ -56,12 +60,18 @@ def query_ebs(db_name):
     for ebSlot, ebHash in ebPoints:
         t1 = time.perf_counter()
         # for EBs later in the traversal, this might have some cache hits
-        tx_refs = cursor.execute("SELECT txHash, txBytesSize FROM EB2TX WHERE (ebSlot, ebHash) = (?, ?) ORDER BY txIndex ASC", (ebSlot, ebHash))
+        tx_refs = cursor.execute(
+            "SELECT txHash, txBytesSize FROM EB2TX WHERE (ebSlot, ebHash) = (?, ?) ORDER BY txIndex ASC",
+            (ebSlot, ebHash),
+        )
         for _ in tx_refs:
             pass
         t2 = time.perf_counter()
         # should be fully cached now
-        tx_refs = cursor.execute("SELECT txHash, txBytesSize FROM EB2TX WHERE (ebSlot, ebHash) = (?, ?) ORDER BY txIndex ASC", (ebSlot, ebHash))
+        tx_refs = cursor.execute(
+            "SELECT txHash, txBytesSize FROM EB2TX WHERE (ebSlot, ebHash) = (?, ?) ORDER BY txIndex ASC",
+            (ebSlot, ebHash),
+        )
         for _ in tx_refs:
             pass
         t3 = time.perf_counter()
@@ -71,6 +81,7 @@ def query_ebs(db_name):
 
     for i in range(ntimings):
         print(timings1[i], timings2[i])
+
 
 if __name__ == "__main__":
     db_name = sys.argv[1]
