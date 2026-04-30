@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
 use crate::{
     config::{NodeId, SimConfiguration},
@@ -27,7 +27,9 @@ pub fn assign(config: &SimConfiguration) -> ShardLookup {
         .collect();
 
     let num_comps = components.len();
-    let mut adj: Vec<HashMap<usize, usize>> = vec![HashMap::new(); num_comps];
+    // BTreeMap so that adjacency iteration is deterministic (affects
+    // KL gain computation tie-breaking).
+    let mut adj: Vec<BTreeMap<usize, usize>> = vec![BTreeMap::new(); num_comps];
     for link in &config.links {
         let ca = node_to_comp[&link.nodes.0];
         let cb = node_to_comp[&link.nodes.1];
@@ -73,7 +75,7 @@ pub fn assign(config: &SimConfiguration) -> ShardLookup {
 /// then refine with Kernighan-Lin to minimize the cut.
 fn bisect_kl(
     items: &[usize],
-    adj: &[HashMap<usize, usize>],
+    adj: &[BTreeMap<usize, usize>],
     comp_sizes: &[usize],
 ) -> (Vec<usize>, Vec<usize>) {
     let n = items.len();

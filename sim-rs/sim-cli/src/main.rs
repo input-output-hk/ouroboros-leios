@@ -1,5 +1,8 @@
 use std::{fs, path::PathBuf, process};
 
+#[global_allocator]
+static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 use anyhow::Result;
 use clap::Parser;
 use events::EventMonitor;
@@ -144,7 +147,7 @@ async fn main() -> Result<()> {
 
     select! {
         result = simulation.run(token) => { result? }
-        result = &mut monitor => { result?? }
+        result = &mut monitor => { return result?; }
         _ = ctrlc_source => {}
     };
 

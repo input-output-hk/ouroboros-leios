@@ -87,6 +87,8 @@ pub enum ShardStrategy {
 #[serde(rename_all = "kebab-case")]
 pub struct RawParameters {
     // Simulation Configuration
+    #[serde(default)]
+    pub seed: u64,
     pub leios_variant: LeiosVariant,
     pub relay_strategy: RelayStrategy,
     pub simulate_transactions: bool,
@@ -189,6 +191,10 @@ pub struct RawParameters {
     pub vote_bundle_size_bytes_constant: u64,
     pub persistent_vote_bundle_size_bytes_per_eb: u64,
     pub non_persistent_vote_bundle_size_bytes_per_eb: u64,
+    #[serde(default)]
+    pub committee_selection_algorithm: CommitteeSelectionAlgorithm,
+    #[serde(default = "default_committee_stake_fraction_threshold")]
+    pub committee_stake_fraction_threshold: f64,
 
     // Certificate configuration
     pub cert_generation_cpu_time_ms_constant: f64,
@@ -251,6 +257,19 @@ pub enum EBPropagationCriteria {
     EbReceived,
     TxsReceived,
     FullyValid,
+}
+
+#[derive(Debug, Default, Copy, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum CommitteeSelectionAlgorithm {
+    #[default]
+    WfaLs,
+    Everyone,
+    TopStakeFraction,
+}
+
+fn default_committee_stake_fraction_threshold() -> f64 {
+    0.95
 }
 
 #[derive(Deserialize)]
@@ -455,13 +474,21 @@ impl From<RawTopology> for Topology {
 }
 
 fn vote_weighted_average(params: &RawParameters, persistent: f64, non_persistent: f64) -> f64 {
-    let total = params.persistent_vote_generation_probability
-        + params.non_persistent_vote_generation_probability;
-    if total == 0.0 {
-        return 0.0;
+    match params.committee_selection_algorithm {
+        // Everyone and TopStakeFraction voters are all deterministically selected,
+        // so they use persistent vote parameters (no eligibility proofs needed).
+        CommitteeSelectionAlgorithm::Everyone
+        | CommitteeSelectionAlgorithm::TopStakeFraction => persistent,
+        CommitteeSelectionAlgorithm::WfaLs => {
+            let total = params.persistent_vote_generation_probability
+                + params.non_persistent_vote_generation_probability;
+            if total == 0.0 {
+                return 0.0;
+            }
+            let frac = params.persistent_vote_generation_probability / total;
+            frac * persistent + (1.0 - frac) * non_persistent
+        }
     }
-    let frac = params.persistent_vote_generation_probability / total;
-    frac * persistent + (1.0 - frac) * non_persistent
 }
 
 #[derive(Debug, Clone)]
@@ -643,7 +670,7 @@ impl TransactionConfig {
 pub(crate) struct RealTransactionConfig {
     next_id: Arc<AtomicU64>,
     input_id: Arc<AtomicU64>,
-    ib_shards: u64,
+    pub(crate) ib_shards: u64,
     pub max_size: u64,
     pub frequency_ms: FloatDistribution,
     pub size_bytes: FloatDistribution,
@@ -813,6 +840,8 @@ pub struct SimConfiguration {
     pub(crate) block_generation_probability: f64,
     pub(crate) ib_generation_probability: f64,
     pub(crate) eb_generation_probability: f64,
+    pub(crate) committee_selection: CommitteeSelectionAlgorithm,
+    pub(crate) vote_eligible_nodes: HashSet<NodeId>,
     pub(crate) vote_probability: f64,
     pub(crate) vote_slot_length: u64,
     pub(crate) eb_include_txs_from_previous_stage: bool,
@@ -834,6 +863,8 @@ pub struct SimConfiguration {
     pub(crate) attacks: AttackConfig,
     /// TX generation batching window for the sequential engine.
     pub(crate) tx_batch_window: Option<Duration>,
+    /// Shared network stats collector (set by sequential engine, read by nodes).
+    pub network_stats: Option<Arc<crate::network::stats::NetworkStatsCollector>>,
 }
 
 impl SimConfiguration {
@@ -858,10 +889,34 @@ impl SimConfiguration {
                 params.ib_shard_period_length_slots
             );
         }
-        let total_stake = topology.nodes.iter().map(|n| n.stake).sum();
+        let total_stake: u64 = topology.nodes.iter().map(|n| n.stake).sum();
         let attacks = AttackConfig::build(&params, &mut topology);
+        let vote_eligible_nodes = match params.committee_selection_algorithm {
+            CommitteeSelectionAlgorithm::WfaLs | CommitteeSelectionAlgorithm::Everyone => {
+                HashSet::new()
+            }
+            CommitteeSelectionAlgorithm::TopStakeFraction => {
+                let threshold =
+                    (total_stake as f64 * params.committee_stake_fraction_threshold) as u64;
+                let mut nodes_by_stake: Vec<_> =
+                    topology.nodes.iter().map(|n| (n.id, n.stake)).collect();
+                nodes_by_stake.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+                let mut cumulative = 0u64;
+                nodes_by_stake
+                    .into_iter()
+                    .take_while(|&(_, stake)| {
+                        if cumulative >= threshold {
+                            return false;
+                        }
+                        cumulative += stake;
+                        true
+                    })
+                    .map(|(id, _)| id)
+                    .collect()
+            }
+        };
         Ok(Self {
-            seed: 0,
+            seed: params.seed,
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
             shard_count: params.shard_count.max(1),
             shard_strategy: params.shard_strategy.clone(),
@@ -892,6 +947,8 @@ impl SimConfiguration {
             block_generation_probability: params.rb_generation_probability,
             ib_generation_probability: params.ib_generation_probability,
             eb_generation_probability: params.eb_generation_probability,
+            committee_selection: params.committee_selection_algorithm,
+            vote_eligible_nodes,
             vote_probability: params.persistent_vote_generation_probability
                 + params.non_persistent_vote_generation_probability,
             vote_threshold: params.vote_threshold,
@@ -914,6 +971,7 @@ impl SimConfiguration {
             transactions: TransactionConfig::new(&params),
             attacks,
             tx_batch_window: params.tx_batch_window_ms.map(duration_ms),
+            network_stats: None,
         })
     }
 }

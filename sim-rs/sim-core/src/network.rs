@@ -11,6 +11,7 @@ use crate::{
 
 pub(crate) mod connection;
 pub(crate) mod coordinator;
+pub mod stats;
 
 /// Maps a node ID to its shard index.
 pub type ShardLookup = Arc<HashMap<NodeId, usize>>;
@@ -21,7 +22,7 @@ pub struct Network<TProtocol, TMessage> {
     sink: mpsc::UnboundedSender<Message<TProtocol, TMessage>>,
 }
 
-impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> Network<TProtocol, TMessage> {
+impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> Network<TProtocol, TMessage> {
     pub fn new(clock: Clock) -> Self {
         let (sink, source) = mpsc::unbounded_channel();
         Self {

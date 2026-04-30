@@ -1,6 +1,5 @@
 use anyhow::Result;
 use rand::Rng;
-use rand_chacha::ChaChaRng;
 use rand_distr::Distribution;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::mpsc;
@@ -8,13 +7,27 @@ use tokio::sync::mpsc;
 use crate::{
     clock::{ClockBarrier, Timestamp},
     config::{NodeConfiguration, NodeId, RealTransactionConfig, SimConfiguration, TransactionConfig},
-    model::Transaction,
+    model::{Transaction, TransactionId},
+    rng::Rng as SimRng,
 };
 
 /// Core transaction generation logic shared between actor and sequential engines.
 /// Uses usize indices to identify nodes; callers map these to their own node addressing.
 pub(super) struct TxGeneratorCore {
-    rng: ChaChaRng,
+    rng: SimRng,
+    /// Monotonic counter. The i-th generated TX draws its random state
+    /// deterministically from the context `("tx_generator", i)`, so the
+    /// TX stream is a pure function of the master seed regardless of any
+    /// per-node or network-timing behaviour elsewhere.
+    next_tx_idx: u64,
+    /// Per-shard TX ID counter.  Derived from (shard_index, tx_idx) to
+    /// avoid sharing an atomic across shard threads, which would make
+    /// ID assignment depend on OS thread scheduling.
+    next_tx_id: u64,
+    /// Per-shard input_id counter for conflict tracking.
+    next_input_id: u64,
+    /// Most recently assigned input_id (for conflict generation).
+    last_input_id: u64,
     config: Option<RealTransactionConfig>,
     node_weights: WeightedLookup<usize>,
     tx_conflict_fractions: Vec<Option<f64>>,
@@ -24,9 +37,12 @@ pub(super) struct TxGeneratorCore {
 impl TxGeneratorCore {
     /// Create a new TxGeneratorCore.
     /// `nodes` is an iterator of (index, node_config) for nodes in this shard.
+    /// `shard_index` is used to offset TX IDs so that different shards
+    /// produce non-overlapping ID ranges without shared atomics.
     pub(super) fn new<'a>(
-        rng: ChaChaRng,
+        rng: SimRng,
         config: &SimConfiguration,
+        shard_index: usize,
         nodes: impl IntoIterator<Item = (usize, &'a NodeConfiguration)>,
     ) -> Self {
         let mut tx_conflict_fractions = Vec::new();
@@ -47,8 +63,15 @@ impl TxGeneratorCore {
             }
         }
 
+        // Offset per-shard counters so TX IDs don't collide across shards.
+        // 1B IDs per shard is far more than any run will generate.
+        let shard_offset = shard_index as u64 * 1_000_000_000;
         Self {
             rng,
+            next_tx_idx: 0,
+            next_tx_id: shard_offset,
+            next_input_id: shard_offset + 1,
+            last_input_id: shard_offset,
             config: match &config.transactions {
                 TransactionConfig::Real(c) => Some(c.clone()),
                 _ => None,
@@ -80,23 +103,64 @@ impl TxGeneratorCore {
         &mut self,
         now: Timestamp,
     ) -> Option<(usize, Arc<Transaction>, Option<Timestamp>)> {
-        let config = self.config.as_ref()?;
-        if self.node_weights.total_weight == 0 {
+        if self.config.is_none() || self.node_weights.total_weight == 0 {
             return None;
         }
 
-        let &idx = self.node_weights.sample(&mut self.rng)?;
+        // Each generated TX gets its own seeded, one-shot ChaChaRng. The
+        // seed is derived from ("tx_generator", tx_idx), so the full
+        // sequence of generated TXs is a pure function of the master
+        // seed. This holds across shards (they increment their own
+        // tx_idx) and regardless of per-node network behaviour.
+        let tx_idx = self.next_tx_idx;
+        self.next_tx_idx += 1;
+        let mut tx_rng = self.rng.seeded_chacha_from(&("tx_generator", tx_idx));
+
+        let &idx = self.node_weights.sample(&mut tx_rng)?;
         let conflict_fraction = self
             .tx_conflict_fractions
             .get(idx)
             .copied()
             .flatten();
 
-        let tx = config.new_tx(&mut self.rng, conflict_fraction);
+        let tx = {
+            let config = self.config.as_ref().unwrap();
+            let id = TransactionId::new(self.next_tx_id);
+            self.next_tx_id += 1;
+            let shard = tx_rng.random_range(0..config.ib_shards);
+            let bytes = (config.size_bytes.sample(&mut tx_rng) as u64).min(config.max_size);
+            let input_id =
+                if tx_rng.random_bool(conflict_fraction.unwrap_or(config.conflict_fraction)) {
+                    self.last_input_id
+                } else {
+                    let id = self.next_input_id;
+                    self.next_input_id += 1;
+                    self.last_input_id = id;
+                    id
+                };
+            let overcollateralization_factor =
+                config.overcollateralization_factor.sample(&mut tx_rng) as u64;
+            Transaction {
+                id,
+                shard,
+                bytes,
+                input_id,
+                overcollateralization_factor,
+            }
+        };
 
-        let millis_until_tx =
-            config.frequency_ms.sample(&mut self.rng) as u64 * self.shard_count as u64;
-        let next_at = now + Duration::from_millis(millis_until_tx);
+        // Preserve sub-millisecond precision from the frequency
+        // distribution: previously this truncated `f64 as u64`, so a
+        // configured 7.5 ms became 7 ms — ~7% faster generation than
+        // intended. `Duration::from_secs_f64` converts to a full
+        // nanosecond-resolution Duration. `.max(0.0)` matches the old
+        // saturating behaviour for non-positive samples from e.g. a
+        // Normal distribution (from_secs_f64 panics on negatives).
+        let config = self.config.as_ref().unwrap();
+        let secs_until_tx = (config.frequency_ms.sample(&mut tx_rng) / 1000.0
+            * self.shard_count as f64)
+            .max(0.0);
+        let next_at = now + Duration::from_secs_f64(secs_until_tx);
 
         let next_time = if config.stop_time.is_some_and(|t| next_at > t) {
             None
@@ -118,7 +182,7 @@ pub struct TransactionProducer {
 
 impl TransactionProducer {
     pub fn new(
-        rng: ChaChaRng,
+        rng: SimRng,
         clock: ClockBarrier,
         mut node_tx_sinks: HashMap<NodeId, mpsc::UnboundedSender<Arc<Transaction>>>,
         config: &SimConfiguration,
@@ -134,7 +198,7 @@ impl TransactionProducer {
             }
         }
         Self {
-            core: TxGeneratorCore::new(rng, config, indexed_nodes),
+            core: TxGeneratorCore::new(rng, config, 0, indexed_nodes),
             clock,
             sinks,
         }
@@ -151,7 +215,7 @@ impl TransactionProducer {
             self.clock.wait_until(next_tx_at).await;
         }
 
-        if node_lookup.is_empty() {
+        if self.sinks.is_empty() {
             tracing::warn!(
                 "No nodes have tx_generation_weight > 0; \
                  skipping transaction generation. \
@@ -206,10 +270,6 @@ impl<T> WeightedLookup<T> {
             elements,
             total_weight,
         }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.elements.is_empty()
     }
 
     pub fn sample<R: Rng>(&self, rng: &mut R) -> Option<&T> {

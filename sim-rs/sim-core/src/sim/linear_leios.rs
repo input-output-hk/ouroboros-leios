@@ -4,20 +4,21 @@ use rand_distr::Distribution;
 use tokio::sync::mpsc;
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    // N.B. HashSet is only used for membership tests (contains/insert), never
+    // iterated in order-sensitive paths, so it does not affect determinism.
+    collections::{BTreeMap, BTreeSet, HashSet, VecDeque},
     sync::Arc,
     time::Duration,
 };
 
-use rand::{Rng as _, seq::SliceRandom as _};
 use rand_chacha::ChaChaRng;
 
 use crate::{
     clock::{Clock, Timestamp},
     config::{
-        CpuTimeConfig, EBPropagationCriteria, LeiosVariant, MempoolSamplingStrategy,
-        NodeBehaviours, NodeConfiguration, NodeId, RelayStrategy, SimConfiguration,
-        TransactionConfig,
+        CommitteeSelectionAlgorithm, CpuTimeConfig, EBPropagationCriteria, LeiosVariant,
+        MempoolSamplingStrategy, NodeBehaviours, NodeConfiguration, NodeId, RelayStrategy,
+        SimConfiguration, TransactionConfig,
     },
     events::EventTracker,
     model::{
@@ -26,6 +27,7 @@ use crate::{
         NoVoteReason, Transaction, TransactionId, TransactionLostReason, VoteBundle,
         VoteBundleId,
     },
+    rng::{DrawSite, Rng},
     sim::{
         MiniProtocol, NodeImpl, SimCpuTask, SimMessage,
         linear_leios::attackers::{EBWithholdingEvent, EBWithholdingSender},
@@ -284,20 +286,21 @@ enum VoteBundleView {
 
 #[derive(Default)]
 struct NodeLeiosState {
-    ebs: HashMap<EndorserBlockId, EndorserBlockView>,
-    ebs_by_rb: HashMap<BlockId, EndorserBlockId>,
-    eb_peer_announcements: HashMap<EndorserBlockId, Vec<NodeId>>,
-    votes: HashMap<VoteBundleId, VoteBundleView>,
-    votes_by_eb: HashMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
-    certified_ebs: HashSet<EndorserBlockId>,
-    incomplete_onchain_ebs: HashSet<EndorserBlockId>,
-    missing_txs: HashMap<TransactionId, Vec<EndorserBlockId>>,
+    ebs: BTreeMap<EndorserBlockId, EndorserBlockView>,
+    ebs_by_rb: BTreeMap<BlockId, EndorserBlockId>,
+    eb_peer_announcements: BTreeMap<EndorserBlockId, Vec<NodeId>>,
+    votes: BTreeMap<VoteBundleId, VoteBundleView>,
+    votes_by_eb: BTreeMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
+    endorsed_ebs: BTreeMap<EndorserBlockId, u64>,
+    incomplete_onchain_ebs: BTreeSet<EndorserBlockId>,
+    missing_txs: BTreeMap<TransactionId, Vec<EndorserBlockId>>,
+    pruned_ebs: BTreeSet<EndorserBlockId>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 struct LedgerState {
-    spent_inputs: HashSet<u64>,
-    seen_blocks: HashSet<BlockId>,
+    spent_inputs: BTreeSet<u64>,
+    seen_blocks: BTreeSet<BlockId>,
 }
 
 pub struct LinearLeiosNode {
@@ -305,14 +308,13 @@ pub struct LinearLeiosNode {
     sim_config: Arc<SimConfiguration>,
     queued: EventResult,
     tracker: EventTracker,
-    rng: ChaChaRng,
     clock: Clock,
     lottery: LotteryConfig,
     consumers: Vec<NodeId>,
     current_slot: u64,
-    txs: HashMap<TransactionId, TransactionView>,
+    txs: BTreeMap<TransactionId, TransactionView>,
     mempool: Mempool,
-    ledger_states: BTreeMap<BlockId, Arc<LedgerState>>,
+    ledger_state: Option<(BlockId, LedgerState)>,
     praos: NodePraosState,
     leios: NodeLeiosState,
     behaviours: NodeBehaviours,
@@ -333,9 +335,13 @@ impl NodeImpl for LinearLeiosNode {
         config: &NodeConfiguration,
         sim_config: Arc<SimConfiguration>,
         tracker: EventTracker,
-        rng: ChaChaRng,
+        _rng: ChaChaRng,
         clock: Clock,
     ) -> Self {
+        // Linear Leios is fully stateless-RNG; `_rng` from NodeImpl::new
+        // is ignored. Randomness is derived on demand from
+        // Rng::new(sim_config.seed) with explicit (node, slot, site)
+        // context. See sim-core/src/rng.rs.
         let lottery = LotteryConfig::Random {
             stake: config.stake,
             total_stake: sim_config.total_stake,
@@ -349,18 +355,17 @@ impl NodeImpl for LinearLeiosNode {
             sim_config,
             queued: EventResult::default(),
             tracker,
-            rng,
             clock,
             lottery,
             consumers: config.consumers.clone(),
             current_slot: 0,
-            txs: HashMap::new(),
+            txs: BTreeMap::new(),
             mempool: Mempool::new(
                 mempool_max_size_bytes,
                 tx_generated_backlog_max_size,
                 tx_peer_backlog_max_size,
             ),
-            ledger_states: BTreeMap::new(),
+            ledger_state: None,
             praos: NodePraosState::default(),
             leios: NodeLeiosState::default(),
             behaviours: config.behaviours.clone(),
@@ -377,6 +382,11 @@ impl NodeImpl for LinearLeiosNode {
         self.current_slot = slot;
         self.try_generate_rb(slot);
         self.prune_old_txs(slot);
+        self.prune_old_leios_state(slot);
+
+        if slot.is_multiple_of(60) && self.id.to_inner() == 0 {
+            self.log_memory_stats(slot);
+        }
 
         std::mem::take(&mut self.queued)
     }
@@ -481,6 +491,222 @@ impl LinearLeiosNode {
             mempool.contains(id)
         });
     }
+
+    fn prune_old_leios_state(&mut self, _current_slot: u64) {
+        // Only prune state for EBs that have been superseded: a strictly newer
+        // EB has been endorsed on-chain, so the older ones will never be needed.
+        let latest_endorsed_slot = self
+            .leios
+            .endorsed_ebs
+            .values()
+            .copied()
+            .max();
+        let Some(latest_slot) = latest_endorsed_slot else {
+            return;
+        };
+
+        let expired: Vec<EndorserBlockId> = self
+            .leios
+            .votes_by_eb
+            .keys()
+            .filter(|eb_id| eb_id.slot < latest_slot)
+            .copied()
+            .collect();
+
+        if expired.is_empty() {
+            return;
+        }
+
+        for eb_id in &expired {
+            // Don't prune EBs that are still being validated by the CPU
+            if matches!(
+                self.leios.ebs.get(eb_id),
+                Some(EndorserBlockView::Received {
+                    validated: false,
+                    ..
+                })
+            ) {
+                continue;
+            }
+            // Don't prune EBs that are on-chain but not yet fully validated.
+            if self.leios.incomplete_onchain_ebs.contains(eb_id) {
+                continue;
+            }
+            self.leios.endorsed_ebs.remove(eb_id);
+            self.leios.votes_by_eb.remove(eb_id);
+            self.leios.ebs.remove(eb_id);
+            self.leios.eb_peer_announcements.remove(eb_id);
+            self.leios.pruned_ebs.insert(*eb_id);
+        }
+
+        self.leios.votes.retain(|_, view| match view {
+            VoteBundleView::Received { votes } => {
+                votes.ebs.keys().any(|eb| eb.slot >= latest_slot)
+            }
+            VoteBundleView::Requested => true,
+        });
+
+        self.leios
+            .ebs_by_rb
+            .retain(|_, eb_id| {
+                eb_id.slot >= latest_slot
+                    || self.leios.incomplete_onchain_ebs.contains(eb_id)
+            });
+    }
+
+    fn log_memory_stats(&self, slot: u64) {
+        let num_nodes = self.sim_config.nodes.len();
+
+        // Process RSS from /proc/self/status
+        let rss_mb = std::fs::read_to_string("/proc/self/status")
+            .ok()
+            .and_then(|s| {
+                s.lines()
+                    .find(|l| l.starts_with("VmRSS:"))
+                    .and_then(|l| l.split_whitespace().nth(1))
+                    .and_then(|v| v.parse::<u64>().ok())
+            })
+            .map(|kb| kb as f64 / 1024.0)
+            .unwrap_or(0.0);
+
+        // txs: count received (hold Arc<Transaction>) vs pending (tiny)
+        let txs_total = self.txs.len();
+        let txs_received = self
+            .txs
+            .values()
+            .filter(|v| matches!(v, TransactionView::Received { .. }))
+            .count();
+        // BTreeMap overhead ~48B/entry, Received: Arc ptr(8) + u64(8), unique Transaction ~56B
+        let txs_bytes = txs_total * 64 + txs_received * 72;
+
+        // mempool
+        let (mp_len, mp_bytes, mp_local_bl, mp_peer_bl) = self.mempool.stats();
+        let mempool_bytes = mp_bytes as usize + mp_len * 96 + (mp_local_bl + mp_peer_bl) * 8;
+
+        // praos.blocks
+        let praos_blocks = self.praos.blocks.len();
+        let praos_tx_refs: usize = self
+            .praos
+            .blocks
+            .values()
+            .filter_map(|v| match v {
+                RankingBlockView::Received { rb, .. } => Some(rb.transactions.len()),
+                _ => None,
+            })
+            .sum();
+        let praos_bytes = praos_blocks * 96 + praos_tx_refs * 56;
+
+        // ledger_state
+        let ledger_count: usize = self.ledger_state.is_some().into();
+        let ledger_inputs = self
+            .ledger_state
+            .as_ref()
+            .map(|(_, ls)| ls.spent_inputs.len())
+            .unwrap_or(0);
+        let ledger_bytes = ledger_inputs * 16;
+
+        // leios.ebs: count entries, sum tx refs
+        let ebs_count = self.leios.ebs.len();
+        let ebs_tx_refs: usize = self
+            .leios
+            .ebs
+            .values()
+            .filter_map(|v| match v {
+                EndorserBlockView::Received { eb, .. } => Some(eb.txs.len()),
+                _ => None,
+            })
+            .sum();
+        let ebs_bytes = ebs_count * 64 + ebs_tx_refs * 8;
+
+        // leios.votes
+        let votes_count = self.leios.votes.len();
+        let votes_bytes = votes_count * 80;
+
+        // leios.votes_by_eb
+        let votes_by_eb_count = self.leios.votes_by_eb.len();
+        let votes_by_eb_voters: usize =
+            self.leios.votes_by_eb.values().map(|m| m.len()).sum();
+        let votes_by_eb_bytes = votes_by_eb_count * 64 + votes_by_eb_voters * 32;
+
+        // leios.eb_peer_announcements
+        let eb_announce_count = self.leios.eb_peer_announcements.len();
+        let eb_announce_peers: usize = self
+            .leios
+            .eb_peer_announcements
+            .values()
+            .map(|v| v.len())
+            .sum();
+        let eb_announce_bytes = eb_announce_count * 64 + eb_announce_peers * 8;
+
+        // smaller collections
+        let ebs_by_rb_count = self.leios.ebs_by_rb.len();
+        let endorsed_count = self.leios.endorsed_ebs.len();
+        let pruned_count = self.leios.pruned_ebs.len();
+        let missing_txs_count = self.leios.missing_txs.len();
+        let small_bytes =
+            ebs_by_rb_count * 48 + endorsed_count * 40 + pruned_count * 32 + missing_txs_count * 64;
+
+        let node_total = txs_bytes
+            + mempool_bytes
+            + praos_bytes
+            + ledger_bytes
+            + ebs_bytes
+            + votes_bytes
+            + votes_by_eb_bytes
+            + eb_announce_bytes
+            + small_bytes;
+        let all_nodes_mb = (node_total * num_nodes) as f64 / (1024.0 * 1024.0);
+
+        tracing::info!(
+            "Memory stats at slot {} (node 0, x{} nodes):\n\
+             \x20 txs:              {:>8} entries  ~ {:>6.1} MB  (received: {})\n\
+             \x20 mempool:          {:>8} entries  ~ {:>6.1} MB  (backlog: {}/{} local, {}/{} peer)\n\
+             \x20 praos.blocks:     {:>8} entries  ~ {:>6.1} MB  (tx_refs: {})\n\
+             \x20 ledger_states:    {:>8} entries  ~ {:>6.1} MB  (spent_inputs: {})\n\
+             \x20 leios.ebs:        {:>8} entries  ~ {:>6.1} MB  (tx_refs: {})\n\
+             \x20 leios.votes:      {:>8} entries  ~ {:>6.1} MB\n\
+             \x20 leios.votes_by_eb:{:>8} entries  ~ {:>6.1} MB  (voters: {})\n\
+             \x20 leios.eb_announce:{:>8} entries  ~ {:>6.1} MB  (peers: {})\n\
+             \x20 leios.ebs_by_rb:  {:>8} entries\n\
+             \x20 leios.endorsed:   {:>8} entries\n\
+             \x20 leios.pruned:     {:>8} entries\n\
+             \x20 leios.missing_txs:{:>8} entries\n\
+             \x20 ---\n\
+             \x20 Estimated total: ~ {:.1} MB  (x {} = ~ {:.1} MB)\n\
+             \x20 Process RSS: {:.0} MB",
+            slot,
+            num_nodes,
+            txs_total, txs_bytes as f64 / 1e6, txs_received,
+            mp_len, mempool_bytes as f64 / 1e6, mp_local_bl, self.mempool.tx_generated_backlog_max_size.unwrap_or(0), mp_peer_bl, self.mempool.tx_peer_backlog_max_size.unwrap_or(0),
+            praos_blocks, praos_bytes as f64 / 1e6, praos_tx_refs,
+            ledger_count, ledger_bytes as f64 / 1e6, ledger_inputs,
+            ebs_count, ebs_bytes as f64 / 1e6, ebs_tx_refs,
+            votes_count, votes_bytes as f64 / 1e6,
+            votes_by_eb_count, votes_by_eb_bytes as f64 / 1e6, votes_by_eb_voters,
+            eb_announce_count, eb_announce_bytes as f64 / 1e6, eb_announce_peers,
+            ebs_by_rb_count,
+            endorsed_count,
+            pruned_count,
+            missing_txs_count,
+            node_total as f64 / 1e6, num_nodes, all_nodes_mb,
+            rss_mb,
+        );
+
+        // Network queue stats (aggregated across all shards by the sequential engine)
+        if let Some(ref collector) = self.sim_config.network_stats {
+            let (connections, active, msgs, bytes) = collector.totals();
+            tracing::info!(
+                "Network queue stats (all shards):\n\
+                 \x20 connections: {} total, {} active\n\
+                 \x20 queued messages: {}\n\
+                 \x20 queued bytes: {:.1} MB",
+                connections,
+                active,
+                msgs,
+                bytes as f64 / (1024.0 * 1024.0),
+            );
+        }
+    }
 }
 
 // Transaction propagation
@@ -537,16 +763,22 @@ impl LinearLeiosNode {
             return;
         }
 
-        let referenced_by_eb = self.acknowledge_tx(&tx);
         let is_local = from == self.id;
         let result = self.try_add_tx_to_mempool(&tx, is_local);
 
         if matches!(result, InsertResult::PeerBacklogFull) {
-            // Peer backlog full — drop the tx entirely to avoid memory growth
-            self.txs.remove(&id);
-            return;
+            // Peer backlog full. If a pending EB references this TX
+            // (it's in missing_txs), keep it in self.txs so has_tx
+            // returns true and try_validating_eb's scan can succeed.
+            // Otherwise drop it to bound memory.
+            if !self.leios.missing_txs.contains_key(&id) {
+                self.txs.remove(&id);
+                return;
+            }
+            // Fall through: TX stays in self.txs, acknowledge below.
         }
 
+        let referenced_by_eb = self.acknowledge_tx(&tx);
         let added_to_mempool = matches!(result, InsertResult::AddedToMempool);
 
         // If we added the TX to our mempool, we want to propagate it so our peers can as well.
@@ -583,6 +815,8 @@ impl LinearLeiosNode {
         let Some(vrf) = self.run_vrf(
             LotteryKind::GenerateRB,
             self.sim_config.block_generation_probability,
+            slot,
+            DrawSite::RbLottery,
         ) else {
             return;
         };
@@ -613,11 +847,14 @@ impl LinearLeiosNode {
                 // If we're endorsing this EB, clear its TXs out of the mempool now
                 // so that we don't include them in new blocks.
                 self.remove_eb_txs_from_mempool(&eb);
-            } else {
+            } else if !self.leios.pruned_ebs.contains(&eb_id) {
                 // We haven't finished validating this EB, maybe even haven't received it and its contents.
                 // That won't stop us from generating the endorsement, though it'll make us produce an empty block.
+                // Skip if the EB was already validated and pruned — no conflict risk.
                 self.leios.incomplete_onchain_ebs.insert(eb_id);
             }
+
+            self.leios.endorsed_ebs.entry(eb_id).or_insert(slot);
 
             Some(Endorsement {
                 eb: eb_id,
@@ -642,6 +879,8 @@ impl LinearLeiosNode {
                     &mut rb_transactions,
                     self.sim_config.max_block_size,
                     true,
+                    slot,
+                    0,
                 );
             }
         }
@@ -664,7 +903,13 @@ impl LinearLeiosNode {
                     eb_transactions.push(Arc::new(tx));
                 }
             } else {
-                self.sample_from_mempool(&mut eb_transactions, self.sim_config.max_eb_size, false);
+                self.sample_from_mempool(
+                    &mut eb_transactions,
+                    self.sim_config.max_eb_size,
+                    false,
+                    slot,
+                    1,
+                );
             }
         }
         let (eb_announcement, eb) = if eb_transactions.is_empty() {
@@ -857,6 +1102,9 @@ impl LinearLeiosNode {
         ) {
             return;
         }
+        if self.leios.pruned_ebs.contains(&eb_id) {
+            return;
+        }
 
         let eb_peer_announcements = self.leios.eb_peer_announcements.entry(eb_id).or_default();
         if has_eb {
@@ -941,10 +1189,16 @@ impl LinearLeiosNode {
                 header_seen,
             },
         );
-        if let Some(endorsement) = &rb.endorsement
-            && !self.is_eb_validated(endorsement.eb)
-        {
-            self.leios.incomplete_onchain_ebs.insert(endorsement.eb);
+        if let Some(endorsement) = &rb.endorsement {
+            self.leios
+                .endorsed_ebs
+                .entry(endorsement.eb)
+                .or_insert(rb.header.id.slot);
+            if !self.is_eb_validated(endorsement.eb)
+                && !self.leios.pruned_ebs.contains(&endorsement.eb)
+            {
+                self.leios.incomplete_onchain_ebs.insert(endorsement.eb);
+            }
         }
 
         self.publish_rb(rb, true);
@@ -1146,7 +1400,8 @@ impl LinearLeiosNode {
         }
         let Some(EndorserBlockView::Received { validated, .. }) = self.leios.ebs.get_mut(&eb.id())
         else {
-            panic!("how did we validate this EB without ever seeing it?");
+            tracing::warn!("EB {} was pruned before CPU validation completed", eb.id());
+            return;
         };
         *validated = true;
         if matches!(
@@ -1262,15 +1517,26 @@ impl LinearLeiosNode {
         if withhold_tx_config.stop_time.is_some_and(|s| slot_ts > s) {
             return vec![];
         }
-        if !self.rng.random_bool(withhold_tx_config.probability) {
+        let rng = Rng::new(self.sim_config.seed);
+        if !rng.draw_bool(
+            self.id,
+            slot,
+            DrawSite::WithholdDecision,
+            withhold_tx_config.probability,
+        ) {
             return vec![];
         }
 
-        let txs_to_generate = withhold_tx_config.txs_to_generate.sample(&mut self.rng) as u64;
+        let mut count_rng = rng.seeded_chacha(self.id, slot, DrawSite::WithholdTxCount);
+        let txs_to_generate = withhold_tx_config.txs_to_generate.sample(&mut count_rng) as u64;
         let mut txs = vec![];
-        for _ in 0..txs_to_generate {
+        for i in 0..txs_to_generate {
             let tx = match &self.sim_config.transactions {
-                TransactionConfig::Real(cfg) => cfg.new_tx(&mut self.rng, None),
+                TransactionConfig::Real(cfg) => {
+                    let mut tx_rng =
+                        rng.seeded_chacha(self.id, slot, DrawSite::TxGenBody { tx_idx: i });
+                    cfg.new_tx(&mut tx_rng, None)
+                }
                 TransactionConfig::Mock(cfg) => cfg.mock_tx(cfg.eb_size / txs_to_generate),
             };
             self.tracker.track_transaction_generated(&tx, self.id);
@@ -1304,9 +1570,33 @@ impl LinearLeiosNode {
     }
 
     fn try_vote_for_endorser_block(&mut self, eb: &Arc<EndorserBlock>, seen: Timestamp) -> bool {
-        let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
-            .filter_map(|f| self.run_vrf(LotteryKind::GenerateVote, f))
-            .count();
+        let vrf_wins = match self.sim_config.committee_selection {
+            CommitteeSelectionAlgorithm::WfaLs => {
+                let eb_id = eb.id();
+                vrf_probabilities(self.sim_config.vote_probability)
+                    .enumerate()
+                    .filter_map(|(trial, f)| {
+                        self.run_vrf(
+                            LotteryKind::GenerateVote,
+                            f,
+                            eb.slot,
+                            DrawSite::VoteVrf {
+                                eb_id,
+                                trial: trial as u16,
+                            },
+                        )
+                    })
+                    .count()
+            }
+            CommitteeSelectionAlgorithm::Everyone => 1,
+            CommitteeSelectionAlgorithm::TopStakeFraction => {
+                if self.sim_config.vote_eligible_nodes.contains(&self.id) {
+                    1
+                } else {
+                    0
+                }
+            }
+        };
         if vrf_wins == 0 {
             return false;
         }
@@ -1436,17 +1726,14 @@ impl LinearLeiosNode {
     }
 
     fn count_votes(&mut self, votes: &VoteBundle) {
-        let vote_threshold = self.sim_config.vote_threshold as usize;
         for (eb_id, count) in votes.ebs.iter() {
-            let all_eb_votes = self.leios.votes_by_eb.entry(*eb_id).or_default();
-            let total_votes_before = all_eb_votes.values().sum::<usize>();
-            *all_eb_votes.entry(votes.id.producer).or_default() += count;
-
-            let total_votes_after = total_votes_before + count;
-            if total_votes_before < vote_threshold && total_votes_after >= vote_threshold {
-                // this EB is officially certified
-                self.leios.certified_ebs.insert(*eb_id);
-            }
+            *self
+                .leios
+                .votes_by_eb
+                .entry(*eb_id)
+                .or_default()
+                .entry(votes.id.producer)
+                .or_default() += count;
         }
     }
 }
@@ -1454,8 +1741,12 @@ impl LinearLeiosNode {
 // Ledger/mempool operations
 impl LinearLeiosNode {
     fn try_add_tx_to_mempool(&mut self, tx: &Arc<Transaction>, is_local: bool) -> InsertResult {
-        let ledger_state = self.resolve_ledger_state(self.latest_rb_id());
-        if ledger_state.spent_inputs.contains(&tx.input_id) {
+        self.resolve_ledger_state(self.latest_rb_id());
+        if self
+            .ledger_state
+            .as_ref()
+            .is_some_and(|(_, ls)| ls.spent_inputs.contains(&tx.input_id))
+        {
             // This TX conflicts with something already on-chain
             return InsertResult::Backlogged;
         }
@@ -1483,6 +1774,8 @@ impl LinearLeiosNode {
         txs: &mut Vec<Arc<Transaction>>,
         max_size: u64,
         remove: bool,
+        slot: u64,
+        shuffle_call: u32,
     ) {
         let mut size = txs.iter().map(|tx| tx.bytes).sum::<u64>();
         let mut candidates: Vec<_> = self.mempool.ids().collect();
@@ -1490,7 +1783,8 @@ impl LinearLeiosNode {
             self.sim_config.mempool_strategy,
             MempoolSamplingStrategy::Random
         ) {
-            candidates.shuffle(&mut self.rng);
+            let rng = Rng::new(self.sim_config.seed);
+            rng.context_shuffle(&mut candidates, self.id, slot, shuffle_call);
         } else {
             candidates.reverse();
         }
@@ -1545,22 +1839,25 @@ impl LinearLeiosNode {
         }
     }
 
-    fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) -> Arc<LedgerState> {
+    fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) {
         let Some(block_id) = rb_ref else {
-            return Arc::new(LedgerState::default());
+            return;
         };
-        if let Some(state) = self.ledger_states.get(&block_id) {
-            return state.clone();
-        };
+        if self
+            .ledger_state
+            .as_ref()
+            .is_some_and(|(id, _)| *id == block_id)
+        {
+            return;
+        }
 
         let mut state = self
-            .ledger_states
-            .last_key_value()
-            .map(|(_, v)| v.as_ref().clone())
+            .ledger_state
+            .take()
+            .map(|(_, s)| s)
             .unwrap_or_default();
 
         let mut block_queue = vec![block_id];
-        let mut complete = true;
         while let Some(block_id) = block_queue.pop() {
             if !state.seen_blocks.insert(block_id) {
                 continue;
@@ -1576,30 +1873,19 @@ impl LinearLeiosNode {
                 state.spent_inputs.insert(tx.input_id);
             }
 
-            if let Some(endorsement) = &rb.endorsement {
-                match self.leios.ebs.get(&endorsement.eb) {
-                    Some(EndorserBlockView::Received { eb, .. }) => {
-                        for tx in &eb.txs {
-                            if self.has_tx(tx.id) {
-                                state.spent_inputs.insert(tx.input_id);
-                            } else {
-                                complete = false;
-                            }
-                        }
-                    }
-                    _ => {
-                        // We haven't validated the EB yet, so we don't know the full ledger state
-                        complete = false;
+            if let Some(endorsement) = &rb.endorsement
+                && let Some(EndorserBlockView::Received { eb, .. }) =
+                    self.leios.ebs.get(&endorsement.eb)
+            {
+                for tx in &eb.txs {
+                    if self.has_tx(tx.id) {
+                        state.spent_inputs.insert(tx.input_id);
                     }
                 }
             }
         }
 
-        let state = Arc::new(state);
-        if complete {
-            self.ledger_states.insert(block_id, state.clone());
-        }
-        state
+        self.ledger_state = Some((block_id, state));
     }
 }
 
@@ -1610,8 +1896,20 @@ impl LinearLeiosNode {
         self.lottery = LotteryConfig::Mock { results };
     }
     // Simulates the output of a VRF using this node's stake (if any).
-    fn run_vrf(&mut self, kind: LotteryKind, success_rate: f64) -> Option<u64> {
-        self.lottery.run(kind, success_rate, &mut self.rng)
+    //
+    // Pure function of (seed, node, slot, site): no per-node RNG state,
+    // so whether this node drew 0 or 600 random values in an earlier
+    // slot cannot affect this draw. Mirrors real VRF semantics (stateless
+    // per key+message).
+    fn run_vrf(
+        &self,
+        kind: LotteryKind,
+        success_rate: f64,
+        slot: u64,
+        site: DrawSite,
+    ) -> Option<u64> {
+        let rng = Rng::new(self.sim_config.seed);
+        self.lottery.run(kind, success_rate, &rng, self.id, slot, site)
     }
 }
 
@@ -1661,6 +1959,15 @@ impl Mempool {
     fn is_generated_backlog_full(&self) -> bool {
         self.tx_generated_backlog_max_size
             .is_some_and(|max| self.local_backlog.len() >= max)
+    }
+
+    fn stats(&self) -> (usize, u64, usize, usize) {
+        (
+            self.mempool.len(),
+            self.mempool_size_bytes,
+            self.local_backlog.len(),
+            self.peer_backlog.len(),
+        )
     }
 
     fn is_peer_backlog_full(&self) -> bool {

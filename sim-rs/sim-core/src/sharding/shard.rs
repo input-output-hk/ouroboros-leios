@@ -42,7 +42,7 @@ pub(crate) trait NetworkRunnable: Send {
 use std::fmt::Debug;
 use std::hash::Hash;
 
-impl<TProtocol: Clone + Eq + Hash + Send + 'static, TMessage: Debug + Send + 'static> NetworkRunnable
+impl<TProtocol: Clone + Eq + Hash + Ord + Send + 'static, TMessage: Debug + Send + 'static> NetworkRunnable
     for Network<TProtocol, TMessage>
 {
     fn run(&mut self) -> futures::future::BoxFuture<'_, Result<()>> {
@@ -64,7 +64,7 @@ pub(crate) fn build_shards<TProtocol, TMessage>(
     mut networks: Vec<Network<TProtocol, TMessage>>,
 ) -> Vec<Shard>
 where
-    TProtocol: Clone + Eq + Hash + Send + Debug + 'static,
+    TProtocol: Clone + Eq + Hash + Ord + Send + Debug + 'static,
     TMessage: Debug + Send + 'static,
 {
     let shard_count = clocks.len();
@@ -155,13 +155,22 @@ where
         }
     }
 
-    // Create per-shard transaction producers
+    // Create per-shard transaction producers.
+    //
+    // Each shard's producer uses the shared stateless Rng. Different
+    // shards still produce disjoint TX streams because shards round-
+    // robin on tx_idx (shard-local counter) and the downstream
+    // node-weight sampling filters by locally-hosted nodes. The master
+    // rng's next_u64 is consumed per shard to preserve existing
+    // per-shard seeding-order semantics for any downstream draws that
+    // still depend on it.
     let tx_producers: Vec<TransactionProducer> = per_shard_tx_sinks
         .into_iter()
         .enumerate()
         .map(|(shard, tx_sinks)| {
+            let _ = rng.next_u64();
             TransactionProducer::new(
-                ChaChaRng::seed_from_u64(rng.next_u64()),
+                crate::rng::Rng::new(config.seed),
                 clocks[shard].barrier(),
                 tx_sinks,
                 config,
