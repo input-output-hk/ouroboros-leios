@@ -1,17 +1,17 @@
 import Link from "@docusaurus/Link";
 
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
-import HomepageFeatures from "@site/src/components/HomepageFeatures";
 import Layout from "@theme/Layout";
 import clsx from "clsx";
 import React, { useEffect, useState } from "react";
 
+import LiveTrackerPreview from "@site/static/img/live-tracker-preview.png";
+import VideoCamUrl from "@site/static/img/video-cam.png";
+import { ArrowRightIcon } from "../components/icons";
 import { LinkButton } from "../components/LinkButton/LinkButton";
 import HowLeiosWorksGraphic from "./HowLeiosWorksGraphic";
 import styles from "./index.module.css";
 import ResearchGraphic from "./ResearchGraphic";
-import VideoCamUrl from "@site/static/img/video-cam.png";
-import LiveTrackerPreview from "@site/static/img/live-tracker-preview.png";
 
 function HomepageHeader() {
   const { siteConfig } = useDocusaurusContext();
@@ -19,10 +19,43 @@ function HomepageHeader() {
   return (
     <>
       <header className={clsx("hero hero--primary")}>
-        <div className="container">
-          <div className={clsx("container-padding", styles.heroBanner)}>
-            <h1 className={styles.heroTitle}>{siteConfig.title}</h1>
-            <p className={styles.heroStandfirst}>{siteConfig.tagline}</p>
+        <video className="hero-video-desktop" autoPlay muted loop playsInline>
+          <source
+            src="/homepage/hero-background-desktop.mp4"
+            type="video/mp4"
+          />
+        </video>
+        <video className="hero-video-mobile" autoPlay muted loop playsInline>
+          <source src="/homepage/hero-background-mobile.mp4" type="video/mp4" />
+        </video>
+        <div className="hero-overlay" />
+
+        <div className={clsx("container hero-content")}>
+          <div className={clsx("container-padding")}>
+            <div className={styles.heroBanner}>
+              <h1 className={styles.heroTitle}>{siteConfig.title}</h1>
+              <p className={styles.heroStandfirst}>{siteConfig.tagline}</p>
+              <div className={styles.heroButtonsContainer}>
+                <a
+                  className={clsx("primary-button homepage-button")}
+                  href="#dev-dashboard"
+                >
+                  View live development{" "}
+                  <ArrowRightIcon
+                    style={{ rotate: "90deg" }}
+                    height={12}
+                    width={12}
+                  />
+                </a>
+                <a
+                  className={clsx("secondary-button homepage-button")}
+                  href="/docs/what-is-leios"
+                >
+                  {" "}
+                  Explore how it works <ArrowRightIcon height={12} width={12} />
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -55,7 +88,6 @@ function UTCDateTime(year, month, day, hour, minute = 0, second = 0) {
 let exceptions = {
   "2025-9": UTCDateTime(2025, 9, 1, 14),
   "2025-12": UTCDateTime(2025, 11, 17, 14),
-  "2026-3": UTCDateTime(2026, 3, 1, 14),
 };
 
 function getNextMeeting(now = new Date()) {
@@ -69,8 +101,8 @@ function getNextMeeting(now = new Date()) {
   }
 
   // Unless there is an exception for next meeting
-  const nextMonth = `${nextMeeting.getFullYear()}-${nextMeeting.getMonth() + 1}`;
-  const exception = exceptions[nextMonth];
+  const exception =
+    exceptions[`${nextMeeting.getFullYear()}-${nextMeeting.getMonth() + 1}`];
   if (exception) {
     nextMeeting = exception;
   }
@@ -158,7 +190,7 @@ function LeiosSpecificationSection() {
               </p>
               <div className={styles.researchContentinkButton}>
                 <LinkButton
-                  text="Read the Full CIP"
+                  text="Read the full CIP"
                   url="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md"
                 />
               </div>
@@ -183,7 +215,7 @@ function HowLeiosWorksSection() {
               <HowLeiosWorksGraphic />
             </div>
             <div className={styles.howLeiosWorksContent}>
-              <h2>How Leios Works</h2>
+              <h2>How Leios works</h2>
               <p className={styles.subtitle}>
                 Block producers simultaneously create both a standard Praos
                 block and a larger secondary block referencing additional
@@ -237,7 +269,7 @@ function HowLeiosWorksSection() {
               </p>
               <div className={styles.howLeiosWorksContentinkButton}>
                 <LinkButton
-                  text="Read the Technical Details"
+                  text="Read the Technical details"
                   url="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#specification"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -412,7 +444,7 @@ function MempoolSimulationSection() {
               </p>
               <div className={styles.mempoolLinkButton}>
                 <LinkButton
-                  text="Try It Yourself"
+                  text="Try it yourself"
                   url="https://leios.cardano-scaling.org/mempool-viz/"
                 />
               </div>
@@ -420,14 +452,14 @@ function MempoolSimulationSection() {
             <div className={styles.mempoolEmbedContainer}>
               <iframe
                 src="https://leios.cardano-scaling.org/mempool-viz/?embed=true&autoPlay=true&loop=true&speed=2"
-                title="Mempool Simulation Visualization"
+                title="Mempool simulation visualization"
                 className={styles.mempoolIframe}
                 loading="lazy"
               />
               <Link
                 to="https://leios.cardano-scaling.org/mempool-viz/"
                 className={styles.mempoolOverlayLink}
-                aria-label="Open Mempool Simulation"
+                aria-label="Open mempool simulation"
               />
             </div>
           </div>
@@ -439,6 +471,34 @@ function MempoolSimulationSection() {
 
 export default function Home(): React.ReactElement {
   const { siteConfig } = useDocusaurusContext();
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    let pending: number | null = null;
+    let lastHeight = 0;
+
+    const handler = (event: MessageEvent) => {
+      if (event.origin !== "https://engineering.iog.io") return;
+      if (event.data?.type !== "dashboard-height" || !iframeRef.current) return;
+      const next = event.data.height;
+      if (next === lastHeight) return;
+      lastHeight = next;
+      if (pending !== null) return;
+      pending = requestAnimationFrame(() => {
+        pending = null;
+        if (iframeRef.current) {
+          iframeRef.current.style.height = lastHeight + "px";
+        }
+      });
+    };
+
+    window.addEventListener("message", handler);
+    return () => {
+      window.removeEventListener("message", handler);
+      if (pending !== null) cancelAnimationFrame(pending);
+    };
+  }, []);
+
   return (
     <Layout
       title={siteConfig.title}
@@ -446,12 +506,25 @@ export default function Home(): React.ReactElement {
     >
       <HomepageHeader />
       <main>
-        <HomepageFeatures />
-        <LeiosSpecificationSection />
-        <HowLeiosWorksSection />
+        {/* <HomepageFeatures /> */}
+        <div data-theme="dark">
+          <LeiosSpecificationSection />
+          <HowLeiosWorksSection />
+        </div>
+        <iframe
+          ref={iframeRef}
+          src="https://engineering.iog.io/documentation-dashboard"
+          title="Leios"
+          className={styles.devTracker}
+          id="dev-dashboard"
+        />
+
         <MonthlyReviewsSection />
+
+        {/* <LeiosSpecificationSection />
+        <HowLeiosWorksSection />
         <LiveTrackerSection />
-        <MempoolSimulationSection />
+        <MempoolSimulationSection /> */}
       </main>
     </Layout>
   );
