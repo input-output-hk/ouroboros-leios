@@ -14,7 +14,7 @@ use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::mpsc;
 use tracing::info;
 
-use crate::chain_tree::{ChainTree, ChainTreeEntry};
+use con_rs::chain_tree::{ChainTree, ChainTreeEntry};
 use crate::validation::Validator;
 
 pub(crate) use peer_chain::{PeerChain, PeerChainEntry};

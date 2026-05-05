@@ -37,8 +37,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use net_core::types::Point;
 use serde::Serialize;
+
+use crate::types::Point;
 
 /// A block entry in a chain tree snapshot, for UI display.
 #[derive(Debug, Clone, Serialize)]
@@ -88,6 +89,12 @@ struct ChainNode {
 pub struct ChainTree {
     nodes: HashMap<[u8; 32], ChainNode>,
     best_tip: Option<(Point, u64)>, // (point, block_number)
+}
+
+impl Default for ChainTree {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ChainTree {
@@ -163,12 +170,12 @@ impl ChainTree {
     }
 
     /// Look up the point for a given hash.
-    pub(crate) fn point(&self, hash: &[u8; 32]) -> Option<&Point> {
+    pub fn point(&self, hash: &[u8; 32]) -> Option<&Point> {
         self.nodes.get(hash).map(|n| &n.point)
     }
 
     /// Look up the prev_hash for a given hash.
-    pub(crate) fn prev_hash(&self, hash: &[u8; 32]) -> Option<[u8; 32]> {
+    pub fn prev_hash(&self, hash: &[u8; 32]) -> Option<[u8; 32]> {
         self.nodes.get(hash).and_then(|n| n.prev_hash)
     }
 
@@ -176,6 +183,12 @@ impl ChainTree {
     #[cfg(test)]
     pub fn len(&self) -> usize {
         self.nodes.len()
+    }
+
+    /// True if the tree contains no blocks.
+    #[cfg(test)]
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
     }
 
     /// Prune blocks with block_number below the threshold.
@@ -221,7 +234,7 @@ impl ChainTree {
     /// result may mean the chain is incomplete, not that it's short.
     /// `select_chain_once` depends on a complete ancestry to find common
     /// ancestors with peers — gaps cause false `OrphanCandidate` results.
-    pub(crate) fn ancestors(&self, mut hash: [u8; 32]) -> Vec<[u8; 32]> {
+    pub fn ancestors(&self, mut hash: [u8; 32]) -> Vec<[u8; 32]> {
         let mut chain = vec![hash];
         while let Some(node) = self.nodes.get(&hash) {
             match node.prev_hash {

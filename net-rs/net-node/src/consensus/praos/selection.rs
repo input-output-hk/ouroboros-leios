@@ -8,7 +8,7 @@ use net_core::peer::PeerId;
 use net_core::types::Point;
 use tracing::info;
 
-use crate::chain_tree::is_better_tip;
+use con_rs::chain_tree::is_better_tip;
 use crate::validation::LedgerCommand;
 
 use super::peer_chain::PeerChainEntry;

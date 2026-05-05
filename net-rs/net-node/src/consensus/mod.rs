@@ -12,7 +12,7 @@ use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::{mpsc, watch};
 
-use crate::chain_tree::ChainTreeEntry;
+use con_rs::chain_tree::ChainTreeEntry;
 use crate::config::{CommitteeSelection, DynamicConfig, StakeEntry};
 use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerOutcome, Validator};
