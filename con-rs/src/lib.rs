@@ -1,15 +1,16 @@
-//! Cardano consensus primitives shared between the test node (`net-node`)
-//! and the simulator (`sim-rs`).
+//! Cardano consensus primitives, sans-IO.
 //!
-//! This crate is sans-IO: no tokio, no clock, no networking. It hosts the
-//! pure protocol pieces that both implementations should agree on —
-//! committee selection (CIP-0164 wFA + LS), pipeline phase math, and vote
-//! aggregation / quorum detection.
+//! Hosts the protocol pieces that every Cardano-Leios implementation
+//! must agree on — committee selection (CIP-0164 wFA + LS), pipeline
+//! phase math, vote aggregation, longest-chain selection.  No tokio,
+//! no clock, no networking; consumers wrap the state machines and
+//! drive them with their own I/O layer.
 
 pub mod aggregation;
 pub mod chain_tree;
 pub mod config;
 pub mod elections;
+pub mod leios;
 pub mod peer;
 pub mod peer_chain;
 pub mod pipeline;
@@ -19,4 +20,4 @@ pub mod wfa;
 
 pub use config::{CommitteeSelection, StakeEntry};
 pub use peer::PeerId;
-pub use types::Point;
+pub use types::{Point, Tip};

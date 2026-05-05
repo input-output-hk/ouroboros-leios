@@ -1,9 +1,9 @@
-//! Cardano consensus value types shared between sim-rs and net-rs.
+//! Cardano consensus value types.
 //!
-//! These are protocol identity types — what a "block" is named on the
-//! chain — not transport types. Wire codecs live with the type because
-//! both consumers must agree on the on-wire encoding, but the type
-//! itself carries no I/O.
+//! Protocol identity types — what a "block" is named on the chain —
+//! not transport types. Wire codecs live with the type because every
+//! consumer must agree on the on-wire encoding, but the type itself
+//! carries no I/O.
 
 use std::fmt;
 
@@ -98,6 +98,43 @@ impl<'a> minicbor::Decode<'a, ()> for Point {
                 "expected point array of length 0 or 2, got {other}"
             ))),
         }
+    }
+}
+
+/// Chain tip: a point plus the block number.
+///
+/// Wire format: [point, blockNo]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Tip {
+    pub point: Point,
+    pub block_no: u64,
+}
+
+impl fmt::Display for Tip {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}@block#{}", self.point, self.block_no)
+    }
+}
+
+impl minicbor::Encode<()> for Tip {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut Encoder<W>,
+        _ctx: &mut (),
+    ) -> Result<(), EncodeError<W::Error>> {
+        e.array(2)?;
+        self.point.encode(e, &mut ())?;
+        e.u64(self.block_no)?;
+        Ok(())
+    }
+}
+
+impl<'a> minicbor::Decode<'a, ()> for Tip {
+    fn decode(d: &mut Decoder<'a>, _ctx: &mut ()) -> Result<Self, DecodeError> {
+        let _len = d.array()?;
+        let point = Point::decode(d, &mut ())?;
+        let block_no = d.u64()?;
+        Ok(Tip { point, block_no })
     }
 }
 

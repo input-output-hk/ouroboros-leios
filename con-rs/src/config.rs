@@ -1,8 +1,8 @@
-//! Protocol-level configuration types shared between sim-rs and net-rs.
+//! Protocol-level configuration types.
 //!
-//! These describe the committee-selection policy and the per-pool stake
-//! registry that drive Leios voting. They are protocol parameters, not
-//! transport or runtime knobs, so they live with the consensus logic.
+//! Describe the committee-selection policy and the per-pool stake
+//! registry that drive Leios voting. Protocol parameters, not transport
+//! or runtime knobs, so they live with the consensus logic.
 
 use serde::{Deserialize, Serialize};
 

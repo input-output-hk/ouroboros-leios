@@ -10,13 +10,11 @@ mod header;
 pub use block::{BlockBody, LeiosBlockInfo};
 pub use header::{HeaderInfo, WrappedHeader};
 
-use std::fmt;
-
 use minicbor::decode::Error as DecodeError;
 use minicbor::encode::Error as EncodeError;
 use minicbor::{Decode, Decoder, Encode, Encoder};
 
-pub use con_rs::Point;
+pub use con_rs::{Point, Tip};
 
 /// Maximum number of points in a FindIntersect message.
 pub const MAX_POINTS: usize = 2048;
@@ -26,45 +24,6 @@ pub const MAX_HEADER_SIZE: usize = 65_535;
 
 /// Maximum block body size (matches BlockFetch StStreaming size limit).
 pub const MAX_BLOCK_SIZE: usize = 2_500_000;
-
-// --- Tip ---
-
-/// Chain tip: a point plus the block number.
-///
-/// Wire format: [point, blockNo]
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Tip {
-    pub point: Point,
-    pub block_no: u64,
-}
-
-impl fmt::Display for Tip {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}@block#{}", self.point, self.block_no)
-    }
-}
-
-impl minicbor::Encode<()> for Tip {
-    fn encode<W: minicbor::encode::Write>(
-        &self,
-        e: &mut Encoder<W>,
-        _ctx: &mut (),
-    ) -> Result<(), EncodeError<W::Error>> {
-        e.array(2)?;
-        self.point.encode(e, &mut ())?;
-        e.u64(self.block_no)?;
-        Ok(())
-    }
-}
-
-impl<'a> minicbor::Decode<'a, ()> for Tip {
-    fn decode(d: &mut Decoder<'a>, _ctx: &mut ()) -> Result<Self, DecodeError> {
-        let _len = d.array()?;
-        let point = Point::decode(d, &mut ())?;
-        let block_no = d.u64()?;
-        Ok(Tip { point, block_no })
-    }
-}
 
 // --- Helpers ---
 

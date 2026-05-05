@@ -6,9 +6,9 @@
 //! vote, expire caches.
 //!
 //! All iteration is over `BTreeMap`s, so given a deterministic input
-//! ordering at the adapter, this module produces deterministic state
-//! mutations and a deterministic effect sequence — required for the
-//! simulator (sim-rs) to reproduce runs from a seed.
+//! ordering at the I/O boundary, this module produces deterministic
+//! state mutations and a deterministic effect sequence — needed by
+//! consumers that replay runs from a seed.
 
 use std::collections::BTreeMap;
 use std::time::Instant;
@@ -120,8 +120,8 @@ impl Elections {
     /// Advance the slot counter, update phases, and emit effects.
     ///
     /// Effect ordering: every `EligibleToVote` (sorted by eb_hash) first,
-    /// then every `Expired` (sorted). Callers iterate in order — sim-rs
-    /// relies on this for deterministic effect dispatch.
+    /// then every `Expired` (sorted). Callers iterate in order; this is
+    /// the contract deterministic-replay consumers rely on.
     pub fn on_slot(&mut self, slot: u64) -> Vec<SlotEffect> {
         self.current_slot = slot;
         let pipeline = self.cfg.pipeline;

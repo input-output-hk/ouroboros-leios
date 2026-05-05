@@ -4,14 +4,14 @@
 //! chain tree, block cache, per-peer announced fragments, validator-
 //! queue projection, and orphan / in-flight tracking.  It is sans-IO:
 //! every public method either mutates state and returns a
-//! `Vec<PraosEffect>` describing what the caller (sim-rs driver or
-//! net-node's tokio event loop) should dispatch — fetch a block range,
-//! re-intersect with a peer, hand a block to the validator, inject into
-//! the chain store — or returns a pure query result.
+//! `Vec<PraosEffect>` describing what the caller's I/O layer should
+//! dispatch — fetch a block range, re-intersect with a peer, hand a
+//! block to the validator, inject into the chain store — or returns a
+//! pure query result.
 //!
-//! Block bodies and headers are carried as opaque `Vec<u8>`.  The CBOR
-//! parsing happens at the I/O boundary (in net-node's wrapper); con-rs
-//! never interprets the bytes.
+//! Block bodies and headers are carried as opaque `Vec<u8>`.  CBOR
+//! parsing happens at the I/O boundary; con-rs never interprets the
+//! bytes.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::time::{Duration, Instant};
@@ -143,9 +143,8 @@ pub enum SelectionDecision {
 
 /// Praos consensus state for one node.
 ///
-/// Fields are `pub` so adapter code (net-node's wrapper, sim-rs's
-/// driver, tests) can read and selectively manipulate them.  External
-/// callers should treat them as state-machine internals: prefer the
+/// Fields are `pub` so adapter code can read and selectively
+/// manipulate them.  Treat them as state-machine internals: prefer the
 /// public methods, which preserve invariants and emit the right
 /// effects.
 pub struct PraosState {
