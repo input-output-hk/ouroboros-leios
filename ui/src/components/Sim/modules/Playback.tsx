@@ -217,7 +217,7 @@ export const Playback: FC = () => {
     }, 200); // Show focus for 200ms
   };
 
-  const stepSize = speedMultiplier;
+  const stepSize = speedMultiplier * 0.1;
 
   // Keyboard event handler
   useEffect(() => {
@@ -283,7 +283,15 @@ export const Playback: FC = () => {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [disabled, handlePlayPause, handleStep, handleSkipEvent, stepSize, speedMultiplier, dispatch]);
+  }, [
+    disabled,
+    handlePlayPause,
+    handleStep,
+    handleSkipEvent,
+    stepSize,
+    speedMultiplier,
+    dispatch,
+  ]);
 
   return (
     <div className="flex items-center gap-2">
