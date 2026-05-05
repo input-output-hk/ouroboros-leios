@@ -11,14 +11,15 @@
 //! - `voting` — EB-triggered vote production with committee selection
 //! - `aggregation` — (future) vote tallies, quorum detection, certificates
 
-mod aggregation;
-mod pipeline;
 pub(crate) mod voting;
-mod wfa;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::{Duration, Instant};
 
+use con_rs::aggregation;
+use con_rs::pipeline::{EbElection, PipelinePhase};
+pub use con_rs::pipeline::PipelineConfig;
+use con_rs::wfa;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::Point;
 use rand::rngs::StdRng;
@@ -30,9 +31,6 @@ use crate::config::{CommitteeSelection, DynamicConfig, StakeEntry};
 use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerCommand, Validator};
 
-use pipeline::EbElection;
-pub use pipeline::PipelineConfig;
-use pipeline::PipelinePhase;
 pub use voting::VotingConfig;
 
 /// Result of matching a `LeiosBlockTxsReceived` response against the
@@ -429,7 +427,6 @@ impl LeiosConsensus {
             self.elections.insert(
                 hash,
                 EbElection {
-                    eb_point: point,
                     announced_slot: slot,
                     phase,
                     validated_at: Instant::now(),

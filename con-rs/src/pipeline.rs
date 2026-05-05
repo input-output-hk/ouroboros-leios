@@ -7,11 +7,9 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
-use net_core::types::Point;
-
 /// Pipeline phase for an EB election (CIP-0164 Linear Leios).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PipelinePhase {
+pub enum PipelinePhase {
     /// Waiting for equivocation detection (3 × Δhdr slots).
     EquivocationCheck,
     /// Voting window open (L_vote slots).
@@ -23,18 +21,21 @@ pub(crate) enum PipelinePhase {
 }
 
 /// Per-EB election state.
-pub(crate) struct EbElection {
-    pub(crate) eb_point: Point,
-    pub(crate) announced_slot: u64,
-    pub(crate) phase: PipelinePhase,
+///
+/// The struct is sans-IO and carries no transport identifier for the EB —
+/// callers key elections by EB hash externally and pass `eb_hash` to
+/// `record_vote` for any logging that needs it.
+pub struct EbElection {
+    pub announced_slot: u64,
+    pub phase: PipelinePhase,
     #[allow(dead_code)] // used by future telemetry
-    pub(crate) validated_at: Instant,
+    pub validated_at: Instant,
     /// True after this node has cast its vote for this EB.
-    pub(crate) voted: bool,
+    pub voted: bool,
     /// Per-voter weight: voter_id+tag → derived weight.
-    pub(crate) voter_weights: HashMap<Vec<u8>, u32>,
+    pub voter_weights: HashMap<Vec<u8>, u32>,
     /// True once quorum has been reached.
-    pub(crate) quorum_reached: bool,
+    pub quorum_reached: bool,
 }
 
 /// CIP-0164 pipeline timing configuration.
@@ -50,7 +51,7 @@ impl PipelineConfig {
     /// Compute the pipeline phase for an EB given the number of slots
     /// elapsed since its announcement. Returns `None` if the election
     /// has expired (past dedup_window after CertEligible).
-    pub(crate) fn phase_for_elapsed(&self, elapsed: u64) -> Option<PipelinePhase> {
+    pub fn phase_for_elapsed(&self, elapsed: u64) -> Option<PipelinePhase> {
         let equivocation_end = 3 * self.delta_hdr;
         let voting_end = equivocation_end + self.vote_window;
         let diffuse_end = voting_end + self.diffuse_window;

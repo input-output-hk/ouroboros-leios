@@ -11,7 +11,7 @@ use super::pipeline::EbElection;
 
 /// Returned from `record_vote` when a vote causes quorum to fire for the
 /// first time. The caller uses this to emit `LeiosQuorumReached` telemetry.
-pub(crate) struct QuorumFormed {
+pub struct QuorumFormed {
     pub eb_slot: u64,
     pub voted_weight: u64,
     pub voters: usize,
@@ -25,7 +25,7 @@ pub(crate) struct QuorumFormed {
 ///
 /// Quorum: `Σ weight ≥ quorum_fraction × expected_committee_size`.
 /// Returns `Some(QuorumFormed)` exactly once per election.
-pub(crate) fn record_vote(
+pub fn record_vote(
     elections: &mut HashMap<[u8; 32], EbElection>,
     eb_hash: &[u8; 32],
     voter_id: Vec<u8>,
@@ -57,7 +57,8 @@ pub(crate) fn record_vote(
     let voters = election.voter_weights.len();
     info!(
         node_id = %node_id,
-        eb_point = %election.eb_point,
+        eb_slot = election.announced_slot,
+        eb_hash = %hex_prefix(eb_hash),
         voted_weight,
         threshold,
         voters,
@@ -70,10 +71,18 @@ pub(crate) fn record_vote(
     })
 }
 
+fn hex_prefix(bytes: &[u8]) -> String {
+    let n = bytes.len().min(4);
+    let mut s = String::with_capacity(n * 2);
+    for b in &bytes[..n] {
+        s.push_str(&format!("{b:02x}"));
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use net_core::types::Point;
     use std::time::Instant;
 
     use super::super::pipeline::PipelinePhase;
@@ -87,7 +96,6 @@ mod tests {
         (
             hash,
             EbElection {
-                eb_point: Point::Specific { slot, hash },
                 announced_slot: slot,
                 phase: PipelinePhase::Voting,
                 validated_at: Instant::now(),
