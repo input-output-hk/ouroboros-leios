@@ -8,6 +8,7 @@
 
 pub mod aggregation;
 pub mod config;
+pub mod elections;
 pub mod pipeline;
 pub mod wfa;
 

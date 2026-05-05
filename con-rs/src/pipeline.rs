@@ -4,7 +4,7 @@
 //! its announcement: EquivocationCheck (3×Δhdr) → Voting (L_vote) →
 //! Diffusing (L_diff) → CertEligible (held until pruned).
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::time::Instant;
 
 /// Pipeline phase for an EB election (CIP-0164 Linear Leios).
@@ -25,6 +25,11 @@ pub enum PipelinePhase {
 /// The struct is sans-IO and carries no transport identifier for the EB —
 /// callers key elections by EB hash externally and pass `eb_hash` to
 /// `record_vote` for any logging that needs it.
+///
+/// `voter_weights` is a `BTreeMap` so iteration order is deterministic.
+/// Election-side aggregations (`Σ weight`, `len()`) are commutative, so
+/// determinism isn't strictly needed here, but the simulator's contract
+/// is uniform: no `HashMap` traversal anywhere in con-rs.
 pub struct EbElection {
     pub announced_slot: u64,
     pub phase: PipelinePhase,
@@ -33,7 +38,7 @@ pub struct EbElection {
     /// True after this node has cast its vote for this EB.
     pub voted: bool,
     /// Per-voter weight: voter_id+tag → derived weight.
-    pub voter_weights: HashMap<Vec<u8>, u32>,
+    pub voter_weights: BTreeMap<Vec<u8>, u32>,
     /// True once quorum has been reached.
     pub quorum_reached: bool,
 }

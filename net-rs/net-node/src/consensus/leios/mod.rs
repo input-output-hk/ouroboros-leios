@@ -16,8 +16,9 @@ pub(crate) mod voting;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::{Duration, Instant};
 
-use con_rs::aggregation;
-use con_rs::pipeline::{EbElection, PipelinePhase};
+use con_rs::elections::{Elections, ElectionsConfig, SlotEffect};
+#[cfg(test)]
+use con_rs::pipeline::PipelinePhase;
 pub use con_rs::pipeline::PipelineConfig;
 use con_rs::wfa;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
@@ -76,27 +77,15 @@ pub struct LeiosConsensus {
     pending_eb_tx_fetches: HashMap<[u8; 32], (u64, std::collections::BTreeMap<u16, u64>)>,
     /// Leios points currently being fetched.
     in_flight: HashMap<Point, Instant>,
-    /// Pipeline timing parameters.
+    /// Pipeline timing parameters. Also held by `elections`; kept here
+    /// because `eb_tx_hashes` / `pending_eb_tx_fetches` are pruned by
+    /// pipeline phase but live outside the election state machine.
     pipeline: PipelineConfig,
-    /// Current slot (advanced by `on_slot`).
-    current_slot: u64,
-    /// Per-EB elections, keyed by EB hash.
-    elections: HashMap<[u8; 32], EbElection>,
-    /// Committee selection mode.
-    committee_selection: CommitteeSelection,
+    /// EB election state machine: phase tracking, voting eligibility,
+    /// vote aggregation, quorum detection. Lives in con-rs (sans-IO).
+    elections: Elections,
     /// Voting configuration (committee selection, stake, vote sizes).
     voting_config: VotingConfig,
-    /// Per-pool persistent committee allocation, identical on every node.
-    persistent_committee: BTreeMap<String, u32>,
-    /// Network-wide stake registry. Used to look up a voter's stake when
-    /// re-running the NPV lottery for incoming votes.
-    stake_registry: BTreeMap<String, u64>,
-    /// Total network stake (sum of stake_registry).
-    total_stake: u64,
-    /// Fraction of expected committee weight required for quorum.
-    quorum_weight_fraction: f64,
-    /// Σ persistent_seats + non_persistent_voters. Threshold base.
-    expected_committee_size: u32,
     /// RNG reserved for future randomization (currently unused: PV is
     /// deterministic from the cached committee, NPV from the signature).
     #[allow(dead_code)]
@@ -151,6 +140,16 @@ impl LeiosConsensus {
             committee_pools = persistent_committee.len(),
             "leios committee initialized"
         );
+        let elections = Elections::new(ElectionsConfig {
+            node_id: node_id.clone(),
+            pipeline,
+            committee_selection,
+            persistent_committee,
+            stake_registry,
+            total_stake,
+            expected_committee_size,
+            quorum_weight_fraction,
+        });
         Self {
             node_id,
             commands,
@@ -160,15 +159,8 @@ impl LeiosConsensus {
             pending_eb_tx_fetches: HashMap::new(),
             in_flight: HashMap::new(),
             pipeline,
-            current_slot: 0,
-            elections: HashMap::new(),
-            committee_selection,
+            elections,
             voting_config,
-            persistent_committee,
-            stake_registry,
-            total_stake,
-            quorum_weight_fraction,
-            expected_committee_size,
             rng: match rng_seed {
                 Some(s) => StdRng::seed_from_u64(s),
                 None => StdRng::from_entropy(),
@@ -187,11 +179,7 @@ impl LeiosConsensus {
     /// Used by the RB producer to populate `RbCertifiedEb` telemetry when
     /// the produced header carries `certified_eb=true`.
     pub fn certified_eb_slot(&self) -> Option<u64> {
-        self.elections
-            .values()
-            .filter(|e| e.quorum_reached && e.phase == PipelinePhase::CertEligible)
-            .map(|e| e.announced_slot)
-            .min()
+        self.elections.certified_eb_slot()
     }
 
     // -- Slot tick ----------------------------------------------------------
@@ -199,63 +187,39 @@ impl LeiosConsensus {
     /// Advance slot tracking. Updates pipeline phases, triggers voting
     /// for elections entering the Voting phase, and prunes expired ones.
     pub async fn on_slot(&mut self, slot: u64) {
-        self.current_slot = slot;
-
-        // Find elections that are in Voting phase and haven't been voted on.
-        let to_vote: Vec<([u8; 32], u64)> = self
-            .elections
-            .iter()
-            .filter(|(_, e)| {
-                let elapsed = slot.saturating_sub(e.announced_slot);
-                matches!(
-                    self.pipeline.phase_for_elapsed(elapsed),
-                    Some(PipelinePhase::Voting)
-                ) && !e.voted
-            })
-            .map(|(hash, e)| (*hash, e.announced_slot))
-            .collect();
-
-        // Vote on each eligible EB.
-        for (hash, eb_slot) in to_vote {
-            if voting::try_vote_on_eb(
-                &self.node_id,
-                &hash,
-                eb_slot,
-                &self.voting_config,
-                &self.commands,
-            )
-            .await
-            {
-                if let Some(election) = self.elections.get_mut(&hash) {
-                    election.voted = true;
+        let effects = self.elections.on_slot(slot);
+        for effect in effects {
+            match effect {
+                SlotEffect::EligibleToVote { eb_hash, eb_slot } => {
+                    if voting::try_vote_on_eb(
+                        &self.node_id,
+                        &eb_hash,
+                        eb_slot,
+                        &self.voting_config,
+                        &self.commands,
+                    )
+                    .await
+                    {
+                        self.elections.mark_voted(&eb_hash);
+                    }
+                }
+                SlotEffect::Expired {
+                    eb_slot,
+                    had_quorum,
+                    voted_weight,
+                    voters,
+                    ..
+                } => {
+                    self.pending_telemetry.push(NodeEvent::LeiosElectionExpired {
+                        node: self.node_id.clone(),
+                        eb_slot,
+                        had_quorum,
+                        voted_weight,
+                        voters,
+                    });
                 }
             }
         }
-
-        // Update phases and prune expired. Emit telemetry for each pruned election.
-        let node_id = &self.node_id;
-        let pending = &mut self.pending_telemetry;
-        self.elections.retain(|_, election| {
-            match self
-                .pipeline
-                .phase_for_elapsed(slot.saturating_sub(election.announced_slot))
-            {
-                Some(phase) => {
-                    election.phase = phase;
-                    true
-                }
-                None => {
-                    pending.push(NodeEvent::LeiosElectionExpired {
-                        node: node_id.clone(),
-                        eb_slot: election.announced_slot,
-                        had_quorum: election.quorum_reached,
-                        voted_weight: election.voter_weights.values().map(|w| *w as u64).sum(),
-                        voters: election.voter_weights.len(),
-                    });
-                    false
-                }
-            }
-        });
         // Prune EB manifests and in-progress tx-fetch state by slot age.
         // Done independently of `elections` so a manifest that arrived
         // but never produced a validated election still expires.
@@ -411,31 +375,7 @@ impl LeiosConsensus {
             Point::Specific { slot, hash } => (*slot, *hash),
             Point::Origin => return,
         };
-
-        if self.elections.contains_key(&hash) {
-            return;
-        }
-
-        let elapsed = self.current_slot.saturating_sub(slot);
-        if let Some(phase) = self.pipeline.phase_for_elapsed(elapsed) {
-            info!(
-                node_id = %self.node_id,
-                %point,
-                ?phase,
-                "eb election created"
-            );
-            self.elections.insert(
-                hash,
-                EbElection {
-                    announced_slot: slot,
-                    phase,
-                    validated_at: Instant::now(),
-                    voted: false,
-                    voter_weights: HashMap::new(),
-                    quorum_reached: false,
-                },
-            );
-        }
+        self.elections.announce(slot, hash);
     }
 
     /// Called when vote validation completes. Derives each vote's weight
@@ -448,23 +388,11 @@ impl LeiosConsensus {
                 continue;
             };
             let voter_id_str = String::from_utf8_lossy(&body.voter_id).into_owned();
-            let weight = match (body.tag, &body.eligibility_signature) {
-                (0, _) => self
-                    .persistent_committee
-                    .get(&voter_id_str)
-                    .copied()
-                    .unwrap_or(0),
-                (1, Some(sig)) => {
-                    let stake = self.stake_registry.get(&voter_id_str).copied().unwrap_or(0);
-                    wfa::count_npv_wins(
-                        sig,
-                        stake,
-                        self.total_stake,
-                        self.committee_selection.non_persistent_voters(),
-                    )
-                }
-                _ => 0,
-            };
+            let weight = self.elections.weight_for(
+                &voter_id_str,
+                body.tag,
+                body.eligibility_signature.as_deref(),
+            );
             if weight == 0 {
                 continue;
             }
@@ -472,15 +400,10 @@ impl LeiosConsensus {
             // an NPV body for the same EB).
             let mut key = body.voter_id.clone();
             key.push(body.tag);
-            if let Some(formed) = aggregation::record_vote(
-                &mut self.elections,
-                &body.endorser_block_hash,
-                key,
-                weight,
-                self.quorum_weight_fraction,
-                self.expected_committee_size,
-                &self.node_id,
-            ) {
+            if let Some(formed) =
+                self.elections
+                    .record_vote(&body.endorser_block_hash, key, weight)
+            {
                 self.pending_telemetry.push(NodeEvent::LeiosQuorumReached {
                     node: self.node_id.clone(),
                     eb_slot: formed.eb_slot,
@@ -636,40 +559,32 @@ impl LeiosConsensus {
     /// CertEligible phase (full pipeline elapsed). Used by the RB
     /// producer to set the certified_eb header flag.
     pub fn has_certified_eb(&self) -> bool {
-        self.elections
-            .values()
-            .any(|e| e.quorum_reached && e.phase == PipelinePhase::CertEligible)
+        self.elections.has_certified_eb()
     }
 
     #[cfg(test)]
     fn election_phase(&self, hash: &[u8; 32]) -> Option<PipelinePhase> {
-        self.elections.get(hash).map(|e| e.phase)
+        self.elections.phase(hash)
     }
 
     #[cfg(test)]
     fn election_count(&self) -> usize {
-        self.elections.len()
+        self.elections.count()
     }
 
     #[cfg(test)]
     fn election_voted(&self, hash: &[u8; 32]) -> bool {
-        self.elections.get(hash).map(|e| e.voted).unwrap_or(false)
+        self.elections.voted(hash)
     }
 
     #[cfg(test)]
     fn election_quorum(&self, hash: &[u8; 32]) -> bool {
-        self.elections
-            .get(hash)
-            .map(|e| e.quorum_reached)
-            .unwrap_or(false)
+        self.elections.quorum(hash)
     }
 
     #[cfg(test)]
     fn election_voter_count(&self, hash: &[u8; 32]) -> usize {
-        self.elections
-            .get(hash)
-            .map(|e| e.voter_weights.len())
-            .unwrap_or(0)
+        self.elections.voter_count(hash)
     }
 
     // -- Housekeeping -------------------------------------------------------

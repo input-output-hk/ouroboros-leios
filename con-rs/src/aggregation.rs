@@ -3,7 +3,7 @@
 //! Tracks votes per EB election, detects when quorum is reached.
 //! Certificate formation and RB header population are in Commit 5.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use tracing::info;
 
@@ -26,7 +26,7 @@ pub struct QuorumFormed {
 /// Quorum: `Σ weight ≥ quorum_fraction × expected_committee_size`.
 /// Returns `Some(QuorumFormed)` exactly once per election.
 pub fn record_vote(
-    elections: &mut HashMap<[u8; 32], EbElection>,
+    elections: &mut BTreeMap<[u8; 32], EbElection>,
     eb_hash: &[u8; 32],
     voter_id: Vec<u8>,
     weight: u32,
@@ -36,7 +36,7 @@ pub fn record_vote(
 ) -> Option<QuorumFormed> {
     let election = elections.get_mut(eb_hash)?;
 
-    use std::collections::hash_map::Entry;
+    use std::collections::btree_map::Entry;
     if let Entry::Vacant(e) = election.voter_weights.entry(voter_id) {
         e.insert(weight);
     } else {
@@ -71,7 +71,7 @@ pub fn record_vote(
     })
 }
 
-fn hex_prefix(bytes: &[u8]) -> String {
+pub(crate) fn hex_prefix(bytes: &[u8]) -> String {
     let n = bytes.len().min(4);
     let mut s = String::with_capacity(n * 2);
     for b in &bytes[..n] {
@@ -100,14 +100,14 @@ mod tests {
                 phase: PipelinePhase::Voting,
                 validated_at: Instant::now(),
                 voted: false,
-                voter_weights: HashMap::new(),
+                voter_weights: BTreeMap::new(),
                 quorum_reached: false,
             },
         )
     }
 
     fn vote(
-        elections: &mut HashMap<[u8; 32], EbElection>,
+        elections: &mut BTreeMap<[u8; 32], EbElection>,
         hash: &[u8; 32],
         voter_id: Vec<u8>,
         weight: u32,
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn votes_accumulate_and_dedup() {
-        let mut elections = HashMap::new();
+        let mut elections = BTreeMap::new();
         let (hash, election) = make_election(10);
         elections.insert(hash, election);
 
@@ -139,7 +139,7 @@ mod tests {
 
     #[test]
     fn quorum_reached_at_weight_threshold() {
-        let mut elections = HashMap::new();
+        let mut elections = BTreeMap::new();
         let (hash, election) = make_election(10);
         elections.insert(hash, election);
 
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn quorum_not_reached_just_below_threshold() {
-        let mut elections = HashMap::new();
+        let mut elections = BTreeMap::new();
         let (hash, election) = make_election(10);
         elections.insert(hash, election);
 
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn many_unit_voters_reach_quorum() {
-        let mut elections = HashMap::new();
+        let mut elections = BTreeMap::new();
         let (hash, election) = make_election(10);
         elections.insert(hash, election);
 
@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn zero_weight_voter_does_not_help_quorum() {
-        let mut elections = HashMap::new();
+        let mut elections = BTreeMap::new();
         let (hash, election) = make_election(10);
         elections.insert(hash, election);
 
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn votes_for_unknown_eb_ignored() {
-        let mut elections = HashMap::new();
+        let mut elections = BTreeMap::new();
         let unknown_hash = [0xFF; 32];
         vote(&mut elections, &unknown_hash, vec![1], 500);
         assert!(elections.is_empty());
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn extra_votes_after_quorum_dont_refire() {
-        let mut elections = HashMap::new();
+        let mut elections = BTreeMap::new();
         let (hash, election) = make_election(10);
         elections.insert(hash, election);
 

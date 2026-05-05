@@ -176,7 +176,8 @@ pub struct NodeConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Committee selection (Leios voting) — lifted to con-rs.
+// Committee selection (Leios voting) — defined in con-rs, re-exported here
+// for callers that import via `crate::config`.
 // ---------------------------------------------------------------------------
 
 pub use con_rs::{CommitteeSelection, StakeEntry};
