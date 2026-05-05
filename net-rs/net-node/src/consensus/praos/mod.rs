@@ -1,102 +1,39 @@
-//! Praos longest-chain consensus with fork tracking.
+//! Praos longest-chain consensus.  Thin I/O wrapper around the
+//! sans-IO `con_rs::praos::PraosState` state machine.
+//!
+//! Each public method on `PraosConsensus` translates wire-format
+//! network events / validator outcomes into logical args, calls into
+//! `PraosState`, and dispatches the returned `Vec<PraosEffect>` to the
+//! network-command channel and the validator actor.
 
-mod fetching;
-mod selection;
-mod validation;
-
-use std::collections::{HashMap, HashSet};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
+#[cfg(test)]
 use net_core::peer::PeerId;
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::mpsc;
-use tracing::info;
 
-use con_rs::chain_tree::{ChainTree, ChainTreeEntry};
-use crate::validation::Validator;
+use con_rs::chain_tree::ChainTreeEntry;
+use con_rs::praos::{ParsedHeaderInfo, PraosEffect, PraosState};
 
-pub(crate) use con_rs::peer_chain::{PeerChain, PeerChainEntry};
+use crate::validation::{LedgerCommand, LedgerOutcome, Validator};
 
-/// How long an in-flight fetch entry remains "active" before being considered
-/// stale and eligible for retry. The coordinator may silently drop a fetch
-/// (e.g. no connected peer has the requested point in its fragment), so we
-/// need a recovery path: if no body arrives within this window, allow a fresh
-/// attempt.
-pub(super) const IN_FLIGHT_TTL: Duration = Duration::from_secs(15);
+// Re-export the selection types so callers (tests, telemetry,
+// production code) can keep importing them from `crate::consensus::praos`.
+#[cfg(test)]
+pub use con_rs::praos::{CachedBlock, HybridWalk, SelectionDecision};
 
-/// Minimum interval between successive `OrphanCandidate` classifications
-/// for the same peer. After one `evaluate_and_fetch` classifies a peer as
-/// orphan and sends `NetworkCommand::ReIntersect`, the peer is skipped in
-/// chain selection for this long. Caps the orphan-cascade rate at 1/sec
-/// per peer even when re-intersection round-trips are millisecond-scale.
-pub(super) const ORPHAN_COOLDOWN: Duration = Duration::from_secs(1);
-
-/// A block body cached after fetch or self-production.
-pub(super) struct CachedBlock {
-    pub(super) point: Point,
-    pub(super) header: WrappedHeader,
-    pub(super) body: BlockBody,
-    pub(super) block_no: u64,
-    pub(super) prev_hash: Option<[u8; 32]>,
-}
-
-/// PraosConsensus state with fork-tracking chain tree.
+/// I/O wrapper around `con_rs::praos::PraosState`.
+///
+/// Public methods take wire-format args (`NetworkEvent`, `WrappedHeader`,
+/// `BlockBody`, `LedgerOutcome`), translate to logical ones, run the
+/// state machine, and dispatch the resulting effects to the network-
+/// command channel and the validator actor.
 pub struct PraosConsensus {
-    pub(super) node_id: String,
-    pub(super) chain_tree: ChainTree,
-    /// Hash of the last block we actually injected into the chain store.
-    pub(super) adopted_tip_hash: Option<[u8; 32]>,
-    /// Points of blocks we produced (skip re-fetching).
-    pub(super) self_produced: HashSet<Point>,
-    /// All block bodies we possess (fetched or self-produced). Pruned beyond k.
-    pub(super) block_cache: HashMap<[u8; 32], CachedBlock>,
-    /// Which cached blocks have passed validation.
-    pub(super) validated: HashSet<[u8; 32]>,
-    /// Points currently being fetched or validated (avoid duplicate requests).
-    /// Each entry remembers when it was added; entries older than
-    /// `IN_FLIGHT_TTL` are treated as stale and dropped lazily so a retry
-    /// can be issued. The coordinator may silently drop a fetch when no
-    /// connected peer has the requested point — without TTL recovery, the
-    /// node would stay stuck on that fork forever.
-    pub(super) in_flight: HashMap<Point, Instant>,
-    /// Per-peer candidate chains. Populated on `TipAdvanced`, truncated on
-    /// `RolledBack`, dropped on `PeerDisconnected`. Drives chain selection
-    /// via `select_chain`.
-    pub(crate) peer_chains: HashMap<PeerId, PeerChain>,
-    /// Per-peer cooldown timestamps. After `evaluate_and_fetch` classifies
-    /// a peer as `OrphanCandidate` it is skipped in chain selection until
-    /// this timestamp passes. Cleared only on `PeerDisconnected`; *not*
-    /// cleared on `IntersectionFound`, because re-intersection round-trips
-    /// on localhost are faster than the rate of TipAdvanced events, so
-    /// clearing the cooldown there would reopen a ping-pong cascade
-    /// between orphan → ReIntersect → IntersectionFound → next event →
-    /// orphan again. The cooldown decouples these: after a re-intersection,
-    /// the peer is re-evaluated only once its cooldown expires, giving the
-    /// fresh ChainSync stream time to rebuild contiguous entries.
-    pub(super) orphan_cooldown: HashMap<PeerId, Instant>,
-    /// Hash the validator's queue will be at after every command we've
-    /// already submitted has been processed. We track this so a fork
-    /// switch can decide whether to insert a `LedgerCommand::Rollback`
-    /// before the next `Apply`. The actual ledger state lags this until
-    /// outcomes arrive.
-    pub(super) queued_validator_tip: Option<[u8; 32]>,
-    /// Hash of the last block the validator has actually `Applied`. Used
-    /// to rewind `queued_validator_tip` after an `ApplyFailed`, since the
-    /// failed block (and any cascading failures behind it) leave the
-    /// queue's projected tip out of sync with reality.
-    pub(super) last_validated_tip: Option<[u8; 32]>,
-    /// Hashes that have been submitted to the validator but whose
-    /// outcome (`Applied` or `ApplyFailed`) hasn't arrived yet. Used to
-    /// gate new submissions on "parent known to the validator" without
-    /// requiring the parent's apply to have already completed: since
-    /// the actor processes commands sequentially, if the parent's Apply
-    /// is already queued, submitting the child right after is safe.
-    pub(super) in_flight_validation: HashSet<[u8; 32]>,
-    pub(super) commands: mpsc::Sender<NetworkCommand>,
-    pub(super) validator: Validator,
-    /// Security parameter k — prune blocks deeper than this.
-    pub(super) security_param_k: u64,
+    pub(crate) state: PraosState,
+    pub(crate) commands: mpsc::Sender<NetworkCommand>,
+    pub(crate) validator: Validator,
 }
 
 impl PraosConsensus {
@@ -107,244 +44,309 @@ impl PraosConsensus {
         security_param_k: u64,
     ) -> Self {
         Self {
-            node_id,
-            chain_tree: ChainTree::new(),
-            adopted_tip_hash: None,
-            self_produced: HashSet::new(),
-            block_cache: HashMap::new(),
-            validated: HashSet::new(),
-            in_flight: HashMap::new(),
-            peer_chains: HashMap::new(),
-            orphan_cooldown: HashMap::new(),
-            queued_validator_tip: None,
-            last_validated_tip: None,
-            in_flight_validation: HashSet::new(),
+            state: PraosState::new(node_id, security_param_k),
             commands,
             validator,
-            security_param_k,
         }
     }
 
-    /// Cap per-peer chains at 2 * k headers — enough to track forks within
-    /// the security window plus a 1k cushion, without growing unboundedly.
-    pub(super) fn peer_chain_cap(&self) -> usize {
-        (self.security_param_k as usize).saturating_mul(2).max(64)
-    }
-
-    /// Ingest a peer's new header announcement into its candidate chain.
-    pub(super) fn record_peer_tip(&mut self, peer_id: PeerId, tip: &Tip, header: &WrappedHeader) {
-        let info = match header.parsed.as_ref() {
-            Some(i) => i,
-            None => return, // opaque header — nothing to select on
-        };
-        // When a peer is still catching up, the announced `header` may be
-        // an ancestor of `tip`. Use whichever hash matches.
-        let (hash, point) = if info.block_number == tip.block_no {
-            match &tip.point {
-                Point::Specific { hash, .. } => (*hash, tip.point.clone()),
-                _ => return,
+    /// Drain effects to the I/O sinks.  Network-side effects go to
+    /// `commands`; validator effects go to `validator.submit`.  Header
+    /// and body bytes are rehydrated into the wire types here; the
+    /// state machine never touched them.
+    async fn dispatch(&mut self, effects: Vec<PraosEffect>) {
+        for effect in effects {
+            match effect {
+                PraosEffect::FetchBlockRange { from, to, peer_id } => {
+                    let _ = self
+                        .commands
+                        .send(NetworkCommand::FetchBlockRange { from, to, peer_id })
+                        .await;
+                }
+                PraosEffect::ReIntersect { peer_id } => {
+                    let _ = self
+                        .commands
+                        .send(NetworkCommand::ReIntersect { peer_id })
+                        .await;
+                }
+                PraosEffect::InjectBlock {
+                    point,
+                    header,
+                    body,
+                    block_no,
+                } => {
+                    let header = WrappedHeader::new(header);
+                    let body = BlockBody::new(body);
+                    let _ = self
+                        .commands
+                        .send(NetworkCommand::InjectBlock {
+                            point,
+                            header: Box::new(header),
+                            body,
+                            block_no,
+                        })
+                        .await;
+                }
+                PraosEffect::InjectRollback { target } => {
+                    let _ = self
+                        .commands
+                        .send(NetworkCommand::InjectRollback { point: target })
+                        .await;
+                }
+                PraosEffect::ValidatorApply {
+                    point,
+                    body,
+                    prev_hash: _,
+                } => {
+                    self.validator
+                        .submit(LedgerCommand::Apply {
+                            point,
+                            body: BlockBody::new(body),
+                        })
+                        .await;
+                }
+                PraosEffect::ValidatorRollback { target } => {
+                    self.validator
+                        .submit(LedgerCommand::Rollback { target })
+                        .await;
+                }
             }
-        } else {
-            match header.point() {
-                Some(Point::Specific { hash, slot }) => (hash, Point::Specific { hash, slot }),
-                _ => return,
-            }
-        };
-        let entry = PeerChainEntry {
-            hash,
-            point,
-            block_no: info.block_number,
-            prev_hash: info.prev_hash,
-        };
-        let cap = self.peer_chain_cap();
-        self.peer_chains
-            .entry(peer_id)
-            .or_insert_with(|| PeerChain::new(cap))
-            .append(entry);
-    }
-
-    /// Store the ChainSync intersection as the peer chain's anchor.
-    /// Entries are NOT cleared here — the orphan handler already clears
-    /// them at the point where re-intersection is requested, and the
-    /// anchor serves as a common-ancestor fallback for `select_chain_once`
-    /// when the entry walk can't reach the adopted chain.
-    pub(super) fn record_peer_intersection(&mut self, peer_id: PeerId, point: &Point) {
-        let cap = self.peer_chain_cap();
-        self.peer_chains
-            .entry(peer_id)
-            .or_insert_with(|| PeerChain::new(cap))
-            .set_anchor(point.clone());
-    }
-
-    /// Truncate a peer's candidate chain on a rollback.
-    pub(super) fn record_peer_rollback(&mut self, peer_id: PeerId, point: &Point) {
-        if let Some(chain) = self.peer_chains.get_mut(&peer_id) {
-            chain.rollback_to(point);
         }
     }
 
-    /// Drop a peer's candidate chain on disconnect.
-    pub(super) fn record_peer_disconnected(&mut self, peer_id: PeerId) {
-        self.peer_chains.remove(&peer_id);
+    /// Translate a `WrappedHeader` to logical metadata when it was
+    /// successfully parsed; `None` for opaque headers.
+    fn parse_header(header: &WrappedHeader) -> Option<ParsedHeaderInfo> {
+        header.parsed.as_ref().map(|i| ParsedHeaderInfo {
+            block_number: i.block_number,
+            slot: i.slot,
+            prev_hash: i.prev_hash,
+        })
     }
 
-    /// Register a block we produced ourselves: cache it, hand it to the
-    /// validator (matching Haskell's `ChainDB.addBlockAsync` behaviour —
-    /// no fast-path for self-produced blocks), drain any peer-fetched
-    /// children that had been waiting for this block as their parent,
-    /// then run `select_chain` in case a peer fork is even better than
-    /// the newly-produced tip. The chain_store update happens later,
-    /// when the `Applied` outcome arrives.
+    // -- Public API (matches old shape, all delegate to `state` + dispatch) -
+
     pub async fn register_self_produced(
         &mut self,
         point: &Point,
         header: &WrappedHeader,
         body: &BlockBody,
     ) {
-        self.self_produced.insert(point.clone());
-
-        let info = match header.parsed.as_ref() {
-            Some(i) => i,
-            None => {
-                // Opaque header — nothing to insert into chain_tree, but
-                // still hand the body to the validator.
-                self.submit_for_validation(point.clone(), body.clone(), None)
-                    .await;
-                return;
-            }
-        };
-        let hash = match point {
-            Point::Specific { hash, .. } => *hash,
-            _ => return,
-        };
-        self.chain_tree.insert(
-            hash,
+        let parsed = Self::parse_header(header);
+        let fx = self.state.register_self_produced(
             point.clone(),
-            info.block_number,
-            info.slot,
-            info.prev_hash,
+            header.raw.clone(),
+            body.raw.clone(),
+            parsed,
         );
-        self.block_cache.entry(hash).or_insert(CachedBlock {
-            point: point.clone(),
-            header: header.clone(),
-            body: body.clone(),
-            block_no: info.block_number,
-            prev_hash: info.prev_hash,
-        });
-
-        self.submit_for_validation(point.clone(), body.clone(), info.prev_hash)
-            .await;
-        self.try_switch_and_execute(hash).await;
+        self.dispatch(fx).await;
     }
 
-    /// Handle a network event. Returns true if the event was consumed by
-    /// consensus (caller should not log it separately).
+    /// Handle a network event.  Returns true if the event was consumed
+    /// by Praos (caller should not log it separately).
     pub async fn handle_event(&mut self, event: &NetworkEvent) -> bool {
-        match event {
+        let now = Instant::now();
+        let (consumed, fx) = match event {
             NetworkEvent::IntersectionFound { peer_id, point } => {
-                self.record_peer_intersection(*peer_id, point);
-                // Do NOT clear orphan_cooldown here — see the comment on
-                // the field. The cooldown must expire naturally.
-                // No select_chain here either: the intersection alone
-                // doesn't change which chain is best; TipAdvanced triggers
-                // that after the cooldown lifts.
-                true
+                self.state.record_peer_intersection(*peer_id, point.clone());
+                (true, Vec::new())
             }
             NetworkEvent::TipAdvanced {
                 peer_id,
                 tip,
                 header,
             } => {
-                self.record_peer_tip(*peer_id, tip, header);
-                self.evaluate_and_fetch().await;
-                true
+                let fx = match Self::parse_header(header) {
+                    Some(info) => {
+                        let hash = match header.point() {
+                            Some(Point::Specific { hash, .. }) => hash,
+                            _ => match &tip.point {
+                                Point::Specific { hash, .. } => *hash,
+                                _ => return false,
+                            },
+                        };
+                        self.state.on_tip_advanced(
+                            *peer_id,
+                            tip.point.clone(),
+                            tip.block_no,
+                            info.block_number,
+                            hash,
+                            info.slot,
+                            info.prev_hash,
+                            now,
+                        )
+                    }
+                    // Opaque header: nothing to record, but still re-run
+                    // selection in case other peers' state has changed.
+                    None => Vec::new(),
+                };
+                (true, fx)
             }
             NetworkEvent::BlockReceived { point, body } => {
-                self.on_block_received(point, body).await;
-                true
+                let header = body
+                    .header()
+                    .unwrap_or_else(|| WrappedHeader::opaque(Vec::new()));
+                let parsed = Self::parse_header(&header);
+                let fx = self.state.on_block_received(
+                    point.clone(),
+                    header.raw.clone(),
+                    body.raw.clone(),
+                    parsed,
+                );
+                (true, fx)
             }
             NetworkEvent::RolledBack { peer_id, point, .. } => {
-                self.record_peer_rollback(*peer_id, point);
-                info!(
-                    node_id = %self.node_id,
-                    %peer_id,
-                    to = %point,
-                    "peer chain rolled back"
-                );
-                self.evaluate_and_fetch().await;
-                true
+                let fx = self.state.on_peer_rolled_back(*peer_id, point, now);
+                (true, fx)
             }
             NetworkEvent::PeerDisconnected { peer_id, .. } => {
-                self.record_peer_disconnected(*peer_id);
-                // Peer is gone; drop any orphan cooldown entry.
-                self.orphan_cooldown.remove(peer_id);
-                self.evaluate_and_fetch().await;
-                false
+                let fx = self.state.on_peer_disconnected(*peer_id, now);
+                (false, fx)
             }
             NetworkEvent::BlockFetchFailed { from, to } => {
-                self.in_flight.remove(from);
-                self.in_flight.remove(to);
-                info!(
-                    node_id = %self.node_id,
-                    from = %from,
-                    to = %to,
-                    "block fetch failed; re-evaluating fetch decisions"
-                );
-                self.evaluate_and_fetch().await;
-                true
+                let fx = self.state.on_block_fetch_failed(from, to, now);
+                (true, fx)
             }
-
-            _ => false,
-        }
+            _ => (false, Vec::new()),
+        };
+        self.dispatch(fx).await;
+        consumed
     }
 
-    /// Current local tip as a `Tip`, derived from the chain tree.
+    /// Periodic retry: evict stale fetches, re-run chain selection.
+    pub async fn retry_select_chain(&mut self) {
+        let fx = self.state.retry_select_chain(Instant::now());
+        self.dispatch(fx).await;
+    }
+
+    /// Handle a validator outcome.  Returns true if the chain store
+    /// rolled back.
+    pub async fn on_validation_outcome(&mut self, outcome: LedgerOutcome) -> bool {
+        let now = Instant::now();
+        let (rolled_back, fx) = match outcome {
+            LedgerOutcome::Applied { point } => {
+                (false, self.state.on_block_applied(point, now))
+            }
+            LedgerOutcome::RolledBack { target } => {
+                (true, self.state.on_block_rolled_back(target))
+            }
+            LedgerOutcome::ApplyFailed { point, error } => {
+                self.state.on_block_apply_failed(point, error);
+                (false, Vec::new())
+            }
+            LedgerOutcome::RollbackFailed { target, error } => {
+                tracing::error!(
+                    node_id = %self.state.node_id,
+                    %target,
+                    %error,
+                    "ledger rollback failed; consensus state may be inconsistent"
+                );
+                (false, Vec::new())
+            }
+            LedgerOutcome::EbValidated { .. } | LedgerOutcome::VotesValidated { .. } => {
+                // Leios outcomes are handled by the facade before reaching Praos.
+                (false, Vec::new())
+            }
+        };
+        self.dispatch(fx).await;
+        rolled_back
+    }
+
+    // -- Queries (forwarded) -----------------------------------------------
+
     #[allow(dead_code)]
     pub fn local_tip(&self) -> Option<Tip> {
-        self.chain_tree.best_tip().map(|(point, block_no)| Tip {
-            point: point.clone(),
+        self.state.local_tip().map(|(point, block_no)| Tip {
+            point,
             block_no,
         })
     }
 
-    /// Snapshot the recent chain tree for UI display.
-    /// Uses the adopted tip (last validated block) rather than the speculative
-    /// best tip, so the prev_hash chain is always connected.
-    /// Returns (chain_tree_entries, tip_block_no, tip_hash_suffix).
     pub fn chain_tree_snapshot(&self) -> (Vec<ChainTreeEntry>, Option<u64>, Option<String>) {
-        match self.adopted_tip_hash {
-            Some(hash) => {
-                let block_no = self.chain_tree.block_number(&hash);
-                let entries = self.chain_tree.snapshot(hash, 10, block_no);
-                let tip_hash = Some(format!("{:02x}{:02x}", hash[30], hash[31]));
-                (entries, block_no, tip_hash)
-            }
-            None => (Vec::new(), None, None),
-        }
+        self.state.chain_tree_snapshot()
     }
 
-    /// Hash of the adopted tip, for passing as prev_hash to block production.
-    /// Returns `None` when no chain has been adopted yet — the production
-    /// code then builds the genesis child (block 1, prev_hash=None).
-    ///
-    /// Uses `adopted_tip_hash` (the validated chain) rather than
-    /// `chain_tree.best_tip_hash()` to avoid building on unvalidated
-    /// peer headers whose ancestor chain may be incomplete.
     pub fn tip_hash(&self) -> Option<[u8; 32]> {
-        self.adopted_tip_hash
+        self.state.tip_hash()
     }
 
-    /// Next block number (adopted tip + 1), for setting in produced block headers.
     pub fn next_block_number(&self) -> u64 {
-        self.adopted_tip_hash
-            .and_then(|h| self.chain_tree.block_number(&h))
-            .map_or(1, |bn| bn + 1)
+        self.state.next_block_number()
+    }
+}
+
+// Test-side wire-type wrappers around state methods.  Tests call these
+// directly to exercise inner state without going through async I/O.
+#[cfg(test)]
+impl PraosConsensus {
+    pub(super) fn record_peer_tip(
+        &mut self,
+        peer_id: PeerId,
+        tip: &Tip,
+        header: &WrappedHeader,
+    ) {
+        let info = match header.parsed.as_ref() {
+            Some(i) => i,
+            None => return,
+        };
+        let hash = match header.point() {
+            Some(Point::Specific { hash, .. }) => hash,
+            _ => match &tip.point {
+                Point::Specific { hash, .. } => *hash,
+                _ => return,
+            },
+        };
+        self.state.record_peer_tip(
+            peer_id,
+            tip.point.clone(),
+            tip.block_no,
+            info.block_number,
+            hash,
+            info.slot,
+            info.prev_hash,
+        );
+    }
+
+    pub(super) fn record_peer_intersection(&mut self, peer_id: PeerId, point: &Point) {
+        self.state.record_peer_intersection(peer_id, point.clone());
+    }
+
+    pub(super) fn record_peer_disconnected(&mut self, peer_id: PeerId) {
+        self.state.record_peer_disconnected(peer_id);
+    }
+
+    pub(super) fn select_chain_once(
+        &self,
+        skip: &std::collections::HashSet<PeerId>,
+    ) -> SelectionDecision {
+        self.state.select_chain_once(skip)
+    }
+
+    pub(super) fn walk_ancestors_hybrid(&self, start_hash: [u8; 32]) -> HybridWalk {
+        self.state.walk_ancestors_hybrid(start_hash)
+    }
+
+    /// Test wrapper: drive the BlockReceived path through the state
+    /// machine and dispatch any resulting effects.
+    pub(super) async fn on_block_received(&mut self, point: &Point, body: &BlockBody) {
+        let header = body
+            .header()
+            .unwrap_or_else(|| WrappedHeader::opaque(Vec::new()));
+        let parsed = Self::parse_header(&header);
+        let fx = self.state.on_block_received(
+            point.clone(),
+            header.raw.clone(),
+            body.raw.clone(),
+            parsed,
+        );
+        self.dispatch(fx).await;
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::collections::HashSet;
+    use std::time::{Duration, Instant};
 
     use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
     use net_core::peer::PeerId;
@@ -354,7 +356,7 @@ mod tests {
     use crate::validation::{LedgerOutcome, Validator};
 
     use con_rs::peer_chain::PeerChainEntry;
-    use super::selection::SelectionDecision;
+    use con_rs::praos::{IN_FLIGHT_TTL, SelectionDecision};
     use super::*;
 
     /// Placeholder peer id for tests that don't care which peer announced
@@ -538,7 +540,7 @@ mod tests {
             })
             .await;
 
-        let chain = consensus.peer_chains.get(&peer).expect("chain exists");
+        let chain = consensus.state.peer_chains.get(&peer).expect("chain exists");
         assert_eq!(chain.len(), 2);
         assert_eq!(chain.tip().unwrap().block_no, 2);
         assert_eq!(chain.tip().unwrap().prev_hash, Some(hash1));
@@ -585,7 +587,7 @@ mod tests {
             })
             .await;
 
-        assert_eq!(consensus.peer_chains.get(&peer).unwrap().len(), 3);
+        assert_eq!(consensus.state.peer_chains.get(&peer).unwrap().len(), 3);
 
         // Roll back to block 1 — only tip1 should remain.
         consensus
@@ -596,7 +598,7 @@ mod tests {
             })
             .await;
 
-        let chain = consensus.peer_chains.get(&peer).unwrap();
+        let chain = consensus.state.peer_chains.get(&peer).unwrap();
         assert_eq!(chain.len(), 1);
         assert_eq!(chain.tip().unwrap().hash, hash1);
     }
@@ -615,7 +617,7 @@ mod tests {
             })
             .await;
 
-        assert!(consensus.peer_chains.contains_key(&peer));
+        assert!(consensus.state.peer_chains.contains_key(&peer));
 
         consensus
             .handle_event(&NetworkEvent::PeerDisconnected {
@@ -624,7 +626,7 @@ mod tests {
             })
             .await;
 
-        assert!(!consensus.peer_chains.contains_key(&peer));
+        assert!(!consensus.state.peer_chains.contains_key(&peer));
     }
 
     #[tokio::test]
@@ -643,7 +645,7 @@ mod tests {
                 .await;
         }
 
-        assert_eq!(consensus.peer_chains.get(&peer).unwrap().len(), 1);
+        assert_eq!(consensus.state.peer_chains.get(&peer).unwrap().len(), 1);
     }
 
     #[tokio::test]
@@ -669,8 +671,8 @@ mod tests {
             .await;
 
         // Same hash announced by both peers — each has an independent entry.
-        assert_eq!(consensus.peer_chains.get(&peer_a).unwrap().len(), 1);
-        assert_eq!(consensus.peer_chains.get(&peer_b).unwrap().len(), 1);
+        assert_eq!(consensus.state.peer_chains.get(&peer_a).unwrap().len(), 1);
+        assert_eq!(consensus.state.peer_chains.get(&peer_b).unwrap().len(), 1);
     }
 
     #[tokio::test]
@@ -799,7 +801,7 @@ mod tests {
             "exactly one ReIntersect should have been emitted"
         );
         assert!(
-            consensus.orphan_cooldown.contains_key(&peer),
+            consensus.state.orphan_cooldown.contains_key(&peer),
             "peer should be recorded on orphan cooldown"
         );
     }
@@ -835,7 +837,7 @@ mod tests {
             reintersect_count, 0,
             "no additional ReIntersect should be sent while peer is on cooldown"
         );
-        assert!(consensus.orphan_cooldown.contains_key(&peer));
+        assert!(consensus.state.orphan_cooldown.contains_key(&peer));
     }
 
     /// Even a burst of TipAdvanced events for the same orphaned peer
@@ -889,7 +891,7 @@ mod tests {
     async fn intersection_found_does_not_clear_cooldown() {
         let peer = PeerId(1);
         let (mut consensus, _cmd_rx) = setup_orphaned_peer(peer).await;
-        assert!(consensus.orphan_cooldown.contains_key(&peer));
+        assert!(consensus.state.orphan_cooldown.contains_key(&peer));
 
         let new_point = Point::Specific {
             slot: 99,
@@ -903,7 +905,7 @@ mod tests {
             .await;
 
         assert!(
-            consensus.orphan_cooldown.contains_key(&peer),
+            consensus.state.orphan_cooldown.contains_key(&peer),
             "IntersectionFound must NOT clear the cooldown"
         );
     }
@@ -914,7 +916,7 @@ mod tests {
     async fn peer_disconnected_clears_cooldown() {
         let peer = PeerId(1);
         let (mut consensus, _cmd_rx) = setup_orphaned_peer(peer).await;
-        assert!(consensus.orphan_cooldown.contains_key(&peer));
+        assert!(consensus.state.orphan_cooldown.contains_key(&peer));
 
         consensus
             .handle_event(&NetworkEvent::PeerDisconnected {
@@ -924,7 +926,7 @@ mod tests {
             .await;
 
         assert!(
-            !consensus.orphan_cooldown.contains_key(&peer),
+            !consensus.state.orphan_cooldown.contains_key(&peer),
             "PeerDisconnected must clear cooldown"
         );
     }
@@ -947,8 +949,8 @@ mod tests {
     ) -> CachedBlock {
         CachedBlock {
             point: Point::Specific { slot, hash },
-            header: WrappedHeader::opaque(Vec::new()),
-            body: BlockBody::opaque(Vec::new()),
+            header: Vec::new(),
+            body: Vec::new(),
             block_no,
             prev_hash,
         }
@@ -964,13 +966,13 @@ mod tests {
         let h3 = [3u8; 32];
         // Insert blocks 1, 2, 3 with prev_hash links, 1 has prev=None.
         consensus
-            .chain_tree
+            .state.chain_tree
             .insert(h1, Point::Specific { slot: 1, hash: h1 }, 1, 1, None);
         consensus
-            .chain_tree
+            .state.chain_tree
             .insert(h2, Point::Specific { slot: 2, hash: h2 }, 2, 2, Some(h1));
         consensus
-            .chain_tree
+            .state.chain_tree
             .insert(h3, Point::Specific { slot: 3, hash: h3 }, 3, 3, Some(h2));
 
         let walk = consensus.walk_ancestors_hybrid(h3);
@@ -990,7 +992,7 @@ mod tests {
         // Anchor and tip go into chain_tree. The middle block goes ONLY
         // into block_cache (simulating a block whose chain_tree insert
         // was skipped, e.g., opaque header with block_no=0).
-        consensus.chain_tree.insert(
+        consensus.state.chain_tree.insert(
             h_anchor,
             Point::Specific {
                 slot: 10,
@@ -1000,7 +1002,7 @@ mod tests {
             10,
             None,
         );
-        consensus.chain_tree.insert(
+        consensus.state.chain_tree.insert(
             h_tip,
             Point::Specific {
                 slot: 12,
@@ -1011,7 +1013,7 @@ mod tests {
             Some(h_mid),
         );
         consensus
-            .block_cache
+            .state.block_cache
             .insert(h_mid, cached(Some(h_anchor), 11, 11, h_mid));
 
         // Walk should cross from chain_tree (h_tip) into block_cache
@@ -1034,7 +1036,7 @@ mod tests {
         let h_missing = [0xEEu8; 32];
 
         // Only h_tip is present; its parent h_missing is in neither store.
-        consensus.chain_tree.insert(
+        consensus.state.chain_tree.insert(
             h_tip,
             Point::Specific {
                 slot: 99,
@@ -1063,10 +1065,10 @@ mod tests {
 
         // h1 goes into chain_tree as a valid genesis child.
         consensus
-            .chain_tree
+            .state.chain_tree
             .insert(h1, Point::Specific { slot: 1, hash: h1 }, 1, 1, None);
         // h2 goes ONLY into block_cache.
-        consensus.block_cache.insert(h2, cached(Some(h1), 2, 2, h2));
+        consensus.state.block_cache.insert(h2, cached(Some(h1), 2, 2, h2));
 
         let walk = consensus.walk_ancestors_hybrid(h2);
         assert_eq!(walk.chain, vec![h2, h1]);
@@ -1272,7 +1274,7 @@ mod tests {
         }
 
         // Cap is max(2*k, 64) = 64.
-        let chain = consensus.peer_chains.get(&peer).unwrap();
+        let chain = consensus.state.peer_chains.get(&peer).unwrap();
         assert_eq!(chain.len(), 64);
         // Most recent entries retained, oldest dropped.
         assert_eq!(chain.tip().unwrap().block_no, 100);
@@ -1577,8 +1579,8 @@ mod tests {
         // adopted_tip should now be block 6.
         assert_eq!(
             consensus
-                .chain_tree
-                .block_number(&consensus.adopted_tip_hash.unwrap()),
+                .state.chain_tree
+                .block_number(&consensus.state.adopted_tip_hash.unwrap()),
             Some(6),
             "adopted tip should be 6 after fork switch"
         );
@@ -1601,14 +1603,14 @@ mod tests {
         };
 
         // Before receiving, block is not in chain_tree.
-        assert!(consensus.chain_tree.block_number(&hash).is_none());
+        assert!(consensus.state.chain_tree.block_number(&hash).is_none());
 
         // Simulate block fetch arrival with a proper block body.
         let body = make_block_body(&header);
         consensus.on_block_received(&tip.point, &body).await;
 
         // After receiving, block should be in chain_tree.
-        assert_eq!(consensus.chain_tree.block_number(&hash), Some(1));
+        assert_eq!(consensus.state.chain_tree.block_number(&hash), Some(1));
     }
 
     /// Regression: when a peer announces a block whose body is later
@@ -1641,7 +1643,7 @@ mod tests {
             .await;
         while cmd_rx.try_recv().is_ok() {}
         assert!(
-            consensus.in_flight.contains_key(&tip2.point),
+            consensus.state.in_flight.contains_key(&tip2.point),
             "first fetch should mark block#2 in_flight"
         );
 
@@ -1649,7 +1651,7 @@ mod tests {
         // in_flight stale and announce the same tip again — the next
         // select_chain pass should evict the stale entry and re-issue.
         let stale = Instant::now() - IN_FLIGHT_TTL - Duration::from_secs(1);
-        consensus.in_flight.insert(tip2.point.clone(), stale);
+        consensus.state.in_flight.insert(tip2.point.clone(), stale);
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
                 peer_id: TEST_PEER,
@@ -1869,7 +1871,7 @@ mod tests {
             "Origin RolledBack should emit InjectRollback with Point::Origin"
         );
         assert!(
-            consensus.last_validated_tip.is_none(),
+            consensus.state.last_validated_tip.is_none(),
             "last_validated_tip should be None after Origin rollback"
         );
     }
@@ -1886,7 +1888,7 @@ mod tests {
         };
         consensus.record_peer_intersection(peer, &point);
 
-        let chain = consensus.peer_chains.get(&peer).unwrap();
+        let chain = consensus.state.peer_chains.get(&peer).unwrap();
         let anchor = chain.anchor().expect("anchor should be set");
         assert_eq!(anchor.hash, [0xAB; 32]);
         assert_eq!(anchor.point, point);
@@ -1916,8 +1918,8 @@ mod tests {
 
         // Set the anchor to block 3 in our adopted chain (a known common
         // ancestor). The anchor hash must be in our chain_tree.
-        let block3_hash = consensus.chain_tree.ancestors(adopted_hash)[2]; // [5, 4, 3]
-        let block3_point = consensus.chain_tree.point(&block3_hash).unwrap().clone();
+        let block3_hash = consensus.state.chain_tree.ancestors(adopted_hash)[2]; // [5, 4, 3]
+        let block3_point = consensus.state.chain_tree.point(&block3_hash).unwrap().clone();
         consensus.record_peer_intersection(peer, &block3_point);
 
         // Peer announces blocks 64..68 with different hashes (different
@@ -2065,7 +2067,7 @@ mod tests {
     async fn queued_validator_tip_tracks_submission_order() {
         let (mut consensus, mut _cmd_rx, _val_rx) = make_consensus();
 
-        assert_eq!(consensus.queued_validator_tip, None);
+        assert_eq!(consensus.state.queued_validator_tip, None);
 
         let (tip1, hdr1) = make_tip(10, 1, None);
         let hash1 = match &tip1.point {
@@ -2075,7 +2077,7 @@ mod tests {
         consensus
             .register_self_produced(&tip1.point, &hdr1, &BlockBody::opaque(Vec::new()))
             .await;
-        assert_eq!(consensus.queued_validator_tip, Some(hash1));
+        assert_eq!(consensus.state.queued_validator_tip, Some(hash1));
 
         let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
         let hash2 = match &tip2.point {
@@ -2085,7 +2087,7 @@ mod tests {
         consensus
             .register_self_produced(&tip2.point, &hdr2, &BlockBody::opaque(Vec::new()))
             .await;
-        assert_eq!(consensus.queued_validator_tip, Some(hash2));
+        assert_eq!(consensus.state.adopted_tip_hash, Some(hash2));
     }
 
     /// When PeerChain entries are non-contiguous (stale entries from an
@@ -2132,7 +2134,7 @@ mod tests {
         }
         drain_validator(&mut consensus, &mut val_rx).await;
         assert_eq!(
-            consensus.adopted_tip_hash,
+            consensus.state.adopted_tip_hash,
             Some(*hashes.last().unwrap()),
             "should be adopted at block 5"
         );
@@ -2171,7 +2173,7 @@ mod tests {
         };
         consensus.record_peer_intersection(peer, &intersection);
         consensus
-            .peer_chains
+            .state.peer_chains
             .get_mut(&peer)
             .unwrap()
             .append(PeerChainEntry {

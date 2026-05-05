@@ -13,6 +13,7 @@ pub mod elections;
 pub mod peer;
 pub mod peer_chain;
 pub mod pipeline;
+pub mod praos;
 pub mod types;
 pub mod wfa;
 

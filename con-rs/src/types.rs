@@ -16,7 +16,7 @@ use minicbor::{Decoder, Encoder};
 /// Wire format:
 ///   origin   = []                    (empty array)
 ///   specific = [slotNo, headerHash]  (2-element array)
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Point {
     Origin,
     Specific { slot: u64, hash: [u8; 32] },
