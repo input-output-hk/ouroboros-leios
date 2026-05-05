@@ -805,4 +805,226 @@ mod tests {
         let outcome = state.match_eb_tx_response(&point(10, 1), &bodies);
         assert_eq!(outcome.matched_bodies, vec![b"body-a".to_vec()]);
     }
+
+    #[test]
+    fn on_eb_txs_offered_gates_per_slot() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        let now = Instant::now();
+        let mut bitmap = BTreeMap::new();
+        bitmap.insert(0u16, 0b111u64);
+
+        let fx = state.on_eb_txs_offered(point(10, 1), bitmap.clone(), now);
+        assert_eq!(fx.len(), 1);
+        assert!(matches!(fx[0], LeiosEffect::FetchLeiosBlockTxs { .. }));
+        assert!(state.pending_eb_tx_fetches.contains_key(&h(1)));
+
+        // Same-slot offer dedup'd via the per-slot gate.
+        let fx2 = state.on_eb_txs_offered(point(10, 2), bitmap, now);
+        assert!(fx2.is_empty());
+    }
+
+    #[test]
+    fn on_eb_txs_offered_origin_point_is_noop() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        let fx = state.on_eb_txs_offered(Point::Origin, BTreeMap::new(), Instant::now());
+        assert!(fx.is_empty());
+    }
+
+    #[test]
+    fn on_eb_txs_received_clears_gate_for_subsequent_fetch() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        let now = Instant::now();
+        let mut bitmap = BTreeMap::new();
+        bitmap.insert(0u16, 0b1u64);
+        let _ = state.on_eb_txs_offered(point(10, 1), bitmap.clone(), now);
+
+        state.on_eb_txs_received(&point(10, 1), 1);
+
+        // A fresh same-slot offer is no longer gated.
+        let fx = state.on_eb_txs_offered(point(10, 2), bitmap, now);
+        assert_eq!(fx.len(), 1);
+    }
+
+    #[test]
+    fn on_votes_offered_emits_fetch() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        let votes = vec![(10u64, vec![0u8; 8])];
+        let fx = state.on_votes_offered(votes.clone());
+        assert_eq!(fx.len(), 1);
+        match &fx[0] {
+            LeiosEffect::FetchLeiosVotes { votes: vs } => assert_eq!(vs, &votes),
+            other => panic!("expected FetchLeiosVotes, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn on_votes_offered_empty_is_noop() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        let fx = state.on_votes_offered(Vec::new());
+        assert!(fx.is_empty());
+    }
+
+    #[test]
+    fn on_votes_received_emits_validate_votes() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        let ids = vec![(10u64, vec![0u8; 8])];
+        let bodies = vec![vec![0xAB]];
+        let fx = state.on_votes_received(ids.clone(), bodies.clone());
+        assert_eq!(fx.len(), 1);
+        match &fx[0] {
+            LeiosEffect::ValidateVotes {
+                vote_ids,
+                vote_data,
+            } => {
+                assert_eq!(vote_ids, &ids);
+                assert_eq!(vote_data, &bodies);
+            }
+            other => panic!("expected ValidateVotes, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn on_validated_eb_creates_election() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        state.on_slot(10);
+        state.on_validated_eb(point(10, 1));
+        assert_eq!(state.elections.count(), 1);
+    }
+
+    #[test]
+    fn on_validated_eb_origin_is_noop() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        state.on_validated_eb(Point::Origin);
+        assert_eq!(state.elections.count(), 0);
+    }
+
+    #[test]
+    fn retry_eb_tx_fetch_with_bitmap_emits_fetch() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        let mut bitmap = BTreeMap::new();
+        bitmap.insert(0u16, 0b10u64);
+        let fx = state.retry_eb_tx_fetch(point(10, 1), bitmap.clone());
+        assert_eq!(fx.len(), 1);
+        match &fx[0] {
+            LeiosEffect::FetchLeiosBlockTxs { point: p, bitmap: b } => {
+                assert_eq!(*p, point(10, 1));
+                assert_eq!(b, &bitmap);
+            }
+            other => panic!("expected FetchLeiosBlockTxs, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn retry_eb_tx_fetch_empty_bitmap_is_noop() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        let fx = state.retry_eb_tx_fetch(point(10, 1), BTreeMap::new());
+        assert!(fx.is_empty());
+    }
+
+    #[test]
+    fn match_eb_tx_response_reports_remaining_bitmap() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        let ha = h(0xA0);
+        let hb = h(0xA1);
+        state.eb_tx_hashes.insert(h(1), (10, vec![ha, hb]));
+        // Pretend we requested both indices 0 and 1.
+        let mut requested = BTreeMap::new();
+        requested.insert(0u16, 0b11u64);
+        state.pending_eb_tx_fetches.insert(h(1), (10, requested));
+        // Only body for index 0 (ha) arrives.
+        let outcome =
+            state.match_eb_tx_response(&point(10, 1), &[(b"body-a".to_vec(), ha)]);
+        assert_eq!(outcome.matched_bodies, vec![b"body-a".to_vec()]);
+        assert_eq!(outcome.requested, 2);
+        // Index 1 still missing.
+        let mut expected_remaining = BTreeMap::new();
+        expected_remaining.insert(0u16, 0b10u64);
+        assert_eq!(outcome.remaining_bitmap, expected_remaining);
+        // pending_eb_tx_fetches updated to remaining-only.
+        assert_eq!(
+            state.pending_eb_tx_fetches.get(&h(1)).map(|(_, b)| b.clone()),
+            Some(expected_remaining)
+        );
+    }
+
+    #[test]
+    fn match_eb_tx_response_clears_pending_when_complete() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        let ha = h(0xA0);
+        state.eb_tx_hashes.insert(h(1), (10, vec![ha]));
+        let mut requested = BTreeMap::new();
+        requested.insert(0u16, 0b1u64);
+        state.pending_eb_tx_fetches.insert(h(1), (10, requested));
+        let outcome =
+            state.match_eb_tx_response(&point(10, 1), &[(b"body-a".to_vec(), ha)]);
+        assert!(outcome.remaining_bitmap.is_empty());
+        assert!(!state.pending_eb_tx_fetches.contains_key(&h(1)));
+    }
+
+    #[test]
+    fn match_eb_tx_response_unknown_manifest_passes_bodies_through() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        let outcome = state.match_eb_tx_response(
+            &point(10, 1),
+            &[(b"some-body".to_vec(), h(0xAA))],
+        );
+        assert_eq!(outcome.matched_bodies, vec![b"some-body".to_vec()]);
+        assert_eq!(outcome.requested, 0);
+        assert!(outcome.remaining_bitmap.is_empty());
+    }
+
+    #[test]
+    fn match_eb_tx_response_origin_point_returns_empty() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        let outcome = state.match_eb_tx_response(&Point::Origin, &[]);
+        assert!(outcome.matched_bodies.is_empty());
+        assert_eq!(outcome.requested, 0);
+    }
+
+    #[test]
+    fn election_expired_emits_telemetry() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        state.on_slot(10);
+        state.elections.announce(10, h(1));
+        // Lifespan = 3+5+5+10 = 23.  Tick past expiry.
+        let fx = state.on_slot(34);
+        assert!(fx.iter().any(|e| matches!(
+            e,
+            LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::ElectionExpired { .. })
+        )));
+    }
+
+    #[test]
+    fn quorum_emits_telemetry_with_weighted_voter() {
+        // Set up an Elections with a persistent committee that hands node
+        // "voter-a" enough seats to single-handedly form quorum.
+        use crate::elections::ElectionsConfig;
+        let mut persistent = BTreeMap::new();
+        persistent.insert("voter-a".to_string(), 100u32);
+        let elections = Elections::new(ElectionsConfig {
+            node_id: "n0".to_string(),
+            pipeline: pipeline(),
+            committee_selection: CommitteeSelection::EveryoneVotes,
+            persistent_committee: persistent,
+            stake_registry: BTreeMap::new(),
+            total_stake: 0,
+            expected_committee_size: 100,
+            quorum_weight_fraction: 0.75,
+        });
+        let mut state = LeiosState::new("n0".into(), elections, cfg(0), pipeline());
+        state.on_slot(10);
+        state.elections.announce(10, h(1));
+
+        let vote = ValidatedVote {
+            voter_id: b"voter-a",
+            tag: 0,
+            eligibility_signature: None,
+            endorser_block_hash: &h(1),
+        };
+        let fx = state.on_validated_votes(std::iter::once(vote));
+        assert!(fx.iter().any(|e| matches!(
+            e,
+            LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::QuorumReached { .. })
+        )));
+    }
 }

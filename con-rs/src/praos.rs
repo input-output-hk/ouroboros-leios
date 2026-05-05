@@ -1188,3 +1188,570 @@ pub struct ParsedHeaderInfo {
     pub slot: u64,
     pub prev_hash: Option<[u8; 32]>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn h(seed: u8) -> [u8; 32] {
+        [seed; 32]
+    }
+
+    fn pt(slot: u64, hash_seed: u8) -> Point {
+        Point::Specific {
+            slot,
+            hash: h(hash_seed),
+        }
+    }
+
+    fn hi(block_number: u64, slot: u64, prev_seed: Option<u8>) -> ParsedHeaderInfo {
+        ParsedHeaderInfo {
+            block_number,
+            slot,
+            prev_hash: prev_seed.map(h),
+        }
+    }
+
+    fn fresh() -> PraosState {
+        PraosState::new("test".to_string(), 100)
+    }
+
+    /// Pre-populate chain_tree + block_cache + validated as if the block
+    /// had been fetched, applied, and adopted.  Avoids driving every
+    /// scenario through the public API.
+    fn install_validated_block(
+        state: &mut PraosState,
+        slot: u64,
+        seed: u8,
+        block_no: u64,
+        prev_seed: Option<u8>,
+    ) {
+        let hash = h(seed);
+        let point = pt(slot, seed);
+        let prev_hash = prev_seed.map(h);
+        state
+            .chain_tree
+            .insert(hash, point.clone(), block_no, slot, prev_hash);
+        state.block_cache.insert(
+            hash,
+            CachedBlock {
+                point,
+                block_no,
+                prev_hash,
+                header: vec![],
+                body: vec![],
+            },
+        );
+        state.validated.insert(hash);
+    }
+
+    // -- Construction & queries ------------------------------------------
+
+    #[test]
+    fn new_state_is_empty() {
+        let s = fresh();
+        assert_eq!(s.tip_hash(), None);
+        assert_eq!(s.next_block_number(), 1);
+        assert_eq!(s.local_tip(), None);
+    }
+
+    #[test]
+    fn peer_chain_cap_floor_is_64() {
+        let small = PraosState::new("test".to_string(), 0);
+        assert_eq!(small.peer_chain_cap(), 64);
+        let large = PraosState::new("test".to_string(), 1000);
+        assert_eq!(large.peer_chain_cap(), 2000);
+    }
+
+    #[test]
+    fn next_block_number_extends_adopted() {
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 5, None);
+        s.adopted_tip_hash = Some(h(1));
+        assert_eq!(s.next_block_number(), 6);
+    }
+
+    #[test]
+    fn local_tip_returns_chain_tree_best() {
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 5, None);
+        let (point, block_no) = s.local_tip().expect("tip set after insert");
+        assert_eq!(point, pt(100, 1));
+        assert_eq!(block_no, 5);
+    }
+
+    #[test]
+    fn chain_tree_snapshot_with_tip() {
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 5, None);
+        s.adopted_tip_hash = Some(h(1));
+        let (entries, block_no, tip_hex) = s.chain_tree_snapshot();
+        assert!(!entries.is_empty());
+        assert_eq!(block_no, Some(5));
+        assert!(tip_hex.is_some());
+    }
+
+    // -- Peer-event mutations (no effects) -------------------------------
+
+    #[test]
+    fn record_peer_tip_appends_entry() {
+        let mut s = fresh();
+        let pid = PeerId(7);
+        s.record_peer_tip(pid, pt(100, 1), 1, 1, h(1), 100, None);
+        let chain = s.peer_chains.get(&pid).expect("peer chain present");
+        assert_eq!(chain.tip().unwrap().block_no, 1);
+    }
+
+    #[test]
+    fn record_peer_intersection_sets_anchor() {
+        let mut s = fresh();
+        let pid = PeerId(7);
+        s.record_peer_intersection(pid, pt(50, 1));
+        let chain = s.peer_chains.get(&pid).expect("peer chain present");
+        assert!(chain.anchor().is_some());
+    }
+
+    #[test]
+    fn record_peer_rollback_truncates() {
+        let mut s = fresh();
+        let pid = PeerId(7);
+        s.record_peer_tip(pid, pt(100, 1), 1, 1, h(1), 100, None);
+        s.record_peer_tip(pid, pt(101, 2), 2, 2, h(2), 101, Some(h(1)));
+        s.record_peer_rollback(pid, &pt(100, 1));
+        let chain = s.peer_chains.get(&pid).unwrap();
+        assert_eq!(chain.tip().unwrap().block_no, 1);
+    }
+
+    #[test]
+    fn record_peer_disconnected_clears_chain_and_cooldown() {
+        let mut s = fresh();
+        let pid = PeerId(7);
+        s.record_peer_tip(pid, pt(100, 1), 1, 1, h(1), 100, None);
+        s.orphan_cooldown
+            .insert(pid, Instant::now() + Duration::from_secs(60));
+        s.record_peer_disconnected(pid);
+        assert!(!s.peer_chains.contains_key(&pid));
+        assert!(!s.orphan_cooldown.contains_key(&pid));
+    }
+
+    // -- Self-production --------------------------------------------------
+
+    #[test]
+    fn register_self_produced_emits_validator_apply() {
+        let mut s = fresh();
+        let fx = s.register_self_produced(
+            pt(100, 1),
+            vec![0xAA],
+            vec![0xBB],
+            Some(hi(1, 100, None)),
+        );
+        assert_eq!(fx.len(), 1);
+        match &fx[0] {
+            PraosEffect::ValidatorApply {
+                point,
+                body,
+                prev_hash,
+            } => {
+                assert_eq!(*point, pt(100, 1));
+                assert_eq!(body, &vec![0xBB]);
+                assert_eq!(*prev_hash, None);
+            }
+            other => panic!("expected ValidatorApply, got {other:?}"),
+        }
+        assert_eq!(s.adopted_tip_hash, Some(h(1)));
+        assert_eq!(s.queued_validator_tip, Some(h(1)));
+        assert!(s.in_flight_validation.contains(&h(1)));
+        assert!(s.self_produced.contains(&pt(100, 1)));
+    }
+
+    #[test]
+    fn register_self_produced_opaque_header_skips_chain_tree() {
+        let mut s = fresh();
+        let fx = s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], None);
+        assert_eq!(fx.len(), 1);
+        assert!(matches!(fx[0], PraosEffect::ValidatorApply { .. }));
+        assert!(s.chain_tree.block_number(&h(1)).is_none());
+    }
+
+    #[test]
+    fn register_self_produced_origin_point_is_noop() {
+        let mut s = fresh();
+        let fx =
+            s.register_self_produced(Point::Origin, vec![], vec![], Some(hi(1, 0, None)));
+        assert!(fx.is_empty());
+        assert!(s.self_produced.contains(&Point::Origin));
+    }
+
+    // -- Validation outcomes ---------------------------------------------
+
+    #[test]
+    fn on_block_applied_emits_inject_block() {
+        let mut s = fresh();
+        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)));
+        let fx = s.on_block_applied(pt(100, 1), Instant::now());
+        assert!(matches!(fx[0], PraosEffect::InjectBlock { .. }));
+        assert!(s.validated.contains(&h(1)));
+        assert_eq!(s.last_validated_tip, Some(h(1)));
+    }
+
+    #[test]
+    fn on_block_applied_uncached_block_is_noop() {
+        let mut s = fresh();
+        let fx = s.on_block_applied(pt(100, 1), Instant::now());
+        assert!(fx.is_empty());
+        assert!(!s.validated.contains(&h(1)));
+    }
+
+    #[test]
+    fn on_block_applied_prunes_below_k() {
+        let mut s = PraosState::new("test".to_string(), 2); // k = 2
+        install_validated_block(&mut s, 100, 1, 1, None);
+        install_validated_block(&mut s, 101, 2, 2, Some(1));
+        install_validated_block(&mut s, 102, 3, 3, Some(2));
+        // Stage block 4 in cache (not yet validated).
+        s.chain_tree.insert(h(4), pt(103, 4), 4, 103, Some(h(3)));
+        s.block_cache.insert(
+            h(4),
+            CachedBlock {
+                point: pt(103, 4),
+                block_no: 4,
+                prev_hash: Some(h(3)),
+                header: vec![],
+                body: vec![],
+            },
+        );
+        s.adopted_tip_hash = Some(h(4));
+
+        let _ = s.on_block_applied(pt(103, 4), Instant::now());
+
+        // bn=4 - k=2 = 2 ⇒ blocks with bn < 2 dropped (block 1 only).
+        assert!(!s.block_cache.contains_key(&h(1)));
+        assert!(s.block_cache.contains_key(&h(2)));
+        assert!(s.block_cache.contains_key(&h(3)));
+        assert!(s.block_cache.contains_key(&h(4)));
+    }
+
+    #[test]
+    fn on_block_apply_failed_rewinds_to_last_validated() {
+        let mut s = fresh();
+        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)));
+        let _ = s.on_block_applied(pt(100, 1), Instant::now());
+        s.register_self_produced(
+            pt(101, 2),
+            vec![0xAA],
+            vec![0xBC],
+            Some(hi(2, 101, Some(1))),
+        );
+        s.on_block_apply_failed(pt(101, 2), "ledger error".to_string());
+        assert_eq!(s.queued_validator_tip, Some(h(1)));
+        assert_eq!(s.adopted_tip_hash, Some(h(1)));
+        assert!(!s.validated.contains(&h(2)));
+    }
+
+    #[test]
+    fn on_block_rolled_back_origin_clears_last_validated() {
+        let mut s = fresh();
+        s.last_validated_tip = Some(h(1));
+        let fx = s.on_block_rolled_back(Point::Origin);
+        assert_eq!(fx.len(), 1);
+        match &fx[0] {
+            PraosEffect::InjectRollback { target } => assert_eq!(*target, Point::Origin),
+            other => panic!("expected InjectRollback, got {other:?}"),
+        }
+        assert_eq!(s.last_validated_tip, None);
+    }
+
+    #[test]
+    fn on_block_rolled_back_specific_emits_inject_rollback() {
+        let mut s = fresh();
+        let fx = s.on_block_rolled_back(pt(50, 9));
+        assert_eq!(fx.len(), 1);
+        match &fx[0] {
+            PraosEffect::InjectRollback { target } => assert_eq!(*target, pt(50, 9)),
+            other => panic!("expected InjectRollback, got {other:?}"),
+        }
+        assert_eq!(s.last_validated_tip, Some(h(9)));
+    }
+
+    // -- on_block_received ------------------------------------------------
+
+    #[test]
+    fn on_block_received_dedups_via_cache() {
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 1, None);
+        let fx = s.on_block_received(pt(100, 1), vec![], vec![], None);
+        assert!(fx.is_empty());
+    }
+
+    #[test]
+    fn on_block_received_origin_point_is_noop() {
+        let mut s = fresh();
+        let fx = s.on_block_received(Point::Origin, vec![], vec![], None);
+        assert!(fx.is_empty());
+    }
+
+    #[test]
+    fn on_block_received_inserts_and_emits_validator_apply() {
+        let mut s = fresh();
+        let fx = s.on_block_received(
+            pt(100, 1),
+            vec![0xAA],
+            vec![0xBB],
+            Some(hi(1, 100, None)),
+        );
+        assert!(fx.iter().any(|e| matches!(e, PraosEffect::ValidatorApply { .. })));
+        assert!(s.block_cache.contains_key(&h(1)));
+        assert_eq!(s.chain_tree.block_number(&h(1)), Some(1));
+    }
+
+    #[test]
+    fn on_block_received_opaque_header_no_chain_tree_insert() {
+        let mut s = fresh();
+        let fx = s.on_block_received(pt(100, 1), vec![0xAA], vec![0xBB], None);
+        // No chain_tree entry, so try_switch fails silently.
+        assert!(fx.is_empty());
+        assert!(s.chain_tree.block_number(&h(1)).is_none());
+        assert!(s.block_cache.contains_key(&h(1)));
+    }
+
+    // -- Chain selection (pure) ------------------------------------------
+
+    #[test]
+    fn select_chain_no_better_when_no_peers() {
+        let s = fresh();
+        let decision = s.select_chain_once(&HashSet::new());
+        assert!(matches!(decision, SelectionDecision::NoBetterChain));
+    }
+
+    #[test]
+    fn select_chain_switched_when_peer_ahead_and_cached() {
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 1, None);
+        s.adopted_tip_hash = Some(h(1));
+        // Block 2 cached and validated but not yet adopted.
+        install_validated_block(&mut s, 101, 2, 2, Some(1));
+
+        let pid = PeerId(7);
+        s.record_peer_tip(pid, pt(101, 2), 2, 2, h(2), 101, Some(h(1)));
+
+        match s.select_chain_once(&HashSet::new()) {
+            SelectionDecision::Switched {
+                peer_id,
+                ancestor,
+                replay,
+                tip_block_no,
+            } => {
+                assert_eq!(peer_id, pid);
+                assert_eq!(ancestor, h(1));
+                assert_eq!(replay, vec![h(2)]);
+                assert_eq!(tip_block_no, 2);
+            }
+            other => panic!("expected Switched, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn select_chain_waiting_when_blocks_missing() {
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 1, None);
+        s.adopted_tip_hash = Some(h(1));
+
+        let pid = PeerId(7);
+        // Peer announces block 2 (prev=h(1)) but we don't have it cached.
+        s.record_peer_tip(pid, pt(101, 2), 2, 2, h(2), 101, Some(h(1)));
+
+        match s.select_chain_once(&HashSet::new()) {
+            SelectionDecision::WaitingForBlocks {
+                peer_id,
+                ancestor,
+                missing,
+                tip_block_no,
+                ..
+            } => {
+                assert_eq!(peer_id, pid);
+                assert_eq!(ancestor, h(1));
+                assert_eq!(missing, vec![pt(101, 2)]);
+                assert_eq!(tip_block_no, 2);
+            }
+            other => panic!("expected WaitingForBlocks, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn select_chain_orphan_when_no_common_ancestor() {
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 1, None);
+        s.adopted_tip_hash = Some(h(1));
+
+        let pid = PeerId(7);
+        // Peer chain references a parent we've never heard of.
+        s.record_peer_tip(pid, pt(200, 99), 5, 5, h(99), 200, Some(h(88)));
+
+        assert!(matches!(
+            s.select_chain_once(&HashSet::new()),
+            SelectionDecision::OrphanCandidate { .. }
+        ));
+    }
+
+    #[test]
+    fn select_chain_skip_filters_peers() {
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 1, None);
+        s.adopted_tip_hash = Some(h(1));
+        install_validated_block(&mut s, 101, 2, 2, Some(1));
+
+        let pid = PeerId(7);
+        s.record_peer_tip(pid, pt(101, 2), 2, 2, h(2), 101, Some(h(1)));
+
+        let mut skip = HashSet::new();
+        skip.insert(pid);
+        assert!(matches!(
+            s.select_chain_once(&skip),
+            SelectionDecision::NoBetterChain
+        ));
+    }
+
+    // -- try_switch_to and walk_ancestors_hybrid -------------------------
+
+    #[test]
+    fn try_switch_to_self_returns_err_none() {
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 1, None);
+        s.adopted_tip_hash = Some(h(1));
+        assert!(matches!(s.try_switch_to(h(1)), Err(None)));
+    }
+
+    #[test]
+    fn try_switch_to_unknown_returns_err_none() {
+        let s = fresh();
+        assert!(matches!(s.try_switch_to(h(99)), Err(None)));
+    }
+
+    #[test]
+    fn walk_ancestors_hybrid_traverses_chain_tree() {
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 1, None);
+        install_validated_block(&mut s, 101, 2, 2, Some(1));
+        install_validated_block(&mut s, 102, 3, 3, Some(2));
+
+        let walk = s.walk_ancestors_hybrid(h(3));
+        assert_eq!(walk.chain, vec![h(3), h(2), h(1)]);
+        assert!(walk.reached_origin);
+    }
+
+    #[test]
+    fn walk_ancestors_hybrid_falls_back_to_block_cache() {
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 1, None);
+        // Block 2 is cached but missing from chain_tree.
+        s.block_cache.insert(
+            h(2),
+            CachedBlock {
+                point: pt(101, 2),
+                block_no: 2,
+                prev_hash: Some(h(1)),
+                header: vec![],
+                body: vec![],
+            },
+        );
+        let walk = s.walk_ancestors_hybrid(h(2));
+        assert_eq!(walk.chain, vec![h(2), h(1)]);
+        assert!(walk.reached_origin);
+    }
+
+    #[test]
+    fn walk_ancestors_hybrid_unknown_terminates() {
+        let s = fresh();
+        let walk = s.walk_ancestors_hybrid(h(99));
+        assert_eq!(walk.chain, vec![h(99)]);
+        assert!(!walk.reached_origin);
+    }
+
+    // -- Periodic + retry paths ------------------------------------------
+
+    #[test]
+    fn retry_select_chain_evicts_stale_in_flight() {
+        let mut s = fresh();
+        let stale = Instant::now() - IN_FLIGHT_TTL - Duration::from_secs(1);
+        s.in_flight.insert(pt(100, 1), stale);
+        let _ = s.retry_select_chain(Instant::now());
+        assert!(s.in_flight.is_empty());
+    }
+
+    #[test]
+    fn retry_select_chain_keeps_fresh_in_flight() {
+        let mut s = fresh();
+        s.in_flight.insert(pt(100, 1), Instant::now());
+        let _ = s.retry_select_chain(Instant::now());
+        assert!(s.in_flight.contains_key(&pt(100, 1)));
+    }
+
+    #[test]
+    fn on_block_fetch_failed_drops_in_flight() {
+        let mut s = fresh();
+        s.in_flight.insert(pt(100, 1), Instant::now());
+        s.in_flight.insert(pt(101, 2), Instant::now());
+        let _ = s.on_block_fetch_failed(&pt(100, 1), &pt(101, 2), Instant::now());
+        assert!(!s.in_flight.contains_key(&pt(100, 1)));
+        assert!(!s.in_flight.contains_key(&pt(101, 2)));
+    }
+
+    // -- High-level handlers --------------------------------------------
+
+    #[test]
+    fn on_tip_advanced_better_peer_emits_fetch() {
+        let mut s = fresh();
+        let pid = PeerId(7);
+        let fx =
+            s.on_tip_advanced(pid, pt(100, 1), 1, 1, h(1), 100, None, Instant::now());
+        assert!(fx
+            .iter()
+            .any(|e| matches!(e, PraosEffect::FetchBlockRange { .. })));
+    }
+
+    #[test]
+    fn on_peer_disconnected_with_no_others_emits_no_effects() {
+        let mut s = fresh();
+        let pid = PeerId(7);
+        s.record_peer_tip(pid, pt(100, 1), 1, 1, h(1), 100, None);
+        let fx = s.on_peer_disconnected(pid, Instant::now());
+        assert!(fx.is_empty());
+        assert!(!s.peer_chains.contains_key(&pid));
+    }
+
+    #[test]
+    fn on_peer_rolled_back_truncates_and_re_evaluates() {
+        let mut s = fresh();
+        let pid = PeerId(7);
+        s.record_peer_tip(pid, pt(100, 1), 1, 1, h(1), 100, None);
+        s.record_peer_tip(pid, pt(101, 2), 2, 2, h(2), 101, Some(h(1)));
+        let _ = s.on_peer_rolled_back(pid, &pt(100, 1), Instant::now());
+        assert_eq!(s.peer_chains.get(&pid).unwrap().tip().unwrap().block_no, 1);
+    }
+
+    #[test]
+    fn orphan_classification_pushes_re_intersect_and_clears_entries() {
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 1, None);
+        s.adopted_tip_hash = Some(h(1));
+
+        let pid = PeerId(7);
+        // Peer announces a block whose parent we've never heard of.
+        let fx = s.on_tip_advanced(
+            pid,
+            pt(200, 99),
+            5,
+            5,
+            h(99),
+            200,
+            Some(h(88)),
+            Instant::now(),
+        );
+        assert!(fx
+            .iter()
+            .any(|e| matches!(e, PraosEffect::ReIntersect { peer_id } if *peer_id == pid)));
+        // Entries cleared, peer placed on cooldown.
+        assert!(s.peer_chains.get(&pid).unwrap().tip().is_none());
+        assert!(s.orphan_cooldown.contains_key(&pid));
+    }
+}
