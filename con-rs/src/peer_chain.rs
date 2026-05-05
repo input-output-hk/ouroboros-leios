@@ -2,11 +2,11 @@
 
 use std::collections::VecDeque;
 
-use net_core::types::Point;
+use crate::types::Point;
 
 /// One header in a per-peer candidate chain.
 #[derive(Debug, Clone)]
-pub(crate) struct PeerChainEntry {
+pub struct PeerChainEntry {
     pub hash: [u8; 32],
     pub point: Point,
     pub block_no: u64,
@@ -44,19 +44,19 @@ pub(crate) struct PeerChainEntry {
 ///   can use it as a guaranteed common ancestor even when the entry
 ///   window is too narrow.
 #[derive(Debug)]
-pub(crate) struct PeerChain {
-    pub(super) entries: VecDeque<PeerChainEntry>,
-    pub(super) cap: usize,
+pub struct PeerChain {
+    pub entries: VecDeque<PeerChainEntry>,
+    pub cap: usize,
     /// The ChainSync intersection point — a guaranteed common ancestor
     /// between the local chain and this peer's chain. Set when
     /// `IntersectionFound` arrives, persists through rollbacks, replaced
     /// on reconnect (new intersection), dropped on disconnect.
-    pub(super) anchor: Option<PeerChainAnchor>,
+    pub anchor: Option<PeerChainAnchor>,
 }
 
 /// The ChainSync intersection point stored as a peer chain anchor.
 #[derive(Debug, Clone)]
-pub(crate) struct PeerChainAnchor {
+pub struct PeerChainAnchor {
     pub hash: [u8; 32],
     pub point: Point,
 }
@@ -126,6 +126,12 @@ impl PeerChain {
     #[allow(dead_code)] // used in tests
     pub fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    /// True if no entries are currently held.
+    #[allow(dead_code)] // paired with `len`
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 
     /// Iterate entries from oldest to newest.

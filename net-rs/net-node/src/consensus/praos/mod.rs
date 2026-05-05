@@ -1,7 +1,6 @@
 //! Praos longest-chain consensus with fork tracking.
 
 mod fetching;
-mod peer_chain;
 mod selection;
 mod validation;
 
@@ -17,7 +16,7 @@ use tracing::info;
 use con_rs::chain_tree::{ChainTree, ChainTreeEntry};
 use crate::validation::Validator;
 
-pub(crate) use peer_chain::{PeerChain, PeerChainEntry};
+pub(crate) use con_rs::peer_chain::{PeerChain, PeerChainEntry};
 
 /// How long an in-flight fetch entry remains "active" before being considered
 /// stale and eligible for retry. The coordinator may silently drop a fetch
@@ -354,7 +353,7 @@ mod tests {
 
     use crate::validation::{LedgerOutcome, Validator};
 
-    use super::peer_chain::PeerChainEntry;
+    use con_rs::peer_chain::PeerChainEntry;
     use super::selection::SelectionDecision;
     use super::*;
 

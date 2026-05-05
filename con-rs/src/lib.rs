@@ -10,9 +10,12 @@ pub mod aggregation;
 pub mod chain_tree;
 pub mod config;
 pub mod elections;
+pub mod peer;
+pub mod peer_chain;
 pub mod pipeline;
 pub mod types;
 pub mod wfa;
 
 pub use config::{CommitteeSelection, StakeEntry};
+pub use peer::PeerId;
 pub use types::Point;

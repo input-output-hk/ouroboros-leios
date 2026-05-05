@@ -11,7 +11,7 @@ use tracing::info;
 use con_rs::chain_tree::is_better_tip;
 use crate::validation::LedgerCommand;
 
-use super::peer_chain::PeerChainEntry;
+use con_rs::peer_chain::PeerChainEntry;
 use super::ORPHAN_COOLDOWN;
 
 /// Result of a hybrid ancestor walk that uses `chain_tree` first and

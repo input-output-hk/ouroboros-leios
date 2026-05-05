@@ -11,22 +11,8 @@ pub(crate) mod peer_task;
 pub mod server_handlers;
 pub mod types;
 
-use std::fmt;
-
+pub use con_rs::PeerId;
 pub use types::{PeerCommand, PeerEvent};
-
-/// Unique identifier for a connected peer within a coordinator session.
-///
-/// Monotonically increasing — not a network address. Two connections to
-/// the same address get different PeerIds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PeerId(pub u64);
-
-impl fmt::Display for PeerId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "peer-{}", self.0)
-    }
-}
 
 /// Connection mode determines which protocol roles the peer task runs.
 ///
