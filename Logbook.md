@@ -6,6 +6,31 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-04-21
+
+### SN on exploring voting architecture
+
+- Voting: worked on identifying duplicated votes, but decided to explore new code paths along vote aggregation and certification instead.
+- Pull requested current progress on the voting and had a failing test -\> turns out it was a lucky seed that had two voter indices be mocked ot the same int. Great driver for committee selection!
+- I have been exploring the various ways to structure the code for the voting thread between "abstract" and "concrete" worlds of consensus.
+- Option 1: Function that takes `ChainDB m blk` and a new type class allows us to go from `LedgerState blk EmptyMK -> Maybe Committee`
+- The type class approach is most widely used in the existing code base.
+- Default methods and types that allow for no-op semantics make the boilerplate bearable -\> "degenerate instances"
+- Some HFC plumbing is needed to select between instances using `All HasLeiosVoting xs`
+- Option 2: A handle much like `BlockForging` where the node would construct a value only for eras that support leios and the HFC would construct a composite handle.
+- Option 3: is a cardano-specific hook into `initNodeKernel` that can even case match on the specific era of the `CardanoBlock` (the HFC-combined `ByronBlock` and `ShelleyBlock` types). It's interesting that this forces the voting logic (in this example) into the `ouroboros-consensus-cardano` package. Working with the concrete types is nice, but the wiring through a hook (albeit one already existing) feels awkward.
+- Also, because the wiring needs to happen in the `cardano-node` package via `RunNodeArgs` (or another hook at the `initNodeKernel` level is needed).
+- Vote validation is actually a good driver for these discussions on abstraction and "inertness" of components: to validate a vote we need a committee -\> a ledger state that provides this. This will naturally drive validation into the `addVote` function of `LeiosVoteState` component which will need to be given polymorphic `LedgerState blk` and requires us to use a type class to access a concrete committee.
+- Starting build an opinion about wiring and HFC and writing it up as guidelines in the leios-design document..
+
+## 2026-04-28
+
+### SN on vote visualization
+
+- Seems like votes are cast for old EBs -\> makes sense, there is no `tooOld` cut off right now. But completions are also re-triggered! -\> need to fix this.
+- I also found another bug when two blocks were forged by the same pool one slot after each other: the wrong header/chainDepState is passed to that new decide forge type function and so the `canCertify` decision is off by one block!
+- After fixing the re-notification I did a run with `TC\=1` (200ms delay between nodes) and it seemed like mempools of node2/3 never filled up? Hence also no announcements + certifications happening!
+
 ## 2026-04-17
 
 ### SN on prototyping voting
