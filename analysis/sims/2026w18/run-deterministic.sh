@@ -99,35 +99,37 @@ sed -e 's/"bandwidth-bytes-per-second":125000000/"bandwidth-bytes-per-second":'"
     -e 's/"cpu-core-count":6,/"cpu-core-count":'"$CPU_COUNT"',/g' \
     "$TOPO_SOURCE" > network.yaml
 
-yaml2json ../config.yaml \
-| jq '. +
-{
-  "leios-variant": "'"$VARIANT"'"
-, "linear-eb-propagation-criteria": "'"$PROPAGATION"'"
-, "linear-diffuse-stage-length-slots": '"$STAGE_LENGTH_DIFF"'
-, "linear-vote-stage-length-slots": '"$STAGE_LENGTH_VOTE"'
-, "leios-stage-length-slots": '"$STAGE_LENGTH_VOTE"'
-, "eb-referenced-txs-max-size-bytes": ('"$BLOCK_SIZE"' * 1000000)
-, "eb-body-avg-size-bytes": ('"$BLOCK_SIZE"' * 1000000)
-, "tx-size-bytes-distribution": {distribution: "constant", value: '"$TX_SIZE"'}
-, "tx-generation-distribution": {distribution: "constant", value: '"$TX_SPACING_HONEST"'}
-, "tx-start-time": '"$TX_START"'
-, "tx-stop-time": '"$TX_STOP"'
-} + (
-  if "'"$PLUTUS"'" == "NA"
-  then
-    {}
-  else
-    {
-      "tx-validation-cpu-time-ms": (0.2624 + ("'"$PLUTUS"'" | tonumber) * 0.05 / '"$THROUGHPUT"' / 1000000 * '"$TX_SIZE"' * 0.9487)
-    , "rb-body-legacy-praos-payload-validation-cpu-time-ms-constant": (0.3478 + 20 * 0.02127)
-    , "rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte": 0.00001943
-    , "eb-body-validation-cpu-time-ms-constant": (0.3478 + (("'"$PLUTUS"'" | tonumber) - 20) * 0.02127)
-    , "eb-body-validation-cpu-time-ms-per-byte": 0.00001943
-    }
-  end
-)
-' > "$OUTDIR/config.yaml"
+# Per-experiment run overrides — written directly as a YAML overlay.
+python3 - > run-overrides.yaml <<PY
+import yaml
+plutus = "$PLUTUS"
+throughput = float("$THROUGHPUT")
+tx_size = int("$TX_SIZE")
+block_size = int("$BLOCK_SIZE")
+overrides = {
+    "leios-variant": "$VARIANT",
+    "linear-eb-propagation-criteria": "$PROPAGATION",
+    "linear-diffuse-stage-length-slots": int("$STAGE_LENGTH_DIFF"),
+    "linear-vote-stage-length-slots": int("$STAGE_LENGTH_VOTE"),
+    "leios-stage-length-slots": int("$STAGE_LENGTH_VOTE"),
+    "eb-referenced-txs-max-size-bytes": block_size * 1000000,
+    "eb-body-avg-size-bytes": block_size * 1000000,
+    "tx-size-bytes-distribution": {"distribution": "constant", "value": tx_size},
+    "tx-generation-distribution": {"distribution": "constant", "value": float("$TX_SPACING_HONEST")},
+    "tx-start-time": int("$TX_START"),
+    "tx-stop-time": int("$TX_STOP"),
+}
+if plutus != "NA":
+    p = float(plutus)
+    overrides.update({
+        "tx-validation-cpu-time-ms": 0.2624 + p * 0.05 / throughput / 1000000 * tx_size * 0.9487,
+        "rb-body-legacy-praos-payload-validation-cpu-time-ms-constant": 0.3478 + 20 * 0.02127,
+        "rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte": 0.00001943,
+        "eb-body-validation-cpu-time-ms-constant": 0.3478 + (p - 20) * 0.02127,
+        "eb-body-validation-cpu-time-ms-per-byte": 0.00001943,
+    })
+print(yaml.safe_dump(overrides, sort_keys=True, default_flow_style=False), end="")
+PY
 
 # Seed override for deterministic runs
 echo "seed: $SEED" > seed.yaml
@@ -189,35 +191,54 @@ esac
 
 echo "Voting mode: $VOTING_MODE (threshold: $VOTE_THRESHOLD)" >&2
 
-CLEANUP_FILES=(sim.log network.yaml seed.yaml voting.yaml engine.yaml)
+CLEANUP_FILES=(sim.log network.yaml seed.yaml voting.yaml engine.yaml run-overrides.yaml)
 
-# Build sim-cli parameter chain; config.yaml goes directly into OUTDIR
-SIM_PARAMS=(-p "$OUTDIR/config.yaml")
+# Engine overlay
 case "$ENGINE" in
   actor)
     echo "Engine: actor (async)" >&2
+    : > engine.yaml
     ;;
   sequential)
     cat > engine.yaml <<EOF
 engine: sequential
 shard-count: 1
 EOF
-    SIM_PARAMS+=(-p engine.yaml)
     echo "Engine: sequential (single shard)" >&2
     ;;
   turbo)
-    SIM_PARAMS+=(-p "$TURBO")
+    cp "$TURBO" engine.yaml
     echo "Engine: turbo (6-shard zero-latency-clusters)" >&2
     ;;
 esac
-SIM_PARAMS+=(-p voting.yaml)
+
+# Memory-limit overlay (optional)
+: > memory-limit-overlay.yaml
+CLEANUP_FILES+=(memory-limit-overlay.yaml)
 if [[ "$USE_MEMORY_LIMIT" == "true" ]]; then
-  SIM_PARAMS+=(-p "$PARAMS_DIR/$MEMORY_LIMIT_FILE")
+  cp "$PARAMS_DIR/$MEMORY_LIMIT_FILE" memory-limit-overlay.yaml
   echo "Memory limits: $MEMORY_LIMIT_FILE" >&2
 else
   echo "Memory limits: disabled" >&2
 fi
-SIM_PARAMS+=(-p seed.yaml)
+
+# Merge base + run overrides + engine + voting + seed + memory-limit into a
+# single complete YAML config so the file in OUTDIR is a self-contained
+# description of the run (no command-line overlays needed).
+python3 - <<'PY' > "$OUTDIR/config.yaml"
+import os, yaml
+merged = {}
+for f in ['../config.yaml', 'run-overrides.yaml', 'engine.yaml', 'voting.yaml', 'seed.yaml', 'memory-limit-overlay.yaml']:
+    if not os.path.isfile(f) or os.path.getsize(f) == 0:
+        continue
+    with open(f) as fh:
+        doc = yaml.safe_load(fh)
+    if doc:
+        merged.update(doc)
+print(yaml.safe_dump(merged, sort_keys=True, default_flow_style=False), end='')
+PY
+
+SIM_PARAMS=(-p "$OUTDIR/config.yaml")
 
 function cleanup() {
   for f in "${CLEANUP_FILES[@]}"; do
