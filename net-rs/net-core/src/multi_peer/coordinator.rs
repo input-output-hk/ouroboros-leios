@@ -379,14 +379,18 @@ impl Coordinator {
     async fn handle_peer_event(&mut self, peer_id: PeerId, event: PeerEvent) {
         match event {
             PeerEvent::Connected { mux_stats } => {
-                if let Some(peer) = self.peers.get_mut(&peer_id) {
-                    peer.mux_stats = Some(mux_stats);
-                }
-                let address = self
-                    .peers
-                    .get(&peer_id)
-                    .map(|p| p.address.clone())
-                    .unwrap_or_default();
+                // The peer task's Connected event can race with our
+                // own remove_peer (which clears self.peers and aborts
+                // the task) — the buffered Connected message gets
+                // processed after the peer is gone.  Drop the stale
+                // event; emitting it would surface a spurious
+                // PeerConnected with an empty address, ordered after
+                // the corresponding PeerDisconnected.
+                let Some(peer) = self.peers.get_mut(&peer_id) else {
+                    return;
+                };
+                peer.mux_stats = Some(mux_stats);
+                let address = peer.address.clone();
                 self.emit_event(NetworkEvent::PeerConnected { peer_id, address });
             }
 
