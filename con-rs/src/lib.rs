@@ -12,6 +12,7 @@ pub mod config;
 pub mod elections;
 pub mod fetch;
 pub mod leios;
+pub mod mempool;
 pub mod peer;
 pub mod peer_chain;
 pub mod pipeline;
