@@ -15,7 +15,6 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
 use super::chain_fragment::ChainFragment;
-use super::leios_tracker::{LeiosTracker, OfferResult, PeerRttLookup};
 use crate::bearer::tcp::TcpBearer;
 use crate::mux::MuxConfig;
 use crate::protocols::peersharing::PeerAddress;
@@ -115,8 +114,6 @@ struct Coordinator {
     chain_store: Arc<ChainStore>,
     /// Shared Leios data store for responder peers (when leios_enabled).
     leios_store: Option<Arc<LeiosStore>>,
-    /// Leios dedup, offer tracking, and fetch routing (None when leios_enabled=false).
-    leios: Option<LeiosTracker>,
     /// Completed inbound duplex connections from the accept loop. The third
     /// tuple element is the RAII guard holding the per-IP slot reservation;
     /// it is stored in the new `PeerState` once the connection is added.
@@ -144,11 +141,6 @@ impl Coordinator {
         chain_store: Arc<ChainStore>,
         leios_store: Option<Arc<LeiosStore>>,
     ) -> Self {
-        let leios = if config.leios_enabled {
-            Some(LeiosTracker::new(config.leios_dedup_window))
-        } else {
-            None
-        };
         Self {
             config,
             peers: HashMap::new(),
@@ -162,7 +154,6 @@ impl Coordinator {
             reconnect_queue: Vec::new(),
             chain_store,
             leios_store,
-            leios,
             inbound_connections: None,
             accept_task: None,
             ip_counts: Arc::new(Mutex::new(HashMap::new())),
@@ -439,80 +430,24 @@ impl Coordinator {
             }
 
             PeerEvent::LeiosBlockOffered { point } => {
-                if let (Point::Specific { slot, hash }, Some(tracker)) =
-                    (&point, self.leios.as_mut())
-                {
-                    match tracker.handle_block_offer(*slot, *hash, peer_id) {
-                        OfferResult::New => {
-                            tracing::debug!("leios: new EB offer at slot {slot} from {peer_id}");
-                            self.emit_event(NetworkEvent::LeiosBlockOffered { point });
-                        }
-                        OfferResult::Duplicate => {
-                            tracing::debug!(
-                                "leios: deduplicated EB offer at slot {slot} from {peer_id} (already seen)"
-                            );
-                        }
-                        OfferResult::AtCapacity => {
-                            tracing::warn!(
-                                "leios: seen_leios_blocks at capacity, forwarding without dedup"
-                            );
-                            self.emit_event(NetworkEvent::LeiosBlockOffered { point });
-                        }
-                    }
-                }
+                // Dedup + per-peer offer tracking lives in con-rs's
+                // CandidateTracker now; just forward with the peer id.
+                self.emit_event(NetworkEvent::LeiosBlockOffered { peer_id, point });
             }
 
             PeerEvent::LeiosBlockTxsOffered { point } => {
-                if let (Point::Specific { slot, hash }, Some(tracker)) =
-                    (&point, self.leios.as_mut())
-                {
-                    match tracker.handle_txs_offer(*slot, *hash, peer_id) {
-                        OfferResult::New => {
-                            tracing::debug!("leios: new TXs offer at slot {slot} from {peer_id}");
-                            self.emit_event(NetworkEvent::LeiosBlockTxsOffered { point });
-                        }
-                        OfferResult::Duplicate => {
-                            tracing::debug!(
-                                "leios: deduplicated TXs offer at slot {slot} from {peer_id} (already seen)"
-                            );
-                        }
-                        OfferResult::AtCapacity => {
-                            tracing::warn!(
-                                "leios: seen_leios_txs at capacity, forwarding without dedup"
-                            );
-                            self.emit_event(NetworkEvent::LeiosBlockTxsOffered { point });
-                        }
-                    }
-                }
+                self.emit_event(NetworkEvent::LeiosBlockTxsOffered { peer_id, point });
             }
 
             PeerEvent::LeiosVotesOffered { votes } => {
-                if let Some(tracker) = self.leios.as_mut() {
-                    let result = tracker.handle_vote_batch(votes, peer_id);
-                    if result.at_capacity {
-                        tracing::warn!(
-                            "leios: seen_leios_votes at capacity, forwarding without dedup"
-                        );
-                    }
-                    if !result.unseen.is_empty() {
-                        tracing::debug!(
-                            "leios: {} new vote(s) from {peer_id}",
-                            result.unseen.len()
-                        );
-                        let unseen = result.unseen;
-                        self.emit_event(NetworkEvent::LeiosVotesOffered { votes: unseen });
-                    } else {
-                        tracing::debug!("leios: all votes from {peer_id} deduplicated");
-                    }
+                if !votes.is_empty() {
+                    self.emit_event(NetworkEvent::LeiosVotesOffered { peer_id, votes });
                 }
             }
 
             PeerEvent::LeiosBlockFetched { point, block } => {
-                if let (Point::Specific { slot, hash }, Some(tracker)) =
-                    (&point, self.leios.as_mut())
-                {
-                    tracker.complete_block_fetch(*slot, *hash);
-                }
+                // Pending-fetch dedup lives in con-rs's CandidateTracker now;
+                // the consensus layer clears the entry on `on_eb_received`.
                 // Populate leios store for responder peers.
                 if let Some(ref store) = self.leios_store {
                     store.inject_block(point.clone(), block.clone());
@@ -524,11 +459,6 @@ impl Coordinator {
                 point,
                 transactions,
             } => {
-                if let (Point::Specific { slot, hash }, Some(tracker)) =
-                    (&point, self.leios.as_mut())
-                {
-                    tracker.complete_txs_fetch(*slot, *hash);
-                }
                 self.emit_event(NetworkEvent::LeiosBlockTxsReceived {
                     point,
                     transactions,
@@ -539,9 +469,6 @@ impl Coordinator {
                 vote_ids,
                 vote_data,
             } => {
-                if let Some(tracker) = self.leios.as_mut() {
-                    tracker.complete_vote_fetch(peer_id);
-                }
                 // Re-inject fetched votes so this node can re-serve them
                 // (epidemic flooding rather than star topology).
                 if let Some(ref store) = self.leios_store {
@@ -676,65 +603,24 @@ impl Coordinator {
                 self.chain_store.rollback_to(&point);
             }
 
-            NetworkCommand::FetchLeiosBlock { point } => {
-                let target = if let (Point::Specific { slot, hash }, Some(tracker)) =
-                    (&point, self.leios.as_mut())
-                {
-                    let slot = *slot;
-                    let hash = *hash;
-                    let lookup = CoordinatorRttLookup { peers: &self.peers };
-                    let picked = tracker.pick_block_fetch_peer(slot, hash, &lookup);
-                    if picked.is_none() {
-                        tracing::debug!("leios: no peer available or already pending for EB fetch at slot {slot}");
-                    }
-                    picked
-                } else {
-                    None
-                };
-                if let Some(best_id) = target {
-                    let rtt = self.peers.get(&best_id).and_then(|p| p.rtt);
-                    tracing::debug!("leios: routing EB fetch to {best_id} (rtt={rtt:?})");
-                    self.send_peer_command(best_id, PeerCommand::FetchLeiosBlock { point });
-                }
+            NetworkCommand::FetchLeiosBlock { peer_id, point } => {
+                // Peer already chosen by con-rs's EbFetchPolicy; just dispatch.
+                self.send_peer_command(peer_id, PeerCommand::FetchLeiosBlock { point });
             }
 
-            NetworkCommand::FetchLeiosBlockTxs { point, bitmap } => {
-                let target = if let (Point::Specific { slot, hash }, Some(tracker)) =
-                    (&point, self.leios.as_mut())
-                {
-                    let slot = *slot;
-                    let hash = *hash;
-                    let lookup = CoordinatorRttLookup { peers: &self.peers };
-                    tracker.pick_txs_fetch_peer(slot, hash, &lookup)
-                } else {
-                    None
-                };
-                if let Some(best_id) = target {
-                    let rtt = self.peers.get(&best_id).and_then(|p| p.rtt);
-                    tracing::debug!("leios: routing TXs fetch to {best_id} (rtt={rtt:?})");
-                    self.send_peer_command(
-                        best_id,
-                        PeerCommand::FetchLeiosBlockTxs { point, bitmap },
-                    );
-                }
+            NetworkCommand::FetchLeiosBlockTxs {
+                peer_id,
+                point,
+                bitmap,
+            } => {
+                self.send_peer_command(
+                    peer_id,
+                    PeerCommand::FetchLeiosBlockTxs { point, bitmap },
+                );
             }
 
-            NetworkCommand::FetchLeiosVotes { votes } => {
-                let assignments: Vec<_> = if let Some(tracker) = self.leios.as_mut() {
-                    let lookup = CoordinatorRttLookup { peers: &self.peers };
-                    tracker
-                        .pick_vote_fetch_peers(votes, &lookup)
-                        .into_iter()
-                        .collect()
-                } else {
-                    Vec::new()
-                };
-                for (target_peer, vote_ids) in assignments {
-                    self.send_peer_command(
-                        target_peer,
-                        PeerCommand::FetchLeiosVotes { votes: vote_ids },
-                    );
-                }
+            NetworkCommand::FetchLeiosVotes { peer_id, votes } => {
+                self.send_peer_command(peer_id, PeerCommand::FetchLeiosVotes { votes });
             }
 
             NetworkCommand::InjectLeiosBlock { point, block } => {
@@ -846,11 +732,9 @@ impl Coordinator {
             }
 
             self.emit_event(NetworkEvent::PeerDisconnected { peer_id, reason });
-
-            // Clean up Leios offer and fetch tracking for this peer.
-            if let Some(tracker) = self.leios.as_mut() {
-                tracker.remove_peer(peer_id);
-            }
+            // Per-peer offer / fetch cleanup lives in con-rs's
+            // CandidateTracker now; the consensus layer prunes on the
+            // PeerDisconnected event.
         }
     }
 
@@ -1220,20 +1104,6 @@ impl Coordinator {
         for (_, peer) in self.peers.drain() {
             peer.task_handle.abort();
         }
-    }
-}
-
-/// Adapter: lets LeiosTracker look up peer RTTs from the coordinator's peer map.
-struct CoordinatorRttLookup<'a> {
-    peers: &'a HashMap<PeerId, PeerState>,
-}
-
-impl PeerRttLookup for CoordinatorRttLookup<'_> {
-    fn rtt(&self, peer: PeerId) -> Option<Duration> {
-        self.peers.get(&peer).and_then(|p| p.rtt)
-    }
-    fn peer_exists(&self, peer: PeerId) -> bool {
-        self.peers.contains_key(&peer)
     }
 }
 

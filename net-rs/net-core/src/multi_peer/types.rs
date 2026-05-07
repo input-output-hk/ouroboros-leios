@@ -69,13 +69,16 @@ pub enum NetworkEvent {
     LeiosBlockAnnounced { header: WrappedHeader },
 
     /// Leios: an endorser block is available for download from a peer.
-    LeiosBlockOffered { point: Point },
+    LeiosBlockOffered { peer_id: PeerId, point: Point },
 
     /// Leios: an EB's transactions are available for download from a peer.
-    LeiosBlockTxsOffered { point: Point },
+    LeiosBlockTxsOffered { peer_id: PeerId, point: Point },
 
-    /// Leios: votes are available for download.
-    LeiosVotesOffered { votes: Vec<(u64, Vec<u8>)> },
+    /// Leios: votes are available for download from a peer.
+    LeiosVotesOffered {
+        peer_id: PeerId,
+        votes: Vec<(u64, Vec<u8>)>,
+    },
 
     /// Leios: a fetched endorser block arrived.
     LeiosBlockReceived { point: Point, block: Vec<u8> },
@@ -149,17 +152,25 @@ pub enum NetworkCommand {
     /// Roll back the chain store to a point (for responder peers).
     InjectRollback { point: Point },
 
-    /// Fetch a specific Leios block. Coordinator picks the best peer.
-    FetchLeiosBlock { point: Point },
+    /// Fetch a Leios block from a specific peer (chosen by con-rs's
+    /// EbFetchPolicy).  The coordinator routes directly to that peer.
+    FetchLeiosBlock { peer_id: PeerId, point: Point },
 
-    /// Fetch selective transactions from an EB. Coordinator picks the best peer.
+    /// Fetch selective transactions from an EB on a specific peer
+    /// (chosen by con-rs's EbTxsFetchPolicy).
     FetchLeiosBlockTxs {
+        peer_id: PeerId,
         point: Point,
         bitmap: BTreeMap<u16, u64>,
     },
 
-    /// Fetch specific votes. Coordinator picks the best peer(s).
-    FetchLeiosVotes { votes: Vec<(u64, Vec<u8>)> },
+    /// Fetch specific votes from a specific peer (chosen by con-rs's
+    /// VoteFetchPolicy — the consensus dispatcher emits one of these
+    /// per peer in the policy's per-peer grouping).
+    FetchLeiosVotes {
+        peer_id: PeerId,
+        votes: Vec<(u64, Vec<u8>)>,
+    },
 
     /// Inject a Leios block into the Leios store (for responder peers to serve).
     InjectLeiosBlock { point: Point, block: Vec<u8> },

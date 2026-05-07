@@ -19,6 +19,7 @@ use std::time::{Duration, Instant};
 use tracing::{info, warn};
 
 use crate::chain_tree::{is_better_tip, ChainTree, ChainTreeEntry};
+use crate::fetch::{BlockFetchPolicy, LowestRttFirst, PeerRtt, UniformRtt};
 use crate::peer::PeerId;
 use crate::peer_chain::{PeerChain, PeerChainEntry};
 use crate::types::Point;
@@ -47,12 +48,17 @@ pub const ORPHAN_COOLDOWN: Duration = Duration::from_secs(1);
 /// wrapper rehydrates them into wire types as it dispatches.
 #[derive(Debug, Clone)]
 pub enum PraosEffect {
-    /// Request a contiguous block range from the network.  When
-    /// `peer_id` is `Some`, the coordinator should prefer that peer.
+    /// Request a contiguous block range from the network.  `peers` is
+    /// the [`BlockFetchPolicy`]'s ranked picks among the candidates
+    /// known to the chain-tracking state — the I/O wrapper dispatches
+    /// one fetch per peer in the list (so a `BroadcastN` policy will
+    /// produce a fan-out, while `LowestRttFirst` gives a single peer).
+    /// An empty `peers` means no candidate is known yet; the wrapper
+    /// can drop the effect or retry later.
     FetchBlockRange {
         from: Point,
         to: Point,
-        peer_id: Option<PeerId>,
+        peers: Vec<PeerId>,
     },
     /// Ask the coordinator to re-run the ChainSync intersection
     /// negotiation with this peer.
@@ -190,10 +196,36 @@ pub struct PraosState {
     /// CIP-0164 `LateRBHeader` voting predicate.  Pruned alongside
     /// `block_cache` on the k-prune path.
     pub header_first_seen: BTreeMap<[u8; 32], u64>,
+
+    /// Strategy for picking peer(s) to fetch each block-range from.
+    pub block_policy: Box<dyn BlockFetchPolicy + Send + Sync>,
+    /// Live per-peer RTT lookup, consulted by `block_policy` at every
+    /// fetch decision.
+    pub rtt: Box<dyn PeerRtt + Send + Sync>,
 }
 
 impl PraosState {
+    /// Construct a new state with the default fetch policy
+    /// ([`LowestRttFirst`]) and a zero-RTT [`UniformRtt`] oracle.  Test
+    /// setups and adapters that don't care about peer ranking can use
+    /// this; production wrappers should follow up with
+    /// [`PraosState::set_fetch_policy`] / [`PraosState::set_rtt`].
     pub fn new(node_id: String, security_param_k: u64) -> Self {
+        Self::with_fetch(
+            node_id,
+            security_param_k,
+            Box::new(LowestRttFirst),
+            Box::new(UniformRtt(Duration::ZERO)),
+        )
+    }
+
+    /// Construct a new state with explicit fetch routing handles.
+    pub fn with_fetch(
+        node_id: String,
+        security_param_k: u64,
+        block_policy: Box<dyn BlockFetchPolicy + Send + Sync>,
+        rtt: Box<dyn PeerRtt + Send + Sync>,
+    ) -> Self {
         Self {
             node_id,
             security_param_k,
@@ -209,7 +241,22 @@ impl PraosState {
             queued_validator_tip: None,
             last_validated_tip: None,
             header_first_seen: BTreeMap::new(),
+            block_policy,
+            rtt,
         }
+    }
+
+    /// Replace the block-fetch policy.
+    pub fn set_fetch_policy(
+        &mut self,
+        policy: Box<dyn BlockFetchPolicy + Send + Sync>,
+    ) {
+        self.block_policy = policy;
+    }
+
+    /// Replace the per-peer RTT oracle.
+    pub fn set_rtt(&mut self, rtt: Box<dyn PeerRtt + Send + Sync>) {
+        self.rtt = rtt;
     }
 
     // -- Queries ------------------------------------------------------------
@@ -695,17 +742,19 @@ impl PraosState {
                     _ => 0,
                 };
                 if to_slot > from_slot && !self.in_flight.contains_key(&gap_point) {
+                    let peers = self.choose_block_fetch_peers(&gap_point, None);
                     info!(
                         node_id = %self.node_id,
                         %from,
                         to = %gap_point,
+                        peer_count = peers.len(),
                         "retry: fetching gap to bridge chain_tree"
                     );
                     self.in_flight.insert(gap_point.clone(), now);
                     fx.push(PraosEffect::FetchBlockRange {
                         from,
                         to: gap_point,
-                        peer_id: None,
+                        peers,
                     });
                 }
             }
@@ -1226,13 +1275,45 @@ impl PraosState {
             return;
         }
         self.in_flight.insert(to.clone(), now);
+        let peers = self.choose_block_fetch_peers(&to, peer_id);
         info!(
             node_id = %self.node_id,
             %from,
             %to,
+            peer_count = peers.len(),
             "fetching missing chain blocks"
         );
-        fx.push(PraosEffect::FetchBlockRange { from, to, peer_id });
+        fx.push(PraosEffect::FetchBlockRange { from, to, peers });
+    }
+
+    /// Resolve the candidate peer set for a Praos block fetch and run
+    /// it through the configured [`BlockFetchPolicy`].
+    ///
+    /// `hint` is the peer whose chain selection drove us to this fetch
+    /// — if its peer-chain still references the target point, it stays
+    /// in the candidate pool; otherwise the candidate set is the union
+    /// of every peer whose announced chain contains `point`.  The
+    /// policy then picks one or more from that pool.
+    fn choose_block_fetch_peers(
+        &self,
+        point: &Point,
+        hint: Option<PeerId>,
+    ) -> Vec<PeerId> {
+        let mut candidates: Vec<PeerId> = self
+            .peer_chains
+            .iter()
+            .filter(|(_, chain)| chain.iter().any(|e| e.point == *point))
+            .map(|(p, _)| *p)
+            .collect();
+        // If the hint isn't already in the candidate set (the
+        // triggering peer's chain may not extend to `point`), include
+        // it as a fallback.
+        if let Some(h) = hint {
+            if !candidates.contains(&h) {
+                candidates.push(h);
+            }
+        }
+        self.block_policy.pick(point, &candidates, self.rtt.as_ref())
     }
 }
 

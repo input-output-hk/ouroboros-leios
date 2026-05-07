@@ -10,6 +10,7 @@ pub mod aggregation;
 pub mod chain_tree;
 pub mod config;
 pub mod elections;
+pub mod fetch;
 pub mod leios;
 pub mod peer;
 pub mod peer_chain;

@@ -26,6 +26,11 @@ use tracing::info;
 use crate::aggregation::QuorumFormed;
 use crate::config::CommitteeSelection;
 use crate::elections::{Elections, SlotEffect};
+use crate::fetch::{
+    CandidateTracker, EbFetchPolicy, EbTxsFetchPolicy, LowestRttFirst, PeerRtt, UniformRtt,
+    VoteFetchPolicy, VoteId,
+};
+use crate::peer::PeerId;
 use crate::pipeline::PipelineConfig;
 use crate::types::Point;
 use crate::wfa;
@@ -100,16 +105,25 @@ pub struct ChainTipContext {
 /// What the I/O layer should do as a result of a state mutation.
 #[derive(Debug, Clone)]
 pub enum LeiosEffect {
-    /// Request the EB body from a peer.
-    FetchLeiosBlock { point: Point },
+    /// Request the EB body from the listed peers.  `peers` is the
+    /// [`EbFetchPolicy`]'s ranked picks — the I/O wrapper dispatches
+    /// one fetch per peer (so a `BroadcastN` policy fans out, while
+    /// `LowestRttFirst` gives a single peer).
+    FetchLeiosBlock { point: Point, peers: Vec<PeerId> },
     /// Request transactions in an EB selected by `bitmap` (sparse map of
-    /// 64-bit segments keyed by 16-bit segment index).
+    /// 64-bit segments keyed by 16-bit segment index).  `peers` chosen
+    /// by [`EbTxsFetchPolicy`].
     FetchLeiosBlockTxs {
         point: Point,
         bitmap: BTreeMap<u16, u64>,
+        peers: Vec<PeerId>,
     },
-    /// Request the listed votes from peers.
-    FetchLeiosVotes { votes: Vec<(u64, Vec<u8>)> },
+    /// Request the listed votes — already grouped by the
+    /// [`VoteFetchPolicy`] into one batch per peer.  The wrapper
+    /// dispatches each (`peer`, `votes`) tuple as a separate fetch.
+    FetchLeiosVotes {
+        per_peer: BTreeMap<PeerId, Vec<(u64, Vec<u8>)>>,
+    },
     /// Record the EB-tx manifest in the network-side store so this
     /// node can serve EB-tx requests back to peers.
     RecordLeiosEbManifest {
@@ -222,14 +236,55 @@ pub struct LeiosState {
     /// Chain-tip metadata fed in by the I/O wrapper.  Used by the
     /// `LateRBHeader` / `WrongEB` voting predicates.
     pub chain_tip_ctx: ChainTipContext,
+
+    /// Offer maps + pending dedup + EB-txs retry tracking.  The I/O
+    /// wrapper records every observed offer here via `on_*_offered`
+    /// before a fetch decision is made.
+    pub candidates: CandidateTracker,
+
+    /// Strategy for picking peer(s) to fetch each EB body from.
+    pub eb_policy: Box<dyn EbFetchPolicy + Send + Sync>,
+    /// Strategy for picking peer(s) to fetch EB transactions from.
+    pub eb_txs_policy: Box<dyn EbTxsFetchPolicy + Send + Sync>,
+    /// Strategy for grouping a vote-id batch across peers.
+    pub vote_policy: Box<dyn VoteFetchPolicy + Send + Sync>,
+    /// Live per-peer RTT lookup, consulted by every fetch policy.
+    pub rtt: Box<dyn PeerRtt + Send + Sync>,
 }
 
 impl LeiosState {
+    /// Construct a new state with the default fetch policy
+    /// ([`LowestRttFirst`] for all three traffic classes) and a
+    /// zero-RTT [`UniformRtt`] oracle.
     pub fn new(
         node_id: String,
         elections: Elections,
         voting_config: VotingConfig,
         pipeline: PipelineConfig,
+    ) -> Self {
+        Self::with_fetch(
+            node_id,
+            elections,
+            voting_config,
+            pipeline,
+            Box::new(LowestRttFirst),
+            Box::new(LowestRttFirst),
+            Box::new(LowestRttFirst),
+            Box::new(UniformRtt(Duration::ZERO)),
+        )
+    }
+
+    /// Construct a new state with explicit fetch routing handles.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_fetch(
+        node_id: String,
+        elections: Elections,
+        voting_config: VotingConfig,
+        pipeline: PipelineConfig,
+        eb_policy: Box<dyn EbFetchPolicy + Send + Sync>,
+        eb_txs_policy: Box<dyn EbTxsFetchPolicy + Send + Sync>,
+        vote_policy: Box<dyn VoteFetchPolicy + Send + Sync>,
+        rtt: Box<dyn PeerRtt + Send + Sync>,
     ) -> Self {
         Self {
             node_id,
@@ -240,6 +295,11 @@ impl LeiosState {
             pending_eb_tx_fetches: BTreeMap::new(),
             in_flight: BTreeMap::new(),
             chain_tip_ctx: ChainTipContext::default(),
+            candidates: CandidateTracker::new(),
+            eb_policy,
+            eb_txs_policy,
+            vote_policy,
+            rtt,
         }
     }
 
@@ -249,6 +309,26 @@ impl LeiosState {
     /// block).
     pub fn set_chain_tip_context(&mut self, ctx: ChainTipContext) {
         self.chain_tip_ctx = ctx;
+    }
+
+    /// Replace the EB fetch policy.
+    pub fn set_eb_policy(&mut self, policy: Box<dyn EbFetchPolicy + Send + Sync>) {
+        self.eb_policy = policy;
+    }
+
+    /// Replace the EB-txs fetch policy.
+    pub fn set_eb_txs_policy(&mut self, policy: Box<dyn EbTxsFetchPolicy + Send + Sync>) {
+        self.eb_txs_policy = policy;
+    }
+
+    /// Replace the vote fetch policy.
+    pub fn set_vote_policy(&mut self, policy: Box<dyn VoteFetchPolicy + Send + Sync>) {
+        self.vote_policy = policy;
+    }
+
+    /// Replace the per-peer RTT oracle.
+    pub fn set_rtt(&mut self, rtt: Box<dyn PeerRtt + Send + Sync>) {
+        self.rtt = rtt;
     }
 
     // -- Slot tick ----------------------------------------------------------
@@ -427,23 +507,48 @@ impl LeiosState {
 
     // -- Network event handlers ---------------------------------------------
 
-    /// A peer offered an EB.  If we don't have it in flight, request it.
-    pub fn on_eb_offered(&mut self, point: Point, now: Instant) -> Vec<LeiosEffect> {
+    /// A peer offered an EB.  Records the offer, then — if no fetch
+    /// for this point is already in flight — runs the [`EbFetchPolicy`]
+    /// against the current candidate set and emits one
+    /// `FetchLeiosBlock` carrying the chosen peers.  Idempotent: a
+    /// repeat offer from the same peer is silently absorbed.
+    pub fn on_eb_offered(
+        &mut self,
+        point: Point,
+        peer: PeerId,
+        now: Instant,
+    ) -> Vec<LeiosEffect> {
         self.evict_stale_in_flight(now);
+        self.candidates.note_eb_offered(point.clone(), peer);
         if self.in_flight.contains_key(&point) {
             return Vec::new();
         }
+        let candidates = self.candidates.eb_candidates(&point);
+        let peers = self
+            .eb_policy
+            .pick(&point, &candidates, self.rtt.as_ref());
+        if peers.is_empty() {
+            return Vec::new();
+        }
         self.in_flight.insert(point.clone(), now);
-        info!(node_id = %self.node_id, %point, "fetching leios block");
-        vec![LeiosEffect::FetchLeiosBlock { point }]
+        info!(
+            node_id = %self.node_id,
+            %point,
+            peer_count = peers.len(),
+            "fetching leios block"
+        );
+        vec![LeiosEffect::FetchLeiosBlock { point, peers }]
     }
 
     /// A peer offered EB transactions.  Caller has already computed the
     /// bitmap of indices it doesn't already have (from its mempool).
-    /// We dedup via an in-flight gate keyed by EB slot.
+    /// Per-slot gate dedups concurrent offers; per-peer attempts map
+    /// drives retry-after-partial-response in
+    /// [`Self::retry_eb_tx_fetch`].
     pub fn on_eb_txs_offered(
         &mut self,
         point: Point,
+        peer: PeerId,
         bitmap: BTreeMap<u16, u64>,
         now: Instant,
     ) -> Vec<LeiosEffect> {
@@ -452,6 +557,7 @@ impl LeiosState {
             Point::Specific { slot, .. } => *slot,
             _ => return Vec::new(),
         };
+        self.candidates.note_eb_txs_offered(point.clone(), peer);
         // Per-slot gate keeps multiple offers from triggering parallel
         // fetches; the synthetic hash distinguishes the gate from an
         // EB-body fetch on the same slot.
@@ -462,31 +568,63 @@ impl LeiosState {
         if self.in_flight.contains_key(&gate_key) {
             return Vec::new();
         }
+        let candidates = self.candidates.eb_txs_candidates(&point);
+        let peers =
+            self.eb_txs_policy
+                .pick(&point, &bitmap, &candidates, self.rtt.as_ref());
+        if peers.is_empty() {
+            return Vec::new();
+        }
         self.in_flight.insert(gate_key, now);
         if let Point::Specific { slot, hash } = &point {
             self.pending_eb_tx_fetches
                 .insert(*hash, (*slot, bitmap.clone()));
         }
+        self.candidates.start_eb_txs_fetch(point.clone(), &peers);
         info!(
             node_id = %self.node_id,
             %point,
             bitmap_segments = bitmap.len(),
+            peer_count = peers.len(),
             "fetching leios block txs"
         );
-        vec![LeiosEffect::FetchLeiosBlockTxs { point, bitmap }]
+        vec![LeiosEffect::FetchLeiosBlockTxs {
+            point,
+            bitmap,
+            peers,
+        }]
     }
 
-    /// A peer offered votes; forward the fetch.
-    pub fn on_votes_offered(&mut self, votes: Vec<(u64, Vec<u8>)>) -> Vec<LeiosEffect> {
+    /// A peer offered votes.  Records each (slot, voter_id) offer in
+    /// the candidate tracker, then runs the [`VoteFetchPolicy`] across
+    /// the batch — the policy decides which peer to ask for each vote
+    /// (potentially fanning out across peers).  Empty if no votes are
+    /// offered or none have a candidate.
+    pub fn on_votes_offered(
+        &mut self,
+        peer: PeerId,
+        votes: Vec<VoteId>,
+    ) -> Vec<LeiosEffect> {
         if votes.is_empty() {
+            return Vec::new();
+        }
+        for v in &votes {
+            self.candidates.note_vote_offered(v.clone(), peer);
+        }
+        let lookup = |v: &VoteId| self.candidates.vote_candidates(v);
+        let per_peer =
+            self.vote_policy
+                .pick(&votes, &lookup, self.rtt.as_ref());
+        if per_peer.is_empty() {
             return Vec::new();
         }
         info!(
             node_id = %self.node_id,
             count = votes.len(),
+            peer_count = per_peer.len(),
             "fetching leios votes"
         );
-        vec![LeiosEffect::FetchLeiosVotes { votes }]
+        vec![LeiosEffect::FetchLeiosVotes { per_peer }]
     }
 
     /// An EB body arrived.  `manifest_hashes` is the decoded tx-hash
@@ -675,8 +813,10 @@ impl LeiosState {
     }
 
     /// Re-issue a `FetchLeiosBlockTxs` for the unfilled bitmap (a
-    /// previous response was partial).  The I/O layer is expected to
-    /// route to a different peer.
+    /// previous response was partial).  The candidate set excludes
+    /// peers that already attempted this EB-txs fetch (tracked by the
+    /// candidate tracker), so the policy will land on a fresh peer or
+    /// emit nothing if every candidate has been tried.
     pub fn retry_eb_tx_fetch(
         &mut self,
         point: Point,
@@ -685,7 +825,19 @@ impl LeiosState {
         if bitmap.is_empty() {
             return Vec::new();
         }
-        vec![LeiosEffect::FetchLeiosBlockTxs { point, bitmap }]
+        let candidates = self.candidates.eb_txs_candidates(&point);
+        let peers =
+            self.eb_txs_policy
+                .pick(&point, &bitmap, &candidates, self.rtt.as_ref());
+        if peers.is_empty() {
+            return Vec::new();
+        }
+        self.candidates.start_eb_txs_fetch(point.clone(), &peers);
+        vec![LeiosEffect::FetchLeiosBlockTxs {
+            point,
+            bitmap,
+            peers,
+        }]
     }
 
     // -- Queries ------------------------------------------------------------
@@ -886,10 +1038,17 @@ mod tests {
     fn on_eb_offered_dedups_via_in_flight() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
         let now = Instant::now();
-        let fx = state.on_eb_offered(point(10, 1), now);
+        let peer = PeerId(1);
+        let fx = state.on_eb_offered(point(10, 1), peer, now);
         assert_eq!(fx.len(), 1);
-        // Second offer: dedup'd.
-        let fx = state.on_eb_offered(point(10, 1), now);
+        match &fx[0] {
+            LeiosEffect::FetchLeiosBlock { peers, .. } => {
+                assert_eq!(*peers, vec![peer]);
+            }
+            other => panic!("expected FetchLeiosBlock, got {other:?}"),
+        }
+        // Second offer from the same peer: dedup'd.
+        let fx = state.on_eb_offered(point(10, 1), peer, now);
         assert!(fx.is_empty());
     }
 
@@ -977,23 +1136,30 @@ mod tests {
     fn on_eb_txs_offered_gates_per_slot() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
         let now = Instant::now();
+        let peer = PeerId(1);
         let mut bitmap = BTreeMap::new();
         bitmap.insert(0u16, 0b111u64);
 
-        let fx = state.on_eb_txs_offered(point(10, 1), bitmap.clone(), now);
+        let fx = state.on_eb_txs_offered(point(10, 1), peer, bitmap.clone(), now);
         assert_eq!(fx.len(), 1);
         assert!(matches!(fx[0], LeiosEffect::FetchLeiosBlockTxs { .. }));
         assert!(state.pending_eb_tx_fetches.contains_key(&h(1)));
 
-        // Same-slot offer dedup'd via the per-slot gate.
-        let fx2 = state.on_eb_txs_offered(point(10, 2), bitmap, now);
+        // Same-slot offer for a different EB hash from a new peer:
+        // dedup'd via the per-slot gate.
+        let fx2 = state.on_eb_txs_offered(point(10, 2), PeerId(2), bitmap, now);
         assert!(fx2.is_empty());
     }
 
     #[test]
     fn on_eb_txs_offered_origin_point_is_noop() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        let fx = state.on_eb_txs_offered(Point::Origin, BTreeMap::new(), Instant::now());
+        let fx = state.on_eb_txs_offered(
+            Point::Origin,
+            PeerId(1),
+            BTreeMap::new(),
+            Instant::now(),
+        );
         assert!(fx.is_empty());
     }
 
@@ -1003,12 +1169,13 @@ mod tests {
         let now = Instant::now();
         let mut bitmap = BTreeMap::new();
         bitmap.insert(0u16, 0b1u64);
-        let _ = state.on_eb_txs_offered(point(10, 1), bitmap.clone(), now);
+        let _ = state.on_eb_txs_offered(point(10, 1), PeerId(1), bitmap.clone(), now);
 
         state.on_eb_txs_received(&point(10, 1), 1);
 
-        // A fresh same-slot offer is no longer gated.
-        let fx = state.on_eb_txs_offered(point(10, 2), bitmap, now);
+        // A fresh same-slot offer for a different EB hash from a new peer
+        // is no longer gated.
+        let fx = state.on_eb_txs_offered(point(10, 2), PeerId(2), bitmap, now);
         assert_eq!(fx.len(), 1);
     }
 
@@ -1016,10 +1183,16 @@ mod tests {
     fn on_votes_offered_emits_fetch() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
         let votes = vec![(10u64, vec![0u8; 8])];
-        let fx = state.on_votes_offered(votes.clone());
+        let peer = PeerId(1);
+        let fx = state.on_votes_offered(peer, votes.clone());
         assert_eq!(fx.len(), 1);
         match &fx[0] {
-            LeiosEffect::FetchLeiosVotes { votes: vs } => assert_eq!(vs, &votes),
+            LeiosEffect::FetchLeiosVotes { per_peer } => {
+                assert_eq!(
+                    per_peer.get(&peer).cloned().unwrap_or_default(),
+                    votes
+                );
+            }
             other => panic!("expected FetchLeiosVotes, got {other:?}"),
         }
     }
@@ -1027,7 +1200,7 @@ mod tests {
     #[test]
     fn on_votes_offered_empty_is_noop() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        let fx = state.on_votes_offered(Vec::new());
+        let fx = state.on_votes_offered(PeerId(1), Vec::new());
         assert!(fx.is_empty());
     }
 
@@ -1068,14 +1241,22 @@ mod tests {
     #[test]
     fn retry_eb_tx_fetch_with_bitmap_emits_fetch() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
+        // The retry path consults eb_txs_candidates, so we need at
+        // least one peer that hasn't been attempted.
+        state.candidates.note_eb_txs_offered(point(10, 1), PeerId(1));
         let mut bitmap = BTreeMap::new();
         bitmap.insert(0u16, 0b10u64);
         let fx = state.retry_eb_tx_fetch(point(10, 1), bitmap.clone());
         assert_eq!(fx.len(), 1);
         match &fx[0] {
-            LeiosEffect::FetchLeiosBlockTxs { point: p, bitmap: b } => {
+            LeiosEffect::FetchLeiosBlockTxs {
+                point: p,
+                bitmap: b,
+                peers,
+            } => {
                 assert_eq!(*p, point(10, 1));
                 assert_eq!(b, &bitmap);
+                assert_eq!(*peers, vec![PeerId(1)]);
             }
             other => panic!("expected FetchLeiosBlockTxs, got {other:?}"),
         }

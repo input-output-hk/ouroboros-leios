@@ -71,11 +71,20 @@ impl PraosConsensus {
     async fn dispatch(&mut self, effects: Vec<PraosEffect>) {
         for effect in effects {
             match effect {
-                PraosEffect::FetchBlockRange { from, to, peer_id } => {
-                    let _ = self
-                        .commands
-                        .send(NetworkCommand::FetchBlockRange { from, to, peer_id })
-                        .await;
+                PraosEffect::FetchBlockRange { from, to, peers } => {
+                    // con-rs's BlockFetchPolicy already picked the peer
+                    // set; emit one fetch command per peer (the empty
+                    // case becomes a no-op).
+                    for peer_id in peers {
+                        let _ = self
+                            .commands
+                            .send(NetworkCommand::FetchBlockRange {
+                                from: from.clone(),
+                                to: to.clone(),
+                                peer_id: Some(peer_id),
+                            })
+                            .await;
+                    }
                 }
                 PraosEffect::ReIntersect { peer_id } => {
                     let _ = self

@@ -159,20 +159,22 @@ impl LeiosConsensus {
     pub async fn handle_event(&mut self, event: &NetworkEvent) -> bool {
         let now = Instant::now();
         let (consumed, fx): (bool, Vec<LeiosEffect>) = match event {
-            NetworkEvent::LeiosBlockOffered { point } => {
-                (true, self.state.on_eb_offered(point.clone(), now))
-            }
-            NetworkEvent::LeiosBlockTxsOffered { point } => {
+            NetworkEvent::LeiosBlockOffered { peer_id, point } => (
+                true,
+                self.state.on_eb_offered(point.clone(), *peer_id, now),
+            ),
+            NetworkEvent::LeiosBlockTxsOffered { peer_id, point } => {
                 let bitmap = self.bitmap_for_missing_txs(point);
                 (
                     true,
                     self.state
-                        .on_eb_txs_offered(point.clone(), bitmap, now),
+                        .on_eb_txs_offered(point.clone(), *peer_id, bitmap, now),
                 )
             }
-            NetworkEvent::LeiosVotesOffered { votes } => {
-                (true, self.state.on_votes_offered(votes.clone()))
-            }
+            NetworkEvent::LeiosVotesOffered { peer_id, votes } => (
+                true,
+                self.state.on_votes_offered(*peer_id, votes.clone()),
+            ),
             NetworkEvent::LeiosBlockReceived { point, block } => {
                 let manifest = decode_overflow_eb(block).map(|(_, hashes)| hashes);
                 (true, self.state.on_eb_received(point.clone(), manifest))
@@ -300,23 +302,40 @@ impl LeiosConsensus {
     async fn dispatch(&mut self, fx: Vec<LeiosEffect>) {
         for eff in fx {
             match eff {
-                LeiosEffect::FetchLeiosBlock { point } => {
-                    let _ = self
-                        .commands
-                        .send(NetworkCommand::FetchLeiosBlock { point })
-                        .await;
+                LeiosEffect::FetchLeiosBlock { point, peers } => {
+                    for peer_id in peers {
+                        let _ = self
+                            .commands
+                            .send(NetworkCommand::FetchLeiosBlock {
+                                peer_id,
+                                point: point.clone(),
+                            })
+                            .await;
+                    }
                 }
-                LeiosEffect::FetchLeiosBlockTxs { point, bitmap } => {
-                    let _ = self
-                        .commands
-                        .send(NetworkCommand::FetchLeiosBlockTxs { point, bitmap })
-                        .await;
+                LeiosEffect::FetchLeiosBlockTxs {
+                    point,
+                    bitmap,
+                    peers,
+                } => {
+                    for peer_id in peers {
+                        let _ = self
+                            .commands
+                            .send(NetworkCommand::FetchLeiosBlockTxs {
+                                peer_id,
+                                point: point.clone(),
+                                bitmap: bitmap.clone(),
+                            })
+                            .await;
+                    }
                 }
-                LeiosEffect::FetchLeiosVotes { votes } => {
-                    let _ = self
-                        .commands
-                        .send(NetworkCommand::FetchLeiosVotes { votes })
-                        .await;
+                LeiosEffect::FetchLeiosVotes { per_peer } => {
+                    for (peer_id, votes) in per_peer {
+                        let _ = self
+                            .commands
+                            .send(NetworkCommand::FetchLeiosVotes { peer_id, votes })
+                            .await;
+                    }
                 }
                 LeiosEffect::RecordLeiosEbManifest { point, tx_hashes } => {
                     let _ = self
@@ -779,12 +798,15 @@ mod tests {
         let p = point(100);
         assert!(
             leios
-                .handle_event(&NetworkEvent::LeiosBlockOffered { point: p.clone() })
+                .handle_event(&NetworkEvent::LeiosBlockOffered {
+                peer_id: net_core::peer::PeerId(1),
+                point: p.clone(),
+            })
                 .await
         );
 
         match rx.try_recv() {
-            Ok(NetworkCommand::FetchLeiosBlock { point: got }) => assert_eq!(got, p),
+            Ok(NetworkCommand::FetchLeiosBlock { point: got, .. }) => assert_eq!(got, p),
             other => panic!("expected FetchLeiosBlock, got {:?}", other),
         }
     }
@@ -797,10 +819,16 @@ mod tests {
 
         let p = point(100);
         leios
-            .handle_event(&NetworkEvent::LeiosBlockOffered { point: p.clone() })
+            .handle_event(&NetworkEvent::LeiosBlockOffered {
+                peer_id: net_core::peer::PeerId(1),
+                point: p.clone(),
+            })
             .await;
         leios
-            .handle_event(&NetworkEvent::LeiosBlockOffered { point: p.clone() })
+            .handle_event(&NetworkEvent::LeiosBlockOffered {
+                peer_id: net_core::peer::PeerId(1),
+                point: p.clone(),
+            })
             .await;
 
         assert!(matches!(
@@ -818,7 +846,10 @@ mod tests {
 
         let p = point(200);
         leios
-            .handle_event(&NetworkEvent::LeiosBlockOffered { point: p.clone() })
+            .handle_event(&NetworkEvent::LeiosBlockOffered {
+                peer_id: net_core::peer::PeerId(1),
+                point: p.clone(),
+            })
             .await;
         leios
             .handle_event(&NetworkEvent::LeiosBlockReceived {
@@ -852,7 +883,10 @@ mod tests {
 
         let p = point(99);
         leios
-            .handle_event(&NetworkEvent::LeiosBlockOffered { point: p.clone() })
+            .handle_event(&NetworkEvent::LeiosBlockOffered {
+                peer_id: net_core::peer::PeerId(1),
+                point: p.clone(),
+            })
             .await;
         leios
             .handle_event(&NetworkEvent::LeiosBlockReceived {
@@ -1186,13 +1220,14 @@ mod tests {
         // Tx availability announcement → should fetch only the missing index (#1).
         leios
             .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                peer_id: net_core::peer::PeerId(1),
                 point: eb_point.clone(),
             })
             .await;
 
         let cmd = next_fetch_cmd(&mut rx).await;
         match cmd {
-            NetworkCommand::FetchLeiosBlockTxs { point, bitmap } => {
+            NetworkCommand::FetchLeiosBlockTxs { point, bitmap, .. } => {
                 assert_eq!(point, eb_point);
                 let indices: Vec<u32> = bitmap_helpers::iter_indices(&bitmap).collect();
                 assert_eq!(indices, vec![1]);
@@ -1214,7 +1249,10 @@ mod tests {
             hash: [0xCC; 32],
         };
         leios
-            .handle_event(&NetworkEvent::LeiosBlockTxsOffered { point: eb_point })
+            .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                peer_id: net_core::peer::PeerId(1),
+                point: eb_point,
+            })
             .await;
 
         let cmd = next_fetch_cmd(&mut rx).await;
@@ -1257,7 +1295,10 @@ mod tests {
             })
             .await;
         leios
-            .handle_event(&NetworkEvent::LeiosBlockTxsOffered { point: eb_point })
+            .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                peer_id: net_core::peer::PeerId(1),
+                point: eb_point,
+            })
             .await;
 
         let cmd = next_fetch_cmd(&mut rx).await;
@@ -1309,6 +1350,7 @@ mod tests {
             .await;
         leios
             .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                peer_id: net_core::peer::PeerId(1),
                 point: eb_point.clone(),
             })
             .await;
@@ -1374,6 +1416,7 @@ mod tests {
             .await;
         leios
             .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                peer_id: net_core::peer::PeerId(1),
                 point: eb_point.clone(),
             })
             .await;
@@ -1386,13 +1429,23 @@ mod tests {
         let remaining: Vec<u32> = bitmap_helpers::iter_indices(&outcome.remaining_bitmap).collect();
         assert_eq!(remaining, vec![0, 2]);
 
+        // A second peer offers the same EB-txs, giving the retry a
+        // fresh candidate (con-rs's EbTxsFetchPolicy excludes the
+        // previously-attempted peer).
+        leios
+            .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                peer_id: net_core::peer::PeerId(2),
+                point: eb_point.clone(),
+            })
+            .await;
+
         // Retry path: caller issues a fresh fetch with the remaining bitmap.
         leios
             .retry_eb_tx_fetch(eb_point.clone(), outcome.remaining_bitmap)
             .await;
         let cmd = next_fetch_cmd(&mut rx).await;
         match cmd {
-            NetworkCommand::FetchLeiosBlockTxs { point, bitmap } => {
+            NetworkCommand::FetchLeiosBlockTxs { point, bitmap, .. } => {
                 assert_eq!(point, eb_point);
                 let indices: Vec<u32> = bitmap_helpers::iter_indices(&bitmap).collect();
                 assert_eq!(indices, vec![0, 2]);
@@ -1447,6 +1500,7 @@ mod tests {
             .await;
         leios
             .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                peer_id: net_core::peer::PeerId(1),
                 point: eb_point.clone(),
             })
             .await;
