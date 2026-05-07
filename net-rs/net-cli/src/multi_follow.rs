@@ -124,7 +124,7 @@ pub async fn run(
                     transactions.len()
                 );
             }
-            NetworkEvent::BlockFetchFailed { from, to } => {
+            NetworkEvent::BlockFetchFailed { from, to, .. } => {
                 if from == to {
                     println!("  block fetch failed: {from}");
                 } else {

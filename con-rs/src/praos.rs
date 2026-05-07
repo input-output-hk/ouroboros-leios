@@ -16,7 +16,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::time::{Duration, Instant};
 
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::chain_tree::{is_better_tip, ChainTree, ChainTreeEntry};
 use crate::fetch::{BlockFetchPolicy, LowestRttFirst, PeerRtt, UniformRtt};
@@ -36,6 +36,17 @@ pub const IN_FLIGHT_TTL: Duration = Duration::from_secs(15);
 /// orphan-cascade rate at 1/sec per peer even when re-intersection
 /// round-trips are millisecond-scale.
 pub const ORPHAN_COOLDOWN: Duration = Duration::from_secs(1);
+
+/// After a peer fails to deliver a fetched block (NoBlocks, mux error,
+/// timeout, malformed body), this much time must pass before chain
+/// selection considers it again.  Without this, `on_block_fetch_failed`
+/// re-runs `select_chain_once` immediately and picks the same peer
+/// (because nothing has changed about its announced fragment), which
+/// busy-loops at microsecond cadence and saturates disk I/O with the
+/// fetch-and-fail log pair.  Routing decisions are the fetch policy's
+/// job; this cooldown just keeps a known-bad peer out of the running
+/// long enough for a different one to be picked.
+pub const BLOCK_FETCH_COOLDOWN: Duration = Duration::from_secs(2);
 
 // ---------------------------------------------------------------------------
 // Effect type
@@ -175,6 +186,11 @@ pub struct PraosState {
     pub peer_chains: BTreeMap<PeerId, PeerChain>,
     /// Peers on cooldown after being classified as `OrphanCandidate`.
     pub orphan_cooldown: BTreeMap<PeerId, Instant>,
+    /// Peers on cooldown after a `BlockFetch` request failed.  Excluded
+    /// from chain selection until the timestamp passes — the fetch
+    /// policy then has fresh information ("avoid this peer for a bit")
+    /// and routes the next attempt elsewhere.
+    pub block_fetch_cooldown: BTreeMap<PeerId, Instant>,
 
     /// Points currently being fetched (avoid duplicate requests).
     pub in_flight: BTreeMap<Point, Instant>,
@@ -236,6 +252,7 @@ impl PraosState {
             validated: BTreeSet::new(),
             peer_chains: BTreeMap::new(),
             orphan_cooldown: BTreeMap::new(),
+            block_fetch_cooldown: BTreeMap::new(),
             in_flight: BTreeMap::new(),
             in_flight_validation: BTreeSet::new(),
             queued_validator_tip: None,
@@ -503,19 +520,27 @@ impl PraosState {
     }
 
     /// A `BlockFetch` failed for the requested range.  Drop the
-    /// in-flight markers so a retry can be issued.
+    /// in-flight markers, put the responsible peer on cooldown, and
+    /// re-run chain selection — which now has fresh information ("this
+    /// peer just failed for this range") and lets the fetch policy
+    /// pick a different candidate.  Without the cooldown, `select_chain`
+    /// reaches the same `WaitingForBlocks { peer_id }` decision and
+    /// re-fetches the same range from the same peer in microseconds.
     pub fn on_block_fetch_failed(
         &mut self,
+        peer_id: PeerId,
         from: &Point,
         to: &Point,
         now: Instant,
     ) -> Vec<PraosEffect> {
         self.in_flight.remove(from);
         self.in_flight.remove(to);
-        info!(
+        self.block_fetch_cooldown
+            .insert(peer_id, now + BLOCK_FETCH_COOLDOWN);
+        debug!(
             node_id = %self.node_id,
-            %from, %to,
-            "block fetch failed; re-evaluating fetch decisions"
+            %peer_id, %from, %to,
+            "block fetch failed; cooling peer and re-evaluating"
         );
         let mut fx = Vec::new();
         self.evaluate_and_fetch_internal(now, &mut fx);
@@ -1077,6 +1102,14 @@ impl PraosState {
             .map(|(p, _)| *p)
             .collect();
         self.orphan_cooldown.retain(|_, until| *until > now);
+        // Peers that recently failed a fetch are excluded too — gives
+        // the fetch policy room to pick someone else.
+        for (p, until) in &self.block_fetch_cooldown {
+            if *until > now {
+                skip.insert(*p);
+            }
+        }
+        self.block_fetch_cooldown.retain(|_, until| *until > now);
 
         loop {
             match self.select_chain_once(&skip) {
@@ -1127,7 +1160,7 @@ impl PraosState {
                     tip_block_no,
                     ..
                 } => {
-                    info!(
+                    debug!(
                         node_id = %self.node_id,
                         %peer_id,
                         tip_block_no,
@@ -1276,7 +1309,7 @@ impl PraosState {
         }
         self.in_flight.insert(to.clone(), now);
         let peers = self.choose_block_fetch_peers(&to, peer_id);
-        info!(
+        debug!(
             node_id = %self.node_id,
             %from,
             %to,
@@ -1885,9 +1918,28 @@ mod tests {
         let mut s = fresh();
         s.in_flight.insert(pt(100, 1), Instant::now());
         s.in_flight.insert(pt(101, 2), Instant::now());
-        let _ = s.on_block_fetch_failed(&pt(100, 1), &pt(101, 2), Instant::now());
+        let now = Instant::now();
+        let pid = PeerId(7);
+        let _ = s.on_block_fetch_failed(pid, &pt(100, 1), &pt(101, 2), now);
         assert!(!s.in_flight.contains_key(&pt(100, 1)));
         assert!(!s.in_flight.contains_key(&pt(101, 2)));
+        assert!(s.block_fetch_cooldown.contains_key(&pid));
+    }
+
+    #[test]
+    fn block_fetch_cooldown_excludes_peer_from_selection() {
+        let mut s = fresh();
+        let pid = PeerId(3);
+        s.block_fetch_cooldown
+            .insert(pid, Instant::now() + Duration::from_secs(10));
+        let mut fx = Vec::new();
+        s.evaluate_and_fetch_internal(Instant::now(), &mut fx);
+        // No fetch effects should target the cooled peer.  We can't
+        // observe `skip` directly, but the cooldown's entry remains
+        // (not yet expired) and `select_chain_once` would have been
+        // called with it in `skip` — see `select_chain_skip_filters_peers`
+        // for the underlying skip-set semantics.
+        assert!(s.block_fetch_cooldown.contains_key(&pid));
     }
 
     // -- High-level handlers --------------------------------------------

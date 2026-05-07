@@ -52,9 +52,17 @@ pub enum NetworkEvent {
     /// A requested block was fetched.
     BlockReceived { point: Point, body: BlockBody },
 
-    /// A requested block fetch failed (peer responded with NoBlocks).
-    /// Carries the full range from the underlying BlockFetch protocol.
-    BlockFetchFailed { from: Point, to: Point },
+    /// A requested block fetch failed (peer responded with NoBlocks,
+    /// the connection died, or no peer had the fragment).  Carries the
+    /// responsible peer when one was actually attempted, so the
+    /// application can put it on cooldown and re-route via the fetch
+    /// policy.  `None` means no peer was reachable for the requested
+    /// fragment — there's no one to cooldown.
+    BlockFetchFailed {
+        peer_id: Option<PeerId>,
+        from: Point,
+        to: Point,
+    },
 
     /// New peers discovered via PeerSharing.
     PeersDiscovered { peers: Vec<PeerAddress> },

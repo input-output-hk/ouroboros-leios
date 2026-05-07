@@ -599,7 +599,11 @@ impl Coordinator {
                     self.pending_fetches.remove(&to);
                 }
                 // Notify application with the full range so it can retry.
-                self.emit_event(NetworkEvent::BlockFetchFailed { from, to });
+                self.emit_event(NetworkEvent::BlockFetchFailed {
+                    peer_id: Some(peer_id),
+                    from,
+                    to,
+                });
             }
 
             PeerEvent::TxsRequested { count } => {
@@ -680,10 +684,18 @@ impl Coordinator {
                     } else {
                         // Peer was scheduled for removal; tell the app the
                         // fetch failed so it can retry via another peer.
-                        self.emit_event(NetworkEvent::BlockFetchFailed { from, to });
+                        self.emit_event(NetworkEvent::BlockFetchFailed {
+                            peer_id: Some(best_id),
+                            from,
+                            to,
+                        });
                     }
                 } else {
-                    self.emit_event(NetworkEvent::BlockFetchFailed { from, to });
+                    self.emit_event(NetworkEvent::BlockFetchFailed {
+                        peer_id: None,
+                        from,
+                        to,
+                    });
                 }
             }
 
@@ -832,6 +844,7 @@ impl Coordinator {
                 .collect();
             for point in &orphaned {
                 self.emit_event(NetworkEvent::BlockFetchFailed {
+                    peer_id: Some(peer_id),
                     from: point.clone(),
                     to: point.clone(),
                 });

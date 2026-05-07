@@ -242,8 +242,15 @@ impl PraosConsensus {
                 let fx = self.state.on_peer_disconnected(*peer_id, now);
                 (false, fx)
             }
-            NetworkEvent::BlockFetchFailed { from, to } => {
-                let fx = self.state.on_block_fetch_failed(from, to, now);
+            NetworkEvent::BlockFetchFailed { peer_id, from, to } => {
+                // Cooldown only applies when an actual peer was tried.
+                // `None` means the coordinator never reached one for the
+                // requested fragment — there's nobody to penalise; just
+                // re-evaluate selection on the next periodic retry.
+                let fx = match peer_id {
+                    Some(p) => self.state.on_block_fetch_failed(*p, from, to, now),
+                    None => Vec::new(),
+                };
                 (true, fx)
             }
             _ => (false, Vec::new()),
@@ -871,6 +878,7 @@ mod tests {
         for _ in 0..100 {
             consensus
                 .handle_event(&NetworkEvent::BlockFetchFailed {
+                    peer_id: None,
                     from: Point::Origin,
                     to: Point::Origin,
                 })
