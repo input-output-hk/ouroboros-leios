@@ -26,8 +26,15 @@ tx_size_min = 250
 tx_size_max = 16384
 
 [validation]
+# Mirror sim-rs `parameters/config.default.yaml` legacy-Praos
+# payload-validation cost (rb-body-legacy-praos-payload-validation-
+# cpu-time-ms-constant=0.3539, -per-byte=2.151e-05).  At 90 KiB max
+# RB body that's ~2.4 ms, so 3-hop propagation finishes well within
+# the pre-voting buffer.  `tx_validation_ms = 0.6201` matches sim-rs's
+# `tx-validation-cpu-time-ms` (an amortised Plutus-inclusive figure).
 rb_head_validation_ms = 1.0
-rb_body_validation_ms_constant = 1000.0
-rb_body_validation_ms_per_byte = 0.001
+rb_body_validation_ms_constant = 0.3539
+rb_body_validation_ms_per_byte = 0.0000215
+tx_validation_ms = 0.6201
 eb_validation_ms = 2.0
 vote_validation_ms = 1.0
