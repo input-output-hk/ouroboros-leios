@@ -1,18 +1,18 @@
 	Command being timed: "../../sim-cli -p wfa-ls/topology-v2/seed-0/config.yaml network.yaml --slots 1500 --conformance-events sim.log"
-	User time (seconds): 11392.83
-	System time (seconds): 2775.05
-	Percent of CPU this job got: 1100%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 21:27.78
+	User time (seconds): 11613.82
+	System time (seconds): 2909.55
+	Percent of CPU this job got: 1108%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 21:49.78
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 9413872
+	Maximum resident set size (kbytes): 9299076
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 8638346
-	Voluntary context switches: 350699672
-	Involuntary context switches: 357905242
+	Minor (reclaiming a frame) page faults: 9260374
+	Voluntary context switches: 378916479
+	Involuntary context switches: 378980152
 	Swaps: 0
 	File system inputs: 0
 	File system outputs: 648

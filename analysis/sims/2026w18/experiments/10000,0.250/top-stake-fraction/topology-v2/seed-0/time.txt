@@ -1,21 +1,21 @@
-	Command being timed: "../../sim-cli -p top-stake-fraction/seed-0/config.yaml -p /home/prc/leios/analysis/sims/2026w18/../../../sim-rs/parameters/turbo.yaml -p voting.yaml -p seed.yaml network.yaml --slots 1500 --conformance-events sim.log"
-	User time (seconds): 10757.00
-	System time (seconds): 1897.28
-	Percent of CPU this job got: 828%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 25:27.42
+	Command being timed: "../../sim-cli -p top-stake-fraction/topology-v2/seed-0/config.yaml network.yaml --slots 1500 --conformance-events sim.log"
+	User time (seconds): 14846.52
+	System time (seconds): 3899.69
+	Percent of CPU this job got: 891%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 35:02.92
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 32539492
+	Maximum resident set size (kbytes): 9446972
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 224833230
-	Voluntary context switches: 751339567
-	Involuntary context switches: 148789328
+	Minor (reclaiming a frame) page faults: 9559452
+	Voluntary context switches: 423738199
+	Involuntary context switches: 679039592
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 672
+	File system outputs: 880
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
