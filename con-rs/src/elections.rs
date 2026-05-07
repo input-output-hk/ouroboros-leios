@@ -11,7 +11,6 @@
 //! consumers that replay runs from a seed.
 
 use std::collections::BTreeMap;
-use std::time::Instant;
 
 use tracing::info;
 
@@ -29,7 +28,14 @@ pub enum SlotEffect {
     /// The local node is in the Voting window for this EB and has not
     /// yet voted. Caller should compute its vote, send it to the network,
     /// then call `mark_voted(eb_hash)` to suppress further re-emission.
-    EligibleToVote { eb_hash: [u8; 32], eb_slot: u64 },
+    /// `eb_seen_slot` is the slot at which this node first learned of the
+    /// EB, carried so the caller can apply the CIP-0164 `LateEB` predicate
+    /// without an extra accessor.
+    EligibleToVote {
+        eb_hash: [u8; 32],
+        eb_slot: u64,
+        eb_seen_slot: u64,
+    },
     /// Election expired (past `dedup_window` slots after CertEligible).
     /// Caller may want to clean associated transient state — for
     /// example, EB tx manifests and in-flight tx-fetch entries keyed
@@ -108,7 +114,7 @@ impl Elections {
             EbElection {
                 announced_slot: eb_slot,
                 phase,
-                validated_at: Instant::now(),
+                seen_slot: self.current_slot,
                 voted: false,
                 voter_weights: BTreeMap::new(),
                 quorum_reached: false,
@@ -138,6 +144,7 @@ impl Elections {
                 effects.push(SlotEffect::EligibleToVote {
                     eb_hash: *hash,
                     eb_slot: election.announced_slot,
+                    eb_seen_slot: election.seen_slot,
                 });
             }
         }
@@ -228,6 +235,13 @@ impl Elections {
 
     pub fn phase(&self, eb_hash: &[u8; 32]) -> Option<PipelinePhase> {
         self.elections.get(eb_hash).map(|e| e.phase)
+    }
+
+    /// Mutable access to a live election. Adapters use this to fix up
+    /// per-EB state the announce path couldn't capture (e.g., a more
+    /// precise `seen_slot` from the network layer's per-message timing).
+    pub fn election_mut(&mut self, eb_hash: &[u8; 32]) -> Option<&mut EbElection> {
+        self.elections.get_mut(eb_hash)
     }
 
     pub fn voted(&self, eb_hash: &[u8; 32]) -> bool {
@@ -339,7 +353,8 @@ mod tests {
             fx,
             vec![SlotEffect::EligibleToVote {
                 eb_hash: h(1),
-                eb_slot: 10
+                eb_slot: 10,
+                eb_seen_slot: 10,
             }]
         );
     }

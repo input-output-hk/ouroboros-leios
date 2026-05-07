@@ -5,7 +5,6 @@
 //! Diffusing (L_diff) → CertEligible (held until pruned).
 
 use std::collections::BTreeMap;
-use std::time::Instant;
 
 /// Pipeline phase for an EB election (CIP-0164 Linear Leios).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,8 +32,11 @@ pub enum PipelinePhase {
 pub struct EbElection {
     pub announced_slot: u64,
     pub phase: PipelinePhase,
-    #[allow(dead_code)] // used by future telemetry
-    pub validated_at: Instant,
+    /// Slot at which this node first learned of the EB. Used by the
+    /// `LateEB` voting predicate (CIP-0164): a voter must have received
+    /// the EB before its voting window closes
+    /// (`announced_slot + 3·Δhdr + L_vote`).
+    pub seen_slot: u64,
     /// True after this node has cast its vote for this EB.
     pub voted: bool,
     /// Per-voter weight: voter_id+tag → derived weight.

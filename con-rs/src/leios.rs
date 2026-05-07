@@ -56,6 +56,44 @@ pub struct VotingConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Voting predicates
+// ---------------------------------------------------------------------------
+
+/// Why a CIP-0164 voting predicate rejected this EB at decision time.
+/// Surfaced via [`LeiosEffect::NoVote`] so the I/O layer can emit
+/// matching telemetry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NoVoteReason {
+    /// The EB was first seen too late to fit within its voting window
+    /// (`announced_slot + 3·Δhdr + L_vote`).
+    LateEB,
+    /// The chain-tip RB header arrived later than `eb_slot + Δhdr`,
+    /// past the equivocation-resistant cutoff.
+    LateRBHeader,
+    /// The chain-tip RB does not announce this EB.
+    WrongEB,
+    /// At least one transaction the EB references is unknown locally.
+    /// Only meaningful in TX-by-references mode; the wrapper supplies
+    /// the `tx_known` callback that drives this check.
+    MissingTX,
+}
+
+/// Chain-tip metadata the I/O wrapper feeds into [`LeiosState`] so the
+/// `LateRBHeader` / `WrongEB` voting predicates can run.
+///
+/// The wrapper updates this whenever the adopted chain tip changes —
+/// typically right after handling a `PraosEffect::InjectBlock` or
+/// observing a successful fork switch.  Defaults to "no chain tip yet"
+/// (both fields `None`); voting predicates treat that as `WrongEB`.
+#[derive(Debug, Clone, Default)]
+pub struct ChainTipContext {
+    /// Slot at which the wrapper received the adopted RB's header.
+    pub rb_header_arrival_slot: Option<u64>,
+    /// EB hash announced by the adopted RB header, if any.
+    pub eb_announcement: Option<[u8; 32]>,
+}
+
+// ---------------------------------------------------------------------------
 // Effect type
 // ---------------------------------------------------------------------------
 
@@ -93,6 +131,16 @@ pub enum LeiosEffect {
         /// Some(sig) if an NPV body should be emitted, carrying this
         /// eligibility signature.  None for PV-only or no-vote cases.
         npv_signature: Option<Vec<u8>>,
+    },
+
+    /// The local node entered the Voting phase for this EB but a
+    /// CIP-0164 voting predicate failed; no vote was emitted.  Sibling
+    /// to [`EmitVote`] — the election is `mark_voted` either way, so
+    /// this fires at most once per EB.
+    NoVote {
+        eb_slot: u64,
+        eb_hash: [u8; 32],
+        reason: NoVoteReason,
     },
 
     /// Submit a fetched EB body for ledger validation.
@@ -170,6 +218,10 @@ pub struct LeiosState {
     pub pending_eb_tx_fetches: BTreeMap<[u8; 32], (u64, BTreeMap<u16, u64>)>,
     /// Leios points / fetch gates currently in flight.
     pub in_flight: BTreeMap<Point, Instant>,
+
+    /// Chain-tip metadata fed in by the I/O wrapper.  Used by the
+    /// `LateRBHeader` / `WrongEB` voting predicates.
+    pub chain_tip_ctx: ChainTipContext,
 }
 
 impl LeiosState {
@@ -187,7 +239,16 @@ impl LeiosState {
             eb_tx_hashes: BTreeMap::new(),
             pending_eb_tx_fetches: BTreeMap::new(),
             in_flight: BTreeMap::new(),
+            chain_tip_ctx: ChainTipContext::default(),
         }
+    }
+
+    /// Update the chain-tip metadata used by the voting predicates.
+    /// The I/O wrapper calls this whenever the adopted chain tip
+    /// changes (e.g., after a successful fork switch or self-produced
+    /// block).
+    pub fn set_chain_tip_context(&mut self, ctx: ChainTipContext) {
+        self.chain_tip_ctx = ctx;
     }
 
     // -- Slot tick ----------------------------------------------------------
@@ -195,27 +256,63 @@ impl LeiosState {
     /// Drive the election state machine forward, decide voting for any
     /// election entering the Voting phase, and prune stale Leios-fetch
     /// state.  Returns the effects to dispatch.
-    pub fn on_slot(&mut self, slot: u64) -> Vec<LeiosEffect> {
+    ///
+    /// `tx_known` is the wrapper's predicate for "do we have this TX
+    /// locally?" — used by the CIP-0164 `MissingTX` voting check in
+    /// TX-by-references mode.  Wrappers without a mempool surface yet
+    /// can pass `&|_| true`; in that case the predicate is a no-op.
+    pub fn on_slot(
+        &mut self,
+        slot: u64,
+        tx_known: &dyn Fn(&[u8; 32]) -> bool,
+    ) -> Vec<LeiosEffect> {
         let mut fx: Vec<LeiosEffect> = Vec::new();
         for eff in self.elections.on_slot(slot) {
             match eff {
-                SlotEffect::EligibleToVote { eb_hash, eb_slot } => {
-                    let (emit_pv, npv_signature) = self.decide_vote(&eb_hash, eb_slot);
-                    if emit_pv || npv_signature.is_some() {
-                        info!(
-                            node_id = %self.node_id,
-                            eb_slot,
-                            emit_pv,
-                            emit_npv = npv_signature.is_some(),
-                            "voting on eb"
-                        );
-                        self.elections.mark_voted(&eb_hash);
-                        fx.push(LeiosEffect::EmitVote {
-                            eb_slot,
-                            eb_hash,
-                            emit_pv,
-                            npv_signature,
-                        });
+                SlotEffect::EligibleToVote {
+                    eb_hash,
+                    eb_slot,
+                    eb_seen_slot,
+                } => {
+                    match self.decide_vote(&eb_hash, eb_slot, eb_seen_slot, tx_known) {
+                        Ok((emit_pv, npv_signature))
+                            if emit_pv || npv_signature.is_some() =>
+                        {
+                            info!(
+                                node_id = %self.node_id,
+                                eb_slot,
+                                emit_pv,
+                                emit_npv = npv_signature.is_some(),
+                                "voting on eb"
+                            );
+                            self.elections.mark_voted(&eb_hash);
+                            fx.push(LeiosEffect::EmitVote {
+                                eb_slot,
+                                eb_hash,
+                                emit_pv,
+                                npv_signature,
+                            });
+                        }
+                        Ok(_) => {
+                            // Lottery loss: no PV seat and no NPV win.
+                            // Don't mark_voted — re-fires next slot in
+                            // case voting config / NPV trial changes
+                            // (matches existing pre-predicate behavior).
+                        }
+                        Err(reason) => {
+                            info!(
+                                node_id = %self.node_id,
+                                eb_slot,
+                                ?reason,
+                                "no vote on eb"
+                            );
+                            self.elections.mark_voted(&eb_hash);
+                            fx.push(LeiosEffect::NoVote {
+                                eb_slot,
+                                eb_hash,
+                                reason,
+                            });
+                        }
                     }
                 }
                 SlotEffect::Expired {
@@ -251,9 +348,58 @@ impl LeiosState {
         fx
     }
 
-    /// Pure decision: should this node emit a PV vote and/or an NPV
-    /// vote for this EB, and if NPV, what's the eligibility signature?
-    fn decide_vote(&self, eb_hash: &[u8; 32], eb_slot: u64) -> (bool, Option<Vec<u8>>) {
+    /// Decide the vote outcome for an EB entering the Voting phase.
+    ///
+    /// Runs the CIP-0164 voting predicates first; on failure returns
+    /// the relevant `NoVoteReason` and no vote is emitted.  On success
+    /// returns `(emit_pv, npv_signature)` — the same shape as the
+    /// underlying lottery decision.  `(false, None)` means the local
+    /// node was eligible to enter the Voting window but neither held a
+    /// persistent seat nor won an NPV trial; the caller treats this as
+    /// silent "lottery loss" (no telemetry, no `mark_voted`).
+    fn decide_vote(
+        &self,
+        eb_hash: &[u8; 32],
+        eb_slot: u64,
+        eb_seen_slot: u64,
+        tx_known: &dyn Fn(&[u8; 32]) -> bool,
+    ) -> Result<(bool, Option<Vec<u8>>), NoVoteReason> {
+        // Predicate 1: LateEB.  The EB must have arrived before its
+        // voting window closes.  The phase machine already filters out
+        // most late arrivals (EligibleToVote only fires during Voting),
+        // but check explicitly for telemetry parity.
+        let voting_end = 3 * self.pipeline.delta_hdr + self.pipeline.vote_window;
+        if eb_seen_slot.saturating_sub(eb_slot) >= voting_end {
+            return Err(NoVoteReason::LateEB);
+        }
+
+        // Predicate 2/3: chain tip must be set, must reference this EB,
+        // and its header must have arrived within the equivocation
+        // cutoff (`eb_slot + Δhdr`).
+        let Some(rb_arrival) = self.chain_tip_ctx.rb_header_arrival_slot else {
+            return Err(NoVoteReason::WrongEB);
+        };
+        if self.chain_tip_ctx.eb_announcement.as_ref() != Some(eb_hash) {
+            return Err(NoVoteReason::WrongEB);
+        }
+        if rb_arrival >= eb_slot + self.pipeline.delta_hdr {
+            return Err(NoVoteReason::LateRBHeader);
+        }
+
+        // Predicate 4: MissingTX.  Only checked when we have a manifest
+        // for this EB — TX-by-references mode populates `eb_tx_hashes`
+        // on `on_eb_received`.  Inlined-TX EBs (no manifest) skip the
+        // check; the validator will reject the EB body if it references
+        // unknown TXs.
+        if let Some((_, tx_hashes)) = self.eb_tx_hashes.get(eb_hash) {
+            for h in tx_hashes {
+                if !tx_known(h) {
+                    return Err(NoVoteReason::MissingTX);
+                }
+            }
+        }
+
+        // Predicates passed — run the lottery.
         let emit_pv = self.voting_config.persistent_seats > 0;
         let n_npv = self.voting_config.committee_selection.non_persistent_voters();
         let npv_signature = if n_npv > 0 {
@@ -276,7 +422,7 @@ impl LeiosState {
         } else {
             None
         };
-        (emit_pv, npv_signature)
+        Ok((emit_pv, npv_signature))
     }
 
     // -- Network event handlers ---------------------------------------------
@@ -641,13 +787,30 @@ mod tests {
         Point::Specific { slot, hash: h(b) }
     }
 
+    /// Default "all txs known" callback: predicates ignore MissingTX
+    /// unless the test populates `eb_tx_hashes` and supplies its own.
+    fn tx_all(_: &[u8; 32]) -> bool {
+        true
+    }
+
+    /// Set chain-tip context that satisfies the LateRBHeader / WrongEB
+    /// predicates for an EB at `eb_slot` whose hash is `eb_hash`.
+    /// Arrival slot = `eb_slot - 1` (within `eb_slot + Δhdr` for Δhdr=1).
+    fn tip_for(state: &mut LeiosState, eb_slot: u64, eb_hash: [u8; 32]) {
+        state.set_chain_tip_context(ChainTipContext {
+            rb_header_arrival_slot: Some(eb_slot.saturating_sub(1)),
+            eb_announcement: Some(eb_hash),
+        });
+    }
+
     #[test]
     fn pv_vote_emitted_when_seated() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
-        state.on_slot(10);
+        state.on_slot(10, &tx_all);
         state.elections.announce(10, h(1));
+        tip_for(&mut state, 10, h(1));
         // Voting phase begins at elapsed=3 (3*delta_hdr).
-        let fx = state.on_slot(13);
+        let fx = state.on_slot(13, &tx_all);
         assert_eq!(fx.len(), 1);
         match &fx[0] {
             LeiosEffect::EmitVote {
@@ -669,9 +832,12 @@ mod tests {
     #[test]
     fn no_vote_when_no_seats_and_no_npv() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        state.on_slot(10);
+        state.on_slot(10, &tx_all);
         state.elections.announce(10, h(1));
-        let fx = state.on_slot(13);
+        tip_for(&mut state, 10, h(1));
+        let fx = state.on_slot(13, &tx_all);
+        // Lottery loss (no PV seat, no NPV win) is silent — no effect,
+        // no `mark_voted` so EligibleToVote can re-fire next slot.
         assert!(fx.is_empty());
         assert!(!state.elections.voted(&h(1)));
     }
@@ -698,9 +864,10 @@ mod tests {
             quorum_weight_fraction: 0.75,
         });
         let mut state = LeiosState::new("n0".into(), elections, voting, pipeline());
-        state.on_slot(10);
+        state.on_slot(10, &tx_all);
         state.elections.announce(10, h(1));
-        let fx = state.on_slot(13);
+        tip_for(&mut state, 10, h(1));
+        let fx = state.on_slot(13, &tx_all);
         assert_eq!(fx.len(), 1);
         match &fx[0] {
             LeiosEffect::EmitVote {
@@ -748,7 +915,7 @@ mod tests {
     #[test]
     fn quorum_emits_telemetry() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        state.on_slot(10);
+        state.on_slot(10, &tx_all);
         state.elections.announce(10, h(1));
         let body_a = ValidatedVote {
             voter_id: b"a",
@@ -769,7 +936,7 @@ mod tests {
         state.eb_tx_hashes.insert(h(1), (10, vec![h(0xAA)]));
         state.pending_eb_tx_fetches.insert(h(1), (10, BTreeMap::new()));
         // Lifespan = 3+5+5+10 = 23.  At elapsed=23 (slot 33), expired.
-        state.on_slot(33);
+        state.on_slot(33, &tx_all);
         assert!(state.eb_tx_hashes.is_empty());
         assert!(state.pending_eb_tx_fetches.is_empty());
     }
@@ -886,7 +1053,7 @@ mod tests {
     #[test]
     fn on_validated_eb_creates_election() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        state.on_slot(10);
+        state.on_slot(10, &tx_all);
         state.on_validated_eb(point(10, 1));
         assert_eq!(state.elections.count(), 1);
     }
@@ -984,10 +1151,10 @@ mod tests {
     #[test]
     fn election_expired_emits_telemetry() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        state.on_slot(10);
+        state.on_slot(10, &tx_all);
         state.elections.announce(10, h(1));
         // Lifespan = 3+5+5+10 = 23.  Tick past expiry.
-        let fx = state.on_slot(34);
+        let fx = state.on_slot(34, &tx_all);
         assert!(fx.iter().any(|e| matches!(
             e,
             LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::ElectionExpired { .. })
@@ -1012,7 +1179,7 @@ mod tests {
             quorum_weight_fraction: 0.75,
         });
         let mut state = LeiosState::new("n0".into(), elections, cfg(0), pipeline());
-        state.on_slot(10);
+        state.on_slot(10, &tx_all);
         state.elections.announce(10, h(1));
 
         let vote = ValidatedVote {
@@ -1026,5 +1193,113 @@ mod tests {
             e,
             LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::QuorumReached { .. })
         )));
+    }
+
+    // -- CIP-0164 voting predicates -----------------------------------------
+
+    /// Helper: assert that `fx` has exactly one effect, a NoVote with
+    /// the given reason for `eb_hash`.
+    fn assert_no_vote(fx: &[LeiosEffect], eb_hash: [u8; 32], expected: NoVoteReason) {
+        assert_eq!(fx.len(), 1, "expected one NoVote, got {fx:?}");
+        match &fx[0] {
+            LeiosEffect::NoVote {
+                eb_hash: h,
+                reason,
+                ..
+            } => {
+                assert_eq!(*h, eb_hash);
+                assert_eq!(*reason, expected);
+            }
+            other => panic!("expected NoVote, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn no_vote_wrong_eb_when_chain_tip_not_set() {
+        // Default ChainTipContext has no rb_header_arrival_slot — predicate
+        // returns WrongEB before any other check.
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        state.on_slot(10, &tx_all);
+        state.elections.announce(10, h(1));
+        let fx = state.on_slot(13, &tx_all);
+        assert_no_vote(&fx, h(1), NoVoteReason::WrongEB);
+        // Election is mark_voted to suppress repeat NoVote next slot.
+        assert!(state.elections.voted(&h(1)));
+    }
+
+    #[test]
+    fn no_vote_wrong_eb_when_chain_tip_announces_other_eb() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        state.on_slot(10, &tx_all);
+        state.elections.announce(10, h(1));
+        // Chain tip RB references h(2), not the EB we're voting on.
+        state.set_chain_tip_context(ChainTipContext {
+            rb_header_arrival_slot: Some(10),
+            eb_announcement: Some(h(2)),
+        });
+        let fx = state.on_slot(13, &tx_all);
+        assert_no_vote(&fx, h(1), NoVoteReason::WrongEB);
+    }
+
+    #[test]
+    fn no_vote_late_rb_header() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        state.on_slot(10, &tx_all);
+        state.elections.announce(10, h(1));
+        // delta_hdr=1, so RB header must arrive before slot 11.  Set
+        // arrival to slot 11 — exactly at the cutoff, predicate fails.
+        state.set_chain_tip_context(ChainTipContext {
+            rb_header_arrival_slot: Some(11),
+            eb_announcement: Some(h(1)),
+        });
+        let fx = state.on_slot(13, &tx_all);
+        assert_no_vote(&fx, h(1), NoVoteReason::LateRBHeader);
+    }
+
+    #[test]
+    fn no_vote_missing_tx() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        state.on_slot(10, &tx_all);
+        state.elections.announce(10, h(1));
+        tip_for(&mut state, 10, h(1));
+        // Manifest references hashes 0xA0, 0xA1.  tx_known returns false
+        // for everything → predicate fires on the first one.
+        state
+            .eb_tx_hashes
+            .insert(h(1), (10, vec![h(0xA0), h(0xA1)]));
+        let no_txs = |_: &[u8; 32]| false;
+        let fx = state.on_slot(13, &no_txs);
+        assert_no_vote(&fx, h(1), NoVoteReason::MissingTX);
+    }
+
+    #[test]
+    fn no_vote_late_eb() {
+        // Construct an EbElection in Voting phase with a seen_slot far
+        // past the voting window. Direct field manipulation is the
+        // cleanest way to set up the late-arrival corner case — the
+        // public `announce` path can't reach it because the phase
+        // machine would already filter the EB out.
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        state.on_slot(10, &tx_all);
+        state.elections.announce(10, h(1));
+        tip_for(&mut state, 10, h(1));
+        // voting_end = 3·1 + 5 = 8. Setting seen_slot = announced + 8 trips LateEB.
+        state.elections.election_mut(&h(1)).unwrap().seen_slot = 18;
+        let fx = state.on_slot(13, &tx_all);
+        assert_no_vote(&fx, h(1), NoVoteReason::LateEB);
+    }
+
+    #[test]
+    fn no_vote_repeat_suppressed_by_mark_voted() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        state.on_slot(10, &tx_all);
+        state.elections.announce(10, h(1));
+        // No chain tip → first slot in Voting fires NoVote(WrongEB).
+        let fx_first = state.on_slot(13, &tx_all);
+        assert_eq!(fx_first.len(), 1);
+        assert!(matches!(fx_first[0], LeiosEffect::NoVote { .. }));
+        // Subsequent slot in Voting: mark_voted suppresses.
+        let fx_second = state.on_slot(14, &tx_all);
+        assert!(fx_second.is_empty());
     }
 }

@@ -13,6 +13,7 @@ use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::{mpsc, watch};
 
 use con_rs::chain_tree::ChainTreeEntry;
+use con_rs::leios::ChainTipContext;
 use crate::config::{CommitteeSelection, DynamicConfig, StakeEntry};
 use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerOutcome, Validator};
@@ -72,7 +73,23 @@ impl Consensus {
 
     /// Notify the Leios layer of a new slot tick.
     pub async fn on_slot(&mut self, slot: u64) {
+        // Bump Praos's slot first so subsequent header-arrival paths
+        // (TipAdvanced, BlockReceived, register_self_produced) stamp
+        // the right slot on `note_header_first_seen`.  Then refresh the
+        // chain-tip context Leios uses for the CIP-0164 voting
+        // predicates before driving elections forward.
+        self.praos.set_current_slot(slot);
+        self.refresh_chain_tip_ctx();
         self.leios.on_slot(slot).await;
+    }
+
+    fn refresh_chain_tip_ctx(&mut self) {
+        let arrival = self.praos.adopted_tip_header_arrival_slot();
+        let eb_announcement = self.praos.adopted_tip_announced_eb();
+        self.leios.set_chain_tip_context(ChainTipContext {
+            rb_header_arrival_slot: arrival,
+            eb_announcement,
+        });
     }
 
     /// Register a self-produced ranking block with Praos consensus.

@@ -108,6 +108,11 @@ pub enum NodeEvent {
         voted_weight: u64,
         voters: usize,
     },
+    LeiosNoVote {
+        node: String,
+        eb_slot: u64,
+        reason: String,
+    },
 }
 
 // ---------------------------------------------------------------------------

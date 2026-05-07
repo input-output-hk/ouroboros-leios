@@ -13,7 +13,7 @@ use std::time::Instant;
 
 use con_rs::elections::{Elections, ElectionsConfig};
 use con_rs::leios::{
-    LeiosEffect, LeiosState, LeiosTelemetryEvent, ValidatedVote, VotingConfig,
+    ChainTipContext, LeiosEffect, LeiosState, LeiosTelemetryEvent, ValidatedVote, VotingConfig,
 };
 pub use con_rs::leios::EbTxMatchOutcome;
 #[cfg(test)]
@@ -134,9 +134,24 @@ impl LeiosConsensus {
         self.state.has_certified_eb()
     }
 
+    /// Update the adopted-chain-tip metadata used by the CIP-0164
+    /// voting predicates (`LateRBHeader`, `WrongEB`).  The Praos
+    /// adapter calls this whenever a new RB is adopted as the chain
+    /// tip — passing the slot at which the RB header arrived locally
+    /// and the EB hash (if any) the header announces.
+    pub fn set_chain_tip_context(&mut self, ctx: ChainTipContext) {
+        self.state.set_chain_tip_context(ctx);
+    }
+
     /// Advance slot tracking, drive elections, dispatch any effects.
     pub async fn on_slot(&mut self, slot: u64) {
-        let fx = self.state.on_slot(slot);
+        // Snapshot the mempool's tx-id set so the predicate-checking
+        // path inside `LeiosState::on_slot` can answer "is this EB's
+        // referenced TX known locally?" for the CIP-0164 MissingTX
+        // check without holding the mempool lock across the call.
+        let known = self.mempool.lock().unwrap().current_tx_ids();
+        let tx_known = |h: &[u8; 32]| known.contains(h.as_slice());
+        let fx = self.state.on_slot(slot, &tx_known);
         self.dispatch(fx).await;
     }
 
@@ -317,6 +332,15 @@ impl LeiosConsensus {
                 } => {
                     self.emit_vote(eb_slot, eb_hash, emit_pv, npv_signature)
                         .await;
+                }
+                LeiosEffect::NoVote {
+                    eb_slot, reason, ..
+                } => {
+                    self.pending_telemetry.push(NodeEvent::LeiosNoVote {
+                        node: self.state.node_id.clone(),
+                        eb_slot,
+                        reason: format!("{reason:?}"),
+                    });
                 }
                 LeiosEffect::ValidateEb { point } => {
                     self.validator
@@ -684,6 +708,12 @@ mod tests {
 
         leios.on_slot(0).await;
         leios.on_validated_eb(point(0));
+        // Make the chain-tip context match the EB so the CIP-0164
+        // predicates (LateRBHeader, WrongEB) accept this vote.
+        leios.set_chain_tip_context(ChainTipContext {
+            rb_header_arrival_slot: Some(0),
+            eb_announcement: Some(point_hash(0)),
+        });
         // No vote yet — still in EquivocationCheck.
         assert!(!leios.election_voted(&point_hash(0)));
 
@@ -709,6 +739,10 @@ mod tests {
 
         leios.on_slot(0).await;
         leios.on_validated_eb(point(0));
+        leios.set_chain_tip_context(ChainTipContext {
+            rb_header_arrival_slot: Some(0),
+            eb_announcement: Some(point_hash(0)),
+        });
 
         // First slot in Voting → vote produced.
         leios.on_slot(3).await;

@@ -92,6 +92,10 @@ pub struct CachedBlock {
     pub prev_hash: Option<[u8; 32]>,
     pub header: Vec<u8>,
     pub body: Vec<u8>,
+    /// EB hash this block's header announces (CIP-0164 Leios extension).
+    /// `None` for opaque or pre-Leios headers; the I/O wrapper sets this
+    /// when it parses the header.
+    pub announced_eb_hash: Option<[u8; 32]>,
 }
 
 // ---------------------------------------------------------------------------
@@ -177,6 +181,15 @@ pub struct PraosState {
     pub queued_validator_tip: Option<[u8; 32]>,
     /// Hash of the last block the validator has actually `Applied`.
     pub last_validated_tip: Option<[u8; 32]>,
+
+    /// Slot at which this node first observed each header hash.
+    /// Populated by [`PraosState::note_header_first_seen`] from any
+    /// arrival path the I/O wrapper recognises as "header seen for the
+    /// first time" (peer tip announcement, fetched body, self-produced).
+    /// Used by [`PraosState::adopted_tip_header_arrival_slot`] for the
+    /// CIP-0164 `LateRBHeader` voting predicate.  Pruned alongside
+    /// `block_cache` on the k-prune path.
+    pub header_first_seen: BTreeMap<[u8; 32], u64>,
 }
 
 impl PraosState {
@@ -195,6 +208,7 @@ impl PraosState {
             in_flight_validation: BTreeSet::new(),
             queued_validator_tip: None,
             last_validated_tip: None,
+            header_first_seen: BTreeMap::new(),
         }
     }
 
@@ -223,6 +237,42 @@ impl PraosState {
         self.chain_tree
             .best_tip()
             .map(|(point, block_no)| (point.clone(), block_no))
+    }
+
+    /// Slot at which the adopted tip RB's header was first observed
+    /// locally.  Falls back to the RB's own slot if the I/O wrapper
+    /// never called [`note_header_first_seen`] for this hash — that's a
+    /// conservative best-case ("header can't have arrived before its
+    /// own slot") and is what the CIP-0164 `LateRBHeader` voting
+    /// predicate consults via the chain-tip context.
+    pub fn adopted_tip_header_arrival_slot(&self) -> Option<u64> {
+        let hash = self.adopted_tip_hash?;
+        if let Some(slot) = self.header_first_seen.get(&hash) {
+            return Some(*slot);
+        }
+        match self.chain_tree.point(&hash)? {
+            Point::Specific { slot, .. } => Some(*slot),
+            Point::Origin => None,
+        }
+    }
+
+    /// EB hash announced by the adopted tip RB header, if any.  The
+    /// I/O wrapper sets this when it parses a header into
+    /// [`ParsedHeaderInfo`]; pre-Leios or opaque-header adoptions
+    /// return `None`.
+    pub fn adopted_tip_announced_eb(&self) -> Option<[u8; 32]> {
+        self.block_cache
+            .get(&self.adopted_tip_hash?)
+            .and_then(|cb| cb.announced_eb_hash)
+    }
+
+    /// Record that this node first observed `header_hash` at slot
+    /// `current_slot`.  Idempotent — only the first call for a given
+    /// hash takes effect, so callers can invoke it from any path that
+    /// surfaces a header (peer tip announcement, fetched body, self-
+    /// produced) without coordinating among them.
+    pub fn note_header_first_seen(&mut self, header_hash: [u8; 32], current_slot: u64) {
+        self.header_first_seen.entry(header_hash).or_insert(current_slot);
     }
 
     /// Snapshot the recent chain tree for UI display.
@@ -360,8 +410,13 @@ impl PraosState {
             return fx;
         }
         let header_was_parsed = parsed_header.is_some();
-        let (block_no, slot, prev_hash) = match parsed_header {
-            Some(info) => (info.block_number, info.slot, info.prev_hash),
+        let (block_no, slot, prev_hash, announced_eb_hash) = match parsed_header {
+            Some(info) => (
+                info.block_number,
+                info.slot,
+                info.prev_hash,
+                info.announced_eb_hash,
+            ),
             None => (
                 self.chain_tree.block_number(&hash).unwrap_or(0),
                 match &point {
@@ -369,6 +424,7 @@ impl PraosState {
                     _ => 0,
                 },
                 self.chain_tree.prev_hash(&hash),
+                None,
             ),
         };
         // Insert into chain_tree only when we have a real block_no
@@ -386,6 +442,7 @@ impl PraosState {
                 prev_hash,
                 header: header_bytes,
                 body: body_bytes,
+                announced_eb_hash,
             },
         );
         info!(
@@ -485,6 +542,7 @@ impl PraosState {
                         prev_hash: info.prev_hash,
                         header: header_bytes,
                         body: body_bytes.clone(),
+                        announced_eb_hash: info.announced_eb_hash,
                     });
                 self.submit_for_validation_internal(point, body_bytes, info.prev_hash, &mut fx);
                 self.try_switch_and_execute_internal(hash, &mut fx);
@@ -543,6 +601,8 @@ impl PraosState {
                     self.chain_tree.prune_below(min);
                     self.block_cache.retain(|_, cb| cb.block_no >= min);
                     self.validated.retain(|h| self.block_cache.contains_key(h));
+                    self.header_first_seen
+                        .retain(|h, _| self.block_cache.contains_key(h));
                 }
             }
         }
@@ -1182,11 +1242,13 @@ impl PraosState {
 
 /// Header metadata extracted from a wire-format header by the I/O
 /// wrapper.  con-rs never parses headers itself.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ParsedHeaderInfo {
     pub block_number: u64,
     pub slot: u64,
     pub prev_hash: Option<[u8; 32]>,
+    /// EB hash this header announces, if any (CIP-0164 Leios extension).
+    pub announced_eb_hash: Option<[u8; 32]>,
 }
 
 #[cfg(test)]
@@ -1206,6 +1268,7 @@ mod tests {
 
     fn hi(block_number: u64, slot: u64, prev_seed: Option<u8>) -> ParsedHeaderInfo {
         ParsedHeaderInfo {
+            announced_eb_hash: None,
             block_number,
             slot,
             prev_hash: prev_seed.map(h),
@@ -1240,6 +1303,7 @@ mod tests {
                 prev_hash,
                 header: vec![],
                 body: vec![],
+                announced_eb_hash: None,
             },
         );
         state.validated.insert(hash);
@@ -1374,6 +1438,53 @@ mod tests {
     }
 
     #[test]
+    fn adopted_tip_accessors_track_announced_eb() {
+        let mut s = fresh();
+        let mut info = hi(1, 100, None);
+        info.announced_eb_hash = Some(h(0xEB));
+        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(info));
+        // Without note_header_first_seen, the accessor falls back to
+        // the RB's own slot.
+        assert_eq!(s.adopted_tip_header_arrival_slot(), Some(100));
+        assert_eq!(s.adopted_tip_announced_eb(), Some(h(0xEB)));
+    }
+
+    #[test]
+    fn adopted_tip_accessors_none_when_no_tip() {
+        let s = fresh();
+        assert_eq!(s.adopted_tip_header_arrival_slot(), None);
+        assert_eq!(s.adopted_tip_announced_eb(), None);
+    }
+
+    #[test]
+    fn adopted_tip_announced_eb_none_for_pre_leios_header() {
+        let mut s = fresh();
+        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)));
+        // hi() defaults announced_eb_hash to None.
+        assert_eq!(s.adopted_tip_announced_eb(), None);
+    }
+
+    #[test]
+    fn note_header_first_seen_is_used_for_arrival() {
+        let mut s = fresh();
+        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)));
+        // Wrapper observed the header at slot 102 (e.g., body arrived
+        // 2 slots after the RB's own slot via fetch).
+        s.note_header_first_seen(h(1), 102);
+        assert_eq!(s.adopted_tip_header_arrival_slot(), Some(102));
+    }
+
+    #[test]
+    fn note_header_first_seen_is_idempotent() {
+        let mut s = fresh();
+        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)));
+        s.note_header_first_seen(h(1), 105);
+        // Subsequent calls don't overwrite — only the first arrival counts.
+        s.note_header_first_seen(h(1), 200);
+        assert_eq!(s.adopted_tip_header_arrival_slot(), Some(105));
+    }
+
+    #[test]
     fn register_self_produced_origin_point_is_noop() {
         let mut s = fresh();
         let fx =
@@ -1418,6 +1529,7 @@ mod tests {
                 prev_hash: Some(h(3)),
                 header: vec![],
                 body: vec![],
+                announced_eb_hash: None,
             },
         );
         s.adopted_tip_hash = Some(h(4));
@@ -1652,6 +1764,7 @@ mod tests {
                 prev_hash: Some(h(1)),
                 header: vec![],
                 body: vec![],
+                announced_eb_hash: None,
             },
         );
         let walk = s.walk_ancestors_hybrid(h(2));

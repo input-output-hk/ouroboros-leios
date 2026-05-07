@@ -83,7 +83,6 @@ pub(crate) fn hex_prefix(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Instant;
 
     use super::super::pipeline::PipelinePhase;
 
@@ -98,7 +97,7 @@ mod tests {
             EbElection {
                 announced_slot: slot,
                 phase: PipelinePhase::Voting,
-                validated_at: Instant::now(),
+                seen_slot: slot,
                 voted: false,
                 voter_weights: BTreeMap::new(),
                 quorum_reached: false,

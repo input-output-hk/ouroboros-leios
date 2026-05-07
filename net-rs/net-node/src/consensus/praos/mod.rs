@@ -34,6 +34,11 @@ pub struct PraosConsensus {
     pub(crate) state: PraosState,
     pub(crate) commands: mpsc::Sender<NetworkCommand>,
     pub(crate) validator: Validator,
+    /// Latest slot tick the wrapper has been informed of.  Used to
+    /// stamp first-seen-at-slot metadata on incoming headers so the
+    /// CIP-0164 `LateRBHeader` voting predicate can run with real
+    /// arrival times instead of best-case fallbacks.
+    pub(crate) current_slot: u64,
 }
 
 impl PraosConsensus {
@@ -47,7 +52,16 @@ impl PraosConsensus {
             state: PraosState::new(node_id, security_param_k),
             commands,
             validator,
+            current_slot: 0,
         }
+    }
+
+    /// Tell the wrapper which slot it's currently in.  The Consensus
+    /// facade calls this from its own `on_slot` before forwarding to
+    /// Leios; subsequent header-arrival paths use this value for
+    /// `note_header_first_seen` stamping.
+    pub fn set_current_slot(&mut self, slot: u64) {
+        self.current_slot = slot;
     }
 
     /// Drain effects to the I/O sinks.  Network-side effects go to
@@ -121,6 +135,7 @@ impl PraosConsensus {
             block_number: i.block_number,
             slot: i.slot,
             prev_hash: i.prev_hash,
+            announced_eb_hash: i.announced_eb.map(|(hash, _size)| hash),
         })
     }
 
@@ -133,6 +148,9 @@ impl PraosConsensus {
         body: &BlockBody,
     ) {
         let parsed = Self::parse_header(header);
+        if let Point::Specific { hash, .. } = point {
+            self.state.note_header_first_seen(*hash, self.current_slot);
+        }
         let fx = self.state.register_self_produced(
             point.clone(),
             header.raw.clone(),
@@ -165,6 +183,7 @@ impl PraosConsensus {
                                 _ => return false,
                             },
                         };
+                        self.state.note_header_first_seen(hash, self.current_slot);
                         self.state.on_tip_advanced(
                             *peer_id,
                             tip.point.clone(),
@@ -187,6 +206,9 @@ impl PraosConsensus {
                     .header()
                     .unwrap_or_else(|| WrappedHeader::opaque(Vec::new()));
                 let parsed = Self::parse_header(&header);
+                if let Point::Specific { hash, .. } = point {
+                    self.state.note_header_first_seen(*hash, self.current_slot);
+                }
                 let fx = self.state.on_block_received(
                     point.clone(),
                     header.raw.clone(),
@@ -272,6 +294,18 @@ impl PraosConsensus {
 
     pub fn next_block_number(&self) -> u64 {
         self.state.next_block_number()
+    }
+
+    /// Slot at which the adopted tip header was first observed
+    /// locally.  Used by the Consensus facade to populate the chain-
+    /// tip context for the Leios `LateRBHeader` voting predicate.
+    pub fn adopted_tip_header_arrival_slot(&self) -> Option<u64> {
+        self.state.adopted_tip_header_arrival_slot()
+    }
+
+    /// EB hash announced by the adopted tip header, if any.
+    pub fn adopted_tip_announced_eb(&self) -> Option<[u8; 32]> {
+        self.state.adopted_tip_announced_eb()
     }
 }
 
@@ -953,6 +987,7 @@ mod tests {
             body: Vec::new(),
             block_no,
             prev_hash,
+            announced_eb_hash: None,
         }
     }
 
