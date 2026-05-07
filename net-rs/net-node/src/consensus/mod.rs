@@ -13,6 +13,7 @@ use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::{mpsc, watch};
 
 use con_rs::chain_tree::ChainTreeEntry;
+use con_rs::fetch::PeerRttCache;
 use con_rs::leios::ChainTipContext;
 use crate::config::{CommitteeSelection, DynamicConfig, StakeEntry};
 use crate::telemetry::NodeEvent;
@@ -45,14 +46,16 @@ impl Consensus {
         committee_seed: u64,
         rng_seed: Option<u64>,
         dyn_config: watch::Receiver<DynamicConfig>,
+        rtt: PeerRttCache,
     ) -> Self {
-        let praos = PraosConsensus::new(
+        let mut praos = PraosConsensus::new(
             node_id.clone(),
             commands.clone(),
             validator.clone(),
             security_param_k,
         );
-        let leios = LeiosConsensus::new(
+        praos.set_rtt(rtt.clone());
+        let mut leios = LeiosConsensus::new(
             node_id,
             commands,
             validator,
@@ -68,6 +71,7 @@ impl Consensus {
             rng_seed,
             dyn_config,
         );
+        leios.set_rtt(rtt);
         Self { praos, leios }
     }
 

@@ -62,7 +62,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let tx_body_resolver: std::sync::Arc<dyn net_core::store::leios_store::TxBodyResolver> =
         std::sync::Arc::new(mempool::MempoolTxBodyResolver::new(mempool.clone()));
 
-    let mut handle = network::start(&config, Some(tx_body_resolver)).await?;
+    // Shared per-peer RTT cache.  The coordinator's keepalive task
+    // writes measurements via the observer callback below; the
+    // consensus state machines read at fetch-decision time.
+    let rtt_cache = con_rs::fetch::PeerRttCache::new();
+    let peer_rtt_observer: net_core::multi_peer::PeerRttObserver = {
+        let cache = rtt_cache.clone();
+        std::sync::Arc::new(move |pid, rtt| {
+            let con_pid = con_rs::peer::PeerId(pid.0);
+            match rtt {
+                Some(d) => cache.set(con_pid, d),
+                None => cache.forget(con_pid),
+            }
+        })
+    };
+
+    let mut handle = network::start(&config, Some(tx_body_resolver), Some(peer_rtt_observer)).await?;
     let commands = handle.commands.clone();
 
     // Dynamic config watch channel (hot-reloadable parameters).
@@ -116,6 +131,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         config.genesis_time_unix,
         config.seed,
         dyn_rx.clone(),
+        rtt_cache,
     );
 
     // Transaction validator (validates received txs before mempool entry).

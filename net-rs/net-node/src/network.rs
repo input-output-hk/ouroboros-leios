@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use net_core::multi_peer::types::NetworkCommand;
-use net_core::multi_peer::{spawn_coordinator, CoordinatorConfig, CoordinatorHandle};
+use net_core::multi_peer::{spawn_coordinator, CoordinatorConfig, CoordinatorHandle, PeerRttObserver};
 use net_core::mux::scheduler::SchedulerType;
 use net_core::store::leios_store::TxBodyResolver;
 
@@ -32,6 +32,7 @@ fn parse_scheduler(name: &str) -> Result<SchedulerType, Box<dyn std::error::Erro
 pub async fn start(
     config: &NodeConfig,
     tx_body_resolver: Option<Arc<dyn TxBodyResolver>>,
+    peer_rtt_observer: Option<PeerRttObserver>,
 ) -> Result<CoordinatorHandle, Box<dyn std::error::Error + Send + Sync>> {
     // Build per-peer delay map from config.
     let peer_delays: HashMap<String, Duration> = config
@@ -61,6 +62,7 @@ pub async fn start(
         max_connections_per_ip: config.max_connections_per_ip,
         peer_delays,
         tx_body_resolver,
+        peer_rtt_observer,
     };
 
     let handle = spawn_coordinator(coordinator_config);

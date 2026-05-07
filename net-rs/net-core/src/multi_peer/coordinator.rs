@@ -403,6 +403,7 @@ impl Coordinator {
             }
 
             PeerEvent::LatencyMeasured { rtt } => {
+                let mut updated = None;
                 if let Some(peer) = self.peers.get_mut(&peer_id) {
                     // Accepted peers (ip_guard.is_some()) don't have a
                     // configured inbound_delay — skip their RTT to avoid
@@ -411,8 +412,13 @@ impl Coordinator {
                     if peer.ip_guard.is_none() {
                         // Add the simulated inbound delay so RTT reflects
                         // configured link latency (real TCP on localhost is ~0).
-                        peer.rtt = Some(rtt + peer.inbound_delay);
+                        let combined = rtt + peer.inbound_delay;
+                        peer.rtt = Some(combined);
+                        updated = Some(combined);
                     }
+                }
+                if let (Some(rtt), Some(obs)) = (updated, &self.config.peer_rtt_observer) {
+                    obs(peer_id, Some(rtt));
                 }
             }
 
@@ -735,6 +741,9 @@ impl Coordinator {
             // Per-peer offer / fetch cleanup lives in con-rs's
             // CandidateTracker now; the consensus layer prunes on the
             // PeerDisconnected event.
+            if let Some(obs) = &self.config.peer_rtt_observer {
+                obs(peer_id, None);
+            }
         }
     }
 

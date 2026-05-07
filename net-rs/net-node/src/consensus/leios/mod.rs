@@ -141,6 +141,14 @@ impl LeiosConsensus {
         self.state.set_chain_tip_context(ctx);
     }
 
+    /// Replace the per-peer RTT oracle the EB / EB-tx / vote fetch
+    /// policies consult.  The Consensus facade calls this with the
+    /// shared [`con_rs::fetch::PeerRttCache`] the coordinator's
+    /// `peer_rtt_observer` callback writes into.
+    pub fn set_rtt(&mut self, rtt: con_rs::fetch::PeerRttCache) {
+        self.state.set_rtt(Box::new(rtt));
+    }
+
     /// Advance slot tracking, drive elections, dispatch any effects.
     pub async fn on_slot(&mut self, slot: u64) {
         // Snapshot the mempool's tx-id set so the predicate-checking

@@ -32,7 +32,15 @@ pub use types::{NetworkCommand, NetworkEvent};
 
 use crate::mux::scheduler::{SchedulerType, TrafficClass};
 use crate::mux::ProtocolId;
+use crate::peer::PeerId;
 use crate::store::leios_store::TxBodyResolver;
+
+/// Per-peer RTT measurement observer.  Invoked from the coordinator
+/// when a `LatencyMeasured` event arrives (with `Some(rtt)`) and on
+/// peer disconnect (with `None`).  Net-rs wires this to a shared
+/// `con_rs::fetch::PeerRttCache` so the consensus state machines'
+/// fetch policies can rank candidates by real measured latency.
+pub type PeerRttObserver = Arc<dyn Fn(PeerId, Option<Duration>) + Send + Sync>;
 
 /// Configuration for the coordinator.
 #[derive(Clone)]
@@ -76,6 +84,10 @@ pub struct CoordinatorConfig {
     /// be served from the application's mempool rather than a duplicate
     /// `LeiosStore::block_txs`. None = receivers cannot re-serve EB txs.
     pub tx_body_resolver: Option<Arc<dyn TxBodyResolver>>,
+    /// Hook invoked on every per-peer RTT measurement.  See
+    /// [`PeerRttObserver`].  None = measurements are recorded only in
+    /// the coordinator's internal `PeerState.rtt` (legacy behaviour).
+    pub peer_rtt_observer: Option<PeerRttObserver>,
 }
 
 impl Default for CoordinatorConfig {
@@ -97,6 +109,7 @@ impl Default for CoordinatorConfig {
             max_connections_per_ip: 3,
             peer_delays: HashMap::new(),
             tx_body_resolver: None,
+            peer_rtt_observer: None,
         }
     }
 }

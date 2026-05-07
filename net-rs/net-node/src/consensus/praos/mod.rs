@@ -64,6 +64,14 @@ impl PraosConsensus {
         self.current_slot = slot;
     }
 
+    /// Replace the per-peer RTT oracle the BlockFetchPolicy consults.
+    /// The Consensus facade calls this with the shared
+    /// [`con_rs::fetch::PeerRttCache`] that the coordinator's
+    /// `peer_rtt_observer` callback writes into.
+    pub fn set_rtt(&mut self, rtt: con_rs::fetch::PeerRttCache) {
+        self.state.set_rtt(Box::new(rtt));
+    }
+
     /// Drain effects to the I/O sinks.  Network-side effects go to
     /// `commands`; validator effects go to `validator.submit`.  Header
     /// and body bytes are rehydrated into the wire types here; the

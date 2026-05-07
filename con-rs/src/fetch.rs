@@ -17,6 +17,7 @@
 //! handle to construct in tests.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use crate::peer::PeerId;
@@ -51,6 +52,54 @@ pub struct UniformRtt(pub Duration);
 impl PeerRtt for UniformRtt {
     fn rtt(&self, _peer: PeerId) -> Option<Duration> {
         Some(self.0)
+    }
+}
+
+/// Concurrent-friendly RTT oracle backed by a shared map.
+///
+/// The wrapper's network actor writes per-peer measurements via
+/// [`Self::set`] (typically from a KeepAlive ping handler); consensus
+/// state machines read at fetch-decision time via the [`PeerRtt`]
+/// impl.  Cheap to clone — internally an `Arc` — so the same cache
+/// can back both writer and readers.
+#[derive(Clone, Default)]
+pub struct PeerRttCache {
+    inner: Arc<RwLock<BTreeMap<PeerId, Duration>>>,
+}
+
+impl PeerRttCache {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a measurement.
+    pub fn set(&self, peer: PeerId, rtt: Duration) {
+        if let Ok(mut g) = self.inner.write() {
+            g.insert(peer, rtt);
+        }
+    }
+
+    /// Drop a peer's measurement on disconnect.
+    pub fn forget(&self, peer: PeerId) {
+        if let Ok(mut g) = self.inner.write() {
+            g.remove(&peer);
+        }
+    }
+
+    /// Number of peers with a recorded measurement.  Useful for tests
+    /// and for telemetry; not part of the [`PeerRtt`] read surface.
+    pub fn len(&self) -> usize {
+        self.inner.read().map(|g| g.len()).unwrap_or(0)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl PeerRtt for PeerRttCache {
+    fn rtt(&self, peer: PeerId) -> Option<Duration> {
+        self.inner.read().ok()?.get(&peer).copied()
     }
 }
 
@@ -601,5 +650,48 @@ mod tests {
         assert_eq!(t.eb_candidates(&pt(15, 1)), vec![pid(2)]);
         assert!(t.vote_candidates(&(5, b"a".to_vec())).is_empty());
         assert_eq!(t.vote_candidates(&(15, b"b".to_vec())), vec![pid(2)]);
+    }
+
+    // -- PeerRttCache -------------------------------------------------------
+
+    #[test]
+    fn rtt_cache_round_trip() {
+        let cache = PeerRttCache::new();
+        cache.set(pid(1), Duration::from_millis(50));
+        cache.set(pid(2), Duration::from_millis(20));
+        assert_eq!(cache.rtt(pid(1)), Some(Duration::from_millis(50)));
+        assert_eq!(cache.rtt(pid(2)), Some(Duration::from_millis(20)));
+        assert_eq!(cache.rtt(pid(3)), None);
+        assert_eq!(cache.len(), 2);
+    }
+
+    #[test]
+    fn rtt_cache_forget_removes_entry() {
+        let cache = PeerRttCache::new();
+        cache.set(pid(1), Duration::from_millis(10));
+        cache.forget(pid(1));
+        assert_eq!(cache.rtt(pid(1)), None);
+        assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn rtt_cache_clone_shares_storage() {
+        let a = PeerRttCache::new();
+        let b = a.clone();
+        a.set(pid(1), Duration::from_millis(7));
+        assert_eq!(b.rtt(pid(1)), Some(Duration::from_millis(7)));
+    }
+
+    #[test]
+    fn rtt_cache_drives_lowest_rtt_first() {
+        // Sanity: a populated cache makes LowestRttFirst rank by real RTT.
+        let cache = PeerRttCache::new();
+        cache.set(pid(1), Duration::from_millis(50));
+        cache.set(pid(2), Duration::from_millis(10));
+        cache.set(pid(3), Duration::from_millis(30));
+        let policy = LowestRttFirst;
+        let picked =
+            BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2), pid(3)], &cache);
+        assert_eq!(picked, vec![pid(2)]);
     }
 }
