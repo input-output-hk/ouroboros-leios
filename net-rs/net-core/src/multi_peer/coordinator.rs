@@ -5,10 +5,87 @@
 //! all peer tasks via a shared fan-in channel and sends commands to
 //! individual peers via per-peer channels.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+/// Dedup state for Leios offer forwarding.
+///
+/// Each peer typically re-announces still-relevant EBs / TXs / votes
+/// in its outgoing notify loop, so without dedup the coordinator would
+/// emit a fresh `NetworkEvent` to the application for every replay.
+/// The application's `network_events` channel is bounded (capacity 64
+/// today) and `coordinator.emit_event().await` blocks when full —
+/// re-announce floods can wedge the coordinator and back-pressure
+/// cascade into per-protocol mux ingress overflow.
+///
+/// Dedup is keyed on `(peer_id, resource)` so each peer's first offer
+/// of a given resource still flows through (consensus's
+/// `CandidateTracker` needs to see all peers that have offered for
+/// `BroadcastN` / `LowestRttFirst` to rank candidates).  Bounded by
+/// slot window — entries below `max_slot - window` are pruned.
+#[derive(Default)]
+struct OfferDedup {
+    /// `(peer, slot, eb_hash)` already forwarded as `LeiosBlockOffered`.
+    seen_eb: BTreeSet<(PeerId, u64, [u8; 32])>,
+    /// `(peer, slot, eb_hash)` already forwarded as `LeiosBlockTxsOffered`.
+    seen_eb_txs: BTreeSet<(PeerId, u64, [u8; 32])>,
+    /// `(peer, slot, voter_id)` already forwarded as part of
+    /// `LeiosVotesOffered`.  Per-vote because a single offer event
+    /// carries a batch.
+    seen_votes: BTreeSet<(PeerId, u64, Vec<u8>)>,
+    max_slot: u64,
+    window: u64,
+}
+
+impl OfferDedup {
+    fn new(window: u64) -> Self {
+        Self {
+            window,
+            ..Default::default()
+        }
+    }
+
+    fn update_slot(&mut self, slot: u64) {
+        if slot > self.max_slot {
+            self.max_slot = slot;
+            let cutoff = slot.saturating_sub(self.window);
+            self.seen_eb.retain(|(_, s, _)| *s >= cutoff);
+            self.seen_eb_txs.retain(|(_, s, _)| *s >= cutoff);
+            self.seen_votes.retain(|(_, s, _)| *s >= cutoff);
+        }
+    }
+
+    /// Returns `true` if `(peer, slot, hash)` is a fresh EB offer that
+    /// should be forwarded; `false` if already seen.
+    fn fresh_eb(&mut self, peer: PeerId, slot: u64, hash: [u8; 32]) -> bool {
+        self.update_slot(slot);
+        self.seen_eb.insert((peer, slot, hash))
+    }
+
+    fn fresh_eb_txs(&mut self, peer: PeerId, slot: u64, hash: [u8; 32]) -> bool {
+        self.update_slot(slot);
+        self.seen_eb_txs.insert((peer, slot, hash))
+    }
+
+    /// Filter a vote batch to fresh-for-this-peer entries.  Updates
+    /// internal state to record forwarding.
+    fn fresh_votes(
+        &mut self,
+        peer: PeerId,
+        votes: Vec<(u64, Vec<u8>)>,
+    ) -> Vec<(u64, Vec<u8>)> {
+        let mut out = Vec::with_capacity(votes.len());
+        for (slot, voter_id) in votes {
+            self.update_slot(slot);
+            if self.seen_votes.insert((peer, slot, voter_id.clone())) {
+                out.push((slot, voter_id));
+            }
+        }
+        out
+    }
+}
 
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -129,6 +206,11 @@ struct Coordinator {
     /// full (treated as a broken peer task). Drained at the bottom of the
     /// main loop body so removal doesn't happen mid-handler.
     pending_removals: Vec<(PeerId, String)>,
+    /// Per-(peer, resource) dedup for Leios offer events.  Without this,
+    /// each peer's notify-loop replay floods `network_events`; the
+    /// coordinator's `.send().await` blocks; per-protocol mux ingress
+    /// channels back up; the mux tears down with `IngressOverflow`.
+    leios_offer_dedup: OfferDedup,
 }
 
 impl Coordinator {
@@ -141,6 +223,7 @@ impl Coordinator {
         chain_store: Arc<ChainStore>,
         leios_store: Option<Arc<LeiosStore>>,
     ) -> Self {
+        let dedup_window = config.leios_dedup_window;
         Self {
             config,
             peers: HashMap::new(),
@@ -159,6 +242,7 @@ impl Coordinator {
             ip_counts: Arc::new(Mutex::new(HashMap::new())),
             peer_provider: Arc::new(|_| Vec::new()),
             pending_removals: Vec::new(),
+            leios_offer_dedup: OfferDedup::new(dedup_window),
         }
     }
 
@@ -436,18 +520,33 @@ impl Coordinator {
             }
 
             PeerEvent::LeiosBlockOffered { point } => {
-                // Dedup + per-peer offer tracking lives in con-rs's
-                // CandidateTracker now; just forward with the peer id.
-                self.emit_event(NetworkEvent::LeiosBlockOffered { peer_id, point });
+                // Per-peer offer tracking + multi-peer accumulation lives
+                // in con-rs's CandidateTracker, but each peer's notify
+                // loop replays still-relevant EBs every iteration —
+                // dedup `(peer, slot, hash)` here so a single peer
+                // re-announce doesn't flood `network_events`.
+                if let Point::Specific { slot, hash } = point {
+                    if self.leios_offer_dedup.fresh_eb(peer_id, slot, hash) {
+                        self.emit_event(NetworkEvent::LeiosBlockOffered { peer_id, point });
+                    }
+                }
             }
 
             PeerEvent::LeiosBlockTxsOffered { point } => {
-                self.emit_event(NetworkEvent::LeiosBlockTxsOffered { peer_id, point });
+                if let Point::Specific { slot, hash } = point {
+                    if self.leios_offer_dedup.fresh_eb_txs(peer_id, slot, hash) {
+                        self.emit_event(NetworkEvent::LeiosBlockTxsOffered { peer_id, point });
+                    }
+                }
             }
 
             PeerEvent::LeiosVotesOffered { votes } => {
-                if !votes.is_empty() {
-                    self.emit_event(NetworkEvent::LeiosVotesOffered { peer_id, votes });
+                let fresh = self.leios_offer_dedup.fresh_votes(peer_id, votes);
+                if !fresh.is_empty() {
+                    self.emit_event(NetworkEvent::LeiosVotesOffered {
+                        peer_id,
+                        votes: fresh,
+                    });
                 }
             }
 
