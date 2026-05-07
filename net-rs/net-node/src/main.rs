@@ -92,7 +92,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             stake = config.production.stake,
             total_stake = config.production.total_stake,
             rb_prob = config.production.rb_generation_probability,
-            eb_prob = config.production.eb_generation_probability,
             vote_prob = config.production.vote_generation_probability,
             "block production enabled"
         );
@@ -230,6 +229,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
 
                     // If an EB was produced (overflow path), inject it.
+                    // Tx bodies are already pinned in the mempool by
+                    // `BlockProducer::try_produce_block` via
+                    // `Mempool::produce_eb`; the LeiosStore serves them
+                    // through its `TxBodyResolver` fallback.
                     if let Some(ref eb) = produced.announced_eb {
                         info!(node_id = %node_id, %eb.point, "produced endorser block (overflow)");
                         telem.record(NodeEvent::EBGenerated {
@@ -240,10 +243,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             point: eb.point.clone(),
                             block: eb.data.clone(),
                         }).await;
-                        let _ = commands.send(NetworkCommand::InjectLeiosBlockTxs {
-                            point: eb.point.clone(),
-                            transactions: eb.transactions.clone(),
-                        }).await;
+                        consensus
+                            .register_self_produced_eb(eb.point.clone(), &eb.data)
+                            .await;
                     }
 
                     consensus
@@ -280,6 +282,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     remaining_segments = outcome.remaining_bitmap.len(),
                                     "leios block txs response is partial — retrying"
                                 );
+                            }
+                            // Pin the bodies in the mempool synchronously
+                            // so the next on_slot's MissingTX predicate sees
+                            // them — the validator pipeline still runs for
+                            // ledger-validity checking, but the predicate
+                            // is content-addressed and doesn't need to wait.
+                            {
+                                let mut pool = mempool.lock().unwrap();
+                                for body in &outcome.matched_bodies {
+                                    pool.merge_eb_body(body.clone());
+                                }
                             }
                             for body in &outcome.matched_bodies {
                                 let _ = tx_valid_tx.try_send(body.clone());

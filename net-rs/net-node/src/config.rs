@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DynamicConfig {
     pub rb_generation_probability: f64,
-    pub eb_generation_probability: f64,
     pub vote_generation_probability: f64,
     pub rb_head_validation_ms: f64,
     pub rb_body_validation_ms_constant: f64,
@@ -32,7 +31,6 @@ pub struct DynamicConfig {
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct DynamicConfigUpdate {
     pub rb_generation_probability: Option<f64>,
-    pub eb_generation_probability: Option<f64>,
     pub vote_generation_probability: Option<f64>,
     pub rb_head_validation_ms: Option<f64>,
     pub rb_body_validation_ms_constant: Option<f64>,
@@ -48,9 +46,6 @@ impl DynamicConfig {
     pub fn apply_update(&mut self, update: &DynamicConfigUpdate) {
         if let Some(v) = update.rb_generation_probability {
             self.rb_generation_probability = v;
-        }
-        if let Some(v) = update.eb_generation_probability {
-            self.eb_generation_probability = v;
         }
         if let Some(v) = update.vote_generation_probability {
             self.vote_generation_probability = v;
@@ -220,10 +215,6 @@ pub struct ProductionConfig {
     #[serde(default = "default_rb_probability")]
     pub rb_generation_probability: f64,
 
-    /// Per-stage probability of producing an endorser block (Leios).
-    #[serde(default)]
-    pub eb_generation_probability: f64,
-
     /// Per-stage probability of producing a vote (Leios).
     /// Used as the sortition lottery probability for WfaLs non-persistent voters.
     #[serde(default)]
@@ -302,7 +293,6 @@ impl Default for ProductionConfig {
             total_stake: default_total_stake(),
             stake_registry: Vec::new(),
             rb_generation_probability: default_rb_probability(),
-            eb_generation_probability: 0.0,
             vote_generation_probability: 0.0,
             stage_length_slots: default_stage_length(),
             committee_selection: CommitteeSelection::default(),
@@ -553,7 +543,6 @@ impl NodeConfig {
     pub fn dynamic_config(&self) -> DynamicConfig {
         DynamicConfig {
             rb_generation_probability: self.production.rb_generation_probability,
-            eb_generation_probability: self.production.eb_generation_probability,
             vote_generation_probability: self.production.vote_generation_probability,
             rb_head_validation_ms: self.validation.rb_head_validation_ms,
             rb_body_validation_ms_constant: self.validation.rb_body_validation_ms_constant,

@@ -260,7 +260,6 @@ mod tests {
     ) -> watch::Receiver<DynamicConfig> {
         let config = DynamicConfig {
             rb_generation_probability: 0.05,
-            eb_generation_probability: 0.0,
             vote_generation_probability: 0.0,
             rb_head_validation_ms: head_ms,
             rb_body_validation_ms_constant: body_const_ms,

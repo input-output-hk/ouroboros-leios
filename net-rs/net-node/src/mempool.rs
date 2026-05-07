@@ -18,7 +18,7 @@ use rand::{Rng, SeedableRng};
 use tokio::sync::{mpsc, watch};
 use tracing::info;
 
-use con_rs::mempool::MempoolState;
+use con_rs::mempool::{EbKey, MempoolState};
 use net_core::peer::PeerId;
 use net_core::protocols::txsubmission::{PendingTx, TxBody, TxId};
 
@@ -72,14 +72,6 @@ impl Mempool {
         self.state.len()
     }
 
-    pub fn drain_all(&mut self) -> Vec<PendingTx> {
-        self.state
-            .drain_all()
-            .into_iter()
-            .map(from_con_tx)
-            .collect()
-    }
-
     pub fn peek_unannounced_for_peer(
         &mut self,
         peer_id: PeerId,
@@ -110,6 +102,53 @@ impl Mempool {
             .into_iter()
             .map(from_con_tx)
             .collect()
+    }
+
+    /// Snapshot of every pending tx_id in the free pool, in arrival
+    /// order — the manifest the next EB will reference if the producer
+    /// commits via `produce_eb`.  Caller uses this to build the EB body
+    /// bytes and derive the EB hash before committing.
+    pub fn all_pending_tx_hashes(&self) -> Vec<[u8; 32]> {
+        self.state
+            .txs
+            .iter()
+            .map(|tx| {
+                let mut h = [0u8; 32];
+                let len = tx.tx_id.len().min(32);
+                h[..len].copy_from_slice(&tx.tx_id[..len]);
+                h
+            })
+            .collect()
+    }
+
+    /// Drain every free tx into an EB pin under `eb_key` and return the
+    /// manifest hashes for the producer to encode.  After this, the
+    /// drained txs stay locally available via `has_tx` / `get_body_by_id`
+    /// but no longer count toward `total_bytes` / `drain_up_to` — i.e.
+    /// they won't be double-included in a subsequent RB body.
+    pub fn produce_eb(&mut self, eb_key: EbKey) -> Vec<TxId> {
+        self.state
+            .produce_eb(eb_key)
+            .into_iter()
+            .map(TxId)
+            .collect()
+    }
+
+    /// Receiver-side: insert a body fetched via LeiosFetch.  Idempotent
+    /// against duplicates already in either compartment.  Hashes the
+    /// body to derive the tx_id (the wire-format manifest reference).
+    pub fn merge_eb_body(&mut self, body: Vec<u8>) {
+        let tx = tx_from_received_bytes(body);
+        self.state.merge_eb_body(tx.tx_id.0, tx.body.0, tx.size);
+    }
+
+    /// Snapshot of every locally available tx id — free pool plus
+    /// EB-pinned bodies.  Used by the CIP-0164 `MissingTX` voting
+    /// predicate.
+    pub fn all_known_tx_ids(&self) -> HashSet<Vec<u8>> {
+        let mut ids: HashSet<Vec<u8>> = self.state.txs.iter().map(|t| t.tx_id.clone()).collect();
+        ids.extend(self.state.eb_pinned.keys().cloned());
+        ids
     }
 }
 

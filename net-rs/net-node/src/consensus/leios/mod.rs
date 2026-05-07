@@ -151,11 +151,12 @@ impl LeiosConsensus {
 
     /// Advance slot tracking, drive elections, dispatch any effects.
     pub async fn on_slot(&mut self, slot: u64) {
-        // Snapshot the mempool's tx-id set so the predicate-checking
-        // path inside `LeiosState::on_slot` can answer "is this EB's
-        // referenced TX known locally?" for the CIP-0164 MissingTX
-        // check without holding the mempool lock across the call.
-        let known = self.mempool.lock().unwrap().current_tx_ids();
+        // Snapshot every locally available tx id — the FIFO mempool
+        // plus EB-pinned bodies — so the CIP-0164 `MissingTX` predicate
+        // sees both the producer's own pinned EB closure and any bodies
+        // a receiver has merged via `LeiosFetch BlockTxs`.  Snapshot
+        // upfront so we don't hold the mempool lock across the call.
+        let known = self.mempool.lock().unwrap().all_known_tx_ids();
         let tx_known = |h: &[u8; 32]| known.contains(h.as_slice());
         let fx = self.state.on_slot(slot, &tx_known);
         self.dispatch(fx).await;
@@ -207,6 +208,18 @@ impl LeiosConsensus {
 
     /// EB validation completed; create an election.
     pub fn on_validated_eb(&mut self, point: Point) {
+        self.state.on_validated_eb(point);
+    }
+
+    /// Register a self-produced EB.  Decodes the manifest, runs the
+    /// same `on_eb_received` path receivers go through (so the
+    /// `RecordLeiosEbManifest` effect lands in the LeiosStore and
+    /// peer offers fire), and marks the EB validated immediately —
+    /// the producer trusts its own work.
+    pub async fn register_self_produced_eb(&mut self, point: Point, eb_data: &[u8]) {
+        let manifest = decode_overflow_eb(eb_data).map(|(_, hashes)| hashes);
+        let fx = self.state.on_eb_received(point.clone(), manifest);
+        self.dispatch(fx).await;
         self.state.on_validated_eb(point);
     }
 
@@ -509,7 +522,6 @@ mod tests {
     fn test_dyn_config() -> watch::Receiver<DynamicConfig> {
         let config = DynamicConfig {
             rb_generation_probability: 0.0,
-            eb_generation_probability: 0.0,
             vote_generation_probability: 1.0, // always vote in tests
             rb_head_validation_ms: 0.0,
             rb_body_validation_ms_constant: 0.0,

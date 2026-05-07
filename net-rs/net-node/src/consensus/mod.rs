@@ -106,6 +106,13 @@ impl Consensus {
         self.praos.register_self_produced(point, header, body).await
     }
 
+    /// Register a self-produced endorser block with Leios consensus —
+    /// records the manifest, fires the offer notifications, and marks
+    /// the EB validated.
+    pub async fn register_self_produced_eb(&mut self, point: Point, eb_data: &[u8]) {
+        self.leios.register_self_produced_eb(point, eb_data).await;
+    }
+
     /// Route a network event to Praos or Leios. Returns true if the event
     /// was consumed (caller should not log it separately).
     pub async fn handle_event(&mut self, event: &NetworkEvent) -> bool {

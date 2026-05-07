@@ -8,20 +8,20 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use tokio::sync::watch;
 
+use con_rs::mempool::EbKey;
 use net_core::protocols::txsubmission::PendingTx;
 use net_core::types::{BlockBody, Point, WrappedHeader};
 
 use crate::config::{DynamicConfig, ProductionConfig};
 
-/// A produced Leios endorser block.
+/// A produced Leios endorser block.  The bodies of the referenced
+/// transactions stay pinned in the mempool under the EB's key — peers
+/// fetch them via `MsgLeiosBlockTxsRequest`, served through the
+/// LeiosStore's `TxBodyResolver` fallback path.
 pub struct ProducedEb {
     pub point: Point,
     /// CBOR-encoded manifest `[slot, [tx_hash, ...]]`.
     pub data: Vec<u8>,
-    /// Transaction bodies referenced by the manifest, in the same order
-    /// as the hashes. Published to the Leios store so peers can fetch
-    /// them via `MsgLeiosBlockTxsRequest`.
-    pub transactions: Vec<Vec<u8>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -263,10 +263,32 @@ impl BlockProducer {
         // Drain mempool and decide RB vs EB path.
         let mut pool = mempool.lock().unwrap();
         let (txs, announced_eb) = if pool.total_bytes() > self.rb_body_max_bytes {
-            // EB path: all txs → EB manifest, RB body empty.
-            let all_txs = pool.drain_all();
-            let eb = make_overflow_eb(slot, &all_txs);
-            (Vec::new(), Some(eb))
+            // EB path: every pending tx becomes an EB body reference,
+            // RB body is empty.  Bodies stay pinned in the mempool
+            // under `eb_pinned` so the producer can vote for its own
+            // EB (MissingTX predicate sees them) and serve `LeiosFetch
+            // BlockTxs` (resolver finds them by tx_id).
+            let manifest: Vec<[u8; 32]> = pool
+                .all_pending_tx_hashes()
+                .into_iter()
+                .collect();
+            let eb_data = encode_overflow_eb(slot, &manifest);
+            let eb_hash = blake2b_256(&eb_data);
+            let eb_key = EbKey {
+                slot,
+                hash: eb_hash,
+            };
+            pool.produce_eb(eb_key);
+            (
+                Vec::new(),
+                Some(ProducedEb {
+                    point: Point::Specific {
+                        slot,
+                        hash: eb_hash,
+                    },
+                    data: eb_data,
+                }),
+            )
         } else {
             // RB path: txs in RB body, no EB.
             let txs = pool.drain_up_to(self.rb_body_max_bytes);
@@ -450,31 +472,29 @@ pub fn decode_overflow_eb(blob: &[u8]) -> Option<(u64, Vec<[u8; 32]>)> {
     Some((slot, hashes))
 }
 
-/// Build an EB manifest from overflow transactions. The EB body is a CBOR
-/// array `[slot, [tx_hash, ...]]` and the point hash is Blake2b-256 of
-/// the manifest bytes (content-addressed).
-fn make_overflow_eb(slot: u64, txs: &[PendingTx]) -> ProducedEb {
+/// Encode an EB body as CBOR `[slot, [tx_hash, ...]]` — pure function
+/// over the manifest hashes; lets the caller hash the bytes to derive
+/// the EB key before committing the drain in the mempool.
+pub fn encode_overflow_eb(slot: u64, manifest: &[[u8; 32]]) -> Vec<u8> {
     let mut data = Vec::new();
     let mut enc = minicbor::Encoder::new(&mut data);
     let _ = enc
         .array(2)
         .and_then(|e| e.u64(slot))
-        .and_then(|e| e.array(txs.len() as u64));
-    for tx in txs {
-        let _ = minicbor::Encoder::new(&mut data).bytes(&tx.tx_id.0);
+        .and_then(|e| e.array(manifest.len() as u64));
+    for h in manifest {
+        let _ = minicbor::Encoder::new(&mut data).bytes(h);
     }
+    data
+}
 
-    let hash_result = blake2b_simd::Params::new().hash_length(32).hash(&data);
-    let mut hash = [0u8; 32];
-    hash.copy_from_slice(hash_result.as_bytes());
-    let point = Point::Specific { slot, hash };
-
-    let transactions = txs.iter().map(|tx| tx.body.0.clone()).collect();
-    ProducedEb {
-        point,
-        data,
-        transactions,
-    }
+/// Blake2b-256 of arbitrary bytes — matches the EB-key derivation used
+/// across the wire and the `tx_from_received_bytes` tx-id derivation.
+pub fn blake2b_256(bytes: &[u8]) -> [u8; 32] {
+    let result = blake2b_simd::Params::new().hash_length(32).hash(bytes);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(result.as_bytes());
+    out
 }
 
 #[cfg(test)]
@@ -493,7 +513,6 @@ mod tests {
     fn dyn_rx(config: &ProductionConfig) -> watch::Receiver<DynamicConfig> {
         let dyn_config = DynamicConfig {
             rb_generation_probability: config.rb_generation_probability,
-            eb_generation_probability: config.eb_generation_probability,
             vote_generation_probability: config.vote_generation_probability,
             rb_head_validation_ms: 1.0,
             rb_body_validation_ms_constant: 1000.0,
@@ -698,27 +717,21 @@ mod tests {
     }
 
     #[test]
-    fn overflow_eb_is_content_addressed() {
-        let txs = vec![make_test_tx(1, 100), make_test_tx(2, 200)];
-        let eb1 = make_overflow_eb(50, &txs);
-        let eb2 = make_overflow_eb(50, &txs);
-        match (&eb1.point, &eb2.point) {
-            (Point::Specific { hash: h1, .. }, Point::Specific { hash: h2, .. }) => {
-                assert_eq!(h1, h2, "same inputs should produce same hash");
-            }
-            _ => panic!("expected Specific points"),
-        }
+    fn encode_overflow_eb_is_deterministic() {
+        let manifest = vec![[0x10u8; 32], [0x20u8; 32]];
+        let a = encode_overflow_eb(50, &manifest);
+        let b = encode_overflow_eb(50, &manifest);
+        assert_eq!(a, b);
+        assert_eq!(blake2b_256(&a), blake2b_256(&b));
     }
 
     #[test]
     fn decode_overflow_eb_round_trip() {
-        let txs = vec![make_test_tx(0x10, 50), make_test_tx(0x20, 70)];
-        let eb = make_overflow_eb(99, &txs);
-        let (slot, hashes) = decode_overflow_eb(&eb.data).expect("decode");
+        let manifest = vec![[0x10u8; 32], [0x20u8; 32]];
+        let data = encode_overflow_eb(99, &manifest);
+        let (slot, hashes) = decode_overflow_eb(&data).expect("decode");
         assert_eq!(slot, 99);
-        assert_eq!(hashes.len(), 2);
-        assert_eq!(hashes[0], [0x10; 32]);
-        assert_eq!(hashes[1], [0x20; 32]);
+        assert_eq!(hashes, manifest);
     }
 
     #[test]
@@ -728,32 +741,19 @@ mod tests {
     }
 
     #[test]
-    fn overflow_eb_carries_tx_bodies_in_manifest_order() {
-        let txs = vec![make_test_tx(0xAA, 100), make_test_tx(0xBB, 200)];
-        let eb = make_overflow_eb(42, &txs);
-
-        assert_eq!(eb.transactions.len(), 2);
-        assert_eq!(eb.transactions[0], vec![0xAA; 100]);
-        assert_eq!(eb.transactions[1], vec![0xBB; 200]);
-    }
-
-    #[test]
-    fn overflow_eb_encodes_tx_hashes() {
-        let txs = vec![make_test_tx(0xAA, 100), make_test_tx(0xBB, 200)];
-        let eb = make_overflow_eb(42, &txs);
-
+    fn encode_overflow_eb_layout() {
+        let manifest = vec![[0xAAu8; 32], [0xBBu8; 32]];
+        let data = encode_overflow_eb(42, &manifest);
         // Decode the manifest: [slot, [hash, ...]]
-        let mut dec = minicbor::Decoder::new(&eb.data);
+        let mut dec = minicbor::Decoder::new(&data);
         let outer_len = dec.array().unwrap().unwrap();
         assert_eq!(outer_len, 2);
         let slot = dec.u64().unwrap();
         assert_eq!(slot, 42);
         let inner_len = dec.array().unwrap().unwrap();
         assert_eq!(inner_len, 2);
-        let hash1 = dec.bytes().unwrap();
-        assert_eq!(hash1, &[0xAA; 32]);
-        let hash2 = dec.bytes().unwrap();
-        assert_eq!(hash2, &[0xBB; 32]);
+        assert_eq!(dec.bytes().unwrap(), &[0xAA; 32]);
+        assert_eq!(dec.bytes().unwrap(), &[0xBB; 32]);
     }
 
     // -- Header roundtrip tests --
@@ -847,7 +847,6 @@ mod tests {
         };
         let dyn_config = DynamicConfig {
             rb_generation_probability: 0.0,
-            eb_generation_probability: 0.0,
             vote_generation_probability: 0.0,
             rb_head_validation_ms: 1.0,
             rb_body_validation_ms_constant: 1000.0,

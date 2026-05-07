@@ -1,9 +1,18 @@
 //! Transaction mempool — sans-IO state machine.
 //!
 //! Holds pending transactions for inclusion in a block (RB body or EB
-//! manifest) plus the per-peer "already advertised" sets that prevent
+//! body) plus the per-peer "already advertised" sets that prevent
 //! re-announcing the same tx to the same peer.  Bounded by a tx count
 //! capacity; the oldest tx is evicted on overflow.
+//!
+//! Tx bodies live in two compartments under one roof:
+//!
+//! - `txs` — the FIFO queue of free txs, drained for the next RB body
+//!   and advertised through TxSubmission.
+//! - `eb_pinned` — bodies pinned because they're referenced by an EB
+//!   that hasn't been settled yet.  Lookups (LeiosFetch BlockTxs server,
+//!   the CIP-0164 `MissingTX` voting predicate) consult both
+//!   transparently via [`MempoolState::has_tx`] / [`get_body_by_id`].
 //!
 //! Validation crosses the con-rs boundary as an effect / response pair,
 //! the same pattern Praos uses for block validation and Leios uses for
@@ -24,6 +33,20 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use tracing::info;
 
 use crate::peer::PeerId;
+
+/// Slot-window retention for EB-pinned bodies.  Holds wide enough that
+/// every active voting / certification window stays serveable; pruned
+/// entries are dropped on every EB observation.
+pub const DEFAULT_EB_RETENTION_SLOTS: u64 = 100;
+
+/// Identifier for an Endorser Block: `(slot, hash)`.  The `hash` half
+/// is a Blake2b-256 over the EB's wire bytes — the wrapper picks the
+/// hash scheme and supplies it on every entry path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct EbKey {
+    pub slot: u64,
+    pub hash: [u8; 32],
+}
 
 /// Opaque transaction identifier.  Conventionally Blake2b-256 of the
 /// body, but con-rs doesn't enforce that — the wrapper picks the hash
@@ -84,30 +107,56 @@ pub enum TxRejectReason {
 /// Treat them as state-machine internals: prefer the public methods,
 /// which preserve invariants.
 pub struct MempoolState {
-    /// Admitted transactions in arrival order.
+    /// Admitted transactions in arrival order — the "free" pool drained
+    /// for RB body inclusion.
     pub txs: VecDeque<PendingTx>,
     /// Sum of `tx.size` across `txs`.
     pub total_bytes: usize,
-    /// Maximum transaction count.
+    /// Maximum transaction count for `txs`.
     pub capacity: usize,
     /// Per-peer "already advertised to this peer" set, so the
-    /// TxSubmission server (or sim-rs's announce loop) never
-    /// re-announces the same tx to the same peer.
+    /// TxSubmission server never re-announces the same tx to the same
+    /// peer.
     pub peer_advertised: BTreeMap<PeerId, BTreeSet<TxId>>,
     /// Bodies currently with the validator.  Cleared on
     /// `on_tx_validated` (body moves to `txs`) or
     /// `on_tx_validation_failed` (body dropped).
     pub pending_validation: BTreeMap<TxId, Vec<u8>>,
+    /// Per-EB ordered tx-hash list — the "EB Body" in CIP-0164 terms.
+    /// Producers populate this from `produce_eb`; receivers from
+    /// `record_eb_manifest` after decoding a fetched EB body.
+    pub eb_manifests: BTreeMap<EbKey, Vec<TxId>>,
+    /// EB-pinned bodies, keyed by `tx_id`.  A body lands here when the
+    /// producer drains it into an EB (so it leaves `txs` but stays
+    /// serveable) or when a receiver fetches it via LeiosFetch.  Drops
+    /// out of the slot retention window prune away EBs whose manifests
+    /// no longer reference a body in here.
+    pub eb_pinned: BTreeMap<TxId, PendingTx>,
+    /// Highest EB slot observed.  Drives slot-window retention.
+    pub max_eb_slot: u64,
+    /// EB retention window in slots.  Manifests + pinned bodies older
+    /// than `max_eb_slot - eb_retention_slots` are evicted on every
+    /// `record_eb_manifest` / `produce_eb` call.
+    pub eb_retention_slots: u64,
 }
 
 impl MempoolState {
     pub fn new(capacity: usize) -> Self {
+        Self::new_with_eb_retention(capacity, DEFAULT_EB_RETENTION_SLOTS)
+    }
+
+    /// Construct with an explicit EB-body retention window.
+    pub fn new_with_eb_retention(capacity: usize, eb_retention_slots: u64) -> Self {
         Self {
             txs: VecDeque::new(),
             total_bytes: 0,
             capacity,
             peer_advertised: BTreeMap::new(),
             pending_validation: BTreeMap::new(),
+            eb_manifests: BTreeMap::new(),
+            eb_pinned: BTreeMap::new(),
+            max_eb_slot: 0,
+            eb_retention_slots,
         }
     }
 
@@ -227,13 +276,21 @@ impl MempoolState {
         self.txs.iter().any(|tx| &tx.tx_id == tx_id)
     }
 
-    /// Look up a tx body by its id.  Linear scan; mempool sizes this
-    /// prototype targets keep it acceptable.
+    /// Look up a tx body by its id across both compartments — the free
+    /// FIFO pool and the EB-pinned pool.  Linear scan over `txs`;
+    /// mempool sizes this prototype targets keep it acceptable.  Used
+    /// by the LeiosFetch BlockTxs server (via the `TxBodyResolver`
+    /// trait in the consumer's wrapper) to resolve manifest entries.
     pub fn get_body_by_id(&self, id: &[u8]) -> Option<Vec<u8>> {
-        self.txs
+        if let Some(body) = self
+            .txs
             .iter()
             .find(|tx| tx.tx_id == id)
             .map(|tx| tx.body.clone())
+        {
+            return Some(body);
+        }
+        self.eb_pinned.get(id).map(|tx| tx.body.clone())
     }
 
     /// Return up to `max_count` txs not yet advertised to `peer_id`,
@@ -306,7 +363,126 @@ impl MempoolState {
         self.txs.is_empty()
     }
 
+    // -- EB body management ------------------------------------------------
+
+    /// Producer-side: drain every free tx, pin the bodies under the
+    /// new EB key, and return the manifest (ordered tx-hash list) for
+    /// the wrapper to encode into the EB's wire bytes.  After this the
+    /// `txs` queue is empty (the next RB body won't include them) but
+    /// the bodies stay serveable via LeiosFetch and visible to the
+    /// `MissingTX` voting predicate.
+    pub fn produce_eb(&mut self, eb_key: EbKey) -> Vec<TxId> {
+        let drained: Vec<PendingTx> = self.txs.drain(..).collect();
+        self.total_bytes = 0;
+        let manifest: Vec<TxId> = drained.iter().map(|tx| tx.tx_id.clone()).collect();
+        for tx in drained {
+            self.eb_pinned.entry(tx.tx_id.clone()).or_insert(tx);
+        }
+        self.eb_manifests.insert(eb_key, manifest.clone());
+        self.bump_eb_slot(eb_key.slot);
+        manifest
+    }
+
+    /// Receiver-side: register the manifest of an EB whose body bytes
+    /// the wrapper has just decoded.  Bodies arrive separately via
+    /// `merge_eb_body` as LeiosFetch responses come in.  No-op if a
+    /// manifest is already recorded for this `eb_key` (first writer
+    /// wins — manifests are content-addressed via the EB hash).
+    pub fn record_eb_manifest(&mut self, eb_key: EbKey, manifest: Vec<TxId>) {
+        self.eb_manifests.entry(eb_key).or_insert(manifest);
+        self.bump_eb_slot(eb_key.slot);
+    }
+
+    /// Receiver-side: insert a body fetched via LeiosFetch.  `tx_id`
+    /// must be the integrity-verified Blake2b-256 of `body` — the
+    /// wrapper hashes incoming bodies and matches against the manifest
+    /// before calling here.  No-op if the tx is already known via
+    /// `txs` or `eb_pinned`.
+    pub fn merge_eb_body(&mut self, tx_id: TxId, body: Vec<u8>, size: u32) {
+        if self.contains(&tx_id) || self.eb_pinned.contains_key(&tx_id) {
+            return;
+        }
+        self.eb_pinned.insert(
+            tx_id.clone(),
+            PendingTx {
+                tx_id,
+                body,
+                size,
+            },
+        );
+    }
+
+    /// True iff the body for `tx_id` is locally available — either
+    /// in the free FIFO pool or pinned under an EB.  Used by the
+    /// CIP-0164 `MissingTX` voting predicate.
+    pub fn has_tx(&self, tx_id: &TxId) -> bool {
+        self.contains(tx_id) || self.eb_pinned.contains_key(tx_id)
+    }
+
+    /// Manifest (ordered tx-hash list) for the given EB, if recorded.
+    pub fn get_eb_manifest(&self, eb_key: &EbKey) -> Option<&[TxId]> {
+        self.eb_manifests.get(eb_key).map(Vec::as_slice)
+    }
+
+    /// Resolve a bitmap-of-indices request for an EB's bodies.
+    /// Returns `None` if the EB's manifest isn't recorded; otherwise
+    /// returns bodies for every requested index whose body is locally
+    /// resolvable.  Out-of-range indices and indices whose body is
+    /// missing are silently dropped (partial response).
+    pub fn get_eb_bodies<I>(&self, eb_key: &EbKey, indices: I) -> Option<Vec<Vec<u8>>>
+    where
+        I: IntoIterator<Item = u32>,
+    {
+        let manifest = self.eb_manifests.get(eb_key)?;
+        let bodies: Vec<Vec<u8>> = indices
+            .into_iter()
+            .filter_map(|i| {
+                let tx_id = manifest.get(i as usize)?;
+                self.get_body_by_id(tx_id)
+            })
+            .collect();
+        Some(bodies)
+    }
+
+    /// Manifest indices whose body is **not** locally available.
+    /// Drives a receiver's outgoing `LeiosFetch BlockTxs` bitmap.
+    pub fn missing_eb_indices(&self, eb_key: &EbKey) -> Vec<u32> {
+        let Some(manifest) = self.eb_manifests.get(eb_key) else {
+            return Vec::new();
+        };
+        manifest
+            .iter()
+            .enumerate()
+            .filter(|(_, id)| !self.has_tx(id))
+            .map(|(i, _)| i as u32)
+            .collect()
+    }
+
     // -- Internal helpers --------------------------------------------------
+
+    fn bump_eb_slot(&mut self, slot: u64) {
+        self.max_eb_slot = self.max_eb_slot.max(slot);
+        self.prune_eb_slot_window();
+    }
+
+    /// Drop EB manifests older than the retention window.  Pinned
+    /// bodies that no surviving manifest references are released too —
+    /// otherwise the producer's drain-into-EB path would leak them
+    /// forever.
+    fn prune_eb_slot_window(&mut self) {
+        let cutoff = self.max_eb_slot.saturating_sub(self.eb_retention_slots);
+        if cutoff == 0 {
+            return;
+        }
+        self.eb_manifests.retain(|key, _| key.slot >= cutoff);
+        let still_referenced: BTreeSet<TxId> = self
+            .eb_manifests
+            .values()
+            .flat_map(|m| m.iter().cloned())
+            .collect();
+        self.eb_pinned
+            .retain(|id, _| still_referenced.contains(id));
+    }
 
     fn admit_internal(
         &mut self,
@@ -681,5 +857,168 @@ mod tests {
         let _ = s.admit_validated(tx_id.clone(), body, sz);
         assert!(!s.pending_validation.contains_key(&tx_id));
         assert_eq!(s.len(), 1);
+    }
+
+    // -- EB body management ------------------------------------------------
+
+    fn eb_key(slot: u64, hash_byte: u8) -> EbKey {
+        EbKey {
+            slot,
+            hash: [hash_byte; 32],
+        }
+    }
+
+    #[test]
+    fn produce_eb_drains_txs_into_pinned_and_returns_manifest() {
+        let mut s = MempoolState::new(10);
+        admit(&mut s, 1, 100);
+        admit(&mut s, 2, 200);
+        admit(&mut s, 3, 300);
+
+        let eb = eb_key(50, 0xEE);
+        let manifest = s.produce_eb(eb);
+
+        assert_eq!(manifest, vec![vec![1u8; 32], vec![2u8; 32], vec![3u8; 32]]);
+        assert!(s.is_empty(), "txs are drained");
+        assert_eq!(s.total_bytes(), 0);
+        assert!(s.eb_pinned.contains_key(&vec![1u8; 32]));
+        assert_eq!(s.get_eb_manifest(&eb), Some(manifest.as_slice()));
+    }
+
+    #[test]
+    fn has_tx_unions_free_pool_and_pinned_bodies() {
+        let mut s = MempoolState::new(10);
+        admit(&mut s, 1, 100);
+        admit(&mut s, 2, 200);
+        let eb = eb_key(10, 0x11);
+        s.produce_eb(eb);
+        // Both still locally available, just under different roofs.
+        assert!(s.has_tx(&vec![1u8; 32]));
+        assert!(s.has_tx(&vec![2u8; 32]));
+        assert!(!s.has_tx(&vec![99u8; 32]));
+        // After draining into an EB, a new tx in the free pool is also has_tx-true.
+        admit(&mut s, 3, 100);
+        assert!(s.has_tx(&vec![3u8; 32]));
+    }
+
+    #[test]
+    fn get_body_by_id_resolves_from_either_compartment() {
+        let mut s = MempoolState::new(10);
+        let (id1, body1, sz1) = tx(1, 50);
+        s.admit_validated(id1.clone(), body1.clone(), sz1);
+        s.produce_eb(eb_key(5, 0x55));
+        // Now id1 is in eb_pinned, not txs.
+        assert_eq!(s.get_body_by_id(&id1), Some(body1));
+        // A fresh free tx resolves from `txs`.
+        let (id2, body2, sz2) = tx(2, 60);
+        s.admit_validated(id2.clone(), body2.clone(), sz2);
+        assert_eq!(s.get_body_by_id(&id2), Some(body2));
+        assert_eq!(s.get_body_by_id(&[99u8; 32]), None);
+    }
+
+    #[test]
+    fn record_eb_manifest_for_receiver_then_merge_bodies() {
+        // Receiver-side flow: see the EB header → fetch body → decode
+        // manifest → record. Bodies arrive later via merge_eb_body.
+        let mut s = MempoolState::new(10);
+        let id_a = vec![0xAAu8; 32];
+        let id_b = vec![0xBBu8; 32];
+        let eb = eb_key(20, 0x77);
+        s.record_eb_manifest(eb, vec![id_a.clone(), id_b.clone()]);
+
+        // Before any bodies, both indices are missing.
+        assert_eq!(s.missing_eb_indices(&eb), vec![0, 1]);
+
+        // Merge the second body first (out-of-order delivery is fine).
+        s.merge_eb_body(id_b.clone(), vec![0xB0], 1);
+        assert_eq!(s.missing_eb_indices(&eb), vec![0]);
+        assert!(s.has_tx(&id_b));
+
+        // Then the first.
+        s.merge_eb_body(id_a.clone(), vec![0xA0], 1);
+        assert!(s.missing_eb_indices(&eb).is_empty());
+    }
+
+    #[test]
+    fn get_eb_bodies_returns_partial_subset_in_index_order() {
+        let mut s = MempoolState::new(10);
+        let ids: Vec<TxId> = (0..5).map(|i| vec![i as u8; 32]).collect();
+        let eb = eb_key(30, 0x33);
+        s.record_eb_manifest(eb, ids.clone());
+        // Only bodies for indices 1 and 3 are locally available.
+        s.merge_eb_body(ids[1].clone(), vec![0x11], 1);
+        s.merge_eb_body(ids[3].clone(), vec![0x33], 1);
+
+        // Server gets a bitmap request for [0, 1, 2, 3, 4]; returns only the
+        // bodies it has, in ascending index order.
+        let got = s.get_eb_bodies(&eb, 0..5).unwrap();
+        assert_eq!(got, vec![vec![0x11], vec![0x33]]);
+    }
+
+    #[test]
+    fn get_eb_bodies_returns_none_for_unknown_eb() {
+        let s = MempoolState::new(10);
+        let eb = eb_key(0, 0xFF);
+        assert!(s.get_eb_bodies(&eb, 0..3).is_none());
+    }
+
+    #[test]
+    fn merge_eb_body_idempotent_against_existing() {
+        let mut s = MempoolState::new(10);
+        let id = vec![0xCCu8; 32];
+        s.record_eb_manifest(eb_key(40, 0x40), vec![id.clone()]);
+        s.merge_eb_body(id.clone(), vec![0xCC], 1);
+        // Second call with a different (faked) body must not overwrite.
+        s.merge_eb_body(id.clone(), vec![0xFF], 1);
+        assert_eq!(s.get_body_by_id(&id), Some(vec![0xCC]));
+    }
+
+    #[test]
+    fn merge_eb_body_skipped_when_already_in_free_pool() {
+        // If a tx is already in `txs` (via TxSubmission), don't double-store
+        // it under eb_pinned.
+        let mut s = MempoolState::new(10);
+        let (id, body, sz) = tx(1, 100);
+        s.admit_validated(id.clone(), body.clone(), sz);
+        s.merge_eb_body(id.clone(), body, sz);
+        assert_eq!(s.eb_pinned.len(), 0);
+    }
+
+    #[test]
+    fn slot_retention_drops_old_eb_manifest_and_pinned_bodies() {
+        // Tight window so the test stays small.
+        let mut s = MempoolState::new_with_eb_retention(100, 5);
+        let old_eb = eb_key(1, 0x01);
+        s.record_eb_manifest(old_eb, vec![vec![0xAAu8; 32]]);
+        s.merge_eb_body(vec![0xAAu8; 32], vec![0xAA], 1);
+        assert!(s.has_tx(&vec![0xAAu8; 32]));
+        assert!(s.get_eb_manifest(&old_eb).is_some());
+
+        // Push max_eb_slot far past the window.
+        s.record_eb_manifest(eb_key(100, 0x02), vec![vec![0xBBu8; 32]]);
+
+        // Old EB and its body are evicted; new EB stays.
+        assert!(s.get_eb_manifest(&old_eb).is_none());
+        assert!(!s.has_tx(&vec![0xAAu8; 32]));
+        assert!(s.get_eb_manifest(&eb_key(100, 0x02)).is_some());
+    }
+
+    #[test]
+    fn slot_retention_keeps_body_referenced_by_a_surviving_eb() {
+        // Same tx referenced by two EBs — pruning one shouldn't drop
+        // the body if the other still references it.
+        let mut s = MempoolState::new_with_eb_retention(100, 5);
+        let id = vec![0xCCu8; 32];
+        s.record_eb_manifest(eb_key(1, 0x01), vec![id.clone()]);
+        s.record_eb_manifest(eb_key(95, 0x02), vec![id.clone()]);
+        s.merge_eb_body(id.clone(), vec![0xCC], 1);
+        // Bump max so the slot=1 EB falls out of the window but slot=95 stays.
+        s.record_eb_manifest(eb_key(99, 0x03), vec![]);
+        assert!(s.get_eb_manifest(&eb_key(1, 0x01)).is_none());
+        assert!(s.get_eb_manifest(&eb_key(95, 0x02)).is_some());
+        assert!(
+            s.has_tx(&id),
+            "body retained because the slot=95 EB still references it"
+        );
     }
 }
