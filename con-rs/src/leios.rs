@@ -671,6 +671,13 @@ impl LeiosState {
             };
             self.in_flight.remove(&gate_key);
         }
+        // Clear the candidate tracker's pending entry so a retry
+        // (driven by the wrapper's match outcome) can be issued
+        // against a fresh peer.  Without this the retry path keeps
+        // hitting `start_eb_txs_fetch == false` and either skipping
+        // (if respected) or piling on concurrent fetches (the actual
+        // pre-fix symptom: 25-node cluster smoke storm).
+        self.candidates.finish_eb_txs_fetch(point);
         info!(
             node_id = %self.node_id,
             %point,
@@ -749,6 +756,11 @@ impl LeiosState {
         point: &Point,
         bodies_with_hashes: &[(Vec<u8>, [u8; 32])],
     ) -> EbTxMatchOutcome {
+        // A response means the in-flight fetch for this point is done;
+        // clear the candidate tracker's pending guard so a retry (which
+        // the caller may issue immediately after inspecting the
+        // outcome's remaining_bitmap) can pick a fresh peer.
+        self.candidates.finish_eb_txs_fetch(point);
         let (eb_slot, hash) = match point {
             Point::Specific { slot, hash } => (*slot, *hash),
             Point::Origin => {
@@ -817,6 +829,10 @@ impl LeiosState {
     /// peers that already attempted this EB-txs fetch (tracked by the
     /// candidate tracker), so the policy will land on a fresh peer or
     /// emit nothing if every candidate has been tried.
+    ///
+    /// Respects the candidate tracker's pending-fetch guard: if a
+    /// fetch is already in flight for `point`, no new fetch is
+    /// issued.  The guard is cleared by [`Self::on_eb_txs_received`].
     pub fn retry_eb_tx_fetch(
         &mut self,
         point: Point,
@@ -832,7 +848,11 @@ impl LeiosState {
         if peers.is_empty() {
             return Vec::new();
         }
-        self.candidates.start_eb_txs_fetch(point.clone(), &peers);
+        if !self.candidates.start_eb_txs_fetch(point.clone(), &peers) {
+            // Already in flight; the pending response will trigger the
+            // next retry attempt via on_eb_txs_received → match → retry.
+            return Vec::new();
+        }
         vec![LeiosEffect::FetchLeiosBlockTxs {
             point,
             bitmap,
