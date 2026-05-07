@@ -44,6 +44,30 @@ pub(crate) struct PeerTaskConfig {
     pub scheduler_type: crate::mux::scheduler::SchedulerType,
 }
 
+/// Per-protocol channel capacity for high-volume Cardano protocols
+/// (chainsync, blockfetch, txsubmission, leios_notify).
+/// `egress_queue_size` is the bound shared by both the egress and
+/// ingress mpsc channels per protocol — when the ingress channel
+/// fills, the mux demuxer returns `IngressChannelFull` and the
+/// whole connection tears down.  These protocols carry kilobyte-
+/// sized messages; 256 segments at the 12 KiB SDU max is ~3 MiB
+/// of headroom which absorbs reconnect-time bursts comfortably.
+const HIGH_VOLUME_QUEUE_SIZE: usize = 256;
+
+/// Per-protocol channel capacity for bulk-fetch protocols
+/// (leios_fetch).  EB block bodies and EB-tx responses are
+/// multi-megabyte and fragment into hundreds of SDU segments; a
+/// single ~3 MiB EB-tx response alone is ~256 segments, so the
+/// regular channel size cannot hold one without immediate
+/// overflow.  Sized to fit a worst-case EB plus headroom for the
+/// next request.
+const BULK_FETCH_QUEUE_SIZE: usize = 4096;
+
+/// Per-protocol channel capacity for low-volume protocols
+/// (keepalive, peersharing).  These exchange small fixed-size
+/// messages on a slow cadence and don't need the same headroom.
+const LOW_VOLUME_QUEUE_SIZE: usize = 4;
+
 /// Protocol configs for client-side protocols (excluding handshake).
 /// When `leios_enabled`, also registers LeiosNotify and LeiosFetch.
 pub(crate) fn client_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig> {
@@ -52,31 +76,31 @@ pub(crate) fn client_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
             id: chainsync::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: chainsync::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: keepalive::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: keepalive::INGRESS_LIMIT,
-            egress_queue_size: 4,
+            egress_queue_size: LOW_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: blockfetch::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: blockfetch::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: peersharing::PROTOCOL_ID,
             traffic_class: TrafficClass::Default(1),
             ingress_limit: peersharing::INGRESS_LIMIT,
-            egress_queue_size: 4,
+            egress_queue_size: LOW_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: txsubmission::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: txsubmission::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
     ];
     if leios_enabled {
@@ -84,13 +108,13 @@ pub(crate) fn client_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
             id: leios_notify::PROTOCOL_ID,
             traffic_class: TrafficClass::Default(1),
             ingress_limit: leios_notify::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         });
         configs.push(ProtocolConfig {
             id: leios_fetch::PROTOCOL_ID,
             traffic_class: TrafficClass::Default(1),
             ingress_limit: leios_fetch::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: BULK_FETCH_QUEUE_SIZE,
         });
     }
     configs
@@ -104,31 +128,31 @@ pub(crate) fn server_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
             id: chainsync::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: chainsync::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: blockfetch::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: blockfetch::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: txsubmission::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: txsubmission::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: peersharing::PROTOCOL_ID,
             traffic_class: TrafficClass::Default(1),
             ingress_limit: peersharing::INGRESS_LIMIT,
-            egress_queue_size: 4,
+            egress_queue_size: LOW_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: keepalive::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: keepalive::INGRESS_LIMIT,
-            egress_queue_size: 4,
+            egress_queue_size: LOW_VOLUME_QUEUE_SIZE,
         },
     ];
     if leios_enabled {
@@ -136,13 +160,13 @@ pub(crate) fn server_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
             id: leios_notify::PROTOCOL_ID,
             traffic_class: TrafficClass::Default(1),
             ingress_limit: leios_notify::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         });
         configs.push(ProtocolConfig {
             id: leios_fetch::PROTOCOL_ID,
             traffic_class: TrafficClass::Default(1),
             ingress_limit: leios_fetch::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: BULK_FETCH_QUEUE_SIZE,
         });
     }
     configs
