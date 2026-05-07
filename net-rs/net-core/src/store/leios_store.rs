@@ -346,7 +346,7 @@ impl LeiosStore {
 
         // Optional diagnostic: emit a stats line every Nth bump so we can
         // spot unbounded growth from outside. `0` disables.
-        if inner.stats_log_interval > 0 && inner.version % inner.stats_log_interval == 0 {
+        if inner.stats_log_interval > 0 && inner.version.is_multiple_of(inner.stats_log_interval) {
             tracing::info!(
                 version = inner.version,
                 max_slot = inner.max_slot,

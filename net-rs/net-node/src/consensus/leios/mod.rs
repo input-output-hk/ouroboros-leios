@@ -16,8 +16,6 @@ use con_rs::leios::{
     ChainTipContext, LeiosEffect, LeiosState, LeiosTelemetryEvent, ValidatedVote, VotingConfig,
 };
 pub use con_rs::leios::EbTxMatchOutcome;
-#[cfg(test)]
-use con_rs::pipeline::PipelinePhase;
 pub use con_rs::pipeline::PipelineConfig;
 use con_rs::wfa;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
@@ -461,16 +459,6 @@ impl LeiosConsensus {
     }
 
     // -- Test helpers (delegate through state) -----------------------------
-
-    #[cfg(test)]
-    fn election_phase(&self, hash: &[u8; 32]) -> Option<PipelinePhase> {
-        self.state.elections.phase(hash)
-    }
-
-    #[cfg(test)]
-    fn election_count(&self) -> usize {
-        self.state.elections.count()
-    }
 
     #[cfg(test)]
     fn election_voted(&self, hash: &[u8; 32]) -> bool {
@@ -1111,7 +1099,7 @@ mod tests {
         let _ = next_record_cmd(&mut rx).await;
         let _ = next_fetch_cmd(&mut rx).await;
 
-        let outcome = leios.match_eb_tx_response(&eb_point, &[body1.clone()]);
+        let outcome = leios.match_eb_tx_response(&eb_point, std::slice::from_ref(&body1));
         assert_eq!(outcome.matched_bodies, vec![body1]);
         assert_eq!(outcome.requested, 3);
         let remaining: Vec<u32> = bitmap_helpers::iter_indices(&outcome.remaining_bitmap).collect();

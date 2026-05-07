@@ -100,16 +100,10 @@ impl Mempool {
         drained
     }
 
-    /// Peek at up to `max_count` transactions without removing them.
-    /// Used by TxSubmission pull model — txs stay available for other
-    /// peers and block production.
-    pub fn peek_up_to(&self, max_count: usize) -> Vec<PendingTx> {
-        self.txs.iter().take(max_count).cloned().collect()
-    }
-
-    /// Like `peek_up_to`, but only returns txs not yet advertised to
-    /// `peer_id`, and records the returned ids so subsequent calls skip
-    /// them. The set is pruned automatically when txs leave the mempool.
+    /// Returns up to `max_count` txs not yet advertised to `peer_id`,
+    /// recording the returned ids so subsequent calls skip them.  The
+    /// per-peer advertised set is pruned automatically when txs leave
+    /// the mempool.
     pub fn peek_unannounced_for_peer(
         &mut self,
         peer_id: PeerId,
@@ -318,11 +312,6 @@ fn exp_sample(rng: &mut StdRng, rate: f64) -> Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn make_tx(size: usize) -> PendingTx {
-        let mut rng = StdRng::seed_from_u64(42);
-        make_fake_tx(&mut rng, size)
-    }
 
     fn make_tx_with_id(id: u8, size: usize) -> PendingTx {
         PendingTx {
@@ -636,30 +625,6 @@ mod tests {
         let mean = total / n as f64;
         // Expected mean = 1/rate = 0.5. Allow ±20%.
         assert!((0.4..=0.6).contains(&mean), "mean={mean}, expected ~0.5");
-    }
-
-    // -- peek_up_to tests --
-
-    #[test]
-    fn peek_up_to_doesnt_remove() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 100));
-        pool.push(make_tx_with_id(2, 200));
-        pool.push(make_tx_with_id(3, 300));
-
-        let peeked = pool.peek_up_to(2);
-        assert_eq!(peeked.len(), 2);
-        assert_eq!(pool.len(), 3);
-    }
-
-    #[test]
-    fn peek_up_to_clamps_to_available() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 100));
-        pool.push(make_tx_with_id(2, 200));
-
-        let peeked = pool.peek_up_to(10);
-        assert_eq!(peeked.len(), 2);
     }
 
     // -- spawn_tx_validator tests --
