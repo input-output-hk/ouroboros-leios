@@ -386,7 +386,18 @@ impl LeiosState {
                                 ?reason,
                                 "no vote on eb"
                             );
-                            self.elections.mark_voted(&eb_hash);
+                            // Only `LateEB` is permanent — `eb_seen_slot`
+                            // is fixed once observed, and a late EB stays
+                            // late.  `WrongEB` / `LateRBHeader` /
+                            // `MissingTX` are transient: the chain tip
+                            // may catch up next slot, or the missing TX
+                            // may arrive.  Suppress `mark_voted` so the
+                            // election re-fires `EligibleToVote` while
+                            // it's still in the Voting phase, giving
+                            // slow propagation a chance to land.
+                            if matches!(reason, NoVoteReason::LateEB) {
+                                self.elections.mark_voted(&eb_hash);
+                            }
                             fx.push(LeiosEffect::NoVote {
                                 eb_slot,
                                 eb_hash,
@@ -1424,8 +1435,9 @@ mod tests {
         state.elections.announce(10, h(1));
         let fx = state.on_slot(13, &tx_all);
         assert_no_vote(&fx, h(1), NoVoteReason::WrongEB);
-        // Election is mark_voted to suppress repeat NoVote next slot.
-        assert!(state.elections.voted(&h(1)));
+        // WrongEB is transient: do NOT mark_voted, so subsequent slots can
+        // re-evaluate as the chain tip catches up.
+        assert!(!state.elections.voted(&h(1)));
     }
 
     #[test]
@@ -1491,16 +1503,47 @@ mod tests {
     }
 
     #[test]
-    fn no_vote_repeat_suppressed_by_mark_voted() {
+    fn no_vote_late_eb_marks_voted_to_suppress_repeat() {
+        // LateEB is the only NoVote reason that mark_voted suppresses,
+        // because `eb_seen_slot` is fixed at receipt — once late, always
+        // late.  Other NoVote reasons (WrongEB, LateRBHeader, MissingTX)
+        // are transient and intentionally re-fire next slot so a slow
+        // chain-tip update or a delayed TX still gets a chance to vote.
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
         state.on_slot(10, &tx_all);
         state.elections.announce(10, h(1));
-        // No chain tip → first slot in Voting fires NoVote(WrongEB).
+        tip_for(&mut state, 10, h(1));
+        state.elections.election_mut(&h(1)).unwrap().seen_slot = 18;
+        // First slot in Voting fires NoVote(LateEB) and marks voted.
         let fx_first = state.on_slot(13, &tx_all);
         assert_eq!(fx_first.len(), 1);
-        assert!(matches!(fx_first[0], LeiosEffect::NoVote { .. }));
-        // Subsequent slot in Voting: mark_voted suppresses.
+        assert!(matches!(
+            fx_first[0],
+            LeiosEffect::NoVote {
+                reason: NoVoteReason::LateEB,
+                ..
+            }
+        ));
+        assert!(state.elections.voted(&h(1)));
+        // Subsequent slots stay quiet.
         let fx_second = state.on_slot(14, &tx_all);
         assert!(fx_second.is_empty());
+    }
+
+    #[test]
+    fn no_vote_transient_reasons_re_fire_each_slot() {
+        // WrongEB / LateRBHeader / MissingTX leave the election unvoted
+        // so EligibleToVote re-fires every slot of the Voting window —
+        // gives the chain tip / mempool a chance to catch up.
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        state.on_slot(10, &tx_all);
+        state.elections.announce(10, h(1));
+        // No chain tip → WrongEB.
+        let fx_first = state.on_slot(13, &tx_all);
+        assert_no_vote(&fx_first, h(1), NoVoteReason::WrongEB);
+        assert!(!state.elections.voted(&h(1)));
+        // Next slot: still no chain tip → WrongEB again, not suppressed.
+        let fx_second = state.on_slot(14, &tx_all);
+        assert_no_vote(&fx_second, h(1), NoVoteReason::WrongEB);
     }
 }

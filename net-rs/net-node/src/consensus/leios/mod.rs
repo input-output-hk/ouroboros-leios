@@ -459,6 +459,11 @@ impl LeiosConsensus {
             data.push(encoded);
         }
         if !votes.is_empty() {
+            self.pending_telemetry.push(NodeEvent::VTBundleGenerated {
+                node: self.state.node_id.clone(),
+                slot: eb_slot,
+                count: votes.len(),
+            });
             let _ = self
                 .commands
                 .send(NetworkCommand::InjectLeiosVotes { votes, data })
