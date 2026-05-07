@@ -815,7 +815,7 @@ mod tests {
         let hash = [0x77u8; 32];
         let point = Point::Specific { slot: 50, hash };
         let txs: Vec<Vec<u8>> = (0..100u8).map(|i| vec![i, i, i]).collect();
-        store.inject_block_txs(point.clone(), txs);
+        store.inject_block_txs_full(point.clone(), txs);
 
         let server_handle =
             tokio::spawn(serve_leios_fetch(server_send, server_recv, store.clone()));

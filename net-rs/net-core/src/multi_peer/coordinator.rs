@@ -5,7 +5,7 @@
 //! all peer tasks via a shared fan-in channel and sends commands to
 //! individual peers via per-peer channels.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -568,6 +568,33 @@ impl Coordinator {
                 point,
                 transactions,
             } => {
+                // Re-inject fetched bodies into the local store so this
+                // node can serve / re-announce them to downstream peers
+                // (epidemic flooding rather than star-from-producer).
+                // Position bodies by content hash → manifest index so a
+                // partial response from the upstream peer still lands
+                // at the right slots in our sparse holdings.
+                if let (Some(store), Point::Specific { slot, hash }) =
+                    (&self.leios_store, &point)
+                {
+                    if let Some(manifest) = store.get_eb_manifest(*slot, hash) {
+                        let by_hash: HashMap<[u8; 32], u32> = manifest
+                            .iter()
+                            .enumerate()
+                            .map(|(i, h)| (*h, i as u32))
+                            .collect();
+                        let indexed: BTreeMap<u32, Vec<u8>> = transactions
+                            .iter()
+                            .filter_map(|body| {
+                                let id = blake2b_256(body);
+                                by_hash.get(&id).map(|&i| (i, body.clone()))
+                            })
+                            .collect();
+                        if !indexed.is_empty() {
+                            store.inject_block_txs(point.clone(), indexed);
+                        }
+                    }
+                }
                 self.emit_event(NetworkEvent::LeiosBlockTxsReceived {
                     point,
                     transactions,
@@ -755,7 +782,11 @@ impl Coordinator {
                 transactions,
             } => {
                 if let Some(ref store) = self.leios_store {
-                    store.inject_block_txs(point, transactions);
+                    // Producer-side command: caller passes the full
+                    // ordered body list. Receiver-side merging from
+                    // partial fetches happens in the LeiosBlockTxsFetched
+                    // handler, not here.
+                    store.inject_block_txs_full(point, transactions);
                 }
             }
 
@@ -1230,6 +1261,15 @@ impl Coordinator {
             peer.task_handle.abort();
         }
     }
+}
+
+/// Blake2b-256 over arbitrary bytes. Matches the tx-id derivation used
+/// by the consensus layer: `blake2b_simd::Params::new().hash_length(32)`.
+fn blake2b_256(bytes: &[u8]) -> [u8; 32] {
+    let result = blake2b_simd::Params::new().hash_length(32).hash(bytes);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(result.as_bytes());
+    out
 }
 
 /// Decrement the per-IP connection count, removing the entry if it reaches zero.
@@ -2510,6 +2550,129 @@ mod tests {
             .await
             .expect("shutdown should accept");
         let _ = tokio::time::timeout(Duration::from_secs(2), handle).await;
+    }
+
+    /// On `LeiosBlockTxsFetched`, the coordinator must hash each body, look
+    /// up its position in the recorded manifest, and merge the bodies into
+    /// the store at those indices. Without this, a non-producer node never
+    /// becomes a source for downstream gossip — every voter ends up
+    /// fetching directly from the producer (hub-spoke).
+    #[tokio::test]
+    async fn coordinator_reinjects_fetched_block_txs_into_store() {
+        let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
+        let (net_event_sender, mut net_event_receiver) = mpsc::channel(NETWORK_EVENTS_CAPACITY);
+        let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
+        let config = CoordinatorConfig::default();
+        let (chain_store, _chain_rx) = ChainStore::new(100);
+        let (leios_store, _leios_rx) = LeiosStore::new(100);
+        let mut coordinator = Coordinator::new(
+            config,
+            peer_event_sender,
+            peer_event_receiver,
+            net_event_sender,
+            net_cmd_receiver,
+            chain_store,
+            Some(leios_store.clone()),
+        );
+
+        // Manifest must be in place before the coordinator can position
+        // received bodies. In production net-node records this after
+        // decoding the EB body; here we set it directly.
+        let body0 = b"alpha".to_vec();
+        let body1 = b"bravo".to_vec();
+        let body2 = b"charlie".to_vec();
+        let h0 = blake2b_256(&body0);
+        let h1 = blake2b_256(&body1);
+        let h2 = blake2b_256(&body2);
+        let eb_hash = [0xEEu8; 32];
+        let point = Point::Specific {
+            slot: 12,
+            hash: eb_hash,
+        };
+        leios_store.record_eb_manifest(point.clone(), vec![h0, h1, h2]);
+
+        // Simulate a partial response from an upstream peer: indices 0
+        // and 2 only. Order is reversed to confirm we don't rely on
+        // response order.
+        coordinator
+            .handle_peer_event(
+                PeerId(7),
+                PeerEvent::LeiosBlockTxsFetched {
+                    point: point.clone(),
+                    transactions: vec![body2.clone(), body0.clone()],
+                },
+            )
+            .await;
+
+        // Bodies are merged at the right positions.
+        let bitmap = crate::protocols::leios_fetch::bitmap::from_indices(&[0, 1, 2]);
+        let got = leios_store
+            .get_block_txs(12, &eb_hash, &bitmap)
+            .expect("store should know about EB");
+        // Index 1 is missing (we never fetched it); union returns just
+        // 0 and 2 in ascending order.
+        assert_eq!(got, vec![body0.clone(), body2.clone()]);
+
+        // The application also gets the original event with all bodies.
+        match net_event_receiver.try_recv().expect("event emitted") {
+            NetworkEvent::LeiosBlockTxsReceived {
+                point: p,
+                transactions,
+            } => {
+                assert_eq!(p, point);
+                assert_eq!(transactions, vec![body2, body0]);
+            }
+            other => panic!("expected LeiosBlockTxsReceived, got {other:?}"),
+        }
+    }
+
+    /// When the manifest hasn't been recorded yet (race-free in
+    /// production but defensible in tests), the coordinator must
+    /// still forward the event without panicking. Bodies aren't
+    /// indexed; downstream peers will see no advertisement until
+    /// the manifest arrives.
+    #[tokio::test]
+    async fn coordinator_handles_block_txs_fetched_without_manifest() {
+        let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
+        let (net_event_sender, mut net_event_receiver) = mpsc::channel(NETWORK_EVENTS_CAPACITY);
+        let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
+        let config = CoordinatorConfig::default();
+        let (chain_store, _chain_rx) = ChainStore::new(100);
+        let (leios_store, _leios_rx) = LeiosStore::new(100);
+        let mut coordinator = Coordinator::new(
+            config,
+            peer_event_sender,
+            peer_event_receiver,
+            net_event_sender,
+            net_cmd_receiver,
+            chain_store,
+            Some(leios_store.clone()),
+        );
+
+        let eb_hash = [0xCCu8; 32];
+        let point = Point::Specific {
+            slot: 14,
+            hash: eb_hash,
+        };
+
+        coordinator
+            .handle_peer_event(
+                PeerId(3),
+                PeerEvent::LeiosBlockTxsFetched {
+                    point: point.clone(),
+                    transactions: vec![b"orphan".to_vec()],
+                },
+            )
+            .await;
+
+        // Event is still forwarded.
+        assert!(matches!(
+            net_event_receiver.try_recv(),
+            Ok(NetworkEvent::LeiosBlockTxsReceived { .. })
+        ));
+        // Store has nothing — no manifest, no inject.
+        let bitmap = crate::protocols::leios_fetch::bitmap::from_indices(&[0]);
+        assert!(leios_store.get_block_txs(14, &eb_hash, &bitmap).is_none());
     }
 
     /// When a peer's command channel fills (peer task not draining), the

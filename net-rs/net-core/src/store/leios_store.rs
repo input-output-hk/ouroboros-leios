@@ -45,9 +45,13 @@ struct BlockKey {
 struct LeiosStoreInner {
     /// Endorser blocks keyed by (slot, hash).
     blocks: HashMap<BlockKey, Vec<u8>>,
-    /// Full transaction bodies per EB. Populated by the producer of an EB
-    /// (it has every body in hand) — gives a fast direct lookup path.
-    block_txs: HashMap<BlockKey, Vec<Vec<u8>>>,
+    /// Transaction bodies per EB, keyed by manifest index. Sparse — a
+    /// receiver accumulating partial bitmap responses populates only the
+    /// indices it has seen so far. The producer populates `0..N` in one
+    /// shot. `get_block_txs` falls through to manifest+resolver for any
+    /// index missing here, so partial holdings still serve subsets to
+    /// downstream peers.
+    block_txs: HashMap<BlockKey, BTreeMap<u32, Vec<u8>>>,
     /// Per-EB ordered tx hash list. Populated by receivers after decoding
     /// a fetched EB manifest. Pairs with `tx_body_resolver` to serve the
     /// bodies indirectly without keeping a duplicate copy.
@@ -166,23 +170,50 @@ impl LeiosStore {
         self.bump_version(&mut inner);
     }
 
-    /// Inject transactions for an endorser block. Generates a BlockTxsOffer notification.
+    /// Merge transaction bodies for an endorser block, indexed by their
+    /// position in the EB manifest. Producers call once with indices
+    /// `0..N` populated; receivers call repeatedly as partial bitmap
+    /// responses arrive. Existing entries are preserved on conflict
+    /// (first writer wins).
     ///
-    /// The `point` must be `Point::Specific { slot, hash }`. If `Point::Origin`
-    /// is passed, the transactions are silently dropped.
-    pub fn inject_block_txs(&self, point: Point, transactions: Vec<Vec<u8>>) {
+    /// A `BlockTxsOffer` notification fires only on the first call for
+    /// a given EB. Subsequent merges are silent — peers already know we
+    /// have *something* for this EB; their next fetch sees the new
+    /// coverage.
+    ///
+    /// The `point` must be `Point::Specific { slot, hash }`. If
+    /// `Point::Origin` is passed, the transactions are silently dropped.
+    pub fn inject_block_txs(&self, point: Point, indexed: BTreeMap<u32, Vec<u8>>) {
         let (slot, hash) = match &point {
             Point::Specific { slot, hash } => (*slot, *hash),
             Point::Origin => return,
         };
         let mut inner = self.inner.lock().unwrap();
         let key = BlockKey { slot, hash };
-        inner.block_txs.insert(key, transactions);
-        inner
-            .notifications
-            .push(LeiosNotification::BlockTxsOffer { point });
+        let entry = inner.block_txs.entry(key).or_default();
+        let first_injection = entry.is_empty();
+        for (idx, body) in indexed {
+            entry.entry(idx).or_insert(body);
+        }
+        if first_injection {
+            inner
+                .notifications
+                .push(LeiosNotification::BlockTxsOffer { point });
+        }
         inner.max_slot = inner.max_slot.max(slot);
         self.bump_version(&mut inner);
+    }
+
+    /// Convenience for the producer path: inject a complete ordered body
+    /// list, indices `0..bodies.len()`. Equivalent to constructing a
+    /// `BTreeMap` and calling `inject_block_txs`.
+    pub fn inject_block_txs_full(&self, point: Point, bodies: Vec<Vec<u8>>) {
+        let indexed: BTreeMap<u32, Vec<u8>> = bodies
+            .into_iter()
+            .enumerate()
+            .map(|(i, b)| (i as u32, b))
+            .collect();
+        self.inject_block_txs(point, indexed);
     }
 
     /// Inject votes. Generates a VotesOffer notification.
@@ -232,10 +263,14 @@ impl LeiosStore {
     }
 
     /// Look up transactions for an endorser block, filtered by the
-    /// CIP-0164 sparse bitmap. Returns `None` if the EB is unknown.
-    /// Returns transactions in ascending index order; out-of-range
-    /// bits in the bitmap are silently ignored. Indices whose body
-    /// the resolver cannot supply are silently dropped (partial response).
+    /// CIP-0164 sparse bitmap. Returns `None` if the EB is unknown
+    /// (neither sparse `block_txs` nor a manifest is recorded).
+    ///
+    /// For each requested index, prefers a body from the sparse
+    /// `block_txs` map; falls through to manifest + `TxBodyResolver`
+    /// for indices not yet held there. Returns the union — bodies in
+    /// ascending index order, silently dropping indices whose body
+    /// neither path can supply (partial response).
     pub fn get_block_txs(
         &self,
         slot: u64,
@@ -243,30 +278,36 @@ impl LeiosStore {
         bitmap: &BTreeMap<u16, u64>,
     ) -> Option<Vec<Vec<u8>>> {
         let key = BlockKey { slot, hash: *hash };
-        // Producer path: full bodies cached directly.
-        {
+        let (block_txs, manifest) = {
             let inner = self.inner.lock().unwrap();
-            if let Some(stored) = inner.block_txs.get(&key) {
-                let selected: Vec<Vec<u8>> = bitmap::iter_indices(bitmap)
-                    .filter_map(|i| stored.get(i as usize).cloned())
-                    .collect();
-                return Some(selected);
-            }
-        }
-        // Receiver path: manifest cached, bodies resolved via callback.
-        let manifest = {
-            let inner = self.inner.lock().unwrap();
-            inner.eb_tx_hashes.get(&key).cloned()
+            (
+                inner.block_txs.get(&key).cloned(),
+                inner.eb_tx_hashes.get(&key).cloned(),
+            )
         };
-        let manifest = manifest?;
-        let resolver = self.tx_body_resolver.as_ref()?;
+        if block_txs.is_none() && manifest.is_none() {
+            return None;
+        }
+        let resolver = self.tx_body_resolver.as_ref();
         let selected: Vec<Vec<u8>> = bitmap::iter_indices(bitmap)
             .filter_map(|i| {
-                let h = manifest.get(i as usize)?;
-                resolver.resolve_body(h)
+                if let Some(body) = block_txs.as_ref().and_then(|m| m.get(&i).cloned()) {
+                    return Some(body);
+                }
+                let h = manifest.as_ref()?.get(i as usize)?;
+                resolver?.resolve_body(h)
             })
             .collect();
         Some(selected)
+    }
+
+    /// Look up the ordered tx-hash manifest for an EB, if recorded.
+    /// Receivers consult this to map a fetched body's content hash to
+    /// its position in the EB before merging into `block_txs`.
+    pub fn get_eb_manifest(&self, slot: u64, hash: &[u8; 32]) -> Option<Vec<[u8; 32]>> {
+        let inner = self.inner.lock().unwrap();
+        let key = BlockKey { slot, hash: *hash };
+        inner.eb_tx_hashes.get(&key).cloned()
     }
 
     /// Look up votes by their `(slot, voter_id)` identifiers.
@@ -389,7 +430,7 @@ mod tests {
         let txs = vec![vec![10, 20], vec![30, 40]];
         let point = Point::Specific { slot: 42, hash };
 
-        store.inject_block_txs(point, txs.clone());
+        store.inject_block_txs_full(point, txs.clone());
 
         let bitmap = bitmap::select_all(txs.len() as u32);
         assert_eq!(store.get_block_txs(42, &hash, &bitmap), Some(txs));
@@ -403,7 +444,7 @@ mod tests {
         let txs = vec![vec![10, 20], vec![30, 40]];
         let point = Point::Specific { slot: 42, hash };
 
-        store.inject_block_txs(point, txs);
+        store.inject_block_txs_full(point, txs);
 
         let bitmap = BTreeMap::new();
         assert_eq!(store.get_block_txs(42, &hash, &bitmap), Some(Vec::new()));
@@ -416,7 +457,7 @@ mod tests {
         let txs: Vec<Vec<u8>> = (0..70u8).map(|i| vec![i]).collect();
         let point = Point::Specific { slot: 1, hash };
 
-        store.inject_block_txs(point, txs);
+        store.inject_block_txs_full(point, txs);
 
         // Pick out-of-order indices spanning two segments to check ordering.
         let bitmap = bitmap::from_indices(&[65, 0, 63]);
@@ -489,7 +530,7 @@ mod tests {
             slot: 1,
             hash: eb_hash,
         };
-        store.inject_block_txs(point.clone(), vec![vec![100u8], vec![200u8]]);
+        store.inject_block_txs_full(point.clone(), vec![vec![100u8], vec![200u8]]);
         // Pretend we also have manifest hashes (would normally be set
         // separately; here we make sure the block_txs path wins).
         store.record_eb_manifest(point, vec![[0; 32], [0; 32]]);
@@ -513,12 +554,123 @@ mod tests {
         let hash = [0xAA; 32];
         let txs = vec![vec![1u8], vec![2u8]];
         let point = Point::Specific { slot: 5, hash };
-        store.inject_block_txs(point, txs);
+        store.inject_block_txs_full(point, txs);
 
         // Bit 99 is past the available 2 txs; should be silently dropped.
         let bitmap = bitmap::from_indices(&[0, 99]);
         let got = store.get_block_txs(5, &hash, &bitmap).unwrap();
         assert_eq!(got, vec![vec![1u8]]);
+    }
+
+    #[test]
+    fn inject_block_txs_partial_then_partial_unions_holdings() {
+        let (store, _rx) = LeiosStore::new(100);
+        let hash = [0x01u8; 32];
+        let point = Point::Specific { slot: 7, hash };
+
+        // First batch: indices 0 and 2.
+        let mut first = BTreeMap::new();
+        first.insert(0u32, vec![0xA0]);
+        first.insert(2u32, vec![0xA2]);
+        store.inject_block_txs(point.clone(), first);
+
+        // Second batch: indices 1 and 3.
+        let mut second = BTreeMap::new();
+        second.insert(1u32, vec![0xA1]);
+        second.insert(3u32, vec![0xA3]);
+        store.inject_block_txs(point, second);
+
+        let bitmap = bitmap::from_indices(&[0, 1, 2, 3]);
+        let got = store.get_block_txs(7, &hash, &bitmap).unwrap();
+        assert_eq!(got, vec![vec![0xA0], vec![0xA1], vec![0xA2], vec![0xA3]]);
+    }
+
+    #[test]
+    fn inject_block_txs_emits_offer_only_on_first_call() {
+        let (store, _rx) = LeiosStore::new(100);
+        let hash = [0x02u8; 32];
+        let point = Point::Specific { slot: 8, hash };
+
+        let mut a = BTreeMap::new();
+        a.insert(0u32, vec![0xB0]);
+        store.inject_block_txs(point.clone(), a);
+
+        let mut b = BTreeMap::new();
+        b.insert(1u32, vec![0xB1]);
+        store.inject_block_txs(point, b);
+
+        // One BlockTxsOffer notification, not two.
+        let txs_offers = store
+            .notifications_after(0)
+            .into_iter()
+            .filter(|n| matches!(n, LeiosNotification::BlockTxsOffer { .. }))
+            .count();
+        assert_eq!(txs_offers, 1);
+    }
+
+    #[test]
+    fn inject_block_txs_does_not_overwrite_existing_index() {
+        let (store, _rx) = LeiosStore::new(100);
+        let hash = [0x03u8; 32];
+        let point = Point::Specific { slot: 9, hash };
+
+        let mut a = BTreeMap::new();
+        a.insert(0u32, vec![0xC0]);
+        store.inject_block_txs(point.clone(), a);
+
+        // Conflicting body for index 0 — first writer wins.
+        let mut b = BTreeMap::new();
+        b.insert(0u32, vec![0xFF]);
+        store.inject_block_txs(point, b);
+
+        let bitmap = bitmap::from_indices(&[0]);
+        let got = store.get_block_txs(9, &hash, &bitmap).unwrap();
+        assert_eq!(got, vec![vec![0xC0]]);
+    }
+
+    #[test]
+    fn get_block_txs_unions_block_txs_with_manifest_resolver() {
+        // Sparse block_txs has indices 0 and 2; manifest+resolver covers
+        // index 1. The union must satisfy a request for all three.
+        let h0 = [0x10u8; 32];
+        let h1 = [0x20u8; 32];
+        let h2 = [0x30u8; 32];
+        let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(HashMap::from([(
+            h1.to_vec(),
+            vec![0xD1],
+        )])));
+        let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
+
+        let eb_hash = [0xDDu8; 32];
+        let point = Point::Specific {
+            slot: 11,
+            hash: eb_hash,
+        };
+        store.record_eb_manifest(point.clone(), vec![h0, h1, h2]);
+
+        let mut partial = BTreeMap::new();
+        partial.insert(0u32, vec![0xD0]);
+        partial.insert(2u32, vec![0xD2]);
+        store.inject_block_txs(point, partial);
+
+        let bitmap = bitmap::from_indices(&[0, 1, 2]);
+        let got = store.get_block_txs(11, &eb_hash, &bitmap).unwrap();
+        assert_eq!(got, vec![vec![0xD0], vec![0xD1], vec![0xD2]]);
+    }
+
+    #[test]
+    fn get_eb_manifest_returns_recorded_hashes() {
+        let (store, _rx) = LeiosStore::new(100);
+        let eb_hash = [0xE1u8; 32];
+        let point = Point::Specific {
+            slot: 13,
+            hash: eb_hash,
+        };
+        let manifest = vec![[0xAA; 32], [0xBB; 32]];
+        store.record_eb_manifest(point, manifest.clone());
+
+        assert_eq!(store.get_eb_manifest(13, &eb_hash), Some(manifest));
+        assert_eq!(store.get_eb_manifest(99, &eb_hash), None);
     }
 
     #[test]
