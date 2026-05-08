@@ -1,38 +1,63 @@
+.devTracker {
+  width: 100%;
+  border: none;
+  display: block;
+  contain: paint;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+
+  background-color: #200830;
+}
+
 .heroBanner {
-  padding-top: 4rem;
-  padding-bottom: 4rem;
+  padding-top: 14rem;
+  padding-bottom: 10rem;
   display: flex;
   justify-content: center;
   flex-direction: column;
   align-items: flex-start;
   position: relative;
-  height: 37.75rem;
   color: #fff;
+  max-width: 37.4rem;
 }
 
 @media (max-width: 997px) {
   .heroBanner {
-    height: 28.125rem;
+    padding-bottom: 6.25rem;
   }
 }
 
 .heroStandfirst {
-  font-size: var(--text-2xl);
+  font-size: 1.375rem;
   font-weight: var(--font-weight-regular);
-  line-height: var(--line-height-sm);
+  line-height: 1.4;
+  max-width: 28.0625rem;
+  margin-bottom: 3rem !important;
 }
 
 .heroTitle {
-  margin-bottom: 1.25rem !important;
+  margin-bottom: 2.5rem !important;
+  font-weight: 500;
+}
+
+.heroButtonsContainer {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .heroButtonsContainer {
+    flex-direction: column;
+    display: flex;
+    gap: 1.5rem;
+    width: 100%;
+  }
 }
 
 @media (max-width: 997px) {
   .heroStandfirst {
-    font-size: var(--text-xl);
-    line-height: var(--line-height-normal);
-  }
-  .heroTitle {
-    margin-bottom: 1.8125rem !important;
+    margin-bottom: 2.5rem !important;
   }
 }
 
@@ -413,7 +438,9 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .trackerEmbedContainer:hover .trackerImage {

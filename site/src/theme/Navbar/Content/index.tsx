@@ -29,7 +29,7 @@ function NavbarItems({ items }: { items: NavbarItemConfig[] }): JSX.Element {
             new Error(
               `A theme navbar item failed to render.
 Please double-check the following navbar item (themeConfig.navbar.items) of your Docusaurus config:
-${JSON.stringify(item, null, 2)}`
+${JSON.stringify(item, null, 2)}`,
             )
           }
         >
@@ -40,13 +40,7 @@ ${JSON.stringify(item, null, 2)}`
   );
 }
 
-function NavbarContentLayout({
-  left,
-  right,
-}: {
-  left: ReactNode;
-  right: ReactNode;
-}) {
+function NavbarContentLayout({ right }: { left: ReactNode; right: ReactNode }) {
   const { pathname } = useLocation();
   return (
     <>
@@ -84,6 +78,7 @@ export default function NavbarContent(): JSX.Element {
   const [leftItems, rightItems] = splitNavbarItems(items);
 
   const searchBarItem = items.find((item) => item.type === "search");
+  const { pathname } = useLocation();
 
   return (
     <NavbarContentLayout
@@ -100,7 +95,9 @@ export default function NavbarContent(): JSX.Element {
           {!mobileSidebar.disabled && <NavbarMobileSidebarToggle />}
           <div className="navbar_item_menu">
             <NavbarItems items={rightItems} />
-            <NavbarColorModeToggle className={styles.colorModeToggle} />
+            {pathname !== "/" && (
+              <NavbarColorModeToggle className={styles.colorModeToggle} />
+            )}
             {!searchBarItem && (
               <NavbarSearch>
                 <SearchBar />
