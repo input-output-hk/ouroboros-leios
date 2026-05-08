@@ -1,21 +1,21 @@
 	Command being timed: "../../sim-cli -p everyone/topology-v2/seed-0/config.yaml network.yaml --slots 1500 --conformance-events sim.log"
-	User time (seconds): 12389.63
-	System time (seconds): 2837.36
-	Percent of CPU this job got: 1091%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 23:15.62
+	User time (seconds): 9422.61
+	System time (seconds): 2455.54
+	Percent of CPU this job got: 1153%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 17:10.01
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 10410624
+	Maximum resident set size (kbytes): 6990980
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 14688659
-	Voluntary context switches: 368987609
-	Involuntary context switches: 370248782
+	Minor (reclaiming a frame) page faults: 11754589
+	Voluntary context switches: 303030387
+	Involuntary context switches: 348230748
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 672
+	File system outputs: 592
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
