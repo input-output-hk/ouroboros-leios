@@ -6,6 +6,25 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-05-07
+
+### SN on prototyping committee selection and vote validation
+
+- The lucky seed with duplicate voter ids (because mock used duplicate first bytes of KES keys) is driving nicely the committee selection code paths.
+- Only adding the minimum needed to satisfy the call sites. Added `getVoterId :: VotingKey -> Committee -> Maybe VoterId`, which required me to define (at least) `type Committee = Set VotingKey`
+- A `newtype Committee = MkCommitee {voters :: Set VotingKey}` is better..
+- I want to have a reason to implement `validateLeiosVote` .. what could drive this?
+- If I would have a stake threshold cut off, but make the production site ignore it.. I should see invalid votes? .. until I fix it again .. not very convincing.
+- Vote validation is every only <u>needed</u> if the issued votes are maliciously crafted. For our node to be able to do that in testing, we would need to swap out (at least) the vote production thread. Then vote validation on the vote store (before sending) or on the receiving end would be triggered.
+- Exploring committee access for vote validation without a test
+- We want to validate votes primarily when receiving them via the mini-protocol. It would also be fine if we validate our own vote before sending it out (defensive programming). This suggests that vote validation should happen in `addVote` of the `LeiosVoteState`
+- To `validateLeiosVote` we need access to the `committee`. Just adding it to `addVote` will not work as we don't have access to a ledger state in the mini protocol client that receives votes.. right?
+- Two options: `LeiosVoteState` gets the ability to fetch the current ledger state/committee (like `Mempool` via `LedgerInterface`) or we "push" it into the `LeiosVoteState` via an `updateCommittee`. What works better on this rarely changing aspect (once per epoch)?
+- By passing in the STM action to get a committee, the `LeiosVoteState` stays easily testable.
+- The casing in `addTx` drove me nicely into an `data AddVoteResult = NoCommittee | InvalidVote ...` direction that can now be used to drive the vote validation (part of `addTx`) to actually check and use the committee / signature schemes via the `LeiosVoteState` test suite. Arguably this could also be unit tests on `validateLeiosVote` directly, but there is no *need* to test at the lower level: the LeiosVoteState is as quick and expressive; maybe preference or separation of concerns / tests could be arguments.
+- After having a nice test driver, I was forced to do actual digital signatures. To get BLS (our target) I need to bump cardano-crypto-class to a later version.
+- Getting latest `cardano-crypto-class` integrated to `cardano-ledger`, `ouroboros-network` and `ouroboros-consensus` was quite some work.. but I finally have BLS DSIGN now!
+
 ## 2026-04-21
 
 ### SN on exploring voting architecture
