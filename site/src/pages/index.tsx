@@ -507,10 +507,10 @@ export default function Home(): React.ReactElement {
       <HomepageHeader />
       <main>
         {/* <HomepageFeatures /> */}
-        <div data-theme="dark">
+        {/* <div data-theme="dark">
           <LeiosSpecificationSection />
           <HowLeiosWorksSection />
-        </div>
+        </div> */}
         <iframe
           ref={iframeRef}
           src="https://engineering.iog.io/documentation-dashboard"
