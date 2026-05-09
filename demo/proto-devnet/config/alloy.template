@@ -1,3 +1,7 @@
+livedebugging {
+	enabled = true
+}
+
 prometheus.remote_write "prometheus" {
 	endpoint {
 		url = "http://127.0.0.1:9090/api/v1/write"
@@ -105,8 +109,8 @@ loki.process "extract_cardano_node_logs" {
 	}
 
 	stage.drop {
-    source = "process"
-    value = "Analyze"
+		source = "process"
+		value  = "Analyze"
 	}
 
 	stage.timestamp {
@@ -132,6 +136,7 @@ loki.process "extract_cardano_node_logs" {
 
 	stage.match {
 		selector = `{process="TxCentrifuge"}`
+
 		stage.static_labels {
 			values = {
 				service = "tx-centrifuge",
@@ -144,5 +149,112 @@ loki.process "extract_cardano_node_logs" {
 		source = "data"
 	}
 
+	forward_to = [
+		loki.write.loki.receiver,
+		loki.process.extract_ptrace_logs.receiver,
+	]
+}
+
+loki.process "extract_ptrace_logs" {
+	stage.json {
+		expressions = {
+			kind = "kind",
+		}
+	}
+
+	stage.labels {
+		values = {
+			kind = "kind",
+		}
+	}
+
+	stage.match {
+		selector = `{kind="Process"}`
+
+		stage.json {
+			expressions = {
+				event    = "event",
+				label    = "label",
+				thread   = "thread_id",
+				argument = "argument",
+				host     = "host",
+			}
+			drop_malformed = true
+		}
+
+		stage.static_labels {
+			values = {
+				service = "ptrace",
+				type    = "ptrace",
+			}
+		}
+
+		stage.labels {
+			values = {
+				ptrace_label  = "label",
+				ptrace_thread = "thread",
+				ptrace_event  = "event",
+			}
+		}
+
+		stage.match {
+			selector = `{ptrace_event="Start"}`
+
+			stage.metrics {
+				metric.counter {
+					name        = "started_total"
+					description = "Total number of started processes"
+					prefix      = "ptrace_"
+					action      = "inc"
+
+					// Look at the "event" field extracted in stage.json
+					source = "event"
+					// Only increment if the source value matches this
+					value = "Start"
+					// Use extracted values as Prometheus labels
+					max_idle_duration = "24h"
+				}
+			}
+		}
+
+		stage.match {
+			selector = `{ptrace_event="End"}`
+
+			stage.json {
+				expressions = {
+					duration = "duration",
+				}
+				drop_malformed = true
+			}
+
+			stage.metrics {
+				metric.counter {
+					name        = "ended_total"
+					description = "Total number of ended processes"
+					prefix      = "ptrace_"
+					action      = "inc"
+
+					source            = "event"
+					value             = "End"
+					max_idle_duration = "24h"
+				}
+
+				metric.gauge {
+					name        = "duration_s"
+					description = "Process duration in seconds"
+					prefix      = "ptrace_"
+					action      = "set"
+					source      = "duration"
+				}
+			}
+		}
+	}
 	forward_to = [loki.write.loki.receiver]
+}
+
+prometheus.scrape "alloy_pipeline_metrics" {
+	targets         = [{"__address__" = "localhost:12345"}]
+	forward_to      = [prometheus.remote_write.prometheus.receiver]
+	scrape_timeout  = "1s"
+	scrape_interval = "1s"
 }

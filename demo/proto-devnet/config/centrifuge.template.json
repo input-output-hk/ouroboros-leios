@@ -18,7 +18,7 @@
   "rate_limit": {
     "type": "token_bucket",
     "scope": "shared",
-    "params": { "tps": 100 }
+    "params": { "tps": 1000 }
   },
   "workloads": {
     "synthetic-chain": {

@@ -11,6 +11,9 @@ MempoolCapacityBytesOverride: 25000000
 # Needed < 10.6
 EnableP2P: true
 
+LeiosDbConfig:
+  Backend: InMemory
+
 LastKnownBlockVersion-Alt: 0
 LastKnownBlockVersion-Major: 3
 LastKnownBlockVersion-Minor: 1
