@@ -77,26 +77,25 @@
  INFO praos: sim_cli::events: Pool 1489 published 1 naive praos block(s)
  INFO praos: sim_cli::events: Pool 1498 published 1 naive praos block(s)
  INFO leios: sim_cli::events: The average age of the pending transactions is NaNs (stddev NaN).
- INFO leios: sim_cli::events: 78 EB(s) were generated; on average there were 0.052 EB(s) per slot.
- INFO leios: sim_cli::events: Each EB contained an average of 6648.256 transaction(s) (stddev 2232.544). 0 EB(s) were empty.
- INFO leios: sim_cli::events: 55 out of 78 EBs expired before an EB from their stage reached an RB.
- INFO leios: sim_cli::events: 149573 out of 150006 transaction(s) were included in at least one EB.
- INFO leios: sim_cli::events: 17158 total votes were generated.
- INFO leios: sim_cli::events: Each stake pool produced an average of 37.463 vote(s) (stddev 14.708).
- INFO leios: sim_cli::events: Each EB received an average of 252.324 vote(s) (stddev 175.195).
- INFO leios: sim_cli::events: There were 17158 bundle(s) of votes. Each bundle contained 1.000 vote(s) (stddev 0.000).
- INFO leios: sim_cli::events: 17090 vote(s) were not generated due to validation failures:
- INFO leios: sim_cli::events:   LateRBHeader: 8595
- INFO leios: sim_cli::events:   LateEB: 6219
- INFO leios: sim_cli::events:   WrongEB: 2276
- INFO leios: sim_cli::events: 37 out of 78 EB(s) did not reach the vote threshold (336).
- INFO leios: sim_cli::events: 23 L1 block(s) had a Leios endorsement.
- INFO leios: sim_cli::events: 146907 tx(s) (220.36 MB) were referenced by a Leios endorsement.
- INFO leios: sim_cli::events: 3099 tx(s) (4.65 MB) were included directly in a Praos block.
- INFO leios: sim_cli::events: Spatial efficiency: 220.36 MB/16.80 MB (1311.922%) of Leios bytes were unique transactions.
- INFO leios: sim_cli::events: 144 tx(s) (0.098%) referenced by a Leios endorsement were redundant.
- INFO leios: sim_cli::events: Each transaction took an average of 237.139s (stddev 153.596) to be included in an EB.
- INFO leios: sim_cli::events: Each transaction took an average of 326.183s (stddev 165.835) to be included in a block.
- INFO network: sim_cli::events: 224716615 TX message(s) were sent. 224716615 of them were received (100.000%).
- INFO network: sim_cli::events: 114588 EB message(s) were sent. 114588 of them were received (100.000%).
- INFO network: sim_cli::events: 26106703 Vote message(s) were sent. 26106703 of them were received (100.000%).
+ INFO leios: sim_cli::events: 56 EB(s) were generated; on average there were 0.037 EB(s) per slot.
+ INFO leios: sim_cli::events: Each EB contained an average of 6671.643 transaction(s) (stddev 2045.491). 0 EB(s) were empty.
+ INFO leios: sim_cli::events: 36 out of 56 EBs expired before an EB from their stage reached an RB.
+ INFO leios: sim_cli::events: 149946 out of 150006 transaction(s) were included in at least one EB.
+ INFO leios: sim_cli::events: 16429 total votes were generated.
+ INFO leios: sim_cli::events: Each stake pool produced an average of 35.871 vote(s) (stddev 14.302).
+ INFO leios: sim_cli::events: Each EB received an average of 298.709 vote(s) (stddev 158.967).
+ INFO leios: sim_cli::events: There were 16429 bundle(s) of votes. Each bundle contained 1.000 vote(s) (stddev 0.000).
+ INFO leios: sim_cli::events: 7966 vote(s) were not generated due to validation failures:
+ INFO leios: sim_cli::events:   LateRBHeader: 7340
+ INFO leios: sim_cli::events:   WrongEB: 626
+ INFO leios: sim_cli::events: 15 out of 56 EB(s) did not reach the vote threshold (336).
+ INFO leios: sim_cli::events: 21 L1 block(s) had a Leios endorsement.
+ INFO leios: sim_cli::events: 147964 tx(s) (221.95 MB) were referenced by a Leios endorsement.
+ INFO leios: sim_cli::events: 2042 tx(s) (3.06 MB) were included directly in a Praos block.
+ INFO leios: sim_cli::events: Spatial efficiency: 221.95 MB/12.14 MB (1828.669%) of Leios bytes were unique transactions.
+ INFO leios: sim_cli::events: 61 tx(s) (0.041%) referenced by a Leios endorsement were redundant.
+ INFO leios: sim_cli::events: Each transaction took an average of 40.998s (stddev 33.015) to be included in an EB.
+ INFO leios: sim_cli::events: Each transaction took an average of 84.191s (stddev 37.625) to be included in a block.
+ INFO network: sim_cli::events: 224858994 TX message(s) were sent. 224858994 of them were received (100.000%).
+ INFO network: sim_cli::events: 81621 EB message(s) were sent. 81621 of them were received (100.000%).
+ INFO network: sim_cli::events: 24628562 Vote message(s) were sent. 24628562 of them were received (100.000%).
