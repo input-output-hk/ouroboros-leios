@@ -82,6 +82,93 @@ pub struct PeerConfig {
     pub inbound_delay_ms: Option<u64>,
 }
 
+// ---------------------------------------------------------------------------
+// Fetch policy
+// ---------------------------------------------------------------------------
+
+/// How con-rs should pick peers for a given traffic class.  Each variant
+/// maps onto a stock policy in `con_rs::fetch`.
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum FetchPolicyKind {
+    /// Send the request to the single candidate with the lowest measured
+    /// RTT.  Matches con-rs's default (`LowestRttFirst`).
+    #[default]
+    LowestRtt,
+    /// Send the request to the `n` candidates with the lowest measured
+    /// RTT.  Omitting `n` fans out to every available candidate
+    /// (equivalent to `BroadcastN::all()`).  `n = 1` mimics `LowestRtt`.
+    Broadcast {
+        #[serde(default)]
+        n: Option<usize>,
+    },
+}
+
+impl FetchPolicyKind {
+    /// Build a [`BlockFetchPolicy`] handle from this config.
+    pub fn into_block_policy(self) -> Box<dyn con_rs::fetch::BlockFetchPolicy + Send + Sync> {
+        use con_rs::fetch::{BroadcastN, LowestRttFirst};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+        }
+    }
+
+    /// Build an [`EbFetchPolicy`] handle from this config.
+    pub fn into_eb_policy(self) -> Box<dyn con_rs::fetch::EbFetchPolicy + Send + Sync> {
+        use con_rs::fetch::{BroadcastN, LowestRttFirst};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+        }
+    }
+
+    /// Build an [`EbTxsFetchPolicy`] handle from this config.
+    pub fn into_eb_txs_policy(self) -> Box<dyn con_rs::fetch::EbTxsFetchPolicy + Send + Sync> {
+        use con_rs::fetch::{BroadcastN, LowestRttFirst};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+        }
+    }
+
+    /// Build a [`VoteFetchPolicy`] handle from this config.
+    pub fn into_vote_policy(self) -> Box<dyn con_rs::fetch::VoteFetchPolicy + Send + Sync> {
+        use con_rs::fetch::{BroadcastN, LowestRttFirst};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+        }
+    }
+}
+
+/// Per-traffic-class fetch-policy selection.  Each class is set
+/// independently so research configs can fan out only EB-txs without
+/// also fanning out blocks or votes.
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+pub struct FetchPolicyConfig {
+    /// Policy for Praos block-range fetches.
+    #[serde(default)]
+    pub block: FetchPolicyKind,
+    /// Policy for fetching EB bodies (`FetchLeiosBlock`).
+    #[serde(default)]
+    pub eb: FetchPolicyKind,
+    /// Policy for fetching EB transaction bodies (`FetchLeiosBlockTxs`).
+    #[serde(default)]
+    pub eb_txs: FetchPolicyKind,
+    /// Policy for fetching missing votes (`FetchLeiosVotes`).
+    #[serde(default)]
+    pub votes: FetchPolicyKind,
+}
+
 /// Top-level node configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct NodeConfig {
@@ -164,6 +251,11 @@ pub struct NodeConfig {
     /// Telemetry configuration.
     #[serde(default)]
     pub telemetry: TelemetryConfig,
+
+    /// Per-traffic-class fetch-policy selection.  Defaults preserve the
+    /// historical behaviour (`LowestRtt` for every class).
+    #[serde(default)]
+    pub fetch_policy: FetchPolicyConfig,
 
     /// Outbound peer list.
     #[serde(default)]
@@ -533,6 +625,7 @@ impl Default for NodeConfig {
             transactions: TxConfig::default(),
             validation: ValidationConfig::default(),
             telemetry: TelemetryConfig::default(),
+            fetch_policy: FetchPolicyConfig::default(),
             peers: Vec::new(),
         }
     }
@@ -776,6 +869,76 @@ stake = 0
         assert_eq!(config.persistent_vote_bytes, 130);
         assert_eq!(config.non_persistent_vote_bytes, 180);
         assert!((config.quorum_stake_fraction - 0.75).abs() < f64::EPSILON);
+    }
+
+    // -- Fetch policy tests --
+
+    #[test]
+    fn fetch_policy_default_is_lowest_rtt_for_all_classes() {
+        let cfg = FetchPolicyConfig::default();
+        assert!(matches!(cfg.block, FetchPolicyKind::LowestRtt));
+        assert!(matches!(cfg.eb, FetchPolicyKind::LowestRtt));
+        assert!(matches!(cfg.eb_txs, FetchPolicyKind::LowestRtt));
+        assert!(matches!(cfg.votes, FetchPolicyKind::LowestRtt));
+    }
+
+    #[test]
+    fn fetch_policy_parses_per_class_broadcast() {
+        let toml_text = r#"
+[fetch_policy.eb_txs]
+kind = "broadcast"
+n = 2
+
+[fetch_policy.votes]
+kind = "broadcast"
+"#;
+        let figment = Figment::from(Serialized::defaults(NodeConfig::default()))
+            .merge(Toml::string(toml_text));
+        let config: NodeConfig = figment.extract().unwrap();
+        assert!(matches!(
+            config.fetch_policy.block,
+            FetchPolicyKind::LowestRtt
+        ));
+        assert!(matches!(config.fetch_policy.eb, FetchPolicyKind::LowestRtt));
+        assert!(matches!(
+            config.fetch_policy.eb_txs,
+            FetchPolicyKind::Broadcast { n: Some(2) }
+        ));
+        // Omitting `n` means "broadcast to all candidates".
+        assert!(matches!(
+            config.fetch_policy.votes,
+            FetchPolicyKind::Broadcast { n: None }
+        ));
+    }
+
+    #[test]
+    fn fetch_policy_lowest_rtt_parses_without_extra_fields() {
+        let toml_text = r#"
+[fetch_policy.block]
+kind = "lowest_rtt"
+"#;
+        let figment = Figment::from(Serialized::defaults(NodeConfig::default()))
+            .merge(Toml::string(toml_text));
+        let config: NodeConfig = figment.extract().unwrap();
+        assert!(matches!(
+            config.fetch_policy.block,
+            FetchPolicyKind::LowestRtt
+        ));
+    }
+
+    #[test]
+    fn fetch_policy_kind_builds_boxed_policies() {
+        // Just make sure the conversions don't panic and produce
+        // distinguishable types; behavioural coverage lives in con-rs.
+        let _: Box<dyn con_rs::fetch::BlockFetchPolicy + Send + Sync> =
+            FetchPolicyKind::LowestRtt.into_block_policy();
+        let _: Box<dyn con_rs::fetch::EbFetchPolicy + Send + Sync> =
+            FetchPolicyKind::Broadcast { n: Some(3) }.into_eb_policy();
+        let _: Box<dyn con_rs::fetch::EbTxsFetchPolicy + Send + Sync> =
+            FetchPolicyKind::Broadcast { n: Some(1) }.into_eb_txs_policy();
+        // `n = None` => broadcast to all candidates.
+        let _: Box<dyn con_rs::fetch::VoteFetchPolicy + Send + Sync> =
+            FetchPolicyKind::Broadcast { n: None }.into_vote_policy();
     }
 
     #[test]

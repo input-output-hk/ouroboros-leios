@@ -72,6 +72,16 @@ impl PraosConsensus {
         self.state.set_rtt(Box::new(rtt));
     }
 
+    /// Replace the BlockFetchPolicy con-rs consults when emitting
+    /// `FetchBlockRange`.  Used by the `Consensus` facade to honour the
+    /// node's `fetch_policy.block` config setting.
+    pub fn set_block_policy(
+        &mut self,
+        policy: Box<dyn con_rs::fetch::BlockFetchPolicy + Send + Sync>,
+    ) {
+        self.state.set_fetch_policy(policy);
+    }
+
     /// Drain effects to the I/O sinks.  Network-side effects go to
     /// `commands`; validator effects go to `validator.submit`.  Header
     /// and body bytes are rehydrated into the wire types here; the

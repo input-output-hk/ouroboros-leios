@@ -131,6 +131,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         config.seed,
         dyn_rx.clone(),
         rtt_cache,
+        config.fetch_policy,
     );
 
     // Transaction validator (validates received txs before mempool entry).

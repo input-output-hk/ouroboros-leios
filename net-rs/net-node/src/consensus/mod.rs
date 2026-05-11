@@ -15,7 +15,7 @@ use tokio::sync::{mpsc, watch};
 use con_rs::chain_tree::ChainTreeEntry;
 use con_rs::fetch::PeerRttCache;
 use con_rs::leios::ChainTipContext;
-use crate::config::{CommitteeSelection, DynamicConfig, StakeEntry};
+use crate::config::{CommitteeSelection, DynamicConfig, FetchPolicyConfig, StakeEntry};
 use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerOutcome, Validator};
 
@@ -47,6 +47,7 @@ impl Consensus {
         rng_seed: Option<u64>,
         dyn_config: watch::Receiver<DynamicConfig>,
         rtt: PeerRttCache,
+        fetch_policy: FetchPolicyConfig,
     ) -> Self {
         let mut praos = PraosConsensus::new(
             node_id.clone(),
@@ -55,6 +56,7 @@ impl Consensus {
             security_param_k,
         );
         praos.set_rtt(rtt.clone());
+        praos.set_block_policy(fetch_policy.block.into_block_policy());
         let mut leios = LeiosConsensus::new(
             node_id,
             commands,
@@ -72,6 +74,9 @@ impl Consensus {
             dyn_config,
         );
         leios.set_rtt(rtt);
+        leios.set_eb_policy(fetch_policy.eb.into_eb_policy());
+        leios.set_eb_txs_policy(fetch_policy.eb_txs.into_eb_txs_policy());
+        leios.set_vote_policy(fetch_policy.votes.into_vote_policy());
         Self { praos, leios }
     }
 

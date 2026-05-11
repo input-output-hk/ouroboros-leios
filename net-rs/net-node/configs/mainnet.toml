@@ -24,6 +24,20 @@ tx_rate = 0.0
 tx_size_min = 250
 tx_size_max = 16384
 
+# Per-traffic-class fetch policy.  Defaults to `lowest_rtt` for every
+# class — that matches the historical behaviour where con-rs picks the
+# single lowest-RTT candidate.  Switch a class to `broadcast` with an
+# explicit `n` to fan a request out to the N lowest-RTT peers, or omit
+# `n` to broadcast to every available candidate; useful for studying
+# tail-latency / collapse trade-offs on EB-tx fetch in particular.
+#
+# [fetch_policy.eb_txs]
+# kind = "broadcast"
+# n = 2
+#
+# [fetch_policy.votes]
+# kind = "broadcast"   # broadcast to all candidates
+
 [validation]
 # Mirror sim-rs `parameters/config.default.yaml` legacy-Praos
 # payload-validation cost (rb-body-legacy-praos-payload-validation-

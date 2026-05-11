@@ -149,6 +149,35 @@ impl LeiosConsensus {
         self.state.set_rtt(Box::new(rtt));
     }
 
+    /// Replace the EbFetchPolicy con-rs consults when emitting
+    /// `FetchLeiosBlock`.
+    pub fn set_eb_policy(
+        &mut self,
+        policy: Box<dyn con_rs::fetch::EbFetchPolicy + Send + Sync>,
+    ) {
+        self.state.set_eb_policy(policy);
+    }
+
+    /// Replace the EbTxsFetchPolicy con-rs consults when emitting
+    /// `FetchLeiosBlockTxs`.  Driven by `fetch_policy.eb_txs` — fanning
+    /// out EB-txs is the primary research lever we have to characterise
+    /// the cluster collapse mode.
+    pub fn set_eb_txs_policy(
+        &mut self,
+        policy: Box<dyn con_rs::fetch::EbTxsFetchPolicy + Send + Sync>,
+    ) {
+        self.state.set_eb_txs_policy(policy);
+    }
+
+    /// Replace the VoteFetchPolicy con-rs consults when emitting
+    /// `FetchLeiosVotes`.
+    pub fn set_vote_policy(
+        &mut self,
+        policy: Box<dyn con_rs::fetch::VoteFetchPolicy + Send + Sync>,
+    ) {
+        self.state.set_vote_policy(policy);
+    }
+
     /// Advance slot tracking, drive elections, dispatch any effects.
     pub async fn on_slot(&mut self, slot: u64) {
         // Snapshot every locally available tx id — the FIFO mempool
@@ -512,6 +541,7 @@ impl LeiosConsensus {
 mod tests {
     use super::*;
     use crate::config::CommitteeSelection;
+    use std::time::Duration;
 
     fn point(slot: u64) -> Point {
         Point::Specific {
@@ -943,6 +973,28 @@ mod tests {
         }
     }
 
+    /// Returns true if no `FetchLeiosBlockTxs` arrives within `window`.
+    /// Drains and ignores any other command kinds so the assertion only
+    /// cares about the fetch effect.
+    async fn no_fetch_cmd_within(
+        rx: &mut mpsc::Receiver<NetworkCommand>,
+        window: Duration,
+    ) -> bool {
+        let deadline = tokio::time::Instant::now() + window;
+        loop {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
+                return true;
+            }
+            match tokio::time::timeout(remaining, rx.recv()).await {
+                Err(_) => return true,
+                Ok(None) => return true,
+                Ok(Some(NetworkCommand::FetchLeiosBlockTxs { .. })) => return false,
+                Ok(Some(_)) => continue,
+            }
+        }
+    }
+
     /// Drain until a RecordLeiosEbManifest arrives.
     async fn next_record_cmd(rx: &mut mpsc::Receiver<NetworkCommand>) -> NetworkCommand {
         loop {
@@ -1010,7 +1062,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn bitmap_for_offered_txs_falls_back_to_select_all_when_manifest_unknown() {
+    async fn no_fetch_emitted_when_manifest_unknown() {
         let (tx, mut rx) = mpsc::channel(8);
         let (validator, _) = test_validator();
         let mempool = crate::mempool::new_mempool(1000);
@@ -1028,23 +1080,16 @@ mod tests {
             })
             .await;
 
-        let cmd = next_fetch_cmd(&mut rx).await;
-        match cmd {
-            NetworkCommand::FetchLeiosBlockTxs { bitmap, .. } => {
-                // Spec-faithful fallback: select_all up to the protocol's
-                // max bitmap entries.
-                assert_eq!(
-                    bitmap.len(),
-                    net_core::protocols::leios_fetch::MAX_BITMAP_ENTRIES,
-                    "fallback should fill the bitmap"
-                );
-            }
-            other => panic!("expected FetchLeiosBlockTxs, got {other:?}"),
-        }
+        // With no manifest cached, the wrapper computes an empty bitmap
+        // and con-rs short-circuits before emitting a fetch.
+        assert!(
+            no_fetch_cmd_within(&mut rx, Duration::from_millis(50)).await,
+            "fetch should be deferred until the manifest is received"
+        );
     }
 
     #[tokio::test]
-    async fn bitmap_is_empty_when_mempool_already_has_every_tx() {
+    async fn no_fetch_emitted_when_mempool_already_has_every_tx() {
         let (tx, mut rx) = mpsc::channel(8);
         let (validator, _) = test_validator();
         let mempool = crate::mempool::new_mempool(1000);
@@ -1074,13 +1119,10 @@ mod tests {
             })
             .await;
 
-        let cmd = next_fetch_cmd(&mut rx).await;
-        match cmd {
-            NetworkCommand::FetchLeiosBlockTxs { bitmap, .. } => {
-                assert!(bitmap.is_empty(), "every tx is local; nothing to request");
-            }
-            other => panic!("expected FetchLeiosBlockTxs, got {other:?}"),
-        }
+        assert!(
+            no_fetch_cmd_within(&mut rx, Duration::from_millis(50)).await,
+            "every tx is local; nothing to request, so no fetch should be emitted"
+        );
     }
 
     // -- Response matching tests --------------------------------------------
