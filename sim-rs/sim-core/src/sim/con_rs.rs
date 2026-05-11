@@ -27,9 +27,10 @@ use con_rs::{
     elections::{Elections, ElectionsConfig},
     leios::{LeiosEffect, LeiosState, LeiosTelemetryEvent, NoVoteReason, VotingConfig},
     lottery as con_lottery,
-    mempool::{MempoolEffect, MempoolState, TxId, TxRejectReason},
+    mempool::{EbKey, MempoolEffect, MempoolState, PendingTx, TxId, TxRejectReason},
     pipeline::PipelineConfig,
     praos::PraosState,
+    production::BodyPath,
     wfa,
 };
 
@@ -37,7 +38,11 @@ use crate::{
     clock::Clock,
     config::{NodeConfiguration, NodeId, SimConfiguration},
     events::EventTracker,
-    model::{NoVoteReason as SimNoVoteReason, Transaction, TransactionId, TransactionLostReason},
+    model::{
+        BlockId, EndorserBlockId, LinearEndorserBlock, LinearRankingBlock,
+        LinearRankingBlockHeader, NoVoteReason as SimNoVoteReason, Transaction, TransactionId,
+        TransactionLostReason,
+    },
     rng::{DrawSite, Rng},
     sim::{NodeImpl, linear_leios::CpuTask, linear_leios::Message, linear_leios::TimedEvent},
 };
@@ -111,6 +116,13 @@ pub struct ConRs {
     /// dedupe `AnnounceTx` storms before they reach the mempool's
     /// `pending_validation` map.
     announced_or_known: std::collections::BTreeSet<TxId>,
+
+    /// Self-produced RB and EB bodies, kept so we can answer peer
+    /// fetches (`RequestRB`, `RequestEB`) without re-encoding.  The
+    /// RB and EB propagation handlers in the next slice consume
+    /// these maps.
+    produced_rbs: BTreeMap<BlockId, Arc<LinearRankingBlock>>,
+    produced_ebs: BTreeMap<EndorserBlockId, Arc<LinearEndorserBlock>>,
 }
 
 type EventResult = super::EventResult<ConRs>;
@@ -189,6 +201,8 @@ impl NodeImpl for ConRs {
             tx_arcs: BTreeMap::new(),
             pending_from: BTreeMap::new(),
             announced_or_known: std::collections::BTreeSet::new(),
+            produced_rbs: BTreeMap::new(),
+            produced_ebs: BTreeMap::new(),
         }
     }
 
@@ -207,10 +221,8 @@ impl NodeImpl for ConRs {
         // (subsequent slice) — the predicate is a no-op without EBs.
         let leios_fx = self.leios.on_slot(slot, &|_| true);
         self.apply_leios_effects(&mut out, leios_fx);
-        // Praos RB lottery.  We track the win in telemetry so the path
-        // is observable; building the RB body + scheduling
-        // `CpuTask::RBBlockGenerated` lands in the next slice along
-        // with the RB / EB propagation handlers.
+        // Praos RB lottery — shared formula with net-rs, sim-rs keeps
+        // its own VRF draw form (`Rng::draw_range`).
         let success_rate = self.sim_config.block_generation_probability;
         let target =
             con_lottery::rb_win_threshold(success_rate, self.config_stake) as u64;
@@ -218,19 +230,7 @@ impl NodeImpl for ConRs {
         let rng = Rng::new(self.sim_config.seed);
         let draw = rng.draw_range(self.id, slot, DrawSite::RbLottery, total_stake);
         if draw < target {
-            // TODO(next slice): build the RB body, drain the mempool
-            // via `BodyPath::decide`, schedule
-            // `CpuTask::RBBlockGenerated`, then announce on
-            // completion.  For now we just record the lottery win for
-            // observability.
-            // `BlockId` requires a producer; using `self.id` matches
-            // the linear adapter's pattern.
-            self.tracker.track_praos_block_lottery_won(
-                crate::model::BlockId {
-                    slot,
-                    producer: self.id,
-                },
-            );
+            self.try_produce_rb(slot, draw, &mut out);
         }
         out
     }
@@ -319,10 +319,10 @@ impl NodeImpl for ConRs {
                     }
                 }
             }
+            CpuTask::RBBlockGenerated(rb, eb) => self.finish_generating_rb(&mut out, rb, eb),
             // Other CpuTask variants stay inert until the RB / EB /
-            // vote paths land.
-            CpuTask::RBBlockGenerated(_, _)
-            | CpuTask::RBHeaderValidated(_, _, _, _)
+            // vote validation paths land in subsequent slices.
+            CpuTask::RBHeaderValidated(_, _, _, _)
             | CpuTask::RBBlockValidated(_)
             | CpuTask::EBHeaderValidated(_, _)
             | CpuTask::EBBlockValidated(_, _)
@@ -338,6 +338,114 @@ impl NodeImpl for ConRs {
 }
 
 impl ConRs {
+    /// Lottery win for slot `slot` (winning draw `vrf`): pick the body
+    /// path via [`BodyPath::decide`] and schedule
+    /// `CpuTask::RBBlockGenerated`.  The `Eb` path also commits the
+    /// drain via [`MempoolState::produce_eb`] under a hash derived from
+    /// the EB id — a sim convenience that stands in for real Blake2b
+    /// hashing of wire bytes.
+    fn try_produce_rb(&mut self, slot: u64, vrf: u64, out: &mut EventResult) {
+        let block_id = BlockId {
+            slot,
+            producer: self.id,
+        };
+        self.tracker.track_praos_block_lottery_won(block_id);
+
+        let max_rb_body = self.sim_config.max_block_size as usize;
+        let body = BodyPath::decide(&mut self.mempool, max_rb_body);
+        let (rb_txs, eb_pair) = match body {
+            BodyPath::Inline(pending) => (self.collect_arcs(pending), None),
+            BodyPath::Eb { manifest } => {
+                // Commit the drain — `produce_eb` moves the pending
+                // txs into `eb_pinned` under the given EbKey.  We
+                // synthesise a deterministic hash from the producer +
+                // slot since sim doesn't model Blake2b on wire bytes.
+                let eb_id = EndorserBlockId {
+                    slot,
+                    pipeline: 0,
+                    producer: self.id,
+                };
+                let eb_hash = synthesize_eb_hash(eb_id);
+                let (_committed, mempool_fx) = self.mempool.produce_eb(EbKey {
+                    slot,
+                    hash: eb_hash,
+                });
+                self.apply_mempool_effects(out, mempool_fx);
+                // Pull the body Arcs from `tx_arcs` in manifest order.
+                let txs: Vec<Arc<Transaction>> = manifest
+                    .iter()
+                    .filter_map(|id| self.tx_arcs.get(id).cloned())
+                    .collect();
+                let bytes = self.sim_config.sizes.linear_eb(&txs);
+                let eb = LinearEndorserBlock {
+                    slot,
+                    producer: self.id,
+                    bytes,
+                    txs: txs.clone(),
+                };
+                (Vec::new(), Some((eb, txs)))
+            }
+        };
+
+        let rb = LinearRankingBlock {
+            header: LinearRankingBlockHeader {
+                id: block_id,
+                vrf,
+                // No parent / chain-tip tracking yet — wired when
+                // PraosState consumes record_self_produced in a later
+                // slice.
+                parent: None,
+                bytes: self.sim_config.sizes.block_header,
+                eb_announcement: eb_pair.as_ref().map(|(eb, _)| eb.id()),
+            },
+            transactions: rb_txs,
+            // No certificate path yet.
+            endorsement: None,
+        };
+
+        out.schedule_cpu_task(CpuTask::RBBlockGenerated(rb, eb_pair));
+    }
+
+    /// `RBBlockGenerated` completion: persist the produced RB/EB in
+    /// the side-tables and announce the header to consumers.  The
+    /// peer-side `AnnounceRBHeader → RequestRBHeader → RBHeader`
+    /// handshake lands in the RB propagation slice.
+    fn finish_generating_rb(
+        &mut self,
+        out: &mut EventResult,
+        rb: LinearRankingBlock,
+        eb: Option<(LinearEndorserBlock, Vec<Arc<Transaction>>)>,
+    ) {
+        self.tracker.track_linear_rb_generated(&rb);
+        let rb_id = rb.header.id;
+        let rb = Arc::new(rb);
+        self.produced_rbs.insert(rb_id, rb);
+        for peer in &self.consumers {
+            out.send_to(*peer, Message::AnnounceRBHeader(rb_id));
+        }
+        if let Some((eb, _withheld)) = eb {
+            self.tracker.track_linear_eb_generated(&eb);
+            let eb_id = eb.id();
+            let eb = Arc::new(eb);
+            self.produced_ebs.insert(eb_id, eb);
+            for peer in &self.consumers {
+                out.send_to(*peer, Message::AnnounceEB(eb_id));
+            }
+        }
+    }
+
+    /// Look up the sim `Arc<Transaction>` for each pending tx in the
+    /// drained set.  Drops anything we lost track of (shouldn't happen
+    /// in practice — every tx that enters the mempool has a matching
+    /// `tx_arcs` entry — but is defensive against future eviction
+    /// drift).
+    fn collect_arcs(&self, pending: Vec<PendingTx>) -> Vec<Arc<Transaction>> {
+        pending
+            .into_iter()
+            .filter_map(|tx| self.tx_arcs.get(&tx.tx_id).cloned())
+            .collect()
+    }
+
     /// Forward Leios-side effects.  Today only telemetry and `NoVote`
     /// have meaningful translations — fetches, vote emissions, and
     /// validation effects need the RB / EB / vote handlers that land
@@ -430,4 +538,15 @@ impl ConRs {
 fn sim_id_from_bytes(bytes: &[u8]) -> Option<TransactionId> {
     let s = std::str::from_utf8(bytes).ok()?;
     s.parse::<u64>().ok().map(TransactionId::new)
+}
+
+/// Deterministic 32-byte EB hash derived from the EB id.  Sim doesn't
+/// model wire-byte Blake2b, so we stand in with a fixed encoding that
+/// is unique per `(slot, pipeline, producer)`.
+fn synthesize_eb_hash(id: EndorserBlockId) -> [u8; 32] {
+    let mut out = [0u8; 32];
+    out[..8].copy_from_slice(&id.slot.to_le_bytes());
+    out[8..16].copy_from_slice(&id.pipeline.to_le_bytes());
+    out[16..24].copy_from_slice(&(id.producer.to_inner() as u64).to_le_bytes());
+    out
 }
