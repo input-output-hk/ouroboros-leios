@@ -12,11 +12,13 @@ pub mod config;
 pub mod elections;
 pub mod fetch;
 pub mod leios;
+pub mod lottery;
 pub mod mempool;
 pub mod peer;
 pub mod peer_chain;
 pub mod pipeline;
 pub mod praos;
+pub mod production;
 pub mod types;
 pub mod wfa;
 

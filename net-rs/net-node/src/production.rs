@@ -260,39 +260,35 @@ impl BlockProducer {
 
         self.block_count += 1;
 
-        // Drain mempool and decide RB vs EB path.
+        // CIP-0164 overflow rule lives in con-rs (`production::BodyPath`).
         let mut pool = mempool.lock().unwrap();
-        let (txs, announced_eb) = if pool.total_bytes() > self.rb_body_max_bytes {
-            // EB path: every pending tx becomes an EB body reference,
-            // RB body is empty.  Bodies stay pinned in the mempool
-            // under `eb_pinned` so the producer can vote for its own
-            // EB (MissingTX predicate sees them) and serve `LeiosFetch
-            // BlockTxs` (resolver finds them by tx_id).
-            let manifest: Vec<[u8; 32]> = pool
-                .all_pending_tx_hashes()
-                .into_iter()
-                .collect();
-            let eb_data = encode_overflow_eb(slot, &manifest);
-            let eb_hash = blake2b_256(&eb_data);
-            let eb_key = EbKey {
-                slot,
-                hash: eb_hash,
-            };
-            pool.produce_eb(eb_key);
-            (
-                Vec::new(),
-                Some(ProducedEb {
-                    point: Point::Specific {
-                        slot,
-                        hash: eb_hash,
-                    },
-                    data: eb_data,
-                }),
-            )
-        } else {
-            // RB path: txs in RB body, no EB.
-            let txs = pool.drain_up_to(self.rb_body_max_bytes);
-            (txs, None)
+        let (txs, announced_eb) = match pool.decide_body_path(self.rb_body_max_bytes) {
+            crate::mempool::BodyPath::Inline(txs) => (txs, None),
+            crate::mempool::BodyPath::Eb { manifest_hashes } => {
+                // Encode wire bytes, hash them, then commit the
+                // drain-and-pin under the resulting EB key.  Bodies stay
+                // pinned in the mempool under `eb_pinned` so the producer
+                // can vote for its own EB (MissingTX predicate sees them)
+                // and serve `LeiosFetch BlockTxs` (resolver finds them by
+                // tx_id).
+                let eb_data = encode_overflow_eb(slot, &manifest_hashes);
+                let eb_hash = blake2b_256(&eb_data);
+                let eb_key = EbKey {
+                    slot,
+                    hash: eb_hash,
+                };
+                pool.produce_eb(eb_key);
+                (
+                    Vec::new(),
+                    Some(ProducedEb {
+                        point: Point::Specific {
+                            slot,
+                            hash: eb_hash,
+                        },
+                        data: eb_data,
+                    }),
+                )
+            }
         };
         drop(pool);
 
@@ -319,11 +315,13 @@ impl BlockProducer {
         self.block_count
     }
 
-    /// Run the VRF lottery for a given success rate. Returns true on win.
+    /// Run the Praos f_block lottery.  Returns true on win.  Threshold
+    /// math lives in [`con_rs::lottery::rb_win_threshold`]; this site
+    /// just supplies the `f64` draw.
     fn run_lottery(&mut self, probability: f64) -> bool {
-        let per_node = probability * self.stake as f64 / self.total_stake as f64;
+        let threshold = con_rs::lottery::rb_win_threshold(probability, self.stake);
         let roll: f64 = self.rng.gen();
-        roll < per_node
+        roll < threshold as f64 / self.total_stake as f64
     }
 
     /// Build a fake block with valid Shelley+ CBOR structure.

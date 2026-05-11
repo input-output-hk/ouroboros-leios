@@ -41,6 +41,29 @@ fn from_con_tx(tx: con_rs::mempool::PendingTx) -> PendingTx {
     }
 }
 
+/// Pad/truncate a `Vec<u8>` tx-id into the wrapper's 32-byte hash form.
+/// con-rs's `TxId = Vec<u8>` is hash-scheme-agnostic; net-rs's wire
+/// format pins it at Blake2b-256.
+fn to_hash_32(id: Vec<u8>) -> [u8; 32] {
+    let mut h = [0u8; 32];
+    let n = id.len().min(32);
+    h[..n].copy_from_slice(&id[..n]);
+    h
+}
+
+/// Which body the next self-produced RB carries — wire-typed sibling of
+/// [`con_rs::production::BodyPath`].
+#[derive(Debug, Clone)]
+pub enum BodyPath {
+    /// RB body inlines these txs; mempool has been drained.
+    Inline(Vec<PendingTx>),
+    /// RB body is empty; the listed manifest is announced via an EB.
+    /// Caller hashes the encoded manifest bytes and finishes the
+    /// drain-and-pin via [`Mempool::produce_eb`] with the resulting
+    /// `EbKey`.
+    Eb { manifest_hashes: Vec<[u8; 32]> },
+}
+
 /// I/O-side wrapper around `con_rs::mempool::MempoolState`.  Public
 /// methods preserve the net-core wire types at the boundary; con-rs
 /// holds the actual state.
@@ -61,10 +84,6 @@ impl Mempool {
     /// telemetry plumbing for them is a follow-up.
     pub fn push(&mut self, tx: PendingTx) {
         let _ = self.state.admit_validated(tx.tx_id.0, tx.body.0, tx.size);
-    }
-
-    pub fn total_bytes(&self) -> usize {
-        self.state.total_bytes()
     }
 
     #[cfg(test)]
@@ -96,29 +115,22 @@ impl Mempool {
         self.state.get_body_by_id(id)
     }
 
-    pub fn drain_up_to(&mut self, max_bytes: usize) -> Vec<PendingTx> {
-        self.state
-            .drain_up_to(max_bytes)
-            .into_iter()
-            .map(from_con_tx)
-            .collect()
-    }
-
-    /// Snapshot of every pending tx_id in the free pool, in arrival
-    /// order — the manifest the next EB will reference if the producer
-    /// commits via `produce_eb`.  Caller uses this to build the EB body
-    /// bytes and derive the EB hash before committing.
-    pub fn all_pending_tx_hashes(&self) -> Vec<[u8; 32]> {
-        self.state
-            .txs
-            .iter()
-            .map(|tx| {
-                let mut h = [0u8; 32];
-                let len = tx.tx_id.len().min(32);
-                h[..len].copy_from_slice(&tx.tx_id[..len]);
-                h
-            })
-            .collect()
+    /// Run the CIP-0164 overflow rule.  Returns the body path the next
+    /// self-produced RB should take — either inline txs (mempool drained)
+    /// or an EB announcement carrying the FIFO-ordered manifest (mempool
+    /// untouched; caller commits via [`Mempool::produce_eb`] once it has
+    /// computed the EB hash from the encoded manifest bytes).
+    ///
+    /// Policy lives in [`con_rs::production::BodyPath::decide`].
+    pub fn decide_body_path(&mut self, rb_body_max_bytes: usize) -> BodyPath {
+        match con_rs::production::BodyPath::decide(&mut self.state, rb_body_max_bytes) {
+            con_rs::production::BodyPath::Inline(txs) => {
+                BodyPath::Inline(txs.into_iter().map(from_con_tx).collect())
+            }
+            con_rs::production::BodyPath::Eb { manifest } => BodyPath::Eb {
+                manifest_hashes: manifest.into_iter().map(to_hash_32).collect(),
+            },
+        }
     }
 
     /// Drain every free tx into an EB pin under `eb_key` and return the
