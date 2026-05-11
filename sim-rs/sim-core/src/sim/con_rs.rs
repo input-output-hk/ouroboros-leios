@@ -25,7 +25,9 @@ use tokio::sync::mpsc;
 use con_rs::{
     config::{CommitteeSelection, StakeEntry},
     elections::{Elections, ElectionsConfig},
-    leios::{LeiosEffect, LeiosState, LeiosTelemetryEvent, NoVoteReason, VotingConfig},
+    leios::{
+        ChainTipContext, LeiosEffect, LeiosState, LeiosTelemetryEvent, NoVoteReason, VotingConfig,
+    },
     lottery as con_lottery,
     mempool::{EbKey, MempoolEffect, MempoolState, PendingTx, TxId, TxRejectReason},
     pipeline::PipelineConfig,
@@ -558,8 +560,11 @@ impl ConRs {
         self.tracker.track_linear_rb_generated(&rb);
         let rb_id = rb.header.id;
         let header_seen = self.clock.now();
+        let header_for_ctx = rb.header.clone();
         let rb = Arc::new(rb);
-        self.note_rb_observed(rb_id);
+        if self.note_rb_observed(rb_id) {
+            self.update_chain_tip_ctx(&header_for_ctx);
+        }
         self.rbs.insert(
             rb_id,
             RbState::Received {
@@ -649,6 +654,9 @@ impl ConRs {
     ) {
         let id = header.id;
         let header_seen = self.clock.now();
+        if self.note_rb_observed(id) {
+            self.update_chain_tip_ctx(&header);
+        }
         self.rbs.insert(
             id,
             RbState::Pending {
@@ -921,8 +929,10 @@ impl ConRs {
     /// Refresh `latest_rb_id` when a higher-slot RB is observed.
     /// Producer break by `NodeId.to_inner()` mirrors the
     /// chain-selection tiebreaker the sequential engine uses on the
-    /// linear adapter.
-    fn note_rb_observed(&mut self, id: BlockId) {
+    /// linear adapter.  Returns `true` when this RB becomes the new
+    /// chain tip, so the caller can propagate the chain-tip context
+    /// to LeiosState.
+    fn note_rb_observed(&mut self, id: BlockId) -> bool {
         let take_new = match self.latest_rb_id {
             None => true,
             Some(cur) => {
@@ -934,6 +944,19 @@ impl ConRs {
         if take_new {
             self.latest_rb_id = Some(id);
         }
+        take_new
+    }
+
+    /// Push the chain tip's `(rb_header_arrival_slot, eb_announcement)`
+    /// pair into LeiosState so the `LateRBHeader` / `WrongEB` voting
+    /// predicates run with up-to-date inputs.  Called whenever the
+    /// adopted chain tip changes — see `note_rb_observed`.
+    fn update_chain_tip_ctx(&mut self, header: &LinearRankingBlockHeader) {
+        let ctx = ChainTipContext {
+            rb_header_arrival_slot: Some(self.current_slot),
+            eb_announcement: header.eb_announcement.map(synthesize_eb_hash),
+        };
+        self.leios.set_chain_tip_context(ctx);
     }
 
     /// Wire an EB (locally produced or peer-received) into
