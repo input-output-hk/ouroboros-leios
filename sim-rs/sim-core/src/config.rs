@@ -226,13 +226,17 @@ pub enum LeiosVariant {
     FullWithTxReferences,
     Linear,
     LinearWithTxReferences,
+    ConRs,
 }
 
 impl LeiosVariant {
     pub fn has_ibs(&self) -> bool {
         !matches!(
             self,
-            Self::FullWithoutIbs | Self::Linear | Self::LinearWithTxReferences
+            Self::FullWithoutIbs
+                | Self::Linear
+                | Self::LinearWithTxReferences
+                | Self::ConRs
         )
     }
 }

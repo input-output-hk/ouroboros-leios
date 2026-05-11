@@ -76,6 +76,13 @@ impl ActorSimulation {
                     super::linear_leios::register_actors,
                 )
             }
+            LeiosVariant::ConRs => {
+                Self::new_generic::<super::con_rs::ConRs, _>(
+                    config,
+                    event_sender,
+                    no_additional_actors,
+                )
+            }
             LeiosVariant::FullWithoutIbs => {
                 Self::new_generic::<StracciatellaLeiosNode, _>(
                     config,

@@ -882,7 +882,8 @@ impl LeiosNode {
                 .max_by_key(|(eb, age, votes)| (Reverse(*age), self.count_txs_in_eb(eb), *votes))?,
             LeiosVariant::FullWithoutIbs
             | LeiosVariant::Linear
-            | LeiosVariant::LinearWithTxReferences => {
+            | LeiosVariant::LinearWithTxReferences
+            | LeiosVariant::ConRs => {
                 unreachable!("wrong implementation")
             }
         };
