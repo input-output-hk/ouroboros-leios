@@ -92,7 +92,7 @@
           "type": "string"
         }
       },
-      "required": ["id", "recipient", "type"],
+      "required": ["id", "recipient", "slot", "type"],
       "type": "object"
     },
     "UIEBSent": {
@@ -127,7 +127,7 @@
           "type": "string"
         }
       },
-      "required": ["id", "recipient", "sender", "type"],
+      "required": ["id", "recipient", "sender", "slot", "type"],
       "type": "object"
     },
     "UIMessage": {
@@ -263,7 +263,7 @@
           "type": "string"
         }
       },
-      "required": ["id", "recipient", "type"],
+      "required": ["id", "recipient", "slot", "type"],
       "type": "object"
     },
     "UIRBSent": {
@@ -298,7 +298,7 @@
           "type": "string"
         }
       },
-      "required": ["id", "recipient", "sender", "type"],
+      "required": ["id", "recipient", "sender", "slot", "type"],
       "type": "object"
     },
     "UITraceEvent": {
@@ -486,7 +486,7 @@
           "type": "array"
         }
       },
-      "required": ["id", "recipient", "type"],
+      "required": ["id", "recipient", "slot", "type"],
       "type": "object"
     },
     "UIVotesSent": {
@@ -529,7 +529,7 @@
           "type": "array"
         }
       },
-      "required": ["id", "recipient", "sender", "type"],
+      "required": ["id", "recipient", "sender", "slot", "type"],
       "type": "object"
     },
     "Vote": {
