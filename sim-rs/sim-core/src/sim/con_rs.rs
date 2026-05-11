@@ -16,6 +16,39 @@
 //! Adversary hooks are intentionally absent — they re-enter as a
 //! follow-on wrapper layer once the protocol-level equivalence in W2.6
 //! is verified.
+//!
+//! # YAML config knobs the adapter reads
+//!
+//! The translation lives in [`derive_pipeline`],
+//! [`derive_committee_selection`], and [`derive_quorum_fraction`].
+//! Anything not in this table either:
+//! - has no con-rs analog (sim-only knobs), or
+//! - hasn't been wired yet (TODOs called out in the helpers).
+//!
+//! | YAML key                                | con-rs destination                                 |
+//! |-----------------------------------------|----------------------------------------------------|
+//! | `leios-header-diffusion-time-ms`        | `PipelineConfig.delta_hdr` (in slots, ceil)        |
+//! | `linear-vote-stage-length-slots`        | `PipelineConfig.vote_window` (CIP-0164 L_vote)     |
+//! | `linear-diffuse-stage-length-slots`     | `PipelineConfig.diffuse_window` (CIP-0164 L_diff)  |
+//! | `linear-tx-max-age-slots`               | `PipelineConfig.dedup_window` (residual)           |
+//! | `committee-selection-algorithm`         | `CommitteeSelection` variant                       |
+//! | `persistent-vote-generation-probability`<br>`+ non-persistent-vote-generation-probability` | `WfaLs.persistent_voters` (combined × node count) |
+//! | `vote-threshold`                        | `ElectionsConfig.quorum_weight_fraction`           |
+//! | `vote-bundle-size-bytes-constant`<br>`+ {persistent,non-persistent}-vote-bundle-size-bytes-per-eb` | `VotingConfig.{persistent,non_persistent}_vote_bytes` (via `Sizes::vote_bundle`) |
+//! | `leios-mempool-size-bytes`              | `MempoolState::new(capacity)`                      |
+//! | `rb-body-max-size-bytes`                | `BodyPath::decide(_, rb_body_max_bytes)`           |
+//! | `rb-generation-probability` (= `block-generation-probability`) | `rb_win_threshold(rate, stake)` |
+//! | _(per-node) `stake`_                    | `StakeEntry.stake` + `VotingConfig.stake`          |
+//! | _(per-node) `name`_                     | `Elections.node_id`, `StakeEntry.node_id`, voter key |
+//!
+//! Hardcoded defaults (no YAML source yet):
+//!
+//! | con-rs field                  | Value | Rationale                                         |
+//! |-------------------------------|-------|---------------------------------------------------|
+//! | `WfaLs.non_persistent_voters` | `0`   | sim collapses PV/NPV into one probability         |
+//! | `StakeCentile.top_centile_of_stake` | `0.95` | sim's `committee-stake-fraction-threshold` isn't propagated to `SimConfiguration` |
+//! | `PraosState` `k`              | `2160` | sim doesn't model security parameter           |
+//! | Fetch policies (RB/EB/votes)  | `LowestRttFirst` with `UniformRtt(0)` (con-rs `LeiosState::new` default) — sim drives fetches via its own `Message` enum |
 
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -63,16 +96,83 @@ fn build_stake_registry(sim_config: &SimConfiguration) -> Vec<StakeEntry> {
         .collect()
 }
 
-/// Placeholder pipeline / voting / quorum knobs. W2.3 replaces this
-/// with values read from the YAML config (vote window, delta_hdr,
-/// quorum fraction, vote-body byte budgets).
-fn placeholder_pipeline() -> PipelineConfig {
+/// Derive con-rs's [`PipelineConfig`] from the sim config.
+///
+/// | con-rs field   | sim source                                                  |
+/// |----------------|-------------------------------------------------------------|
+/// | `delta_hdr`    | ceil(`leios-header-diffusion-time-ms` / 1000)               |
+/// | `vote_window`  | `linear-vote-stage-length-slots` (CIP-0164 L_vote)          |
+/// | `diffuse_window` | `linear-diffuse-stage-length-slots` (CIP-0164 L_diff)     |
+/// | `dedup_window` | `linear-tx-max-age-slots` minus the others (with a floor)   |
+fn derive_pipeline(sim_config: &SimConfiguration) -> PipelineConfig {
+    let delta_hdr = sim_config
+        .header_diffusion_time
+        .as_secs_f64()
+        .ceil() as u64;
+    let vote_window = sim_config.linear_vote_stage_length;
+    let diffuse_window = sim_config.linear_diffuse_stage_length;
+    // Dedup window is "how long after CertEligible the cert can still be
+    // included in an RB".  Sim's nearest analog is the residual past
+    // `3*δ_hdr + L_vote + L_diff` in `linear-tx-max-age-slots`.  A
+    // generous floor keeps short-config runs from rejecting valid certs.
+    let pipeline_window = 3 * delta_hdr + vote_window + diffuse_window;
+    let dedup_window = sim_config
+        .linear_tx_max_age_slots
+        .map(|m| m.saturating_sub(pipeline_window).max(10))
+        .unwrap_or(100);
     PipelineConfig {
-        delta_hdr: 1,
-        vote_window: 5,
-        diffuse_window: 5,
-        dedup_window: 10,
+        delta_hdr,
+        vote_window,
+        diffuse_window,
+        dedup_window,
     }
+}
+
+/// Derive con-rs's [`CommitteeSelection`] from sim's
+/// [`CommitteeSelectionAlgorithm`].
+///
+/// | con-rs variant                | sim algorithm                                     |
+/// |-------------------------------|---------------------------------------------------|
+/// | `WfaLs { persistent_voters }` | `wfa-ls` — sim collapses PV/NPV into a single     |
+/// |                               | probability, so the entire expected committee     |
+/// |                               | becomes persistent_voters and NPV is disabled.    |
+/// | `EveryoneVotes`               | `everyone`                                        |
+/// | `StakeCentile`                | `top-stake-fraction` (uses sim's default 0.95)    |
+fn derive_committee_selection(sim_config: &SimConfiguration) -> CommitteeSelection {
+    use crate::config::CommitteeSelectionAlgorithm as A;
+    match sim_config.committee_selection {
+        A::WfaLs => {
+            // Sim uses a single combined `vote_probability` across PV
+            // and NPV.  Map the expected total committee weight into
+            // PV seats; NPV gets 0 so the seed-deterministic
+            // persistent allocation alone selects voters.
+            let total_nodes = sim_config.nodes.len() as u32;
+            let persistent_voters = ((sim_config.vote_probability * total_nodes as f64) as u32)
+                .max(1);
+            CommitteeSelection::WfaLs {
+                persistent_voters,
+                non_persistent_voters: 0,
+            }
+        }
+        A::Everyone => CommitteeSelection::EveryoneVotes,
+        // Sim's `committee_stake_fraction_threshold` isn't propagated
+        // through to `SimConfiguration` — use the spec default 0.95
+        // until/unless that wire-up lands.
+        A::TopStakeFraction => CommitteeSelection::StakeCentile {
+            top_centile_of_stake: 0.95,
+        },
+    }
+}
+
+/// Quorum fraction = `vote_threshold / expected_committee_size`.  Sim
+/// stores quorum as an absolute vote count; con-rs wants the same
+/// boundary as a fraction of expected total weight.  Falls back to
+/// 0.75 (CIP-0164 default) when the divisor is zero.
+fn derive_quorum_fraction(sim_config: &SimConfiguration, expected: u32) -> f64 {
+    if expected == 0 {
+        return 0.75;
+    }
+    sim_config.vote_threshold as f64 / expected as f64
 }
 
 /// Canonical mapping from sim's `TransactionId` to con-rs's opaque
@@ -268,14 +368,15 @@ impl NodeImpl for ConRs {
         // `(node, slot, site)` context.
 
         let stake_registry = build_stake_registry(&sim_config);
-        let committee_selection = CommitteeSelection::default();
+        let committee_selection = derive_committee_selection(&sim_config);
         let persistent_committee =
             wfa::build_committee(&committee_selection, &stake_registry, sim_config.seed);
         let expected_committee_size =
             wfa::expected_committee_size(&committee_selection, &persistent_committee);
         let total_stake: u64 = stake_registry.iter().map(|e| e.stake).sum();
 
-        let pipeline = placeholder_pipeline();
+        let pipeline = derive_pipeline(&sim_config);
+        let quorum_weight_fraction = derive_quorum_fraction(&sim_config, expected_committee_size);
         let elections = Elections::new(ElectionsConfig {
             node_id: config.name.clone(),
             pipeline,
@@ -287,25 +388,30 @@ impl NodeImpl for ConRs {
                 .collect(),
             total_stake,
             expected_committee_size,
-            quorum_weight_fraction: 0.75,
+            quorum_weight_fraction,
         });
 
         let persistent_seats = persistent_committee.get(&config.name).copied().unwrap_or(0);
+        // Sim collapses PV / NPV byte budgets into a single
+        // `vote_bundle_size_bytes_constant + vote_per_eb * n_ebs` curve
+        // via `vote_weighted_average`.  Since per-class breakdowns
+        // aren't preserved on `SimConfiguration`, pass the full
+        // single-EB cost on both legs — the adapter currently emits
+        // exactly one bundle per EB.
+        let vote_bytes_per_bundle = sim_config.sizes.vote_bundle(1);
         let voting_config = VotingConfig {
             committee_selection,
             stake: config.stake,
             total_stake,
-            // Vote-body byte budgets are set by W2.3 from the YAML;
-            // zero here is harmless because the voting path isn't wired
-            // yet.
-            persistent_vote_bytes: 0,
-            non_persistent_vote_bytes: 0,
+            persistent_vote_bytes: vote_bytes_per_bundle as usize,
+            non_persistent_vote_bytes: vote_bytes_per_bundle as usize,
             persistent_seats,
         };
 
         let leios = LeiosState::new(config.name.clone(), elections, voting_config, pipeline);
-        // Praos security parameter `k`: 2160 is the Cardano-mainnet
-        // value; W2.3 will read it from the sim config.
+        // Cardano-mainnet security parameter; sim doesn't model a
+        // distinct `k`, and 2160 sets `PraosState`'s chain-tree
+        // pruning depth comfortably beyond any sim run length.
         let praos = PraosState::new(config.name.clone(), 2160);
         let mempool = MempoolState::new(sim_config.mempool_size_bytes as usize);
         let node_names = sim_config_nodes_to_names(&sim_config);
