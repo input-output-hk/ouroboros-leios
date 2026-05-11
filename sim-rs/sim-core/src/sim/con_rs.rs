@@ -290,6 +290,15 @@ pub struct ConRs {
     /// no fork-choice, no slot-battle resolution.  Slot ties take
     /// the producer with the lower `NodeId.to_inner()`.
     latest_rb_id: Option<BlockId>,
+
+    /// Dedup set for `LeiosEffect::NoVote` telemetry.  con-rs's
+    /// election lifecycle re-fires `NoVote` once per voting-window
+    /// slot for transient reasons (WrongEB / MissingTX / LateRBHeader)
+    /// until the predicate succeeds or the EB ages out.  At 750
+    /// nodes × O(10) in-flight EBs that's thousands of duplicate
+    /// telemetry events per slot; we collapse them to once per
+    /// `(eb_hash, reason)` here.
+    noted_no_vote: std::collections::BTreeSet<([u8; 32], SimNoVoteReason)>,
 }
 
 enum VoteState {
@@ -446,6 +455,7 @@ impl NodeImpl for ConRs {
             node_names,
             votes_by_eb: BTreeMap::new(),
             latest_rb_id: None,
+            noted_no_vote: std::collections::BTreeSet::new(),
         }
     }
 
@@ -1142,7 +1152,7 @@ impl ConRs {
     /// flows directly via the `Message` enum (see the handlers above)
     /// and validation timing through `CpuTask`, so the con-rs
     /// abstractions for those channels don't need translation here.
-    fn apply_leios_effects(&self, out: &mut EventResult, effects: Vec<LeiosEffect>) {
+    fn apply_leios_effects(&mut self, out: &mut EventResult, effects: Vec<LeiosEffect>) {
         for fx in effects {
             match fx {
                 LeiosEffect::EmitVote {
@@ -1164,6 +1174,12 @@ impl ConRs {
                         NoVoteReason::WrongEB => SimNoVoteReason::WrongEB,
                         NoVoteReason::MissingTX => SimNoVoteReason::MissingTX,
                     };
+                    // con-rs re-fires NoVote per slot per EB on
+                    // transient reasons until the election expires.
+                    // Collapse the duplicate telemetry stream here.
+                    if !self.noted_no_vote.insert((eb_hash, sim_reason.clone())) {
+                        continue;
+                    }
                     if let Some(&eb_id) = self.eb_hash_to_id.get(&eb_hash) {
                         self.tracker
                             .track_no_vote(eb_slot, 0, self.id, eb_id, sim_reason);
