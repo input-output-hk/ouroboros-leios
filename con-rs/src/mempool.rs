@@ -66,7 +66,7 @@ pub struct PendingTx {
 // ---------------------------------------------------------------------------
 
 /// What the I/O layer should do as a result of a state mutation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MempoolEffect {
     /// Submit `body` to the wrapper's transaction validator.  When the
     /// validator returns, the wrapper calls
@@ -94,6 +94,12 @@ pub enum TxRejectReason {
     /// Already in the mempool or already pending validation; the
     /// duplicate body was discarded.
     AlreadyKnown,
+    /// The tx was pinned under an EB whose manifest aged past the
+    /// retention window (`eb_retention_slots` slots behind
+    /// `max_eb_slot`).  No surviving manifest referenced this body, so
+    /// it was released from `eb_pinned`.  Sim adapters map this to
+    /// their `EBExpired` tx-loss reason.
+    EbClosurePruned,
 }
 
 // ---------------------------------------------------------------------------
@@ -371,7 +377,11 @@ impl MempoolState {
     /// `txs` queue is empty (the next RB body won't include them) but
     /// the bodies stay serveable via LeiosFetch and visible to the
     /// `MissingTX` voting predicate.
-    pub fn produce_eb(&mut self, eb_key: EbKey) -> Vec<TxId> {
+    ///
+    /// Returns the manifest and any `TxRejected{EbClosurePruned}`
+    /// effects emitted when older EB closures aged out of the
+    /// retention window.
+    pub fn produce_eb(&mut self, eb_key: EbKey) -> (Vec<TxId>, Vec<MempoolEffect>) {
         let drained: Vec<PendingTx> = self.txs.drain(..).collect();
         self.total_bytes = 0;
         let manifest: Vec<TxId> = drained.iter().map(|tx| tx.tx_id.clone()).collect();
@@ -379,8 +389,8 @@ impl MempoolState {
             self.eb_pinned.entry(tx.tx_id.clone()).or_insert(tx);
         }
         self.eb_manifests.insert(eb_key, manifest.clone());
-        self.bump_eb_slot(eb_key.slot);
-        manifest
+        let fx = self.bump_eb_slot(eb_key.slot);
+        (manifest, fx)
     }
 
     /// Receiver-side: register the manifest of an EB whose body bytes
@@ -388,9 +398,12 @@ impl MempoolState {
     /// `merge_eb_body` as LeiosFetch responses come in.  No-op if a
     /// manifest is already recorded for this `eb_key` (first writer
     /// wins — manifests are content-addressed via the EB hash).
-    pub fn record_eb_manifest(&mut self, eb_key: EbKey, manifest: Vec<TxId>) {
+    ///
+    /// Returns any `TxRejected{EbClosurePruned}` effects emitted when
+    /// older EB closures aged out of the retention window.
+    pub fn record_eb_manifest(&mut self, eb_key: EbKey, manifest: Vec<TxId>) -> Vec<MempoolEffect> {
         self.eb_manifests.entry(eb_key).or_insert(manifest);
-        self.bump_eb_slot(eb_key.slot);
+        self.bump_eb_slot(eb_key.slot)
     }
 
     /// Receiver-side: insert a body fetched via LeiosFetch.  `tx_id`
@@ -460,19 +473,20 @@ impl MempoolState {
 
     // -- Internal helpers --------------------------------------------------
 
-    fn bump_eb_slot(&mut self, slot: u64) {
+    fn bump_eb_slot(&mut self, slot: u64) -> Vec<MempoolEffect> {
         self.max_eb_slot = self.max_eb_slot.max(slot);
-        self.prune_eb_slot_window();
+        self.prune_eb_slot_window()
     }
 
     /// Drop EB manifests older than the retention window.  Pinned
     /// bodies that no surviving manifest references are released too —
     /// otherwise the producer's drain-into-EB path would leak them
-    /// forever.
-    fn prune_eb_slot_window(&mut self) {
+    /// forever.  Each released body produces an `EbClosurePruned`
+    /// `TxRejected` effect so consumers can record the tx loss.
+    fn prune_eb_slot_window(&mut self) -> Vec<MempoolEffect> {
         let cutoff = self.max_eb_slot.saturating_sub(self.eb_retention_slots);
         if cutoff == 0 {
-            return;
+            return Vec::new();
         }
         self.eb_manifests.retain(|key, _| key.slot >= cutoff);
         let still_referenced: BTreeSet<TxId> = self
@@ -480,8 +494,19 @@ impl MempoolState {
             .values()
             .flat_map(|m| m.iter().cloned())
             .collect();
-        self.eb_pinned
-            .retain(|id, _| still_referenced.contains(id));
+        let mut fx = Vec::new();
+        self.eb_pinned.retain(|id, _| {
+            if still_referenced.contains(id) {
+                true
+            } else {
+                fx.push(MempoolEffect::TxRejected {
+                    tx_id: id.clone(),
+                    reason: TxRejectReason::EbClosurePruned,
+                });
+                false
+            }
+        });
+        fx
     }
 
     fn admit_internal(
@@ -876,9 +901,10 @@ mod tests {
         admit(&mut s, 3, 300);
 
         let eb = eb_key(50, 0xEE);
-        let manifest = s.produce_eb(eb);
+        let (manifest, evictions) = s.produce_eb(eb);
 
         assert_eq!(manifest, vec![vec![1u8; 32], vec![2u8; 32], vec![3u8; 32]]);
+        assert!(evictions.is_empty(), "no older EBs to evict yet");
         assert!(s.is_empty(), "txs are drained");
         assert_eq!(s.total_bytes(), 0);
         assert!(s.eb_pinned.contains_key(&vec![1u8; 32]));
@@ -891,7 +917,7 @@ mod tests {
         admit(&mut s, 1, 100);
         admit(&mut s, 2, 200);
         let eb = eb_key(10, 0x11);
-        s.produce_eb(eb);
+        let _ = s.produce_eb(eb);
         // Both still locally available, just under different roofs.
         assert!(s.has_tx(&vec![1u8; 32]));
         assert!(s.has_tx(&vec![2u8; 32]));
@@ -989,18 +1015,52 @@ mod tests {
         // Tight window so the test stays small.
         let mut s = MempoolState::new_with_eb_retention(100, 5);
         let old_eb = eb_key(1, 0x01);
-        s.record_eb_manifest(old_eb, vec![vec![0xAAu8; 32]]);
-        s.merge_eb_body(vec![0xAAu8; 32], vec![0xAA], 1);
-        assert!(s.has_tx(&vec![0xAAu8; 32]));
+        let evicted_id = vec![0xAAu8; 32];
+        let evictions_initial = s.record_eb_manifest(old_eb, vec![evicted_id.clone()]);
+        assert!(evictions_initial.is_empty(), "no evictions on first record");
+        s.merge_eb_body(evicted_id.clone(), vec![0xAA], 1);
+        assert!(s.has_tx(&evicted_id));
         assert!(s.get_eb_manifest(&old_eb).is_some());
 
         // Push max_eb_slot far past the window.
-        s.record_eb_manifest(eb_key(100, 0x02), vec![vec![0xBBu8; 32]]);
+        let evictions = s.record_eb_manifest(eb_key(100, 0x02), vec![vec![0xBBu8; 32]]);
 
         // Old EB and its body are evicted; new EB stays.
         assert!(s.get_eb_manifest(&old_eb).is_none());
-        assert!(!s.has_tx(&vec![0xAAu8; 32]));
+        assert!(!s.has_tx(&evicted_id));
         assert!(s.get_eb_manifest(&eb_key(100, 0x02)).is_some());
+
+        // The evicted body produces a TxRejected effect with the new
+        // EbClosurePruned reason so adapters can record the tx loss.
+        assert_eq!(
+            evictions,
+            vec![MempoolEffect::TxRejected {
+                tx_id: evicted_id,
+                reason: TxRejectReason::EbClosurePruned,
+            }]
+        );
+    }
+
+    #[test]
+    fn produce_eb_emits_evictions_for_aged_pins() {
+        let mut s = MempoolState::new_with_eb_retention(100, 5);
+        // Old EB with a pinned body.
+        let old_id = vec![0xAAu8; 32];
+        let _ = s.record_eb_manifest(eb_key(1, 0x01), vec![old_id.clone()]);
+        s.merge_eb_body(old_id.clone(), vec![0xAA], 1);
+
+        // Produce a new EB far past the retention window — the
+        // producer-side path also evicts the aged closure.
+        admit(&mut s, 9, 100);
+        let (_manifest, evictions) = s.produce_eb(eb_key(100, 0x02));
+
+        assert_eq!(
+            evictions,
+            vec![MempoolEffect::TxRejected {
+                tx_id: old_id,
+                reason: TxRejectReason::EbClosurePruned,
+            }]
+        );
     }
 
     #[test]

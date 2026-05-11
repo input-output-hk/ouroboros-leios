@@ -144,7 +144,7 @@ mod tests {
             slot: 7,
             hash: [0xAA; 32],
         };
-        let committed = state.produce_eb(eb_key);
+        let (committed, _evictions) = state.produce_eb(eb_key);
         assert_eq!(committed, manifest);
         assert_eq!(state.txs.len(), 0);
         assert_eq!(state.total_bytes, 0);

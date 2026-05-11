@@ -133,17 +133,17 @@ impl Mempool {
         }
     }
 
-    /// Drain every free tx into an EB pin under `eb_key` and return the
-    /// manifest hashes for the producer to encode.  After this, the
+    /// Drain every free tx into an EB pin under `eb_key`.  After this the
     /// drained txs stay locally available via `has_tx` / `get_body_by_id`
     /// but no longer count toward `total_bytes` / `drain_up_to` — i.e.
     /// they won't be double-included in a subsequent RB body.
-    pub fn produce_eb(&mut self, eb_key: EbKey) -> Vec<TxId> {
-        self.state
-            .produce_eb(eb_key)
-            .into_iter()
-            .map(TxId)
-            .collect()
+    ///
+    /// `MempoolEffect::TxRejected{EbClosurePruned}` evictions of older
+    /// closures aging past the retention window are dropped on the
+    /// floor here; net-rs has no telemetry plumbing for them yet, and
+    /// sim-rs's adapter will surface them directly.
+    pub fn produce_eb(&mut self, eb_key: EbKey) {
+        let _ = self.state.produce_eb(eb_key);
     }
 
     /// Receiver-side: insert a body fetched via LeiosFetch.  Idempotent
