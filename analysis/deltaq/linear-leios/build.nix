@@ -8,19 +8,10 @@
       ...
     }:
     let
-      hpkgs = pkgs.haskell.packages.ghc910;
-
-      hnPkgs = import ../../../nix/haskell-nix-pkgs.nix { inherit inputs system; };
-      project = hnPkgs.haskell-nix.cabalProject' {
+      hsProject = import (inputs.self + "/nix/mk-haskell-project.nix") { inherit inputs system; } {
         name = "leios-deltaq";
         src = ./.;
-        compiler-nix-name = "ghc9101";
-        inputMap = {
-          "https://chap.intersectmbo.org/" = inputs.CHaP;
-        };
-        shell.withHoogle = false;
       };
-      flake = project.flake { };
     in
     {
       devShells.dev-analysis-deltaq-linear-leios = pkgs.mkShell {
@@ -30,10 +21,10 @@
           pkgs.pango
         ];
         nativeBuildInputs = [
-          hpkgs.ghc
+          hsProject.hpkgs.ghc
           pkgs.cabal-install
-          hpkgs.haskell-language-server
-          hpkgs.fourmolu
+          hsProject.hpkgs.haskell-language-server
+          hsProject.hpkgs.fourmolu
           pkgs.pkg-config
         ];
         shellHook = ''
@@ -47,6 +38,6 @@
         '';
       };
 
-      legacyPackages.leios-deltaq = flake;
+      legacyPackages.leios-deltaq = hsProject.flake;
     };
 }

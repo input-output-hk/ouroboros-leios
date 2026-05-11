@@ -9,9 +9,6 @@
     }:
     let
       inherit (pkgs) lib;
-      hpkgs = pkgs.haskell.packages.ghc910;
-
-      hnPkgs = import ../nix/haskell-nix-pkgs.nix { inherit inputs system; };
 
       # Include this cluster + the sibling leios-trace-hs referenced by
       # cabal.project's `packages: . ../leios-trace-hs`. haskell.nix is told
@@ -25,17 +22,11 @@
         ];
       };
 
-      project = hnPkgs.haskell-nix.cabalProject' {
+      hsProject = import (inputs.self + "/nix/mk-haskell-project.nix") { inherit inputs system; } {
         name = "ouroboros-leios-sim";
         inherit src;
         cabalProjectFileName = "simulation/cabal.project";
-        compiler-nix-name = "ghc9101";
-        inputMap = {
-          "https://chap.intersectmbo.org/" = inputs.CHaP;
-        };
-        shell.withHoogle = false;
       };
-      flake = project.flake { };
     in
     {
       devShells.dev-simulation = pkgs.mkShell {
@@ -52,10 +43,10 @@
             sqlite
           ]);
         nativeBuildInputs = [
-          hpkgs.ghc
+          hsProject.hpkgs.ghc
           pkgs.cabal-install
-          hpkgs.haskell-language-server
-          hpkgs.fourmolu
+          hsProject.hpkgs.haskell-language-server
+          hsProject.hpkgs.fourmolu
           pkgs.pkg-config
         ];
         shellHook = ''
@@ -66,6 +57,6 @@
         '';
       };
 
-      legacyPackages.simulation = flake;
+      legacyPackages.simulation = hsProject.flake;
     };
 }

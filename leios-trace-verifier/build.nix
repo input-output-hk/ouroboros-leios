@@ -9,8 +9,7 @@
     }:
     let
       inherit (pkgs) lib;
-      hpkgs = pkgs.haskell.packages.ghc910;
-      agda = import ../nix/agda.nix {
+      agda = import (inputs.self + "/nix/agda.nix") {
         inherit
           pkgs
           inputs
@@ -18,8 +17,6 @@
           lib
           ;
       };
-
-      hnPkgs = import ../nix/haskell-nix-pkgs.nix { inherit inputs system; };
 
       # Sources: this cluster + sibling leios-trace-hs, with the Agda-generated
       # Haskell sources overlaid into leios-trace-verifier/dist/haskell. The
@@ -47,17 +44,11 @@
           $out/leios-trace-verifier/dist/haskell/data/
       '';
 
-      project = hnPkgs.haskell-nix.cabalProject' {
+      hsProject = import (inputs.self + "/nix/mk-haskell-project.nix") { inherit inputs system; } {
         name = "leios-trace-verifier";
         inherit src;
         cabalProjectFileName = "leios-trace-verifier/cabal.project";
-        compiler-nix-name = "ghc9101";
-        inputMap = {
-          "https://chap.intersectmbo.org/" = inputs.CHaP;
-        };
-        shell.withHoogle = false;
       };
-      flake = project.flake { };
 
       inherit (inputs.leios-spec.packages.${system}) agdaWithPkgs leiosSpec;
       agdaWithDeps = agdaWithPkgs.withPackages (p: [
@@ -76,10 +67,10 @@
           pkgs.zlib
         ];
         nativeBuildInputs = [
-          hpkgs.ghc
+          hsProject.hpkgs.ghc
           pkgs.cabal-install
-          hpkgs.haskell-language-server
-          hpkgs.fourmolu
+          hsProject.hpkgs.haskell-language-server
+          hsProject.hpkgs.fourmolu
           pkgs.pkg-config
           pkgs.gnumake
           agdaWithDeps
@@ -92,6 +83,6 @@
         '';
       };
 
-      legacyPackages.leios-trace-verifier = flake;
+      legacyPackages.leios-trace-verifier = hsProject.flake;
     };
 }

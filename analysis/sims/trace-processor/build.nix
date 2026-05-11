@@ -8,19 +8,10 @@
       ...
     }:
     let
-      hpkgs = pkgs.haskell.packages.ghc910;
-
-      hnPkgs = import ../../../nix/haskell-nix-pkgs.nix { inherit inputs system; };
-      project = hnPkgs.haskell-nix.cabalProject' {
+      hsProject = import (inputs.self + "/nix/mk-haskell-project.nix") { inherit inputs system; } {
         name = "trace-processor";
         src = ./.;
-        compiler-nix-name = "ghc9101";
-        inputMap = {
-          "https://chap.intersectmbo.org/" = inputs.CHaP;
-        };
-        shell.withHoogle = false;
       };
-      flake = project.flake { };
     in
     {
       devShells.dev-analysis-sims-trace-processor = pkgs.mkShell {
@@ -28,10 +19,10 @@
           pkgs.zlib
         ];
         nativeBuildInputs = [
-          hpkgs.ghc
+          hsProject.hpkgs.ghc
           pkgs.cabal-install
-          hpkgs.haskell-language-server
-          hpkgs.fourmolu
+          hsProject.hpkgs.haskell-language-server
+          hsProject.hpkgs.fourmolu
           pkgs.pkg-config
         ];
         shellHook = ''
@@ -42,6 +33,6 @@
         '';
       };
 
-      legacyPackages.trace-processor = flake;
+      legacyPackages.trace-processor = hsProject.flake;
     };
 }

@@ -26,7 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-14, ubuntu-22.04]
-        ghc-version: ["9.10.1"]
+        ghc-version: ["9.10.3"]
 
     steps:
       - name: 📥 Checkout repository
