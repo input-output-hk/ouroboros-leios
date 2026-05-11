@@ -41,7 +41,7 @@ use crate::{
     model::{
         BlockId, EndorserBlockId, LinearEndorserBlock, LinearRankingBlock,
         LinearRankingBlockHeader, NoVoteReason as SimNoVoteReason, Transaction, TransactionId,
-        TransactionLostReason,
+        TransactionLostReason, VoteBundle, VoteBundleId,
     },
     rng::{DrawSite, Rng},
     sim::{NodeImpl, linear_leios::CpuTask, linear_leios::Message, linear_leios::TimedEvent},
@@ -152,6 +152,26 @@ pub struct ConRs {
     /// peer who already told us).  Will graduate to a full fetch
     /// candidate set when the multi-peer fetch policy lands.
     eb_announcers: BTreeMap<EndorserBlockId, Vec<NodeId>>,
+
+    /// Reverse lookup from con-rs's 32-byte EB hash back to sim's
+    /// `EndorserBlockId`.  Populated whenever an EB enters
+    /// [`LeiosState`] via `record_eb_in_leios`.
+    eb_hash_to_id: BTreeMap<[u8; 32], EndorserBlockId>,
+
+    /// Vote bundle state machine.  Self-emitted bundles land in
+    /// `Received` immediately; peer-announced bundles walk
+    /// `Pending → Requested → Received`.
+    vote_bundles: BTreeMap<VoteBundleId, VoteState>,
+
+    /// NodeId → pool name lookup, cached so the vote-aggregation path
+    /// (which keys by con-rs's `voter_key: Vec<u8>` over the pool name)
+    /// doesn't pay a `sim_config.nodes` linear scan per vote.
+    node_names: BTreeMap<NodeId, String>,
+}
+
+enum VoteState {
+    Requested,
+    Received { votes: Arc<VoteBundle> },
 }
 
 /// State of an EB known to this node.
@@ -272,6 +292,7 @@ impl NodeImpl for ConRs {
         // value; W2.3 will read it from the sim config.
         let praos = PraosState::new(config.name.clone(), 2160);
         let mempool = MempoolState::new(sim_config.mempool_size_bytes as usize);
+        let node_names = sim_config_nodes_to_names(&sim_config);
 
         Self {
             id: config.id,
@@ -291,6 +312,9 @@ impl NodeImpl for ConRs {
             rbs: BTreeMap::new(),
             ebs: BTreeMap::new(),
             eb_announcers: BTreeMap::new(),
+            eb_hash_to_id: BTreeMap::new(),
+            vote_bundles: BTreeMap::new(),
+            node_names,
         }
     }
 
@@ -386,8 +410,12 @@ impl NodeImpl for ConRs {
                 self.tracker.track_eb_received(eb.id(), from, self.id);
                 out.schedule_cpu_task(CpuTask::EBHeaderValidated(from, eb));
             }
-            // Vote handlers come up in the next slice.
-            Message::AnnounceVotes(_) | Message::RequestVotes(_) | Message::Votes(_) => {}
+            Message::AnnounceVotes(id) => self.receive_announce_votes(&mut out, from, id),
+            Message::RequestVotes(id) => self.receive_request_votes(&mut out, from, id),
+            Message::Votes(bundle) => {
+                self.tracker.track_votes_received(&bundle, from, self.id);
+                out.schedule_cpu_task(CpuTask::VTBundleValidated(from, bundle));
+            }
         }
         out
     }
@@ -421,8 +449,12 @@ impl NodeImpl for ConRs {
                 self.finish_validating_eb_header(&mut out, from, eb);
             }
             CpuTask::EBBlockValidated(eb, seen) => self.finish_validating_eb(&mut out, eb, seen),
-            // Vote validation paths land in the next slice.
-            CpuTask::VTBundleGenerated(_, _) | CpuTask::VTBundleValidated(_, _) => {}
+            CpuTask::VTBundleGenerated(bundle, eb) => {
+                self.finish_generating_votes(&mut out, bundle, eb);
+            }
+            CpuTask::VTBundleValidated(from, bundle) => {
+                self.finish_validating_votes(&mut out, from, bundle);
+            }
         }
         out
     }
@@ -748,14 +780,103 @@ impl ConRs {
         let _ = out;
     }
 
+    fn receive_announce_votes(
+        &mut self,
+        out: &mut EventResult,
+        from: NodeId,
+        id: VoteBundleId,
+    ) {
+        let should_request = match self.vote_bundles.get(&id) {
+            None => true,
+            Some(VoteState::Requested) => {
+                self.sim_config.relay_strategy == RelayStrategy::RequestFromAll
+            }
+            Some(VoteState::Received { .. }) => false,
+        };
+        if should_request {
+            self.vote_bundles.insert(id, VoteState::Requested);
+            out.send_to(from, Message::RequestVotes(id));
+        }
+    }
+
+    fn receive_request_votes(
+        &mut self,
+        out: &mut EventResult,
+        from: NodeId,
+        id: VoteBundleId,
+    ) {
+        if let Some(VoteState::Received { votes }) = self.vote_bundles.get(&id) {
+            self.tracker.track_votes_sent(votes, self.id, from);
+            out.send_to(from, Message::Votes(votes.clone()));
+        }
+    }
+
+    fn finish_generating_votes(
+        &mut self,
+        out: &mut EventResult,
+        bundle: VoteBundle,
+        _eb: Arc<LinearEndorserBlock>,
+    ) {
+        self.tracker.track_votes_generated(&bundle);
+        let bundle = Arc::new(bundle);
+        let id = bundle.id;
+        self.vote_bundles
+            .insert(id, VoteState::Received { votes: bundle.clone() });
+        // Self-attribution: feed our own vote into the aggregator
+        // immediately so quorum can form even when this node sees no
+        // other voters.
+        self.record_bundle_into_elections(&bundle);
+        for peer in &self.consumers {
+            out.send_to(*peer, Message::AnnounceVotes(id));
+        }
+    }
+
+    fn finish_validating_votes(
+        &mut self,
+        out: &mut EventResult,
+        from: NodeId,
+        bundle: Arc<VoteBundle>,
+    ) {
+        let id = bundle.id;
+        if matches!(self.vote_bundles.get(&id), Some(VoteState::Received { .. })) {
+            return;
+        }
+        self.vote_bundles
+            .insert(id, VoteState::Received { votes: bundle.clone() });
+        self.record_bundle_into_elections(&bundle);
+        for peer in &self.consumers {
+            if *peer == from {
+                continue;
+            }
+            out.send_to(*peer, Message::AnnounceVotes(id));
+        }
+    }
+
+    /// Record every (eb, weight) entry in `bundle` into the elections
+    /// aggregator using the bundle's producer as the voter key.
+    /// Idempotent — `record_vote` dedupes per `(eb_hash, voter_key)`.
+    fn record_bundle_into_elections(&mut self, bundle: &VoteBundle) {
+        let Some(voter_name) = self.node_names.get(&bundle.id.producer).cloned() else {
+            return;
+        };
+        for (eb_id, count) in &bundle.ebs {
+            let eb_hash = synthesize_eb_hash(*eb_id);
+            self.leios
+                .elections
+                .record_vote(&eb_hash, voter_name.clone().into_bytes(), *count as u32);
+        }
+    }
+
     /// Wire an EB (locally produced or peer-received) into
     /// [`LeiosState`]: register the tx-hash manifest and announce the
     /// election immediately (sim validates synchronously in the
     /// CpuTask, so we skip the separate `ValidateEb` effect path).
     fn record_eb_in_leios(&mut self, eb_id: EndorserBlockId, eb: &LinearEndorserBlock) {
+        let eb_hash = synthesize_eb_hash(eb_id);
+        self.eb_hash_to_id.insert(eb_hash, eb_id);
         let point = con_rs::types::Point::Specific {
             slot: eb_id.slot,
-            hash: synthesize_eb_hash(eb_id),
+            hash: eb_hash,
         };
         let manifest: Vec<[u8; 32]> = eb.txs.iter().map(|tx| tx_id_hash(tx.id)).collect();
         let fx = self.leios.on_eb_received(point.clone(), Some(manifest));
@@ -810,46 +931,112 @@ impl ConRs {
             .collect()
     }
 
-    /// Forward Leios-side effects.  Today only telemetry and `NoVote`
-    /// have meaningful translations — fetches, vote emissions, and
-    /// validation effects need the RB / EB / vote handlers that land
-    /// in subsequent slices.  Unhandled variants are intentionally
-    /// dropped (`_`) so this compiles cleanly while the surface grows.
-    fn apply_leios_effects(&self, _out: &mut EventResult, effects: Vec<LeiosEffect>) {
+    /// Forward Leios-side effects to sim's `EventResult` and tracker.
+    /// Fetch / validate effects stay no-op: sim drives RB/EB/vote
+    /// flows directly via the `Message` enum (see the handlers above)
+    /// and validation timing through `CpuTask`, so the con-rs
+    /// abstractions for those channels don't need translation here.
+    fn apply_leios_effects(&self, out: &mut EventResult, effects: Vec<LeiosEffect>) {
         for fx in effects {
             match fx {
-                LeiosEffect::NoVote { eb_slot: _, eb_hash: _, reason } => {
+                LeiosEffect::EmitVote {
+                    eb_slot,
+                    eb_hash,
+                    emit_pv,
+                    npv_signature,
+                } => {
+                    self.emit_vote(out, eb_slot, eb_hash, emit_pv, npv_signature);
+                }
+                LeiosEffect::NoVote {
+                    eb_slot,
+                    eb_hash,
+                    reason,
+                } => {
                     let sim_reason = match reason {
                         NoVoteReason::LateEB => SimNoVoteReason::LateEB,
                         NoVoteReason::LateRBHeader => SimNoVoteReason::LateRBHeader,
                         NoVoteReason::WrongEB => SimNoVoteReason::WrongEB,
                         NoVoteReason::MissingTX => SimNoVoteReason::MissingTX,
                     };
-                    // EndorserBlockId reconstruction requires the EB's
-                    // producer — that information isn't carried in
-                    // the effect, only the hash.  The RB / EB slice
-                    // will maintain a hash → EndorserBlockId index;
-                    // until then, track_no_vote needs that mapping, so
-                    // we skip emission here.  TODO: wire once the
-                    // index exists.
-                    let _ = sim_reason;
+                    if let Some(&eb_id) = self.eb_hash_to_id.get(&eb_hash) {
+                        self.tracker
+                            .track_no_vote(eb_slot, 0, self.id, eb_id, sim_reason);
+                    }
                 }
                 LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::QuorumReached { .. })
                 | LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::ElectionExpired { .. }) => {
-                    // No 1:1 sim telemetry yet; sim derives equivalent
-                    // signals from votes_by_eb counts.
+                    // No 1:1 sim telemetry; sim's stat aggregator
+                    // derives equivalent signals from `votes_by_eb`
+                    // counts on the receive path.
                 }
+                // Fetch effects stay no-op: sim drives RB/EB/vote
+                // fetches directly through its `Message` enum, so
+                // con-rs's fetch-policy abstraction isn't on the
+                // path.  Validation effects similarly: sim's
+                // `CpuTask` already models the validation hop.
                 LeiosEffect::FetchLeiosBlock { .. }
                 | LeiosEffect::FetchLeiosBlockTxs { .. }
                 | LeiosEffect::FetchLeiosVotes { .. }
                 | LeiosEffect::RecordLeiosEbManifest { .. }
-                | LeiosEffect::EmitVote { .. }
                 | LeiosEffect::ValidateEb { .. }
-                | LeiosEffect::ValidateVotes { .. } => {
-                    // Wired up by the EB / vote slice.
-                }
+                | LeiosEffect::ValidateVotes { .. } => {}
             }
         }
+    }
+
+    /// Build a sim `VoteBundle` for this EB carrying the weight con-rs
+    /// computed (PV seats + NPV wins) and schedule it through
+    /// `CpuTask::VTBundleGenerated` so the validation timing matches
+    /// `linear_leios`.
+    fn emit_vote(
+        &self,
+        out: &mut EventResult,
+        eb_slot: u64,
+        eb_hash: [u8; 32],
+        emit_pv: bool,
+        npv_signature: Option<Vec<u8>>,
+    ) {
+        let Some(&eb_id) = self.eb_hash_to_id.get(&eb_hash) else {
+            return;
+        };
+        let Some(EbState::Received { eb, .. }) = self.ebs.get(&eb_id) else {
+            return;
+        };
+        let pv_weight = if emit_pv {
+            self.leios.voting_config.persistent_seats
+        } else {
+            0
+        };
+        let npv_weight = match npv_signature {
+            Some(sig) => con_rs::wfa::count_npv_wins(
+                &sig,
+                self.leios.voting_config.stake,
+                self.leios.voting_config.total_stake,
+                self.leios
+                    .voting_config
+                    .committee_selection
+                    .non_persistent_voters(),
+            ),
+            None => 0,
+        };
+        let weight = (pv_weight + npv_weight) as usize;
+        if weight == 0 {
+            return;
+        }
+        let id = VoteBundleId {
+            slot: eb_slot,
+            pipeline: 0,
+            producer: self.id,
+        };
+        self.tracker.track_vote_lottery_won(id);
+        let mut ebs = BTreeMap::new();
+        ebs.insert(eb_id, weight);
+        let bundle = VoteBundle {
+            id,
+            bytes: self.sim_config.sizes.vote_bundle(1),
+            ebs,
+        };
+        out.schedule_cpu_task(CpuTask::VTBundleGenerated(bundle, eb.clone()));
     }
 
     /// Forward mempool-side effects to sim's tracker. Today only the
@@ -905,6 +1092,19 @@ fn sim_id_from_bytes(bytes: &[u8]) -> Option<TransactionId> {
     }
     let arr: [u8; 8] = bytes[..8].try_into().ok()?;
     Some(TransactionId::new(u64::from_le_bytes(arr)))
+}
+
+/// Build the NodeId → pool-name lookup once at startup.  con-rs's
+/// vote aggregator keys voters by their pool name (the same string
+/// that appears in [`StakeEntry::node_id`] and the persistent
+/// committee map), so the adapter needs to translate sim's
+/// integer-typed `NodeId` on the receive path.
+fn sim_config_nodes_to_names(sim_config: &SimConfiguration) -> BTreeMap<NodeId, String> {
+    sim_config
+        .nodes
+        .iter()
+        .map(|n| (n.id, n.name.clone()))
+        .collect()
 }
 
 /// Deterministic 32-byte EB hash derived from the EB id.  Sim doesn't
