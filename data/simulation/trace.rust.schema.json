@@ -368,6 +368,9 @@
         "sender": {
           "type": "string"
         },
+        "slot": {
+          "type": "number"
+        },
         "type": {
           "$ref": "#/definitions/NetworkEventType"
         }

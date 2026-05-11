@@ -1,4 +1,4 @@
-import { IServerMessage, ITransformedNodeMap } from "@/components/Sim/types";
+import { IServerMessage, ITransformedNodeMap, IVote } from "@/components/Sim/types";
 import { Dispatch, RefObject } from "react";
 
 // Types of messages submitted between nodes
@@ -43,7 +43,7 @@ export interface IMessageAnimation {
   progress: number; // 0-1, calculated based on current timeline position
   sizeBytes: number; // payload size for visual scaling
   slot?: number;
-  votes?: Array<{ voterId: number; ebHash: string; slot: number }>;
+  votes?: IVote[];
   numTxs?: number;
 }
 

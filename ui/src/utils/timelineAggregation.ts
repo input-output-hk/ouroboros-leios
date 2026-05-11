@@ -2,6 +2,7 @@ import {
   IServerMessage,
   EServerMessageType,
   ITransformedNodeMap,
+  IVote,
 } from "@/components/Sim/types";
 import {
   ISimulationAggregatedData,
@@ -142,7 +143,7 @@ const createMessageAnimation = (
   targetTime: number,
   travelTime: number,
   sizeBytes: number,
-  extra?: { slot?: number; votes?: Array<{ voterId: number; ebHash: string; slot: number }>; numTxs?: number },
+  extra?: { slot?: number; votes?: IVote[]; numTxs?: number },
 ) => {
   const estimatedReceiveTime = sentTime + travelTime;
 
