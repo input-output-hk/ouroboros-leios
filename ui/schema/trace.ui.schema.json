@@ -1,0 +1,565 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "BlockRef": {
+      "description": "Reference to a block by its identifier.",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": ["id"],
+      "type": "object"
+    },
+    "Endorsement": {
+      "description": "Endorsement carried in a ranking block.",
+      "properties": {
+        "eb": {
+          "$ref": "#/definitions/BlockRef"
+        }
+      },
+      "required": ["eb"],
+      "type": "object"
+    },
+    "UIEBGenerated": {
+      "properties": {
+        "endorser_blocks": {
+          "items": {
+            "$ref": "#/definitions/BlockRef"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "input_blocks": {
+          "description": "Carried by the simulator; omitted by the prototype.",
+          "items": {
+            "$ref": "#/definitions/BlockRef"
+          },
+          "type": "array"
+        },
+        "pipeline": {
+          "type": "number"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "const": "EBGenerated",
+          "type": "string"
+        }
+      },
+      "required": [
+        "endorser_blocks",
+        "id",
+        "pipeline",
+        "producer",
+        "size_bytes",
+        "slot",
+        "type"
+      ],
+      "type": "object"
+    },
+    "UIEBReceived": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "const": "EBReceived",
+          "type": "string"
+        }
+      },
+      "required": ["id", "recipient", "type"],
+      "type": "object"
+    },
+    "UIEBSent": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "msg_size_bytes": {
+          "description": "Carried by the simulator; omitted by the prototype.",
+          "type": "number"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "sending_s": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "const": "EBSent",
+          "type": "string"
+        }
+      },
+      "required": ["id", "recipient", "sender", "type"],
+      "type": "object"
+    },
+    "UIMessage": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/UITxsGenerated"
+        },
+        {
+          "$ref": "#/definitions/UIRBGenerated"
+        },
+        {
+          "$ref": "#/definitions/UIEBGenerated"
+        },
+        {
+          "$ref": "#/definitions/UIVotesGenerated"
+        },
+        {
+          "$ref": "#/definitions/UIRBSent"
+        },
+        {
+          "$ref": "#/definitions/UIEBSent"
+        },
+        {
+          "$ref": "#/definitions/UIVotesSent"
+        },
+        {
+          "$ref": "#/definitions/UITxsSent"
+        },
+        {
+          "$ref": "#/definitions/UIRBReceived"
+        },
+        {
+          "$ref": "#/definitions/UIEBReceived"
+        },
+        {
+          "$ref": "#/definitions/UIVotesReceived"
+        },
+        {
+          "$ref": "#/definitions/UITxsReceived"
+        }
+      ],
+      "description": "Union of every message shape the UI renders."
+    },
+    "UIRBGenerated": {
+      "properties": {
+        "endorsement": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Endorsement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endorsements": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/definitions/Endorsement"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/BlockRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Carried by the simulator; omitted by the prototype."
+        },
+        "producer": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "tx_payload_bytes": {
+          "description": "Carried by the simulator; omitted by the prototype.",
+          "type": "number"
+        },
+        "type": {
+          "const": "RBGenerated",
+          "type": "string"
+        }
+      },
+      "required": [
+        "endorsement",
+        "id",
+        "producer",
+        "size_bytes",
+        "slot",
+        "type"
+      ],
+      "type": "object"
+    },
+    "UIRBReceived": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "const": "RBReceived",
+          "type": "string"
+        }
+      },
+      "required": ["id", "recipient", "type"],
+      "type": "object"
+    },
+    "UIRBSent": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "msg_size_bytes": {
+          "description": "Carried by the simulator; omitted by the prototype.",
+          "type": "number"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "sending_s": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "const": "RBSent",
+          "type": "string"
+        }
+      },
+      "required": ["id", "recipient", "sender", "type"],
+      "type": "object"
+    },
+    "UITraceEvent": {
+      "description": "Top-level event entry as produced by either trace source.",
+      "properties": {
+        "message": {
+          "$ref": "#/definitions/UIMessage"
+        },
+        "time_s": {
+          "type": "number"
+        }
+      },
+      "required": ["message", "time_s"],
+      "type": "object"
+    },
+    "UITxsGenerated": {
+      "description": "Transaction-generation event. `TXGenerated` is the simulator name;\n`TxsGenerated` is the post-normalisation name used inside the UI.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "publisher": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "type": {
+          "enum": ["TXGenerated", "TxsGenerated"],
+          "type": "string"
+        }
+      },
+      "required": ["id", "publisher", "size_bytes", "type"],
+      "type": "object"
+    },
+    "UITxsReceived": {
+      "description": "Received event for transactions. `TXReceived` is the simulator name;\n`TxsReceived` is what the prototype emits.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "msg_size_bytes": {
+          "description": "Carried by the prototype; the simulator omits this.",
+          "type": "number"
+        },
+        "num_txs": {
+          "description": "Number of transactions in the message — prototype only.",
+          "type": "number"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": ["TXReceived", "TxsReceived"],
+          "type": "string"
+        }
+      },
+      "required": ["id", "recipient", "type"],
+      "type": "object"
+    },
+    "UITxsSent": {
+      "description": "Sent event for transactions. `TXSent` is the simulator name; `TxsSent`\nis what the prototype emits.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "msg_size_bytes": {
+          "type": "number"
+        },
+        "num_txs": {
+          "description": "Number of transactions in the message — prototype only.",
+          "type": "number"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "sending_s": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": ["TXSent", "TxsSent"],
+          "type": "string"
+        }
+      },
+      "required": ["id", "msg_size_bytes", "recipient", "sender", "type"],
+      "type": "object"
+    },
+    "UIVotesGenerated": {
+      "description": "Vote-generation event. `VTBundleGenerated` is the simulator name;\n`VotesGenerated` is what the prototype emits. The `votes` payload also\ndiffers in shape: simulator emits a weight map keyed by voter id, the\nprototype emits an array of per-vote records.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "pipeline": {
+          "description": "Carried by the simulator; omitted by the prototype.",
+          "type": "number"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": ["VTBundleGenerated", "VotesGenerated"],
+          "type": "string"
+        },
+        "votes": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            {
+              "items": {
+                "$ref": "#/definitions/Vote"
+              },
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "required": ["id", "producer", "size_bytes", "slot", "type", "votes"],
+      "type": "object"
+    },
+    "UIVotesReceived": {
+      "description": "Received event for a vote-bundle message. `VTBundleReceived` is the\nsimulator name; `VotesReceived` is what the prototype emits.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": ["VTBundleReceived", "VotesReceived"],
+          "type": "string"
+        },
+        "votes": {
+          "description": "Per-vote records as emitted by the prototype; the simulator omits this.",
+          "items": {
+            "$ref": "#/definitions/Vote"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["id", "recipient", "type"],
+      "type": "object"
+    },
+    "UIVotesSent": {
+      "description": "Sent event for a vote-bundle message. `VTBundleSent` is the simulator\nname; `VotesSent` is what the prototype emits.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "msg_size_bytes": {
+          "description": "Carried by the simulator; omitted by the prototype.",
+          "type": "number"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "sending_s": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": ["VTBundleSent", "VotesSent"],
+          "type": "string"
+        },
+        "votes": {
+          "description": "Per-vote records as emitted by the prototype; the simulator omits this.",
+          "items": {
+            "$ref": "#/definitions/Vote"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["id", "recipient", "sender", "type"],
+      "type": "object"
+    },
+    "Vote": {
+      "description": "A single vote as carried in the prototype's `MsgLeiosVotes` payloads.",
+      "properties": {
+        "ebHash": {
+          "type": "string"
+        },
+        "electionId": {
+          "description": "Legacy field name for `slot`, kept for older prototype traces.",
+          "type": "number"
+        },
+        "slot": {
+          "description": "Slot of the EB being voted on (current prototype trace format).",
+          "type": "number"
+        },
+        "voteSignature": {
+          "type": "boolean"
+        },
+        "voterId": {
+          "type": "number"
+        }
+      },
+      "required": ["ebHash", "voterId"],
+      "type": "object"
+    }
+  },
+  "description": "A whole trace file represented as an array (e.g. after `jq -cs '.'`).",
+  "items": {
+    "$ref": "#/definitions/UITraceEvent"
+  },
+  "type": "array"
+}

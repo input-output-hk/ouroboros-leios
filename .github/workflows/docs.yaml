@@ -129,6 +129,16 @@ jobs:
         working-directory: ui
         run: npm install
 
+      - name: 🔍 Check trace schema is up to date
+        working-directory: ui
+        run: |
+          npm run gen:schema
+          git diff --exit-code schema/
+
+      - name: 🧪 Validate stored traces against schema
+        working-directory: ui
+        run: npm run validate:traces
+
       - name: 🏗️ Build visualizer
         working-directory: ui
         run: npm run build

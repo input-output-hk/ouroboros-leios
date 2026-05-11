@@ -91,7 +91,10 @@ const LEGACY_MESSAGE_TYPE_MAP: Record<string, EServerMessageType> = {
 const normalizeMessageType = (event: IServerMessage): IServerMessage => {
   const mapped = LEGACY_MESSAGE_TYPE_MAP[event.message.type];
   if (mapped) {
-    return { ...event, message: { ...event.message, type: mapped } };
+    return {
+      ...event,
+      message: { ...event.message, type: mapped } as IServerMessage["message"],
+    };
   }
   return event;
 };
@@ -154,7 +157,7 @@ const consumeStream = async (
     const { message } = serverMessage;
 
     // Filter only visualization-relevant events
-    if (message.type !== "__unknown" && allowedEvents.has(message.type)) {
+    if (allowedEvents.has(message.type as EServerMessageType)) {
       filteredCount++;
       batch.push(serverMessage);
 

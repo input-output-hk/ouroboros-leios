@@ -73,9 +73,7 @@ const parseRankingBlockGenerated = (
         slot: log.slot,
         producer: streamLabels.process,
         size_bytes: 0, // TODO: add size_bytes
-        header_bytes: 0, // TODO: used? have we access to the header?
         endorsement: null,
-        transactions: [], // TODO: used?
       };
 
       return {
@@ -204,7 +202,6 @@ const parseEndorserBlockGenerated = (
         producer: streamLabels.process,
         size_bytes: log.ebSize,
         pipeline: 0, // XXX: unused
-        transactions: [], // TODO: used?
         endorser_blocks: [], // XXX: not relevant for linear leios
       };
 
