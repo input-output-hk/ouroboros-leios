@@ -32,7 +32,7 @@
 //! | `linear-diffuse-stage-length-slots`     | `PipelineConfig.diffuse_window` (CIP-0164 L_diff)  |
 //! | `linear-tx-max-age-slots`               | `PipelineConfig.dedup_window` (residual)           |
 //! | `committee-selection-algorithm`         | `CommitteeSelection` variant                       |
-//! | `persistent-vote-generation-probability`<br>`+ non-persistent-vote-generation-probability` | `WfaLs.persistent_voters` (combined × node count) |
+//! | `persistent-vote-generation-probability`<br>`+ non-persistent-vote-generation-probability` | `WfaLs.persistent_voters` (combined — already dimensioned as expected total committee weight per EB) |
 //! | `vote-threshold`                        | `ElectionsConfig.quorum_weight_fraction`           |
 //! | `vote-bundle-size-bytes-constant`<br>`+ {persistent,non-persistent}-vote-bundle-size-bytes-per-eb` | `VotingConfig.{persistent,non_persistent}_vote_bytes` (via `Sizes::vote_bundle`) |
 //! | `leios-mempool-size-bytes`              | `MempoolState::new(capacity)`                      |
@@ -138,17 +138,24 @@ fn derive_pipeline(sim_config: &SimConfiguration) -> PipelineConfig {
 /// |                               | becomes persistent_voters and NPV is disabled.    |
 /// | `EveryoneVotes`               | `everyone`                                        |
 /// | `StakeCentile`                | `top-stake-fraction` (uses sim's default 0.95)    |
+///
+/// **Dimension note:** sim's `*-vote-generation-probability` knobs
+/// (despite the name) are the *expected total committee weight per
+/// EB* — each voter runs `probability` VRF trials whose individual
+/// success rate is stake-weighted, so the across-voters sum already
+/// totals `probability`.  con-rs's `persistent_voters` is the
+/// seat-count distributed across pools, also dimensioned as "total
+/// weight per EB".  The two map directly without scaling by node
+/// count.
 fn derive_committee_selection(sim_config: &SimConfiguration) -> CommitteeSelection {
     use crate::config::CommitteeSelectionAlgorithm as A;
     match sim_config.committee_selection {
         A::WfaLs => {
-            // Sim uses a single combined `vote_probability` across PV
-            // and NPV.  Map the expected total committee weight into
-            // PV seats; NPV gets 0 so the seed-deterministic
-            // persistent allocation alone selects voters.
-            let total_nodes = sim_config.nodes.len() as u32;
-            let persistent_voters = ((sim_config.vote_probability * total_nodes as f64) as u32)
-                .max(1);
+            // Sim collapses PV / NPV into a single combined
+            // probability.  Push the whole expected committee weight
+            // into the deterministic persistent allocation; NPV stays
+            // at 0 so we don't double-count.
+            let persistent_voters = (sim_config.vote_probability as u32).max(1);
             CommitteeSelection::WfaLs {
                 persistent_voters,
                 non_persistent_voters: 0,
