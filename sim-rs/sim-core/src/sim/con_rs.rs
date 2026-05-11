@@ -74,10 +74,29 @@ fn placeholder_pipeline() -> PipelineConfig {
 }
 
 /// Canonical mapping from sim's `TransactionId` to con-rs's opaque
-/// `TxId`. Stable across runs; reversible via the `tx_arcs` side-table
-/// the adapter maintains.
+/// `TxId`.  Returns a 32-byte vec so the same value can serve as the
+/// `[u8; 32]` hash slots use in EB manifests and in the
+/// `MissingTX` voting predicate's `tx_known` callback — see
+/// [`tx_id_hash`].
 fn tx_id_for(id: TransactionId) -> TxId {
-    id.to_string().into_bytes()
+    tx_id_hash(id).to_vec()
+}
+
+/// 32-byte form of [`tx_id_for`], for callers that need the hash
+/// representation directly (EB manifest entries, `tx_known`).  Sim
+/// doesn't model real wire-byte Blake2b hashing — we encode the
+/// underlying `u64` deterministically into the first 8 bytes.
+fn tx_id_hash(id: TransactionId) -> [u8; 32] {
+    // `TransactionId`'s inner value is exposed via Display.  Parsing
+    // the string back to u64 keeps us decoupled from the inner field
+    // visibility (currently private to `model.rs`).
+    let n: u64 = id
+        .to_string()
+        .parse()
+        .expect("TransactionId Display is the inner u64");
+    let mut out = [0u8; 32];
+    out[..8].copy_from_slice(&n.to_le_bytes());
+    out
 }
 
 pub struct ConRs {
@@ -123,11 +142,32 @@ pub struct ConRs {
     /// `AnnounceRBHeader → RequestRBHeader → RBHeader → … → RB`
     /// handshake completes.
     rbs: BTreeMap<BlockId, RbState>,
-    /// EBs announced or produced locally, indexed by `EndorserBlockId`.
-    /// Carries the body only once the receive-side EB slice lands;
-    /// for now it only holds self-produced bodies served on
-    /// `RequestEB`.
-    ebs: BTreeMap<EndorserBlockId, Arc<LinearEndorserBlock>>,
+    /// EB state machine, indexed by `EndorserBlockId`.  Self-produced
+    /// EBs enter at [`EbState::Received`]; peer-announced EBs walk
+    /// `Pending → Requested → Received` as the
+    /// `AnnounceEB → RequestEB → EB` handshake completes.
+    ebs: BTreeMap<EndorserBlockId, EbState>,
+    /// Peers that announced each EB, in arrival order.  Used today to
+    /// keep the fan-out symmetric (don't echo `AnnounceEB` back to a
+    /// peer who already told us).  Will graduate to a full fetch
+    /// candidate set when the multi-peer fetch policy lands.
+    eb_announcers: BTreeMap<EndorserBlockId, Vec<NodeId>>,
+}
+
+/// State of an EB known to this node.
+enum EbState {
+    /// Announced by a peer but no `RequestEB` sent yet.
+    Pending,
+    /// `RequestEB` sent, awaiting the `EB` response.
+    Requested,
+    /// Body received (or locally produced).  Servable on `RequestEB`.
+    Received {
+        eb: Arc<LinearEndorserBlock>,
+        #[allow(dead_code)] // surfaces via stats once endorsement timing wires in
+        seen: Timestamp,
+        #[allow(dead_code)] // gates EB-as-candidate decisions once voting lands
+        validated: bool,
+    },
 }
 
 /// State of an RB known to this node.  Linear progression with one
@@ -250,6 +290,7 @@ impl NodeImpl for ConRs {
             announced_or_known: std::collections::BTreeSet::new(),
             rbs: BTreeMap::new(),
             ebs: BTreeMap::new(),
+            eb_announcers: BTreeMap::new(),
         }
     }
 
@@ -339,13 +380,14 @@ impl NodeImpl for ConRs {
                 self.tracker.track_linear_rb_received(&rb, from, self.id);
                 out.schedule_cpu_task(CpuTask::RBBlockValidated(rb));
             }
-            // EB and vote handlers come up in subsequent slices.
-            Message::AnnounceEB(_)
-            | Message::RequestEB(_)
-            | Message::EB(_)
-            | Message::AnnounceVotes(_)
-            | Message::RequestVotes(_)
-            | Message::Votes(_) => {}
+            Message::AnnounceEB(id) => self.receive_announce_eb(&mut out, from, id),
+            Message::RequestEB(id) => self.receive_request_eb(&mut out, from, id),
+            Message::EB(eb) => {
+                self.tracker.track_eb_received(eb.id(), from, self.id);
+                out.schedule_cpu_task(CpuTask::EBHeaderValidated(from, eb));
+            }
+            // Vote handlers come up in the next slice.
+            Message::AnnounceVotes(_) | Message::RequestVotes(_) | Message::Votes(_) => {}
         }
         out
     }
@@ -375,11 +417,12 @@ impl NodeImpl for ConRs {
                 self.finish_validating_rb_header(&mut out, from, header, has_body, has_eb);
             }
             CpuTask::RBBlockValidated(rb) => self.finish_validating_rb(&mut out, rb),
-            // EB and vote validation paths land in subsequent slices.
-            CpuTask::EBHeaderValidated(_, _)
-            | CpuTask::EBBlockValidated(_, _)
-            | CpuTask::VTBundleGenerated(_, _)
-            | CpuTask::VTBundleValidated(_, _) => {}
+            CpuTask::EBHeaderValidated(from, eb) => {
+                self.finish_validating_eb_header(&mut out, from, eb);
+            }
+            CpuTask::EBBlockValidated(eb, seen) => self.finish_validating_eb(&mut out, eb, seen),
+            // Vote validation paths land in the next slice.
+            CpuTask::VTBundleGenerated(_, _) | CpuTask::VTBundleValidated(_, _) => {}
         }
         out
     }
@@ -485,8 +528,20 @@ impl ConRs {
         if let Some((eb, _withheld)) = eb {
             self.tracker.track_linear_eb_generated(&eb);
             let eb_id = eb.id();
+            let seen = self.clock.now();
             let eb = Arc::new(eb);
-            self.ebs.insert(eb_id, eb);
+            // Locally produced: feed the manifest into LeiosState so
+            // the election is announced and the per-EB voting
+            // lifecycle runs at the next slot tick.
+            self.record_eb_in_leios(eb_id, &eb);
+            self.ebs.insert(
+                eb_id,
+                EbState::Received {
+                    eb,
+                    seen,
+                    validated: true,
+                },
+            );
             for peer in &self.consumers {
                 out.send_to(*peer, Message::AnnounceEB(eb_id));
             }
@@ -601,6 +656,115 @@ impl ConRs {
             self.tracker.track_linear_rb_sent(rb, self.id, from);
             out.send_to(from, Message::RB(rb.clone()));
         }
+    }
+
+    fn receive_announce_eb(
+        &mut self,
+        out: &mut EventResult,
+        from: NodeId,
+        id: EndorserBlockId,
+    ) {
+        self.eb_announcers.entry(id).or_default().push(from);
+        let should_request = match self.ebs.get(&id) {
+            None => true,
+            Some(EbState::Pending) => true,
+            Some(EbState::Requested) => {
+                self.sim_config.relay_strategy == RelayStrategy::RequestFromAll
+            }
+            Some(EbState::Received { .. }) => false,
+        };
+        if should_request {
+            self.ebs.insert(id, EbState::Requested);
+            out.send_to(from, Message::RequestEB(id));
+        } else if !self.ebs.contains_key(&id) {
+            self.ebs.insert(id, EbState::Pending);
+        }
+    }
+
+    fn receive_request_eb(
+        &mut self,
+        out: &mut EventResult,
+        from: NodeId,
+        id: EndorserBlockId,
+    ) {
+        if let Some(EbState::Received { eb, .. }) = self.ebs.get(&id) {
+            self.tracker.track_linear_eb_sent(eb, self.id, from);
+            out.send_to(from, Message::EB(eb.clone()));
+        }
+    }
+
+    fn finish_validating_eb_header(
+        &mut self,
+        out: &mut EventResult,
+        from: NodeId,
+        eb: Arc<LinearEndorserBlock>,
+    ) {
+        let eb_id = eb.id();
+        if matches!(self.ebs.get(&eb_id), Some(EbState::Received { .. })) {
+            return;
+        }
+        let seen = self.clock.now();
+        self.ebs.insert(
+            eb_id,
+            EbState::Received {
+                eb: eb.clone(),
+                seen,
+                validated: false,
+            },
+        );
+        // Propagate immediately under the default `EbReceived`
+        // criterion — the `TxsReceived` / `FullyValid` policy knobs
+        // wire up alongside the EB-tx fetch slice.
+        for peer in &self.consumers {
+            if *peer == from {
+                continue;
+            }
+            out.send_to(*peer, Message::AnnounceEB(eb_id));
+        }
+        out.schedule_cpu_task(CpuTask::EBBlockValidated(eb, seen));
+    }
+
+    fn finish_validating_eb(
+        &mut self,
+        out: &mut EventResult,
+        eb: Arc<LinearEndorserBlock>,
+        seen: Timestamp,
+    ) {
+        let eb_id = eb.id();
+        let entry = EbState::Received {
+            eb: eb.clone(),
+            seen,
+            validated: true,
+        };
+        self.ebs.insert(eb_id, entry);
+        // Feed LeiosState so the election is created and the voting
+        // lifecycle starts at the next slot tick.  Idempotent — a
+        // duplicate `announce` is silently absorbed.
+        self.record_eb_in_leios(eb_id, &eb);
+        // Drain any leios effects emitted by validation.  Today these
+        // are `RecordLeiosEbManifest` + `ValidateEb` (we already
+        // validated, so the latter is a no-op) — both are absorbed
+        // by `apply_leios_effects`.
+        let _ = out;
+    }
+
+    /// Wire an EB (locally produced or peer-received) into
+    /// [`LeiosState`]: register the tx-hash manifest and announce the
+    /// election immediately (sim validates synchronously in the
+    /// CpuTask, so we skip the separate `ValidateEb` effect path).
+    fn record_eb_in_leios(&mut self, eb_id: EndorserBlockId, eb: &LinearEndorserBlock) {
+        let point = con_rs::types::Point::Specific {
+            slot: eb_id.slot,
+            hash: synthesize_eb_hash(eb_id),
+        };
+        let manifest: Vec<[u8; 32]> = eb.txs.iter().map(|tx| tx_id_hash(tx.id)).collect();
+        let fx = self.leios.on_eb_received(point.clone(), Some(manifest));
+        // Drop the effects — `RecordLeiosEbManifest` doesn't need
+        // forwarding (the local mempool already pinned the bodies on
+        // `produce_eb`), and `ValidateEb` is a no-op for sim's
+        // synchronous validation model.
+        let _ = fx;
+        self.leios.on_validated_eb(point);
     }
 
     fn finish_validating_rb(&mut self, _out: &mut EventResult, rb: Arc<LinearRankingBlock>) {
@@ -732,12 +896,15 @@ impl ConRs {
     }
 }
 
-/// Recover a `TransactionId` from its con-rs byte encoding. Inverse of
-/// `tx_id_for`. Used in the rejection telemetry path when the body
-/// arc has already been evicted from `tx_arcs`.
+/// Recover a `TransactionId` from its 32-byte con-rs encoding.
+/// Inverse of [`tx_id_for`].  Used in the rejection telemetry path
+/// when the body arc has already been evicted from `tx_arcs`.
 fn sim_id_from_bytes(bytes: &[u8]) -> Option<TransactionId> {
-    let s = std::str::from_utf8(bytes).ok()?;
-    s.parse::<u64>().ok().map(TransactionId::new)
+    if bytes.len() < 8 {
+        return None;
+    }
+    let arr: [u8; 8] = bytes[..8].try_into().ok()?;
+    Some(TransactionId::new(u64::from_le_bytes(arr)))
 }
 
 /// Deterministic 32-byte EB hash derived from the EB id.  Sim doesn't
