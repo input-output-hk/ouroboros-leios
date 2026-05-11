@@ -155,6 +155,7 @@ Key parameters:
 - EB size: 12 MB max
 - Vote probability: 480 persistent + 120 non-persistent (wfa-ls), threshold 450
 - Stage lengths: diffuse=7 slots, vote=4 slots
+- Mempool: **unbounded** (`leios-mempool-size-bytes: null`). The bounded mempool added in sim-rs 1.4.0 collapses ingress fanout to ~15% under saturation, which is not what we want to measure for the CIP — keep null for production sweeps.
 
 ### Voting mode thresholds
 
