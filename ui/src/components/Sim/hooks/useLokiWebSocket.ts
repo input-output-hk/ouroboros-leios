@@ -387,15 +387,21 @@ const parseVotesGenerated = (
   try {
     const log = JSON.parse(logLine);
 
-    // {"hash":"...","kind":"LeiosVoted","slot":2245,"voter":228}
+    // {"kind":"LeiosVoted","vote":{"slot":76,"ebHash":"...","voterId":228,"voteSignature":true}}
     if (log.kind === "LeiosVoted") {
       const message: IVotesGenerated = {
         type: EServerMessageType.VotesGenerated,
-        id: `vote-${log.slot}-${log.voter}-${log.hash}`,
-        slot: log.slot,
+        id: `vote-${log.vote.slot}-${log.vote.voterId}-${log.vote.ebHash}`,
+        slot: log.vote.slot,
         producer: streamLabels.process,
         size_bytes: 100,
-        votes: [{ voterId: log.voter, ebHash: log.hash, electionId: log.slot }],
+        votes: [
+          {
+            voterId: log.vote.voterId,
+            ebHash: log.vote.ebHash,
+            slot: log.vote.slot,
+          },
+        ],
       };
 
       return {
@@ -417,7 +423,8 @@ const parseVotesSent = (
   try {
     const log = JSON.parse(logLine);
 
-    // {"kind":"Send","msg":{"kind":"MsgLeiosVotes","votes":[{"ebHash":"...","electionId":301,"voterId":228}]},"mux_at":"...","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"}}
+    // New: {"kind":"Send","msg":{"kind":"MsgLeiosVotes","votes":[{"ebHash":"...","slot":76,"voteSignature":true,"voterId":228}]},"mux_at":"...","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"}}
+    // Old (pre-rename): votes carried `electionId` instead of `slot`.
     if (
       (log.direction || log.kind) === "Send" &&
       log.msg &&
@@ -430,14 +437,14 @@ const parseVotesSent = (
       const votes = (log.msg.votes || []).map((v: any) => ({
         voterId: v.voterId,
         ebHash: v.ebHash,
-        electionId: v.electionId,
+        slot: v.slot ?? v.electionId,
       }));
       const firstVote = votes[0] || {};
-      const voteId = `vote-${firstVote.electionId}-${firstVote.voterId}-${firstVote.ebHash}`;
+      const voteId = `vote-${firstVote.slot}-${firstVote.voterId}-${firstVote.ebHash}`;
 
       const message: IVotesSent = {
         type: EServerMessageType.VotesSent,
-        slot: firstVote.electionId || 0,
+        slot: firstVote.slot || 0,
         id: voteId,
         sender,
         recipient,
@@ -463,7 +470,8 @@ const parseVotesReceived = (
   try {
     const log = JSON.parse(logLine);
 
-    // {"kind":"Recv","msg":{"kind":"MsgLeiosVotes","votes":[{"voterId":228,"ebHash":"...","electionId":301}]},"mux_at":"...","peer":{"connectionId":"127.0.0.1:3001 127.0.0.1:3002"}}
+    // New: {"kind":"Recv","msg":{"kind":"MsgLeiosVotes","votes":[{"voterId":228,"ebHash":"...","slot":76,"voteSignature":true}]},"mux_at":"...","peer":{"connectionId":"127.0.0.1:3001 127.0.0.1:3002"}}
+    // Old (pre-rename): votes carried `electionId` instead of `slot`.
     if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosVotes") {
       const [recipient, sender] = getNodesFromConnection(
         log.peer?.connectionId || log.connectionId,
@@ -472,14 +480,14 @@ const parseVotesReceived = (
       const votes = (log.msg.votes || []).map((v: any) => ({
         voterId: v.voterId,
         ebHash: v.ebHash,
-        electionId: v.electionId,
+        slot: v.slot ?? v.electionId,
       }));
       const firstVote = votes[0] || {};
-      const voteId = `vote-${firstVote.electionId}-${firstVote.voterId}-${firstVote.ebHash}`;
+      const voteId = `vote-${firstVote.slot}-${firstVote.voterId}-${firstVote.ebHash}`;
 
       const message: IVotesReceived = {
         type: EServerMessageType.VotesReceived,
-        slot: firstVote.electionId || 0,
+        slot: firstVote.slot || 0,
         id: voteId,
         sender,
         recipient,

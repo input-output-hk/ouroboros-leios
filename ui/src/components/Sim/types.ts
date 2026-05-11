@@ -167,7 +167,7 @@ export interface IEndorserBlockSent {
 export interface IVote {
   voterId: number;
   ebHash: string;
-  electionId: number;
+  slot: number;
 }
 
 export interface IVotesGenerated {

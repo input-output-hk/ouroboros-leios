@@ -56,7 +56,7 @@ const MessageDetail: FC<{
 
   // Vote-specific details
   if (animation.votes && animation.votes.length > 0) {
-    const rounds = [...new Set(animation.votes.map((v) => v.electionId))];
+    const rounds = [...new Set(animation.votes.map((v) => v.slot))];
     details.push({ label: "Round", value: rounds.join(", ") });
 
     const ebHashes = [...new Set(animation.votes.map((v) => v.ebHash))];

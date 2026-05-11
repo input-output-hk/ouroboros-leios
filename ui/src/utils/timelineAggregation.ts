@@ -142,7 +142,7 @@ const createMessageAnimation = (
   targetTime: number,
   travelTime: number,
   sizeBytes: number,
-  extra?: { slot?: number; votes?: Array<{ voterId: number; ebHash: string; electionId: number }>; numTxs?: number },
+  extra?: { slot?: number; votes?: Array<{ voterId: number; ebHash: string; slot: number }>; numTxs?: number },
 ) => {
   const estimatedReceiveTime = sentTime + travelTime;
 
