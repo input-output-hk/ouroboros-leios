@@ -113,17 +113,25 @@ use crate::store::leios_store::LeiosStore;
 
 /// Capacity of the per-peer command channel (coordinator → peer task).
 /// Large enough that a brief peer-task stall doesn't immediately force
-/// removal; full channel is treated as a broken peer.
-const PEER_COMMAND_CAPACITY: usize = 256;
+/// removal; full channel is treated as a broken peer. Sized for the
+/// vote-/eb-tx-fetch burst when an EB reaches quorum: each peer can be
+/// the target of many small fetch commands in the same millisecond.
+const PEER_COMMAND_CAPACITY: usize = 4096;
 
 /// Capacity of the network_events channel (coordinator → application).
-const NETWORK_EVENTS_CAPACITY: usize = 8192;
+/// Sized to absorb the bursts at quorum (per-peer vote and eb-tx fetch
+/// offers fan out into O(peers × votes) events on every consensus round).
+const NETWORK_EVENTS_CAPACITY: usize = 65536;
 
 /// Capacity of the network_commands channel (application → coordinator).
-const NETWORK_COMMANDS_CAPACITY: usize = 1024;
+/// Sized to absorb the matching burst of fetch commands the app issues
+/// in response to a quorum event.
+const NETWORK_COMMANDS_CAPACITY: usize = 16384;
 
 /// Capacity of the peer_events fan-in channel (all peer tasks → coordinator).
-const PEER_EVENTS_CAPACITY: usize = 2048;
+/// Shared by all peer tasks; sized for the burst when every peer simultaneously
+/// emits vote/eb-tx offer events.
+const PEER_EVENTS_CAPACITY: usize = 32768;
 
 /// Minimum free slots in `network_events` before the coordinator pulls a new
 /// peer event. Handlers may emit several `NetworkEvent`s per peer event
@@ -132,8 +140,8 @@ const PEER_EVENTS_CAPACITY: usize = 2048;
 /// free slot count drops below this threshold, the `peer_events` branch of
 /// the main `select!` is disabled, which blocks peer tasks on
 /// `peer_event_sender.send().await` and propagates backpressure all the
-/// way to TCP.
-const MIN_EMIT_HEADROOM: usize = 256;
+/// way to TCP. Kept proportional (~1.5%) to NETWORK_EVENTS_CAPACITY.
+const MIN_EMIT_HEADROOM: usize = 1024;
 
 /// Per-peer state tracked by the coordinator.
 struct PeerState {
