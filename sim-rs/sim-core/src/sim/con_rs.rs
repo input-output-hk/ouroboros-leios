@@ -466,12 +466,20 @@ impl NodeImpl for ConRs {
     fn handle_new_slot(&mut self, slot: u64) -> EventResult {
         self.current_slot = slot;
         let mut out = EventResult::default();
-        // Drive Leios election lifecycle.  Today no EBs are announced
-        // from this adapter so the only effects we expect are election
-        // expirations as the pipeline phases roll forward; we still
-        // drain whatever lands so the next slice doesn't surprise us.
-        // `tx_known` is `|_| true` until the EB-manifest path is wired
-        // (subsequent slice) — the predicate is a no-op without EBs.
+        // Periodic adapter-side pruning. Without it the chain-state
+        // side-tables grow unboundedly — RBs, EBs, vote bundles,
+        // eb_announcers, eb_hash_to_id, votes_by_eb, noted_no_vote
+        // each carry one entry per (slot, producer/voter) seen.  At
+        // 750 nodes × 1500 slots that's millions of entries and a
+        // ~6× slowdown vs linear_leios.  Prune everything older than
+        // 5× the pipeline window; cert assembly and `LeiosState`
+        // both age out well before that.
+        if slot.is_multiple_of(100) {
+            self.prune_chain_state(slot);
+        }
+        // Drive Leios election lifecycle.  `tx_known` is `|_| true`
+        // until the EB-manifest path's `MissingTX` predicate is
+        // hooked up to a real callback (sim's tx_arcs).
         let leios_fx = self.leios.on_slot(slot, &|_| true);
         self.apply_leios_effects(&mut out, leios_fx);
         // Praos RB lottery — shared formula with net-rs, sim-rs keeps
@@ -1068,6 +1076,36 @@ impl ConRs {
             self.latest_rb_id = Some(id);
         }
         take_new
+    }
+
+    /// Drop chain-state entries older than 5× the pipeline window.
+    /// All consumers — cert assembly, `LeiosState`, vote serving —
+    /// only care about state within the active window, so the
+    /// adapter-side mirrors can age out aggressively without losing
+    /// signal.  `tx_arcs` and `announced_or_known` are excluded
+    /// because they don't carry a slot label yet; that's a follow-on
+    /// once a `(tx_id → seen_slot)` index lands.
+    fn prune_chain_state(&mut self, current_slot: u64) {
+        let pipeline = self.leios.pipeline;
+        let window = 3 * pipeline.delta_hdr
+            + pipeline.vote_window
+            + pipeline.diffuse_window
+            + pipeline.dedup_window;
+        let cutoff = current_slot.saturating_sub(window.saturating_mul(5).max(50));
+        self.rbs.retain(|id, _| id.slot >= cutoff);
+        self.ebs.retain(|id, _| id.slot >= cutoff);
+        self.eb_announcers.retain(|id, _| id.slot >= cutoff);
+        self.vote_bundles.retain(|id, _| id.slot >= cutoff);
+        self.votes_by_eb.retain(|id, _| id.slot >= cutoff);
+        // `eb_hash_to_id` is keyed by hash; drop entries whose
+        // corresponding EndorserBlockId is below the cutoff.
+        self.eb_hash_to_id.retain(|_, id| id.slot >= cutoff);
+        // `noted_no_vote` is keyed by `(hash, reason)`; drop entries
+        // whose hash no longer maps to a live EB.
+        let live_hashes: std::collections::BTreeSet<[u8; 32]> =
+            self.eb_hash_to_id.keys().copied().collect();
+        self.noted_no_vote
+            .retain(|(hash, _)| live_hashes.contains(hash));
     }
 
     /// Push the chain tip's `(rb_header_arrival_slot, eb_announcement)`
