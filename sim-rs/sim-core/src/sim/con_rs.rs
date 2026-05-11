@@ -39,7 +39,7 @@ use crate::{
     config::{NodeConfiguration, NodeId, RelayStrategy, SimConfiguration},
     events::EventTracker,
     model::{
-        BlockId, EndorserBlockId, LinearEndorserBlock, LinearRankingBlock,
+        BlockId, Endorsement, EndorserBlockId, LinearEndorserBlock, LinearRankingBlock,
         LinearRankingBlockHeader, NoVoteReason as SimNoVoteReason, Transaction, TransactionId,
         TransactionLostReason, VoteBundle, VoteBundleId,
     },
@@ -167,6 +167,20 @@ pub struct ConRs {
     /// (which keys by con-rs's `voter_key: Vec<u8>` over the pool name)
     /// doesn't pay a `sim_config.nodes` linear scan per vote.
     node_names: BTreeMap<NodeId, String>,
+
+    /// Sim-side mirror of con-rs's aggregator, keyed by EB so the
+    /// endorsement assembly path can answer "who voted, with what
+    /// weight, for the certified EB?" without scanning private
+    /// `Elections` state.  Populated by `record_bundle_into_elections`
+    /// alongside `Elections::record_vote`.
+    votes_by_eb: BTreeMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
+
+    /// Latest RB header this node has seen (received or produced).
+    /// Stands in for the proper Praos chain selection until
+    /// `PraosState` is wired — picks "highest slot" as the parent,
+    /// no fork-choice, no slot-battle resolution.  Slot ties take
+    /// the producer with the lower `NodeId.to_inner()`.
+    latest_rb_id: Option<BlockId>,
 }
 
 enum VoteState {
@@ -315,6 +329,8 @@ impl NodeImpl for ConRs {
             eb_hash_to_id: BTreeMap::new(),
             vote_bundles: BTreeMap::new(),
             node_names,
+            votes_by_eb: BTreeMap::new(),
+            latest_rb_id: None,
         }
     }
 
@@ -518,16 +534,12 @@ impl ConRs {
             header: LinearRankingBlockHeader {
                 id: block_id,
                 vrf,
-                // No parent / chain-tip tracking yet — wired when
-                // PraosState consumes record_self_produced in a later
-                // slice.
-                parent: None,
+                parent: self.pick_parent(),
                 bytes: self.sim_config.sizes.block_header,
                 eb_announcement: eb_pair.as_ref().map(|(eb, _)| eb.id()),
             },
             transactions: rb_txs,
-            // No certificate path yet.
-            endorsement: None,
+            endorsement: self.try_build_endorsement(),
         };
 
         out.schedule_cpu_task(CpuTask::RBBlockGenerated(rb, eb_pair));
@@ -547,6 +559,7 @@ impl ConRs {
         let rb_id = rb.header.id;
         let header_seen = self.clock.now();
         let rb = Arc::new(rb);
+        self.note_rb_observed(rb_id);
         self.rbs.insert(
             rb_id,
             RbState::Received {
@@ -855,6 +868,8 @@ impl ConRs {
     /// Record every (eb, weight) entry in `bundle` into the elections
     /// aggregator using the bundle's producer as the voter key.
     /// Idempotent — `record_vote` dedupes per `(eb_hash, voter_key)`.
+    /// Also mirrors the entry into `votes_by_eb` so endorsement
+    /// assembly can list voters without scanning private state.
     fn record_bundle_into_elections(&mut self, bundle: &VoteBundle) {
         let Some(voter_name) = self.node_names.get(&bundle.id.producer).cloned() else {
             return;
@@ -864,6 +879,60 @@ impl ConRs {
             self.leios
                 .elections
                 .record_vote(&eb_hash, voter_name.clone().into_bytes(), *count as u32);
+            self.votes_by_eb
+                .entry(*eb_id)
+                .or_default()
+                .insert(bundle.id.producer, *count);
+        }
+    }
+
+    /// Pick the parent BlockId for a newly produced RB.  Stand-in for
+    /// proper Praos chain selection — picks the highest-slot RB the
+    /// adapter has seen, breaking ties on producer.
+    fn pick_parent(&self) -> Option<BlockId> {
+        self.latest_rb_id
+    }
+
+    /// If the local Elections aggregator has a certified EB whose slot
+    /// is old enough that we can endorse it now, build a sim
+    /// [`Endorsement`] for it.  Returns `None` if no cert is ready or
+    /// the matching `EndorserBlockId` isn't known locally.
+    fn try_build_endorsement(&self) -> Option<Endorsement> {
+        let cert_slot = self.leios.certified_eb_slot()?;
+        // Look up the EB at that slot whose hash carries a quorum.
+        // Pretty much always one, but iterate just in case multiple
+        // EBs were announced for the same slot.
+        let eb_id = self
+            .eb_hash_to_id
+            .iter()
+            .find(|(hash, eb_id)| {
+                eb_id.slot == cert_slot && self.leios.elections.quorum(*hash)
+            })
+            .map(|(_, eb_id)| *eb_id)?;
+        let voters = self.votes_by_eb.get(&eb_id)?.clone();
+        let size_bytes = self.sim_config.sizes.cert(voters.len());
+        Some(Endorsement {
+            eb: eb_id,
+            size_bytes,
+            votes: voters,
+        })
+    }
+
+    /// Refresh `latest_rb_id` when a higher-slot RB is observed.
+    /// Producer break by `NodeId.to_inner()` mirrors the
+    /// chain-selection tiebreaker the sequential engine uses on the
+    /// linear adapter.
+    fn note_rb_observed(&mut self, id: BlockId) {
+        let take_new = match self.latest_rb_id {
+            None => true,
+            Some(cur) => {
+                id.slot > cur.slot
+                    || (id.slot == cur.slot
+                        && id.producer.to_inner() < cur.producer.to_inner())
+            }
+        };
+        if take_new {
+            self.latest_rb_id = Some(id);
         }
     }
 
@@ -895,6 +964,7 @@ impl ConRs {
             .get(&id)
             .and_then(|s| s.header_seen())
             .unwrap_or(self.clock.now());
+        self.note_rb_observed(id);
         self.rbs.insert(
             id,
             RbState::Received {
