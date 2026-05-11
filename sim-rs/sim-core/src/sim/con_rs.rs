@@ -245,6 +245,12 @@ pub struct ConRs {
     /// `pending_validation` map.
     announced_or_known: std::collections::BTreeSet<TxId>,
 
+    /// Per-`TxId` slot at which we first observed the tx (announce,
+    /// receive, or local generation).  Used by `prune_chain_state`
+    /// to age out `tx_arcs` / `announced_or_known` so they don't
+    /// grow forever — mirrors linear_leios's `prune_old_txs`.
+    tx_seen_slot: BTreeMap<TxId, u64>,
+
     /// RB state machine, indexed by `BlockId`.  Self-produced blocks
     /// enter at [`RbState::Received`]; peer announcements walk
     /// `HeaderPending → Pending → Requested → Received` as the
@@ -447,6 +453,7 @@ impl NodeImpl for ConRs {
             tx_arcs: BTreeMap::new(),
             pending_from: BTreeMap::new(),
             announced_or_known: std::collections::BTreeSet::new(),
+            tx_seen_slot: BTreeMap::new(),
             rbs: BTreeMap::new(),
             ebs: BTreeMap::new(),
             eb_announcers: BTreeMap::new(),
@@ -501,6 +508,7 @@ impl NodeImpl for ConRs {
         let id = tx_id_for(tx.id);
         self.tx_arcs.insert(id.clone(), tx.clone());
         self.announced_or_known.insert(id.clone());
+        self.tx_seen_slot.insert(id.clone(), self.current_slot);
 
         let mut out = EventResult::default();
         // Locally-generated txs skip the validate-then-admit dance:
@@ -523,7 +531,8 @@ impl NodeImpl for ConRs {
         match msg {
             Message::AnnounceTx(id) => {
                 let key = tx_id_for(id);
-                if self.announced_or_known.insert(key) {
+                if self.announced_or_known.insert(key.clone()) {
+                    self.tx_seen_slot.entry(key).or_insert(self.current_slot);
                     out.send_to(from, Message::RequestTx(id));
                 }
             }
@@ -539,7 +548,8 @@ impl NodeImpl for ConRs {
                     .track_transaction_received(tx.id, from, self.id);
                 let key = tx_id_for(tx.id);
                 self.tx_arcs.insert(key.clone(), tx.clone());
-                self.pending_from.insert(key, from);
+                self.pending_from.insert(key.clone(), from);
+                self.tx_seen_slot.entry(key).or_insert(self.current_slot);
                 out.schedule_cpu_task(CpuTask::TransactionValidated(from, tx));
             }
             Message::AnnounceRBHeader(id) => self.receive_announce_rb_header(&mut out, from, id),
@@ -1078,34 +1088,55 @@ impl ConRs {
         take_new
     }
 
-    /// Drop chain-state entries older than 5× the pipeline window.
-    /// All consumers — cert assembly, `LeiosState`, vote serving —
-    /// only care about state within the active window, so the
-    /// adapter-side mirrors can age out aggressively without losing
-    /// signal.  `tx_arcs` and `announced_or_known` are excluded
-    /// because they don't carry a slot label yet; that's a follow-on
-    /// once a `(tx_id → seen_slot)` index lands.
+    /// Drop chain-state and tx-state entries older than their
+    /// relevant window.  All consumers — cert assembly, `LeiosState`,
+    /// vote serving, peer tx-fetch — only need state within the
+    /// active window, so the adapter-side mirrors can age out
+    /// aggressively without losing signal.
     fn prune_chain_state(&mut self, current_slot: u64) {
         let pipeline = self.leios.pipeline;
-        let window = 3 * pipeline.delta_hdr
+        let chain_window = 3 * pipeline.delta_hdr
             + pipeline.vote_window
             + pipeline.diffuse_window
             + pipeline.dedup_window;
-        let cutoff = current_slot.saturating_sub(window.saturating_mul(5).max(50));
-        self.rbs.retain(|id, _| id.slot >= cutoff);
-        self.ebs.retain(|id, _| id.slot >= cutoff);
-        self.eb_announcers.retain(|id, _| id.slot >= cutoff);
-        self.vote_bundles.retain(|id, _| id.slot >= cutoff);
-        self.votes_by_eb.retain(|id, _| id.slot >= cutoff);
+        let chain_cutoff =
+            current_slot.saturating_sub(chain_window.saturating_mul(5).max(50));
+        self.rbs.retain(|id, _| id.slot >= chain_cutoff);
+        self.ebs.retain(|id, _| id.slot >= chain_cutoff);
+        self.eb_announcers.retain(|id, _| id.slot >= chain_cutoff);
+        self.vote_bundles.retain(|id, _| id.slot >= chain_cutoff);
+        self.votes_by_eb.retain(|id, _| id.slot >= chain_cutoff);
         // `eb_hash_to_id` is keyed by hash; drop entries whose
         // corresponding EndorserBlockId is below the cutoff.
-        self.eb_hash_to_id.retain(|_, id| id.slot >= cutoff);
+        self.eb_hash_to_id
+            .retain(|_, id| id.slot >= chain_cutoff);
         // `noted_no_vote` is keyed by `(hash, reason)`; drop entries
         // whose hash no longer maps to a live EB.
         let live_hashes: std::collections::BTreeSet<[u8; 32]> =
             self.eb_hash_to_id.keys().copied().collect();
         self.noted_no_vote
             .retain(|(hash, _)| live_hashes.contains(hash));
+
+        // TX state ages out on its own (faster) clock.  Mirror
+        // linear_leios's `prune_old_txs`: keep anything still in the
+        // mempool (it might still be included in a future EB), age
+        // out the rest by `linear-tx-max-age-slots` (default 23).
+        let tx_max_age = self
+            .sim_config
+            .linear_tx_max_age_slots
+            .unwrap_or(100);
+        let tx_cutoff = current_slot.saturating_sub(tx_max_age);
+        let mempool_ids: std::collections::BTreeSet<TxId> =
+            self.mempool.current_tx_ids().into_iter().collect();
+        self.tx_seen_slot.retain(|id, seen| {
+            *seen >= tx_cutoff || mempool_ids.contains(id)
+        });
+        let live_txs: std::collections::BTreeSet<TxId> =
+            self.tx_seen_slot.keys().cloned().collect();
+        self.tx_arcs.retain(|id, _| live_txs.contains(id));
+        self.announced_or_known
+            .retain(|id| live_txs.contains(id));
+        self.pending_from.retain(|id, _| live_txs.contains(id));
     }
 
     /// Push the chain tip's `(rb_header_arrival_slot, eb_announcement)`
