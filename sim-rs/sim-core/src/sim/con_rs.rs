@@ -35,8 +35,8 @@ use con_rs::{
 };
 
 use crate::{
-    clock::Clock,
-    config::{NodeConfiguration, NodeId, SimConfiguration},
+    clock::{Clock, Timestamp},
+    config::{NodeConfiguration, NodeId, RelayStrategy, SimConfiguration},
     events::EventTracker,
     model::{
         BlockId, EndorserBlockId, LinearEndorserBlock, LinearRankingBlock,
@@ -117,12 +117,59 @@ pub struct ConRs {
     /// `pending_validation` map.
     announced_or_known: std::collections::BTreeSet<TxId>,
 
-    /// Self-produced RB and EB bodies, kept so we can answer peer
-    /// fetches (`RequestRB`, `RequestEB`) without re-encoding.  The
-    /// RB and EB propagation handlers in the next slice consume
-    /// these maps.
-    produced_rbs: BTreeMap<BlockId, Arc<LinearRankingBlock>>,
-    produced_ebs: BTreeMap<EndorserBlockId, Arc<LinearEndorserBlock>>,
+    /// RB state machine, indexed by `BlockId`.  Self-produced blocks
+    /// enter at [`RbState::Received`]; peer announcements walk
+    /// `HeaderPending → Pending → Requested → Received` as the
+    /// `AnnounceRBHeader → RequestRBHeader → RBHeader → … → RB`
+    /// handshake completes.
+    rbs: BTreeMap<BlockId, RbState>,
+    /// EBs announced or produced locally, indexed by `EndorserBlockId`.
+    /// Carries the body only once the receive-side EB slice lands;
+    /// for now it only holds self-produced bodies served on
+    /// `RequestEB`.
+    ebs: BTreeMap<EndorserBlockId, Arc<LinearEndorserBlock>>,
+}
+
+/// State of an RB known to this node.  Linear progression with one
+/// quirk: locally produced blocks skip the early states and land
+/// directly in [`RbState::Received`].
+enum RbState {
+    /// Header request sent to a peer, waiting for the `RBHeader`
+    /// response.
+    HeaderPending,
+    /// Header received and validated; no body yet.
+    Pending {
+        header: LinearRankingBlockHeader,
+        header_seen: Timestamp,
+    },
+    /// Body request sent to a peer, waiting for the `RB` response.
+    Requested {
+        header: LinearRankingBlockHeader,
+        header_seen: Timestamp,
+    },
+    /// Body received (or locally produced).  Servable on `RequestRB`.
+    Received {
+        rb: Arc<LinearRankingBlock>,
+        header_seen: Timestamp,
+    },
+}
+
+impl RbState {
+    fn header(&self) -> Option<&LinearRankingBlockHeader> {
+        match self {
+            Self::HeaderPending => None,
+            Self::Pending { header, .. } | Self::Requested { header, .. } => Some(header),
+            Self::Received { rb, .. } => Some(&rb.header),
+        }
+    }
+    fn header_seen(&self) -> Option<Timestamp> {
+        match self {
+            Self::HeaderPending => None,
+            Self::Pending { header_seen, .. }
+            | Self::Requested { header_seen, .. }
+            | Self::Received { header_seen, .. } => Some(*header_seen),
+        }
+    }
 }
 
 type EventResult = super::EventResult<ConRs>;
@@ -201,8 +248,8 @@ impl NodeImpl for ConRs {
             tx_arcs: BTreeMap::new(),
             pending_from: BTreeMap::new(),
             announced_or_known: std::collections::BTreeSet::new(),
-            produced_rbs: BTreeMap::new(),
-            produced_ebs: BTreeMap::new(),
+            rbs: BTreeMap::new(),
+            ebs: BTreeMap::new(),
         }
     }
 
@@ -281,15 +328,19 @@ impl NodeImpl for ConRs {
                 self.pending_from.insert(key, from);
                 out.schedule_cpu_task(CpuTask::TransactionValidated(from, tx));
             }
-            // Other variants are still no-ops while RB / EB / vote
-            // handlers come up in subsequent commits.
-            Message::AnnounceRBHeader(_)
-            | Message::RequestRBHeader(_)
-            | Message::RBHeader(_, _, _)
-            | Message::AnnounceRB(_)
-            | Message::RequestRB(_)
-            | Message::RB(_)
-            | Message::AnnounceEB(_)
+            Message::AnnounceRBHeader(id) => self.receive_announce_rb_header(&mut out, from, id),
+            Message::RequestRBHeader(id) => self.receive_request_rb_header(&mut out, from, id),
+            Message::RBHeader(header, has_body, has_eb) => {
+                out.schedule_cpu_task(CpuTask::RBHeaderValidated(from, header, has_body, has_eb));
+            }
+            Message::AnnounceRB(id) => self.receive_announce_rb(&mut out, from, id),
+            Message::RequestRB(id) => self.receive_request_rb(&mut out, from, id),
+            Message::RB(rb) => {
+                self.tracker.track_linear_rb_received(&rb, from, self.id);
+                out.schedule_cpu_task(CpuTask::RBBlockValidated(rb));
+            }
+            // EB and vote handlers come up in subsequent slices.
+            Message::AnnounceEB(_)
             | Message::RequestEB(_)
             | Message::EB(_)
             | Message::AnnounceVotes(_)
@@ -320,11 +371,12 @@ impl NodeImpl for ConRs {
                 }
             }
             CpuTask::RBBlockGenerated(rb, eb) => self.finish_generating_rb(&mut out, rb, eb),
-            // Other CpuTask variants stay inert until the RB / EB /
-            // vote validation paths land in subsequent slices.
-            CpuTask::RBHeaderValidated(_, _, _, _)
-            | CpuTask::RBBlockValidated(_)
-            | CpuTask::EBHeaderValidated(_, _)
+            CpuTask::RBHeaderValidated(from, header, has_body, has_eb) => {
+                self.finish_validating_rb_header(&mut out, from, header, has_body, has_eb);
+            }
+            CpuTask::RBBlockValidated(rb) => self.finish_validating_rb(&mut out, rb),
+            // EB and vote validation paths land in subsequent slices.
+            CpuTask::EBHeaderValidated(_, _)
             | CpuTask::EBBlockValidated(_, _)
             | CpuTask::VTBundleGenerated(_, _)
             | CpuTask::VTBundleValidated(_, _) => {}
@@ -407,9 +459,9 @@ impl ConRs {
     }
 
     /// `RBBlockGenerated` completion: persist the produced RB/EB in
-    /// the side-tables and announce the header to consumers.  The
-    /// peer-side `AnnounceRBHeader → RequestRBHeader → RBHeader`
-    /// handshake lands in the RB propagation slice.
+    /// the side-tables and announce the header to consumers.  Locally
+    /// produced blocks bypass the receive-side state walk and land
+    /// directly in [`RbState::Received`].
     fn finish_generating_rb(
         &mut self,
         out: &mut EventResult,
@@ -418,8 +470,15 @@ impl ConRs {
     ) {
         self.tracker.track_linear_rb_generated(&rb);
         let rb_id = rb.header.id;
+        let header_seen = self.clock.now();
         let rb = Arc::new(rb);
-        self.produced_rbs.insert(rb_id, rb);
+        self.rbs.insert(
+            rb_id,
+            RbState::Received {
+                rb,
+                header_seen,
+            },
+        );
         for peer in &self.consumers {
             out.send_to(*peer, Message::AnnounceRBHeader(rb_id));
         }
@@ -427,10 +486,151 @@ impl ConRs {
             self.tracker.track_linear_eb_generated(&eb);
             let eb_id = eb.id();
             let eb = Arc::new(eb);
-            self.produced_ebs.insert(eb_id, eb);
+            self.ebs.insert(eb_id, eb);
             for peer in &self.consumers {
                 out.send_to(*peer, Message::AnnounceEB(eb_id));
             }
+        }
+    }
+
+    fn receive_announce_rb_header(
+        &mut self,
+        out: &mut EventResult,
+        from: NodeId,
+        id: BlockId,
+    ) {
+        let should_request = match self.rbs.get(&id) {
+            None => true,
+            Some(RbState::HeaderPending) => {
+                self.sim_config.relay_strategy == RelayStrategy::RequestFromAll
+            }
+            _ => false,
+        };
+        if should_request {
+            self.rbs.insert(id, RbState::HeaderPending);
+            out.send_to(from, Message::RequestRBHeader(id));
+        }
+    }
+
+    fn receive_request_rb_header(
+        &mut self,
+        out: &mut EventResult,
+        from: NodeId,
+        id: BlockId,
+    ) {
+        let Some(state) = self.rbs.get(&id) else {
+            return;
+        };
+        let Some(header) = state.header().cloned() else {
+            return;
+        };
+        let have_body = matches!(state, RbState::Received { .. });
+        // Announce EB availability if we've produced or fully received
+        // the announced EB; the EB receive slice will replace this
+        // local check with a state-machine query.
+        let have_eb = header
+            .eb_announcement
+            .is_some_and(|eb_id| self.ebs.contains_key(&eb_id));
+        out.send_to(from, Message::RBHeader(header, have_body, have_eb));
+    }
+
+    /// `RBHeaderValidated` completion: place the header in
+    /// [`RbState::Pending`], announce to other consumers, and request
+    /// the body from `from` when it's already on-hand.  Slot-battle
+    /// resolution is intentionally omitted in this slice — the next
+    /// PraosState slice gets that for free.
+    fn finish_validating_rb_header(
+        &mut self,
+        out: &mut EventResult,
+        from: NodeId,
+        header: LinearRankingBlockHeader,
+        has_body: bool,
+        _has_eb: bool,
+    ) {
+        let id = header.id;
+        let header_seen = self.clock.now();
+        self.rbs.insert(
+            id,
+            RbState::Pending {
+                header: header.clone(),
+                header_seen,
+            },
+        );
+        for peer in &self.consumers {
+            if *peer == from {
+                continue;
+            }
+            out.send_to(*peer, Message::AnnounceRBHeader(id));
+        }
+        if has_body {
+            self.rbs.insert(
+                id,
+                RbState::Requested {
+                    header,
+                    header_seen,
+                },
+            );
+            out.send_to(from, Message::RequestRB(id));
+        }
+    }
+
+    fn receive_announce_rb(&mut self, out: &mut EventResult, from: NodeId, id: BlockId) {
+        let (header, header_seen) = match self.rbs.get(&id) {
+            Some(RbState::Pending { header, header_seen }) => {
+                (header.clone(), *header_seen)
+            }
+            Some(RbState::Requested { header, header_seen })
+                if self.sim_config.relay_strategy == RelayStrategy::RequestFromAll =>
+            {
+                (header.clone(), *header_seen)
+            }
+            _ => return,
+        };
+        self.rbs.insert(
+            id,
+            RbState::Requested {
+                header,
+                header_seen,
+            },
+        );
+        out.send_to(from, Message::RequestRB(id));
+    }
+
+    fn receive_request_rb(&mut self, out: &mut EventResult, from: NodeId, id: BlockId) {
+        if let Some(RbState::Received { rb, .. }) = self.rbs.get(&id) {
+            self.tracker.track_linear_rb_sent(rb, self.id, from);
+            out.send_to(from, Message::RB(rb.clone()));
+        }
+    }
+
+    fn finish_validating_rb(&mut self, _out: &mut EventResult, rb: Arc<LinearRankingBlock>) {
+        let id = rb.header.id;
+        let header_seen = self
+            .rbs
+            .get(&id)
+            .and_then(|s| s.header_seen())
+            .unwrap_or(self.clock.now());
+        self.rbs.insert(
+            id,
+            RbState::Received {
+                rb: rb.clone(),
+                header_seen,
+            },
+        );
+        // Drop tx_arcs entries that are now on-chain so the mempool
+        // accounting doesn't carry phantom references.  `MempoolState`
+        // handles its own pruning on `on_block_applied` once
+        // PraosState wires the apply effect; until then we just clear
+        // our side-table so EB / RB serving doesn't double-count.
+        let ids_on_chain: Vec<TxId> = rb
+            .transactions
+            .iter()
+            .map(|tx| tx_id_for(tx.id))
+            .collect();
+        self.mempool.on_block_applied(&ids_on_chain);
+        for id in &ids_on_chain {
+            self.tx_arcs.remove(id);
+            self.announced_or_known.remove(id);
         }
     }
 
