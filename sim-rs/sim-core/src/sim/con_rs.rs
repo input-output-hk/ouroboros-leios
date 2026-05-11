@@ -25,7 +25,8 @@ use tokio::sync::mpsc;
 use con_rs::{
     config::{CommitteeSelection, StakeEntry},
     elections::{Elections, ElectionsConfig},
-    leios::{LeiosState, VotingConfig},
+    leios::{LeiosEffect, LeiosState, LeiosTelemetryEvent, NoVoteReason, VotingConfig},
+    lottery as con_lottery,
     mempool::{MempoolEffect, MempoolState, TxId, TxRejectReason},
     pipeline::PipelineConfig,
     praos::PraosState,
@@ -36,7 +37,8 @@ use crate::{
     clock::Clock,
     config::{NodeConfiguration, NodeId, SimConfiguration},
     events::EventTracker,
-    model::{Transaction, TransactionId, TransactionLostReason},
+    model::{NoVoteReason as SimNoVoteReason, Transaction, TransactionId, TransactionLostReason},
+    rng::{DrawSite, Rng},
     sim::{NodeImpl, linear_leios::CpuTask, linear_leios::Message, linear_leios::TimedEvent},
 };
 
@@ -82,8 +84,12 @@ pub struct ConRs {
     clock: Clock,
     consumers: Vec<NodeId>,
     current_slot: u64,
+    /// Local pool's stake.  Cached from the sim config because the
+    /// production lottery runs once per slot.
+    config_stake: u64,
+    /// Network-wide stake, the lottery denominator.
+    total_stake: u64,
 
-    #[allow(dead_code)] // wired up once the slot tick drives elections
     leios: LeiosState,
     #[allow(dead_code)] // wired up once Praos message handlers land
     praos: PraosState,
@@ -175,6 +181,8 @@ impl NodeImpl for ConRs {
             clock,
             consumers: config.consumers.clone(),
             current_slot: 0,
+            config_stake: config.stake,
+            total_stake,
             leios,
             praos,
             mempool,
@@ -190,7 +198,41 @@ impl NodeImpl for ConRs {
 
     fn handle_new_slot(&mut self, slot: u64) -> EventResult {
         self.current_slot = slot;
-        EventResult::default()
+        let mut out = EventResult::default();
+        // Drive Leios election lifecycle.  Today no EBs are announced
+        // from this adapter so the only effects we expect are election
+        // expirations as the pipeline phases roll forward; we still
+        // drain whatever lands so the next slice doesn't surprise us.
+        // `tx_known` is `|_| true` until the EB-manifest path is wired
+        // (subsequent slice) — the predicate is a no-op without EBs.
+        let leios_fx = self.leios.on_slot(slot, &|_| true);
+        self.apply_leios_effects(&mut out, leios_fx);
+        // Praos RB lottery.  We track the win in telemetry so the path
+        // is observable; building the RB body + scheduling
+        // `CpuTask::RBBlockGenerated` lands in the next slice along
+        // with the RB / EB propagation handlers.
+        let success_rate = self.sim_config.block_generation_probability;
+        let target =
+            con_lottery::rb_win_threshold(success_rate, self.config_stake) as u64;
+        let total_stake = self.total_stake;
+        let rng = Rng::new(self.sim_config.seed);
+        let draw = rng.draw_range(self.id, slot, DrawSite::RbLottery, total_stake);
+        if draw < target {
+            // TODO(next slice): build the RB body, drain the mempool
+            // via `BodyPath::decide`, schedule
+            // `CpuTask::RBBlockGenerated`, then announce on
+            // completion.  For now we just record the lottery win for
+            // observability.
+            // `BlockId` requires a producer; using `self.id` matches
+            // the linear adapter's pattern.
+            self.tracker.track_praos_block_lottery_won(
+                crate::model::BlockId {
+                    slot,
+                    producer: self.id,
+                },
+            );
+        }
+        out
     }
 
     fn handle_new_tx(&mut self, tx: Arc<Transaction>) -> EventResult {
@@ -296,6 +338,48 @@ impl NodeImpl for ConRs {
 }
 
 impl ConRs {
+    /// Forward Leios-side effects.  Today only telemetry and `NoVote`
+    /// have meaningful translations — fetches, vote emissions, and
+    /// validation effects need the RB / EB / vote handlers that land
+    /// in subsequent slices.  Unhandled variants are intentionally
+    /// dropped (`_`) so this compiles cleanly while the surface grows.
+    fn apply_leios_effects(&self, _out: &mut EventResult, effects: Vec<LeiosEffect>) {
+        for fx in effects {
+            match fx {
+                LeiosEffect::NoVote { eb_slot: _, eb_hash: _, reason } => {
+                    let sim_reason = match reason {
+                        NoVoteReason::LateEB => SimNoVoteReason::LateEB,
+                        NoVoteReason::LateRBHeader => SimNoVoteReason::LateRBHeader,
+                        NoVoteReason::WrongEB => SimNoVoteReason::WrongEB,
+                        NoVoteReason::MissingTX => SimNoVoteReason::MissingTX,
+                    };
+                    // EndorserBlockId reconstruction requires the EB's
+                    // producer — that information isn't carried in
+                    // the effect, only the hash.  The RB / EB slice
+                    // will maintain a hash → EndorserBlockId index;
+                    // until then, track_no_vote needs that mapping, so
+                    // we skip emission here.  TODO: wire once the
+                    // index exists.
+                    let _ = sim_reason;
+                }
+                LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::QuorumReached { .. })
+                | LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::ElectionExpired { .. }) => {
+                    // No 1:1 sim telemetry yet; sim derives equivalent
+                    // signals from votes_by_eb counts.
+                }
+                LeiosEffect::FetchLeiosBlock { .. }
+                | LeiosEffect::FetchLeiosBlockTxs { .. }
+                | LeiosEffect::FetchLeiosVotes { .. }
+                | LeiosEffect::RecordLeiosEbManifest { .. }
+                | LeiosEffect::EmitVote { .. }
+                | LeiosEffect::ValidateEb { .. }
+                | LeiosEffect::ValidateVotes { .. } => {
+                    // Wired up by the EB / vote slice.
+                }
+            }
+        }
+    }
+
     /// Forward mempool-side effects to sim's tracker. Today only the
     /// `TxRejected` family lands here — `ValidateTx` is bypassed since
     /// sim handles validation timing through `CpuTask` directly. When
