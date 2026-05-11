@@ -11,8 +11,18 @@ type RustEvent =
     | CpuEvent
     | BlockEvent
     | shared.NoBlockEvent
+    | VTBundleNotGenerated
     | NetworkEvent
     | SlotEvent;
+
+interface VTBundleNotGenerated {
+    type: "VTBundleNotGenerated";
+    slot: number;
+    pipeline: number;
+    producer: string;
+    eb: string;
+    reason: string;
+}
 
 type CpuEvent =
     | CpuSubtaskEvent
@@ -45,7 +55,7 @@ type CpuTaskType = shared.CpuTaskType;
 type BlockEvent = shared.BlockEvent | LotteryWon | GeneratedTransaction | LostTransaction;
 
 interface LotteryWon {
-    type: "IBLotteryWon" | "EBLotteryWon" | "VTLotteryWon";
+    type: "IBLotteryWon" | "EBLotteryWon" | "RBLotteryWon" | "VTLotteryWon";
     id: string;
     slot: number;
     producer: string;

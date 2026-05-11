@@ -101,7 +101,7 @@ export interface UIRBSent {
     /** Carried by the simulator; omitted by the prototype. */
     msg_size_bytes?: number;
     sending_s?: number;
-    slot?: number;
+    slot: number;
     ids?: string[];
 }
 
@@ -113,7 +113,7 @@ export interface UIEBSent {
     /** Carried by the simulator; omitted by the prototype. */
     msg_size_bytes?: number;
     sending_s?: number;
-    slot?: number;
+    slot: number;
     ids?: string[];
 }
 
@@ -127,7 +127,7 @@ export interface UIVotesSent {
     /** Carried by the simulator; omitted by the prototype. */
     msg_size_bytes?: number;
     sending_s?: number;
-    slot?: number;
+    slot: number;
     ids?: string[];
     /** Per-vote records as emitted by the prototype; the simulator omits this. */
     votes?: Vote[];
@@ -155,7 +155,7 @@ export interface UIRBReceived {
     id: string;
     recipient: string;
     sender?: string;
-    slot?: number;
+    slot: number;
     ids?: string[];
 }
 
@@ -164,7 +164,7 @@ export interface UIEBReceived {
     id: string;
     recipient: string;
     sender?: string;
-    slot?: number;
+    slot: number;
     ids?: string[];
 }
 
@@ -175,7 +175,7 @@ export interface UIVotesReceived {
     id: string;
     recipient: string;
     sender?: string;
-    slot?: number;
+    slot: number;
     ids?: string[];
     /** Per-vote records as emitted by the prototype; the simulator omits this. */
     votes?: Vote[];

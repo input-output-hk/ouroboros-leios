@@ -242,7 +242,6 @@
         "producer",
         "size_bytes",
         "slot",
-        "tx_payload_bytes",
         "type"
       ],
       "type": "object"

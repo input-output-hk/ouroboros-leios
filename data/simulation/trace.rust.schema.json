@@ -237,7 +237,6 @@
         "producer",
         "size_bytes",
         "slot",
-        "tx_payload_bytes",
         "type"
       ],
       "type": "object"
@@ -344,7 +343,12 @@
           "type": "number"
         },
         "type": {
-          "enum": ["EBLotteryWon", "IBLotteryWon", "VTLotteryWon"],
+          "enum": [
+            "EBLotteryWon",
+            "IBLotteryWon",
+            "RBLotteryWon",
+            "VTLotteryWon"
+          ],
           "type": "string"
         }
       },
@@ -451,6 +455,9 @@
           "$ref": "#/definitions/LostTransaction"
         },
         {
+          "$ref": "#/definitions/VTBundleNotGenerated"
+        },
+        {
           "$ref": "#/definitions/NetworkEvent"
         },
         {
@@ -498,6 +505,31 @@
         }
       },
       "required": ["node", "slot", "type"],
+      "type": "object"
+    },
+    "VTBundleNotGenerated": {
+      "properties": {
+        "eb": {
+          "type": "string"
+        },
+        "pipeline": {
+          "type": "number"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "const": "VTBundleNotGenerated",
+          "type": "string"
+        }
+      },
+      "required": ["eb", "pipeline", "producer", "reason", "slot", "type"],
       "type": "object"
     }
   },

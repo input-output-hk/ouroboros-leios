@@ -84,7 +84,7 @@ interface GeneratedRankingBlock extends GeneratedBlockEvent {
     endorsement: Endorsement | null;
     endorsements?: Endorsement[] | null;
     id: string;
-    tx_payload_bytes: number;
+    tx_payload_bytes?: number;
     parent: BlockRef | null;
 }
 
