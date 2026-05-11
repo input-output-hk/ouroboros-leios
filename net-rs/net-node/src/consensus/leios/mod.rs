@@ -299,9 +299,14 @@ impl LeiosConsensus {
             Point::Origin => return BTreeMap::new(),
         };
         let Some((_, tx_hashes)) = self.state.eb_tx_hashes.get(hash) else {
-            let max_txs =
-                (net_core::protocols::leios_fetch::MAX_BITMAP_ENTRIES as u32).saturating_mul(64);
-            return bitmap::select_all(max_txs);
+            // Manifest hasn't arrived yet (EB body fetch still in flight).
+            // Returning a full 65k-bit bitmap here triggers a retry storm
+            // — the server has no body either, every response is empty,
+            // remaining stays full, and the loop pumps massive requests
+            // through every channel until the cluster wedges. Skip the
+            // fetch; the peer's notify-loop will re-offer once the
+            // manifest is cached and we can build a proper sparse bitmap.
+            return BTreeMap::new();
         };
         let have = self.mempool.lock().unwrap().current_tx_ids();
         let missing: Vec<u32> = tx_hashes

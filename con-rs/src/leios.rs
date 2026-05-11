@@ -569,6 +569,14 @@ impl LeiosState {
             _ => return Vec::new(),
         };
         self.candidates.note_eb_txs_offered(point.clone(), peer);
+        // Empty bitmap means the consumer has nothing to fetch (either
+        // all txs known locally, or — more commonly — the EB body /
+        // manifest hasn't arrived yet so we can't yet name the missing
+        // indices). Don't engage the per-slot gate or emit a fetch; wait
+        // for the next offer once the manifest lands.
+        if bitmap.is_empty() {
+            return Vec::new();
+        }
         // Per-slot gate keeps multiple offers from triggering parallel
         // fetches; the synthetic hash distinguishes the gate from an
         // EB-body fetch on the same slot.
