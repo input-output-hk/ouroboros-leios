@@ -484,6 +484,9 @@ impl NodeImpl for ConRs {
         if slot.is_multiple_of(100) {
             self.prune_chain_state(slot);
         }
+        if slot.is_multiple_of(60) && self.id.to_inner() == 0 {
+            self.log_memory_stats(slot);
+        }
         // Drive Leios election lifecycle.  `tx_known` is `|_| true`
         // until the EB-manifest path's `MissingTX` predicate is
         // hooked up to a real callback (sim's tx_arcs).
@@ -1137,6 +1140,168 @@ impl ConRs {
         self.announced_or_known
             .retain(|id| live_txs.contains(id));
         self.pending_from.retain(|id, _| live_txs.contains(id));
+    }
+
+    /// Per-component state-size dump, mirroring linear_leios's
+    /// `log_memory_stats`.  Node 0 emits this every 60 slots so the
+    /// memory curve can be eyeballed alongside the EventMonitor's
+    /// global stats.  Byte estimates are rough but consistent across
+    /// runs — usable for spotting growth, not for absolute accounting.
+    fn log_memory_stats(&self, slot: u64) {
+        let num_nodes = self.sim_config.nodes.len();
+
+        let rss_mb = std::fs::read_to_string("/proc/self/status")
+            .ok()
+            .and_then(|s| {
+                s.lines()
+                    .find(|l| l.starts_with("VmRSS:"))
+                    .and_then(|l| l.split_whitespace().nth(1))
+                    .and_then(|v| v.parse::<u64>().ok())
+            })
+            .map(|kb| kb as f64 / 1024.0)
+            .unwrap_or(0.0);
+
+        // -- Adapter-side side-tables -----------------------------------
+        let tx_arcs = self.tx_arcs.len();
+        let announced = self.announced_or_known.len();
+        let tx_seen = self.tx_seen_slot.len();
+        let pending_from = self.pending_from.len();
+        let rbs = self.rbs.len();
+        let ebs = self.ebs.len();
+        let ebs_tx_refs: usize = self
+            .ebs
+            .values()
+            .filter_map(|s| match s {
+                EbState::Received { eb, .. } => Some(eb.txs.len()),
+                _ => None,
+            })
+            .sum();
+        let eb_announcers_count = self.eb_announcers.len();
+        let eb_announcers_peers: usize = self
+            .eb_announcers
+            .values()
+            .map(|v| v.len())
+            .sum();
+        let eb_hash_to_id = self.eb_hash_to_id.len();
+        let vote_bundles = self.vote_bundles.len();
+        let votes_by_eb_count = self.votes_by_eb.len();
+        let votes_by_eb_voters: usize =
+            self.votes_by_eb.values().map(|m| m.len()).sum();
+        let noted_no_vote = self.noted_no_vote.len();
+
+        // -- LeiosState owned state -------------------------------------
+        let eb_tx_hashes_count = self.leios.eb_tx_hashes.len();
+        let eb_tx_hashes_refs: usize = self
+            .leios
+            .eb_tx_hashes
+            .values()
+            .map(|(_, v)| v.len())
+            .sum();
+        let pending_eb_tx_fetches = self.leios.pending_eb_tx_fetches.len();
+        let leios_in_flight = self.leios.in_flight.len();
+        let elections_count = self.leios.elections.count();
+
+        // -- MempoolState ----------------------------------------------
+        let mempool_txs = self.mempool.txs.len();
+        let mempool_bytes = self.mempool.total_bytes;
+        let mempool_peer_advertised = self.mempool.peer_advertised.len();
+        let mempool_peer_advertised_total: usize = self
+            .mempool
+            .peer_advertised
+            .values()
+            .map(|s| s.len())
+            .sum();
+        let mempool_pending_validation = self.mempool.pending_validation.len();
+        let mempool_eb_manifests = self.mempool.eb_manifests.len();
+        let mempool_eb_manifests_refs: usize = self
+            .mempool
+            .eb_manifests
+            .values()
+            .map(|v| v.len())
+            .sum();
+        let mempool_eb_pinned = self.mempool.eb_pinned.len();
+
+        // -- Rough byte estimates ---------------------------------------
+        let tx_arcs_bytes = tx_arcs * 96; // BTreeMap entry + Arc<Transaction>
+        let announced_bytes = announced * 64;
+        let tx_seen_bytes = tx_seen * 56;
+        let pending_from_bytes = pending_from * 48;
+        let rbs_bytes = rbs * 96;
+        let ebs_bytes = ebs * 96 + ebs_tx_refs * 8;
+        let eb_announcers_bytes = eb_announcers_count * 64 + eb_announcers_peers * 8;
+        let eb_hash_bytes = eb_hash_to_id * 64;
+        let vote_bundles_bytes = vote_bundles * 96;
+        let votes_by_eb_bytes = votes_by_eb_count * 64 + votes_by_eb_voters * 32;
+        let noted_no_vote_bytes = noted_no_vote * 48;
+        let eb_tx_hashes_bytes = eb_tx_hashes_count * 64 + eb_tx_hashes_refs * 32;
+        let mempool_overhead_bytes = mempool_peer_advertised_total * 32
+            + mempool_eb_manifests_refs * 32;
+
+        let node_total = tx_arcs_bytes
+            + announced_bytes
+            + tx_seen_bytes
+            + pending_from_bytes
+            + rbs_bytes
+            + ebs_bytes
+            + eb_announcers_bytes
+            + eb_hash_bytes
+            + vote_bundles_bytes
+            + votes_by_eb_bytes
+            + noted_no_vote_bytes
+            + eb_tx_hashes_bytes
+            + mempool_overhead_bytes;
+        let all_nodes_mb = (node_total * num_nodes) as f64 / (1024.0 * 1024.0);
+
+        tracing::info!(
+            "ConRs memory stats at slot {} (node 0, x{} nodes):\n\
+             \x20 tx_arcs:              {:>8} entries  ~ {:>6.1} MB\n\
+             \x20 announced_or_known:   {:>8} entries  ~ {:>6.1} MB\n\
+             \x20 tx_seen_slot:         {:>8} entries  ~ {:>6.1} MB\n\
+             \x20 pending_from:         {:>8} entries  ~ {:>6.1} MB\n\
+             \x20 rbs:                  {:>8} entries  ~ {:>6.1} MB\n\
+             \x20 ebs:                  {:>8} entries  ~ {:>6.1} MB  (tx_refs: {})\n\
+             \x20 eb_announcers:        {:>8} entries  ~ {:>6.1} MB  (peers: {})\n\
+             \x20 eb_hash_to_id:        {:>8} entries  ~ {:>6.1} MB\n\
+             \x20 vote_bundles:         {:>8} entries  ~ {:>6.1} MB\n\
+             \x20 votes_by_eb:          {:>8} entries  ~ {:>6.1} MB  (voters: {})\n\
+             \x20 noted_no_vote:        {:>8} entries  ~ {:>6.1} MB\n\
+             \x20 leios.eb_tx_hashes:   {:>8} entries  ~ {:>6.1} MB  (refs: {})\n\
+             \x20 leios.pending_eb_tx_fetches: {:>3} entries\n\
+             \x20 leios.in_flight:      {:>8} entries\n\
+             \x20 leios.elections:      {:>8} entries\n\
+             \x20 mempool.txs:          {:>8} entries  ~ {:>6.1} MB\n\
+             \x20 mempool.peer_advertised: {:>5} peers  ({} total ids)\n\
+             \x20 mempool.pending_validation: {:>4} entries\n\
+             \x20 mempool.eb_manifests: {:>8} entries  (refs: {})\n\
+             \x20 mempool.eb_pinned:    {:>8} entries\n\
+             \x20 ---\n\
+             \x20 Estimated total: ~ {:.1} MB  (x {} = ~ {:.1} MB)\n\
+             \x20 Process RSS: {:.0} MB",
+            slot,
+            num_nodes,
+            tx_arcs, tx_arcs_bytes as f64 / 1e6,
+            announced, announced_bytes as f64 / 1e6,
+            tx_seen, tx_seen_bytes as f64 / 1e6,
+            pending_from, pending_from_bytes as f64 / 1e6,
+            rbs, rbs_bytes as f64 / 1e6,
+            ebs, ebs_bytes as f64 / 1e6, ebs_tx_refs,
+            eb_announcers_count, eb_announcers_bytes as f64 / 1e6, eb_announcers_peers,
+            eb_hash_to_id, eb_hash_bytes as f64 / 1e6,
+            vote_bundles, vote_bundles_bytes as f64 / 1e6,
+            votes_by_eb_count, votes_by_eb_bytes as f64 / 1e6, votes_by_eb_voters,
+            noted_no_vote, noted_no_vote_bytes as f64 / 1e6,
+            eb_tx_hashes_count, eb_tx_hashes_bytes as f64 / 1e6, eb_tx_hashes_refs,
+            pending_eb_tx_fetches,
+            leios_in_flight,
+            elections_count,
+            mempool_txs, mempool_bytes as f64 / 1e6,
+            mempool_peer_advertised, mempool_peer_advertised_total,
+            mempool_pending_validation,
+            mempool_eb_manifests, mempool_eb_manifests_refs,
+            mempool_eb_pinned,
+            node_total as f64 / 1e6, num_nodes, all_nodes_mb,
+            rss_mb,
+        );
     }
 
     /// Push the chain tip's `(rb_header_arrival_slot, eb_announcement)`
