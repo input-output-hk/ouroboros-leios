@@ -774,12 +774,15 @@ impl ConRs {
             return;
         };
         let have_body = matches!(state, RbState::Received { .. });
-        // Announce EB availability if we've produced or fully received
-        // the announced EB; the EB receive slice will replace this
-        // local check with a state-machine query.
+        // `have_eb` is the signal that drives the receiver's
+        // proactive RequestEB on header arrival.  It must be true
+        // only when the body is locally servable — `Pending` /
+        // `Requested` slots advertise an EB we can't yet hand out,
+        // so the requester would stall in `Requested` waiting on a
+        // RequestEB this side silently drops.
         let have_eb = header
             .eb_announcement
-            .is_some_and(|eb_id| self.ebs.contains_key(&eb_id));
+            .is_some_and(|eb_id| matches!(self.ebs.get(&eb_id), Some(EbState::Received { .. })));
         out.send_to(from, Message::RBHeader(header, have_body, have_eb));
     }
 
