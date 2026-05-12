@@ -10,9 +10,27 @@ let
 
   inherit (repoRoot.nix) agda;
 
+  # Narrow the source set to just the directories the Haskell project
+  # actually needs. This shrinks `leios-hs-sources` from the whole repo to
+  # ~the Haskell packages + their test data, so unrelated edits (UI, docs,
+  # demo/, etc.) no longer invalidate haskell.nix's plan-to-nix-pkgs.
+  src = lib.fileset.toSource {
+    root = ./..;
+    fileset = lib.fileset.unions [
+      ../cabal.project
+      ../simulation
+      ../leios-trace-hs
+      ../analysis/sims/trace-processor
+      ../analysis/deltaq/linear-leios
+      ../post-cip/tx-measurements/betti0
+      ../data
+      ../leios-trace-verifier/conformance-traces
+    ];
+  };
+
   sources = pkgs.stdenv.mkDerivation {
     name = "leios-hs-sources";
-    src = ./..;
+    inherit src;
     patchPhase = ''
       # Add the trace verifier package.
       sed -i '/^packages:/a\ \ leios-trace-verifier/dist/haskell' cabal.project
