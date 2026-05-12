@@ -493,7 +493,10 @@ impl NodeImpl for ConRs {
         if slot.is_multiple_of(100) {
             self.prune_chain_state(slot);
         }
-        if slot.is_multiple_of(60) && self.id.to_inner() == 0 {
+        if self.sim_config.log_memory_stats
+            && slot.is_multiple_of(60)
+            && self.id.to_inner() == 0
+        {
             self.log_memory_stats(slot);
         }
         // Drive Leios election lifecycle.  `tx_known` is `|_| true`
