@@ -5,12 +5,13 @@ import DeltaQ
 import DeltaQ.Leios (validateEB)
 import DeltaQ.Leios.EmpiricalDistributions (applyTx, reapplyTx)
 import DeltaQ.Praos (blendedDelay, blockSizes)
+import DeltaQ.Progress (withStdoutProgress)
 import Graphics.Rendering.Chart.Backend.Cairo
 import Graphics.Rendering.Chart.Easy
 import Statistics.Leios (quorumProbability)
 
 main :: IO ()
-main = do
+main = withStdoutProgress $ do
   let committeeSizeEstimated = 600 :: Integer
   let numberSPOs = 2500 :: Integer
   let τ = 3 % 4

@@ -15,8 +15,8 @@ module DeltaQ.Praos (
   blendedDelay,
 ) where
 
-import DeltaQ (DQ, Outcome (wait), ProbabilisticOutcome (choices))
-import DeltaQ.Common (doSequentially)
+import DeltaQ (Outcome (wait), ProbabilisticOutcome (choices))
+import DeltaQ.Common (DQ, doSequentially)
 
 data BlockSize = B1 | B64 | B256 | B512 | B1024 | B2048
   deriving (Show, Eq)

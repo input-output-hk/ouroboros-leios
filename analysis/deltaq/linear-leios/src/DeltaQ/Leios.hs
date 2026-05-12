@@ -18,7 +18,6 @@ module DeltaQ.Leios (
 import Data.Maybe (fromJust)
 import Data.Ratio ((%))
 import DeltaQ (
-  DQ,
   DeltaQ (quantile, successWithin),
   Outcome ((./\.), (.>>.)),
   ProbabilisticOutcome (Probability),
@@ -26,6 +25,7 @@ import DeltaQ (
   maybeFromEventually,
   wait,
  )
+import DeltaQ.Common (DQ, unwrap)
 import DeltaQ.Distributions
 import DeltaQ.Leios.EmpiricalDistributions (
   applyTxs,
@@ -102,12 +102,18 @@ fetchingTxs =
     ]
 
 -- | Single cache lookup
+--
+-- TODO: This bypasses the DSL by going to @M.Measure@ directly, which is
+-- why we need @unwrap@ here. Mathematically equivalent to
+-- @choice π_1 (blendedDelay B1024) (wait 0.001)@ since
+-- @π_2 = 1 - π_1@ (verify numerically against the FIXME below before
+-- swapping). Doing so would remove the only @unwrap@ in this library.
 txCache :: M.Measure Rational
 txCache = M.add (M.scale π_1 blendedDelay') (M.scale π_2 (M.dirac 0.001))
  where
   blendedDelay' :: M.Measure Rational
   -- FIXME(SN): This is still a 1024kB transaction transfer. But lower values result in a 0 denominator?
-  blendedDelay' = fromJust $ M.fromDistribution (PW.distribution (blendedDelay B1024))
+  blendedDelay' = fromJust $ M.fromDistribution (PW.distribution (unwrap (blendedDelay B1024)))
   π_1 = (2 - p) / (2 + p)
   π_2 = 2 * p / (2 + p)
   p = 0.75

@@ -11,6 +11,7 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Csv (DefaultOrdered (..), FromNamedRecord (..), ToNamedRecord (..), encodeDefaultOrderedByName)
 import Data.Ratio ((%))
 import DeltaQ.Leios (pHeaderOnTime, pValidating)
+import DeltaQ.Progress (withStdoutProgress)
 import GHC.Generics
 
 data Result = Result
@@ -46,7 +47,7 @@ writeResults :: [Result] -> IO ()
 writeResults = BL.writeFile "output.csv" . encodeDefaultOrderedByName
 
 main :: IO ()
-main = do
+main = withStdoutProgress $ do
   let f = 1 % 20
   let τ = 3 % 4
   let committeeSizeEstimated = 600

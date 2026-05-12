@@ -8,7 +8,8 @@ module DeltaQ.Distributions (
   pairList,
 ) where
 
-import DeltaQ
+import DeltaQ hiding (DQ)
+import DeltaQ.Common (DQ)
 
 import qualified Statistics.Distribution as S
 import qualified Statistics.Distribution.Exponential as S

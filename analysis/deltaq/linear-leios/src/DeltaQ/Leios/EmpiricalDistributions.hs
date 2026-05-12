@@ -11,7 +11,7 @@ module DeltaQ.Leios.EmpiricalDistributions (
 ) where
 
 import Data.List (sort)
-import DeltaQ (DQ)
+import DeltaQ.Common (DQ)
 import DeltaQ.Distributions (
   measuredDQ,
   scaleMixtureDQ,
