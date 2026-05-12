@@ -1373,7 +1373,7 @@ impl ConRs {
         self.leios.on_validated_eb(point);
     }
 
-    fn finish_validating_rb(&mut self, _out: &mut EventResult, rb: Arc<LinearRankingBlock>) {
+    fn finish_validating_rb(&mut self, out: &mut EventResult, rb: Arc<LinearRankingBlock>) {
         let id = rb.header.id;
         let header_seen = self
             .rbs
@@ -1388,6 +1388,14 @@ impl ConRs {
                 header_seen,
             },
         );
+        // Tell peers we have the body now so downstream relays can
+        // transition out of `Pending` and fetch.  Mirrors
+        // linear_leios's `publish_rb` fan-out; without this the body
+        // only reaches the producer's direct consumers (those whose
+        // first RBHeader response carried `has_body=true`).
+        for peer in &self.consumers {
+            out.send_to(*peer, Message::AnnounceRB(id));
+        }
         // Drop tx_arcs entries that are now on-chain so the mempool
         // accounting doesn't carry phantom references.  `MempoolState`
         // handles its own pruning on `on_block_applied` once
