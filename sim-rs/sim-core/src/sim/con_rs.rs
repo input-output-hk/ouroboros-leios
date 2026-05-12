@@ -305,6 +305,14 @@ pub struct ConRs {
     /// telemetry events per slot; we collapse them to once per
     /// `(eb_hash, reason)` here.
     noted_no_vote: std::collections::BTreeSet<([u8; 32], SimNoVoteReason)>,
+
+    /// EBs we've observed on-chain via an RB's `endorsement` but
+    /// haven't yet validated the body for locally.  When the body
+    /// validation completes, we drain its txs from this node's
+    /// mempool / tx-tracking maps so the next RB / EB won't include
+    /// already-certified txs.  Mirrors linear_leios's
+    /// `incomplete_onchain_ebs`.
+    incomplete_onchain_ebs: std::collections::BTreeSet<EndorserBlockId>,
 }
 
 enum VoteState {
@@ -463,6 +471,7 @@ impl NodeImpl for ConRs {
             votes_by_eb: BTreeMap::new(),
             latest_rb_id: None,
             noted_no_vote: std::collections::BTreeSet::new(),
+            incomplete_onchain_ebs: std::collections::BTreeSet::new(),
         }
     }
 
@@ -640,6 +649,24 @@ impl ConRs {
         };
         self.tracker.track_praos_block_lottery_won(block_id);
 
+        // Build the endorsement (if any) before picking the body, so we
+        // can drain the endorsed EB's txs from this node's mempool
+        // before they get re-included in the new EB body.  Matches
+        // linear_leios's `remove_eb_txs_from_mempool` call in its
+        // RB-build closure.
+        let endorsement = self.try_build_endorsement();
+        if let Some(endorsement) = endorsement.as_ref() {
+            let eb_arc = match self.ebs.get(&endorsement.eb) {
+                Some(EbState::Received { eb, validated: true, .. }) => Some(eb.clone()),
+                _ => None,
+            };
+            if let Some(eb) = eb_arc {
+                self.drain_endorsed_eb(&eb);
+            } else {
+                self.incomplete_onchain_ebs.insert(endorsement.eb);
+            }
+        }
+
         let max_rb_body = self.sim_config.max_block_size as usize;
         let body = BodyPath::decide(&mut self.mempool, max_rb_body);
         let (rb_txs, eb_pair) = match body {
@@ -685,7 +712,7 @@ impl ConRs {
                 eb_announcement: eb_pair.as_ref().map(|(eb, _)| eb.id()),
             },
             transactions: rb_txs,
-            endorsement: self.try_build_endorsement(),
+            endorsement,
         };
 
         out.schedule_cpu_task(CpuTask::RBBlockGenerated(rb, eb_pair));
@@ -941,6 +968,12 @@ impl ConRs {
         // lifecycle starts at the next slot tick.  Idempotent — a
         // duplicate `announce` is silently absorbed.
         self.record_eb_in_leios(eb_id, &eb);
+        // If this EB was already endorsed on-chain (we saw the
+        // endorsement in an RB before its body validated locally),
+        // drain its txs now.  See `finish_validating_rb`.
+        if self.incomplete_onchain_ebs.remove(&eb_id) {
+            self.drain_endorsed_eb(&eb);
+        }
         // Drain any leios effects emitted by validation.  Today these
         // are `RecordLeiosEbManifest` + `ValidateEb` (we already
         // validated, so the latter is a no-op) — both are absorbed
@@ -1369,6 +1402,39 @@ impl ConRs {
         for id in &ids_on_chain {
             self.tx_arcs.remove(id);
             self.announced_or_known.remove(id);
+        }
+        // The RB also carries an endorsement when it certifies an EB.
+        // The endorsed EB's txs are now on-chain (via the EB closure),
+        // so drain them from the local mempool / tx-tracking maps so
+        // the next RB / EB this node produces won't double-include
+        // them.  Mirrors linear_leios's drain on RB-with-endorsement.
+        // If the EB body hasn't validated locally yet, defer in
+        // `incomplete_onchain_ebs` and drain on `finish_validating_eb`.
+        if let Some(endorsement) = rb.endorsement.as_ref() {
+            let eb_id = endorsement.eb;
+            let eb_arc = match self.ebs.get(&eb_id) {
+                Some(EbState::Received { eb, validated: true, .. }) => Some(eb.clone()),
+                _ => None,
+            };
+            if let Some(eb) = eb_arc {
+                self.drain_endorsed_eb(&eb);
+            } else {
+                self.incomplete_onchain_ebs.insert(eb_id);
+            }
+        }
+    }
+
+    /// Remove the EB's txs from this node's mempool free pool and
+    /// the adapter-side tx-tracking maps.  Idempotent: tx-ids that
+    /// aren't currently held are silently skipped.
+    fn drain_endorsed_eb(&mut self, eb: &LinearEndorserBlock) {
+        let tx_ids: Vec<TxId> = eb.txs.iter().map(|tx| tx_id_for(tx.id)).collect();
+        self.mempool.on_block_applied(&tx_ids);
+        for id in &tx_ids {
+            self.tx_arcs.remove(id);
+            self.announced_or_known.remove(id);
+            self.tx_seen_slot.remove(id);
+            self.pending_from.remove(id);
         }
     }
 
