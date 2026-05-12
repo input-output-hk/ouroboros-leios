@@ -116,6 +116,10 @@ pub struct MempoolState {
     /// Admitted transactions in arrival order — the "free" pool drained
     /// for RB body inclusion.
     pub txs: VecDeque<PendingTx>,
+    /// Membership index over `txs`, kept in lockstep with every push /
+    /// pop / retain so `contains` and `current_tx_ids` are `O(log n)`
+    /// instead of a linear scan.
+    pub tx_index: BTreeSet<TxId>,
     /// Sum of `tx.size` across `txs`.
     pub total_bytes: usize,
     /// Maximum transaction count for `txs`.
@@ -155,6 +159,7 @@ impl MempoolState {
     pub fn new_with_eb_retention(capacity: usize, eb_retention_slots: u64) -> Self {
         Self {
             txs: VecDeque::new(),
+            tx_index: BTreeSet::new(),
             total_bytes: 0,
             capacity,
             peer_advertised: BTreeMap::new(),
@@ -248,6 +253,9 @@ impl MempoolState {
         if self.txs.len() == before {
             return;
         }
+        for tx_id in included_tx_ids {
+            self.tx_index.remove(tx_id);
+        }
         self.total_bytes = self.txs.iter().map(|tx| tx.size as usize).sum();
         for tx_id in included_tx_ids {
             self.prune_from_peer_sets(tx_id);
@@ -274,12 +282,12 @@ impl MempoolState {
     /// voting predicate (via the snapshot the wrapper passes into
     /// `LeiosState::on_slot`).
     pub fn current_tx_ids(&self) -> BTreeSet<TxId> {
-        self.txs.iter().map(|tx| tx.tx_id.clone()).collect()
+        self.tx_index.clone()
     }
 
     /// True iff `tx_id` is in the mempool.
     pub fn contains(&self, tx_id: &TxId) -> bool {
-        self.txs.iter().any(|tx| &tx.tx_id == tx_id)
+        self.tx_index.contains(tx_id)
     }
 
     /// Look up a tx body by its id across both compartments — the free
@@ -334,6 +342,7 @@ impl MempoolState {
                 break;
             }
             let tx = self.txs.pop_front().unwrap();
+            self.tx_index.remove(&tx.tx_id);
             bytes = next_bytes;
             self.total_bytes -= tx.size as usize;
             result.push(tx);
@@ -351,6 +360,7 @@ impl MempoolState {
     pub fn drain_all(&mut self) -> Vec<PendingTx> {
         self.total_bytes = 0;
         let drained: Vec<PendingTx> = self.txs.drain(..).collect();
+        self.tx_index.clear();
         for tx in &drained {
             self.prune_from_peer_sets(&tx.tx_id);
         }
@@ -383,6 +393,7 @@ impl MempoolState {
     /// retention window.
     pub fn produce_eb(&mut self, eb_key: EbKey) -> (Vec<TxId>, Vec<MempoolEffect>) {
         let drained: Vec<PendingTx> = self.txs.drain(..).collect();
+        self.tx_index.clear();
         self.total_bytes = 0;
         let manifest: Vec<TxId> = drained.iter().map(|tx| tx.tx_id.clone()).collect();
         for tx in drained {
@@ -518,6 +529,7 @@ impl MempoolState {
         let mut fx = Vec::new();
         if self.txs.len() >= self.capacity {
             if let Some(old) = self.txs.pop_front() {
+                self.tx_index.remove(&old.tx_id);
                 self.total_bytes -= old.size as usize;
                 let evicted_id = old.tx_id.clone();
                 self.prune_from_peer_sets(&evicted_id);
@@ -533,6 +545,7 @@ impl MempoolState {
             }
         }
         self.total_bytes += size as usize;
+        self.tx_index.insert(tx_id.clone());
         self.txs.push_back(PendingTx {
             tx_id,
             body,
