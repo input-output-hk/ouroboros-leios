@@ -621,7 +621,9 @@ impl BlockSizeConfig {
 
     pub fn linear_eb(&self, txs: &[Arc<Transaction>]) -> u64 {
         let body_size = match self.variant {
-            LeiosVariant::LinearWithTxReferences => txs.len() as u64 * self.eb_per_ib,
+            LeiosVariant::LinearWithTxReferences | LeiosVariant::ConRs => {
+                txs.len() as u64 * self.eb_per_ib
+            }
             _ => txs.iter().map(|tx| tx.bytes).sum::<u64>(),
         };
         self.eb_constant + body_size
