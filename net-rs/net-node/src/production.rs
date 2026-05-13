@@ -207,6 +207,7 @@ pub struct BlockProducer {
     stake: u64,
     total_stake: u64,
     rb_body_max_bytes: usize,
+    eb_body_max_bytes: usize,
     dyn_config: watch::Receiver<DynamicConfig>,
     block_count: u64,
 }
@@ -227,6 +228,7 @@ impl BlockProducer {
             stake: config.stake,
             total_stake: config.total_stake,
             rb_body_max_bytes: config.rb_body_max_bytes,
+            eb_body_max_bytes: config.eb_body_max_bytes,
             dyn_config,
             block_count: 0,
         }
@@ -239,8 +241,10 @@ impl BlockProducer {
 
     /// Run the VRF lottery for a Praos ranking block. On win, drains the
     /// mempool: if pending txs fit in `rb_body_max_bytes`, they go in the
-    /// RB body (RB path). Otherwise, ALL txs go into an EB manifest and
-    /// the RB body is empty (EB path).
+    /// RB body (RB path). Otherwise the EB-overflow path fires: an EB
+    /// announcement carries a FIFO-ordered manifest capped at
+    /// `eb_body_max_bytes` worth of tx bodies, the RB body is empty,
+    /// and the remainder stays in the mempool for the next RB.
     pub fn try_produce_block(
         &mut self,
         slot: u64,
@@ -262,7 +266,10 @@ impl BlockProducer {
 
         // CIP-0164 overflow rule lives in con-rs (`production::BodyPath`).
         let mut pool = mempool.lock().unwrap();
-        let (txs, announced_eb) = match pool.decide_body_path(self.rb_body_max_bytes) {
+        let (txs, announced_eb) = match pool.decide_body_path(
+            self.rb_body_max_bytes,
+            self.eb_body_max_bytes,
+        ) {
             crate::mempool::BodyPath::Inline(txs) => (txs, None),
             crate::mempool::BodyPath::Eb { manifest_hashes } => {
                 // Encode wire bytes, hash them, then commit the
@@ -271,13 +278,14 @@ impl BlockProducer {
                 // can vote for its own EB (MissingTX predicate sees them)
                 // and serve `LeiosFetch BlockTxs` (resolver finds them by
                 // tx_id).
+                let manifest_len = manifest_hashes.len();
                 let eb_data = encode_overflow_eb(slot, &manifest_hashes);
                 let eb_hash = blake2b_256(&eb_data);
                 let eb_key = EbKey {
                     slot,
                     hash: eb_hash,
                 };
-                pool.produce_eb(eb_key);
+                pool.produce_eb(eb_key, manifest_len);
                 (
                     Vec::new(),
                     Some(ProducedEb {

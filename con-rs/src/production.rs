@@ -34,12 +34,31 @@ impl BodyPath {
     /// - Below the cap: drains tx bodies into [`BodyPath::Inline`].
     ///   The mempool's free pool shrinks by the returned set.
     /// - At or above the cap: collects the FIFO-ordered manifest
-    ///   into [`BodyPath::Eb`].  The mempool is NOT mutated yet —
+    ///   into [`BodyPath::Eb`], capped at `eb_body_max_bytes`
+    ///   worth of tx bodies.  The mempool is NOT mutated yet —
     ///   the wrapper must follow up with `produce_eb` once it has
     ///   computed the EB hash from the encoded manifest bytes.
-    pub fn decide(mempool: &mut MempoolState, rb_body_max_bytes: usize) -> Self {
+    ///   At least one tx is always emitted if the free pool is
+    ///   non-empty, even if the first tx alone exceeds the cap.
+    pub fn decide(
+        mempool: &mut MempoolState,
+        rb_body_max_bytes: usize,
+        eb_body_max_bytes: usize,
+    ) -> Self {
         if mempool.total_bytes > rb_body_max_bytes {
-            let manifest: Vec<TxId> = mempool.txs.iter().map(|tx| tx.tx_id.clone()).collect();
+            let mut manifest: Vec<TxId> = Vec::new();
+            let mut bytes = 0usize;
+            for tx in mempool.txs.iter() {
+                let next = bytes + tx.size as usize;
+                if next > eb_body_max_bytes && !manifest.is_empty() {
+                    break;
+                }
+                manifest.push(tx.tx_id.clone());
+                bytes = next;
+                if bytes >= eb_body_max_bytes {
+                    break;
+                }
+            }
             BodyPath::Eb { manifest }
         } else {
             BodyPath::Inline(mempool.drain_up_to(rb_body_max_bytes))
@@ -68,11 +87,14 @@ mod tests {
         }
     }
 
+    // EB cap big enough to never matter for these unit cases.
+    const EB_CAP: usize = 1 << 30;
+
     #[test]
     fn inline_when_under_cap() {
         let mut state = MempoolState::new(100);
         populate(&mut state, &[(1, 100), (2, 100), (3, 100)]); // 300 bytes total
-        let body = BodyPath::decide(&mut state, 500);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP);
         match body {
             BodyPath::Inline(txs) => {
                 assert_eq!(txs.len(), 3);
@@ -87,7 +109,7 @@ mod tests {
     fn eb_when_over_cap() {
         let mut state = MempoolState::new(100);
         populate(&mut state, &[(1, 200), (2, 200), (3, 200)]); // 600 bytes total
-        let body = BodyPath::decide(&mut state, 500);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP);
         match body {
             BodyPath::Eb { manifest } => {
                 assert_eq!(manifest.len(), 3);
@@ -107,7 +129,7 @@ mod tests {
     fn at_cap_inlines() {
         let mut state = MempoolState::new(100);
         populate(&mut state, &[(1, 250), (2, 250)]); // 500 bytes, == cap
-        let body = BodyPath::decide(&mut state, 500);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP);
         // total_bytes (500) is NOT > 500 → Inline.
         assert!(matches!(body, BodyPath::Inline(_)));
     }
@@ -116,14 +138,14 @@ mod tests {
     fn boundary_one_byte_over_cap_routes_eb() {
         let mut state = MempoolState::new(100);
         populate(&mut state, &[(1, 250), (2, 251)]); // 501, just over 500
-        let body = BodyPath::decide(&mut state, 500);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP);
         assert!(matches!(body, BodyPath::Eb { .. }));
     }
 
     #[test]
     fn empty_mempool_yields_empty_inline() {
         let mut state = MempoolState::new(100);
-        let body = BodyPath::decide(&mut state, 500);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP);
         match body {
             BodyPath::Inline(txs) => assert!(txs.is_empty()),
             other => panic!("expected Inline, got {other:?}"),
@@ -134,7 +156,7 @@ mod tests {
     fn eb_manifest_then_produce_eb_commits_drain() {
         let mut state = MempoolState::new(100);
         populate(&mut state, &[(1, 200), (2, 200), (3, 200)]);
-        let body = BodyPath::decide(&mut state, 500);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP);
         let manifest = match body {
             BodyPath::Eb { manifest } => manifest,
             other => panic!("expected Eb, got {other:?}"),
@@ -144,9 +166,52 @@ mod tests {
             slot: 7,
             hash: [0xAA; 32],
         };
-        let (committed, _evictions) = state.produce_eb(eb_key);
+        let (committed, _evictions) = state.produce_eb(eb_key, manifest.len());
         assert_eq!(committed, manifest);
         assert_eq!(state.txs.len(), 0);
         assert_eq!(state.total_bytes, 0);
+    }
+
+    #[test]
+    fn eb_manifest_capped_by_eb_body_max_bytes() {
+        // Mempool overflows the RB cap, but the EB cap is small enough
+        // that only the FIFO prefix should be selected.
+        let mut state = MempoolState::new(100);
+        populate(&mut state, &[(1, 200), (2, 200), (3, 200), (4, 200), (5, 200)]); // 1000 bytes
+        // RB cap 500, EB cap 500 → first 2 txs (400 bytes <= 500, third would push to 600)
+        let body = BodyPath::decide(&mut state, 500, 500);
+        let manifest = match body {
+            BodyPath::Eb { manifest } => manifest,
+            other => panic!("expected Eb, got {other:?}"),
+        };
+        assert_eq!(manifest.len(), 2);
+        assert_eq!(manifest[0], vec![1u8; 32]);
+        assert_eq!(manifest[1], vec![2u8; 32]);
+        // Mempool still has all 5 txs until produce_eb is called.
+        assert_eq!(state.txs.len(), 5);
+        assert_eq!(state.total_bytes, 1000);
+
+        let eb_key = EbKey {
+            slot: 1,
+            hash: [0xAB; 32],
+        };
+        let (committed, _) = state.produce_eb(eb_key, manifest.len());
+        assert_eq!(committed.len(), 2);
+        // Remaining three txs still pending.
+        assert_eq!(state.txs.len(), 3);
+        assert_eq!(state.total_bytes, 600);
+    }
+
+    #[test]
+    fn eb_manifest_emits_one_when_first_tx_exceeds_cap() {
+        let mut state = MempoolState::new(100);
+        populate(&mut state, &[(1, 1000), (2, 200)]); // first alone > eb cap
+        let body = BodyPath::decide(&mut state, 500, 500);
+        let manifest = match body {
+            BodyPath::Eb { manifest } => manifest,
+            other => panic!("expected Eb, got {other:?}"),
+        };
+        assert_eq!(manifest.len(), 1);
+        assert_eq!(manifest[0], vec![1u8; 32]);
     }
 }

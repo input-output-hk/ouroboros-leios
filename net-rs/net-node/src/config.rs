@@ -348,6 +348,13 @@ pub struct ProductionConfig {
     /// exceeds this, transactions go into an EB instead.
     #[serde(default = "default_rb_body_max_bytes")]
     pub rb_body_max_bytes: usize,
+
+    /// Maximum bytes of transaction data referenced by a single EB.
+    /// When the EB-overflow path fires, the FIFO-ordered manifest is
+    /// truncated at this byte cap; the remainder stays in the mempool
+    /// for the next RB.
+    #[serde(default = "default_eb_body_max_bytes")]
+    pub eb_body_max_bytes: usize,
 }
 
 fn default_total_stake() -> u64 {
@@ -378,6 +385,10 @@ fn default_rb_body_max_bytes() -> usize {
     65_536
 }
 
+fn default_eb_body_max_bytes() -> usize {
+    16_384_000
+}
+
 impl Default for ProductionConfig {
     fn default() -> Self {
         Self {
@@ -395,6 +406,7 @@ impl Default for ProductionConfig {
             leios_vote_window_slots: default_vote_window(),
             leios_diffuse_window_slots: default_diffuse_window(),
             rb_body_max_bytes: default_rb_body_max_bytes(),
+            eb_body_max_bytes: default_eb_body_max_bytes(),
         }
     }
 }

@@ -36,7 +36,8 @@
 //! | `vote-threshold`                        | `ElectionsConfig.quorum_weight_fraction`           |
 //! | `vote-bundle-size-bytes-constant`<br>`+ {persistent,non-persistent}-vote-bundle-size-bytes-per-eb` | `VotingConfig.{persistent,non_persistent}_vote_bytes` (via `Sizes::vote_bundle`) |
 //! | `leios-mempool-size-bytes`              | `MempoolState::new(capacity)`                      |
-//! | `rb-body-max-size-bytes`                | `BodyPath::decide(_, rb_body_max_bytes)`           |
+//! | `rb-body-max-size-bytes`                | `BodyPath::decide(_, rb_body_max_bytes, _)`        |
+//! | `eb-referenced-txs-max-size-bytes`      | `BodyPath::decide(_, _, eb_body_max_bytes)` (caps the EB body's referenced-tx size) |
 //! | `rb-generation-probability` (= `block-generation-probability`) | `rb_win_threshold(rate, stake)` |
 //! | _(per-node) `stake`_                    | `StakeEntry.stake` + `VotingConfig.stake`          |
 //! | _(per-node) `name`_                     | `Elections.node_id`, `StakeEntry.node_id`, voter key |
@@ -671,11 +672,12 @@ impl ConRs {
         }
 
         let max_rb_body = self.sim_config.max_block_size as usize;
-        let body = BodyPath::decide(&mut self.mempool, max_rb_body);
+        let max_eb_body = self.sim_config.max_eb_size as usize;
+        let body = BodyPath::decide(&mut self.mempool, max_rb_body, max_eb_body);
         let (rb_txs, eb_pair) = match body {
             BodyPath::Inline(pending) => (self.collect_arcs(pending), None),
             BodyPath::Eb { manifest } => {
-                // Commit the drain — `produce_eb` moves the pending
+                // Commit the drain — `produce_eb` moves the manifest's
                 // txs into `eb_pinned` under the given EbKey.  We
                 // synthesise a deterministic hash from the producer +
                 // slot since sim doesn't model Blake2b on wire bytes.
@@ -685,10 +687,13 @@ impl ConRs {
                     producer: self.id,
                 };
                 let eb_hash = synthesize_eb_hash(eb_id);
-                let (_committed, mempool_fx) = self.mempool.produce_eb(EbKey {
-                    slot,
-                    hash: eb_hash,
-                });
+                let (_committed, mempool_fx) = self.mempool.produce_eb(
+                    EbKey {
+                        slot,
+                        hash: eb_hash,
+                    },
+                    manifest.len(),
+                );
                 self.apply_mempool_effects(out, mempool_fx);
                 // Pull the body Arcs from `tx_arcs` in manifest order.
                 let txs: Vec<Arc<Transaction>> = manifest

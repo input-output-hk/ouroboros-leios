@@ -381,20 +381,33 @@ impl MempoolState {
 
     // -- EB body management ------------------------------------------------
 
-    /// Producer-side: drain every free tx, pin the bodies under the
-    /// new EB key, and return the manifest (ordered tx-hash list) for
-    /// the wrapper to encode into the EB's wire bytes.  After this the
-    /// `txs` queue is empty (the next RB body won't include them) but
-    /// the bodies stay serveable via LeiosFetch and visible to the
-    /// `MissingTX` voting predicate.
+    /// Producer-side: drain the first `count` free txs, pin their
+    /// bodies under the new EB key, and return the manifest (ordered
+    /// tx-hash list) for the wrapper to encode into the EB's wire
+    /// bytes.  The remaining free txs stay in the mempool for the
+    /// next RB.  The pinned bodies stay serveable via LeiosFetch and
+    /// visible to the `MissingTX` voting predicate.
+    ///
+    /// `count` must come from `BodyPath::Eb { manifest }`'s
+    /// `manifest.len()` — pairing the size-capped manifest selection
+    /// with a matching prefix drain.
     ///
     /// Returns the manifest and any `TxRejected{EbClosurePruned}`
     /// effects emitted when older EB closures aged out of the
     /// retention window.
-    pub fn produce_eb(&mut self, eb_key: EbKey) -> (Vec<TxId>, Vec<MempoolEffect>) {
-        let drained: Vec<PendingTx> = self.txs.drain(..).collect();
-        self.tx_index.clear();
-        self.total_bytes = 0;
+    pub fn produce_eb(
+        &mut self,
+        eb_key: EbKey,
+        count: usize,
+    ) -> (Vec<TxId>, Vec<MempoolEffect>) {
+        let take = count.min(self.txs.len());
+        let mut drained: Vec<PendingTx> = Vec::with_capacity(take);
+        for _ in 0..take {
+            let tx = self.txs.pop_front().expect("checked len");
+            self.tx_index.remove(&tx.tx_id);
+            self.total_bytes -= tx.size as usize;
+            drained.push(tx);
+        }
         let manifest: Vec<TxId> = drained.iter().map(|tx| tx.tx_id.clone()).collect();
         for tx in drained {
             self.eb_pinned.entry(tx.tx_id.clone()).or_insert(tx);
@@ -914,7 +927,7 @@ mod tests {
         admit(&mut s, 3, 300);
 
         let eb = eb_key(50, 0xEE);
-        let (manifest, evictions) = s.produce_eb(eb);
+        let (manifest, evictions) = s.produce_eb(eb, 3);
 
         assert_eq!(manifest, vec![vec![1u8; 32], vec![2u8; 32], vec![3u8; 32]]);
         assert!(evictions.is_empty(), "no older EBs to evict yet");
@@ -930,7 +943,7 @@ mod tests {
         admit(&mut s, 1, 100);
         admit(&mut s, 2, 200);
         let eb = eb_key(10, 0x11);
-        let _ = s.produce_eb(eb);
+        let _ = s.produce_eb(eb, 2);
         // Both still locally available, just under different roofs.
         assert!(s.has_tx(&vec![1u8; 32]));
         assert!(s.has_tx(&vec![2u8; 32]));
@@ -945,7 +958,7 @@ mod tests {
         let mut s = MempoolState::new(10);
         let (id1, body1, sz1) = tx(1, 50);
         s.admit_validated(id1.clone(), body1.clone(), sz1);
-        s.produce_eb(eb_key(5, 0x55));
+        s.produce_eb(eb_key(5, 0x55), 1);
         // Now id1 is in eb_pinned, not txs.
         assert_eq!(s.get_body_by_id(&id1), Some(body1));
         // A fresh free tx resolves from `txs`.
@@ -1065,7 +1078,7 @@ mod tests {
         // Produce a new EB far past the retention window — the
         // producer-side path also evicts the aged closure.
         admit(&mut s, 9, 100);
-        let (_manifest, evictions) = s.produce_eb(eb_key(100, 0x02));
+        let (_manifest, evictions) = s.produce_eb(eb_key(100, 0x02), 1);
 
         assert_eq!(
             evictions,

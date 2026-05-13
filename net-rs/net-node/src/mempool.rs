@@ -117,13 +117,22 @@ impl Mempool {
 
     /// Run the CIP-0164 overflow rule.  Returns the body path the next
     /// self-produced RB should take — either inline txs (mempool drained)
-    /// or an EB announcement carrying the FIFO-ordered manifest (mempool
-    /// untouched; caller commits via [`Mempool::produce_eb`] once it has
-    /// computed the EB hash from the encoded manifest bytes).
+    /// or an EB announcement carrying a FIFO-ordered manifest capped at
+    /// `eb_body_max_bytes` worth of tx bodies (mempool untouched; caller
+    /// commits via [`Mempool::produce_eb`] once it has computed the EB
+    /// hash from the encoded manifest bytes).
     ///
     /// Policy lives in [`con_rs::production::BodyPath::decide`].
-    pub fn decide_body_path(&mut self, rb_body_max_bytes: usize) -> BodyPath {
-        match con_rs::production::BodyPath::decide(&mut self.state, rb_body_max_bytes) {
+    pub fn decide_body_path(
+        &mut self,
+        rb_body_max_bytes: usize,
+        eb_body_max_bytes: usize,
+    ) -> BodyPath {
+        match con_rs::production::BodyPath::decide(
+            &mut self.state,
+            rb_body_max_bytes,
+            eb_body_max_bytes,
+        ) {
             con_rs::production::BodyPath::Inline(txs) => {
                 BodyPath::Inline(txs.into_iter().map(from_con_tx).collect())
             }
@@ -133,17 +142,20 @@ impl Mempool {
         }
     }
 
-    /// Drain every free tx into an EB pin under `eb_key`.  After this the
-    /// drained txs stay locally available via `has_tx` / `get_body_by_id`
-    /// but no longer count toward `total_bytes` / `drain_up_to` — i.e.
-    /// they won't be double-included in a subsequent RB body.
+    /// Drain the first `count` free txs into an EB pin under `eb_key`.
+    /// `count` must come from the `BodyPath::Eb` manifest's length so
+    /// the drain matches the size-capped selection.  After this the
+    /// drained txs stay locally available via `has_tx` /
+    /// `get_body_by_id` but no longer count toward `total_bytes` /
+    /// `drain_up_to` — i.e. they won't be double-included in a
+    /// subsequent RB body.
     ///
     /// `MempoolEffect::TxRejected{EbClosurePruned}` evictions of older
     /// closures aging past the retention window are dropped on the
     /// floor here; net-rs has no telemetry plumbing for them yet, and
     /// sim-rs's adapter will surface them directly.
-    pub fn produce_eb(&mut self, eb_key: EbKey) {
-        let _ = self.state.produce_eb(eb_key);
+    pub fn produce_eb(&mut self, eb_key: EbKey, count: usize) {
+        let _ = self.state.produce_eb(eb_key, count);
     }
 
     /// Receiver-side: insert a body fetched via LeiosFetch.  Idempotent
