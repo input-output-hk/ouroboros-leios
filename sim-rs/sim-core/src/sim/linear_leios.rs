@@ -238,6 +238,13 @@ impl NodeImpl for LinearLeiosNode {
             Message::AnnounceVotes(id) => self.receive_announce_votes(from, id),
             Message::RequestVotes(id) => self.receive_request_votes(from, id),
             Message::Votes(votes) => self.receive_votes(from, votes),
+
+            // Per-vote variants are emitted exclusively by the con-rs
+            // adapter; a sim run uses one adapter throughout so this
+            // arm is unreachable.
+            Message::AnnounceVote(_) | Message::RequestVote(_) | Message::Vote(_) => {
+                unreachable!("linear_leios.rs does not exchange per-vote messages");
+            }
         }
         std::mem::take(&mut self.queued)
     }
@@ -255,6 +262,9 @@ impl NodeImpl for LinearLeiosNode {
             CpuTask::VTBundleGenerated(votes, _) => self.finish_generating_vote_bundle(votes),
             CpuTask::VTBundleValidated(from, votes) => {
                 self.finish_validating_vote_bundle(from, votes)
+            }
+            CpuTask::VoteGenerated(_) | CpuTask::VoteValidated(_, _) => {
+                unreachable!("linear_leios.rs does not schedule per-vote CpuTasks");
             }
         }
         std::mem::take(&mut self.queued)

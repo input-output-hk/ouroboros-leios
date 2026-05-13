@@ -271,6 +271,66 @@ pub struct VoteBundle {
     pub ebs: BTreeMap<EndorserBlockId, usize>,
 }
 
+/// CIP-0164 vote class.  Persistent voters carry a 2-byte
+/// persistent-voter id; non-persistent carry the 28-byte pool id
+/// plus a 48-byte eligibility signature.  Both classes finish with
+/// the 48-byte BLS vote signature.  See CDDL diff in
+/// `docs/cddl/diffs/common/votes-certificates.md`.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VoteKind {
+    Persistent,
+    NonPersistent,
+}
+
+/// Wire identity for a single CIP-0164 vote — one voter, one EB,
+/// one kind.  CIP partitions PV and NPV pools disjointly so the
+/// pair `(voter, eb)` is unambiguous in practice; the kind tags the
+/// id for indexing / dedup convenience.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct VoteId<Node = NodeId> {
+    pub slot: u64,
+    pub voter: Node,
+    pub eb: EndorserBlockId<Node>,
+    pub kind: VoteKind,
+}
+impl<Node: Display> Display for VoteId<Node> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let kind = match self.kind {
+            VoteKind::Persistent => "PV",
+            VoteKind::NonPersistent => "NPV",
+        };
+        f.write_fmt(format_args!(
+            "{}-{}-{}-{}",
+            self.slot, self.voter, self.eb, kind
+        ))
+    }
+}
+impl<Node: Display> Serialize for VoteId<Node> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+/// A single CIP-0164 vote on the sim wire.  Carries the
+/// eligibility-derivation inputs the verifier needs (PV: implicit
+/// from `id.voter`; NPV: explicit 48-byte signature) but no weight —
+/// weight is recomputed at verification time from the local
+/// persistent-committee + stake registry, matching
+/// `con_rs::elections::Elections::weight_for`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Vote {
+    pub id: VoteId,
+    pub bytes: u64,
+    /// `Some(sig)` for NPV (carries the BLS eligibility signature);
+    /// `None` for PV (voter is identified by `id.voter` and verified
+    /// against the persistent-committee registry).
+    pub eligibility_signature: Option<Vec<u8>>,
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NoVoteReason {
     InvalidSlot,

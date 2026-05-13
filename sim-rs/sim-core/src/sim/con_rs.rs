@@ -77,7 +77,7 @@ use crate::{
     model::{
         BlockId, Endorsement, EndorserBlockId, LinearEndorserBlock, LinearRankingBlock,
         LinearRankingBlockHeader, NoVoteReason as SimNoVoteReason, Transaction, TransactionId,
-        TransactionLostReason, VoteBundle, VoteBundleId,
+        TransactionLostReason, Vote, VoteId, VoteKind,
     },
     rng::{DrawSite, Rng},
     sim::{
@@ -282,7 +282,7 @@ pub struct ConRs {
     /// Vote bundle state machine.  Self-emitted bundles land in
     /// `Received` immediately; peer-announced bundles walk
     /// `Pending → Requested → Received`.
-    vote_bundles: BTreeMap<VoteBundleId, VoteState>,
+    votes: BTreeMap<VoteId, VoteState>,
 
     /// NodeId → pool name lookup, cached so the vote-aggregation path
     /// (which keys by con-rs's `voter_key: Vec<u8>` over the pool name)
@@ -339,7 +339,7 @@ pub struct ConRs {
 
 enum VoteState {
     Requested,
-    Received { votes: Arc<VoteBundle> },
+    Received { vote: Arc<Vote> },
 }
 
 /// State of an EB known to this node.
@@ -494,7 +494,7 @@ impl NodeImpl for ConRs {
             ebs: BTreeMap::new(),
             eb_announcers: BTreeMap::new(),
             eb_hash_to_id: BTreeMap::new(),
-            vote_bundles: BTreeMap::new(),
+            votes: BTreeMap::new(),
             node_names,
             votes_by_eb: BTreeMap::new(),
             latest_rb_id: None,
@@ -620,11 +620,22 @@ impl NodeImpl for ConRs {
                 self.tracker.track_eb_received(eb.id(), from, self.id);
                 out.schedule_cpu_task(CpuTask::EBHeaderValidated(from, eb));
             }
-            Message::AnnounceVotes(id) => self.receive_announce_votes(&mut out, from, id),
-            Message::RequestVotes(id) => self.receive_request_votes(&mut out, from, id),
-            Message::Votes(bundle) => {
-                self.tracker.track_votes_received(&bundle, from, self.id);
-                out.schedule_cpu_task(CpuTask::VTBundleValidated(from, bundle));
+            Message::AnnounceVotes(_)
+            | Message::RequestVotes(_)
+            | Message::Votes(_) => {
+                // con-rs adapter emits per-vote, never bundles — every
+                // node in a sim run uses the same adapter, so the
+                // bundle variants can't reach this handler.
+                unreachable!(
+                    "con-rs adapter does not exchange VoteBundles; the bundle \
+                     Message variants are linear_leios.rs-only"
+                );
+            }
+            Message::AnnounceVote(id) => self.receive_announce_vote(&mut out, from, id),
+            Message::RequestVote(id) => self.receive_request_vote(&mut out, from, id),
+            Message::Vote(vote) => {
+                self.tracker.track_vote_received(&vote, from, self.id);
+                out.schedule_cpu_task(CpuTask::VoteValidated(from, vote));
             }
         }
         out
@@ -662,11 +673,17 @@ impl NodeImpl for ConRs {
                 self.finish_validating_eb_header(&mut out, from, eb);
             }
             CpuTask::EBBlockValidated(eb, seen) => self.finish_validating_eb(&mut out, eb, seen),
-            CpuTask::VTBundleGenerated(bundle, eb) => {
-                self.finish_generating_votes(&mut out, bundle, eb);
+            CpuTask::VTBundleGenerated(_, _) | CpuTask::VTBundleValidated(_, _) => {
+                unreachable!(
+                    "con-rs adapter does not schedule bundle CpuTasks; the bundle \
+                     variants are linear_leios.rs-only"
+                );
             }
-            CpuTask::VTBundleValidated(from, bundle) => {
-                self.finish_validating_votes(&mut out, from, bundle);
+            CpuTask::VoteGenerated(vote) => {
+                self.finish_generating_vote(&mut out, vote);
+            }
+            CpuTask::VoteValidated(from, vote) => {
+                self.finish_validating_vote(&mut out, from, vote);
             }
         }
         out
@@ -1081,13 +1098,13 @@ impl ConRs {
         let _ = out;
     }
 
-    fn receive_announce_votes(
+    fn receive_announce_vote(
         &mut self,
         out: &mut EventResult,
         from: NodeId,
-        id: VoteBundleId,
+        id: VoteId,
     ) {
-        let should_request = match self.vote_bundles.get(&id) {
+        let should_request = match self.votes.get(&id) {
             None => true,
             Some(VoteState::Requested) => {
                 self.sim_config.relay_strategy == RelayStrategy::RequestFromAll
@@ -1095,83 +1112,91 @@ impl ConRs {
             Some(VoteState::Received { .. }) => false,
         };
         if should_request {
-            self.vote_bundles.insert(id, VoteState::Requested);
-            out.send_to(from, Message::RequestVotes(id));
+            self.votes.insert(id, VoteState::Requested);
+            out.send_to(from, Message::RequestVote(id));
         }
     }
 
-    fn receive_request_votes(
+    fn receive_request_vote(
         &mut self,
         out: &mut EventResult,
         from: NodeId,
-        id: VoteBundleId,
+        id: VoteId,
     ) {
-        if let Some(VoteState::Received { votes }) = self.vote_bundles.get(&id) {
-            self.tracker.track_votes_sent(votes, self.id, from);
-            out.send_to(from, Message::Votes(votes.clone()));
+        if let Some(VoteState::Received { vote }) = self.votes.get(&id) {
+            self.tracker.track_vote_sent(vote, self.id, from);
+            out.send_to(from, Message::Vote(vote.clone()));
         }
     }
 
-    fn finish_generating_votes(
-        &mut self,
-        out: &mut EventResult,
-        bundle: VoteBundle,
-        _eb: Arc<LinearEndorserBlock>,
-    ) {
-        self.tracker.track_votes_generated(&bundle);
-        let bundle = Arc::new(bundle);
-        let id = bundle.id;
-        self.vote_bundles
-            .insert(id, VoteState::Received { votes: bundle.clone() });
+    fn finish_generating_vote(&mut self, out: &mut EventResult, vote: Arc<Vote>) {
+        // `VoteGenerated` telemetry was emitted at decision time in
+        // `emit_vote` (the moment the producer commits to a vote);
+        // this CPU-task completion just propagates the wire message.
+        let id = vote.id;
+        self.votes
+            .insert(id, VoteState::Received { vote: vote.clone() });
         // Self-attribution: feed our own vote into the aggregator
         // immediately so quorum can form even when this node sees no
         // other voters.
-        self.record_bundle_into_elections(&bundle);
+        self.record_vote_into_elections(&vote);
         for peer in &self.consumers {
-            out.send_to(*peer, Message::AnnounceVotes(id));
+            out.send_to(*peer, Message::AnnounceVote(id));
         }
     }
 
-    fn finish_validating_votes(
+    fn finish_validating_vote(
         &mut self,
         out: &mut EventResult,
         from: NodeId,
-        bundle: Arc<VoteBundle>,
+        vote: Arc<Vote>,
     ) {
-        let id = bundle.id;
-        if matches!(self.vote_bundles.get(&id), Some(VoteState::Received { .. })) {
+        let id = vote.id;
+        if matches!(self.votes.get(&id), Some(VoteState::Received { .. })) {
             return;
         }
-        self.vote_bundles
-            .insert(id, VoteState::Received { votes: bundle.clone() });
-        self.record_bundle_into_elections(&bundle);
+        self.votes
+            .insert(id, VoteState::Received { vote: vote.clone() });
+        self.record_vote_into_elections(&vote);
         for peer in &self.consumers {
             if *peer == from {
                 continue;
             }
-            out.send_to(*peer, Message::AnnounceVotes(id));
+            out.send_to(*peer, Message::AnnounceVote(id));
         }
     }
 
-    /// Record every (eb, weight) entry in `bundle` into the elections
-    /// aggregator using the bundle's producer as the voter key.
-    /// Idempotent — `record_vote` dedupes per `(eb_hash, voter_key)`.
-    /// Also mirrors the entry into `votes_by_eb` so endorsement
-    /// assembly can list voters without scanning private state.
-    fn record_bundle_into_elections(&mut self, bundle: &VoteBundle) {
-        let Some(voter_name) = self.node_names.get(&bundle.id.producer).cloned() else {
+    /// Feed a single received vote into the elections aggregator.
+    /// `Elections::record_vote` dedupes per `(eb_hash, voter_key)` and
+    /// `weight_for` recomputes weight from local state, matching the
+    /// CIP-0164 wire shape (no explicit weight on the wire).  Also
+    /// mirrors into `votes_by_eb` so endorsement assembly can list
+    /// voters without scanning private state.
+    fn record_vote_into_elections(&mut self, vote: &Vote) {
+        let Some(voter_name) = self.node_names.get(&vote.id.voter).cloned() else {
             return;
         };
-        for (eb_id, count) in &bundle.ebs {
-            let eb_hash = synthesize_eb_hash(*eb_id);
-            self.leios
-                .elections
-                .record_vote(&eb_hash, voter_name.clone().into_bytes(), *count as u32);
-            self.votes_by_eb
-                .entry(*eb_id)
-                .or_default()
-                .insert(bundle.id.producer, *count);
+        let eb_hash = synthesize_eb_hash(vote.id.eb);
+        let tag = match vote.id.kind {
+            VoteKind::Persistent => 0u8,
+            VoteKind::NonPersistent => 1u8,
+        };
+        let voter_key = voter_name.into_bytes();
+        let weight = self.leios.elections.weight_for(
+            std::str::from_utf8(&voter_key).unwrap_or(""),
+            tag,
+            vote.eligibility_signature.as_deref(),
+        );
+        if weight == 0 {
+            return;
         }
+        self.leios
+            .elections
+            .record_vote(&eb_hash, voter_key, weight);
+        self.votes_by_eb
+            .entry(vote.id.eb)
+            .or_default()
+            .insert(vote.id.voter, weight as usize);
     }
 
     /// Pick the parent BlockId for a newly produced RB.  Stand-in for
@@ -1243,7 +1268,7 @@ impl ConRs {
         self.rbs.retain(|id, _| id.slot >= chain_cutoff);
         self.ebs.retain(|id, _| id.slot >= chain_cutoff);
         self.eb_announcers.retain(|id, _| id.slot >= chain_cutoff);
-        self.vote_bundles.retain(|id, _| id.slot >= chain_cutoff);
+        self.votes.retain(|id, _| id.slot >= chain_cutoff);
         self.votes_by_eb.retain(|id, _| id.slot >= chain_cutoff);
         // Drop EB-pending-txs entries whose EB has aged out, then
         // sweep the reverse index of any orphaned references.
@@ -1326,7 +1351,7 @@ impl ConRs {
             .map(|v| v.len())
             .sum();
         let eb_hash_to_id = self.eb_hash_to_id.len();
-        let vote_bundles = self.vote_bundles.len();
+        let votes_count = self.votes.len();
         let votes_by_eb_count = self.votes_by_eb.len();
         let votes_by_eb_voters: usize =
             self.votes_by_eb.values().map(|m| m.len()).sum();
@@ -1373,7 +1398,7 @@ impl ConRs {
         let ebs_bytes = ebs * 96 + ebs_tx_refs * 8;
         let eb_announcers_bytes = eb_announcers_count * 64 + eb_announcers_peers * 8;
         let eb_hash_bytes = eb_hash_to_id * 64;
-        let vote_bundles_bytes = vote_bundles * 96;
+        let votes_bytes = votes_count * 96;
         let votes_by_eb_bytes = votes_by_eb_count * 64 + votes_by_eb_voters * 32;
         let noted_no_vote_bytes = noted_no_vote * 48;
         let eb_tx_hashes_bytes = eb_tx_hashes_count * 64 + eb_tx_hashes_refs * 32;
@@ -1388,7 +1413,7 @@ impl ConRs {
             + ebs_bytes
             + eb_announcers_bytes
             + eb_hash_bytes
-            + vote_bundles_bytes
+            + votes_bytes
             + votes_by_eb_bytes
             + noted_no_vote_bytes
             + eb_tx_hashes_bytes
@@ -1405,7 +1430,7 @@ impl ConRs {
              \x20 ebs:                  {:>8} entries  ~ {:>6.1} MB  (tx_refs: {})\n\
              \x20 eb_announcers:        {:>8} entries  ~ {:>6.1} MB  (peers: {})\n\
              \x20 eb_hash_to_id:        {:>8} entries  ~ {:>6.1} MB\n\
-             \x20 vote_bundles:         {:>8} entries  ~ {:>6.1} MB\n\
+             \x20 votes:                {:>8} entries  ~ {:>6.1} MB\n\
              \x20 votes_by_eb:          {:>8} entries  ~ {:>6.1} MB  (voters: {})\n\
              \x20 noted_no_vote:        {:>8} entries  ~ {:>6.1} MB\n\
              \x20 leios.eb_tx_hashes:   {:>8} entries  ~ {:>6.1} MB  (refs: {})\n\
@@ -1430,7 +1455,7 @@ impl ConRs {
             ebs, ebs_bytes as f64 / 1e6, ebs_tx_refs,
             eb_announcers_count, eb_announcers_bytes as f64 / 1e6, eb_announcers_peers,
             eb_hash_to_id, eb_hash_bytes as f64 / 1e6,
-            vote_bundles, vote_bundles_bytes as f64 / 1e6,
+            votes_count, votes_bytes as f64 / 1e6,
             votes_by_eb_count, votes_by_eb_bytes as f64 / 1e6, votes_by_eb_voters,
             noted_no_vote, noted_no_vote_bytes as f64 / 1e6,
             eb_tx_hashes_count, eb_tx_hashes_bytes as f64 / 1e6, eb_tx_hashes_refs,
@@ -1624,10 +1649,13 @@ impl ConRs {
         }
     }
 
-    /// Build a sim `VoteBundle` for this EB carrying the weight con-rs
-    /// computed (PV seats + NPV wins) and schedule it through
-    /// `CpuTask::VTBundleGenerated` so the validation timing matches
-    /// `linear_leios`.
+    /// Emit a single CIP-0164 vote — one BLS signature per (voter, EB).
+    /// Per Part A's partition fix, `decide_vote` returns at most one of
+    /// PV / NPV per voter, so this builds exactly one [`Vote`] message
+    /// and schedules it through [`CpuTask::VoteGenerated`].  No weight
+    /// is carried on the wire — the receiver re-derives it via
+    /// `Elections::weight_for` from the persistent-committee registry
+    /// (PV) or by re-running `count_npv_wins` from the signature (NPV).
     fn emit_vote(
         &self,
         out: &mut EventResult,
@@ -1639,44 +1667,52 @@ impl ConRs {
         let Some(&eb_id) = self.eb_hash_to_id.get(&eb_hash) else {
             return;
         };
-        let Some(EbState::Received { eb, .. }) = self.ebs.get(&eb_id) else {
-            return;
-        };
-        let pv_weight = if emit_pv {
-            self.leios.voting_config.persistent_seats
-        } else {
-            0
-        };
-        let npv_weight = match npv_signature {
-            Some(sig) => con_rs::wfa::count_npv_wins(
-                &sig,
-                self.leios.voting_config.stake,
-                self.leios.voting_config.total_stake,
-                self.leios
-                    .voting_config
-                    .committee_selection
-                    .non_persistent_voters(),
+        // CIP-0164 partition (enforced by `decide_vote`): exactly one
+        // of PV / NPV is true.  Carry the kind on the wire so the
+        // receiver knows which `weight_for` branch to take; the
+        // weight itself stays implicit, re-derived by each verifier.
+        let (kind, sig_for_wire, bytes, weight) = match (emit_pv, npv_signature) {
+            (true, _) => (
+                VoteKind::Persistent,
+                None,
+                self.leios.voting_config.persistent_vote_bytes as u64,
+                self.leios.voting_config.persistent_seats,
             ),
-            None => 0,
+            (false, Some(sig)) => {
+                let npv_wins = con_rs::wfa::count_npv_wins(
+                    &sig,
+                    self.leios.voting_config.stake,
+                    self.leios.voting_config.total_stake,
+                    self.leios
+                        .voting_config
+                        .committee_selection
+                        .non_persistent_voters(),
+                );
+                (
+                    VoteKind::NonPersistent,
+                    Some(sig),
+                    self.leios.voting_config.non_persistent_vote_bytes as u64,
+                    npv_wins,
+                )
+            }
+            (false, None) => return, // lottery loss
         };
-        let weight = (pv_weight + npv_weight) as usize;
         if weight == 0 {
             return;
         }
-        let id = VoteBundleId {
+        let id = VoteId {
             slot: eb_slot,
-            pipeline: 0,
-            producer: self.id,
+            voter: self.id,
+            eb: eb_id,
+            kind,
         };
-        self.tracker.track_vote_lottery_won(id);
-        let mut ebs = BTreeMap::new();
-        ebs.insert(eb_id, weight);
-        let bundle = VoteBundle {
+        let vote = Arc::new(Vote {
             id,
-            bytes: self.sim_config.sizes.vote_bundle(1),
-            ebs,
-        };
-        out.schedule_cpu_task(CpuTask::VTBundleGenerated(bundle, eb.clone()));
+            bytes,
+            eligibility_signature: sig_for_wire,
+        });
+        self.tracker.track_vote_generated(&vote, weight);
+        out.schedule_cpu_task(CpuTask::VoteGenerated(vote));
     }
 
     /// Forward mempool-side effects to sim's tracker. Today only the

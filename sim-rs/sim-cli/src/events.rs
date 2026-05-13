@@ -478,6 +478,21 @@ impl EventMonitor {
                 Event::VTBundleReceived { .. } => {
                     vote_messages.received += 1;
                 }
+
+                // CIP-0164 per-vote events (con-rs adapter).
+                Event::VoteGenerated {
+                    eb, voter, weight, ..
+                } => {
+                    total_votes += weight as u64;
+                    *eb_votes.entry(eb.clone()).or_default() += weight as f64;
+                    *votes_per_pool.entry(voter.id).or_default() += weight as f64;
+                }
+                Event::VoteSent { .. } => {
+                    vote_messages.sent += 1;
+                }
+                Event::VoteReceived { .. } => {
+                    vote_messages.received += 1;
+                }
             }
         }
 

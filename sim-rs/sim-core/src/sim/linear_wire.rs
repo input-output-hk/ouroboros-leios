@@ -26,7 +26,7 @@ use crate::{
     model::{
         BlockId, EndorserBlockId, LinearEndorserBlock as EndorserBlock,
         LinearRankingBlock as RankingBlock, LinearRankingBlockHeader as RankingBlockHeader,
-        Transaction, TransactionId, VoteBundle, VoteBundleId,
+        Transaction, TransactionId, Vote, VoteBundle, VoteBundleId, VoteId,
     },
     sim::{MiniProtocol, SimCpuTask, SimMessage},
 };
@@ -57,10 +57,18 @@ pub enum Message {
     RequestEB(EndorserBlockId),
     EB(Arc<EndorserBlock>),
 
-    // Vote propagation
+    // Vote propagation — bundle path used by `linear_leios.rs`.
+    // Aggregates multiple votes for one voter into a single message;
+    // sim-only, not in the CIP.
     AnnounceVotes(VoteBundleId),
     RequestVotes(VoteBundleId),
     Votes(Arc<VoteBundle>),
+
+    // Vote propagation — per-vote path used by `con_rs.rs`.  One BLS
+    // signature, one wire message; mirrors the CIP-0164 wire format.
+    AnnounceVote(VoteId),
+    RequestVote(VoteId),
+    Vote(Arc<Vote>),
 }
 
 impl SimMessage for Message {
@@ -85,6 +93,10 @@ impl SimMessage for Message {
             Self::AnnounceVotes(_) => MiniProtocol::Vote,
             Self::RequestVotes(_) => MiniProtocol::Vote,
             Self::Votes(_) => MiniProtocol::Vote,
+
+            Self::AnnounceVote(_) => MiniProtocol::Vote,
+            Self::RequestVote(_) => MiniProtocol::Vote,
+            Self::Vote(_) => MiniProtocol::Vote,
         }
     }
 
@@ -109,6 +121,10 @@ impl SimMessage for Message {
             Self::AnnounceVotes(_) => 8,
             Self::RequestVotes(_) => 8,
             Self::Votes(v) => v.bytes,
+
+            Self::AnnounceVote(_) => 8,
+            Self::RequestVote(_) => 8,
+            Self::Vote(v) => v.bytes,
         }
     }
 }
@@ -128,9 +144,17 @@ pub enum CpuTask {
     /// An endorser block has been received and validated, and is ready to propagate
     EBBlockValidated(Arc<EndorserBlock>, Timestamp),
     /// A bundle of votes has been generated and is ready to propagate
+    /// (`linear_leios.rs` only — sim-only aggregation, not in the CIP)
     VTBundleGenerated(VoteBundle, Arc<EndorserBlock>),
     /// A bundle of votes has been received and validated, ready to propagate
+    /// (`linear_leios.rs` only)
     VTBundleValidated(NodeId, Arc<VoteBundle>),
+    /// A single CIP-0164 vote has been generated and is ready to propagate
+    /// (`con_rs.rs` only — one BLS signature per CpuTask)
+    VoteGenerated(Arc<Vote>),
+    /// A single CIP-0164 vote has been received and validated, ready to propagate
+    /// (`con_rs.rs` only)
+    VoteValidated(NodeId, Arc<Vote>),
 }
 
 impl SimCpuTask for CpuTask {
@@ -144,6 +168,8 @@ impl SimCpuTask for CpuTask {
             Self::EBBlockValidated(_, _) => "ValEB",
             Self::VTBundleGenerated(_, _) => "GenVote",
             Self::VTBundleValidated(_, _) => "ValVote",
+            Self::VoteGenerated(_) => "GenVote",
+            Self::VoteValidated(_, _) => "ValVote",
         }
         .to_string()
     }
@@ -158,6 +184,8 @@ impl SimCpuTask for CpuTask {
             Self::EBBlockValidated(_, _) => "".to_string(),
             Self::VTBundleGenerated(_, _) => "".to_string(),
             Self::VTBundleValidated(_, _) => "".to_string(),
+            Self::VoteGenerated(_) => "".to_string(),
+            Self::VoteValidated(_, _) => "".to_string(),
         }
     }
 
@@ -209,6 +237,12 @@ impl SimCpuTask for CpuTask {
                     + (config.vote_generation_per_tx * eb.txs.len() as u32),
             ],
             Self::VTBundleValidated(_, _) => vec![config.vote_validation],
+            // CIP-0164 per-vote: one BLS sign on the emit side; one
+            // BLS pair-check on validation.  The per-tx EB-content
+            // cost is absorbed by the EB-validation pipeline rather
+            // than re-charged per vote.
+            Self::VoteGenerated(_) => vec![config.vote_generation_constant],
+            Self::VoteValidated(_, _) => vec![config.vote_validation],
         }
     }
 }
