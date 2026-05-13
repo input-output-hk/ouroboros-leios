@@ -453,6 +453,7 @@ impl NodeImpl for ConRs {
             persistent_vote_bytes: vote_bytes_per_bundle as usize,
             non_persistent_vote_bytes: vote_bytes_per_bundle as usize,
             persistent_seats,
+            retry_vote_in_window: sim_config.retry_vote_in_window,
         };
 
         let mut leios = LeiosState::new(config.name.clone(), elections, voting_config, pipeline);

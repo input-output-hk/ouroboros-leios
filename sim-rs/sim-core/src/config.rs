@@ -216,6 +216,23 @@ pub struct RawParameters {
     #[serde(default)]
     pub fetch_policy: FetchPolicy,
 
+    /// Should a voter retry across slots of the CIP-0164 voting
+    /// window when an in-window vote attempt didn't succeed?  Covers
+    /// both retry paths:
+    ///
+    /// - transient predicate failure (`WrongEB` / `LateRBHeader` /
+    ///   `MissingTX`) — a later slot may see chain-tip / mempool
+    ///   state that flips the predicate to success;
+    /// - lottery loss (no PV seat, no NPV win) — the NPV trial re-runs
+    ///   with a fresh per-slot VRF input.
+    ///
+    /// Default `true` matches the CIP reading.  `false` gives a
+    /// single decision per `(voter, EB)` and one NPV trial — matches
+    /// `linear_leios.rs`'s single-shot lottery behaviour.  Useful for
+    /// like-for-like comparisons.  con-rs adapter only.
+    #[serde(default = "default_retry_vote_in_window")]
+    pub retry_vote_in_window: bool,
+
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
     pub tx_size_bytes_distribution: DistributionConfig,
@@ -918,6 +935,7 @@ pub struct SimConfiguration {
     pub aggregate_events: bool,
     pub log_memory_stats: bool,
     pub fetch_policy: FetchPolicy,
+    pub retry_vote_in_window: bool,
     pub trace_nodes: HashSet<NodeId>,
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
@@ -1028,6 +1046,7 @@ impl SimConfiguration {
             aggregate_events: false,
             log_memory_stats: false,
             fetch_policy: params.fetch_policy,
+            retry_vote_in_window: params.retry_vote_in_window,
             trace_nodes: HashSet::new(),
             nodes: topology.nodes,
             links: topology.links,
@@ -1092,6 +1111,10 @@ fn default_shard_max_size_pct() -> u64 {
 
 fn default_parallel_threshold() -> usize {
     10
+}
+
+fn default_retry_vote_in_window() -> bool {
+    true
 }
 #[derive(Debug, Clone)]
 pub struct NodeConfiguration {

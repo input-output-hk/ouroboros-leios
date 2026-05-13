@@ -58,6 +58,24 @@ pub struct VotingConfig {
     /// Number of PV seats this node holds in the persistent committee.
     /// `0` means no PV vote is emitted regardless of EB.
     pub persistent_seats: u32,
+    /// Should the election be left eligible across the voting window
+    /// when a slot's vote attempt didn't succeed?  Covers both paths:
+    ///
+    /// - **predicate failure** (`WrongEB` / `LateRBHeader` /
+    ///   `MissingTX`): a later slot may see chain-tip / mempool state
+    ///   that flips the predicate to success.  `LateEB` stays permanent
+    ///   either way.
+    /// - **lottery loss** (no PV seat and no NPV win): the NPV trial
+    ///   re-runs with a fresh per-slot VRF input, so a non-seated voter
+    ///   has independent retries each slot.
+    ///
+    /// `true` (default) matches the CIP-0164 reading that the voting
+    /// window is the licence to vote at any in-window moment.
+    /// `false` mirrors `linear_leios.rs`'s single-shot behaviour: one
+    /// decision per (voter, EB), one NPV trial, no retries.  Useful
+    /// for like-for-like comparisons against the older sim and for
+    /// adversarial simulations.
+    pub retry_vote_in_window: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -415,9 +433,19 @@ impl LeiosState {
                         }
                         Ok(_) => {
                             // Lottery loss: no PV seat and no NPV win.
-                            // Don't mark_voted — re-fires next slot in
-                            // case voting config / NPV trial changes
-                            // (matches existing pre-predicate behavior).
+                            // The NPV trial uses a per-slot VRF input, so
+                            // a non-seated voter has up to `vote_window`
+                            // independent chances to win across the
+                            // window.  Don't mark_voted by default — the
+                            // election re-fires next slot and runs a
+                            // fresh trial.
+                            //
+                            // `retry_vote_in_window = false` collapses
+                            // this to one trial per (voter, EB), matching
+                            // `linear_leios.rs`'s single-shot lottery.
+                            if !self.voting_config.retry_vote_in_window {
+                                self.elections.mark_voted(&eb_hash);
+                            }
                         }
                         Err(reason) => {
                             info!(
@@ -435,7 +463,13 @@ impl LeiosState {
                             // election re-fires `EligibleToVote` while
                             // it's still in the Voting phase, giving
                             // slow propagation a chance to land.
-                            if matches!(reason, NoVoteReason::LateEB) {
+                            //
+                            // `retry_vote_in_window = false` collapses
+                            // every reason to permanent — single-shot
+                            // semantics matching `linear_leios.rs`.
+                            if matches!(reason, NoVoteReason::LateEB)
+                                || !self.voting_config.retry_vote_in_window
+                            {
                                 self.elections.mark_voted(&eb_hash);
                             }
                             fx.push(LeiosEffect::NoVote {
@@ -1007,6 +1041,7 @@ mod tests {
             persistent_vote_bytes: 130,
             non_persistent_vote_bytes: 180,
             persistent_seats,
+            retry_vote_in_window: true,
         }
     }
 

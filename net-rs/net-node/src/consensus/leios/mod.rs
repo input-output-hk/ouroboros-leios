@@ -83,6 +83,10 @@ impl LeiosConsensus {
             persistent_vote_bytes,
             non_persistent_vote_bytes,
             persistent_seats,
+            // Net-rs keeps the CIP-0164 retry semantics; the
+            // single-shot collapse is sim-only for like-for-like
+            // comparison against `linear_leios.rs`.
+            retry_vote_in_window: true,
         };
         info!(
             node_id = %node_id,
