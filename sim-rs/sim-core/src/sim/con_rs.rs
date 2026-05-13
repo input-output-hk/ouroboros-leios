@@ -314,6 +314,22 @@ pub struct ConRs {
     /// already-certified txs.  Mirrors linear_leios's
     /// `incomplete_onchain_ebs`.
     incomplete_onchain_ebs: std::collections::BTreeSet<EndorserBlockId>,
+
+    /// EBs received whose manifest references tx bodies the local
+    /// mempool doesn't yet hold.  Entry value is the still-missing
+    /// subset; entry drops when fully resolved (then
+    /// `CpuTask::EBBlockValidated` is scheduled).  Mirrors the
+    /// `LinearWithTxReferences` gate in `linear_leios.rs` — without
+    /// this, an EB validates the instant its manifest arrives, voting
+    /// opens before the bodies have diffused, and the CIP-0164
+    /// MissingTX predicate fails for receivers whose tx-diffusion path
+    /// lags the EB.
+    eb_pending_txs: BTreeMap<EndorserBlockId, std::collections::BTreeSet<TransactionId>>,
+
+    /// Reverse index of `eb_pending_txs`: for each missing tx id, the
+    /// set of EBs blocked on it.  An admitted tx is looked up here so
+    /// every blocked EB can re-check coverage and release if complete.
+    missing_tx_index: BTreeMap<TransactionId, std::collections::BTreeSet<EndorserBlockId>>,
 }
 
 enum VoteState {
@@ -478,6 +494,8 @@ impl NodeImpl for ConRs {
             latest_rb_id: None,
             noted_no_vote: std::collections::BTreeSet::new(),
             incomplete_onchain_ebs: std::collections::BTreeSet::new(),
+            eb_pending_txs: BTreeMap::new(),
+            missing_tx_index: BTreeMap::new(),
         }
     }
 
@@ -544,6 +562,12 @@ impl NodeImpl for ConRs {
         for peer in &self.consumers {
             out.send_to(*peer, Message::AnnounceTx(tx.id));
         }
+        // Release any EBs that were waiting on this tx body's arrival.
+        // The local-generation path is unlikely to find blocked EBs in
+        // practice (we generate before we see EBs referencing us), but
+        // staying symmetric with the peer-sent admit path keeps the
+        // invariant simple: every admitted tx tries to wake gated EBs.
+        self.acknowledge_tx_for_pending_ebs(&mut out, tx.id);
         out
     }
 
@@ -618,6 +642,9 @@ impl NodeImpl for ConRs {
                         }
                         out.send_to(*peer, Message::AnnounceTx(tx.id));
                     }
+                    // Release any EBs that were waiting on this tx
+                    // body's arrival (CIP-0164 receiver gate).
+                    self.acknowledge_tx_for_pending_ebs(&mut out, tx.id);
                 }
             }
             CpuTask::RBBlockGenerated(rb, eb) => self.finish_generating_rb(&mut out, rb, eb),
@@ -961,7 +988,61 @@ impl ConRs {
             }
             out.send_to(*peer, Message::AnnounceEB(eb_id));
         }
-        out.schedule_cpu_task(CpuTask::EBBlockValidated(eb, seen));
+        // CIP-0164: an EB can only be validated once every referenced
+        // tx body is locally available.  Mirrors the
+        // `LinearWithTxReferences` gate in `linear_leios.rs`; without
+        // it, voting opens before tx diffusion has populated the
+        // receiver's mempool and the MissingTX predicate fails on
+        // peers downstream of the producer.
+        let missing: std::collections::BTreeSet<TransactionId> = eb
+            .txs
+            .iter()
+            .map(|tx| tx.id)
+            .filter(|id| !self.local_has_tx(*id))
+            .collect();
+        if missing.is_empty() {
+            out.schedule_cpu_task(CpuTask::EBBlockValidated(eb, seen));
+        } else {
+            for tx_id in &missing {
+                self.missing_tx_index
+                    .entry(*tx_id)
+                    .or_default()
+                    .insert(eb_id);
+            }
+            self.eb_pending_txs.insert(eb_id, missing);
+        }
+    }
+
+    /// True iff the local mempool already holds the body for `tx_id`.
+    /// The receiver-side gate in `finish_validating_eb_header` and the
+    /// release path in `acknowledge_tx_for_pending_ebs` both consult
+    /// this; `MempoolState::has_tx` already unions the free FIFO pool
+    /// and EB-pinned bodies, matching `linear_leios`'s `has_tx` plus
+    /// CIP-0164's MissingTX semantics.
+    fn local_has_tx(&self, tx_id: TransactionId) -> bool {
+        let key = tx_id_for(tx_id);
+        self.mempool.has_tx(&key)
+    }
+
+    /// A tx body was just admitted to the local mempool.  Walk the
+    /// reverse index to find every EB still waiting on it; drop the
+    /// tx id from each pending set; for any EB whose set is now empty,
+    /// schedule its `CpuTask::EBBlockValidated`.
+    fn acknowledge_tx_for_pending_ebs(&mut self, out: &mut EventResult, tx_id: TransactionId) {
+        let Some(blocked) = self.missing_tx_index.remove(&tx_id) else {
+            return;
+        };
+        for eb_id in blocked {
+            if let Some(remaining) = self.eb_pending_txs.get_mut(&eb_id) {
+                remaining.remove(&tx_id);
+                if remaining.is_empty() {
+                    self.eb_pending_txs.remove(&eb_id);
+                    if let Some(EbState::Received { eb, seen, .. }) = self.ebs.get(&eb_id) {
+                        out.schedule_cpu_task(CpuTask::EBBlockValidated(eb.clone(), *seen));
+                    }
+                }
+            }
+        }
     }
 
     fn finish_validating_eb(
@@ -1158,6 +1239,13 @@ impl ConRs {
         self.eb_announcers.retain(|id, _| id.slot >= chain_cutoff);
         self.vote_bundles.retain(|id, _| id.slot >= chain_cutoff);
         self.votes_by_eb.retain(|id, _| id.slot >= chain_cutoff);
+        // Drop EB-pending-txs entries whose EB has aged out, then
+        // sweep the reverse index of any orphaned references.
+        self.eb_pending_txs.retain(|id, _| id.slot >= chain_cutoff);
+        self.missing_tx_index.retain(|_, ebs| {
+            ebs.retain(|id| id.slot >= chain_cutoff);
+            !ebs.is_empty()
+        });
         // `eb_hash_to_id` is keyed by hash; drop entries whose
         // corresponding EndorserBlockId is below the cutoff.
         self.eb_hash_to_id
