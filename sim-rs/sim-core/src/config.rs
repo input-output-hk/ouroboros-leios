@@ -83,6 +83,90 @@ pub enum ShardStrategy {
     MinCut,
 }
 
+/// Which stock policy in `con_rs::fetch` to use for a given traffic
+/// class.  Mirrors net-rs's `FetchPolicyKind` so YAML configs round-
+/// trip between the two consumers.
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum FetchPolicyKind {
+    /// Single-peer pick by lowest measured RTT.  Matches con-rs's
+    /// `LeiosState::new` default.
+    #[default]
+    LowestRtt,
+    /// Fan out to `n` lowest-RTT candidates.  Omitting `n` fans to
+    /// every candidate (`BroadcastN::all()`); `n = 1` mimics LowestRtt.
+    Broadcast {
+        #[serde(default)]
+        n: Option<usize>,
+    },
+    /// Suppress this class of fetch entirely.  Only meaningful for
+    /// `eb-txs` (organic tx diffusion fills the gap); the other
+    /// classes have no fallback and will stall.
+    NoFetch,
+}
+
+/// Per-traffic-class fetch-policy selection for the con-rs adapter.
+/// Defaults map onto `LeiosState::new`'s constructor: every class
+/// uses `LowestRttFirst` with a zero-RTT oracle (sim drives fetches
+/// via its own Message enum; the policy still picks which peer).
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+pub struct FetchPolicy {
+    #[serde(default)]
+    pub block: FetchPolicyKind,
+    #[serde(default)]
+    pub eb: FetchPolicyKind,
+    #[serde(default)]
+    pub eb_txs: FetchPolicyKind,
+    #[serde(default)]
+    pub votes: FetchPolicyKind,
+}
+
+impl FetchPolicyKind {
+    pub fn into_block_policy(self) -> Box<dyn con_rs::fetch::BlockFetchPolicy + Send + Sync> {
+        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
+        }
+    }
+
+    pub fn into_eb_policy(self) -> Box<dyn con_rs::fetch::EbFetchPolicy + Send + Sync> {
+        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
+        }
+    }
+
+    pub fn into_eb_txs_policy(self) -> Box<dyn con_rs::fetch::EbTxsFetchPolicy + Send + Sync> {
+        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
+        }
+    }
+
+    pub fn into_vote_policy(self) -> Box<dyn con_rs::fetch::VoteFetchPolicy + Send + Sync> {
+        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
+        }
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawParameters {
@@ -123,6 +207,14 @@ pub struct RawParameters {
     pub linear_diffuse_stage_length_slots: u64,
     pub linear_eb_propagation_criteria: EBPropagationCriteria,
     pub linear_tx_max_age_slots: Option<u64>,
+
+    // Fetch routing (con-rs adapter only)
+    /// Per-traffic-class fetch-policy selection.  Defaults to
+    /// `lowest-rtt` for every class (matching `LeiosState::new`).
+    /// Mirrors net-rs's `FetchPolicyConfig` shape.  Only consumed by
+    /// the con-rs adapter; `linear_leios.rs` has its own diffusion path.
+    #[serde(default)]
+    pub fetch_policy: FetchPolicy,
 
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
@@ -825,6 +917,7 @@ pub struct SimConfiguration {
     pub emit_conformance_events: bool,
     pub aggregate_events: bool,
     pub log_memory_stats: bool,
+    pub fetch_policy: FetchPolicy,
     pub trace_nodes: HashSet<NodeId>,
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
@@ -934,6 +1027,7 @@ impl SimConfiguration {
             emit_conformance_events: false,
             aggregate_events: false,
             log_memory_stats: false,
+            fetch_policy: params.fetch_policy,
             trace_nodes: HashSet::new(),
             nodes: topology.nodes,
             links: topology.links,

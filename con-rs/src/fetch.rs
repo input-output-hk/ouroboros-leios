@@ -284,6 +284,52 @@ impl VoteFetchPolicy for BroadcastN {
     }
 }
 
+/// Fetch suppressor.  Every `pick` returns an empty result so the
+/// matching offer never fans out into a fetch effect.  Primarily
+/// useful as `EbTxsFetchPolicy` — evaluating the protocol in a
+/// regime where EB-referenced txs reach a node only via normal tx
+/// diffusion (`AnnounceTx`/`SendTxs`), with no dedicated EB-tx
+/// fetch carrying anything for them.  Implemented for all four
+/// traffic classes so a config can plug it in symmetrically; outside
+/// EB-txs the other classes have no organic fallback, so using
+/// `NoFetch` there will stall the relevant pipeline.
+pub struct NoFetch;
+
+impl BlockFetchPolicy for NoFetch {
+    fn pick(&self, _: &Point, _: &[PeerId], _: &dyn PeerRtt) -> Vec<PeerId> {
+        Vec::new()
+    }
+}
+
+impl EbFetchPolicy for NoFetch {
+    fn pick(&self, _: &Point, _: &[PeerId], _: &dyn PeerRtt) -> Vec<PeerId> {
+        Vec::new()
+    }
+}
+
+impl EbTxsFetchPolicy for NoFetch {
+    fn pick(
+        &self,
+        _: &Point,
+        _: &BTreeMap<u16, u64>,
+        _: &[PeerId],
+        _: &dyn PeerRtt,
+    ) -> Vec<PeerId> {
+        Vec::new()
+    }
+}
+
+impl VoteFetchPolicy for NoFetch {
+    fn pick(
+        &self,
+        _: &[VoteId],
+        _: &VoteCandidateLookup<'_>,
+        _: &dyn PeerRtt,
+    ) -> BTreeMap<PeerId, Vec<VoteId>> {
+        BTreeMap::new()
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Candidate tracker
 // ---------------------------------------------------------------------------

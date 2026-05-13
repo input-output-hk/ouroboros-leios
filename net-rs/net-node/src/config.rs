@@ -102,50 +102,58 @@ pub enum FetchPolicyKind {
         #[serde(default)]
         n: Option<usize>,
     },
+    /// Suppress this fetch class entirely.  Only EB-txs has an organic
+    /// fallback (normal tx diffusion); using `no_fetch` on the other
+    /// classes will stall the corresponding pipeline.
+    NoFetch,
 }
 
 impl FetchPolicyKind {
     /// Build a [`BlockFetchPolicy`] handle from this config.
     pub fn into_block_policy(self) -> Box<dyn con_rs::fetch::BlockFetchPolicy + Send + Sync> {
-        use con_rs::fetch::{BroadcastN, LowestRttFirst};
+        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
             FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
                 n: n.unwrap_or(usize::MAX),
             }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
         }
     }
 
     /// Build an [`EbFetchPolicy`] handle from this config.
     pub fn into_eb_policy(self) -> Box<dyn con_rs::fetch::EbFetchPolicy + Send + Sync> {
-        use con_rs::fetch::{BroadcastN, LowestRttFirst};
+        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
             FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
                 n: n.unwrap_or(usize::MAX),
             }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
         }
     }
 
     /// Build an [`EbTxsFetchPolicy`] handle from this config.
     pub fn into_eb_txs_policy(self) -> Box<dyn con_rs::fetch::EbTxsFetchPolicy + Send + Sync> {
-        use con_rs::fetch::{BroadcastN, LowestRttFirst};
+        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
             FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
                 n: n.unwrap_or(usize::MAX),
             }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
         }
     }
 
     /// Build a [`VoteFetchPolicy`] handle from this config.
     pub fn into_vote_policy(self) -> Box<dyn con_rs::fetch::VoteFetchPolicy + Send + Sync> {
-        use con_rs::fetch::{BroadcastN, LowestRttFirst};
+        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
             FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
                 n: n.unwrap_or(usize::MAX),
             }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
         }
     }
 }

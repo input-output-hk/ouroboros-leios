@@ -49,7 +49,7 @@
 //! | `WfaLs.non_persistent_voters` | `0`   | sim collapses PV/NPV into one probability         |
 //! | `StakeCentile.top_centile_of_stake` | `0.95` | sim's `committee-stake-fraction-threshold` isn't propagated to `SimConfiguration` |
 //! | `PraosState` `k`              | `2160` | sim doesn't model security parameter           |
-//! | Fetch policies (RB/EB/votes)  | `LowestRttFirst` with `UniformRtt(0)` (con-rs `LeiosState::new` default) — sim drives fetches via its own `Message` enum |
+//! | Fetch policies (RB/EB/EB-txs/votes) | YAML `fetch-policy.{block,eb,eb-txs,votes}` (default `lowest-rtt` everywhere, matching `LeiosState::new`).  RTT oracle is `UniformRtt(0)` — sim drives fetches via its own `Message` enum |
 
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -439,11 +439,16 @@ impl NodeImpl for ConRs {
             persistent_seats,
         };
 
-        let leios = LeiosState::new(config.name.clone(), elections, voting_config, pipeline);
+        let mut leios = LeiosState::new(config.name.clone(), elections, voting_config, pipeline);
+        let fp = sim_config.fetch_policy;
+        leios.set_eb_policy(fp.eb.into_eb_policy());
+        leios.set_eb_txs_policy(fp.eb_txs.into_eb_txs_policy());
+        leios.set_vote_policy(fp.votes.into_vote_policy());
         // Cardano-mainnet security parameter; sim doesn't model a
         // distinct `k`, and 2160 sets `PraosState`'s chain-tree
         // pruning depth comfortably beyond any sim run length.
-        let praos = PraosState::new(config.name.clone(), 2160);
+        let mut praos = PraosState::new(config.name.clone(), 2160);
+        praos.set_fetch_policy(fp.block.into_block_policy());
         let mempool = MempoolState::new(sim_config.mempool_size_bytes as usize);
         let node_names = sim_config_nodes_to_names(&sim_config);
 
