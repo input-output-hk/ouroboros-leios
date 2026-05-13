@@ -565,9 +565,17 @@ impl LeiosState {
         }
 
         // Predicates passed — run the lottery.
+        //
+        // CIP-0164 partitions pools by stake-ordering into persistent
+        // (indices [1, n₁]) and non-persistent candidates (indices
+        // [i*, |P|]) — these ranges are disjoint, so a pool with a
+        // persistent seat is *not* eligible as an NPV candidate.  A
+        // pool emits exactly one vote per election: PV xor NPV.
         let emit_pv = self.voting_config.persistent_seats > 0;
         let n_npv = self.voting_config.committee_selection.non_persistent_voters();
-        let npv_signature = if n_npv > 0 {
+        let npv_signature = if emit_pv || n_npv == 0 {
+            None
+        } else {
             let sig = wfa::npv_eligibility_signature(
                 self.node_id.as_bytes(),
                 eb_hash,
@@ -579,13 +587,7 @@ impl LeiosState {
                 self.voting_config.total_stake,
                 n_npv,
             );
-            if wins > 0 {
-                Some(sig)
-            } else {
-                None
-            }
-        } else {
-            None
+            if wins > 0 { Some(sig) } else { None }
         };
         Ok((emit_pv, npv_signature))
     }
@@ -1109,15 +1111,17 @@ mod tests {
     }
 
     #[test]
-    fn wfa_ls_can_emit_pv_and_npv() {
-        let mut voting = cfg(5);
+    fn wfa_ls_pv_seated_voter_skips_npv_trial() {
+        // CIP-0164 partitions persistent and non-persistent pools by
+        // stake-ordering: a pool with a persistent seat is NOT eligible
+        // for an NPV signature on the same EB.  Verify the partition
+        // is honoured at emission time.
+        let mut voting = cfg(5); // 5 persistent seats
         voting.committee_selection = CommitteeSelection::WfaLs {
             persistent_voters: 480,
             non_persistent_voters: 120,
         };
-        voting.stake = 400; // 40% → almost-certain NPV win
-        // Both LeiosState and Elections need WfaLs config so the
-        // lottery re-derivation matches.
+        voting.stake = 400; // 40% — would near-certainly win NPV if eligible
         use crate::elections::ElectionsConfig;
         let elections = Elections::new(ElectionsConfig {
             node_id: "n0".to_string(),
@@ -1142,7 +1146,50 @@ mod tests {
                 ..
             } => {
                 assert!(*emit_pv);
-                assert!(npv_signature.is_some());
+                assert!(
+                    npv_signature.is_none(),
+                    "PV-seated voter must not also emit NPV signature"
+                );
+            }
+            other => panic!("expected EmitVote, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn wfa_ls_non_seated_voter_can_emit_npv() {
+        // The complementary case: a voter with no persistent seat that
+        // wins the NPV lottery emits an NPV-only vote.
+        let mut voting = cfg(0); // no persistent seats
+        voting.committee_selection = CommitteeSelection::WfaLs {
+            persistent_voters: 480,
+            non_persistent_voters: 120,
+        };
+        voting.stake = 400;
+        use crate::elections::ElectionsConfig;
+        let elections = Elections::new(ElectionsConfig {
+            node_id: "n0".to_string(),
+            pipeline: pipeline(),
+            committee_selection: voting.committee_selection.clone(),
+            persistent_committee: BTreeMap::new(),
+            stake_registry: BTreeMap::new(),
+            total_stake: 1000,
+            expected_committee_size: 600,
+            quorum_weight_fraction: 0.75,
+        });
+        let mut state = LeiosState::new("n0".into(), elections, voting, pipeline());
+        state.on_slot(10, &tx_all);
+        state.elections.announce(10, h(1));
+        tip_for(&mut state, 10, h(1));
+        let fx = state.on_slot(13, &tx_all);
+        assert_eq!(fx.len(), 1);
+        match &fx[0] {
+            LeiosEffect::EmitVote {
+                emit_pv,
+                npv_signature,
+                ..
+            } => {
+                assert!(!*emit_pv, "no persistent seats → no PV vote");
+                assert!(npv_signature.is_some(), "non-seated NPV win expected");
             }
             other => panic!("expected EmitVote, got {other:?}"),
         }

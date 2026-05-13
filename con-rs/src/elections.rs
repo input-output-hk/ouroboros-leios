@@ -205,7 +205,12 @@ impl Elections {
     /// - `tag == 0` (PV): looks up the voter's persistent-committee seat
     ///   count (`0` if not seated).
     /// - `tag == 1` (NPV): re-runs the NPV lottery from the embedded
-    ///   eligibility signature and the voter's stake.
+    ///   eligibility signature and the voter's stake.  If the voter
+    ///   *also* holds a persistent seat, returns `0` — CIP-0164
+    ///   partitions persistent (indices `[1, n₁]`) and non-persistent
+    ///   candidate (`[i*, |P|]`) pools disjointly, so a verified NPV
+    ///   signature from a persistent-seated voter is spec-violating
+    ///   and must not contribute weight.
     /// - any other tag, or NPV without a signature: `0`.
     pub fn weight_for(&self, voter_id: &str, tag: u8, npv_signature: Option<&[u8]>) -> u32 {
         match (tag, npv_signature) {
@@ -216,6 +221,9 @@ impl Elections {
                 .copied()
                 .unwrap_or(0),
             (1, Some(sig)) => {
+                if self.cfg.persistent_committee.contains_key(voter_id) {
+                    return 0;
+                }
                 let stake = self
                     .cfg
                     .stake_registry
