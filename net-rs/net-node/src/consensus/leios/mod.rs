@@ -319,37 +319,17 @@ impl LeiosConsensus {
     // -- Helpers ------------------------------------------------------------
 
     /// Build the sparse bitmap of transactions we don't already have
-    /// for an EB-tx offer.  If the manifest isn't cached yet, fall back
-    /// to selecting all indices so the request is still useful.
+    /// for an EB-tx offer.  Delegates to
+    /// [`con_rs::leios::LeiosState::missing_eb_tx_bitmap`]; an empty
+    /// result here suppresses the fetch (manifest unknown or every
+    /// referenced tx already locally available).
     fn bitmap_for_missing_txs(&self, point: &Point) -> BTreeMap<u16, u64> {
-        use net_core::protocols::leios_fetch::bitmap;
         let hash = match point {
             Point::Specific { hash, .. } => hash,
             Point::Origin => return BTreeMap::new(),
         };
-        let Some((_, tx_hashes)) = self.state.eb_tx_hashes.get(hash) else {
-            // Manifest hasn't arrived yet (EB body fetch still in flight).
-            // Returning a full 65k-bit bitmap here triggers a retry storm
-            // — the server has no body either, every response is empty,
-            // remaining stays full, and the loop pumps massive requests
-            // through every channel until the cluster wedges. Skip the
-            // fetch; the peer's notify-loop will re-offer once the
-            // manifest is cached and we can build a proper sparse bitmap.
-            return BTreeMap::new();
-        };
-        let have = self.mempool.lock().unwrap().current_tx_ids();
-        let missing: Vec<u32> = tx_hashes
-            .iter()
-            .enumerate()
-            .filter_map(|(i, h)| {
-                if have.contains(h.as_slice()) {
-                    None
-                } else {
-                    Some(i as u32)
-                }
-            })
-            .collect();
-        bitmap::from_indices(&missing)
+        let mempool = self.mempool.lock().unwrap();
+        self.state.missing_eb_tx_bitmap(hash, mempool.as_inner())
     }
 
     async fn dispatch(&mut self, fx: Vec<LeiosEffect>) {

@@ -78,6 +78,13 @@ impl Mempool {
         }
     }
 
+    /// Borrow the underlying con-rs state for read-only operations
+    /// that consult the mempool but don't mutate it (e.g.
+    /// `LeiosState::missing_eb_tx_bitmap`).
+    pub fn as_inner(&self) -> &MempoolState {
+        &self.state
+    }
+
     /// Admit a tx that's already been validated (locally generated, or
     /// produced by `spawn_tx_validator` after its delay).  TxRejected
     /// effects (queue-full evictions, dedup) are dropped silently —
@@ -107,9 +114,6 @@ impl Mempool {
         self.state.forget_peer(to_con_pid(peer_id));
     }
 
-    pub fn current_tx_ids(&self) -> HashSet<Vec<u8>> {
-        self.state.current_tx_ids().into_iter().collect()
-    }
 
     pub fn get_body_by_id(&self, id: &[u8]) -> Option<Vec<u8>> {
         self.state.get_body_by_id(id)

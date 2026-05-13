@@ -321,6 +321,46 @@ impl LeiosState {
         self.eb_txs_policy = policy;
     }
 
+    /// Build the sparse CIP-0164 bitmap of manifest indices whose tx
+    /// bodies are *not* locally available, ready to feed
+    /// [`Self::on_eb_txs_offered`] or directly into the wire
+    /// `MsgLeiosBlockTxsRequest`.
+    ///
+    /// Looks up the EB's manifest in [`Self::eb_tx_hashes`] (populated
+    /// by `on_eb_received`).  Returns an empty bitmap when:
+    /// - the manifest isn't cached yet (EB body fetch still in flight),
+    /// - every referenced tx is already in the local mempool
+    ///   ([`crate::mempool::MempoolState::has_tx`] true for all),
+    /// - the EB has no referenced txs.
+    ///
+    /// Returning an empty bitmap for "no manifest yet" deliberately
+    /// suppresses the fetch — re-issuing with a full
+    /// [`crate::bitmap::select_all`] would trigger a retry storm
+    /// against a peer that doesn't have the bodies either.  The peer's
+    /// notify-loop will re-offer once the manifest is cached.
+    pub fn missing_eb_tx_bitmap(
+        &self,
+        eb_hash: &[u8; 32],
+        mempool: &crate::mempool::MempoolState,
+    ) -> std::collections::BTreeMap<u16, u64> {
+        let Some((_, tx_hashes)) = self.eb_tx_hashes.get(eb_hash) else {
+            return std::collections::BTreeMap::new();
+        };
+        let missing: Vec<u32> = tx_hashes
+            .iter()
+            .enumerate()
+            .filter_map(|(i, h)| {
+                let tx_id: crate::mempool::TxId = h.to_vec();
+                if mempool.has_tx(&tx_id) {
+                    None
+                } else {
+                    Some(i as u32)
+                }
+            })
+            .collect();
+        crate::bitmap::from_indices(&missing)
+    }
+
     /// Replace the vote fetch policy.
     pub fn set_vote_policy(&mut self, policy: Box<dyn VoteFetchPolicy + Send + Sync>) {
         self.vote_policy = policy;
@@ -1553,5 +1593,45 @@ mod tests {
         // Next slot: still no chain tip → WrongEB again, not suppressed.
         let fx_second = state.on_slot(14, &tx_all);
         assert_no_vote(&fx_second, h(1), NoVoteReason::WrongEB);
+    }
+
+    // -- missing_eb_tx_bitmap ---------------------------------------------
+
+    #[test]
+    fn missing_eb_tx_bitmap_empty_when_manifest_unknown() {
+        let state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        let mempool = crate::mempool::MempoolState::new(1024);
+        let bitmap = state.missing_eb_tx_bitmap(&h(0xAA), &mempool);
+        assert!(bitmap.is_empty());
+    }
+
+    #[test]
+    fn missing_eb_tx_bitmap_returns_indices_not_in_mempool() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        let manifest = vec![h(1), h(2), h(3), h(4)];
+        state.eb_tx_hashes.insert(h(0xAB), (50, manifest));
+
+        let mut mempool = crate::mempool::MempoolState::new(4096);
+        // Local mempool has txs 0 (h(1)) and 2 (h(3)); 1 (h(2)) and 3 (h(4)) are missing.
+        mempool.admit_validated(h(1).to_vec(), vec![0u8; 16], 16);
+        mempool.admit_validated(h(3).to_vec(), vec![0u8; 16], 16);
+
+        let bitmap = state.missing_eb_tx_bitmap(&h(0xAB), &mempool);
+        let indices: Vec<u32> = crate::bitmap::iter_indices(&bitmap).collect();
+        assert_eq!(indices, vec![1, 3]);
+    }
+
+    #[test]
+    fn missing_eb_tx_bitmap_empty_when_all_held() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        let manifest = vec![h(5), h(6)];
+        state.eb_tx_hashes.insert(h(0xCD), (50, manifest));
+
+        let mut mempool = crate::mempool::MempoolState::new(4096);
+        mempool.admit_validated(h(5).to_vec(), vec![0u8; 8], 8);
+        mempool.admit_validated(h(6).to_vec(), vec![0u8; 8], 8);
+
+        let bitmap = state.missing_eb_tx_bitmap(&h(0xCD), &mempool);
+        assert!(bitmap.is_empty());
     }
 }
