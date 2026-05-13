@@ -288,8 +288,19 @@ pub struct RawParameters {
     pub eb_include_txs_from_previous_stage: bool,
 
     // Vote configuration
-    pub persistent_vote_generation_probability: f64,
-    pub non_persistent_vote_generation_probability: f64,
+    //
+    // The two voter-count fields are the expected size of the
+    // persistent / non-persistent voter committees per EB.  Historic
+    // YAML keys `persistent-vote-generation-probability` /
+    // `non-persistent-vote-generation-probability` are still accepted
+    // (the values were always voter counts, never probabilities; the
+    // old names date from a pre-CIP-0164 framing).  Linear sums them
+    // into one VRF-lottery probability; con-rs uses them directly as
+    // PV / NPV committee sizes for `CommitteeSelection::WfaLs`.
+    #[serde(alias = "persistent-vote-generation-probability")]
+    pub persistent_voters: f64,
+    #[serde(alias = "non-persistent-vote-generation-probability")]
+    pub non_persistent_voters: f64,
     pub persistent_vote_generation_cpu_time_ms: f64,
     pub non_persistent_vote_generation_cpu_time_ms: f64,
     pub vote_generation_cpu_time_ms_per_tx: f64,
@@ -593,12 +604,11 @@ fn vote_weighted_average(params: &RawParameters, persistent: f64, non_persistent
         CommitteeSelectionAlgorithm::Everyone
         | CommitteeSelectionAlgorithm::TopStakeFraction => persistent,
         CommitteeSelectionAlgorithm::WfaLs => {
-            let total = params.persistent_vote_generation_probability
-                + params.non_persistent_vote_generation_probability;
+            let total = params.persistent_voters + params.non_persistent_voters;
             if total == 0.0 {
                 return 0.0;
             }
-            let frac = params.persistent_vote_generation_probability / total;
+            let frac = params.persistent_voters / total;
             frac * persistent + (1.0 - frac) * non_persistent
         }
     }
@@ -960,7 +970,16 @@ pub struct SimConfiguration {
     pub(crate) eb_generation_probability: f64,
     pub(crate) committee_selection: CommitteeSelectionAlgorithm,
     pub(crate) vote_eligible_nodes: HashSet<NodeId>,
+    /// Sum of `persistent_voters + non_persistent_voters`.  Linear
+    /// uses this as a single VRF-lottery probability per (voter, EB).
     pub(crate) vote_probability: f64,
+    /// CIP-0164 PV / NPV committee sizes.  con-rs uses these
+    /// directly via [`con_rs::config::CommitteeSelection::WfaLs`];
+    /// linear collapses them into `vote_probability`.  Stored as
+    /// f64 (PV/NPV can be non-integer); con-rs casts at the
+    /// boundary.
+    pub(crate) persistent_voters: f64,
+    pub(crate) non_persistent_voters: f64,
     pub(crate) vote_slot_length: u64,
     pub(crate) eb_include_txs_from_previous_stage: bool,
     pub(crate) linear_vote_stage_length: u64,
@@ -1070,8 +1089,9 @@ impl SimConfiguration {
             eb_generation_probability: params.eb_generation_probability,
             committee_selection: params.committee_selection_algorithm,
             vote_eligible_nodes,
-            vote_probability: params.persistent_vote_generation_probability
-                + params.non_persistent_vote_generation_probability,
+            vote_probability: params.persistent_voters + params.non_persistent_voters,
+            persistent_voters: params.persistent_voters,
+            non_persistent_voters: params.non_persistent_voters,
             vote_threshold: params.vote_threshold,
             vote_slot_length: params.leios_stage_active_voting_slots,
             eb_include_txs_from_previous_stage: params.eb_include_txs_from_previous_stage,

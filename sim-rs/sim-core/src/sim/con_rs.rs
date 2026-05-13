@@ -152,14 +152,16 @@ fn derive_committee_selection(sim_config: &SimConfiguration) -> CommitteeSelecti
     use crate::config::CommitteeSelectionAlgorithm as A;
     match sim_config.committee_selection {
         A::WfaLs => {
-            // Sim collapses PV / NPV into a single combined
-            // probability.  Push the whole expected committee weight
-            // into the deterministic persistent allocation; NPV stays
-            // at 0 so we don't double-count.
-            let persistent_voters = (sim_config.vote_probability as u32).max(1);
+            // CIP-0164 WfaLs splits the committee into a deterministic
+            // Hare-quota persistent allocation plus a per-EB NPV
+            // lottery.  Read the two committee sizes straight from
+            // config — the legacy YAML names
+            // `{,non-}persistent-vote-generation-probability` are
+            // serde-aliased to `{,non-}persistent-voters` so existing
+            // experiment configs keep working.
             CommitteeSelection::WfaLs {
-                persistent_voters,
-                non_persistent_voters: 0,
+                persistent_voters: (sim_config.persistent_voters as u32).max(1),
+                non_persistent_voters: sim_config.non_persistent_voters as u32,
             }
         }
         A::Everyone => CommitteeSelection::EveryoneVotes,
