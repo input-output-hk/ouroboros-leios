@@ -18,7 +18,8 @@ use crate::{
     model::{LinearEndorserBlock, LinearRankingBlock, Transaction, VoteBundle},
     sim::{
         EventResult, NodeImpl,
-        linear_leios::{CpuTask, LinearLeiosNode, Message, TimedEvent},
+        linear_leios::LinearLeiosNode,
+        linear_wire::{CpuTask, Message, TimedEvent},
         lottery::{LotteryKind, MockLotteryResults},
     },
 };

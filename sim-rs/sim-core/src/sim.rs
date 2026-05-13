@@ -19,6 +19,7 @@ mod cpu;
 mod driver;
 mod leios;
 pub(crate) mod linear_leios;
+pub(crate) mod linear_wire;
 mod lottery;
 pub(crate) mod sequential;
 mod slot;

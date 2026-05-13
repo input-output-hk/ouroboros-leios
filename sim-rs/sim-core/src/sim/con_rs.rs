@@ -80,7 +80,10 @@ use crate::{
         TransactionLostReason, VoteBundle, VoteBundleId,
     },
     rng::{DrawSite, Rng},
-    sim::{NodeImpl, linear_leios::CpuTask, linear_leios::Message, linear_leios::TimedEvent},
+    sim::{
+        NodeImpl,
+        linear_wire::{CpuTask, Message, TimedEvent},
+    },
 };
 
 /// Stake registry derived from the sim config. Every node builds an
