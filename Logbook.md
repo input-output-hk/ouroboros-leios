@@ -6,6 +6,17 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-05-11
+
+### SN on prototype voting/certifying
+
+- Spent quite some time on the UI types / trace types to ensure things stay consistent across producers (simulation, prototype) and the consumers (ui and trace verifier)
+- Putting the real cryptographic operations in place, had me change the types: Separation of signing key and verification key, Set can't be used because of no `Ord` of verification keys.
+- What context to use for BLS signatures (the library provides a context for proof of possesions)
+- Talked to thomas and we should use `minSigPoPDST`
+- Test-driven prototyping of certification: An initial property in the threadnet to assert traces when we reached certification is not bad.. but I quickly realize that sketching a `validateLeiosCertificate` and putting it into block validation is the beset end-to-end driver for this.
+- Now I need to move the `LeiosCertificate` type to `cardano-ledger` because .. where should we validate certs?
+
 ## 2026-05-07
 
 ### SN on prototyping committee selection and vote validation
