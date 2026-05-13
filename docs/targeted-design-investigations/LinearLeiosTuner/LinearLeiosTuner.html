@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Linear Leios Tuner</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 960px; margin: 2em auto; padding: 0 1em; color: #222; line-height: 1.45; }
+  h1 { margin-bottom: 0.2em; }
+  .lede { color: #555; margin-top: 0; }
+  .tuner-block { border: 1px solid #ddd; border-radius: 6px; padding: 1em 1.25em; margin: 1.5em 0; background: #fafafa; }
+  .tuner-block h2 { margin-top: 0; }
+  .controls { margin: 0.5em 0 0.75em 0; }
+  .controls label { font-weight: 600; margin-right: 0.5em; }
+  .controls input[type="number"] { width: 5em; padding: 0.2em 0.4em; font-size: 1em; }
+  .controls input[type="range"] { vertical-align: middle; margin-left: 0.75em; width: 16em; }
+  .readout { font-size: 0.9em; color: #555; margin-top: 0.5em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .big-result { font-size: 2em; font-weight: 600; color: #224080; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin: 0.25em 0; }
+  .warn { color: #b04020; }
+  .plot { width: 100%; height: 400px; }
+</style>
+</head>
+<body>
+
+<h1>Linear Leios Tuner</h1>
+
+<p>An interactive calculator for ballparking best-possible EB success rate and overall Leios capacity for various values of L and MaxSize, where L=3×L<sub>hdr</sub> + L<sub>vote</sub> + L<sub>diff</sub>.</p>
+
+<section class="tuner-block" data-block="run-gap-pmf">
+  <h2>Arrival rate of inter-RB gaps &ge; L (at 5% active slot coefficient)</h2>
+  <p>Repeatedly toss a coin biased 19:1 toward heads (p&nbsp;=&nbsp;P(H)&nbsp;=&nbsp;19/20, q&nbsp;=&nbsp;P(T)&nbsp;=&nbsp;1/20). The renewal process jumps each time a tails terminates a run of &ge;&nbsp;L heads. Plot the PMF of the holding times (how many tosses between consecutive jumps). Rug plot of illustrative quantiles.</p>
+  <div class="controls">
+    <label for="rungap-n">L:</label>
+    <input id="rungap-n" type="number" min="2" max="200" step="1" value="14">
+    <input id="rungap-n-slider" type="range" min="2" max="200" step="1" value="14" aria-label="L slider">
+  </div>
+  <div id="rungap-plot" class="plot"></div>
+  <div id="rungap-readout" class="readout"></div>
+</section>
+
+<section class="tuner-block" data-block="throughput">
+  <h2>Theoretical average capacity (100% stake participating, every EB full &amp; successful if L gap)</h2>
+  <p>For each run length k from 2 to &lceil;L&times;4&divide;3&rceil;, plots MaxSize divided by the mean holding time of the renewal process defined by k (which is MaxSize &middot; q &middot; p<sup>k</sup>). The step at k = L is highlighted.</p>
+  <div class="controls">
+    <label for="throughput-sz">MaxSize:</label>
+    <input id="throughput-sz" type="number" min="1" step="1" value="1000">
+  </div>
+  <div id="throughput-plot" class="plot"></div>
+  <div id="throughput-readout" class="readout"></div>
+</section>
+
+<script>
+"use strict";
+
+const Utils = {
+  truncateAtQuantile(pmf, threshold) {
+    let acc = 0;
+    for (let i = 0; i < pmf.length; i++) {
+      acc += pmf[i];
+      if (acc > threshold) return i;
+    }
+    return pmf.length - 1;
+  },
+  meanFromPMF(pmf) {
+    let m = 0;
+    for (let i = 0; i < pmf.length; i++) m += i * pmf[i];
+    return m;
+  },
+  // For each q in `qs` (assumed sorted ascending), return the smallest x with CDF(x) >= q.
+  quantiles(pmf, qs) {
+    const out = new Array(qs.length).fill(pmf.length - 1);
+    let qi = 0, acc = 0;
+    for (let x = 0; x < pmf.length && qi < qs.length; x++) {
+      acc += pmf[x];
+      while (qi < qs.length && acc >= qs[qi]) { out[qi++] = x; }
+    }
+    return out;
+  },
+  // Nice round step (1/2/5 × 10^k) targeting ~`targetCount` ticks across `span`.
+  niceTickStep(span, targetCount = 8) {
+    if (!isFinite(span) || span <= 0) return 1;
+    const raw = span / targetCount;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / pow;
+    const nice = norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10;
+    return Math.max(1, Math.round(nice * pow));
+  },
+};
+
+const RunGapPmfBlock = (() => {
+  const p = 19 / 20;
+  const q = 1 - p;
+  const RELEVANCYQUANTILE = 0.95;
+  const MAX_STEPS = 5_000_000;
+
+  // Holding-time PMF for the renewal process that jumps at each T which terminates an H-run of
+  // length >= L. Derivation (no recurrent-event machinery needed):
+  //
+  // 1. Decompose the toss sequence following a renewal T into i.i.d. "cycles". A cycle starts
+  //    just after a T and ends at (and includes) the next T. The i.i.d. property is immediate:
+  //    each cycle starts in the same state (the state immediately following a T) and tosses are
+  //    i.i.d. Bernoulli.
+  //
+  // 2. Each cycle has the form (H-run of length R >= 0) followed by exactly one T, so its total
+  //    length is W = R + 1. Counting,
+  //      P(R = m) = p^m * q,   m = 0, 1, 2, ...
+  //    A cycle "fires" (its terminating T is a renewal of our process) iff R >= L. Hence
+  //      P(fire) = sum_{m >= L} p^m * q = p^L,    and    P(not fire) = 1 - p^L.
+  //
+  // 3. Let K = first cycle index that fires; K ~ Geometric(p^L) on {1, 2, 3, ...}.
+  //    The holding time is G = W_1 + W_2 + ... + W_K, with W_1, ..., W_{K-1} i.i.d. as
+  //    (W | not fire) and W_K independent of those, distributed as (W | fire).
+  //
+  // 4. The two "tagged" PGFs (writing alpha = q * p^L):
+  //      A(z) := E[z^W * 1{not fire}]
+  //            = sum_{m=0}^{L-1} z^{m+1} * p^m * q
+  //            = z * q * (1 - (p*z)^L) / (1 - p*z)
+  //      B(z) := E[z^W * 1{fire}]
+  //            = sum_{m=L}^{infty} z^{m+1} * p^m * q
+  //            = alpha * z^{L+1} / (1 - p*z)
+  //    Summing the stopped sum over K is a geometric series in A(z):
+  //      phi_G(z) = sum_{k>=1} P(K=k) * (A(z)/(1-p^L))^{k-1} * B(z)/p^L ...
+  //    which collapses (after the (1-p^L) and p^L normalizers cancel) to
+  //      phi_G(z) = B(z) / (1 - A(z))
+  //               = alpha * z^{L+1} / (1 - z + alpha * z^{L+1}).
+  //
+  // 5. Coefficient matching on phi_G(z) * (1 - z + alpha * z^{L+1}) = alpha * z^{L+1} gives a
+  //    second-order (shift by L+1) linear recurrence:
+  //      f(g) = 0                              for g <= L
+  //      f(L+1) = alpha
+  //      f(g) = f(g-1) - alpha * f(g-L-1)      for g >= L+2
+  //    O(1) per step, exact in double precision (verified to ~1e-16 against the Markov
+  //    steady-state computation this replaced).
+  //
+  // 6. We iterate the recurrence in place until the cumulative mass first exceeds RELEVANCYQUANTILE,
+  //    and return that index as the x-axis truncation point.
+  function computePMF(L) {
+    const alpha = q * Math.pow(p, L);
+    const pmf = new Array(L + 1).fill(0);
+    pmf.push(alpha);
+    let cumulative = alpha;
+    let truncatedAt = null;
+    let hitCap = false;
+    if (cumulative > RELEVANCYQUANTILE) {
+      truncatedAt = L + 1;
+    } else {
+      for (let g = L + 2; g <= MAX_STEPS; g++) {
+        const v = pmf[g - 1] - alpha * pmf[g - L - 1];
+        pmf.push(v);
+        cumulative += v;
+        if (cumulative > RELEVANCYQUANTILE) { truncatedAt = g; break; }
+        if (g === MAX_STEPS) hitCap = true;
+      }
+    }
+    if (truncatedAt === null) truncatedAt = pmf.length - 1;
+    return { pmf, truncatedAt, cumulative, hitCap };
+  }
+
+  function monteCarlo(L, numTosses, truncatedAt) {
+    // Record positions of T's that end H-runs of length >= L (the renewal jumps).
+    const jumps = [];
+    let runLen = 0;
+    for (let t = 1; t <= numTosses; t++) {
+      const isH = Math.random() < p;
+      if (isH) {
+        runLen++;
+      } else {
+        if (runLen >= L) jumps.push(t);
+        runLen = 0;
+      }
+    }
+    if (jumps.length < 2) return { n: 0, mean: NaN, cdfAtTrunc: NaN };
+    let sum = 0, le = 0;
+    for (let i = 1; i < jumps.length; i++) {
+      const h = jumps[i] - jumps[i - 1];
+      sum += h;
+      if (h <= truncatedAt) le++;
+    }
+    const n = jumps.length - 1;
+    return { n, mean: sum / n, cdfAtTrunc: le / n };
+  }
+
+  function init() {
+    const nInput = document.getElementById("rungap-n");
+    nInput.addEventListener("input", recompute);
+    recompute();
+  }
+
+  const MAX_PLOT_POINTS = 5000;
+
+  function recompute() {
+    const raw = Number(document.getElementById("rungap-n").value);
+    const L = Math.min(200, Math.max(2, Math.floor(Number.isFinite(raw) ? raw : 2)));
+
+    const { pmf, truncatedAt, cumulative, hitCap } = computePMF(L);
+
+    // Plot data, downsampled by a uniform stride if the PMF is longer than ~MAX_PLOT_POINTS,
+    // so SVG render time stays roughly constant with L. The PMF here decays smoothly (no
+    // high-frequency wiggles), so a stride-based subsample faithfully traces its shape.
+    let xs, ys;
+    const fullLen = truncatedAt + 1;
+    if (fullLen <= MAX_PLOT_POINTS) {
+      xs = Array.from({ length: fullLen }, (_, i) => i);
+      ys = pmf.slice(0, fullLen);
+    } else {
+      const stride = Math.ceil(fullLen / MAX_PLOT_POINTS);
+      xs = []; ys = [];
+      for (let i = 0; i <= truncatedAt; i += stride) { xs.push(i); ys.push(pmf[i]); }
+      if (xs[xs.length - 1] !== truncatedAt) { xs.push(truncatedAt); ys.push(pmf[truncatedAt]); }
+    }
+
+    const quantilePcts = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95];
+    const quantileXs = Utils.quantiles(pmf, quantilePcts.map(p => p / 100));
+    const quantileSizes = quantilePcts.map(p => 12 * (1 + (0 == p % 25 ? 1 : 0) + (0 == p % 50 ? 1 : 0)));
+
+    Plotly.react("rungap-plot", [
+      {
+        x: xs, y: ys, type: "scatter", mode: "lines",
+        line: { color: "#3060c0", shape: "hv" },
+        fill: "tozeroy",
+        fillcolor: "rgba(48, 96, 192, 0.12)",
+        hovertemplate: "x=%{x}<br>P=%{y:.4g}<extra></extra>",
+        showlegend: false,
+      },
+      {
+        x: quantileXs,
+        y: quantileXs.map(() => 0),
+        type: "scatter",
+        mode: "markers",
+        marker: { symbol: "line-ns-open", size: quantileSizes, color: "#c04020", line: { width: 1.5, color: "#c04020" } },
+        text: quantilePcts.map(p => `${p}%`),
+        hovertemplate: "quantile %{text}: x=%{x}<extra></extra>",
+        showlegend: false,
+      },
+    ], {
+      xaxis: (() => {
+        const step = Utils.niceTickStep(truncatedAt + 1);
+        const tickInts = [];
+        for (let i = 0; i <= truncatedAt; i += step) tickInts.push(i);
+        return {
+          title: "x (holding time)",
+          tickvals: tickInts.map(i => i + 0.5),
+          ticktext: tickInts.map(i => i.toString()),
+          range: [-0.5, truncatedAt + 0.5],
+          showgrid: false,
+        };
+      })(),
+      yaxis: { title: "P(holding time = x)", rangemode: "tozero" },
+      margin: { l: 70, r: 30, t: 10, b: 50 },
+      annotations: [{
+        x: (L + 1) * 0.95 + truncatedAt * 0.05,
+        y: pmf[L + 1] / 3,
+          text: `⌈Q(0.95)⌉ = ${truncatedAt}`,
+        showarrow: false,
+        xanchor: "left",
+        yanchor: "middle",
+        font: { size: 20 },
+      }],
+    }, { displayModeBar: false, responsive: true });
+
+    const theoreticalMean = 1 / (q * Math.pow(p, L));
+    const readout = document.getElementById("rungap-readout");
+    const parts = [
+      `theoretical mean = ${theoreticalMean.toLocaleString(undefined, { maximumFractionDigits: 2 })} tosses`,
+    ];
+    readout.innerHTML = parts.join(" • ") + (hitCap
+      ? ` <span class="warn">(hit ${MAX_STEPS.toLocaleString()}-step cap before reaching 95%; result is partial)</span>`
+      : "");
+
+    if (new URLSearchParams(location.search).get("debug") === "1") {
+      const mc = monteCarlo(L, 200000, truncatedAt);
+      const meanWithinTruncation = Utils.meanFromPMF(pmf);
+      console.log(`[rungap L=${L}] analytic mean (within truncation)=${meanWithinTruncation.toFixed(2)}, theoretical=${theoreticalMean.toFixed(2)}, MC mean (n=${mc.n})=${mc.mean.toFixed(2)}`);
+      console.log(`[rungap L=${L}] analytic CDF at x=${truncatedAt}=${cumulative.toFixed(4)}, MC CDF=${mc.cdfAtTrunc.toFixed(4)}`);
+    }
+  }
+
+  return { init };
+})();
+
+const ThroughputBlock = (() => {
+  const p = 19 / 20;
+  const q = 1 - p;
+
+  function recompute() {
+    const L = Math.max(1, Math.floor(Number(document.getElementById("rungap-n").value) || 1));
+    const MaxSize = Math.max(1, Math.floor(Number(document.getElementById("throughput-sz").value) || 1));
+
+    const kLo = 2;
+    const kHi = Math.ceil(L * 4 / 3);
+
+    const ks = [];
+    const ratios = [];
+    for (let k = kLo; k <= kHi; k++) {
+      ks.push(k);
+      ratios.push(MaxSize * q * Math.pow(p, k));
+    }
+    // Duplicate the final value so the rightmost step has a horizontal segment.
+    const xPlot = [...ks, kHi + 1];
+    const yPlot = [...ratios, ratios[ratios.length - 1]];
+
+    const ratioAtL = MaxSize * q * Math.pow(p, L);
+
+    Plotly.react("throughput-plot", [
+      {
+        x: xPlot, y: yPlot, type: "scatter", mode: "lines",
+        line: { color: "#3060c0", shape: "hv" },
+        hovertemplate: "k=%{x}<br>MaxSize/mean=%{y:.4g}<extra></extra>",
+        showlegend: false,
+      },
+      {
+        x: [L + 0.5], y: [ratioAtL], customdata: [L], type: "scatter", mode: "markers",
+        marker: { symbol: "circle", size: 10, color: "#c04020" },
+        hovertemplate: "k=L=%{customdata}<br>MaxSize/mean=%{y:.4g}<extra></extra>",
+        showlegend: false,
+      },
+    ], {
+      xaxis: (() => {
+        const step = Utils.niceTickStep(kHi - kLo + 1);
+        const labeled = ks.filter(k => (k - kLo) % step === 0);
+        return {
+          title: "k (minimum heads-run length)",
+          tickvals: labeled.map(k => k + 0.5),
+          ticktext: labeled.map(k => k.toString()),
+          range: [kLo - 0.5, kHi + 1.5],
+          showgrid: false,
+        };
+      })(),
+      yaxis: { title: "MaxSize ÷ mean holding time", rangemode: "tozero" },
+      margin: { l: 70, r: 30, t: 10, b: 50 }
+    }, { displayModeBar: false, responsive: true });
+
+    document.getElementById("throughput-readout").innerHTML =
+      `at k=L=${L}: <span style="color: #c04020">MaxSize ÷ mean = ${ratioAtL.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span> ` +
+      `(swept k = ${kLo}..${kHi})`;
+  }
+
+  function init() {
+    document.getElementById("throughput-sz").addEventListener("input", recompute);
+    document.getElementById("rungap-n").addEventListener("input", recompute);
+    recompute();
+  }
+
+  return { init };
+})();
+
+document.addEventListener("DOMContentLoaded", () => {
+  // Couple the L number input and its slider so each mirrors the other. Both blocks
+  // listen for "input" on the number element; moving the slider dispatches that event,
+  // so the block listeners need no special-casing.
+  const lNum = document.getElementById("rungap-n");
+  const lSlider = document.getElementById("rungap-n-slider");
+  lNum.addEventListener("input", () => { if (lSlider.value !== lNum.value) lSlider.value = lNum.value; });
+  lSlider.addEventListener("input", () => {
+    if (lNum.value !== lSlider.value) {
+      lNum.value = lSlider.value;
+      lNum.dispatchEvent(new Event("input"));
+    }
+  });
+
+  RunGapPmfBlock.init();
+  ThroughputBlock.init();
+});
+</script>
+</body>
+</html>
