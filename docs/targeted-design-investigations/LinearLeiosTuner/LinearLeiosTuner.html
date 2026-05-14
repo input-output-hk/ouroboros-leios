@@ -40,7 +40,7 @@
 
 <section class="tuner-block" data-block="throughput">
   <h2>Theoretical average capacity (100% stake participating, every EB full &amp; successful if L gap)</h2>
-  <p>For each run length k from 2 to &lceil;L&times;4&divide;3&rceil;, plots MaxSize divided by the mean holding time of the renewal process defined by k (which is MaxSize &middot; q &middot; p<sup>k</sup>). The step at k = L is highlighted.</p>
+  <p>For each run length k from 2 to &lceil;L&times;4&divide;3&rceil;, plots MaxSize divided by the mean holding time of the renewal process defined by k (which is MaxSize &middot; q &middot; p<sup>k</sup>). The step at k = L is highlighted. The orange line at y<sub>2</sub> = 5% per second marks the protocol's worst-case network utilization required to sustain the corresponding capacity.</p>
   <div class="controls">
     <label for="throughput-sz">MaxSize:</label>
     <input id="throughput-sz" type="number" min="1" step="1" value="1000">
@@ -84,6 +84,15 @@ const Utils = {
     const norm = raw / pow;
     const nice = norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10;
     return Math.max(1, Math.round(nice * pow));
+  },
+  // Like niceTickStep, but for real-valued ranges (does not clamp to integer).
+  niceFloatStep(span, targetCount = 6) {
+    if (!isFinite(span) || span <= 0) return 1;
+    const raw = span / targetCount;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / pow;
+    const nice = norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10;
+    return nice * pow;
   },
 };
 
@@ -301,17 +310,49 @@ const ThroughputBlock = (() => {
 
     const ratioAtL = MaxSize * q * Math.pow(p, L);
 
+    // Build y-axis tick positions once, then mirror them on the right axis as percentages
+    // (y2 = y1 / MaxSize × 100%). Identical range + tickvals → tick rows align by construction.
+    const yMax = ratios[0]; // ratios is decreasing in k, so the max is at kLo.
+    const yLine = 0.05 * MaxSize; // the orange reference line at y2 = 5% per second.
+    const yPeak = Math.max(yMax, yLine);
+    const yUpper = yPeak * 1.05;
+    const yStep = Utils.niceFloatStep(yPeak);
+    const yTicks = [];
+    for (let v = 0; v <= yUpper + yStep * 0.001; v += yStep) yTicks.push(v);
+    const fmtPct = v => {
+      const pct = v / MaxSize * 100;
+      const rounded = Number(pct.toFixed(2));
+      return rounded + "%";
+    };
+
     Plotly.react("throughput-plot", [
       {
         x: xPlot, y: yPlot, type: "scatter", mode: "lines",
         line: { color: "#3060c0", shape: "hv" },
-        hovertemplate: "k=%{x}<br>MaxSize/mean=%{y:.4g}<extra></extra>",
+        customdata: yPlot.map(v => v / MaxSize * 100),
+        hovertemplate: "k=%{x}<br>MaxSize ÷ mean = %{y:.4g} (%{customdata:.3g}% per sec)<extra></extra>",
         showlegend: false,
       },
       {
-        x: [L + 0.5], y: [ratioAtL], customdata: [L], type: "scatter", mode: "markers",
+        x: [kLo - 0.5, kHi + 1.5], y: [yLine, yLine],
+        type: "scatter", mode: "lines",
+        line: { color: "#ff7f0e", width: 2 },
+        hovertemplate: "5% per sec — worst-case network utilization<extra></extra>",
+        showlegend: false,
+      },
+      {
+        x: [L + 0.5], y: [ratioAtL], customdata: [[L, ratioAtL / MaxSize * 100]],
+        type: "scatter", mode: "markers",
         marker: { symbol: "circle", size: 10, color: "#c04020" },
-        hovertemplate: "k=L=%{customdata}<br>MaxSize/mean=%{y:.4g}<extra></extra>",
+        hovertemplate: "k=L=%{customdata[0]}<br>MaxSize ÷ mean = %{y:.4g} (%{customdata[1]:.3g}% per sec)<extra></extra>",
+        showlegend: false,
+      },
+      // Zero-width trace anchored to yaxis2 so Plotly actually renders the right-side axis.
+      {
+        x: [kLo, kHi + 1], y: [0, 0], yaxis: "y2",
+        type: "scatter", mode: "lines",
+        line: { width: 0 },
+        hoverinfo: "skip",
         showlegend: false,
       },
     ], {
@@ -326,13 +367,30 @@ const ThroughputBlock = (() => {
           showgrid: false,
         };
       })(),
-      yaxis: { title: "MaxSize ÷ mean holding time", rangemode: "tozero" },
-      margin: { l: 70, r: 30, t: 10, b: 50 }
+      yaxis: {
+        title: "MaxSize ÷ mean holding time",
+        range: [0, yUpper],
+        tickvals: yTicks,
+      },
+      yaxis2: {
+        title: "% of MaxSize per second",
+        overlaying: "y",
+        side: "right",
+        range: [0, yUpper],
+        tickvals: yTicks,
+        ticktext: yTicks.map(fmtPct),
+        showgrid: false,
+      },
+      margin: { l: 70, r: 70, t: 10, b: 50 }
     }, { displayModeBar: false, responsive: true });
 
+    // capacity / worst-case = (MaxSize · q · p^L) / (0.05 · MaxSize) = p^L  (since q = 1/20).
+    const utilFraction = Math.pow(p, L);
+    const utilPct = (utilFraction * 100).toFixed(2);
     document.getElementById("throughput-readout").innerHTML =
       `at k=L=${L}: <span style="color: #c04020">MaxSize ÷ mean = ${ratioAtL.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span> ` +
-      `(swept k = ${kLo}..${kHi})`;
+      `(swept k = ${kLo}..${kHi}) &bull; ` +
+      `<span style="color: #c04020">capacity</span> ÷ <span style="color: #ff7f0e">worst-case usage</span> = 0.95<sup>${L}</sup> ≈ ${utilPct}%`;
   }
 
   function init() {

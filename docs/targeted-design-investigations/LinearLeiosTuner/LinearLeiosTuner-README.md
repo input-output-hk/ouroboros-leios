@@ -39,3 +39,6 @@ The stems for 25%, 50%, and 75% are taller than the others, and 50% taller still
 The second section is titled Theoretical average capacity (with 100% stake participating, max EBs, succeed if L gap).
 Its input is a positive integer MaxSize, defaulting to 1000 (just a number input---no slider).
 Its output is another step plot, showing MaxSize divided by the mean holding time for all run lengths from 2 to ⌈L×4÷3⌉, with the value for L highlighted.
+It has a second y-axis, which is the same shape as the first y-axis, but each y2 label is the same-height y1 label÷MaxSize×100% per second.
+There is also a constant line plotted in orange at y2 = 5% per second; its describe as the protocol's worst-case protocol network usage in order to achieve the corresponding capacity.
+A readout near the plot should print the ratio of the theoretical average capacity as a fraction of the 5% worst-case network usage (the closed-form formula for that is 0.95^L).
