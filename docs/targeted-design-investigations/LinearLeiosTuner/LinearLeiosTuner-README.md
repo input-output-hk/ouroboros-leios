@@ -12,7 +12,9 @@ The corresponding Dynamic HTML file will replace these macros with dynamic eleme
 - The syntax {let VAR be ...} is similar to {eval ...}, but in addition rendering as the current value it also updates the value of the given global variable.
 
 - The syntax {insert plot N} renders the Nth plot.
-  There are two plots total, defined in the next sections.
+  There are three plots total, defined in the next sections.
+
+- The syntax {hr} is a classy looking section break.
 
 ## Plot 1
 
@@ -49,10 +51,18 @@ The stems for 25%, 50%, and 75% are taller than the others, and 50% taller still
 
 ## Plot 2
 
-The second plot is titled Theoretical average capacity (with 100% stake participating, max EBs, succeed if L gap).
-Its output is another step plot, showing MaxSize divided by the mean holding time for all run lengths from 0 to ⌈L×4÷3⌉, with the value for L highlighted.
+The second plot is titled "Theoretical average capacity (with 100% stake participating, max EBs, succeed if L gap)".
+It's another step plot, showing MaxSize divided by the mean holding time for all run lengths from 0 to ⌈L×4÷3⌉, with the value for L highlighted.
 It has a second y-axis, which is the same shape as the first y-axis, but each y2 label is the same-height y1 label÷MaxSize×100% per second.
 There is also a constant line plotted in orange at y2 = f = 5% per second (f, not g!); its describe as the protocol's worst-case protocol network usage in order to achieve the corresponding capacity.
+
+## Plot 3
+
+The third plot is titled "How quickly do Mempools need to refill, given L and g?".
+It's another step plot, showing six curves, each the probability that at most M jumps occur within the k tosses immediately following some arbitrary jump, for M=0 to M=5.
+The x-axis ranges from k=0 to k=30×L.
+
+For each curve, the probabilities are calculated via a 2D Markov calculation.
 
 ## Template
 
@@ -88,6 +98,8 @@ Here it's shown for the shortest durations whose cumulative probability is at le
 
 {insert plot 1}
 
+{hr}
+
 For a given positive maximum EB size {input MaxSize, default 12000}, we can calculate the throughput capacity offered by the successful EBs on an average g-chain.
 If we optimistically assume that every EB that g doesn't prevent is both successful and full, then the average capacity will be MaxSize ÷ (N ÷ g) = {eval MaxSize ÷ (N ÷ g)} bytes per second.
 Here it's shown for possible values of L from 1 to ⌈L×4÷3⌉.
@@ -112,8 +124,23 @@ In the most extreme case, the ratio would worsen to (N ÷ g) ÷ (1 ÷ f) = {let 
 Three caveats.
 
 - The 1 ÷ (1 - A) is a crude guesstimate.
-  The actual multiplier depends on how much of the g growth on the chain consists of adversarial blocks.
+  The actual multiplier depends on how much of the g-chain consists of adversarial blocks.
 - The above inefficiency ratio calculations exclude the network utilization necessary for the EBs themselves (distinct from the transactions to which they refer) and the votes.
   Those exclusions are much smaller than full EBs, but not totally negligible---that is a forgivable shortcoming of the current draft.
 - The above also ignores the fact that every SPO elected in a multi-leader slot announces an EB.
   That's an additional ~2.5% inefficiency excluded in the above calculations.
+
+{hr}
+
+Finally, a question related to how quickly the Mempools would need to be able to refill.
+If EBs are succeeding too quickly, back-to-back, then TxSubmission might not be able to replenish the Mempools to saturate the unusually high density of successful EBs on the g-chain.
+
+The following plot has x-axis from k=0 to k=30×L.
+It plots the probability that there will be at most M additional EBs allowed by g within the k slots starting immediately after some jump.
+
+{insert plot 3}
+
+CIP-0164 recommends a Mempool containing enough transactions for two full EBs.
+Thus, the M=1 curve captures the probability that a Mempool that was full before the initiating EB would suffice even if it wasn't refilled at all.
+The M=2 curve, therefore, indicates how soon the Mempool would need to refill one EB's worth of transactions to avoid not being able to fill the third EB in a short timeframe.
+The higher M curves would demand that much faster refilling.

@@ -34,6 +34,15 @@
   .big-result { font-size: 2em; font-weight: 600; color: #224080; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin: 0.25em 0; }
   .warn { color: #b04020; }
   .plot { width: 100%; height: 400px; }
+  /* {hr} macro — typographic section break: three muted dots, centered, with breathing room. */
+  .section-break {
+    text-align: center;
+    font-size: 1.6em;
+    color: #aaa;
+    letter-spacing: 0.6em;
+    margin: 2.5em 0 2em;
+    user-select: none;
+  }
 </style>
 </head>
 <body>
@@ -69,6 +78,8 @@ Here it's shown for the shortest durations whose cumulative probability is at le
 
 <div id="rungap-plot" class="plot"></div>
 
+<div class="section-break" aria-hidden="true">·&nbsp;·&nbsp;·</div>
+
 <p>For a given positive maximum EB size <span class="sticky-input">MaxSize = <input id="MaxSize" type="number" min="1" step="1" value="12000"></span>, we can calculate the throughput capacity offered by the successful EBs on an average g-chain.
 If we optimistically assume that every EB that g doesn't prevent is both successful and full, then the average capacity will be MaxSize &divide; (N &divide; g) = <span class="rx" id="rx-cap"></span> bytes per second.
 Here it's shown for possible values of L from 0 to &lceil;L&times;4&divide;3&rceil;.</p>
@@ -91,10 +102,24 @@ In the most extreme case, the ratio would worsen to (N &divide; g) &divide; (1 &
 
 <p>Three caveats.</p>
 <ul>
-  <li>The 1 &divide; (1 &minus; A) is a crude guesstimate. The actual multiplier depends on how much of the g growth on the chain consists of adversarial blocks.</li>
+  <li>The 1 &divide; (1 &minus; A) is a crude guesstimate. The actual multiplier depends on how much of the g-chain consists of adversarial blocks..</li>
   <li>The above inefficiency ratio calculations exclude the network utilization necessary for the EBs themselves (distinct from the transactions to which they refer) and the votes. Those exclusions are much smaller than full EBs, but not totally negligible&mdash;that is a forgivable shortcoming of the current draft.</li>
   <li>The above also ignores the fact that every SPO elected in a multi-leader slot announces an EB. That's an additional ~2.5% inefficiency excluded in the above calculations.</li>
 </ul>
+
+<div class="section-break" aria-hidden="true">·&nbsp;·&nbsp;·</div>
+
+<p>Finally, a question related to how quickly the Mempools would need to be able to refill.
+If EBs are succeeding too quickly, back-to-back, then TxSubmission might not be able to replenish the Mempools to saturate the unusually high density of successful EBs on the g-chain.</p>
+
+<p>The following plot has x-axis from k=0 to k=30&times;L.
+It plots the probability that there will be at most M additional EBs allowed by g within the k slots starting immediately after some jump.</p>
+
+<div id="mempool-plot" class="plot"></div>
+
+<p>CIP-0164 recommends a Mempool containing enough transactions for two full EBs.
+Thus, the M=1 line captures the probability that a Mempool that was full before the initiating EB would suffice even if it wasn't refilled at all.
+The M=2 line, therefore, indicates how soon the Mempool would need to refill one EB's worth of transactions to avoid not being able to fill the thirrd EB in a short timeframe. The higher M curves would demand that much faster refilling.</p>
 
 <script>
 "use strict";
@@ -450,6 +475,109 @@ const ThroughputBlock = (() => {
   return { init };
 })();
 
+// Plot 3 — "How quickly do Mempools need to refill?". For each k in 0..30·L, six curves
+// give P(at most M jumps in the k tosses following an arbitrary jump) for M = 0..5.
+// Computed with a 2-D Markov chain whose state is (h, j): consecutive-H count (saturated at
+// L) and jump-count-so-far (saturated at Jmax = 6, so cell j=6 represents "≥ 6 jumps" — the
+// extra row above M=5 lets cells 0..5 each hold an *exact* j=M probability, which we then
+// cumulate ascending to get P(j ≤ M)).
+// Initial state is (h=0, j=0) — the chain re-enters right after the conditioning jump.
+// Each toss: H → h := min(h+1, L), j unchanged; T → if h = L emit a jump (j := min(j+1, Jmax))
+// then h := 0, else just h := 0.
+const MempoolPlotBlock = (() => {
+  function recompute() {
+    const rawL = Number(document.getElementById("L").value);
+    const L = Math.min(200, Math.max(2, Math.floor(Number.isFinite(rawL) ? rawL : 14)));
+    const rawG = Number(document.getElementById("g").value);
+    const g = Math.min(0.05, Math.max(0.01, (Number.isFinite(rawG) ? rawG : 5) / 100));
+    const p = 1 - g;
+    const q = g;
+
+    const K = 30 * L;
+    const Jmax = 6; // saturate at 6, so cells j = 0..5 stay as *exact* counts.
+
+    let state = Array.from({ length: L + 1 }, () => new Array(Jmax + 1).fill(0));
+    state[0][0] = 1;
+
+    // probs[M][k] = P(j ≤ M at toss k). Plotted for M = 0..5.
+    // At k = 0 we're at the conditioning jump (j = 0), so P(j ≤ M) = 1 for every M.
+    const probs = Array.from({ length: 6 }, () => new Array(K + 1).fill(0));
+    for (let M = 0; M <= 5; M++) probs[M][0] = 1;
+
+    for (let k = 1; k <= K; k++) {
+      const next = Array.from({ length: L + 1 }, () => new Array(Jmax + 1).fill(0));
+      for (let h = 0; h <= L; h++) {
+        const row = state[h];
+        const newHheads = h === L ? L : h + 1;
+        for (let j = 0; j <= Jmax; j++) {
+          const v = row[j];
+          if (v === 0) continue;
+          next[newHheads][j] += v * p;
+          if (h === L) {
+            const newJ = j === Jmax ? Jmax : j + 1;
+            next[0][newJ] += v * q;
+          } else {
+            next[0][j] += v * q;
+          }
+        }
+      }
+      state = next;
+      // Marginals: column-sum each j, then accumulate ascending to get P(j ≤ M).
+      let s0 = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0, s5 = 0;
+      for (let h = 0; h <= L; h++) {
+        const r = state[h];
+        s0 += r[0]; s1 += r[1]; s2 += r[2]; s3 += r[3]; s4 += r[4]; s5 += r[5];
+      }
+      probs[0][k] = s0;
+      probs[1][k] = probs[0][k] + s1;
+      probs[2][k] = probs[1][k] + s2;
+      probs[3][k] = probs[2][k] + s3;
+      probs[4][k] = probs[3][k] + s4;
+      probs[5][k] = probs[4][k] + s5;
+    }
+
+    const xs = Array.from({ length: K + 1 }, (_, i) => i);
+    // ColorBrewer-style sequential blue ramp, light → dark for M = 0..5.
+    const colors = ["#c6dbef", "#9ecae1", "#6baed6", "#3182bd", "#08519c", "#08306b"];
+    const traces = [];
+    for (let M = 0; M <= 5; M++) {
+      traces.push({
+        x: xs, y: probs[M], type: "scatter", mode: "lines",
+        line: { color: colors[M], shape: "hv", width: 2 },
+        name: `M = ${M}`,
+        hovertemplate: `k=%{x}<br>P(≤ ${M} jumps) = %{y:.4g}<extra></extra>`,
+      });
+    }
+
+    Plotly.react("mempool-plot", traces, {
+      xaxis: (() => {
+        const step = Utils.niceTickStep(K + 1);
+        const tickInts = [];
+        for (let i = 0; i <= K; i += step) tickInts.push(i);
+        return {
+          title: "k (tosses since previous jump)",
+          tickvals: tickInts.map(i => i + 0.5),
+          ticktext: tickInts.map(i => i.toString()),
+          range: [-0.5, K + 0.5],
+          showgrid: false,
+        };
+      })(),
+      yaxis: { title: "P(at most M jumps)", range: [0, 1] },
+      title: { text: "How quickly do Mempools need to refill, given L and g?", font: { size: 14 } },
+      margin: { l: 70, r: 30, t: 40, b: 50 },
+      legend: { x: 0.99, y: 0.5, xanchor: "right", yanchor: "middle", bgcolor: "rgba(255,255,255,0.7)" },
+    }, { displayModeBar: false, responsive: true });
+  }
+
+  function init() {
+    document.getElementById("L").addEventListener("input", recompute);
+    document.getElementById("g").addEventListener("input", recompute);
+    recompute();
+  }
+
+  return { init };
+})();
+
 // Inline reactive values for the prose ({eval ...} macros in the spec).
 // Recomputed on any input change; each .rx span is rewritten with the current value.
 const ReactiveText = (() => {
@@ -464,8 +592,10 @@ const ReactiveText = (() => {
     const L = Math.min(200, Math.max(2, Math.floor(Number(document.getElementById("L").value) || 14)));
     const MaxSize = Math.max(1, Math.floor(Number(document.getElementById("MaxSize").value) || 12000));
     // A is shown to the reader as a percentage (0..50) but every formula treats it as a
-    // fraction (0..0.5); otherwise (1 − A) would go negative.
-    const A = Math.min(50, Math.max(0, Math.floor(Number(document.getElementById("A").value) || 33))) / 100;
+    // fraction (0..0.5); otherwise (1 − A) would go negative. A = 0 is a legal input, so we
+    // can't use `|| 33` for the default — `0 || 33` would clobber zero. Treat NaN as default.
+    const rawA = Number(document.getElementById("A").value);
+    const A = Math.min(50, Math.max(0, Math.floor(Number.isFinite(rawA) ? rawA : 33))) / 100;
     // g is shown as a percentage (1..5); formulas use the fraction (0.01..0.05).
     const rawG = Number(document.getElementById("g").value);
     const g = Math.min(0.05, Math.max(0.01, (Number.isFinite(rawG) ? rawG : 5) / 100));
@@ -590,6 +720,7 @@ document.addEventListener("DOMContentLoaded", () => {
   ReactiveText.init();
   RunGapPmfBlock.init();
   ThroughputBlock.init();
+  MempoolPlotBlock.init();
   StickyInputs.init();
 });
 </script>
