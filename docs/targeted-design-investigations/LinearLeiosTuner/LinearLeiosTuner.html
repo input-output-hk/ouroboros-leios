@@ -43,45 +43,55 @@
 <p>This page visualizes the consequences of different values of <span class="sticky-input">L = <input id="L" type="number" min="2" max="200" step="1" value="14"> <input id="L-slider" type="range" min="2" max="200" step="1" value="14" aria-label="L slider"></span> between 2 and 200.
 L is the sum 3&times;L<sub>hdr</sub> + L<sub>vote</sub> + L<sub>diff</sub> from the Linear Leios specification.</p>
 
-<p>One calculation we've often considered is the probability of the leader schedule itself preventing an EB from succeeding: Linear Leios allows an EB to be certified only by the subsequent RB and only if that RB arises at least L slots later.</p>
+<p>One calculation we've often considered is the probability of the leader schedule itself preventing an EB from succeeding: Linear Leios allows an EB to be certified only by the subsequent RB and only if that RB arises at least L slots later.
+Before we introduce the math, a corresponding clarification is due.</p>
 
-<p>P(leader schedule prevention | L=<span class="rx" id="rx-L1"></span>) = 1 &minus; 0.95<sup>L</sup> = 1 &minus; <span class="rx" id="rx-pow"></span> = <span class="rx" id="rx-prev"></span>.</p>
+<p>While we do often refer to the "leader schedule" as the limiting factor, that habit tacitly assumes the adversary is not attacking Praos.
+In other words, it assumes that the density of the RBs on the best Praos chain are determined by the leader schedule.
+The relevant parameter is f = 5%, the Praos <em>active slot coefficient</em>.</p>
 
-<p>(The 0.95 is 1-f where f is 0.05, i.e. the Praos <em>active slot coefficient</em>.)</p>
+<p>When not under attack, f causes the Praos chain to grow by one block every 1/f=20 seconds, on average.
+When under attack, however, the honest parties will be unable to communicate as effectively, and so some of their elections in the leader schedule will be wasted on short forks instead of them all contributing as growth of the best single chain.
+We introduce a variable <span class="sticky-input">g = <input id="g" type="number" min="1" max="5" step="0.1" value="5"> <input id="g-slider" type="range" min="1" max="5" step="0.1" value="5" aria-label="g slider"></span> between 1% and f=5% to model this.
+When g = f = 5%, the adversary is not interfering with Praos.
+When g &lt; f, they are, and the difference determines the degree of their success&mdash;this numeric quantity is ad-hoc, but useful enough for our other calculations in this memo.</p>
 
-<p>A healthy chain will, on average, need to announce N = 0.95<sup>&minus;L</sup> = <span class="rx" id="rx-N1"></span> EBs for the leader schedule to allow one of them to succeed. That's the N for which N &times; (1 &minus; P(leader schedule prevention | L=<span class="rx" id="rx-L2"></span>)) = 1.</p>
+<p>P(too dense | L=<span class="rx" id="rx-L1"></span>) = 1 &minus; (1 &minus; g)<sup>L</sup> = 1 &minus; <span class="rx" id="rx-pow"></span> = <span class="rx" id="rx-prev"></span>.</p>
 
-<p>With an active slot coefficient of 0.05, a healthy chain will, on average, announce one EB per 20 seconds.
-Therefore, on average, there will be 20 &times; N = <span class="rx" id="rx-20N"></span> seconds between EBs not prevented by the leader schedule.</p>
+<p>A g-chain will, on average, need to announce N = (1 &minus; g)<sup>&minus;L</sup> = <span class="rx" id="rx-N1"></span> EBs for g to allow one of them to succeed. That's the N for which N &times; (1 &minus; P(too dense | L=<span class="rx" id="rx-L2"></span>)) = 1.</p>
 
-<p>Beyond just the average 20 &times; N, we can also calculate the whole probability mass function of that duration.
-The model is tosses of a 19:1 biased coin, where every run of at least L heads terminated by a tails is an EB that the leader schedule didn't prevent, which is a "jump" in that <a href="https://en.wikipedia.org/wiki/Renewal_theory">"renewal process"</a> and therefore delineates the "holding time" since the previous jump.
+<p>A g-chain will, on average, announce one EB per 1/g=<span class="rx" id="rx-1overG"></span> seconds.
+Therefore, on average, there will be N &divide; g = <span class="rx" id="rx-NoverG"></span> seconds between EBs not prevented by g.</p>
+
+<p>Beyond just the average N &divide; g, we can also calculate the whole probability mass function of that duration.
+The model is tosses of a (1&minus;g):g biased coin, where every run of at least L heads terminated by a tails is an EB that g didn't prevent, which is a "jump" in that <a href="https://en.wikipedia.org/wiki/Renewal_theory">"renewal process"</a> and therefore delineates the "holding time" since the previous jump.
 Here it's shown for the shortest durations whose cumulative probability is at least 95% along with select quantiles.</p>
 
 <div id="rungap-plot" class="plot"></div>
 
-<p>For a given positive maximum EB size <span class="sticky-input">MaxSize = <input id="MaxSize" type="number" min="1" step="1" value="12000"></span>, we can calculate the throughput capacity offered by the successful EBs on an average chain.
-If we optimistically assume that every EB that the leader schedule doesn't prevent is both successful and full, then the average capacity will be MaxSize &divide; (20 &times; N) = <span class="rx" id="rx-cap"></span> bytes per second.
+<p>For a given positive maximum EB size <span class="sticky-input">MaxSize = <input id="MaxSize" type="number" min="1" step="1" value="12000"></span>, we can calculate the throughput capacity offered by the successful EBs on an average g-chain.
+If we optimistically assume that every EB that g doesn't prevent is both successful and full, then the average capacity will be MaxSize &divide; (N &divide; g) = <span class="rx" id="rx-cap"></span> bytes per second.
 Here it's shown for possible values of L from 0 to &lceil;L&times;4&divide;3&rceil;.</p>
 
 <div id="throughput-plot" class="plot"></div>
 
 <p>Also shown in orange is the average rate at which EBs are announced.
-Note that as L increases, the capacity decreases but the amount of announcements doesn't change&mdash;it's still one per 20 seconds.
+Note that as L increases or g decreases, the capacity decreases but the amount of announcements doesn't change&mdash;it's still one per 1/f=20 seconds.
 MaxSize can be increased to bring the capacity back up, but that also proportionally increases the size of each announced EB.
 It's therefore important to acknowledge that adversarial RBs are able to announce any EB they want, and the whole network will diffuse it&mdash;they can choose to always announce full EBs, even if no EB has succeeded for a long while.</p>
 
 <p>Suppose the adversary controls a percentage of the total stake <span class="sticky-input">A = <input id="A" type="number" min="0" max="50" step="1" value="33"> <input id="A-slider" type="range" min="0" max="50" step="1" value="33" aria-label="A slider"></span> between 0 and 50%.
-For now, at least, assume that the adversary is not attacking Praos growth; see the caveat below.
-Thus, the ratio of the network utilization the adversary can steadily cause versus the average chain capacity is A &times; N &divide; 1 = <span class="rx" id="rx-AN"></span>&mdash;and that's even assuming the adversary is choosing to include certs in its RBs.
-If they instead omit Leios certs from their RBs, then the ratio worsens to A &times; N &divide; (1 &minus; A) = <span class="rx" id="rx-ANomit"></span>.</p>
+(If A is large, the adversary could severely reduce g well below f=5%, for example, by simply withholding their own blocks. But whether to do so is that adversary's prerogative, and so the variables can be tuned independently.)
+This adversary leads each slot with a probability of &phi;<sub>f</sub>(A) = 1 &minus; (1 &minus; f)<sup>A</sup> = <span class="rx" id="rx-pA"></span>.
+Thus, the ratio of the network utilization the adversary can steadily cause versus the average g-chain capacity is (N &divide; g) &divide; (1 &divide; &phi;<sub>f</sub>(A)) = <span class="rx" id="rx-advRatio"></span>&mdash;and that's even assuming the adversary is choosing to include certs in its RBs.
+If they instead omit Leios certs from their RBs, then the ratio worsens by some factor like 1 &divide; (1 &minus; A) to <span class="rx" id="rx-advRatioOmit"></span>.</p>
 
 <p>If the adversary is causing mempool fragmentation, then the <em>honest</em> announced EBs could also be full even when no EBs are succeeding.
-In the most extreme case, the ratio would worsen to N &divide; 1 = <span class="rx" id="rx-Nfrag"></span> or even N &divide; (1 &minus; A) = <span class="rx" id="rx-Nom"></span> depending on the adversary's RBs.</p>
+In the most extreme case, the ratio would worsen to (N &divide; g) &divide; (1 &divide; f) = <span class="rx" id="rx-frag"></span> or even something like 1 &divide; (1 &minus; A) times worse at <span class="rx" id="rx-fragOmit"></span> if the adversary omits Leios certs in their RBs.</p>
 
 <p>Three caveats.</p>
 <ul>
-  <li>If the adversary disrupts the growth of the RB chain, then it's less dense than the leader schedule and so fewer of the EBs <em>on the chain</em> will be prevented by the leader schedule. It's not trivial how to appropriately adjust the calculations in this memo.</li>
+  <li>The 1 &divide; (1 &minus; A) is a crude guesstimate. The actual multiplier depends on how much of the g growth on the chain consists of adversarial blocks.</li>
   <li>The above inefficiency ratio calculations exclude the network utilization necessary for the EBs themselves (distinct from the transactions to which they refer) and the votes. Those exclusions are much smaller than full EBs, but not totally negligible&mdash;that is a forgivable shortcoming of the current draft.</li>
   <li>The above also ignores the fact that every SPO elected in a multi-leader slot announces an EB. That's an additional ~2.5% inefficiency excluded in the above calculations.</li>
 </ul>
@@ -134,8 +144,9 @@ const Utils = {
 };
 
 const RunGapPmfBlock = (() => {
-  const p = 19 / 20;
-  const q = 1 - p;
+  // p and q are derived from the user-controlled g (q = g, p = 1 − g); each recompute reads
+  // the current g and passes p,q into computePMF/monteCarlo so the renewal-coin tracks the
+  // input rather than being pinned to the original 19:1 ratio.
   const RELEVANCYQUANTILE = 0.95;
   const MAX_STEPS = 5_000_000;
 
@@ -180,7 +191,7 @@ const RunGapPmfBlock = (() => {
   //
   // 6. We iterate the recurrence in place until the cumulative mass first exceeds RELEVANCYQUANTILE,
   //    and return that index as the x-axis truncation point.
-  function computePMF(L) {
+  function computePMF(L, p, q) {
     const alpha = q * Math.pow(p, L);
     const pmf = new Array(L + 1).fill(0);
     pmf.push(alpha);
@@ -190,19 +201,21 @@ const RunGapPmfBlock = (() => {
     if (cumulative > RELEVANCYQUANTILE) {
       truncatedAt = L + 1;
     } else {
-      for (let g = L + 2; g <= MAX_STEPS; g++) {
-        const v = pmf[g - 1] - alpha * pmf[g - L - 1];
+      // Inner loop's `i` is the holding-time index — renamed from the original `g` to avoid
+      // shadowing the user-input "g" semantically used outside this function.
+      for (let i = L + 2; i <= MAX_STEPS; i++) {
+        const v = pmf[i - 1] - alpha * pmf[i - L - 1];
         pmf.push(v);
         cumulative += v;
-        if (cumulative > RELEVANCYQUANTILE) { truncatedAt = g; break; }
-        if (g === MAX_STEPS) hitCap = true;
+        if (cumulative > RELEVANCYQUANTILE) { truncatedAt = i; break; }
+        if (i === MAX_STEPS) hitCap = true;
       }
     }
     if (truncatedAt === null) truncatedAt = pmf.length - 1;
     return { pmf, truncatedAt, cumulative, hitCap };
   }
 
-  function monteCarlo(L, numTosses, truncatedAt) {
+  function monteCarlo(L, p, numTosses, truncatedAt) {
     // Record positions of T's that end H-runs of length >= L (the renewal jumps).
     const jumps = [];
     let runLen = 0;
@@ -227,18 +240,23 @@ const RunGapPmfBlock = (() => {
   }
 
   function init() {
-    const nInput = document.getElementById("L");
-    nInput.addEventListener("input", recompute);
+    document.getElementById("L").addEventListener("input", recompute);
+    document.getElementById("g").addEventListener("input", recompute);
     recompute();
   }
 
   const MAX_PLOT_POINTS = 5000;
 
   function recompute() {
-    const raw = Number(document.getElementById("L").value);
-    const L = Math.min(200, Math.max(2, Math.floor(Number.isFinite(raw) ? raw : 2)));
+    const rawL = Number(document.getElementById("L").value);
+    const L = Math.min(200, Math.max(2, Math.floor(Number.isFinite(rawL) ? rawL : 2)));
+    // g is displayed to the user as a percentage (1..5); every formula uses the fraction (0.01..0.05).
+    const rawG = Number(document.getElementById("g").value);
+    const g = Math.min(0.05, Math.max(0.01, (Number.isFinite(rawG) ? rawG : 5) / 100));
+    const p = 1 - g;
+    const q = g;
 
-    const { pmf, truncatedAt, cumulative, hitCap } = computePMF(L);
+    const { pmf, truncatedAt, cumulative, hitCap } = computePMF(L, p, q);
 
     // Plot data, downsampled by a uniform stride if the PMF is longer than ~MAX_PLOT_POINTS,
     // so SVG render time stays roughly constant with L. The PMF here decays smoothly (no
@@ -292,7 +310,7 @@ const RunGapPmfBlock = (() => {
         };
       })(),
       yaxis: { title: "P(holding time = x)", rangemode: "tozero" },
-      title: { text: "Arrival rate of inter-RB gaps ≥ L (at 5% active slot coefficient)", font: { size: 14 } },
+      title: { text: "Arrival rate of inter-RB gaps ≥ L on a g-chain", font: { size: 14 } },
       margin: { l: 70, r: 30, t: 40, b: 50 },
       annotations: [{
         x: (L + 1) * 0.95 + truncatedAt * 0.05,
@@ -307,11 +325,11 @@ const RunGapPmfBlock = (() => {
 
     if (new URLSearchParams(location.search).get("debug") === "1") {
       const theoreticalMean = 1 / (q * Math.pow(p, L));
-      const mc = monteCarlo(L, 200000, truncatedAt);
+      const mc = monteCarlo(L, p, 200000, truncatedAt);
       const meanWithinTruncation = Utils.meanFromPMF(pmf);
-      console.log(`[rungap L=${L}] analytic mean (within truncation)=${meanWithinTruncation.toFixed(2)}, theoretical=${theoreticalMean.toFixed(2)}, MC mean (n=${mc.n})=${mc.mean.toFixed(2)}`);
-      console.log(`[rungap L=${L}] analytic CDF at x=${truncatedAt}=${cumulative.toFixed(4)}, MC CDF=${mc.cdfAtTrunc.toFixed(4)}`);
-      if (hitCap) console.warn(`[rungap L=${L}] hit ${MAX_STEPS.toLocaleString()}-step cap before reaching 95%; result is partial`);
+      console.log(`[rungap L=${L} g=${g}] analytic mean (within truncation)=${meanWithinTruncation.toFixed(2)}, theoretical=${theoreticalMean.toFixed(2)}, MC mean (n=${mc.n})=${mc.mean.toFixed(2)}`);
+      console.log(`[rungap L=${L} g=${g}] analytic CDF at x=${truncatedAt}=${cumulative.toFixed(4)}, MC CDF=${mc.cdfAtTrunc.toFixed(4)}`);
+      if (hitCap) console.warn(`[rungap L=${L} g=${g}] hit ${MAX_STEPS.toLocaleString()}-step cap before reaching 95%; result is partial`);
     }
   }
 
@@ -319,12 +337,17 @@ const RunGapPmfBlock = (() => {
 })();
 
 const ThroughputBlock = (() => {
-  const p = 19 / 20;
-  const q = 1 - p;
+  // f is the Praos active slot coefficient (constant); it drives the *announcement*
+  // bandwidth and so the orange reference line. g is the on-chain growth coefficient
+  // (user-controlled, ≤ f); it drives the *successful-EB* capacity curve.
+  const f = 0.05;
 
   function recompute() {
     const L = Math.max(1, Math.floor(Number(document.getElementById("L").value) || 1));
     const MaxSize = Math.max(1, Math.floor(Number(document.getElementById("MaxSize").value) || 1));
+    const rawG = Number(document.getElementById("g").value);
+    const g = Math.min(0.05, Math.max(0.01, (Number.isFinite(rawG) ? rawG : 5) / 100));
+    const p = 1 - g;
 
     const kLo = 0;
     const kHi = Math.ceil(L * 4 / 3);
@@ -333,18 +356,18 @@ const ThroughputBlock = (() => {
     const ratios = [];
     for (let k = kLo; k <= kHi; k++) {
       ks.push(k);
-      ratios.push(MaxSize * q * Math.pow(p, k));
+      ratios.push(MaxSize * g * Math.pow(p, k));
     }
     // Duplicate the final value so the rightmost step has a horizontal segment.
     const xPlot = [...ks, kHi + 1];
     const yPlot = [...ratios, ratios[ratios.length - 1]];
 
-    const ratioAtL = MaxSize * q * Math.pow(p, L);
+    const ratioAtL = MaxSize * g * Math.pow(p, L);
 
     // Build y-axis tick positions once, then mirror them on the right axis as percentages
     // (y2 = y1 / MaxSize × 100%). Identical range + tickvals → tick rows align by construction.
     const yMax = ratios[0]; // ratios is decreasing in k, so the max is at kLo.
-    const yLine = 0.05 * MaxSize; // the orange reference line at y2 = 5% per second.
+    const yLine = f * MaxSize; // the orange reference line at y2 = f = 5% per second.
     const yPeak = Math.max(yMax, yLine);
     const yUpper = yPeak * 1.05;
     const yStep = Utils.niceFloatStep(yPeak);
@@ -420,6 +443,7 @@ const ThroughputBlock = (() => {
   function init() {
     document.getElementById("MaxSize").addEventListener("input", recompute);
     document.getElementById("L").addEventListener("input", recompute);
+    document.getElementById("g").addEventListener("input", recompute);
     recompute();
   }
 
@@ -442,24 +466,33 @@ const ReactiveText = (() => {
     // A is shown to the reader as a percentage (0..50) but every formula treats it as a
     // fraction (0..0.5); otherwise (1 − A) would go negative.
     const A = Math.min(50, Math.max(0, Math.floor(Number(document.getElementById("A").value) || 33))) / 100;
-    const powL = Math.pow(0.95, L);
-    const N = Math.pow(0.95, -L); // {eval let N be 0.95^(-L)}
+    // g is shown as a percentage (1..5); formulas use the fraction (0.01..0.05).
+    const rawG = Number(document.getElementById("g").value);
+    const g = Math.min(0.05, Math.max(0.01, (Number.isFinite(rawG) ? rawG : 5) / 100));
+    const f = 0.05; // Praos active slot coefficient — constant; used only for φ_f(A).
+    const powL = Math.pow(1 - g, L);
+    const N = Math.pow(1 - g, -L); // {eval let N be (1 − g)^(−L)}
+    const pA = 1 - Math.pow(1 - f, A); // {eval let pA be 1 - 0.95^A} — φ_f(A) = 1 − (1−f)^A
     setText("rx-L1", L);
     setText("rx-L2", L);
     setText("rx-pow", fmt(powL));
     setText("rx-prev", fmt(1 - powL));
     setText("rx-N1", fmt(N));
-    setText("rx-20N", fmt(20 * N, 2));
-    setText("rx-cap", fmt(MaxSize / (20 * N), 2));
-    setText("rx-AN", fmt(A * N));
-    setText("rx-ANomit", fmt(A * N / (1 - A)));
-    setText("rx-Nfrag", fmt(N));
-    setText("rx-Nom", fmt(N / (1 - A)));
+    setText("rx-1overG", fmt(1 / g, 2));
+    setText("rx-NoverG", fmt(N / g, 2));
+    setText("rx-cap", fmt(MaxSize / (N / g), 2));
+    setText("rx-pA", fmt(pA));
+    setText("rx-advRatio", fmt((N / g) / (1 / pA)));
+    setText("rx-advRatioOmit", fmt(((N / g) / (1 - A)) / (1 / pA)));
+    const frag = (N / g) / (1 / f); // {let frag be (N ÷ g) ÷ (1 ÷ f)}
+    setText("rx-frag", fmt(frag));
+    setText("rx-fragOmit", fmt(frag / (1 - A)));
   }
   function init() {
     document.getElementById("L").addEventListener("input", recompute);
     document.getElementById("MaxSize").addEventListener("input", recompute);
     document.getElementById("A").addEventListener("input", recompute);
+    document.getElementById("g").addEventListener("input", recompute);
     recompute();
   }
   return { init };
@@ -551,6 +584,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
   couple("L", "L-slider");
+  couple("g", "g-slider");
   couple("A", "A-slider");
 
   ReactiveText.init();

@@ -16,7 +16,7 @@ The corresponding Dynamic HTML file will replace these macros with dynamic eleme
 
 ## Plot 1
 
-The first plot is titled "Arrival rate of inter-RB gaps ≥ L (at 5% active slot coefficient)".
+The first plot is titled "Arrival rate of inter-RB gaps ≥ L on a g-chain".
 It's a step plot portraying the probability mass holding times in a renewal process defined by L (truncating x-axis after 95% cumulative).
 Repeatedly toss a coin that's biased 19:1 towards heads.
 The renewal process jumps when a run of L or more heads ends.
@@ -52,7 +52,7 @@ The stems for 25%, 50%, and 75% are taller than the others, and 50% taller still
 The second plot is titled Theoretical average capacity (with 100% stake participating, max EBs, succeed if L gap).
 Its output is another step plot, showing MaxSize divided by the mean holding time for all run lengths from 0 to ⌈L×4÷3⌉, with the value for L highlighted.
 It has a second y-axis, which is the same shape as the first y-axis, but each y2 label is the same-height y1 label÷MaxSize×100% per second.
-There is also a constant line plotted in orange at y2 = 5% per second; its describe as the protocol's worst-case protocol network usage in order to achieve the corresponding capacity.
+There is also a constant line plotted in orange at y2 = f = 5% per second (f, not g!); its describe as the protocol's worst-case protocol network usage in order to achieve the corresponding capacity.
 
 ## Template
 
@@ -62,46 +62,57 @@ This page visualizes the consequences of different values of {input L, default 1
 L is the sum 3×L_hdr + L_vote + L_diff from the Linear Leios specification.
 
 One calculation we've often considered is the probability of the leader schedule itself preventing an EB from succeeding: Linear Leios allows an EB to be certified only by the subsequent RB and only if that RB arises at least L slots later.
+Before we introduce the math, a corresponding clarification is due.
 
-P(leader schedule prevention | L={eval L}) = 1 - 0.95<sup>L</sup> = 1 - {eval 0.95^L} = {eval 1 - 0.95^L}.
+While we do often refer to the "leader schedule" as the limiting factor, that habit tacitly assumes the adversary is not attacking Praos.
+In other words, it assumes that the density of the RBs on the best Praos chain are determined by the leader schedule.
+The relevant parameter is f = 5%, the Praos _active slot coefficient_.
 
-(The 0.95 is 1-f where f is 0.05, i.e. the Praos _active slot coefficient_.)
+When not under attack, f causes the Praos chain to grow by one block every 1/f=20 seconds, on average.
+When under attack, however, the honest parties will be unable to communicate as effectively, and so some of their elections in the leader schedule will be wasted on short forks instead of them all contributing as growth of the best single chain.
+We introduce a variable {input g, default 5%, both a number input and a coupled slider} between 1% and f=5% to model this.
+When g = f = 5%, the adversary is not interfering with Praos.
+When g < f, they are, and the difference determines the degree of their success---this numeric quantity is ad-hoc, but useful enough for our other calculations in this memo.
 
-A healthy chain will, on average, need to announce N = 0.95<sup>-L</sup> = {eval let N be 0.95^(-L)} EBs for the leader schedule to allow one of them to succeed.
-That's the N for which N × (1 - P(leader schedule prevention | L={eval L})) = 1.
+P(too dense | L={eval L} g={eval g}) = 1 - (1 - g)<sup>L</sup> = 1 - {eval (1 - g)^L} = {eval 1 - (1 - g)^L}.
 
-With an active slot coefficient of 0.05, a healthy chain will, on average, announce one EB per 20 seconds.
-Therefore, on average, there will be 20 × N = {eval 20 × N} seconds between EBs not prevented by the leader schedule.
+A g-chain will, on average, need to announce N = (1 - g)<sup>-L</sup> = {eval let N be (1 - g)^(-L)} EBs for g to allow one of them to succeed.
+That's the N for which N × (1 - P(too dense | L={eval L} g={eval g})) = 1.
 
-Beyond just the average 20 × N, we can also calculate the whole probability mass function of that duration.
-The model is tosses of a 19:1 biased coin, where every run of at least L heads terminated by a tails is an EB that the leader schedule didn't prevent, which is a "jump" in that ["renewal process"](https://en.wikipedia.org/wiki/Renewal_theory) and therefore delineates the "holding time" since the previous jump.
+A g-chain will, on average, announce one EB per 1/g={eval 1/g} seconds.
+Therefore, on average, there will be N ÷ g = {eval N ÷ g} seconds between EBs not prevented by g.
+
+Beyond just the average N ÷ g, we can also calculate the whole probability mass function of that duration.
+The model is tosses of a (1-g):g biased coin, where every run of at least L heads terminated by a tails is an EB that the g didn't prevent, which is a "jump" in that ["renewal process"](https://en.wikipedia.org/wiki/Renewal_theory) and therefore delineates the "holding time" since the previous jump.
 Here it's shown for the shortest durations whose cumulative probability is at least 95% along with select quantiles.
 
 {insert plot 1}
 
-For a given positive maximum EB size {input MaxSize, default 12000}, we can calculate the throughput capacity offered by the successful EBs on an average chain.
-If we optimistically assume that every EB that the leader schedule doesn't prevent is both successful and full, then the average capacity will be MaxSize ÷ (20 × N) = {eval MaxSize ÷ (20 × N)} bytes per second.
+For a given positive maximum EB size {input MaxSize, default 12000}, we can calculate the throughput capacity offered by the successful EBs on an average g-chain.
+If we optimistically assume that every EB that g doesn't prevent is both successful and full, then the average capacity will be MaxSize ÷ (N ÷ g) = {eval MaxSize ÷ (N ÷ g)} bytes per second.
 Here it's shown for possible values of L from 1 to ⌈L×4÷3⌉.
 
 {insert plot 2}
 
 Also shown in orange is the average rate at which EBs are announced.
-Note that as L increases, the capacity decreases but the amount of announcements doesn't change---it's still one per 20 seconds.
+Note that as L increases or g decreases, the capacity decreases but the amount of announcements doesn't change---it's still one per 1/f=20 seconds.
 MaxSize can be increased to bring the capacity back up, but that also proportionally increases the size of each announced EB.
 It's therefore important to acknowledge that adversarial RBs are able to announce any EB they want, and the whole network will diffuse it---they can choose to always announce full EBs, even if no EB has succeeded for a long while.
 
 Suppose the adversary controls a percentage of the total stake {input A, default 33, both a number input and a coupled slider} between 0 and 50%.
-For now, at least, assume that the adversary is not attacking Praos growth; see the caveat below.
-Thus, the ratio of the network utilization the adversary can steadily cause versus the average chain capacity is A × N ÷ 1 = {eval A × N}---and that's even assuming the adversary is choosing to include certs in its RBs.
-If they instead omit Leios certs from their RBs, then the ratio worsens to A × N ÷ (1 - A) = {eval A × N ÷ (1 - A)}.
+(If A is large, the adversary could severely reduce g well below f=5%, for example, by simply withholding their own blocks.
+But whether to do so is that adversary's perogative, and so the variables can be tuned independently.)
+This adversary leads each slot with a probability of φ<sub>f</sub>(A) = 1 - (1 - f)<sup>A</sup> = {let pA be 1 - 0.95^A}.
+Thus, the ratio of the network utilization the adversary can steadily cause versus the average g-chain capacity is (N ÷ g) ÷ (1 ÷ φ<sub>f</sub>(A)) = {eval (N ÷ g) ÷ (1 ÷ pA)}---and that's even assuming the adversary is choosing to include certs in its RBs.
+If they instead omit Leios certs from their RBs, then the ratio worsens by some factor like 1 ÷ (1 - A) to {eval ((N ÷ g) ÷ (1 - A)) ÷ (1 ÷ pA)}.
 
 If the adversary is causing mempool fragmentation, then the _honest_ announced EBs could also be full even when no EBs are succeeding.
-In the most extreme case, the ratio would worsen to N ÷ 1 = {eval N} or even N ÷ (1 - A) = {eval N ÷ (1 - A)} depending on the adversary's RBs.
+In the most extreme case, the ratio would worsen to (N ÷ g) ÷ (1 ÷ f) = {let frag be (N ÷ g) ÷ (1 ÷ f)} or even something like 1 ÷ (1 - A) times worse at {eval frag ÷ (1 - A)} if the adversary omits Leios certs in their RBs.
 
 Three caveats.
 
-- If the adversary disrupts the growth of the RB chain, then it's less dense than the leader schedule and so fewer of the EBs _on the chain_ will be prevented by the leader schedule.
-  It's not trivial how to appropriately adjust the calculations in this memo.
+- The 1 ÷ (1 - A) is a crude guesstimate.
+  The actual multiplier depends on how much of the g growth on the chain consists of adversarial blocks.
 - The above inefficiency ratio calculations exclude the network utilization necessary for the EBs themselves (distinct from the transactions to which they refer) and the votes.
   Those exclusions are much smaller than full EBs, but not totally negligible---that is a forgivable shortcoming of the current draft.
 - The above also ignores the fact that every SPO elected in a multi-leader slot announces an EB.
