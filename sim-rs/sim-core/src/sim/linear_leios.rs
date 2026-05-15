@@ -266,6 +266,11 @@ impl NodeImpl for LinearLeiosNode {
             CpuTask::VoteGenerated(_) | CpuTask::VoteValidated(_, _) => {
                 unreachable!("linear_leios.rs does not schedule per-vote CpuTasks");
             }
+            CpuTask::RBBlockApplied(_) | CpuTask::EBBlockApplied(_) => {
+                unreachable!(
+                    "linear_leios.rs collapses validate+apply; ledger-apply CpuTasks are con-rs only"
+                );
+            }
         }
         std::mem::take(&mut self.queued)
     }

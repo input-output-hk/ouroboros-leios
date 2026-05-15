@@ -258,6 +258,17 @@ pub struct RawParameters {
     pub rb_body_legacy_praos_payload_validation_cpu_time_ms_per_byte: f64,
     pub rb_body_legacy_praos_payload_avg_size_bytes: u64,
 
+    /// CPU cost to apply an RB to ledger state (UTXO mutation, after
+    /// the body-validation signature/structure check has passed).
+    /// Scales by tx count; defaults are minimal-but-nonzero so the
+    /// `PraosState::on_block_applied` accounting fires without
+    /// skewing throughput.  (`con-rs` adapter only — `linear_leios`
+    /// collapses validate+apply into one step.)
+    #[serde(default = "default_rb_apply_cpu_time_ms")]
+    pub rb_apply_cpu_time_ms: f64,
+    #[serde(default = "default_rb_apply_cpu_time_ms_per_tx")]
+    pub rb_apply_cpu_time_ms_per_tx: f64,
+
     // Input block configuration
     pub ib_generation_probability: f64,
     pub ib_generation_cpu_time_ms: f64,
@@ -286,6 +297,16 @@ pub struct RawParameters {
     pub eb_referenced_txs_max_size_bytes: u64,
     pub eb_body_avg_size_bytes: u64,
     pub eb_include_txs_from_previous_stage: bool,
+
+    /// CPU cost to apply an EB closure to ledger state — the EB's
+    /// referenced txs land on-chain via the certifying RB's
+    /// endorsement.  Parallel pathway to `rb_apply_cpu_time_ms` and
+    /// gates mempool-prune of the EB's tx set.  (`con-rs` adapter
+    /// only.)
+    #[serde(default = "default_eb_apply_cpu_time_ms")]
+    pub eb_apply_cpu_time_ms: f64,
+    #[serde(default = "default_eb_apply_cpu_time_ms_per_tx")]
+    pub eb_apply_cpu_time_ms_per_tx: f64,
 
     // Vote configuration
     //
@@ -639,6 +660,10 @@ pub(crate) struct CpuTimeConfig {
     pub cert_generation_per_node: Duration,
     pub cert_validation_constant: Duration,
     pub cert_validation_per_node: Duration,
+    pub rb_apply_constant: Duration,
+    pub rb_apply_per_tx: Duration,
+    pub eb_apply_constant: Duration,
+    pub eb_apply_per_tx: Duration,
 }
 impl CpuTimeConfig {
     fn new(params: &RawParameters) -> Self {
@@ -686,6 +711,10 @@ impl CpuTimeConfig {
             cert_generation_per_node: duration_ms(params.cert_generation_cpu_time_ms_per_node),
             cert_validation_constant: duration_ms(params.cert_validation_cpu_time_ms_constant),
             cert_validation_per_node: duration_ms(params.cert_validation_cpu_time_ms_per_node),
+            rb_apply_constant: duration_ms(params.rb_apply_cpu_time_ms),
+            rb_apply_per_tx: duration_ms(params.rb_apply_cpu_time_ms_per_tx),
+            eb_apply_constant: duration_ms(params.eb_apply_cpu_time_ms),
+            eb_apply_per_tx: duration_ms(params.eb_apply_cpu_time_ms_per_tx),
         }
     }
 }
@@ -1135,6 +1164,22 @@ fn default_parallel_threshold() -> usize {
 
 fn default_retry_vote_in_window() -> bool {
     true
+}
+
+fn default_rb_apply_cpu_time_ms() -> f64 {
+    0.5
+}
+
+fn default_rb_apply_cpu_time_ms_per_tx() -> f64 {
+    0.05
+}
+
+fn default_eb_apply_cpu_time_ms() -> f64 {
+    0.5
+}
+
+fn default_eb_apply_cpu_time_ms_per_tx() -> f64 {
+    0.05
 }
 #[derive(Debug, Clone)]
 pub struct NodeConfiguration {

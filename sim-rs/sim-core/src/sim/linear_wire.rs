@@ -155,6 +155,16 @@ pub enum CpuTask {
     /// A single CIP-0164 vote has been received and validated, ready to propagate
     /// (`con_rs.rs` only)
     VoteValidated(NodeId, Arc<Vote>),
+    /// A ranking block has been validated and is now being applied to
+    /// ledger state — distinct from `RBBlockValidated` (block-body
+    /// signature / structure check).  Scales with tx count because
+    /// applying a real Cardano block walks every input + output.
+    /// (`con_rs.rs` only — `linear_leios.rs` collapses validate+apply.)
+    RBBlockApplied(Arc<RankingBlock>),
+    /// An endorser block's closure has been validated and is now being
+    /// applied to ledger state.  Gates mempool pruning of the EB's
+    /// referenced txs.  (`con_rs.rs` only.)
+    EBBlockApplied(Arc<EndorserBlock>),
 }
 
 impl SimCpuTask for CpuTask {
@@ -170,6 +180,8 @@ impl SimCpuTask for CpuTask {
             Self::VTBundleValidated(_, _) => "ValVote",
             Self::VoteGenerated(_) => "GenVote",
             Self::VoteValidated(_, _) => "ValVote",
+            Self::RBBlockApplied(_) => "AppRB",
+            Self::EBBlockApplied(_) => "AppEB",
         }
         .to_string()
     }
@@ -186,6 +198,8 @@ impl SimCpuTask for CpuTask {
             Self::VTBundleValidated(_, _) => "".to_string(),
             Self::VoteGenerated(_) => "".to_string(),
             Self::VoteValidated(_, _) => "".to_string(),
+            Self::RBBlockApplied(_) => "".to_string(),
+            Self::EBBlockApplied(_) => "".to_string(),
         }
     }
 
@@ -243,6 +257,21 @@ impl SimCpuTask for CpuTask {
             // than re-charged per vote.
             Self::VoteGenerated(_) => vec![config.vote_generation_constant],
             Self::VoteValidated(_, _) => vec![config.vote_validation],
+            // Ledger-apply: scales by tx count (a real ledger walks
+            // every input/output).  Distinct from body validation
+            // (which is the signature/structure check that already
+            // ran).  Minimal-but-nonzero default keeps the accounting
+            // honest without skewing throughput; studies that need to
+            // characterise the fork-rate-vs-apply-latency curve dial
+            // this up.
+            Self::RBBlockApplied(rb) => {
+                let n_txs = rb.transactions.len() as u32;
+                vec![config.rb_apply_constant + config.rb_apply_per_tx * n_txs]
+            }
+            Self::EBBlockApplied(eb) => {
+                let n_txs = eb.txs.len() as u32;
+                vec![config.eb_apply_constant + config.eb_apply_per_tx * n_txs]
+            }
         }
     }
 }

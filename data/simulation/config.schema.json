@@ -296,6 +296,22 @@
     "eb-validation-cpu-time-ms": {
       "type": "number"
     },
+    "rb-apply-cpu-time-ms": {
+      "description": "Per-block constant CPU cost for ledger-apply (con-rs adapter only).",
+      "type": "number"
+    },
+    "rb-apply-cpu-time-ms-per-tx": {
+      "description": "Per-tx scaling for RB ledger-apply (con-rs adapter only).",
+      "type": "number"
+    },
+    "eb-apply-cpu-time-ms": {
+      "description": "Per-EB-closure constant CPU cost for ledger-apply (con-rs adapter only).",
+      "type": "number"
+    },
+    "eb-apply-cpu-time-ms-per-tx": {
+      "description": "Per-tx scaling for EB ledger-apply (con-rs adapter only).",
+      "type": "number"
+    },
     "ib-body-avg-size-bytes": {
       "additionalProperties": false,
       "properties": {},

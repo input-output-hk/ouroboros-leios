@@ -51,7 +51,11 @@
 //! | `PraosState` `k`              | `2160` | sim doesn't model security parameter           |
 //! | Fetch policies (RB/EB/EB-txs/votes) | YAML `fetch-policy.{block,eb,eb-txs,votes}` (default `lowest-rtt` everywhere, matching `LeiosState::new`).  RTT oracle is `UniformRtt(0)` — sim drives fetches via its own `Message` enum |
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    sync::Arc,
+    time::Instant,
+};
 
 use rand_chacha::ChaChaRng;
 use tokio::sync::mpsc;
@@ -64,9 +68,11 @@ use con_rs::{
     },
     lottery as con_lottery,
     mempool::{EbKey, MempoolEffect, MempoolState, PendingTx, TxId, TxRejectReason},
+    peer::PeerId,
     pipeline::PipelineConfig,
-    praos::PraosState,
+    praos::{ParsedHeaderInfo, PraosEffect, PraosState},
     production::BodyPath,
+    types::Point,
     wfa,
 };
 
@@ -230,7 +236,6 @@ pub struct ConRs {
     total_stake: u64,
 
     leios: LeiosState,
-    #[allow(dead_code)] // wired up once Praos message handlers land
     praos: PraosState,
     mempool: MempoolState,
 
@@ -296,12 +301,22 @@ pub struct ConRs {
     /// alongside `Elections::record_vote`.
     votes_by_eb: BTreeMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
 
-    /// Latest RB header this node has seen (received or produced).
-    /// Stands in for the proper Praos chain selection until
-    /// `PraosState` is wired — picks "highest slot" as the parent,
-    /// no fork-choice, no slot-battle resolution.  Slot ties take
-    /// the producer with the lower `NodeId.to_inner()`.
-    latest_rb_id: Option<BlockId>,
+    /// Reverse lookup from con-rs's 32-byte RB hash back to sim's
+    /// `BlockId`.  Populated whenever an RB is fed to [`PraosState`]
+    /// (self-produced via `register_self_produced`, peer-received via
+    /// `on_block_received`).  `pick_parent` projects PraosState's
+    /// `local_tip` back through this table to recover a `BlockId`
+    /// suitable for the sim's wire format.
+    rb_hash_to_id: BTreeMap<[u8; 32], BlockId>,
+
+    /// Real-clock anchor for converting sim `Timestamp`s into
+    /// `Instant`s when calling con-rs APIs that take `now: Instant`
+    /// (Praos cooldowns, fetch-policy RTT math).  Captured once at
+    /// adapter construction; all calls to `instant_now` return
+    /// `epoch + (clock.now() - Timestamp::zero())`, so deltas inside
+    /// PraosState (e.g., `BLOCK_FETCH_COOLDOWN`) advance with sim
+    /// time, not real time.
+    instant_epoch: Instant,
 
     /// Dedup set for `LeiosEffect::NoVote` telemetry.  con-rs's
     /// election lifecycle re-fires `NoVote` once per voting-window
@@ -497,7 +512,8 @@ impl NodeImpl for ConRs {
             votes: BTreeMap::new(),
             node_names,
             votes_by_eb: BTreeMap::new(),
-            latest_rb_id: None,
+            rb_hash_to_id: BTreeMap::new(),
+            instant_epoch: Instant::now(),
             noted_no_vote: std::collections::BTreeSet::new(),
             incomplete_onchain_ebs: std::collections::BTreeSet::new(),
             eb_pending_txs: BTreeMap::new(),
@@ -685,6 +701,8 @@ impl NodeImpl for ConRs {
             CpuTask::VoteValidated(from, vote) => {
                 self.finish_validating_vote(&mut out, from, vote);
             }
+            CpuTask::RBBlockApplied(rb) => self.finish_applying_rb(&mut out, rb),
+            CpuTask::EBBlockApplied(eb) => self.finish_applying_eb(eb),
         }
         out
     }
@@ -794,18 +812,33 @@ impl ConRs {
         self.tracker.track_linear_rb_generated(&rb);
         let rb_id = rb.header.id;
         let header_seen = self.clock.now();
-        let header_for_ctx = rb.header.clone();
+        let header_for_parse = rb.header.clone();
         let rb = Arc::new(rb);
-        if self.note_rb_observed(rb_id) {
-            self.update_chain_tip_ctx(&header_for_ctx);
-        }
+        // Insert into `rbs` first so `dispatch_praos_effects` can
+        // resolve the `Arc<RankingBlock>` when it schedules the apply
+        // CpuTask in response to `register_self_produced`'s
+        // `ValidatorApply` effect.
         self.rbs.insert(
             rb_id,
             RbState::Received {
-                rb,
+                rb: rb.clone(),
                 header_seen,
             },
         );
+        // Feed PraosState: register the self-produced block, note its
+        // header arrival, and dispatch the returned effects.  The
+        // `ValidatorApply` effect schedules `CpuTask::RBBlockApplied`,
+        // which is when the ledger-apply cost is charged and the
+        // chain-tip context refreshes.
+        let hash = synthesize_rb_hash(rb_id);
+        self.rb_hash_to_id.insert(hash, rb_id);
+        let point = block_id_to_point(rb_id);
+        let parsed = parsed_header_from_rb(&header_for_parse);
+        self.praos.note_header_first_seen(hash, self.current_slot);
+        let fx = self
+            .praos
+            .register_self_produced(point, Vec::new(), Vec::new(), Some(parsed));
+        self.dispatch_praos_effects(out, fx);
         for peer in &self.consumers {
             out.send_to(*peer, Message::AnnounceRBHeader(rb_id));
         }
@@ -878,9 +911,9 @@ impl ConRs {
 
     /// `RBHeaderValidated` completion: place the header in
     /// [`RbState::Pending`], announce to other consumers, and request
-    /// the body from `from` when it's already on-hand.  Slot-battle
-    /// resolution is intentionally omitted in this slice — the next
-    /// PraosState slice gets that for free.
+    /// the body from `from` when it's already on-hand.  Tip adoption
+    /// happens on body-validate (`finish_validating_rb`); this path
+    /// only records the peer's announcement and notes header arrival.
     fn finish_validating_rb_header(
         &mut self,
         out: &mut EventResult,
@@ -891,9 +924,24 @@ impl ConRs {
     ) {
         let id = header.id;
         let header_seen = self.clock.now();
-        if self.note_rb_observed(id) {
-            self.update_chain_tip_ctx(&header);
-        }
+        // Tell PraosState the peer's tip advanced.  Phase 3 will
+        // dispatch the returned `FetchBlockRange` effects; today the
+        // body-fetch handshake runs through sim's own Message enum.
+        let hash = synthesize_rb_hash(id);
+        self.rb_hash_to_id.insert(hash, id);
+        self.praos.note_header_first_seen(hash, self.current_slot);
+        let point = block_id_to_point(id);
+        let prev_hash = header.parent.map(synthesize_rb_hash);
+        let _ = self.praos.on_tip_advanced(
+            node_id_to_peer_id(from),
+            point,
+            id.slot,
+            id.slot,
+            hash,
+            id.slot,
+            prev_hash,
+            self.instant_now(),
+        );
         self.rbs.insert(
             id,
             RbState::Pending {
@@ -1087,9 +1135,12 @@ impl ConRs {
         self.record_eb_in_leios(eb_id, &eb);
         // If this EB was already endorsed on-chain (we saw the
         // endorsement in an RB before its body validated locally),
-        // drain its txs now.  See `finish_validating_rb`.
+        // schedule its apply CpuTask now — `finish_applying_eb` does
+        // the actual mempool drain.  Single-shot via `.remove`: a
+        // hypothetical second pass through this function for the same
+        // EB would otherwise schedule the apply twice.
         if self.incomplete_onchain_ebs.remove(&eb_id) {
-            self.drain_endorsed_eb(&eb);
+            out.schedule_cpu_task(CpuTask::EBBlockApplied(eb.clone()));
         }
         // Drain any leios effects emitted by validation.  Today these
         // are `RecordLeiosEbManifest` + `ValidateEb` (we already
@@ -1199,11 +1250,17 @@ impl ConRs {
             .insert(vote.id.voter, weight as usize);
     }
 
-    /// Pick the parent BlockId for a newly produced RB.  Stand-in for
-    /// proper Praos chain selection — picks the highest-slot RB the
-    /// adapter has seen, breaking ties on producer.
+    /// Pick the parent `BlockId` for a newly produced RB.  Reads
+    /// con-rs's adopted tip (`PraosState::local_tip`) and projects it
+    /// back through `rb_hash_to_id` so the produced header carries the
+    /// sim-native form of the parent reference.  Returns `None` until
+    /// the first RB has been validated locally.
     fn pick_parent(&self) -> Option<BlockId> {
-        self.latest_rb_id
+        let (point, _block_no) = self.praos.local_tip()?;
+        match point {
+            Point::Specific { hash, .. } => self.rb_hash_to_id.get(&hash).copied(),
+            Point::Origin => None,
+        }
     }
 
     /// If the local Elections aggregator has a certified EB whose slot
@@ -1229,27 +1286,6 @@ impl ConRs {
             size_bytes,
             votes: voters,
         })
-    }
-
-    /// Refresh `latest_rb_id` when a higher-slot RB is observed.
-    /// Producer break by `NodeId.to_inner()` mirrors the
-    /// chain-selection tiebreaker the sequential engine uses on the
-    /// linear adapter.  Returns `true` when this RB becomes the new
-    /// chain tip, so the caller can propagate the chain-tip context
-    /// to LeiosState.
-    fn note_rb_observed(&mut self, id: BlockId) -> bool {
-        let take_new = match self.latest_rb_id {
-            None => true,
-            Some(cur) => {
-                id.slot > cur.slot
-                    || (id.slot == cur.slot
-                        && id.producer.to_inner() < cur.producer.to_inner())
-            }
-        };
-        if take_new {
-            self.latest_rb_id = Some(id);
-        }
-        take_new
     }
 
     /// Drop chain-state and tx-state entries older than their
@@ -1472,14 +1508,70 @@ impl ConRs {
         );
     }
 
+    /// Project sim time onto a real-clock `Instant` for con-rs APIs
+    /// that take `now: Instant`.  Anchored at `instant_epoch` (captured
+    /// at adapter construction), so identical sim-time deltas yield
+    /// identical `Instant` deltas across runs — PraosState's cooldowns
+    /// and RTT comparisons therefore advance with simulated time.
+    fn instant_now(&self) -> Instant {
+        self.instant_epoch + (self.clock.now() - Timestamp::zero())
+    }
+
+    /// Translate [`PraosEffect`]s into sim CpuTasks / message sends /
+    /// telemetry.  Net-rs has its own dispatcher in
+    /// `net-node/src/consensus/praos/mod.rs`; the sim's flavour drops
+    /// effects whose semantics it doesn't model (chain-store inject,
+    /// validator-side rollback) and routes `ValidatorApply` through
+    /// the CPU task queue for the apply-cost accounting.
+    fn dispatch_praos_effects(&mut self, out: &mut EventResult, effects: Vec<PraosEffect>) {
+        for fx in effects {
+            match fx {
+                // Sim has its own AnnounceRBHeader / RequestRBHeader
+                // handshake; fetch routing through con-rs's pluggable
+                // policy isn't wired here yet.
+                PraosEffect::FetchBlockRange { .. } => {}
+                // No ChainSync mini-protocol in the sim.
+                PraosEffect::ReIntersect { .. } => {}
+                // Sim's chain-state mirror is maintained inline by the
+                // RB-validated path; no separate chain-store to push to.
+                PraosEffect::InjectBlock { .. } => {}
+                // Phase 3 doesn't model fork-switch rollbacks yet
+                // (parent-hash = None makes ancestor walks impossible).
+                // Surface as telemetry once an adversarial scenario
+                // needs it.
+                PraosEffect::InjectRollback { .. } => {}
+                PraosEffect::ValidatorRollback { .. } => {}
+                // Charge the apply cost through the CpuTask queue.
+                // Looks the RB up by its synthesized hash; this is
+                // why `finish_validating_rb` / `finish_generating_rb`
+                // insert into `self.rbs` before calling PraosState.
+                PraosEffect::ValidatorApply { point, .. } => {
+                    let hash = match point {
+                        Point::Specific { hash, .. } => hash,
+                        Point::Origin => continue,
+                    };
+                    let Some(&block_id) = self.rb_hash_to_id.get(&hash) else {
+                        continue;
+                    };
+                    if let Some(RbState::Received { rb, .. }) = self.rbs.get(&block_id) {
+                        out.schedule_cpu_task(CpuTask::RBBlockApplied(rb.clone()));
+                    }
+                }
+            }
+        }
+    }
+
     /// Push the chain tip's `(rb_header_arrival_slot, eb_announcement)`
     /// pair into LeiosState so the `LateRBHeader` / `WrongEB` voting
-    /// predicates run with up-to-date inputs.  Called whenever the
-    /// adopted chain tip changes — see `note_rb_observed`.
-    fn update_chain_tip_ctx(&mut self, header: &LinearRankingBlockHeader) {
+    /// predicates run with up-to-date inputs.  Sources both fields
+    /// from [`PraosState`] — called immediately after every
+    /// `on_block_applied` so the LeiosState voting predicates see the
+    /// freshly-adopted tip.  Idempotent if the tip didn't actually
+    /// change (`set_chain_tip_context` is a plain assignment).
+    fn update_chain_tip_ctx(&mut self) {
         let ctx = ChainTipContext {
-            rb_header_arrival_slot: Some(self.current_slot),
-            eb_announcement: header.eb_announcement.map(synthesize_eb_hash),
+            rb_header_arrival_slot: self.praos.adopted_tip_header_arrival_slot(),
+            eb_announcement: self.praos.adopted_tip_announced_eb(),
         };
         self.leios.set_chain_tip_context(ctx);
     }
@@ -1512,7 +1604,9 @@ impl ConRs {
             .get(&id)
             .and_then(|s| s.header_seen())
             .unwrap_or(self.clock.now());
-        self.note_rb_observed(id);
+        // Insert into `rbs` first so the dispatched `ValidatorApply`
+        // effect's CpuTask can resolve the `Arc<RankingBlock>` from
+        // the side-table when it fires.
         self.rbs.insert(
             id,
             RbState::Received {
@@ -1528,11 +1622,35 @@ impl ConRs {
         for peer in &self.consumers {
             out.send_to(*peer, Message::AnnounceRB(id));
         }
+        // Feed PraosState's receive path.  The `ValidatorApply` effect
+        // it emits schedules `CpuTask::RBBlockApplied`, which is when
+        // the mempool prune + endorsed-EB drain + chain-tip context
+        // refresh actually run.  `on_block_received` dedupes by hash,
+        // so a stray call for a self-produced RB (which already
+        // entered via `register_self_produced`) is a no-op.
+        let point = block_id_to_point(id);
+        let hash = synthesize_rb_hash(id);
+        self.rb_hash_to_id.insert(hash, id);
+        let parsed = parsed_header_from_rb(&rb.header);
+        let fx = self
+            .praos
+            .on_block_received(point, Vec::new(), Vec::new(), Some(parsed));
+        self.dispatch_praos_effects(out, fx);
+    }
+
+    /// `RBBlockApplied` completion: PraosState ratifies the block,
+    /// mempool gets pruned of the included txs, and any endorsed-EB
+    /// closure is queued for its own apply CpuTask.  This is the
+    /// "post-validation, state-mutation" step — distinct from
+    /// `finish_validating_rb`, which is the body-signature check.
+    fn finish_applying_rb(&mut self, out: &mut EventResult, rb: Arc<LinearRankingBlock>) {
+        let id = rb.header.id;
+        let point = block_id_to_point(id);
+        let now = self.instant_now();
+        let fx = self.praos.on_block_applied(point, now);
+        self.dispatch_praos_effects(out, fx);
         // Drop tx_arcs entries that are now on-chain so the mempool
-        // accounting doesn't carry phantom references.  `MempoolState`
-        // handles its own pruning on `on_block_applied` once
-        // PraosState wires the apply effect; until then we just clear
-        // our side-table so EB / RB serving doesn't double-count.
+        // accounting doesn't carry phantom references.
         let ids_on_chain: Vec<TxId> = rb
             .transactions
             .iter()
@@ -1544,12 +1662,9 @@ impl ConRs {
             self.announced_or_known.remove(id);
         }
         // The RB also carries an endorsement when it certifies an EB.
-        // The endorsed EB's txs are now on-chain (via the EB closure),
-        // so drain them from the local mempool / tx-tracking maps so
-        // the next RB / EB this node produces won't double-include
-        // them.  Mirrors linear_leios's drain on RB-with-endorsement.
-        // If the EB body hasn't validated locally yet, defer in
-        // `incomplete_onchain_ebs` and drain on `finish_validating_eb`.
+        // Schedule the EB-closure apply CpuTask if the body's
+        // validated locally; otherwise stash in `incomplete_onchain_ebs`
+        // so `finish_validating_eb` schedules it on body arrival.
         if let Some(endorsement) = rb.endorsement.as_ref() {
             let eb_id = endorsement.eb;
             let eb_arc = match self.ebs.get(&eb_id) {
@@ -1557,11 +1672,25 @@ impl ConRs {
                 _ => None,
             };
             if let Some(eb) = eb_arc {
-                self.drain_endorsed_eb(&eb);
+                out.schedule_cpu_task(CpuTask::EBBlockApplied(eb));
             } else {
                 self.incomplete_onchain_ebs.insert(eb_id);
             }
         }
+        // Tip is now committed — refresh Leios's chain-tip context so
+        // the voting predicates see the fresh adopted tip.
+        self.update_chain_tip_ctx();
+    }
+
+    /// `EBBlockApplied` completion: drain the EB closure's txs from
+    /// the local mempool / tracking maps.  Pure state mutation —
+    /// idempotent, so a producer that already drained inline (to
+    /// build the next body cleanly) can still schedule this CpuTask
+    /// just to charge the CPU cost.
+    fn finish_applying_eb(&mut self, eb: Arc<LinearEndorserBlock>) {
+        let eb_id = eb.id();
+        self.drain_endorsed_eb(&eb);
+        self.incomplete_onchain_ebs.remove(&eb_id);
     }
 
     /// Remove the EB's txs from this node's mempool free pool and
@@ -1792,4 +1921,55 @@ fn synthesize_eb_hash(id: EndorserBlockId) -> [u8; 32] {
     out[8..16].copy_from_slice(&id.pipeline.to_le_bytes());
     out[16..24].copy_from_slice(&(id.producer.to_inner() as u64).to_le_bytes());
     out
+}
+
+/// Deterministic 32-byte RB hash derived from the RB id.  Layout is
+/// chosen so that lexicographic byte order = `(producer asc, slot
+/// asc)` within a block_number group: PraosState breaks
+/// block-number ties on lower hash, and block_number is `slot`
+/// here, so for two RBs at the same slot from different producers
+/// this layout makes the tiebreaker pick the lower
+/// `producer.to_inner()`.
+///
+/// Disjoint from `synthesize_eb_hash` (high bit set in byte 24) so
+/// the same `BlockId`/`EndorserBlockId` would never alias even if
+/// fed through the wrong constructor.
+fn synthesize_rb_hash(id: BlockId) -> [u8; 32] {
+    let mut out = [0u8; 32];
+    out[..8].copy_from_slice(&(id.producer.to_inner() as u64).to_be_bytes());
+    out[8..16].copy_from_slice(&id.slot.to_be_bytes());
+    out[24] = 0x80;
+    out
+}
+
+/// Wrap a sim [`BlockId`] in con-rs's [`Point::Specific`].  Pairs with
+/// [`synthesize_rb_hash`] and the `rb_hash_to_id` reverse table.
+fn block_id_to_point(id: BlockId) -> Point {
+    Point::Specific {
+        slot: id.slot,
+        hash: synthesize_rb_hash(id),
+    }
+}
+
+/// Translate a sim `LinearRankingBlockHeader` to con-rs's
+/// [`ParsedHeaderInfo`].  `block_number = slot` keeps PraosState's
+/// chain-tree weight monotonic along the sim's chain (slots strictly
+/// increase per chain link).  `prev_hash` is the synthesized hash of
+/// the parent `BlockId` carried in the sim header — chains the new
+/// block to its parent so PraosState's ancestor walks find a common
+/// ancestor on chain selection.
+fn parsed_header_from_rb(header: &LinearRankingBlockHeader) -> ParsedHeaderInfo {
+    ParsedHeaderInfo {
+        block_number: header.id.slot,
+        slot: header.id.slot,
+        prev_hash: header.parent.map(synthesize_rb_hash),
+        announced_eb_hash: header.eb_announcement.map(synthesize_eb_hash),
+    }
+}
+
+/// Sim `NodeId` (a `usize` newtype) → con-rs `PeerId` (a `u64`
+/// newtype).  Width-only cast; sim node counts fit comfortably in
+/// `u64` on every platform we target.
+fn node_id_to_peer_id(id: NodeId) -> PeerId {
+    PeerId(id.to_inner() as u64)
 }
