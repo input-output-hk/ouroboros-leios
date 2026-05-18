@@ -1249,7 +1249,7 @@ impl ConRs {
         }
         self.leios
             .elections
-            .record_vote(&eb_hash, voter_key, weight);
+            .record_vote(&eb_hash, vote.id.eb.slot, voter_key, weight);
         self.votes_by_eb
             .entry(vote.id.eb)
             .or_default()
@@ -1271,21 +1271,21 @@ impl ConRs {
 
     /// If the local Elections aggregator has a certified EB whose slot
     /// is old enough that we can endorse it now, build a sim
-    /// [`Endorsement`] for it.  Returns `None` if no cert is ready or
-    /// the matching `EndorserBlockId` isn't known locally.
+    /// [`Endorsement`] for it.  Iterates `votes_by_eb` rather than
+    /// `eb_hash_to_id` so a cert can assemble for an EB whose body
+    /// hasn't been received locally — CIP-0164 allows it, and the
+    /// producer-side EB-safety gate (`LeiosState::has_endorsed_unvalidated_eb`)
+    /// then forces an empty RB body until the closure validates.
     fn try_build_endorsement(&self) -> Option<Endorsement> {
         let cert_slot = self.leios.certified_eb_slot()?;
-        // Look up the EB at that slot whose hash carries a quorum.
-        // Pretty much always one, but iterate just in case multiple
-        // EBs were announced for the same slot.
-        let eb_id = self
-            .eb_hash_to_id
+        let (eb_id, voters) = self
+            .votes_by_eb
             .iter()
-            .find(|(hash, eb_id)| {
-                eb_id.slot == cert_slot && self.leios.elections.quorum(*hash)
+            .find(|(eb_id, _)| {
+                eb_id.slot == cert_slot
+                    && self.leios.elections.quorum(&synthesize_eb_hash(**eb_id))
             })
-            .map(|(_, eb_id)| *eb_id)?;
-        let voters = self.votes_by_eb.get(&eb_id)?.clone();
+            .map(|(eb_id, voters)| (*eb_id, voters.clone()))?;
         let size_bytes = self.sim_config.sizes.cert(voters.len());
         Some(Endorsement {
             eb: eb_id,

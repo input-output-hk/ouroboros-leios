@@ -272,6 +272,7 @@ impl LeiosConsensus {
                 tag: body.tag,
                 eligibility_signature: body.eligibility_signature.as_deref(),
                 endorser_block_hash: &body.endorser_block_hash,
+                endorser_block_slot: body.election_id,
             })
             .collect();
         let fx = self.state.on_validated_votes(bodies);

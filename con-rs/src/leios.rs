@@ -860,10 +860,12 @@ impl LeiosState {
             // Dedup key: voter_id || tag.
             let mut key = body.voter_id.to_vec();
             key.push(body.tag);
-            if let Some(formed) = self
-                .elections
-                .record_vote(body.endorser_block_hash, key, weight)
-            {
+            if let Some(formed) = self.elections.record_vote(
+                body.endorser_block_hash,
+                body.endorser_block_slot,
+                key,
+                weight,
+            ) {
                 let QuorumFormed {
                     eb_slot,
                     voted_weight,
@@ -1025,6 +1027,11 @@ pub struct ValidatedVote<'a> {
     pub tag: u8,
     pub eligibility_signature: Option<&'a [u8]>,
     pub endorser_block_hash: &'a [u8; 32],
+    /// Slot at which the EB was announced.  Required because votes
+    /// can arrive before the local node has seen the EB body —
+    /// without a slot, the placeholder election can't compute its
+    /// pipeline phase.  CIP-0164 vote bodies carry this.
+    pub endorser_block_slot: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -1287,6 +1294,7 @@ mod tests {
             tag: 0,
             eligibility_signature: None,
             endorser_block_hash: &h(1),
+            endorser_block_slot: 10,
         };
         // Stub committee weight: weight_for() returns 0 by default;
         // we'd need PV seats for non-zero weight.  Instead just verify
@@ -1574,6 +1582,7 @@ mod tests {
             tag: 0,
             eligibility_signature: None,
             endorser_block_hash: &h(1),
+            endorser_block_slot: 10,
         };
         let fx = state.on_validated_votes(std::iter::once(vote));
         assert!(fx.iter().any(|e| matches!(

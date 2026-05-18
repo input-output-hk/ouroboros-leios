@@ -91,11 +91,17 @@ impl Elections {
         self.elections.len()
     }
 
-    /// Create an election for an announced EB. Returns `true` iff a new
-    /// election was inserted; `false` if a duplicate exists or the EB
-    /// is already past its pipeline lifetime relative to `current_slot`.
+    /// Mark an election as locally-body-validated.  If an election
+    /// already exists for `eb_hash` (e.g., as a vote-placeholder
+    /// created by `record_vote`), flips `body_validated_locally` to
+    /// true and preserves accumulated votes.  Otherwise creates a
+    /// fresh election with the flag set.  Returns `true` iff a new
+    /// election was inserted; `false` if a placeholder was upgraded or
+    /// the EB is already past its pipeline lifetime relative to
+    /// `current_slot`.
     pub fn announce(&mut self, eb_slot: u64, eb_hash: [u8; 32]) -> bool {
-        if self.elections.contains_key(&eb_hash) {
+        if let Some(existing) = self.elections.get_mut(&eb_hash) {
+            existing.body_validated_locally = true;
             return false;
         }
         let elapsed = self.current_slot.saturating_sub(eb_slot);
@@ -118,6 +124,7 @@ impl Elections {
                 voted: false,
                 voter_weights: BTreeMap::new(),
                 quorum_reached: false,
+                body_validated_locally: true,
             },
         );
         true
@@ -182,20 +189,27 @@ impl Elections {
 
     /// Record a vote received for an EB. The caller decoded the vote
     /// body and computed the weight (typically via `weight_for`).
-    /// Returns `Some(QuorumFormed)` exactly once per election.
+    /// Returns `Some(QuorumFormed)` exactly once per election.  If
+    /// the election doesn't exist yet, a vote-placeholder is created
+    /// at `eb_slot` (see [`aggregation::record_vote`] for the
+    /// CIP-0164 rationale).
     pub fn record_vote(
         &mut self,
         eb_hash: &[u8; 32],
+        eb_slot: u64,
         voter_key: Vec<u8>,
         weight: u32,
     ) -> Option<QuorumFormed> {
         aggregation::record_vote(
             &mut self.elections,
             eb_hash,
+            eb_slot,
             voter_key,
             weight,
             self.cfg.quorum_weight_fraction,
             self.cfg.expected_committee_size,
+            self.current_slot,
+            self.cfg.pipeline,
             &self.cfg.node_id,
         )
     }
@@ -259,12 +273,17 @@ impl Elections {
             .unwrap_or(false)
     }
 
-    /// True iff an election exists for this EB hash — equivalently, the
-    /// EB body has been locally validated (the producer-side EB-safety
-    /// gate's "I have the closure" predicate).  Returns false once the
-    /// election ages out of its pipeline lifetime.
+    /// True iff the EB body has been locally validated (the
+    /// producer-side EB-safety gate's "I have the closure" predicate).
+    /// A vote-placeholder election exists when only votes have been
+    /// observed; this query returns false for that case so the gate
+    /// fires when the producer holds a cert for an EB whose body has
+    /// not been validated locally.
     pub fn is_announced(&self, eb_hash: &[u8; 32]) -> bool {
-        self.elections.contains_key(eb_hash)
+        self.elections
+            .get(eb_hash)
+            .map(|e| e.body_validated_locally)
+            .unwrap_or(false)
     }
 
     pub fn quorum(&self, eb_hash: &[u8; 32]) -> bool {
@@ -433,8 +452,8 @@ mod tests {
         e.on_slot(10);
         e.announce(10, h(1));
         // 75% × 100 = 75. Two voters of weight 40 each cross 75.
-        assert!(e.record_vote(&h(1), b"a".to_vec(), 40).is_none());
-        assert!(e.record_vote(&h(1), b"b".to_vec(), 40).is_some());
+        assert!(e.record_vote(&h(1), 10, b"a".to_vec(), 40).is_none());
+        assert!(e.record_vote(&h(1), 10, b"b".to_vec(), 40).is_some());
         assert!(e.quorum(&h(1)));
         // After Voting+Diffusing windows, phase should be CertEligible.
         e.on_slot(23);

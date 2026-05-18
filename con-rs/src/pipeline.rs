@@ -43,6 +43,14 @@ pub struct EbElection {
     pub voter_weights: BTreeMap<Vec<u8>, u32>,
     /// True once quorum has been reached.
     pub quorum_reached: bool,
+    /// True once `on_validated_eb` has fired for this hash on the local
+    /// node — i.e., the body is in hand and verified.  An election can
+    /// exist with this flag false if the node received votes for an EB
+    /// whose body has not yet been fetched or validated locally;
+    /// CIP-0164 allows cert formation from votes alone, so the
+    /// election aggregates either way.  Drives the producer-side
+    /// EB-safety gate (`endorsed_unvalidated_ebs` in `LeiosState`).
+    pub body_validated_locally: bool,
 }
 
 /// CIP-0164 pipeline timing configuration.
