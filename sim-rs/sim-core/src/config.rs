@@ -525,6 +525,18 @@ pub struct RawLinkInfo {
     pub latency_ms: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bandwidth_bytes_per_second: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub tcp_envelope: Option<RawTcpEnvelope>,
+}
+
+/// User-facing topology knobs for the analytic TCP envelope model. Only the
+/// loss probability is exposed; all other parameters are derived from the
+/// link's latency and bandwidth in [`tcp_model::LinkEnvelopeCfg::defaults_for`].
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct RawTcpEnvelope {
+    #[serde(default)]
+    pub loss_prob_per_segment: f64,
 }
 
 pub struct Topology {
@@ -640,13 +652,24 @@ impl From<RawTopology> for Topology {
                     .push(consumer_id);
                 let mut ids = [consumer_id, producer_id];
                 ids.sort();
+                let latency = duration_ms(producer_info.latency_ms);
+                let tcp_envelope = producer_info.tcp_envelope.as_ref().and_then(|raw| {
+                    let bps = producer_info.bandwidth_bytes_per_second?;
+                    if bps == 0 || latency.is_zero() {
+                        return None;
+                    }
+                    let mut cfg = tcp_model::LinkEnvelopeCfg::defaults_for(latency, bps);
+                    cfg.loss_prob_per_segment = raw.loss_prob_per_segment;
+                    Some(cfg)
+                });
                 links.insert(
                     ids,
                     LinkConfiguration {
                         nodes: (ids[0], ids[1]),
-                        latency: duration_ms(producer_info.latency_ms),
+                        latency,
                         bandwidth_bps: producer_info.bandwidth_bytes_per_second,
                         use_tcp: false,
+                        tcp_envelope,
                     },
                 );
             }
@@ -1351,6 +1374,7 @@ pub struct LinkConfiguration {
     /// Use the TCP congestion-window model for this link instead of the
     /// simple bandwidth-sharing model.
     pub use_tcp: bool,
+    pub tcp_envelope: Option<tcp_model::LinkEnvelopeCfg>,
 }
 
 #[derive(Debug, Clone, Default)]

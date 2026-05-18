@@ -982,21 +982,21 @@ where
                 // Intra-shard (or single-shard): both directions
                 connections.insert(
                     Link { from, to },
-                    ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp),
+                    ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp, None),
                 );
                 connections.insert(
                     Link { from: to, to: from },
-                    ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp),
+                    ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp, None),
                 );
             } else if ts == shard_idx {
                 connections.insert(
                     Link { from, to },
-                    ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp),
+                    ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp, None),
                 );
             } else if fs == shard_idx {
                 connections.insert(
                     Link { from: to, to: from },
-                    ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp),
+                    ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp, None),
                 );
             }
         }

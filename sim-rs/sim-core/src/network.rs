@@ -2,11 +2,13 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc, time::Duratio
 
 use anyhow::{Result, bail};
 use coordinator::{CrossShardDelivery, EdgeConfig, Message, NetworkCoordinator};
+use tcp_model::LinkEnvelopeCfg;
 use tokio::sync::mpsc;
 
 use crate::{
     clock::{Clock, ClockBarrier},
     config::NodeId,
+    rng::Rng,
 };
 
 pub(crate) mod connection;
@@ -33,6 +35,13 @@ impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> Network<TProtocol, TMe
         }
     }
 
+    /// Attach the deterministic loss-draw oracle. Required for any edge that
+    /// is later added with a non-`None` tcp-envelope configuration; ignored
+    /// when no edge uses an envelope.
+    pub fn set_rng_oracle(&mut self, oracle: Rng) {
+        self.coordinator.set_rng_oracle(oracle);
+    }
+
     pub fn set_edge_policy(
         &mut self,
         from: NodeId,
@@ -40,6 +49,7 @@ impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> Network<TProtocol, TMe
         latency: Duration,
         bandwidth_bps: Option<u64>,
         use_tcp: bool,
+        tcp_envelope: Option<LinkEnvelopeCfg>,
     ) -> Result<()> {
         self.coordinator.add_edge(EdgeConfig {
             from,
@@ -47,6 +57,7 @@ impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> Network<TProtocol, TMe
             latency,
             bandwidth_bps,
             use_tcp,
+            tcp_envelope: tcp_envelope.clone(),
         });
         self.coordinator.add_edge(EdgeConfig {
             from: to,
@@ -54,6 +65,7 @@ impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> Network<TProtocol, TMe
             latency,
             bandwidth_bps,
             use_tcp,
+            tcp_envelope,
         });
         Ok(())
     }
@@ -66,9 +78,16 @@ impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> Network<TProtocol, TMe
         latency: Duration,
         bandwidth_bps: Option<u64>,
         use_tcp: bool,
+        tcp_envelope: Option<LinkEnvelopeCfg>,
     ) {
-        self.coordinator
-            .add_edge(EdgeConfig { from, to, latency, bandwidth_bps, use_tcp });
+        self.coordinator.add_edge(EdgeConfig {
+            from,
+            to,
+            latency,
+            bandwidth_bps,
+            use_tcp,
+            tcp_envelope,
+        });
     }
 
     /// Set up direct cross-shard routing: this NC sends directly to target NCs.
