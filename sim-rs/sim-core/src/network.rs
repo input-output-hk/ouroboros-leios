@@ -12,6 +12,7 @@ use crate::{
 pub(crate) mod connection;
 pub(crate) mod coordinator;
 pub mod stats;
+pub(crate) mod tcp_connection;
 
 /// Maps a node ID to its shard index.
 pub type ShardLookup = Arc<HashMap<NodeId, usize>>;
@@ -38,18 +39,21 @@ impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> Network<TProtocol, TMe
         to: NodeId,
         latency: Duration,
         bandwidth_bps: Option<u64>,
+        use_tcp: bool,
     ) -> Result<()> {
         self.coordinator.add_edge(EdgeConfig {
             from,
             to,
             latency,
             bandwidth_bps,
+            use_tcp,
         });
         self.coordinator.add_edge(EdgeConfig {
             from: to,
             to: from,
             latency,
             bandwidth_bps,
+            use_tcp,
         });
         Ok(())
     }
@@ -61,8 +65,10 @@ impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> Network<TProtocol, TMe
         to: NodeId,
         latency: Duration,
         bandwidth_bps: Option<u64>,
+        use_tcp: bool,
     ) {
-        self.coordinator.add_edge(EdgeConfig { from, to, latency, bandwidth_bps });
+        self.coordinator
+            .add_edge(EdgeConfig { from, to, latency, bandwidth_bps, use_tcp });
     }
 
     /// Set up direct cross-shard routing: this NC sends directly to target NCs.

@@ -72,6 +72,16 @@ impl Default for TcpState {
     }
 }
 
+impl TcpState {
+    /// Returns true iff every scheduled ACK has already arrived by `now`.
+    /// Used by `TcpConnection` to decide whether the idle-reset condition holds.
+    pub fn all_acks_arrived(&self, now: Timestamp) -> bool {
+        self.acknowledgements
+            .iter()
+            .all(|Reverse((ts, _))| *ts <= now)
+    }
+}
+
 // ── Forecast ─────────────────────────────────────────────────────────────────
 
 /// Timing forecast for one message or fragment.

@@ -16,7 +16,7 @@ use crate::{
     config::NodeId,
 };
 
-use super::connection::Connection;
+use super::connection::ConnectionKind;
 
 /// Tuple sent directly from source NC to target NC for cross-shard messages.
 pub type CrossShardDelivery<TProtocol, TMessage> = (NodeId, NodeId, TProtocol, TMessage, u64, Timestamp);
@@ -24,7 +24,7 @@ pub type CrossShardDelivery<TProtocol, TMessage> = (NodeId, NodeId, TProtocol, T
 pub struct NetworkCoordinator<TProtocol, TMessage> {
     source: mpsc::UnboundedReceiver<Message<TProtocol, TMessage>>,
     sinks: HashMap<NodeId, mpsc::UnboundedSender<(NodeId, TMessage)>>,
-    connections: HashMap<Link, Connection<TProtocol, TMessage>>,
+    connections: HashMap<Link, ConnectionKind<TProtocol, TMessage>>,
     events: PriorityQueue<Link, Reverse<Timestamp>>,
     local_nodes: HashSet<NodeId>,
     /// Per-shard delivery sinks for sending cross-shard messages directly to target NCs.
@@ -45,6 +45,7 @@ pub struct EdgeConfig {
     pub to: NodeId,
     pub latency: Duration,
     pub bandwidth_bps: Option<u64>,
+    pub use_tcp: bool,
 }
 
 impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> NetworkCoordinator<TProtocol, TMessage> {
@@ -90,7 +91,11 @@ impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> NetworkCoordinator<TPr
             from: config.from,
             to: config.to,
         };
-        let connection = Connection::new(config.latency, config.bandwidth_bps);
+        let connection = ConnectionKind::from_config(
+            config.latency,
+            config.bandwidth_bps,
+            config.use_tcp,
+        );
         self.connections.insert(link, connection);
     }
 

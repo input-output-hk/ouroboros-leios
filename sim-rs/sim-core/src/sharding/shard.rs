@@ -93,15 +93,29 @@ where
         if from_shard == to_shard {
             // Intra-shard: both directions
             networks[from_shard]
-                .set_edge_policy(from, to, link_config.latency, link_config.bandwidth_bps)
+                .set_edge_policy(
+                    from,
+                    to,
+                    link_config.latency,
+                    link_config.bandwidth_bps,
+                    link_config.use_tcp,
+                )
                 .expect("failed to set edge policy");
         } else {
             // Cross-shard: incoming connections on each target shard's NC
             networks[to_shard].add_incoming_edge(
-                from, to, link_config.latency, link_config.bandwidth_bps,
+                from,
+                to,
+                link_config.latency,
+                link_config.bandwidth_bps,
+                link_config.use_tcp,
             );
             networks[from_shard].add_incoming_edge(
-                to, from, link_config.latency, link_config.bandwidth_bps,
+                to,
+                from,
+                link_config.latency,
+                link_config.bandwidth_bps,
+                link_config.use_tcp,
             );
         }
     }

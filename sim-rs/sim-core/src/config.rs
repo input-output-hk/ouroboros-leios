@@ -644,6 +644,7 @@ impl From<RawTopology> for Topology {
                         nodes: (ids[0], ids[1]),
                         latency: duration_ms(producer_info.latency_ms),
                         bandwidth_bps: producer_info.bandwidth_bytes_per_second,
+                        use_tcp: false,
                     },
                 );
             }
@@ -1338,6 +1339,9 @@ pub struct LinkConfiguration {
     pub nodes: (NodeId, NodeId),
     pub latency: Duration,
     pub bandwidth_bps: Option<u64>,
+    /// Use the TCP congestion-window model for this link instead of the
+    /// simple bandwidth-sharing model.
+    pub use_tcp: bool,
 }
 
 #[derive(Debug, Clone, Default)]
