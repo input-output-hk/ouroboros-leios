@@ -16,3 +16,13 @@
 //!
 //! The crate is pure: no I/O, no async, no time source. Times are passed in
 //! as [`std::time::Duration`] since a consumer-chosen link epoch.
+
+pub mod config;
+pub mod curve;
+pub mod envelope;
+pub mod link;
+
+pub use config::LinkEnvelopeCfg;
+pub use curve::{Curve, CurveSegment};
+pub use envelope::Envelope;
+pub use link::LinkState;
