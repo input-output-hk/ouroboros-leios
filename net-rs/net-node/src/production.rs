@@ -252,6 +252,7 @@ impl BlockProducer {
         block_number: u64,
         certified_eb: bool,
         mempool: &crate::mempool::SharedMempool,
+        leios: &con_rs::leios::LeiosState,
     ) -> Option<ProducedRb> {
         if !self.is_active() {
             return None;
@@ -264,12 +265,15 @@ impl BlockProducer {
 
         self.block_count += 1;
 
-        // CIP-0164 overflow rule lives in con-rs (`production::BodyPath`).
+        // CIP-0164 overflow rule plus producer-side EB-safety gate
+        // both live in con-rs (`production::BodyPath`).
         let mut pool = mempool.lock().unwrap();
         let (txs, announced_eb) = match pool.decide_body_path(
             self.rb_body_max_bytes,
             self.eb_body_max_bytes,
+            leios,
         ) {
+            crate::mempool::BodyPath::Empty => (Vec::new(), None),
             crate::mempool::BodyPath::Inline(txs) => (txs, None),
             crate::mempool::BodyPath::Eb { manifest_hashes } => {
                 // Encode wire bytes, hash them, then commit the
@@ -534,6 +538,45 @@ mod tests {
         crate::mempool::new_mempool(1000)
     }
 
+    /// Minimal `LeiosState` for tests that don't exercise the
+    /// producer-side EB-safety gate — `has_endorsed_unvalidated_eb`
+    /// is false on a fresh state, so `BodyPath::decide` falls through
+    /// to the regular overflow rule.
+    fn empty_leios() -> con_rs::leios::LeiosState {
+        use con_rs::config::CommitteeSelection;
+        use con_rs::elections::{Elections, ElectionsConfig};
+        use con_rs::leios::{LeiosState, VotingConfig};
+        use con_rs::pipeline::PipelineConfig;
+        use std::collections::BTreeMap;
+
+        let pipeline = PipelineConfig {
+            delta_hdr: 1,
+            vote_window: 5,
+            diffuse_window: 5,
+            dedup_window: 10,
+        };
+        let elections = Elections::new(ElectionsConfig {
+            node_id: "test".to_string(),
+            pipeline,
+            committee_selection: CommitteeSelection::EveryoneVotes,
+            persistent_committee: BTreeMap::new(),
+            stake_registry: BTreeMap::new(),
+            total_stake: 1000,
+            expected_committee_size: 100,
+            quorum_weight_fraction: 0.75,
+        });
+        let voting = VotingConfig {
+            committee_selection: CommitteeSelection::EveryoneVotes,
+            stake: 100,
+            total_stake: 1000,
+            persistent_vote_bytes: 130,
+            non_persistent_vote_bytes: 180,
+            persistent_seats: 1,
+            retry_vote_in_window: true,
+        };
+        LeiosState::new("test".into(), elections, voting, pipeline)
+    }
+
     fn make_test_tx(id: u8, size: usize) -> PendingTx {
         PendingTx {
             tx_id: TxId(vec![id; 32]),
@@ -563,7 +606,7 @@ mod tests {
         assert!(!producer.is_active());
         for slot in 0..100 {
             assert!(producer
-                .try_produce_block(slot, None, slot + 1, false, &mempool)
+                .try_produce_block(slot, None, slot + 1, false, &mempool, &empty_leios())
                 .is_none());
         }
     }
@@ -579,7 +622,7 @@ mod tests {
         let mempool = empty_mempool();
         assert!(producer.is_active());
         for slot in 0..100 {
-            let result = producer.try_produce_block(slot, None, slot + 1, false, &mempool);
+            let result = producer.try_produce_block(slot, None, slot + 1, false, &mempool, &empty_leios());
             assert!(result.is_some(), "should produce at slot {slot}");
             match result.unwrap().point {
                 Point::Specific { slot: s, .. } => assert_eq!(s, slot),
@@ -602,7 +645,7 @@ mod tests {
             (0..1000)
                 .filter_map(|slot| {
                     producer
-                        .try_produce_block(slot, None, slot + 1, false, &mempool)
+                        .try_produce_block(slot, None, slot + 1, false, &mempool, &empty_leios())
                         .map(|_| slot)
                 })
                 .collect::<Vec<_>>()
@@ -625,7 +668,7 @@ mod tests {
         let wins: usize = (0..10_000)
             .filter(|slot| {
                 producer
-                    .try_produce_block(*slot, None, 1, false, &mempool)
+                    .try_produce_block(*slot, None, 1, false, &mempool, &empty_leios())
                     .is_some()
             })
             .count();
@@ -649,7 +692,7 @@ mod tests {
         let mempool = mempool_with_txs(vec![make_test_tx(1, 500), make_test_tx(2, 300)]);
 
         let produced = producer
-            .try_produce_block(100, None, 1, false, &mempool)
+            .try_produce_block(100, None, 1, false, &mempool, &empty_leios())
             .unwrap();
 
         assert_eq!(produced.included_tx_count, 2);
@@ -672,7 +715,7 @@ mod tests {
         let mempool = empty_mempool();
 
         let produced = producer
-            .try_produce_block(100, None, 1, false, &mempool)
+            .try_produce_block(100, None, 1, false, &mempool, &empty_leios())
             .unwrap();
 
         assert_eq!(produced.included_tx_count, 0);
@@ -699,7 +742,7 @@ mod tests {
         ]);
 
         let produced = producer
-            .try_produce_block(100, None, 1, false, &mempool)
+            .try_produce_block(100, None, 1, false, &mempool, &empty_leios())
             .unwrap();
 
         // EB path: RB body is empty, EB is announced.
@@ -774,7 +817,7 @@ mod tests {
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         let mempool = empty_mempool();
         let produced = producer
-            .try_produce_block(12345, None, 1, false, &mempool)
+            .try_produce_block(12345, None, 1, false, &mempool, &empty_leios())
             .unwrap();
 
         assert!(produced.header.parsed.is_some(), "header should parse");
@@ -798,7 +841,7 @@ mod tests {
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         let mempool = empty_mempool();
         let produced = producer
-            .try_produce_block(100, None, 1, true, &mempool)
+            .try_produce_block(100, None, 1, true, &mempool, &empty_leios())
             .unwrap();
 
         let info = produced.header.parsed.as_ref().unwrap();
@@ -816,7 +859,7 @@ mod tests {
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         let mempool = empty_mempool();
         let produced = producer
-            .try_produce_block(100, None, 1, false, &mempool)
+            .try_produce_block(100, None, 1, false, &mempool, &empty_leios())
             .unwrap();
 
         let info = produced.header.parsed.as_ref().unwrap();
@@ -836,7 +879,7 @@ mod tests {
         let mempool = mempool_with_txs(vec![make_test_tx(1, 200)]);
 
         let produced = producer
-            .try_produce_block(100, None, 1, true, &mempool)
+            .try_produce_block(100, None, 1, true, &mempool, &empty_leios())
             .unwrap();
 
         let info = produced.header.parsed.as_ref().unwrap();
@@ -868,7 +911,7 @@ mod tests {
         let wins_before: usize = (0..100)
             .filter(|slot| {
                 producer
-                    .try_produce_block(*slot, None, 1, false, &mempool)
+                    .try_produce_block(*slot, None, 1, false, &mempool, &empty_leios())
                     .is_some()
             })
             .count();
@@ -881,7 +924,7 @@ mod tests {
         let wins_after: usize = (100..200)
             .filter(|slot| {
                 producer
-                    .try_produce_block(*slot, None, 1, false, &mempool)
+                    .try_produce_block(*slot, None, 1, false, &mempool, &empty_leios())
                     .is_some()
             })
             .count();

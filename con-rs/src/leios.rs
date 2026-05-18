@@ -248,6 +248,15 @@ pub struct LeiosState {
     /// emitted; used at response time to verify which manifest indices
     /// were actually fulfilled.
     pub pending_eb_tx_fetches: BTreeMap<[u8; 32], (u64, BTreeMap<u16, u64>)>,
+    /// EB hashes the local node holds a chain-committed cert for whose
+    /// body it has not validated locally.  Producer-side EB-safety
+    /// gate: while non-empty, the next self-produced RB must emit an
+    /// empty body and no fresh EB announcement (the cert it carries is
+    /// independent of body inclusion).  Insertion via
+    /// `on_chain_endorsement`; cleared by `on_validated_eb` and by
+    /// pipeline-aging in `on_slot`.  Values are EB slot, tagged so the
+    /// entry can age out symmetrically with the election lifecycle.
+    pub endorsed_unvalidated_ebs: BTreeMap<[u8; 32], u64>,
     /// Leios points / fetch gates currently in flight.
     pub in_flight: BTreeMap<Point, Instant>,
 
@@ -311,6 +320,7 @@ impl LeiosState {
             pipeline,
             eb_tx_hashes: BTreeMap::new(),
             pending_eb_tx_fetches: BTreeMap::new(),
+            endorsed_unvalidated_ebs: BTreeMap::new(),
             in_flight: BTreeMap::new(),
             chain_tip_ctx: ChainTipContext::default(),
             candidates: CandidateTracker::new(),
@@ -506,6 +516,15 @@ impl LeiosState {
                 .is_some()
         });
         self.pending_eb_tx_fetches.retain(|_, (eb_slot, _)| {
+            pipeline
+                .phase_for_elapsed(slot.saturating_sub(*eb_slot))
+                .is_some()
+        });
+        // Age out gate entries on the same pipeline timeline as the
+        // election itself — an EB past its lifetime can no longer be
+        // applied as an endorsement, so it no longer threatens future
+        // RB bodies.
+        self.endorsed_unvalidated_ebs.retain(|_, eb_slot| {
             pipeline
                 .phase_for_elapsed(slot.saturating_sub(*eb_slot))
                 .is_some()
@@ -783,13 +802,39 @@ impl LeiosState {
 
     // -- Validation outcomes ------------------------------------------------
 
-    /// EB validation succeeded; create an election for it.
+    /// EB validation succeeded; create an election for it.  Also
+    /// clears the EB-safety gate entry — a body that just validated
+    /// can no longer make a future RB body unsafe.
     pub fn on_validated_eb(&mut self, point: Point) {
         let (slot, hash) = match &point {
             Point::Specific { slot, hash } => (*slot, *hash),
             Point::Origin => return,
         };
         self.elections.announce(slot, hash);
+        self.endorsed_unvalidated_ebs.remove(&hash);
+    }
+
+    /// The local node has observed a chain-committed cert for the EB
+    /// at `(eb_slot, eb_hash)` (a self-produced or peer RB whose body
+    /// the wrapper is in the process of applying).  If the EB body
+    /// has not been validated locally, the producer-side EB-safety
+    /// gate fires from this point until either the body validates
+    /// (`on_validated_eb`) or the EB ages out of its pipeline.
+    /// Idempotent.
+    pub fn on_chain_endorsement(&mut self, eb_slot: u64, eb_hash: [u8; 32]) {
+        if self.elections.is_announced(&eb_hash) {
+            return;
+        }
+        self.endorsed_unvalidated_ebs.entry(eb_hash).or_insert(eb_slot);
+    }
+
+    /// Producer-side EB-safety predicate consumed by
+    /// [`crate::production::BodyPath::decide`].  True iff the local
+    /// node holds a chain-committed cert for at least one EB whose
+    /// body it has not validated locally; in that state the next
+    /// self-produced RB must emit an empty body.
+    pub fn has_endorsed_unvalidated_eb(&self) -> bool {
+        !self.endorsed_unvalidated_ebs.is_empty()
     }
 
     /// Vote validation succeeded; attribute each vote to its EB

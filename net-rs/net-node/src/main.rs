@@ -206,7 +206,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let next_block_no = consensus.next_block_number();
                 let certified_eb = leios && consensus.has_certified_eb();
                 let certified_eb_slot = if certified_eb { consensus.certified_eb_slot() } else { None };
-                if let Some(produced) = producer.try_produce_block(slot, prev_hash, next_block_no, certified_eb, &mempool) {
+                if let Some(produced) = producer.try_produce_block(slot, prev_hash, next_block_no, certified_eb, &mempool, consensus.leios_state()) {
                     info!(
                         node_id = %node_id,
                         point = %produced.point,

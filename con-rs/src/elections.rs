@@ -259,6 +259,14 @@ impl Elections {
             .unwrap_or(false)
     }
 
+    /// True iff an election exists for this EB hash — equivalently, the
+    /// EB body has been locally validated (the producer-side EB-safety
+    /// gate's "I have the closure" predicate).  Returns false once the
+    /// election ages out of its pipeline lifetime.
+    pub fn is_announced(&self, eb_hash: &[u8; 32]) -> bool {
+        self.elections.contains_key(eb_hash)
+    }
+
     pub fn quorum(&self, eb_hash: &[u8; 32]) -> bool {
         self.elections
             .get(eb_hash)

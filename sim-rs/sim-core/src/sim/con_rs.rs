@@ -327,14 +327,6 @@ pub struct ConRs {
     /// `(eb_hash, reason)` here.
     noted_no_vote: std::collections::BTreeSet<([u8; 32], SimNoVoteReason)>,
 
-    /// EBs we've observed on-chain via an RB's `endorsement` but
-    /// haven't yet validated the body for locally.  When the body
-    /// validation completes, we drain its txs from this node's
-    /// mempool / tx-tracking maps so the next RB / EB won't include
-    /// already-certified txs.  Mirrors linear_leios's
-    /// `incomplete_onchain_ebs`.
-    incomplete_onchain_ebs: std::collections::BTreeSet<EndorserBlockId>,
-
     /// EBs received whose manifest references tx bodies the local
     /// mempool doesn't yet hold.  Entry value is the still-missing
     /// subset; entry drops when fully resolved (then
@@ -515,7 +507,6 @@ impl NodeImpl for ConRs {
             rb_hash_to_id: BTreeMap::new(),
             instant_epoch: Instant::now(),
             noted_no_vote: std::collections::BTreeSet::new(),
-            incomplete_onchain_ebs: std::collections::BTreeSet::new(),
             eb_pending_txs: BTreeMap::new(),
             missing_tx_index: BTreeMap::new(),
         }
@@ -730,7 +721,10 @@ impl ConRs {
         // can drain the endorsed EB's txs from this node's mempool
         // before they get re-included in the new EB body.  Matches
         // linear_leios's `remove_eb_txs_from_mempool` call in its
-        // RB-build closure.
+        // RB-build closure.  If the EB body isn't validated locally,
+        // tell LeiosState — the EB-safety gate in `BodyPath::decide`
+        // will short-circuit to an empty body so we never write txs
+        // that the unvalidated closure might claim.
         let endorsement = self.try_build_endorsement();
         if let Some(endorsement) = endorsement.as_ref() {
             let eb_arc = match self.ebs.get(&endorsement.eb) {
@@ -740,14 +734,17 @@ impl ConRs {
             if let Some(eb) = eb_arc {
                 self.drain_endorsed_eb(&eb);
             } else {
-                self.incomplete_onchain_ebs.insert(endorsement.eb);
+                let eb_hash = synthesize_eb_hash(endorsement.eb);
+                self.leios
+                    .on_chain_endorsement(endorsement.eb.slot, eb_hash);
             }
         }
 
         let max_rb_body = self.sim_config.max_block_size as usize;
         let max_eb_body = self.sim_config.max_eb_size as usize;
-        let body = BodyPath::decide(&mut self.mempool, max_rb_body, max_eb_body);
+        let body = BodyPath::decide(&mut self.mempool, max_rb_body, max_eb_body, &self.leios);
         let (rb_txs, eb_pair) = match body {
+            BodyPath::Empty => (Vec::new(), None),
             BodyPath::Inline(pending) => (self.collect_arcs(pending), None),
             BodyPath::Eb { manifest } => {
                 // Commit the drain — `produce_eb` moves the manifest's
@@ -1128,18 +1125,28 @@ impl ConRs {
             seen,
             validated: true,
         };
+        // Snapshot the EB-safety gate BEFORE `record_eb_in_leios`
+        // clears it via `on_validated_eb` — we still need to know
+        // whether the chain had already endorsed this EB so we can
+        // fire the deferred apply CpuTask.
+        let eb_hash = synthesize_eb_hash(eb_id);
+        let was_endorsed_unvalidated = self
+            .leios
+            .endorsed_unvalidated_ebs
+            .contains_key(&eb_hash);
         self.ebs.insert(eb_id, entry);
         // Feed LeiosState so the election is created and the voting
         // lifecycle starts at the next slot tick.  Idempotent — a
-        // duplicate `announce` is silently absorbed.
+        // duplicate `announce` is silently absorbed.  Also clears any
+        // matching gate entry via `on_validated_eb`.
         self.record_eb_in_leios(eb_id, &eb);
         // If this EB was already endorsed on-chain (we saw the
         // endorsement in an RB before its body validated locally),
         // schedule its apply CpuTask now — `finish_applying_eb` does
-        // the actual mempool drain.  Single-shot via `.remove`: a
-        // hypothetical second pass through this function for the same
-        // EB would otherwise schedule the apply twice.
-        if self.incomplete_onchain_ebs.remove(&eb_id) {
+        // the actual mempool drain.  A second pass through this
+        // function for the same EB sees `was_endorsed_unvalidated=false`
+        // (the gate has already been cleared), so no double-schedule.
+        if was_endorsed_unvalidated {
             out.schedule_cpu_task(CpuTask::EBBlockApplied(eb.clone()));
         }
         // Drain any leios effects emitted by validation.  Today these
@@ -1663,8 +1670,9 @@ impl ConRs {
         }
         // The RB also carries an endorsement when it certifies an EB.
         // Schedule the EB-closure apply CpuTask if the body's
-        // validated locally; otherwise stash in `incomplete_onchain_ebs`
-        // so `finish_validating_eb` schedules it on body arrival.
+        // validated locally; otherwise raise the EB-safety gate via
+        // `LeiosState::on_chain_endorsement` so `finish_validating_eb`
+        // sees it pending and schedules the apply on body arrival.
         if let Some(endorsement) = rb.endorsement.as_ref() {
             let eb_id = endorsement.eb;
             let eb_arc = match self.ebs.get(&eb_id) {
@@ -1674,7 +1682,8 @@ impl ConRs {
             if let Some(eb) = eb_arc {
                 out.schedule_cpu_task(CpuTask::EBBlockApplied(eb));
             } else {
-                self.incomplete_onchain_ebs.insert(eb_id);
+                let eb_hash = synthesize_eb_hash(eb_id);
+                self.leios.on_chain_endorsement(eb_id.slot, eb_hash);
             }
         }
         // Tip is now committed — refresh Leios's chain-tip context so
@@ -1688,9 +1697,7 @@ impl ConRs {
     /// build the next body cleanly) can still schedule this CpuTask
     /// just to charge the CPU cost.
     fn finish_applying_eb(&mut self, eb: Arc<LinearEndorserBlock>) {
-        let eb_id = eb.id();
         self.drain_endorsed_eb(&eb);
-        self.incomplete_onchain_ebs.remove(&eb_id);
     }
 
     /// Remove the EB's txs from this node's mempool free pool and

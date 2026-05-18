@@ -55,6 +55,12 @@ fn to_hash_32(id: Vec<u8>) -> [u8; 32] {
 /// [`con_rs::production::BodyPath`].
 #[derive(Debug, Clone)]
 pub enum BodyPath {
+    /// Producer-side EB-safety gate fired: the local node holds a
+    /// chain-committed cert for an EB whose body it has not validated
+    /// locally.  The RB body must be empty and no fresh EB announced;
+    /// the cert itself is independent and remains the caller's
+    /// responsibility.
+    Empty,
     /// RB body inlines these txs; mempool has been drained.
     Inline(Vec<PendingTx>),
     /// RB body is empty; the listed manifest is announced via an EB.
@@ -120,23 +126,31 @@ impl Mempool {
     }
 
     /// Run the CIP-0164 overflow rule.  Returns the body path the next
-    /// self-produced RB should take — either inline txs (mempool drained)
-    /// or an EB announcement carrying a FIFO-ordered manifest capped at
-    /// `eb_body_max_bytes` worth of tx bodies (mempool untouched; caller
-    /// commits via [`Mempool::produce_eb`] once it has computed the EB
-    /// hash from the encoded manifest bytes).
+    /// self-produced RB should take:
+    ///
+    /// - `Empty` when `leios`'s producer-side EB-safety gate is set
+    ///   (chain-committed cert for an EB whose body the local node
+    ///   has not validated).  Mempool is untouched.
+    /// - `Inline(txs)` when the mempool fits in the RB body cap
+    ///   (drained on return).
+    /// - `Eb { manifest_hashes }` when the mempool overflows the cap
+    ///   (mempool untouched; caller commits the drain via
+    ///   [`Mempool::produce_eb`] once it has the EB hash).
     ///
     /// Policy lives in [`con_rs::production::BodyPath::decide`].
     pub fn decide_body_path(
         &mut self,
         rb_body_max_bytes: usize,
         eb_body_max_bytes: usize,
+        leios: &con_rs::leios::LeiosState,
     ) -> BodyPath {
         match con_rs::production::BodyPath::decide(
             &mut self.state,
             rb_body_max_bytes,
             eb_body_max_bytes,
+            leios,
         ) {
+            con_rs::production::BodyPath::Empty => BodyPath::Empty,
             con_rs::production::BodyPath::Inline(txs) => {
                 BodyPath::Inline(txs.into_iter().map(from_con_tx).collect())
             }

@@ -194,6 +194,13 @@ impl Consensus {
         self.leios.has_certified_eb()
     }
 
+    /// Borrow the underlying `LeiosState`.  Used by `try_produce_block`
+    /// to consult the producer-side EB-safety gate
+    /// (`BodyPath::decide` reads `has_endorsed_unvalidated_eb`).
+    pub fn leios_state(&self) -> &con_rs::leios::LeiosState {
+        &self.leios.state
+    }
+
     /// Slot of the earliest certified EB, if any. Used to populate the
     /// eb_slot field on the `RbCertifiedEb` telemetry event.
     pub fn certified_eb_slot(&self) -> Option<u64> {
