@@ -113,6 +113,10 @@ pub struct CachedBlock {
     /// `None` for opaque or pre-Leios headers; the I/O wrapper sets this
     /// when it parses the header.
     pub announced_eb_hash: Option<[u8; 32]>,
+    /// Whether this block's header certifies the parent RB's
+    /// announced EB (CIP-0164 Leios extension).  The EB being
+    /// certified is resolved via [`PraosState::parent_announced_eb`].
+    pub certified_eb: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -330,6 +334,33 @@ impl PraosState {
             .and_then(|cb| cb.announced_eb_hash)
     }
 
+    /// If the block at `point` carries a CIP-0164 cert for its
+    /// parent's announced EB, return the parent RB's slot and the
+    /// announced EB hash.  Used by the I/O wrapper to feed
+    /// [`crate::leios::LeiosState::on_chain_endorsement`] on every
+    /// successful block apply.
+    pub fn parent_announced_eb_for_cert(
+        &self,
+        point: &Point,
+    ) -> Option<(u64, [u8; 32])> {
+        let hash = match point {
+            Point::Specific { hash, .. } => *hash,
+            Point::Origin => return None,
+        };
+        let cb = self.block_cache.get(&hash)?;
+        if !cb.certified_eb {
+            return None;
+        }
+        let parent_hash = cb.prev_hash?;
+        let parent = self.block_cache.get(&parent_hash)?;
+        let parent_eb_hash = parent.announced_eb_hash?;
+        let parent_slot = match &parent.point {
+            Point::Specific { slot, .. } => *slot,
+            Point::Origin => return None,
+        };
+        Some((parent_slot, parent_eb_hash))
+    }
+
     /// Record that this node first observed `header_hash` at slot
     /// `current_slot`.  Idempotent — only the first call for a given
     /// hash takes effect, so callers can invoke it from any path that
@@ -474,23 +505,26 @@ impl PraosState {
             return fx;
         }
         let header_was_parsed = parsed_header.is_some();
-        let (block_no, slot, prev_hash, announced_eb_hash) = match parsed_header {
-            Some(info) => (
-                info.block_number,
-                info.slot,
-                info.prev_hash,
-                info.announced_eb_hash,
-            ),
-            None => (
-                self.chain_tree.block_number(&hash).unwrap_or(0),
-                match &point {
-                    Point::Specific { slot, .. } => *slot,
-                    _ => 0,
-                },
-                self.chain_tree.prev_hash(&hash),
-                None,
-            ),
-        };
+        let (block_no, slot, prev_hash, announced_eb_hash, certified_eb) =
+            match parsed_header {
+                Some(info) => (
+                    info.block_number,
+                    info.slot,
+                    info.prev_hash,
+                    info.announced_eb_hash,
+                    info.certified_eb,
+                ),
+                None => (
+                    self.chain_tree.block_number(&hash).unwrap_or(0),
+                    match &point {
+                        Point::Specific { slot, .. } => *slot,
+                        _ => 0,
+                    },
+                    self.chain_tree.prev_hash(&hash),
+                    None,
+                    false,
+                ),
+            };
         // Insert into chain_tree only when we have a real block_no
         // (parsed header) or, for opaque headers, when fallback metadata
         // is non-default.  Inserting block_no=0 confuses pruning.
@@ -507,6 +541,7 @@ impl PraosState {
                 header: header_bytes,
                 body: body_bytes,
                 announced_eb_hash,
+                certified_eb,
             },
         );
         info!(
@@ -615,6 +650,7 @@ impl PraosState {
                         header: header_bytes,
                         body: body_bytes.clone(),
                         announced_eb_hash: info.announced_eb_hash,
+                        certified_eb: info.certified_eb,
                     });
                 self.submit_for_validation_internal(point, body_bytes, info.prev_hash, &mut fx);
                 self.try_switch_and_execute_internal(hash, &mut fx);
@@ -1363,6 +1399,11 @@ pub struct ParsedHeaderInfo {
     pub prev_hash: Option<[u8; 32]>,
     /// EB hash this header announces, if any (CIP-0164 Leios extension).
     pub announced_eb_hash: Option<[u8; 32]>,
+    /// CIP-0164 Leios extension: whether this RB certifies the parent
+    /// RB's announced EB.  The EB being certified is the parent's
+    /// `announced_eb_hash`; chain context (`parent_announced_eb`)
+    /// resolves the hash at apply time.
+    pub certified_eb: bool,
 }
 
 #[cfg(test)]
@@ -1386,6 +1427,7 @@ mod tests {
             block_number,
             slot,
             prev_hash: prev_seed.map(h),
+            certified_eb: false,
         }
     }
 
@@ -1418,6 +1460,7 @@ mod tests {
                 header: vec![],
                 body: vec![],
                 announced_eb_hash: None,
+                certified_eb: false,
             },
         );
         state.validated.insert(hash);
@@ -1644,6 +1687,7 @@ mod tests {
                 header: vec![],
                 body: vec![],
                 announced_eb_hash: None,
+                certified_eb: false,
             },
         );
         s.adopted_tip_hash = Some(h(4));
@@ -1879,6 +1923,7 @@ mod tests {
                 header: vec![],
                 body: vec![],
                 announced_eb_hash: None,
+                certified_eb: false,
             },
         );
         let walk = s.walk_ancestors_hybrid(h(2));

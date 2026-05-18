@@ -809,7 +809,7 @@ impl ConRs {
         self.tracker.track_linear_rb_generated(&rb);
         let rb_id = rb.header.id;
         let header_seen = self.clock.now();
-        let header_for_parse = rb.header.clone();
+        let parsed = parsed_header_from_rb(&rb);
         let rb = Arc::new(rb);
         // Insert into `rbs` first so `dispatch_praos_effects` can
         // resolve the `Arc<RankingBlock>` when it schedules the apply
@@ -830,7 +830,6 @@ impl ConRs {
         let hash = synthesize_rb_hash(rb_id);
         self.rb_hash_to_id.insert(hash, rb_id);
         let point = block_id_to_point(rb_id);
-        let parsed = parsed_header_from_rb(&header_for_parse);
         self.praos.note_header_first_seen(hash, self.current_slot);
         let fx = self
             .praos
@@ -1638,7 +1637,7 @@ impl ConRs {
         let point = block_id_to_point(id);
         let hash = synthesize_rb_hash(id);
         self.rb_hash_to_id.insert(hash, id);
-        let parsed = parsed_header_from_rb(&rb.header);
+        let parsed = parsed_header_from_rb(&rb);
         let fx = self
             .praos
             .on_block_received(point, Vec::new(), Vec::new(), Some(parsed));
@@ -1965,12 +1964,14 @@ fn block_id_to_point(id: BlockId) -> Point {
 /// the parent `BlockId` carried in the sim header — chains the new
 /// block to its parent so PraosState's ancestor walks find a common
 /// ancestor on chain selection.
-fn parsed_header_from_rb(header: &LinearRankingBlockHeader) -> ParsedHeaderInfo {
+fn parsed_header_from_rb(rb: &LinearRankingBlock) -> ParsedHeaderInfo {
+    let h = &rb.header;
     ParsedHeaderInfo {
-        block_number: header.id.slot,
-        slot: header.id.slot,
-        prev_hash: header.parent.map(synthesize_rb_hash),
-        announced_eb_hash: header.eb_announcement.map(synthesize_eb_hash),
+        block_number: h.id.slot,
+        slot: h.id.slot,
+        prev_hash: h.parent.map(synthesize_rb_hash),
+        announced_eb_hash: h.eb_announcement.map(synthesize_eb_hash),
+        certified_eb: rb.endorsement.is_some(),
     }
 }
 

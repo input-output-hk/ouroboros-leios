@@ -163,6 +163,7 @@ impl PraosConsensus {
             slot: i.slot,
             prev_hash: i.prev_hash,
             announced_eb_hash: i.announced_eb.map(|(hash, _size)| hash),
+            certified_eb: i.certified_eb.unwrap_or(false),
         })
     }
 
@@ -340,6 +341,16 @@ impl PraosConsensus {
     /// EB hash announced by the adopted tip header, if any.
     pub fn adopted_tip_announced_eb(&self) -> Option<[u8; 32]> {
         self.state.adopted_tip_announced_eb()
+    }
+
+    /// For an RB at `point` carrying a CIP-0164 cert, return the
+    /// parent RB's (slot, announced_eb_hash).  Used by the facade to
+    /// drive `LeiosState::on_chain_endorsement` at apply time.
+    pub fn parent_announced_eb_for_cert(
+        &self,
+        point: &Point,
+    ) -> Option<(u64, [u8; 32])> {
+        self.state.parent_announced_eb_for_cert(point)
     }
 }
 
@@ -1023,6 +1034,7 @@ mod tests {
             block_no,
             prev_hash,
             announced_eb_hash: None,
+            certified_eb: false,
         }
     }
 

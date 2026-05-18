@@ -168,6 +168,20 @@ impl Consensus {
                 self.leios.on_validated_votes(&vote_data);
                 false
             }
+            LedgerOutcome::Applied { ref point } => {
+                // Producer-side EB-safety gate: an RB carrying a cert
+                // for the parent's announced EB needs that EB recorded
+                // in `LeiosState` until its body validates locally.
+                // `BodyPath::decide` reads this for the next own RB.
+                if let Some((eb_slot, eb_hash)) =
+                    self.praos.parent_announced_eb_for_cert(point)
+                {
+                    self.leios
+                        .state
+                        .on_chain_endorsement(eb_slot, eb_hash);
+                }
+                self.praos.on_validation_outcome(outcome).await
+            }
             other => self.praos.on_validation_outcome(other).await,
         }
     }
