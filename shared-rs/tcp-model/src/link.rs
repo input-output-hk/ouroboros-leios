@@ -3,15 +3,17 @@
 //! Each directed link carries its own [`LinkState`]. Consumers call
 //! [`LinkState::on_send`] before queueing a new message: this prunes expired
 //! envelopes, fires a cold-start or idle-reset envelope when appropriate, and
-//! draws packet loss. At any other moment they can query
-//! [`LinkState::bw_mult`] (the multiplier on nominal bandwidth) and
-//! [`LinkState::delivery_floor`] (an absolute time below which arrivals must
-//! not be reported).
+//! pushes a loss envelope if the caller's pre-drawn `loss_drawn` flag is set.
+//! At any other moment they can query [`LinkState::bw_mult`] (the multiplier
+//! on nominal bandwidth) and [`LinkState::delivery_floor`] (an absolute time
+//! below which arrivals must not be reported).
+//!
+//! Randomness is the consumer's responsibility: see
+//! [`LinkEnvelopeCfg::msg_loss_prob`] for the per-message probability to
+//! Bernoulli-sample from any deterministic oracle.
 
 use std::time::Duration;
 
-use rand::Rng;
-use rand::rngs::StdRng;
 use smallvec::SmallVec;
 
 use crate::config::LinkEnvelopeCfg;
@@ -22,16 +24,14 @@ const INTEGRATE_STEPS: u32 = 16;
 
 pub struct LinkState {
     cfg: LinkEnvelopeCfg,
-    rng: StdRng,
     last_traffic: Option<Duration>,
     active: SmallVec<[Envelope; 4]>,
 }
 
 impl LinkState {
-    pub fn new(cfg: LinkEnvelopeCfg, rng: StdRng) -> Self {
+    pub fn new(cfg: LinkEnvelopeCfg) -> Self {
         Self {
             cfg,
-            rng,
             last_traffic: None,
             active: SmallVec::new(),
         }
@@ -57,9 +57,14 @@ impl LinkState {
     }
 
     /// Called before a new message is queued for transmission. Drops expired
-    /// envelopes, fires a cold or idle envelope when applicable, and draws a
-    /// loss event whose probability scales with the message's segment count.
-    pub fn on_send(&mut self, t: Duration, bytes: u64) {
+    /// envelopes, fires a cold or idle envelope when applicable, and pushes
+    /// a loss envelope when the caller's pre-drawn `loss_drawn` is true.
+    /// Envelopes whose depth and durations make them immediately expired
+    /// (e.g. when the config is [`LinkEnvelopeCfg::disabled`]) are never
+    /// retained — callers can rely on [`Self::has_active_envelopes`] being
+    /// false in that case. `_bytes` is currently unused but kept for symmetry
+    /// with [`LinkEnvelopeCfg::msg_loss_prob`].
+    pub fn on_send(&mut self, t: Duration, _bytes: u64, loss_drawn: bool) {
         self.active.retain(|e| !e.is_expired_at(t));
 
         let trigger_cold = match self.last_traffic {
@@ -67,14 +72,59 @@ impl LinkState {
             Some(prev) => t.checked_sub(prev).is_some_and(|gap| gap > self.cfg.idle_reset_threshold),
         };
         if trigger_cold {
-            self.active.push(self.cold_envelope(t));
+            let env = self.cold_envelope(t);
+            if !env.is_expired_at(t) {
+                self.active.push(env);
+            }
         }
 
-        if self.draw_loss(bytes) {
-            self.active.push(self.loss_envelope(t));
+        if loss_drawn {
+            let env = self.loss_envelope(t);
+            if !env.is_expired_at(t) {
+                self.active.push(env);
+            }
         }
 
         self.last_traffic = Some(t);
+    }
+
+    /// True iff at least one envelope is currently in [`Self::on_send`]'s
+    /// active stack. Useful for consumers that want to take a faster path
+    /// when the link is unperturbed.
+    pub fn has_active_envelopes(&self) -> bool {
+        !self.active.is_empty()
+    }
+
+    /// Smallest `t ≥ t0` such that [`Self::bytes_deliverable`]`(bps, t0, t)`
+    /// reaches `target`. Returns `t0` when the target is zero; returns the
+    /// supplied `upper` if even `bytes_deliverable(t0, upper)` falls short.
+    /// Useful for projecting when a specific number of bytes will have been
+    /// delivered through an envelope-modulated pipe.
+    pub fn invert_bytes_deliverable(
+        &self,
+        bps: u64,
+        target: u64,
+        t0: Duration,
+        upper: Duration,
+    ) -> Duration {
+        if target == 0 || bps == 0 {
+            return t0;
+        }
+        if upper <= t0 || self.bytes_deliverable(bps, t0, upper) < target {
+            return upper;
+        }
+        let mut lo = t0;
+        let mut hi = upper;
+        let tolerance = Duration::from_micros(1);
+        while hi.saturating_sub(lo) > tolerance {
+            let mid = lo + (hi - lo) / 2;
+            if self.bytes_deliverable(bps, t0, mid) >= target {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        hi
     }
 
     /// Integrates `bps · bw_mult(s)` over `[t0, t1]`. Sub-divides at every
@@ -139,35 +189,21 @@ impl LinkState {
             lat_stall: self.cfg.rto,
         }
     }
-
-    fn draw_loss(&mut self, bytes: u64) -> bool {
-        if self.cfg.loss_prob_per_segment <= 0.0 || bytes == 0 {
-            return false;
-        }
-        let segments = bytes.div_ceil(self.cfg.mss_bytes) as f64;
-        let p_msg = 1.0 - (1.0 - self.cfg.loss_prob_per_segment).powf(segments);
-        self.rng.gen::<f64>() < p_msg
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::SeedableRng;
 
     fn ms(n: u64) -> Duration {
         Duration::from_millis(n)
     }
 
-    fn rng() -> StdRng {
-        StdRng::seed_from_u64(0xC0FFEE)
-    }
-
     #[test]
     fn fresh_link_fires_cold_envelope_on_first_send() {
         let cfg = LinkEnvelopeCfg::defaults_for(ms(150), 1_000_000);
-        let mut s = LinkState::new(cfg, rng());
-        s.on_send(ms(0), 1500);
+        let mut s = LinkState::new(cfg);
+        s.on_send(ms(0), 1500, false);
         assert_eq!(s.active.len(), 1);
         // Step onset → mult at t=0 is `depth`, well below 1.0.
         assert!(s.bw_mult(ms(0)) < 0.2);
@@ -176,23 +212,23 @@ mod tests {
     #[test]
     fn second_send_within_idle_threshold_does_not_re_fire() {
         let cfg = LinkEnvelopeCfg::defaults_for(ms(150), 1_000_000);
-        let mut s = LinkState::new(cfg, rng());
-        s.on_send(ms(0), 1500);
+        let mut s = LinkState::new(cfg);
+        s.on_send(ms(0), 1500, false);
         let cold_release_end = ms(0) + s.cfg.cold_release;
         // Second send inside the cold envelope's recovery and well inside
         // the idle threshold: only the original envelope is active.
-        s.on_send(cold_release_end / 2, 1500);
+        s.on_send(cold_release_end / 2, 1500, false);
         assert_eq!(s.active.len(), 1);
     }
 
     #[test]
     fn long_idle_gap_re_fires_cold_envelope() {
         let cfg = LinkEnvelopeCfg::defaults_for(ms(150), 1_000_000);
-        let mut s = LinkState::new(cfg, rng());
-        s.on_send(ms(0), 1500);
+        let mut s = LinkState::new(cfg);
+        s.on_send(ms(0), 1500, false);
         let before = s.active.len();
         let later = s.cfg.idle_reset_threshold + ms(100);
-        s.on_send(later, 1500);
+        s.on_send(later, 1500, false);
         // A new cold envelope has been pushed; the old one may still be
         // mid-release if its recovery is longer than the idle threshold.
         assert!(s.active.len() > before);
@@ -200,33 +236,20 @@ mod tests {
     }
 
     #[test]
-    fn loss_disabled_by_default() {
+    fn loss_drawn_pushes_loss_envelope() {
         let cfg = LinkEnvelopeCfg::defaults_for(ms(150), 1_000_000);
-        let mut s = LinkState::new(cfg, rng());
-        for i in 0..1000 {
-            s.on_send(ms(i * 10), 1500);
-        }
-        // Without loss, only one envelope at a time is active (cold/idle).
-        assert!(s.active.len() <= 1);
-    }
-
-    #[test]
-    fn loss_certain_always_fires() {
-        let mut cfg = LinkEnvelopeCfg::defaults_for(ms(150), 1_000_000);
-        cfg.loss_prob_per_segment = 1.0;
-        let mut s = LinkState::new(cfg, rng());
-        s.on_send(ms(0), 1500);
+        let mut s = LinkState::new(cfg);
+        s.on_send(ms(0), 1500, true);
         // Cold + loss envelopes both active.
         assert_eq!(s.active.len(), 2);
     }
 
     #[test]
     fn delivery_floor_unblocked_outside_stall() {
-        let mut cfg = LinkEnvelopeCfg::defaults_for(ms(150), 1_000_000);
-        cfg.loss_prob_per_segment = 1.0;
+        let cfg = LinkEnvelopeCfg::defaults_for(ms(150), 1_000_000);
         let rto = cfg.rto;
-        let mut s = LinkState::new(cfg, rng());
-        s.on_send(ms(100), 1500);
+        let mut s = LinkState::new(cfg);
+        s.on_send(ms(100), 1500, true);
         // Inside the rto stall → floor at fired_at + rto.
         assert_eq!(s.delivery_floor(ms(500)), ms(100) + rto);
         // After stall → no floor.
@@ -235,8 +258,7 @@ mod tests {
 
     #[test]
     fn bytes_deliverable_zero_envelopes_is_linear() {
-        let cfg = LinkEnvelopeCfg::disabled();
-        let s = LinkState::new(cfg, rng());
+        let s = LinkState::new(LinkEnvelopeCfg::disabled());
         let bytes = s.bytes_deliverable(1_000_000, ms(0), ms(100));
         // 100ms at 1MB/s = 100_000 bytes.
         assert_eq!(bytes, 100_000);
@@ -245,8 +267,8 @@ mod tests {
     #[test]
     fn bytes_deliverable_under_cold_envelope_is_below_linear() {
         let cfg = LinkEnvelopeCfg::defaults_for(ms(150), 1_000_000);
-        let mut s = LinkState::new(cfg, rng());
-        s.on_send(ms(0), 1);
+        let mut s = LinkState::new(cfg);
+        s.on_send(ms(0), 1, false);
         let bytes = s.bytes_deliverable(1_000_000, ms(0), ms(200));
         // 200ms at 1MB/s, depth ≈ 0.05 ramping up → much less than 200_000.
         assert!(bytes < 100_000, "got {bytes}");
@@ -260,8 +282,8 @@ mod tests {
         // `bytes_deliverable` and assert the integrator lands in a sane band.
         let lat = ms(300);
         let bps: u64 = 1_024_000;
-        let mut s = LinkState::new(LinkEnvelopeCfg::defaults_for(lat, bps), rng());
-        s.on_send(Duration::ZERO, 1);
+        let mut s = LinkState::new(LinkEnvelopeCfg::defaults_for(lat, bps));
+        s.on_send(Duration::ZERO, 1, false);
 
         let target: u64 = 1_048_576;
         let (mut lo, mut hi) = (Duration::ZERO, Duration::from_secs(10));

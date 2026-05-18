@@ -5,6 +5,5 @@ edition = "2021"
 description = "Analytic envelope model of TCP transport effects (slow-start, idle reset, packet loss) for Cardano Leios network simulators."
 
 [dependencies]
-rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 smallvec = { version = "1", features = ["serde"] }

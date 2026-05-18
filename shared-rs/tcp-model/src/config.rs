@@ -68,6 +68,18 @@ impl LinkEnvelopeCfg {
         }
     }
 
+    /// Effective per-message loss probability under independent per-segment
+    /// drops. Returns `0.0` when either input is zero. Consumers draw a
+    /// uniform random `u ∈ [0, 1)` and pass `u < msg_loss_prob(bytes)` as
+    /// the `loss_drawn` argument to [`crate::LinkState::on_send`].
+    pub fn msg_loss_prob(&self, bytes: u64) -> f64 {
+        if self.loss_prob_per_segment <= 0.0 || bytes == 0 {
+            return 0.0;
+        }
+        let segments = bytes.div_ceil(self.mss_bytes) as f64;
+        1.0 - (1.0 - self.loss_prob_per_segment).powf(segments)
+    }
+
     /// A configuration that fires no envelopes: cold/idle envelopes have unit
     /// depth and zero release, loss probability is zero.
     pub fn disabled() -> Self {
@@ -118,5 +130,21 @@ mod tests {
         assert_eq!(cfg.cold_bw_depth, 1.0);
         assert_eq!(cfg.loss_prob_per_segment, 0.0);
         assert_eq!(cfg.idle_reset_threshold, Duration::MAX);
+    }
+
+    #[test]
+    fn msg_loss_prob_scales_with_segment_count() {
+        let mut cfg = LinkEnvelopeCfg::defaults_for(Duration::from_millis(100), 1_000_000);
+        cfg.loss_prob_per_segment = 0.001;
+        // Single-segment message: p_msg ≈ p_seg.
+        assert!((cfg.msg_loss_prob(1000) - 0.001).abs() < 1e-9);
+        // Ten-segment message: 1 - (1 - 0.001)^10 ≈ 0.00996.
+        assert!((cfg.msg_loss_prob(10 * cfg.mss_bytes) - 0.009955_f64).abs() < 1e-5);
+    }
+
+    #[test]
+    fn msg_loss_prob_zero_when_disabled() {
+        let cfg = LinkEnvelopeCfg::disabled();
+        assert_eq!(cfg.msg_loss_prob(1_000_000), 0.0);
     }
 }
