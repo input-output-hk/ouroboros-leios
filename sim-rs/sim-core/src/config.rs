@@ -529,14 +529,79 @@ pub struct RawLinkInfo {
     pub tcp_envelope: Option<RawTcpEnvelope>,
 }
 
-/// User-facing topology knobs for the analytic TCP envelope model. Only the
-/// loss probability is exposed; all other parameters are derived from the
-/// link's latency and bandwidth in [`tcp_model::LinkEnvelopeCfg::defaults_for`].
+/// User-facing topology knobs for the analytic TCP envelope model. Every
+/// field is an optional override on top of the
+/// [`tcp_model::LinkEnvelopeCfg::defaults_for`] derivation. Durations use
+/// the same `_ms` suffix convention as the surrounding topology schema.
+///
+/// Note: `mss_bytes` and `initial_cwnd_segments` do *not* re-derive
+/// dependent fields like `cold_bw_depth` or `cold_release_ms` on their own.
+/// Override those too if you change MSS or IW away from the defaults.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct RawTcpEnvelope {
-    #[serde(default)]
-    pub loss_prob_per_segment: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss_prob_per_segment: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mss_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub initial_cwnd_segments: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idle_reset_threshold_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rto_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss_bw_depth: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cold_bw_depth: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cold_release_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cold_release_shape: Option<tcp_model::Curve>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss_release_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss_release_shape: Option<tcp_model::Curve>,
+}
+
+impl RawTcpEnvelope {
+    /// Apply this YAML block over a baseline [`tcp_model::LinkEnvelopeCfg`].
+    /// Fields left as `None` keep the baseline value.
+    pub fn apply(&self, cfg: &mut tcp_model::LinkEnvelopeCfg) {
+        if let Some(v) = self.loss_prob_per_segment {
+            cfg.loss_prob_per_segment = v;
+        }
+        if let Some(v) = self.mss_bytes {
+            cfg.mss_bytes = v;
+        }
+        if let Some(v) = self.initial_cwnd_segments {
+            cfg.initial_cwnd_segments = v;
+        }
+        if let Some(v) = self.idle_reset_threshold_ms {
+            cfg.idle_reset_threshold = Duration::from_millis(v);
+        }
+        if let Some(v) = self.rto_ms {
+            cfg.rto = Duration::from_millis(v);
+        }
+        if let Some(v) = self.loss_bw_depth {
+            cfg.loss_bw_depth = v;
+        }
+        if let Some(v) = self.cold_bw_depth {
+            cfg.cold_bw_depth = v;
+        }
+        if let Some(v) = self.cold_release_ms {
+            cfg.cold_release = Duration::from_millis(v);
+        }
+        if let Some(v) = self.cold_release_shape {
+            cfg.cold_release_shape = v;
+        }
+        if let Some(v) = self.loss_release_ms {
+            cfg.loss_release = Duration::from_millis(v);
+        }
+        if let Some(v) = self.loss_release_shape {
+            cfg.loss_release_shape = v;
+        }
+    }
 }
 
 pub struct Topology {
@@ -659,7 +724,7 @@ impl From<RawTopology> for Topology {
                         return None;
                     }
                     let mut cfg = tcp_model::LinkEnvelopeCfg::defaults_for(latency, bps);
-                    cfg.loss_prob_per_segment = raw.loss_prob_per_segment;
+                    raw.apply(&mut cfg);
                     Some(cfg)
                 });
                 links.insert(
@@ -1501,5 +1566,80 @@ mod consensus_behaviour_tests {
         for id in a.keys() {
             assert!(id.to_inner() % 2 == 0);
         }
+    }
+}
+
+#[cfg(test)]
+mod tcp_envelope_tests {
+    use super::*;
+    use tcp_model::Curve;
+
+    fn parsed(yaml: &str) -> RawTcpEnvelope {
+        serde_yaml::from_str(yaml).expect("parse failure")
+    }
+
+    #[test]
+    fn empty_block_is_all_none() {
+        let env = parsed("{}");
+        assert!(env.loss_prob_per_segment.is_none());
+        assert!(env.cold_release_shape.is_none());
+    }
+
+    #[test]
+    fn kebab_case_fields_parse() {
+        let env = parsed(
+            "
+            loss-prob-per-segment: 0.001
+            mss-bytes: 1500
+            initial-cwnd-segments: 16
+            idle-reset-threshold-ms: 250
+            rto-ms: 200
+            loss-bw-depth: 0.75
+            cold-bw-depth: 0.1
+            cold-release-ms: 500
+            cold-release-shape: linear
+            loss-release-ms: 2000
+            loss-release-shape: geometric
+            ",
+        );
+        assert_eq!(env.loss_prob_per_segment, Some(0.001));
+        assert_eq!(env.mss_bytes, Some(1500));
+        assert_eq!(env.initial_cwnd_segments, Some(16));
+        assert_eq!(env.idle_reset_threshold_ms, Some(250));
+        assert_eq!(env.rto_ms, Some(200));
+        assert_eq!(env.loss_bw_depth, Some(0.75));
+        assert_eq!(env.cold_bw_depth, Some(0.1));
+        assert_eq!(env.cold_release_ms, Some(500));
+        assert_eq!(env.cold_release_shape, Some(Curve::Linear));
+        assert_eq!(env.loss_release_ms, Some(2000));
+        assert_eq!(env.loss_release_shape, Some(Curve::Geometric));
+    }
+
+    #[test]
+    fn unknown_field_is_rejected() {
+        let res: Result<RawTcpEnvelope, _> = serde_yaml::from_str("not-a-field: 1");
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn apply_layers_overrides_on_top_of_defaults() {
+        let yaml = "
+            loss-prob-per-segment: 0.002
+            rto-ms: 500
+            cold-release-shape: linear
+        ";
+        let raw: RawTcpEnvelope = serde_yaml::from_str(yaml).unwrap();
+        let mut cfg = tcp_model::LinkEnvelopeCfg::defaults_for(
+            Duration::from_millis(150),
+            1_000_000,
+        );
+        let baseline_cold_release = cfg.cold_release;
+        raw.apply(&mut cfg);
+        assert_eq!(cfg.loss_prob_per_segment, 0.002);
+        assert_eq!(cfg.rto, Duration::from_millis(500));
+        assert_eq!(cfg.cold_release_shape, Curve::Linear);
+        // Unmentioned fields keep their derived defaults.
+        assert_eq!(cfg.cold_release, baseline_cold_release);
+        assert_eq!(cfg.mss_bytes, 1460);
     }
 }

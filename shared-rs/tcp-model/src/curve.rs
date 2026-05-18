@@ -16,6 +16,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Curve {
     Step,
     Linear,
