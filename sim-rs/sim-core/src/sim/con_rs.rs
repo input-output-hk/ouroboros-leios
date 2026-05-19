@@ -536,10 +536,19 @@ impl NodeImpl for ConRs {
         {
             self.log_memory_stats(slot);
         }
-        // Drive Leios election lifecycle.  `tx_known` is `|_| true`
-        // until the EB-manifest path's `MissingTX` predicate is
-        // hooked up to a real callback (sim's tx_arcs).
-        let leios_fx = self.leios.on_slot(slot, &|_| true);
+        // Drive Leios election lifecycle.  `tx_known` mirrors
+        // `local_has_tx`: a body counts as held if it's in the
+        // mempool (free ∪ EB-pinned) or cached in `tx_arcs` (e.g.,
+        // admit-rejected on capacity).  Disjoint-field borrows let
+        // the closure capture &mempool and &tx_arcs while
+        // self.leios is borrowed mutably.
+        let mempool = &self.mempool;
+        let tx_arcs = &self.tx_arcs;
+        let tx_known = |hash: &[u8; 32]| {
+            let key = hash.to_vec();
+            mempool.has_tx(&key) || tx_arcs.contains_key(&key)
+        };
+        let leios_fx = self.leios.on_slot(slot, &tx_known);
         self.apply_leios_effects(&mut out, leios_fx);
         // Praos RB lottery — shared formula with net-rs, sim-rs keeps
         // its own VRF draw form (`Rng::draw_range`).
@@ -663,10 +672,23 @@ impl NodeImpl for ConRs {
             CpuTask::TransactionValidated(from, tx) => {
                 let key = tx_id_for(tx.id);
                 self.pending_from.remove(&key);
-                let fx = self.mempool.admit_validated(key, vec![], tx.bytes as u32);
+                let fx = self.mempool.admit_validated(
+                    key.clone(),
+                    vec![],
+                    tx.bytes as u32,
+                );
                 let admitted = !fx
                     .iter()
                     .any(|e| matches!(e, MempoolEffect::TxRejected { .. }));
+                let queue_full = fx.iter().any(|e| {
+                    matches!(
+                        e,
+                        MempoolEffect::TxRejected {
+                            reason: TxRejectReason::QueueFull,
+                            ..
+                        }
+                    )
+                });
                 self.apply_mempool_effects(&mut out, fx);
                 if admitted {
                     for peer in &self.consumers {
@@ -678,6 +700,28 @@ impl NodeImpl for ConRs {
                     // Release any EBs that were waiting on this tx
                     // body's arrival (CIP-0164 receiver gate).
                     self.acknowledge_tx_for_pending_ebs(&mut out, tx.id);
+                } else if queue_full {
+                    // Body cached in tx_arcs but mempool rejected on
+                    // capacity.  If any pending EB references this tx,
+                    // the body still counts as locally available —
+                    // `local_has_tx` returns true via tx_arcs, so
+                    // release any blocked EB and tell peers we hold
+                    // it.  If no pending EB needs it, drop the cache
+                    // entry to bound memory (mirrors linear's
+                    // `self.txs.remove(&id)` branch in propagate_tx).
+                    if self.missing_tx_index.contains_key(&tx.id) {
+                        for peer in &self.consumers {
+                            if *peer == from {
+                                continue;
+                            }
+                            out.send_to(*peer, Message::AnnounceTx(tx.id));
+                        }
+                        self.acknowledge_tx_for_pending_ebs(&mut out, tx.id);
+                    } else {
+                        self.tx_arcs.remove(&key);
+                        self.announced_or_known.remove(&key);
+                        self.tx_seen_slot.remove(&key);
+                    }
                 }
             }
             CpuTask::RBBlockGenerated(rb, eb) => self.finish_generating_rb(&mut out, rb, eb),
@@ -1111,15 +1155,17 @@ impl ConRs {
         }
     }
 
-    /// True iff the local mempool already holds the body for `tx_id`.
-    /// The receiver-side gate in `finish_validating_eb_header` and the
-    /// release path in `acknowledge_tx_for_pending_ebs` both consult
-    /// this; `MempoolState::has_tx` already unions the free FIFO pool
-    /// and EB-pinned bodies, matching `linear_leios`'s `has_tx` plus
-    /// CIP-0164's MissingTX semantics.
+    /// True iff the body for `tx_id` is locally available — i.e. in
+    /// the mempool (free pool ∪ EB-pinned) OR cached in `tx_arcs`
+    /// after a capacity-rejected admit.  CIP-0164's MissingTX
+    /// predicate asks "do we have the body?", not "is it in the free
+    /// pool?", so a body that arrived and was admit-rejected but
+    /// still sits in `tx_arcs` counts as held for EB-validation
+    /// purposes.  Mirrors `linear_leios`'s `has_tx` semantics over
+    /// its `TransactionView::Received` cache.
     fn local_has_tx(&self, tx_id: TransactionId) -> bool {
         let key = tx_id_for(tx_id);
-        self.mempool.has_tx(&key)
+        self.mempool.has_tx(&key) || self.tx_arcs.contains_key(&key)
     }
 
     /// A tx body was just admitted to the local mempool.  Walk the
