@@ -38,6 +38,11 @@ pub struct DynamicConfigUpdate {
     pub eb_validation_ms: Option<f64>,
     pub vote_validation_ms: Option<f64>,
     pub tx_rate: Option<f64>,
+    /// Hot-swap the per-node behaviour.  Carried separately from the
+    /// other fields because the swap mutates live state machines
+    /// rather than feeding a watch channel — see
+    /// `Consensus::set_behaviour`.
+    pub behaviour: Option<shared_consensus::behaviour::BehaviourSpec>,
 }
 
 impl DynamicConfig {
@@ -264,6 +269,14 @@ pub struct NodeConfig {
     /// historical behaviour (`LowestRtt` for every class).
     #[serde(default)]
     pub fetch_policy: FetchPolicyConfig,
+
+    /// Pluggable per-node adversarial / experimental behaviour.  See
+    /// `shared_consensus::behaviour` for the trait and the catalogue
+    /// of concrete impls.  `None` (the default) installs the no-op
+    /// honest behaviour and is indistinguishable from the historical
+    /// behaviour-less build.
+    #[serde(default)]
+    pub behaviour: Option<shared_consensus::behaviour::BehaviourSpec>,
 
     /// Outbound peer list.
     #[serde(default)]
@@ -646,6 +659,7 @@ impl Default for NodeConfig {
             validation: ValidationConfig::default(),
             telemetry: TelemetryConfig::default(),
             fetch_policy: FetchPolicyConfig::default(),
+            behaviour: None,
             peers: Vec::new(),
         }
     }

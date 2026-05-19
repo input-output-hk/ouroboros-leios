@@ -88,6 +88,20 @@ pub struct ClusterConfig {
     /// Override rb_generation_probability for all nodes.
     pub rb_generation_probability: Option<f64>,
 
+    /// Per-node adversarial / experimental behaviour.  See
+    /// `shared_consensus::behaviour::BehaviourSpec` for the catalogue.
+    /// When set, every node whose index is listed in `behaviour_nodes`
+    /// is started with this behaviour; the remaining nodes stay honest.
+    /// Empty `behaviour_nodes` with a non-`None` spec means *all* nodes
+    /// run the same behaviour (rare; useful for isolated experiments).
+    #[serde(default)]
+    pub behaviour: Option<shared_consensus::behaviour::BehaviourSpec>,
+
+    /// Node indices that should run [`Self::behaviour`].  Ignored when
+    /// `behaviour` is `None`.
+    #[serde(default)]
+    pub behaviour_nodes: Vec<usize>,
+
     /// External peers injected into random nodes.
     #[serde(default)]
     pub external_peers: Vec<ExternalPeerConfig>,
@@ -141,6 +155,8 @@ impl Default for ClusterConfig {
             stats_interval_secs: default_stats_interval(),
             event_window_size: default_event_window_size(),
             rb_generation_probability: None,
+            behaviour: None,
+            behaviour_nodes: Vec::new(),
             external_peers: Vec::new(),
         }
     }

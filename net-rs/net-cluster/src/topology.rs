@@ -32,6 +32,9 @@ pub struct NodeTopology {
     pub stake: u64,
     /// Deterministic PRNG seed for this node.
     pub seed: u64,
+    /// Behaviour spec installed at startup, or `None` for honest.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub behaviour: Option<shared_consensus::behaviour::BehaviourSpec>,
     /// Outbound peer connections (not serialized — use `edges` instead).
     #[serde(skip)]
     pub peers: Vec<PeerLink>,
@@ -70,9 +73,19 @@ pub fn generate(config: &ClusterConfig, total_stake: u64) -> Topology {
     let stakes = distribute_stake(n, total_stake, &config.stake_distribution);
 
     // Step 3: Build node topologies.
+    let behaviour_set: std::collections::BTreeSet<usize> =
+        config.behaviour_nodes.iter().copied().collect();
+    let attach_to_all = config.behaviour.is_some() && behaviour_set.is_empty();
     let mut nodes: Vec<NodeTopology> = (0..n)
         .map(|i| {
             let port = config.base_port + i as u16;
+            let behaviour = if config.behaviour.is_some()
+                && (attach_to_all || behaviour_set.contains(&i))
+            {
+                config.behaviour.clone()
+            } else {
+                None
+            };
             NodeTopology {
                 index: i,
                 node_id: format!("node-{i}"),
@@ -80,6 +93,7 @@ pub fn generate(config: &ClusterConfig, total_stake: u64) -> Topology {
                 listen_port: port,
                 stake: stakes[i],
                 seed: config.seed.unwrap_or(0) + i as u64,
+                behaviour,
                 peers: Vec::new(),
             }
         })

@@ -91,6 +91,14 @@ impl Mempool {
         &self.state
     }
 
+    /// Materialise the given behaviour spec and install it on the
+    /// underlying [`MempoolState`].  Replaces any previously-set
+    /// behaviour (including the default honest one).
+    pub fn set_behaviour(&mut self, spec: &shared_consensus::behaviour::BehaviourSpec) {
+        self.state
+            .set_behaviour(shared_consensus::behaviour::build(spec));
+    }
+
     /// Admit a tx that's already been validated (locally generated, or
     /// produced by `spawn_tx_validator` after its delay).  TxRejected
     /// effects (queue-full evictions, dedup) are dropped silently —

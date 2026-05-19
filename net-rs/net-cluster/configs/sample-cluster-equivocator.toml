@@ -1,0 +1,31 @@
+# Cluster with one RB-equivocator node.
+#
+# Run with:
+#   cargo run -p net-cluster -- --config net-cluster/configs/sample-cluster-equivocator.toml
+#
+# Node 3 runs `RbEquivocator`; the other nine stay honest.  Honest peers
+# should detect the equivocation (CIP-0164 RB-header equivocation rule)
+# and abstain from voting for any EB associated with the offending slot.
+
+num_nodes = 10
+degree = 3
+min_latency_ms = 5
+max_latency_ms = 100
+
+base_config = "net-node/configs/mainnet.toml"
+base_port = 30200
+seed = 42
+output_events = "cluster-events-equivocator.jsonl"
+ordering_window_secs = 1.0
+aggregator_port = 9200
+stats_interval_secs = 1
+stake_distribution = "equal"
+rb_generation_probability = 0.05
+
+# Per-node adversarial behaviour: install RbEquivocator on node 3.
+# Top-level keys MUST come before the `[behaviour]` table header,
+# otherwise TOML nests them inside the table.
+behaviour_nodes = [3]
+
+[behaviour]
+kind = "rb-equivocator"

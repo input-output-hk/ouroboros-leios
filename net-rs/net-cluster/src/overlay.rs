@@ -110,6 +110,18 @@ fn render_overlay(
     writeln!(s, "type = \"http\"").ok();
     writeln!(s, "url = \"http://127.0.0.1:{aggregator_port}/stats\"").ok();
 
+    // Per-node behaviour spec.  Serialise via the toml crate to keep
+    // the TOML representation in sync with serde's view of
+    // `BehaviourSpec`; the spec is a tagged enum (`kind = "..."`) with
+    // optional per-variant fields, so handwritten TOML would silently
+    // miss new variants.
+    if let Some(spec) = &node.behaviour {
+        writeln!(s).ok();
+        let inner = toml::to_string(spec).unwrap_or_default();
+        writeln!(s, "[behaviour]").ok();
+        s.push_str(&inner);
+    }
+
     for peer in &node.peers {
         writeln!(s).ok();
         writeln!(s, "[[peers]]").ok();
@@ -171,6 +183,7 @@ mod tests {
             listen_port: 30000,
             stake: 500,
             seed: 42,
+            behaviour: None,
             peers: vec![
                 PeerLink {
                     address: "127.0.0.1:30001".to_string(),
@@ -229,6 +242,34 @@ mod tests {
         assert_eq!(entries[0]["stake"].as_integer(), Some(500));
         assert_eq!(entries[2]["node_id"].as_str(), Some("node-2"));
         assert_eq!(entries[2]["stake"].as_integer(), Some(0));
+    }
+
+    #[test]
+    fn test_render_overlay_with_behaviour() {
+        // A node with a behaviour spec should emit a `[behaviour]` table
+        // that round-trips through the toml parser.
+        let mut node = sample_node();
+        node.behaviour = Some(shared_consensus::behaviour::BehaviourSpec::RbEquivocator);
+        let toml_str = render_overlay(&node, 9100, 5, 1, &[]);
+        let parsed: toml::Value = toml::from_str(&toml_str).expect("generated TOML should parse");
+        assert_eq!(
+            parsed["behaviour"]["kind"].as_str(),
+            Some("rb-equivocator"),
+            "behaviour table missing or malformed: {toml_str}"
+        );
+    }
+
+    #[test]
+    fn test_render_overlay_without_behaviour_omits_section() {
+        // No behaviour set → no [behaviour] table emitted (default
+        // honest path stays implicit; net-node falls through to
+        // HonestBehaviour).
+        let node = sample_node();
+        let toml_str = render_overlay(&node, 9100, 5, 1, &[]);
+        assert!(
+            !toml_str.contains("[behaviour]"),
+            "expected no behaviour section, got: {toml_str}"
+        );
     }
 
     #[test]

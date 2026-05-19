@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+shared-consensus = { path = "../../shared-rs/consensus" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "signal", "process", "io-util"] }
 axum = "0.7"
 async-stream = "0.3"

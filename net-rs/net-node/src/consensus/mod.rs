@@ -48,6 +48,7 @@ impl Consensus {
         dyn_config: watch::Receiver<DynamicConfig>,
         rtt: PeerRttCache,
         fetch_policy: FetchPolicyConfig,
+        behaviour: Option<shared_consensus::behaviour::BehaviourSpec>,
     ) -> Self {
         let mut praos = PraosConsensus::new(
             node_id.clone(),
@@ -61,7 +62,7 @@ impl Consensus {
             node_id,
             commands,
             validator,
-            mempool,
+            mempool.clone(),
             pipeline,
             committee_selection,
             stake,
@@ -77,7 +78,41 @@ impl Consensus {
         leios.set_eb_policy(fetch_policy.eb.into_eb_policy());
         leios.set_eb_txs_policy(fetch_policy.eb_txs.into_eb_txs_policy());
         leios.set_vote_policy(fetch_policy.votes.into_vote_policy());
+        // Apply the per-node behaviour spec to every state machine.  Each
+        // state owns its own materialised behaviour; behaviours holding
+        // observed-by-host state (DelayQueue, "have I attacked yet"
+        // flags) therefore see only one host.  Stateless adversaries
+        // (RbEquivocator, LazyVoter) are unaffected.
+        if let Some(spec) = behaviour.as_ref() {
+            tracing::info!(?spec, "installing per-node behaviour");
+            praos.set_behaviour(spec);
+            leios.set_behaviour(spec);
+            // Mempool is owned by the wrapper; reach in and apply.  The
+            // SharedMempool lock is the I/O-side concurrency surface; we
+            // hold it just long enough to swap.
+            if let Ok(mut m) = mempool.lock() {
+                m.set_behaviour(spec);
+            }
+        }
         Self { praos, leios }
+    }
+
+    /// Swap the per-node behaviour on every owned state machine.  Called
+    /// at startup (from the config field) and at runtime from the
+    /// stdin-driven `DynamicConfigUpdate` path.  The mempool side has
+    /// to grab the shared lock; the praos and leios sides own their
+    /// state directly.
+    pub fn set_behaviour(
+        &mut self,
+        spec: &shared_consensus::behaviour::BehaviourSpec,
+        mempool: &crate::mempool::SharedMempool,
+    ) {
+        tracing::info!(?spec, "swapping per-node behaviour");
+        self.praos.set_behaviour(spec);
+        self.leios.set_behaviour(spec);
+        if let Ok(mut m) = mempool.lock() {
+            m.set_behaviour(spec);
+        }
     }
 
     /// Notify the Leios layer of a new slot tick.

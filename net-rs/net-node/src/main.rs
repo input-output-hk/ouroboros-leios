@@ -132,6 +132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         dyn_rx.clone(),
         rtt_cache,
         config.fetch_policy,
+        config.behaviour.clone(),
     );
 
     // Transaction validator (validates received txs before mempool entry).
@@ -371,6 +372,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 let mut current = dyn_tx.borrow().clone();
                                 current.apply_update(&update);
                                 let _ = dyn_tx.send(current);
+                                // Behaviour swap is separate from the
+                                // watch-channel ambient config: it
+                                // mutates the live state machines.
+                                if let Some(spec) = &update.behaviour {
+                                    consensus.set_behaviour(spec, &mempool);
+                                }
                                 info!(node_id = %node_id, "dynamic config updated");
                             }
                             Err(e) => {

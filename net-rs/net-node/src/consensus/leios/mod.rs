@@ -182,6 +182,13 @@ impl LeiosConsensus {
         self.state.set_vote_policy(policy);
     }
 
+    /// Materialise the given behaviour spec and install it on the
+    /// underlying [`LeiosState`].
+    pub fn set_behaviour(&mut self, spec: &shared_consensus::behaviour::BehaviourSpec) {
+        self.state
+            .set_behaviour(shared_consensus::behaviour::build(spec));
+    }
+
     /// Advance slot tracking, drive elections, dispatch any effects.
     pub async fn on_slot(&mut self, slot: u64) {
         // Snapshot every locally available tx id — the FIFO mempool

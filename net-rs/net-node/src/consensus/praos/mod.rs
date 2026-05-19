@@ -82,6 +82,13 @@ impl PraosConsensus {
         self.state.set_fetch_policy(policy);
     }
 
+    /// Materialise the given behaviour spec and install it on the
+    /// underlying [`PraosState`](shared_consensus::praos::PraosState).
+    pub fn set_behaviour(&mut self, spec: &shared_consensus::behaviour::BehaviourSpec) {
+        self.state
+            .set_behaviour(shared_consensus::behaviour::build(spec));
+    }
+
     /// Drain effects to the I/O sinks.  Network-side effects go to
     /// `commands`; validator effects go to `validator.submit`.  Header
     /// and body bytes are rehydrated into the wire types here; the
