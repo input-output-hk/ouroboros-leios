@@ -95,9 +95,11 @@ impl Consensus {
     fn refresh_chain_tip_ctx(&mut self) {
         let arrival = self.praos.adopted_tip_header_arrival_slot();
         let eb_announcement = self.praos.adopted_tip_announced_eb();
+        let equivocating_slots = self.praos.equivocating_rb_slots().clone();
         self.leios.set_chain_tip_context(ChainTipContext {
             rb_header_arrival_slot: arrival,
             eb_announcement,
+            equivocating_slots,
         });
     }
 

@@ -217,6 +217,20 @@ pub struct PraosState {
     /// `block_cache` on the k-prune path.
     pub header_first_seen: BTreeMap<[u8; 32], u64>,
 
+    /// CIP-0164 RB-header equivocation tracker.  Per `(slot, issuer)`
+    /// pair, the set of distinct RB header hashes observed.  The
+    /// tracker is fed from every path that surfaces a parsed header
+    /// (`on_block_received`, `register_self_produced`); insertions
+    /// that grow a set past size 1 flag the slot in
+    /// [`equivocating_rb_slots`].
+    pub header_hashes_by_slot_issuer:
+        BTreeMap<(u64, Vec<u8>), BTreeSet<[u8; 32]>>,
+    /// Slots at which RB-header equivocation has been detected.
+    /// CIP-0164's "It has not detected any equivocating RB header for
+    /// the same slot" voting condition consults this set via
+    /// [`Self::is_equivocating_slot`].
+    pub equivocating_rb_slots: BTreeSet<u64>,
+
     /// Strategy for picking peer(s) to fetch each block-range from.
     pub block_policy: Box<dyn BlockFetchPolicy + Send + Sync>,
     /// Live per-peer RTT lookup, consulted by `block_policy` at every
@@ -262,6 +276,8 @@ impl PraosState {
             queued_validator_tip: None,
             last_validated_tip: None,
             header_first_seen: BTreeMap::new(),
+            header_hashes_by_slot_issuer: BTreeMap::new(),
+            equivocating_rb_slots: BTreeSet::new(),
             block_policy,
             rtt,
         }
@@ -368,6 +384,38 @@ impl PraosState {
     /// produced) without coordinating among them.
     pub fn note_header_first_seen(&mut self, header_hash: [u8; 32], current_slot: u64) {
         self.header_first_seen.entry(header_hash).or_insert(current_slot);
+    }
+
+    /// Record an observed RB header for equivocation detection.
+    /// Called from every path that surfaces a parsed header
+    /// (`on_block_received`, `register_self_produced`).  If `issuer`
+    /// is empty, detection is skipped for this header (allows
+    /// pre-issuer callers to no-op).  If a second distinct hash
+    /// arrives for the same `(slot, issuer)`, the slot is added to
+    /// [`Self::equivocating_rb_slots`] and CIP-0164 voters will
+    /// abstain from voting on any EB associated with that slot.
+    fn note_header_for_equivocation(
+        &mut self,
+        slot: u64,
+        issuer: &[u8],
+        header_hash: [u8; 32],
+    ) {
+        if issuer.is_empty() {
+            return;
+        }
+        let key = (slot, issuer.to_vec());
+        let set = self.header_hashes_by_slot_issuer.entry(key).or_default();
+        set.insert(header_hash);
+        if set.len() > 1 {
+            self.equivocating_rb_slots.insert(slot);
+        }
+    }
+
+    /// True iff RB-header equivocation has been detected at `slot`.
+    /// Consulted by [`crate::leios::LeiosState::decide_vote`] via
+    /// [`crate::leios::ChainTipContext::equivocating_slots`].
+    pub fn is_equivocating_slot(&self, slot: u64) -> bool {
+        self.equivocating_rb_slots.contains(&slot)
     }
 
     /// Snapshot the recent chain tree for UI display.
@@ -505,7 +553,7 @@ impl PraosState {
             return fx;
         }
         let header_was_parsed = parsed_header.is_some();
-        let (block_no, slot, prev_hash, announced_eb_hash, certified_eb) =
+        let (block_no, slot, prev_hash, announced_eb_hash, certified_eb, issuer) =
             match parsed_header {
                 Some(info) => (
                     info.block_number,
@@ -513,6 +561,7 @@ impl PraosState {
                     info.prev_hash,
                     info.announced_eb_hash,
                     info.certified_eb,
+                    info.issuer,
                 ),
                 None => (
                     self.chain_tree.block_number(&hash).unwrap_or(0),
@@ -523,8 +572,15 @@ impl PraosState {
                     self.chain_tree.prev_hash(&hash),
                     None,
                     false,
+                    Vec::new(),
                 ),
             };
+        // CIP-0164 RB-header equivocation tracking — must run on
+        // every distinct header observed (before any dedup that
+        // would short-circuit the path).  Honored across both
+        // peer-received and self-produced headers; a node that
+        // self-produces two headers at the same slot equivocates too.
+        self.note_header_for_equivocation(slot, &issuer, hash);
         // Insert into chain_tree only when we have a real block_no
         // (parsed header) or, for opaque headers, when fallback metadata
         // is non-default.  Inserting block_no=0 confuses pruning.
@@ -634,6 +690,12 @@ impl PraosState {
         };
         match parsed_header {
             Some(info) => {
+                // CIP-0164 equivocation tracking — a producer that
+                // self-produces multiple headers at the same slot
+                // equivocates against itself.  Tracker is honest
+                // about that, so honest voters abstain even on
+                // their own conflicting EBs.
+                self.note_header_for_equivocation(info.slot, &info.issuer, hash);
                 self.chain_tree.insert(
                     hash,
                     point.clone(),
@@ -1404,6 +1466,14 @@ pub struct ParsedHeaderInfo {
     /// `announced_eb_hash`; chain context (`parent_announced_eb`)
     /// resolves the hash at apply time.
     pub certified_eb: bool,
+    /// Producer identity (issuer verification key in real Cardano;
+    /// `NodeId` bytes in sim).  Used for CIP-0164 RB-header
+    /// equivocation detection: two distinct header hashes with the
+    /// same `(slot, issuer)` tuple are an equivocation, and honest
+    /// voters must abstain from voting on any EB associated with
+    /// that slot.  Empty bytes disable detection for this header
+    /// (preserves behavior for callers that haven't populated it).
+    pub issuer: Vec<u8>,
 }
 
 #[cfg(test)]
@@ -1428,6 +1498,7 @@ mod tests {
             slot,
             prev_hash: prev_seed.map(h),
             certified_eb: false,
+            issuer: Vec::new(),
         }
     }
 
@@ -1553,6 +1624,72 @@ mod tests {
         s.record_peer_disconnected(pid);
         assert!(!s.peer_chains.contains_key(&pid));
         assert!(!s.orphan_cooldown.contains_key(&pid));
+    }
+
+    // -- CIP-0164 RB-header equivocation detection ----------------------
+
+    fn parsed_with_issuer(slot: u64, issuer: u8) -> ParsedHeaderInfo {
+        ParsedHeaderInfo {
+            block_number: slot,
+            slot,
+            prev_hash: None,
+            announced_eb_hash: None,
+            certified_eb: false,
+            issuer: vec![issuer; 4],
+        }
+    }
+
+    #[test]
+    fn two_distinct_headers_same_slot_issuer_flag_slot() {
+        let mut s = fresh();
+        let now = Instant::now();
+        s.on_block_received(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
+        s.on_block_received(pt(100, 2), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
+        assert!(s.is_equivocating_slot(100));
+        assert!(s.equivocating_rb_slots.contains(&100));
+    }
+
+    #[test]
+    fn distinct_headers_same_slot_different_issuers_no_flag() {
+        // Two different producers winning the same slot via VRF is a
+        // legitimate Praos fork — not equivocation by CIP-0164.
+        let mut s = fresh();
+        s.on_block_received(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
+        s.on_block_received(pt(100, 2), vec![], vec![], Some(parsed_with_issuer(100, 0xBB)));
+        assert!(!s.is_equivocating_slot(100));
+    }
+
+    #[test]
+    fn empty_issuer_disables_detection() {
+        // Pre-issuer callers (issuer = Vec::new()) get no-op detection,
+        // preserving legacy behavior.
+        let mut s = fresh();
+        s.on_block_received(pt(100, 1), vec![], vec![], Some(hi(100, 100, None)));
+        s.on_block_received(pt(100, 2), vec![], vec![], Some(hi(100, 100, None)));
+        assert!(!s.is_equivocating_slot(100));
+    }
+
+    #[test]
+    fn duplicate_header_hash_same_issuer_does_not_flag() {
+        // Same hash arriving twice (e.g., from two peers) isn't
+        // equivocation — it's the same header.
+        let mut s = fresh();
+        s.on_block_received(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
+        // Second on_block_received with the same hash is a no-op via
+        // the block_cache dedup; manually probe the tracker invariant.
+        s.note_header_for_equivocation(100, &[0xAA; 4], h(1));
+        assert!(!s.is_equivocating_slot(100));
+    }
+
+    #[test]
+    fn self_produced_equivocation_flags_slot() {
+        // A producer that registers two distinct self-produced
+        // headers at the same slot equivocates against itself; the
+        // tracker honors that.
+        let mut s = fresh();
+        s.register_self_produced(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
+        s.register_self_produced(pt(100, 2), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
+        assert!(s.is_equivocating_slot(100));
     }
 
     // -- Self-production --------------------------------------------------

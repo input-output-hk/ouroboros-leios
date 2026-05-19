@@ -164,6 +164,12 @@ impl PraosConsensus {
             prev_hash: i.prev_hash,
             announced_eb_hash: i.announced_eb.map(|(hash, _size)| hash),
             certified_eb: i.certified_eb.unwrap_or(false),
+            // CIP-0164 RB-header equivocation tracker keys on issuer
+            // identity.  `issuer_vkey` is the Shelley+ header field
+            // identifying the signer; two headers signed by the same
+            // key at the same slot are an equivocation by the same
+            // producer.
+            issuer: i.issuer_vkey.to_vec(),
         })
     }
 
@@ -341,6 +347,15 @@ impl PraosConsensus {
     /// EB hash announced by the adopted tip header, if any.
     pub fn adopted_tip_announced_eb(&self) -> Option<[u8; 32]> {
         self.state.adopted_tip_announced_eb()
+    }
+
+    /// CIP-0164 RB-header equivocation set.  Slots at which two
+    /// distinct RB headers were observed from the same issuer; the
+    /// facade clones this into [`ChainTipContext::equivocating_slots`]
+    /// on every chain-tip refresh so the Leios voting predicate can
+    /// abstain on hits.
+    pub fn equivocating_rb_slots(&self) -> &std::collections::BTreeSet<u64> {
+        &self.state.equivocating_rb_slots
     }
 
     /// For an RB at `point` carrying a CIP-0164 cert, return the

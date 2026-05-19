@@ -1693,6 +1693,10 @@ impl ConRs {
         let ctx = ChainTipContext {
             rb_header_arrival_slot: self.praos.adopted_tip_header_arrival_slot(),
             eb_announcement: self.praos.adopted_tip_announced_eb(),
+            // CIP-0164 RB-header equivocation set, fed from PraosState
+            // on every chain-tip refresh.  Clone is cheap here — the
+            // set holds at most O(pipeline-window) entries.
+            equivocating_slots: self.praos.equivocating_rb_slots.clone(),
         };
         self.leios.set_chain_tip_context(ctx);
     }
@@ -1993,6 +1997,9 @@ impl ConRs {
                         // fold into `MissingEB` (semantic neighbour:
                         // we don't have the validated body yet).
                         NoVoteReason::EBValidating => SimNoVoteReason::MissingEB,
+                        NoVoteReason::EquivocatingRB => {
+                            SimNoVoteReason::EquivocatingRB
+                        }
                     };
                     // con-rs re-fires NoVote per slot per EB on
                     // transient reasons until the election expires.
@@ -2214,6 +2221,12 @@ fn parsed_header_from_rb(rb: &LinearRankingBlock) -> ParsedHeaderInfo {
         prev_hash: h.parent.map(synthesize_rb_hash),
         announced_eb_hash: h.eb_announcement.map(synthesize_eb_hash),
         certified_eb: rb.endorsement.is_some(),
+        // CIP-0164 equivocation detection keys on (slot, issuer).
+        // Sim doesn't have signing keys, so encode `NodeId` (a u64
+        // newtype) as the issuer.  Two RBs at the same slot with
+        // different headers but the same producer NodeId look like
+        // the same signer to PraosState's equivocation tracker.
+        issuer: (h.id.producer.to_inner() as u64).to_le_bytes().to_vec(),
     }
 }
 

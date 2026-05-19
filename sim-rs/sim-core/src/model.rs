@@ -345,6 +345,10 @@ pub enum NoVoteReason {
     LateRBHeader,
     LateEB,
     WrongEB,
+    /// CIP-0164 RB-header equivocation detected at the EB's slot —
+    /// honest voters abstain from voting for any EB associated with
+    /// the equivocating slot.
+    EquivocatingRB,
 }
 
 #[derive(Debug, Clone, Serialize)]

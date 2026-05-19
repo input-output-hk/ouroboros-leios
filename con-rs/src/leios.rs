@@ -109,6 +109,14 @@ pub enum NoVoteReason {
     /// blocks the local emission while cert assembly from peer votes
     /// can still proceed via the `aggregation` module.
     EBValidating,
+    /// The local node has detected RB-header equivocation at the EB's
+    /// announcement slot — two distinct RB headers signed by the same
+    /// issuer at the same slot.  CIP-0164: honest voters abstain from
+    /// voting for any EB associated with an equivocating slot.  The
+    /// 3·Δhdr `EquivocationCheck` phase is the collection window for
+    /// this detection; once voting opens, the flag is consulted from
+    /// [`ChainTipContext::equivocating_slots`].
+    EquivocatingRB,
 }
 
 /// Chain-tip metadata the I/O wrapper feeds into [`LeiosState`] so the
@@ -120,6 +128,12 @@ pub enum NoVoteReason {
 /// (both fields `None`); voting predicates treat that as `WrongEB`.
 #[derive(Debug, Clone, Default)]
 pub struct ChainTipContext {
+    /// Slots at which RB-header equivocation has been detected.  Fed
+    /// by the wrapper from [`crate::praos::PraosState::equivocating_rb_slots`]
+    /// on every chain-tip refresh.  CIP-0164 voters consult this in
+    /// `decide_vote`: a hit means abstain (no vote for any EB
+    /// associated with that slot).
+    pub equivocating_slots: std::collections::BTreeSet<u64>,
     /// Slot at which the wrapper received the adopted RB's header.
     pub rb_header_arrival_slot: Option<u64>,
     /// EB hash announced by the adopted RB header, if any.
@@ -578,6 +592,18 @@ impl LeiosState {
         }
         if rb_arrival >= eb_slot + self.pipeline.delta_hdr {
             return Err(NoVoteReason::LateRBHeader);
+        }
+
+        // CIP-0164: "It has not detected any equivocating RB header
+        // for the same slot."  The 3·Δhdr EquivocationCheck pipeline
+        // phase is the collection window; voting only opens after it
+        // closes, at which point the wrapper's chain-tip refresh has
+        // populated `equivocating_slots` from PraosState.  A hit
+        // means abstain — refuse to vote for any EB associated with
+        // an equivocating slot, regardless of which EB the chain tip
+        // ultimately picks.
+        if self.chain_tip_ctx.equivocating_slots.contains(&eb_slot) {
+            return Err(NoVoteReason::EquivocatingRB);
         }
 
         // Predicate 4: MissingTX.  Only checked when we have a manifest
@@ -1141,6 +1167,7 @@ mod tests {
         state.set_chain_tip_context(ChainTipContext {
             rb_header_arrival_slot: Some(eb_slot.saturating_sub(1)),
             eb_announcement: Some(eb_hash),
+            ..Default::default()
         });
     }
 
@@ -1654,6 +1681,7 @@ mod tests {
         state.set_chain_tip_context(ChainTipContext {
             rb_header_arrival_slot: Some(10),
             eb_announcement: Some(h(2)),
+            ..Default::default()
         });
         let fx = state.on_slot(13, &tx_all);
         assert_no_vote(&fx, h(1), NoVoteReason::WrongEB);
@@ -1669,6 +1697,7 @@ mod tests {
         state.set_chain_tip_context(ChainTipContext {
             rb_header_arrival_slot: Some(11),
             eb_announcement: Some(h(1)),
+            ..Default::default()
         });
         let fx = state.on_slot(13, &tx_all);
         assert_no_vote(&fx, h(1), NoVoteReason::LateRBHeader);
@@ -1688,6 +1717,27 @@ mod tests {
         let no_txs = |_: &[u8; 32]| false;
         let fx = state.on_slot(13, &no_txs);
         assert_no_vote(&fx, h(1), NoVoteReason::MissingTX);
+    }
+
+    #[test]
+    fn no_vote_equivocating_rb_slot() {
+        // CIP-0164: when RB-header equivocation has been detected at
+        // the EB's slot, the voter abstains — regardless of which EB
+        // the chain tip ultimately picks.
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        state.on_slot(10, &tx_all);
+        state.elections.announce(10, h(1));
+        // Chain tip references this EB and the header arrived on time;
+        // the only blocker is the equivocation flag.
+        let mut ctx = ChainTipContext {
+            rb_header_arrival_slot: Some(10),
+            eb_announcement: Some(h(1)),
+            ..Default::default()
+        };
+        ctx.equivocating_slots.insert(10);
+        state.set_chain_tip_context(ctx);
+        let fx = state.on_slot(13, &tx_all);
+        assert_no_vote(&fx, h(1), NoVoteReason::EquivocatingRB);
     }
 
     #[test]

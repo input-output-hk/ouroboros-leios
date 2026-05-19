@@ -630,6 +630,7 @@ mod tests {
         leios.set_chain_tip_context(ChainTipContext {
             rb_header_arrival_slot: Some(0),
             eb_announcement: Some(point_hash(0)),
+            ..Default::default()
         });
         // No vote yet — still in EquivocationCheck.
         assert!(!leios.election_voted(&point_hash(0)));
@@ -659,6 +660,7 @@ mod tests {
         leios.set_chain_tip_context(ChainTipContext {
             rb_header_arrival_slot: Some(0),
             eb_announcement: Some(point_hash(0)),
+            ..Default::default()
         });
 
         // First slot in Voting → vote produced.
