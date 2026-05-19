@@ -115,6 +115,23 @@ impl Consensus {
         }
     }
 
+    /// Ask the per-node behaviour what to do for this slot's
+    /// self-produced RB.  See
+    /// [`shared_consensus::behaviour::RbProductionStrategy`].  Default
+    /// `HonestBehaviour` always returns `Normal`.
+    pub fn rb_production_strategy(
+        &mut self,
+        slot: u64,
+    ) -> shared_consensus::behaviour::RbProductionStrategy {
+        // The behaviour lives on `LeiosState` (chosen during the
+        // initial scaffolding because the Leios side has the broadest
+        // hook surface); the strategy method takes a `&PraosState`
+        // alongside.  Borrow split is done by passing `praos.state()`
+        // before mutably borrowing the leios layer.
+        let praos = self.praos.state();
+        self.leios.state_mut().ask_rb_production_strategy(praos, slot)
+    }
+
     /// Notify the Leios layer of a new slot tick.
     pub async fn on_slot(&mut self, slot: u64) {
         // Bump Praos's slot first so subsequent header-arrival paths

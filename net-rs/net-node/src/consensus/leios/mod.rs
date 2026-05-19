@@ -189,6 +189,13 @@ impl LeiosConsensus {
             .set_behaviour(shared_consensus::behaviour::build(spec));
     }
 
+    /// Mutable borrow of [`LeiosState`] for the few wrapper paths that
+    /// need to drive the take/restore behaviour helpers (e.g.
+    /// `ask_rb_production_strategy`).
+    pub(crate) fn state_mut(&mut self) -> &mut shared_consensus::leios::LeiosState {
+        &mut self.state
+    }
+
     /// Advance slot tracking, drive elections, dispatch any effects.
     pub async fn on_slot(&mut self, slot: u64) {
         // Snapshot every locally available tx id — the FIFO mempool

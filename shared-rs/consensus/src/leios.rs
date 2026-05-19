@@ -372,6 +372,28 @@ impl LeiosState {
         self.behaviour = Some(behaviour);
     }
 
+    /// Ask the installed behaviour what to do for this slot's
+    /// self-produced RB.  Honest nodes always get
+    /// [`crate::behaviour::RbProductionStrategy::Normal`]; adversarial
+    /// behaviours can return `Suppress` (drop the win silently) or
+    /// `Equivocate` (the wrapper should also emit a duplicate RB
+    /// carrying the same issuer + slot but a different body).  Routed
+    /// through the standard take/restore helper so the behaviour can
+    /// see `&LeiosState` + `&PraosState` without borrow conflicts.
+    pub fn ask_rb_production_strategy(
+        &mut self,
+        praos: &crate::praos::PraosState,
+        slot: u64,
+    ) -> crate::behaviour::RbProductionStrategy {
+        let mut behaviour = self
+            .behaviour
+            .take()
+            .expect("behaviour is Some between public calls");
+        let strategy = behaviour.rb_production_strategy(self, praos, slot);
+        self.behaviour = Some(behaviour);
+        strategy
+    }
+
     /// Short name of the current behaviour, e.g. `"honest"`,
     /// `"rb-equivocator"`.  Useful for telemetry and structured logs.
     pub fn behaviour_name(&self) -> &'static str {

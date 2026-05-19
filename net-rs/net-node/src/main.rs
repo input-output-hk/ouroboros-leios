@@ -208,6 +208,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let certified_eb = leios && consensus.has_certified_eb();
                 let certified_eb_slot = if certified_eb { consensus.certified_eb_slot() } else { None };
                 if let Some(produced) = producer.try_produce_block(slot, prev_hash, next_block_no, certified_eb, &mempool, consensus.leios_state()) {
+                    // Consult the per-node behaviour: an adversarial
+                    // `Suppress` drops the win silently; `Equivocate`
+                    // produces a duplicate RB with the same issuer +
+                    // slot but a different body, triggering CIP-0164
+                    // detection on every honest peer.
+                    use shared_consensus::behaviour::RbProductionStrategy;
+                    let strategy = consensus.rb_production_strategy(slot);
+                    if strategy == RbProductionStrategy::Suppress {
+                        info!(
+                            node_id = %node_id,
+                            slot,
+                            "suppressing produced RB (behaviour=suppress)"
+                        );
+                    } else {
                     info!(
                         node_id = %node_id,
                         point = %produced.point,
@@ -253,6 +267,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     consensus
                         .register_self_produced(&produced.point, &produced.header, &produced.body)
                         .await;
+
+                    if strategy == RbProductionStrategy::Equivocate {
+                        // Build a duplicate header sharing (slot,
+                        // issuer) but with an empty body, register and
+                        // inject it.  Peers detect the equivocation
+                        // via the shared-consensus
+                        // `note_header_for_equivocation` path on
+                        // `on_block_received`.
+                        let extra = producer.produce_equivocation_extra(
+                            &produced,
+                            prev_hash,
+                            next_block_no,
+                        );
+                        info!(
+                            node_id = %node_id,
+                            primary = %produced.point,
+                            extra = %extra.point,
+                            "emitting equivocation extra RB"
+                        );
+                        telem.record(NodeEvent::RBGenerated {
+                            node: node_id.clone(),
+                            slot,
+                            size_bytes: extra.body.raw.len(),
+                        }).await;
+                        consensus
+                            .register_self_produced(&extra.point, &extra.header, &extra.body)
+                            .await;
+                    }
+                    }
                 }
 
                 // Periodic retry: re-run chain selection every 5 slots

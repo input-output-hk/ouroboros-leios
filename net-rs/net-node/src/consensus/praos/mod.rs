@@ -89,6 +89,13 @@ impl PraosConsensus {
             .set_behaviour(shared_consensus::behaviour::build(spec));
     }
 
+    /// Borrow the underlying [`PraosState`](shared_consensus::praos::PraosState)
+    /// for read-only consultation (e.g. by the
+    /// `RbProductionStrategy` hook, which takes a `&PraosState`).
+    pub(crate) fn state(&self) -> &shared_consensus::praos::PraosState {
+        &self.state
+    }
+
     /// Drain effects to the I/O sinks.  Network-side effects go to
     /// `commands`; validator effects go to `validator.submit`.  Header
     /// and body bytes are rehydrated into the wire types here; the

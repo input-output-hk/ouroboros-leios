@@ -210,6 +210,12 @@ pub struct BlockProducer {
     eb_body_max_bytes: usize,
     dyn_config: watch::Receiver<DynamicConfig>,
     block_count: u64,
+    /// Issuer vkey used by `make_fake_block`.  Refreshed at the top of
+    /// every honest production call; the equivocation-extra path reuses
+    /// the unchanged value so the duplicate header shares the issuer
+    /// (CIP-0164 equivocation requires same-issuer same-slot distinct
+    /// headers).
+    last_issuer_vkey: [u8; 32],
 }
 
 impl BlockProducer {
@@ -231,6 +237,7 @@ impl BlockProducer {
             eb_body_max_bytes: config.eb_body_max_bytes,
             dyn_config,
             block_count: 0,
+            last_issuer_vkey: [0u8; 32],
         }
     }
 
@@ -262,6 +269,10 @@ impl BlockProducer {
         if !self.run_lottery(rb_prob) {
             return None;
         }
+
+        // Fresh issuer for this slot's honest block; equivocation
+        // extras then reuse the same value.
+        self.rng.fill(&mut self.last_issuer_vkey);
 
         self.block_count += 1;
 
@@ -328,6 +339,37 @@ impl BlockProducer {
         self.block_count
     }
 
+    /// Produce a duplicate RB for the same lottery win, with the same
+    /// issuer and slot as `primary` but a fresh body — yields a
+    /// distinct header hash that triggers CIP-0164 RB-header
+    /// equivocation detection on every honest peer.  Used by the
+    /// `RbEquivocator` behaviour via the wrapper's
+    /// [`RbProductionStrategy::Equivocate`] branch.
+    pub fn produce_equivocation_extra(
+        &mut self,
+        primary: &ProducedRb,
+        prev_hash: Option<[u8; 32]>,
+        block_number: u64,
+    ) -> ProducedRb {
+        let slot = match primary.point {
+            Point::Specific { slot, .. } => slot,
+            Point::Origin => unreachable!("primary RB is never at Origin"),
+        };
+        // Reuse `self.last_issuer_vkey` (still the primary's issuer)
+        // and use an empty body — different body_hash → different
+        // block_hash → different header_hash, but same (slot, issuer)
+        // so the detection rule fires.
+        let (point, header, body) =
+            self.make_fake_block(slot, prev_hash, block_number, false, &[], None);
+        ProducedRb {
+            point,
+            header,
+            body,
+            announced_eb: None,
+            included_tx_count: 0,
+        }
+    }
+
     /// Run the Praos f_block lottery.  Returns true on win.  Threshold
     /// math lives in [`shared_consensus::lottery::rb_win_threshold`]; this site
     /// just supplies the `f64` draw.
@@ -358,8 +400,10 @@ impl BlockProducer {
         txs: &[PendingTx],
         announced_eb: Option<([u8; 32], u32)>,
     ) -> (Point, WrappedHeader, BlockBody) {
-        let mut issuer_vkey = [0u8; 32];
-        self.rng.fill(&mut issuer_vkey);
+        // `last_issuer_vkey` is refreshed by `try_produce_block` at the
+        // start of every honest call; equivocation-extra reuses the
+        // previous value.
+        let issuer_vkey = self.last_issuer_vkey;
         let mut body_hash = [0u8; 32];
         self.rng.fill(&mut body_hash);
 
