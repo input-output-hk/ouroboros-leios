@@ -157,6 +157,11 @@ impl Elections {
         }
 
         // Pass 2: update phase or emit Expired and drop, in BTreeMap order.
+        // Quorum-reached elections survive expiry — a quorum is an
+        // assemblable cert and remains usable for future RB endorsements
+        // until something newer supersedes it.  Matches linear's
+        // "prune when a later EB is endorsed" semantics; pruning at
+        // the chain-cutoff is the caller's responsibility.
         self.elections.retain(|hash, election| {
             match pipeline.phase_for_elapsed(slot.saturating_sub(election.announced_slot)) {
                 Some(phase) => {
@@ -171,7 +176,7 @@ impl Elections {
                         voted_weight: election.voter_weights.values().map(|w| *w as u64).sum(),
                         voters: election.voter_weights.len(),
                     });
-                    false
+                    election.quorum_reached
                 }
             }
         });
