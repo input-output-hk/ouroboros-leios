@@ -1,12 +1,15 @@
 //! Per-link envelope state.
 //!
-//! Each directed link carries its own [`LinkState`]. Consumers call
-//! [`LinkState::on_send`] before queueing a new message: this prunes expired
-//! envelopes, fires a cold-start or idle-reset envelope when appropriate, and
-//! pushes a loss envelope if the caller's pre-drawn `loss_drawn` flag is set.
-//! At any other moment they can query [`LinkState::bw_mult`] (the multiplier
-//! on nominal bandwidth) and [`LinkState::delivery_floor`] (an absolute time
-//! below which arrivals must not be reported).
+//! Each directed link carries its own [`LinkState`] holding at most one
+//! [`Envelope`] — TCP has a single cwnd per connection, and loss or idle
+//! events *re-trigger* the envelope rather than overlay onto a stack.
+//! Consumers call [`LinkState::on_send`] before queueing a new message:
+//! that prunes the envelope if it has fully released, fires a cold/idle
+//! envelope when applicable, and replaces the envelope with a fresh loss
+//! event when the caller's pre-drawn `loss_drawn` flag is set. Replacement
+//! captures the current multiplier as the new envelope's `bw_start` so the
+//! ramp continues smoothly from wherever the link was at the moment of the
+//! event.
 //!
 //! Randomness is the consumer's responsibility: see
 //! [`LinkEnvelopeCfg::msg_loss_prob`] for the per-message probability to
@@ -25,7 +28,7 @@ const INTEGRATE_STEPS: u32 = 16;
 pub struct LinkState {
     cfg: LinkEnvelopeCfg,
     last_traffic: Option<Duration>,
-    active: SmallVec<[Envelope; 4]>,
+    current: Option<Envelope>,
 }
 
 impl LinkState {
@@ -33,7 +36,7 @@ impl LinkState {
         Self {
             cfg,
             last_traffic: None,
-            active: SmallVec::new(),
+            current: None,
         }
     }
 
@@ -41,58 +44,71 @@ impl LinkState {
         &self.cfg
     }
 
-    /// Product of every active envelope's bandwidth multiplier at `t`.
+    /// Multiplier on nominal bandwidth at time `t`. `1.0` when no envelope
+    /// is active or the active envelope has fully released.
     pub fn bw_mult(&self, t: Duration) -> f64 {
-        self.active.iter().map(|e| e.bw_mult_at(t)).product()
+        self.current.as_ref().map(|e| e.bw_mult_at(t)).unwrap_or(1.0)
     }
 
-    /// Latest stall-window end-time among active envelopes whose stall window
-    /// covers `t`. If none, returns `t` itself — the arrival is unaffected.
+    /// Stall-window end-time if `t` lies inside an active stall, else `t`.
     pub fn delivery_floor(&self, t: Duration) -> Duration {
-        self.active
-            .iter()
-            .filter_map(|e| e.delivery_floor_at(t))
-            .max()
+        self.current
+            .as_ref()
+            .and_then(|e| e.delivery_floor_at(t))
             .unwrap_or(t)
     }
 
-    /// Called before a new message is queued for transmission. Drops expired
-    /// envelopes, fires a cold or idle envelope when applicable, and pushes
-    /// a loss envelope when the caller's pre-drawn `loss_drawn` is true.
-    /// Envelopes whose depth and durations make them immediately expired
-    /// (e.g. when the config is [`LinkEnvelopeCfg::disabled`]) are never
-    /// retained — callers can rely on [`Self::has_active_envelopes`] being
-    /// false in that case. `_bytes` is currently unused but kept for symmetry
-    /// with [`LinkEnvelopeCfg::msg_loss_prob`].
+    /// Called before a new message is queued for transmission. Clears the
+    /// envelope if it has fully released, fires a cold/idle envelope when
+    /// applicable, and replaces it with a fresh loss envelope (capturing
+    /// the current mult as `bw_start`) when `loss_drawn` is true. Envelopes
+    /// that would be born immediately expired (e.g. under
+    /// [`LinkEnvelopeCfg::disabled`]) are dropped at birth — callers can
+    /// rely on [`Self::has_active_envelopes`] being false in that case.
     pub fn on_send(&mut self, t: Duration, _bytes: u64, loss_drawn: bool) {
-        self.active.retain(|e| !e.is_expired_at(t));
+        if self.current.as_ref().is_some_and(|e| e.is_expired_at(t)) {
+            self.current = None;
+        }
 
-        let trigger_cold = match self.last_traffic {
-            None => true,
-            Some(prev) => t.checked_sub(prev).is_some_and(|gap| gap > self.cfg.idle_reset_threshold),
-        };
+        let trigger_cold = self.current.is_none()
+            && match self.last_traffic {
+                None => true,
+                Some(prev) => t
+                    .checked_sub(prev)
+                    .is_some_and(|gap| gap > self.cfg.idle_reset_threshold),
+            };
         if trigger_cold {
             let env = self.cold_envelope(t);
             if !env.is_expired_at(t) {
-                self.active.push(env);
+                self.current = Some(env);
             }
         }
 
         if loss_drawn {
-            let env = self.loss_envelope(t);
+            let mult_now = self.bw_mult(t);
+            // Preserve any unfinished stall window from a prior loss event —
+            // a new loss can extend it but never shorten it.
+            let existing_stall_end = self
+                .current
+                .as_ref()
+                .map(|e| e.fired_at + e.lat_stall)
+                .filter(|end| *end > t)
+                .unwrap_or(t);
+            let new_stall_end = t + self.cfg.rto;
+            let lat_stall = existing_stall_end.max(new_stall_end) - t;
+            let env = self.loss_envelope(t, mult_now, lat_stall);
             if !env.is_expired_at(t) {
-                self.active.push(env);
+                self.current = Some(env);
             }
         }
 
         self.last_traffic = Some(t);
     }
 
-    /// True iff at least one envelope is currently in [`Self::on_send`]'s
-    /// active stack. Useful for consumers that want to take a faster path
-    /// when the link is unperturbed.
+    /// True iff an envelope is currently in effect. Plural in the name is a
+    /// historical hold-over from a stacked design; there is at most one.
     pub fn has_active_envelopes(&self) -> bool {
-        !self.active.is_empty()
+        self.current.is_some()
     }
 
     /// Smallest `t ≥ t0` such that [`Self::bytes_deliverable`]`(bps, t0, t)`
@@ -127,18 +143,18 @@ impl LinkState {
         hi
     }
 
-    /// Integrates `bps · bw_mult(s)` over `[t0, t1]`. Sub-divides at every
-    /// active envelope's phase transition, then applies a composite trapezoid
-    /// rule with [`INTEGRATE_STEPS`] sub-steps inside each phase-stable piece
-    /// so that geometric release curves are approximated accurately enough
-    /// for sim-realism use.
+    /// Integrates `bps · bw_mult(s)` over `[t0, t1]`. Sub-divides at the
+    /// active envelope's phase transitions, then applies a composite
+    /// trapezoid rule with [`INTEGRATE_STEPS`] sub-steps inside each
+    /// phase-stable piece so that geometric release curves integrate
+    /// accurately enough for sim-realism use.
     pub fn bytes_deliverable(&self, bps: u64, t0: Duration, t1: Duration) -> u64 {
         if t1 <= t0 || bps == 0 {
             return 0;
         }
-        let mut breaks: SmallVec<[Duration; 16]> = SmallVec::new();
+        let mut breaks: SmallVec<[Duration; 4]> = SmallVec::new();
         breaks.push(t0);
-        for e in &self.active {
+        if let Some(e) = &self.current {
             let onset_end = e.fired_at + e.bw_onset.duration;
             let release_end = onset_end + e.bw_release.duration;
             for b in [e.fired_at, onset_end, release_end] {
@@ -171,6 +187,7 @@ impl LinkState {
     fn cold_envelope(&self, t: Duration) -> Envelope {
         Envelope {
             fired_at: t,
+            bw_start: 1.0,
             bw_depth: self.cfg.cold_bw_depth,
             bw_onset: CurveSegment::new(Duration::ZERO, Curve::Step),
             bw_release: CurveSegment::new(self.cfg.cold_release, self.cfg.cold_release_shape),
@@ -178,15 +195,18 @@ impl LinkState {
         }
     }
 
-    fn loss_envelope(&self, t: Duration) -> Envelope {
+    fn loss_envelope(&self, t: Duration, start_mult: f64, lat_stall: Duration) -> Envelope {
+        let depth = (start_mult * self.cfg.loss_bw_depth).max(1e-6).min(start_mult);
         Envelope {
             fired_at: t,
-            bw_depth: self.cfg.loss_bw_depth,
-            // Onset holds bw at 1.0 throughout the RTO stall (delivery floor
-            // masks any transmission), then steps to depth as recovery begins.
+            bw_start: start_mult,
+            bw_depth: depth,
+            // Onset holds bw at `start_mult` through the RTO stall (delivery
+            // floor masks any transmission anyway), then steps to depth as
+            // recovery begins.
             bw_onset: CurveSegment::new(self.cfg.rto, Curve::Step),
             bw_release: CurveSegment::new(self.cfg.loss_release, self.cfg.loss_release_shape),
-            lat_stall: self.cfg.rto,
+            lat_stall,
         }
     }
 }
@@ -204,7 +224,7 @@ mod tests {
         let cfg = LinkEnvelopeCfg::defaults_for(ms(150), 1_000_000);
         let mut s = LinkState::new(cfg);
         s.on_send(ms(0), 1500, false);
-        assert_eq!(s.active.len(), 1);
+        assert!(s.has_active_envelopes());
         // Step onset → mult at t=0 is `depth`, well below 1.0.
         assert!(s.bw_mult(ms(0)) < 0.2);
     }
@@ -214,34 +234,55 @@ mod tests {
         let cfg = LinkEnvelopeCfg::defaults_for(ms(150), 1_000_000);
         let mut s = LinkState::new(cfg);
         s.on_send(ms(0), 1500, false);
+        let original_fired = s.current.as_ref().unwrap().fired_at;
         let cold_release_end = ms(0) + s.cfg.cold_release;
-        // Second send inside the cold envelope's recovery and well inside
-        // the idle threshold: only the original envelope is active.
         s.on_send(cold_release_end / 2, 1500, false);
-        assert_eq!(s.active.len(), 1);
+        // Still the original cold envelope — no re-trigger.
+        assert_eq!(s.current.as_ref().unwrap().fired_at, original_fired);
     }
 
     #[test]
-    fn long_idle_gap_re_fires_cold_envelope() {
+    fn long_idle_gap_re_fires_cold_envelope_after_release() {
         let cfg = LinkEnvelopeCfg::defaults_for(ms(150), 1_000_000);
         let mut s = LinkState::new(cfg);
         s.on_send(ms(0), 1500, false);
-        let before = s.active.len();
-        let later = s.cfg.idle_reset_threshold + ms(100);
+        // Past the cold envelope's release end AND past the idle threshold.
+        let later = s.cfg.cold_release + s.cfg.idle_reset_threshold + ms(100);
         s.on_send(later, 1500, false);
-        // A new cold envelope has been pushed; the old one may still be
-        // mid-release if its recovery is longer than the idle threshold.
-        assert!(s.active.len() > before);
+        let env = s.current.as_ref().unwrap();
+        assert_eq!(env.fired_at, later);
         assert!(s.bw_mult(later) < 0.2);
     }
 
     #[test]
-    fn loss_drawn_pushes_loss_envelope() {
+    fn loss_replaces_envelope_and_picks_up_from_current_mult() {
         let cfg = LinkEnvelopeCfg::defaults_for(ms(150), 1_000_000);
         let mut s = LinkState::new(cfg);
+        // Fire cold envelope, advance partway through its recovery.
+        s.on_send(ms(0), 1500, false);
+        let t_loss = s.cfg.cold_release / 2;
+        let mult_before_loss = s.bw_mult(t_loss);
+        assert!(mult_before_loss > s.cfg.cold_bw_depth && mult_before_loss < 1.0);
+        s.on_send(t_loss, 1500, true);
+        let env = s.current.as_ref().unwrap();
+        assert_eq!(env.fired_at, t_loss);
+        // bw_start captured the recovery-phase multiplier; depth halved it.
+        assert!((env.bw_start - mult_before_loss).abs() < 1e-9);
+        assert!((env.bw_depth - mult_before_loss * 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn back_to_back_losses_extend_stall_window() {
+        let cfg = LinkEnvelopeCfg::defaults_for(ms(150), 1_000_000);
+        let mut s = LinkState::new(cfg);
+        let rto = s.cfg.rto;
         s.on_send(ms(0), 1500, true);
-        // Cold + loss envelopes both active.
-        assert_eq!(s.active.len(), 2);
+        // Stall ends at t = rto.
+        assert_eq!(s.delivery_floor(rto / 2), rto);
+        // Second loss 200ms later → new stall ends at 200ms + rto, which is
+        // longer than the prior end. The replacement must honour that.
+        s.on_send(ms(200), 1500, true);
+        assert_eq!(s.delivery_floor(ms(300)), ms(200) + rto);
     }
 
     #[test]
