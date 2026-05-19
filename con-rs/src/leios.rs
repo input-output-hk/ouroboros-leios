@@ -553,6 +553,20 @@ impl LeiosState {
                 .phase_for_elapsed(slot.saturating_sub(*eb_slot))
                 .is_some()
         });
+        // Bound CandidateTracker memory: drop offer / pending-fetch /
+        // attempts entries below the pipeline-window horizon.  Without
+        // this, every peer announcement accumulates per-EB / per-vote
+        // entries indefinitely.  At scale (long runs × many peers × per-
+        // vote offers) the unpruned tracker is the dominant memory cost
+        // of `LeiosState`.  Pruning to `slot - pipeline_window` is safe:
+        // any fetch decision for an older EB or vote has already
+        // happened (the election itself is past expiry).
+        let pipeline_window = 3 * pipeline.delta_hdr
+            + pipeline.vote_window
+            + pipeline.diffuse_window
+            + pipeline.dedup_window;
+        let min_keep = slot.saturating_sub(pipeline_window);
+        self.candidates.prune_below_slot(min_keep);
         fx
     }
 
@@ -1717,6 +1731,46 @@ mod tests {
         let no_txs = |_: &[u8; 32]| false;
         let fx = state.on_slot(13, &no_txs);
         assert_no_vote(&fx, h(1), NoVoteReason::MissingTX);
+    }
+
+    #[test]
+    fn on_slot_prunes_candidate_tracker_below_pipeline_window() {
+        // Pipeline = 3·1 + 5 + 5 + 10 = 23 slots.  At slot 30, anything
+        // ≤ slot 7 should drop; entries at slot 8 and above stay.
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        let peer = crate::peer::PeerId(1);
+        state.candidates.note_eb_offered(point(5, 0xAA), peer);
+        state.candidates.note_eb_offered(point(8, 0xBB), peer);
+        state.candidates.note_eb_txs_offered(point(5, 0xCC), peer);
+        state.candidates.note_eb_txs_offered(point(8, 0xDD), peer);
+        state
+            .candidates
+            .note_vote_offered((5, b"voter".to_vec()), peer);
+        state
+            .candidates
+            .note_vote_offered((8, b"voter".to_vec()), peer);
+
+        let _ = state.on_slot(30, &tx_all);
+
+        // Slot 5 is below `30 - 23 = 7` → dropped.
+        assert!(state.candidates.eb_candidates(&point(5, 0xAA)).is_empty());
+        assert!(state.candidates.eb_txs_candidates(&point(5, 0xCC)).is_empty());
+        assert!(
+            state
+                .candidates
+                .vote_candidates(&(5, b"voter".to_vec()))
+                .is_empty()
+        );
+        // Slot 8 ≥ 7 → kept.
+        assert_eq!(state.candidates.eb_candidates(&point(8, 0xBB)), vec![peer]);
+        assert_eq!(
+            state.candidates.eb_txs_candidates(&point(8, 0xDD)),
+            vec![peer]
+        );
+        assert_eq!(
+            state.candidates.vote_candidates(&(8, b"voter".to_vec())),
+            vec![peer]
+        );
     }
 
     #[test]
