@@ -99,6 +99,16 @@ pub enum NoVoteReason {
     /// Only meaningful in TX-by-references mode; the wrapper supplies
     /// the `tx_known` callback that drives this check.
     MissingTX,
+    /// The EB body has not been validated locally yet — either the
+    /// body hasn't been received (vote-placeholder election) or the
+    /// body is present but the validator hasn't ratified it
+    /// (`on_validated_eb` not yet fired).  All referenced TXs may
+    /// already be available; the distinction from `MissingTX` is that
+    /// the tx-set is *not* the blocker — local validation is.  CIP-0164
+    /// requires the voter to validate the EB body before voting; this
+    /// blocks the local emission while cert assembly from peer votes
+    /// can still proceed via the `aggregation` module.
+    EBValidating,
 }
 
 /// Chain-tip metadata the I/O wrapper feeds into [`LeiosState`] so the
@@ -581,6 +591,17 @@ impl LeiosState {
                     return Err(NoVoteReason::MissingTX);
                 }
             }
+        }
+
+        // Predicate 5: EBValidating.  Voting attests EB-body validity,
+        // so the local node must have ratified the body
+        // (`on_validated_eb`) before emitting a vote.  Vote-placeholder
+        // elections (created from received peer votes when the body
+        // hadn't arrived) and elections with a body still in the
+        // validator queue both fail this check.  Distinct from
+        // `MissingTX`: the tx-set may already be complete.
+        if !self.elections.is_announced(eb_hash) {
+            return Err(NoVoteReason::EBValidating);
         }
 
         // Predicates passed — run the lottery.

@@ -1269,13 +1269,6 @@ impl ConRs {
         }
     }
 
-    /// If the local Elections aggregator has a certified EB whose slot
-    /// is old enough that we can endorse it now, build a sim
-    /// [`Endorsement`] for it.  Iterates `votes_by_eb` rather than
-    /// `eb_hash_to_id` so a cert can assemble for an EB whose body
-    /// hasn't been received locally — CIP-0164 allows it, and the
-    /// producer-side EB-safety gate (`LeiosState::has_endorsed_unvalidated_eb`)
-    /// then forces an empty RB body until the closure validates.
     fn try_build_endorsement(&self) -> Option<Endorsement> {
         let cert_slot = self.leios.certified_eb_slot()?;
         let (eb_id, voters) = self
@@ -1751,6 +1744,10 @@ impl ConRs {
                         NoVoteReason::LateRBHeader => SimNoVoteReason::LateRBHeader,
                         NoVoteReason::WrongEB => SimNoVoteReason::WrongEB,
                         NoVoteReason::MissingTX => SimNoVoteReason::MissingTX,
+                        // Sim has no dedicated "validating" telemetry;
+                        // fold into `MissingEB` (semantic neighbour:
+                        // we don't have the validated body yet).
+                        NoVoteReason::EBValidating => SimNoVoteReason::MissingEB,
                     };
                     // con-rs re-fires NoVote per slot per EB on
                     // transient reasons until the election expires.
