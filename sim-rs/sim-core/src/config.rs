@@ -176,6 +176,8 @@ pub struct RawParameters {
     pub leios_variant: LeiosVariant,
     pub relay_strategy: RelayStrategy,
     pub simulate_transactions: bool,
+    #[serde(default = "default_tcp_congestion_control")]
+    pub tcp_congestion_control: bool,
     pub timestamp_resolution_ms: f64,
     #[serde(default = "default_shard_count")]
     pub shard_count: usize,
@@ -1200,7 +1202,10 @@ impl SimConfiguration {
             retry_vote_in_window: params.retry_vote_in_window,
             trace_nodes: HashSet::new(),
             nodes: topology.nodes,
-            links: topology.links,
+            links: topology.links.into_iter().map(|mut lc| {
+                lc.use_tcp = params.tcp_congestion_control;
+                lc
+            }).collect(),
             stage_length: params.leios_stage_length_slots,
             max_eb_age: params.eb_max_age_slots,
             late_ib_inclusion: params.leios_late_ib_inclusion,
@@ -1287,6 +1292,10 @@ fn resolve_consensus_behaviours(
 
 fn duration_ms(ms: f64) -> Duration {
     Duration::from_secs_f64(ms / 1000.0)
+}
+
+fn default_tcp_congestion_control() -> bool {
+    true
 }
 
 fn default_shard_count() -> usize {
