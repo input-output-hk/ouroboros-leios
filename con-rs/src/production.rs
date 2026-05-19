@@ -45,28 +45,49 @@ pub enum BodyPath {
 }
 
 impl BodyPath {
-    /// CIP-0164 overflow rule, gated on the producer-side EB-safety
-    /// check.  Consults [`LeiosState::has_endorsed_unvalidated_eb`]
-    /// first; if set, short-circuits to [`BodyPath::Empty`] with the
-    /// mempool untouched.
+    /// CIP-0164 overflow rule, gated on (1) the producer-side EB-safety
+    /// check and (2) the cert-XOR-inline-body rule.
     ///
-    /// Otherwise inspects the mempool's free-pool size against
-    /// `rb_body_max_bytes`:
+    /// First consults [`LeiosState::has_endorsed_unvalidated_eb`]; if
+    /// set, short-circuits to [`BodyPath::Empty`] with the mempool
+    /// untouched.
     ///
-    /// - Below the cap: drains tx bodies into [`BodyPath::Inline`].
-    ///   The mempool's free pool shrinks by the returned set.
-    /// - At or above the cap: collects the FIFO-ordered manifest
-    ///   into [`BodyPath::Eb`], capped at `eb_body_max_bytes`
-    ///   worth of tx bodies.  The mempool is NOT mutated yet —
-    ///   the wrapper must follow up with `produce_eb` once it has
-    ///   computed the EB hash from the encoded manifest bytes.
-    ///   At least one tx is always emitted if the free pool is
-    ///   non-empty, even if the first tx alone exceeds the cap.
+    /// `endorsement_present` is true iff the caller is about to attach
+    /// a Leios certificate to this RB.  CIP-0164 forbids both a cert
+    /// and inline txs in the same RB body (a validator carrying a cert
+    /// must build ledger state from the endorsed EB's closure before
+    /// it could validate fresh txs, and the slot budget cannot fit
+    /// both).  Announcing a new EB in the header is independent of
+    /// the cert, so the EB-overflow path remains available.
+    ///
+    /// Cases (after the EB-safety check):
+    ///
+    /// - `endorsement_present = false`, mempool ≤ `rb_body_max_bytes`:
+    ///   drain tx bodies into [`BodyPath::Inline`].  The mempool's
+    ///   free pool shrinks by the returned set.
+    /// - `endorsement_present = false`, mempool > `rb_body_max_bytes`:
+    ///   collect the FIFO-ordered manifest into [`BodyPath::Eb`],
+    ///   capped at `eb_body_max_bytes` worth of tx bodies.  The
+    ///   mempool is NOT mutated yet — the wrapper must follow up
+    ///   with `produce_eb` once it has computed the EB hash from the
+    ///   encoded manifest bytes.  At least one tx is always emitted
+    ///   if the free pool is non-empty, even if the first tx alone
+    ///   exceeds the cap.
+    /// - `endorsement_present = true`, mempool ≤ `rb_body_max_bytes`:
+    ///   [`BodyPath::Empty`].  The cert lands on its own; inline txs
+    ///   are forbidden, and the mempool is too small to motivate an
+    ///   EB.  Mempool untouched; the txs will be drained on a later
+    ///   RB.
+    /// - `endorsement_present = true`, mempool > `rb_body_max_bytes`:
+    ///   [`BodyPath::Eb`].  The cert ships with a fresh EB
+    ///   announcement; both are allowed simultaneously since the
+    ///   announcement lives in the header and the body stays empty.
     pub fn decide(
         mempool: &mut MempoolState,
         rb_body_max_bytes: usize,
         eb_body_max_bytes: usize,
         leios: &LeiosState,
+        endorsement_present: bool,
     ) -> Self {
         if leios.has_endorsed_unvalidated_eb() {
             return BodyPath::Empty;
@@ -86,6 +107,12 @@ impl BodyPath {
                 }
             }
             BodyPath::Eb { manifest }
+        } else if endorsement_present {
+            // Cert + inline-txs would be a CIP-0164 violation; the
+            // mempool is too small to motivate an EB-overflow, so the
+            // RB carries the cert alone and the mempool waits for a
+            // future slot.
+            BodyPath::Empty
         } else {
             BodyPath::Inline(mempool.drain_up_to(rb_body_max_bytes))
         }
@@ -159,7 +186,7 @@ mod tests {
         let mut state = MempoolState::new(100);
         let leios = empty_leios();
         populate(&mut state, &[(1, 100), (2, 100), (3, 100)]); // 300 bytes total
-        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios, false);
         match body {
             BodyPath::Inline(txs) => {
                 assert_eq!(txs.len(), 3);
@@ -175,7 +202,7 @@ mod tests {
         let mut state = MempoolState::new(100);
         let leios = empty_leios();
         populate(&mut state, &[(1, 200), (2, 200), (3, 200)]); // 600 bytes total
-        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios, false);
         match body {
             BodyPath::Eb { manifest } => {
                 assert_eq!(manifest.len(), 3);
@@ -196,7 +223,7 @@ mod tests {
         let mut state = MempoolState::new(100);
         let leios = empty_leios();
         populate(&mut state, &[(1, 250), (2, 250)]); // 500 bytes, == cap
-        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios, false);
         // total_bytes (500) is NOT > 500 → Inline.
         assert!(matches!(body, BodyPath::Inline(_)));
     }
@@ -206,7 +233,7 @@ mod tests {
         let mut state = MempoolState::new(100);
         let leios = empty_leios();
         populate(&mut state, &[(1, 250), (2, 251)]); // 501, just over 500
-        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios, false);
         assert!(matches!(body, BodyPath::Eb { .. }));
     }
 
@@ -214,7 +241,7 @@ mod tests {
     fn empty_mempool_yields_empty_inline() {
         let mut state = MempoolState::new(100);
         let leios = empty_leios();
-        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios, false);
         match body {
             BodyPath::Inline(txs) => assert!(txs.is_empty()),
             other => panic!("expected Inline, got {other:?}"),
@@ -226,7 +253,7 @@ mod tests {
         let mut state = MempoolState::new(100);
         let leios = empty_leios();
         populate(&mut state, &[(1, 200), (2, 200), (3, 200)]);
-        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios, false);
         let manifest = match body {
             BodyPath::Eb { manifest } => manifest,
             other => panic!("expected Eb, got {other:?}"),
@@ -250,7 +277,7 @@ mod tests {
         let leios = empty_leios();
         populate(&mut state, &[(1, 200), (2, 200), (3, 200), (4, 200), (5, 200)]); // 1000 bytes
         // RB cap 500, EB cap 500 → first 2 txs (400 bytes <= 500, third would push to 600)
-        let body = BodyPath::decide(&mut state, 500, 500, &leios);
+        let body = BodyPath::decide(&mut state, 500, 500, &leios, false);
         let manifest = match body {
             BodyPath::Eb { manifest } => manifest,
             other => panic!("expected Eb, got {other:?}"),
@@ -278,7 +305,7 @@ mod tests {
         let mut state = MempoolState::new(100);
         let leios = empty_leios();
         populate(&mut state, &[(1, 1000), (2, 200)]); // first alone > eb cap
-        let body = BodyPath::decide(&mut state, 500, 500, &leios);
+        let body = BodyPath::decide(&mut state, 500, 500, &leios, false);
         let manifest = match body {
             BodyPath::Eb { manifest } => manifest,
             other => panic!("expected Eb, got {other:?}"),
@@ -296,7 +323,7 @@ mod tests {
         let mut leios = empty_leios();
         leios.endorsed_unvalidated_ebs.insert([0xCC; 32], 7);
         populate(&mut state, &[(1, 400), (2, 400)]); // 800 bytes, overflows 500
-        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios, false);
         assert!(matches!(body, BodyPath::Empty));
         assert_eq!(state.txs.len(), 2);
         assert_eq!(state.total_bytes, 800);
@@ -314,7 +341,52 @@ mod tests {
             hash: [0xDD; 32],
         });
         populate(&mut state, &[(1, 100)]);
-        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios, false);
         assert!(matches!(body, BodyPath::Inline(_)));
+    }
+
+    #[test]
+    fn endorsement_with_small_mempool_returns_empty_not_inline() {
+        // CIP-0164: a cert and inline txs in the same RB body are
+        // mutually exclusive.  With a cert about to attach and the
+        // mempool below the overflow threshold, the only legal body
+        // is empty.
+        let mut state = MempoolState::new(100);
+        let leios = empty_leios();
+        populate(&mut state, &[(1, 100), (2, 100), (3, 100)]); // 300 bytes < 500
+        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios, true);
+        assert!(matches!(body, BodyPath::Empty));
+        // Mempool must be untouched — the txs wait for a later RB.
+        assert_eq!(state.txs.len(), 3);
+        assert_eq!(state.total_bytes, 300);
+    }
+
+    #[test]
+    fn endorsement_with_overflowing_mempool_routes_eb() {
+        // A cert in the header coexists with a fresh EB announcement
+        // (the announcement is header-side, body stays empty).  This
+        // path is legal under CIP-0164.
+        let mut state = MempoolState::new(100);
+        let leios = empty_leios();
+        populate(&mut state, &[(1, 400), (2, 400)]); // 800 bytes > 500
+        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios, true);
+        match body {
+            BodyPath::Eb { manifest } => {
+                assert_eq!(manifest.len(), 2);
+            }
+            other => panic!("expected Eb, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn no_endorsement_with_small_mempool_inlines() {
+        // Sanity: with no cert this slot, the small-mempool path
+        // still drains into Inline (Praos fallback).
+        let mut state = MempoolState::new(100);
+        let leios = empty_leios();
+        populate(&mut state, &[(1, 100)]);
+        let body = BodyPath::decide(&mut state, 500, EB_CAP, &leios, false);
+        assert!(matches!(body, BodyPath::Inline(_)));
+        assert_eq!(state.txs.len(), 0);
     }
 }

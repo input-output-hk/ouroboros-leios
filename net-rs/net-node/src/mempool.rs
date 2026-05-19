@@ -137,18 +137,24 @@ impl Mempool {
     ///   (mempool untouched; caller commits the drain via
     ///   [`Mempool::produce_eb`] once it has the EB hash).
     ///
+    /// `endorsement_present` must reflect whether the caller is about
+    /// to attach a Leios certificate to this RB; the body-path
+    /// decision enforces the CIP-0164 cert-XOR-inline-body rule.
+    ///
     /// Policy lives in [`con_rs::production::BodyPath::decide`].
     pub fn decide_body_path(
         &mut self,
         rb_body_max_bytes: usize,
         eb_body_max_bytes: usize,
         leios: &con_rs::leios::LeiosState,
+        endorsement_present: bool,
     ) -> BodyPath {
         match con_rs::production::BodyPath::decide(
             &mut self.state,
             rb_body_max_bytes,
             eb_body_max_bytes,
             leios,
+            endorsement_present,
         ) {
             con_rs::production::BodyPath::Empty => BodyPath::Empty,
             con_rs::production::BodyPath::Inline(txs) => {

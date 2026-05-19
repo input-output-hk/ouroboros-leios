@@ -272,6 +272,7 @@ impl BlockProducer {
             self.rb_body_max_bytes,
             self.eb_body_max_bytes,
             leios,
+            certified_eb,
         ) {
             crate::mempool::BodyPath::Empty => (Vec::new(), None),
             crate::mempool::BodyPath::Inline(txs) => (txs, None),

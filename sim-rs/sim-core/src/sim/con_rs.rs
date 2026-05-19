@@ -795,7 +795,20 @@ impl ConRs {
 
         let max_rb_body = self.sim_config.max_block_size as usize;
         let max_eb_body = self.sim_config.max_eb_size as usize;
-        let body = BodyPath::decide(&mut self.mempool, max_rb_body, max_eb_body, &self.leios);
+        // Pass cert-presence so `BodyPath::decide` enforces CIP-0164's
+        // cert-XOR-inline-body rule.  Without this, a cert + small
+        // mempool would inline txs alongside the cert in the body, which
+        // the CIP forbids (validator-side timing budget can't both build
+        // ledger state from the endorsed closure AND validate fresh
+        // inline txs in the same slot).
+        let endorsement_present = endorsement.is_some();
+        let body = BodyPath::decide(
+            &mut self.mempool,
+            max_rb_body,
+            max_eb_body,
+            &self.leios,
+            endorsement_present,
+        );
         let (rb_txs, eb_pair) = match body {
             BodyPath::Empty => (Vec::new(), None),
             BodyPath::Inline(pending) => (self.collect_arcs(pending), None),
