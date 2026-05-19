@@ -245,6 +245,15 @@ impl NodeImpl for LinearLeiosNode {
             Message::AnnounceVote(_) | Message::RequestVote(_) | Message::Vote(_) => {
                 unreachable!("linear_leios.rs does not exchange per-vote messages");
             }
+            // EB-tx fetch triplet is con-rs-only.  `linear_leios.rs`
+            // delivers tx bodies via the inline `Message::EB` payload
+            // and falls back to normal tx diffusion for the missing
+            // set, so these variants don't reach this dispatch.
+            Message::AnnounceEBTxs(_)
+            | Message::RequestEBTxs(_, _)
+            | Message::EBTxs(_, _) => {
+                unreachable!("linear_leios.rs does not exchange EB-tx fetch messages");
+            }
         }
         std::mem::take(&mut self.queued)
     }

@@ -627,6 +627,15 @@ impl NodeImpl for ConRs {
                 self.tracker.track_eb_received(eb.id(), from, self.id);
                 out.schedule_cpu_task(CpuTask::EBHeaderValidated(from, eb));
             }
+            Message::AnnounceEBTxs(id) => {
+                self.receive_announce_eb_txs(&mut out, from, id);
+            }
+            Message::RequestEBTxs(id, bitmap) => {
+                self.receive_request_eb_txs(&mut out, from, id, bitmap);
+            }
+            Message::EBTxs(id, txs) => {
+                self.receive_eb_txs(&mut out, from, id, txs);
+            }
             Message::AnnounceVotes(_)
             | Message::RequestVotes(_)
             | Message::Votes(_) => {
@@ -855,8 +864,15 @@ impl ConRs {
                     validated: true,
                 },
             );
+            // Manifest goes out on AnnounceEB; the EB-tx fetch
+            // triplet is announced separately so peers can pull body
+            // bodies via RequestEBTxs even before they've fully
+            // assembled the EB body locally.  Locally-produced EBs
+            // have all bodies pinned in mempool from `produce_eb`, so
+            // we're servable immediately.
             for peer in &self.consumers {
                 out.send_to(*peer, Message::AnnounceEB(eb_id));
+                out.send_to(*peer, Message::AnnounceEBTxs(eb_id));
             }
         }
     }
@@ -1046,27 +1062,40 @@ impl ConRs {
                 validated: false,
             },
         );
+        // Register the manifest into LeiosState now (rather than
+        // waiting for body validation) so the EB-tx fetch path can
+        // query `missing_eb_tx_bitmap` and so any peer-vote that
+        // arrives before validation can attach to a placeholder
+        // election with the right slot.
+        self.record_eb_manifest_in_leios(eb_id, &eb);
         // Propagate immediately under the default `EbReceived`
         // criterion — the `TxsReceived` / `FullyValid` policy knobs
-        // wire up alongside the EB-tx fetch slice.
+        // wire up alongside the EB-tx fetch slice.  Also offer the
+        // EB-tx fetch endpoint so peers can pull bodies from this
+        // node without waiting for a full validation cycle here.
         for peer in &self.consumers {
             if *peer == from {
                 continue;
             }
             out.send_to(*peer, Message::AnnounceEB(eb_id));
+            out.send_to(*peer, Message::AnnounceEBTxs(eb_id));
         }
         // CIP-0164: an EB can only be validated once every referenced
-        // tx body is locally available.  Mirrors the
-        // `LinearWithTxReferences` gate in `linear_leios.rs`; without
-        // it, voting opens before tx diffusion has populated the
-        // receiver's mempool and the MissingTX predicate fails on
-        // peers downstream of the producer.
-        let missing: std::collections::BTreeSet<TransactionId> = eb
-            .txs
-            .iter()
-            .map(|tx| tx.id)
-            .filter(|id| !self.local_has_tx(*id))
-            .collect();
+        // tx body is locally available.  Compute the missing set;
+        // park the EB and issue an active `RequestEBTxs(eb_id,
+        // bitmap)` to the EB sender.  Bodies will arrive via
+        // `Message::EBTxs` (or, as a fallback, via normal tx
+        // diffusion), and `acknowledge_tx_for_pending_ebs` releases
+        // the EB once the missing set drains.
+        let mut missing: std::collections::BTreeSet<TransactionId> =
+            std::collections::BTreeSet::new();
+        let mut missing_indices: Vec<u32> = Vec::new();
+        for (idx, tx) in eb.txs.iter().enumerate() {
+            if !self.local_has_tx(tx.id) {
+                missing.insert(tx.id);
+                missing_indices.push(idx as u32);
+            }
+        }
         if missing.is_empty() {
             out.schedule_cpu_task(CpuTask::EBBlockValidated(eb, seen));
         } else {
@@ -1077,6 +1106,8 @@ impl ConRs {
                     .insert(eb_id);
             }
             self.eb_pending_txs.insert(eb_id, missing);
+            let bitmap = con_rs::bitmap::from_indices(&missing_indices);
+            out.send_to(from, Message::RequestEBTxs(eb_id, bitmap));
         }
     }
 
@@ -1134,11 +1165,13 @@ impl ConRs {
             .endorsed_unvalidated_ebs
             .contains_key(&eb_hash);
         self.ebs.insert(eb_id, entry);
-        // Feed LeiosState so the election is created and the voting
+        // Manifest was registered at header-validation time (see
+        // `record_eb_manifest_in_leios`); this is the validate-side
+        // companion that announces the election so the voting
         // lifecycle starts at the next slot tick.  Idempotent — a
         // duplicate `announce` is silently absorbed.  Also clears any
         // matching gate entry via `on_validated_eb`.
-        self.record_eb_in_leios(eb_id, &eb);
+        self.record_eb_validated_in_leios(eb_id);
         // If this EB was already endorsed on-chain (we saw the
         // endorsement in an RB before its body validated locally),
         // schedule its apply CpuTask now — `finish_applying_eb` does
@@ -1605,11 +1638,18 @@ impl ConRs {
         self.leios.set_chain_tip_context(ctx);
     }
 
-    /// Wire an EB (locally produced or peer-received) into
-    /// [`LeiosState`]: register the tx-hash manifest and announce the
-    /// election immediately (sim validates synchronously in the
-    /// CpuTask, so we skip the separate `ValidateEb` effect path).
-    fn record_eb_in_leios(&mut self, eb_id: EndorserBlockId, eb: &LinearEndorserBlock) {
+    /// Register an EB's tx-hash manifest into [`LeiosState`].  Called
+    /// on header-validation completion (peer-received EBs) and at
+    /// produce time (locally-produced EBs).  Idempotent — the
+    /// manifest is keyed by hash and re-inserting overwrites with the
+    /// same value.  Does NOT call `on_validated_eb`; that fires from
+    /// [`Self::record_eb_validated_in_leios`] once the EB closure has
+    /// been fully validated locally.
+    fn record_eb_manifest_in_leios(
+        &mut self,
+        eb_id: EndorserBlockId,
+        eb: &LinearEndorserBlock,
+    ) {
         let eb_hash = synthesize_eb_hash(eb_id);
         self.eb_hash_to_id.insert(eb_hash, eb_id);
         let point = con_rs::types::Point::Specific {
@@ -1617,13 +1657,129 @@ impl ConRs {
             hash: eb_hash,
         };
         let manifest: Vec<[u8; 32]> = eb.txs.iter().map(|tx| tx_id_hash(tx.id)).collect();
-        let fx = self.leios.on_eb_received(point.clone(), Some(manifest));
-        // Drop the effects — `RecordLeiosEbManifest` doesn't need
-        // forwarding (the local mempool already pinned the bodies on
-        // `produce_eb`), and `ValidateEb` is a no-op for sim's
-        // synchronous validation model.
-        let _ = fx;
+        let _ = self.leios.on_eb_received(point, Some(manifest));
+    }
+
+    /// Wire an EB (locally produced or peer-received) into
+    /// [`LeiosState`]: register the tx-hash manifest AND announce the
+    /// election.  Used for locally-produced EBs (where the body is
+    /// instantly valid) — peer-received EBs split into manifest at
+    /// header-validate and validated at body-validate to support the
+    /// EB-tx fetch round-trip.
+    fn record_eb_in_leios(&mut self, eb_id: EndorserBlockId, eb: &LinearEndorserBlock) {
+        self.record_eb_manifest_in_leios(eb_id, eb);
+        let eb_hash = synthesize_eb_hash(eb_id);
+        let point = con_rs::types::Point::Specific {
+            slot: eb_id.slot,
+            hash: eb_hash,
+        };
         self.leios.on_validated_eb(point);
+    }
+
+    /// Mark a peer-received EB as locally validated in [`LeiosState`]
+    /// (manifest was already registered at header-validation time).
+    fn record_eb_validated_in_leios(&mut self, eb_id: EndorserBlockId) {
+        let eb_hash = synthesize_eb_hash(eb_id);
+        let point = con_rs::types::Point::Specific {
+            slot: eb_id.slot,
+            hash: eb_hash,
+        };
+        self.leios.on_validated_eb(point);
+    }
+
+    /// A peer offered EB-txs for `eb_id`.  If we have a manifest and
+    /// missing bodies, issue a [`Message::RequestEBTxs`] against the
+    /// announcer; otherwise drop on the floor (we don't need any
+    /// bodies, or we don't have the manifest yet — the EB-receive
+    /// path will fetch when the manifest lands).
+    fn receive_announce_eb_txs(
+        &mut self,
+        out: &mut EventResult,
+        from: NodeId,
+        id: EndorserBlockId,
+    ) {
+        // Already pending or fully resolved → nothing to do.
+        let Some(missing) = self.eb_pending_txs.get(&id) else {
+            return;
+        };
+        let Some(EbState::Received { eb, .. }) = self.ebs.get(&id) else {
+            return;
+        };
+        let missing_indices: Vec<u32> = eb
+            .txs
+            .iter()
+            .enumerate()
+            .filter_map(|(i, tx)| {
+                if missing.contains(&tx.id) {
+                    Some(i as u32)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if missing_indices.is_empty() {
+            return;
+        }
+        let bitmap = con_rs::bitmap::from_indices(&missing_indices);
+        out.send_to(from, Message::RequestEBTxs(id, bitmap));
+    }
+
+    /// A peer asked for EB-txs.  Look up our local EB Arc and pull the
+    /// requested bodies straight out of `eb.txs` (the producer's
+    /// closure is carried by the Arc, and any node that received the
+    /// EB has it too).  Reply with [`Message::EBTxs`].
+    fn receive_request_eb_txs(
+        &mut self,
+        out: &mut EventResult,
+        from: NodeId,
+        id: EndorserBlockId,
+        bitmap: BTreeMap<u16, u64>,
+    ) {
+        let Some(EbState::Received { eb, .. }) = self.ebs.get(&id) else {
+            return;
+        };
+        let bodies: Vec<Arc<Transaction>> = con_rs::bitmap::iter_indices(&bitmap)
+            .filter_map(|i| eb.txs.get(i as usize).cloned())
+            .collect();
+        if bodies.is_empty() {
+            return;
+        }
+        out.send_to(from, Message::EBTxs(id, bodies));
+    }
+
+    /// `Message::EBTxs(eb_id, bodies)` arrived.  Schedule a
+    /// `TransactionValidated` CpuTask for each body — the existing
+    /// validation pipeline admits to mempool, fans out `AnnounceTx`
+    /// to peers (closing the linear-equivalent re-announce path),
+    /// and releases gated EBs via
+    /// [`Self::acknowledge_tx_for_pending_ebs`].
+    fn receive_eb_txs(
+        &mut self,
+        out: &mut EventResult,
+        from: NodeId,
+        _eb_id: EndorserBlockId,
+        bodies: Vec<Arc<Transaction>>,
+    ) {
+        for tx in bodies {
+            let key = tx_id_for(tx.id);
+            // Drop duplicates: tx already validated / pending /
+            // mempool-resident.  `admit_validated` would emit
+            // `AlreadyKnown` and short-circuit, but skipping here
+            // avoids the redundant CpuTask schedule.
+            if self.mempool.has_tx(&key)
+                || self.announced_or_known.contains(&key)
+            {
+                continue;
+            }
+            self.tracker.track_transaction_received(tx.id, from, self.id);
+            self.tx_arcs.insert(key.clone(), tx.clone());
+            self.announced_or_known.insert(key.clone());
+            self.pending_from.insert(key.clone(), from);
+            self.tx_seen_slot
+                .entry(key)
+                .or_insert(self.current_slot);
+            out.schedule_cpu_task(CpuTask::TransactionValidated(from, tx));
+        }
     }
 
     fn finish_validating_rb(&mut self, out: &mut EventResult, rb: Arc<LinearRankingBlock>) {

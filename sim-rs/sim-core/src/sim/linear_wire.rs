@@ -18,7 +18,7 @@
 //! other's `handle_message` / `handle_cpu_task` matches; the
 //! union-typing keeps the engine's message routing single-typed.
 
-use std::{sync::Arc, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use crate::{
     clock::Timestamp,
@@ -57,6 +57,19 @@ pub enum Message {
     RequestEB(EndorserBlockId),
     EB(Arc<EndorserBlock>),
 
+    // EB-tx fetch (CIP-0164 LeiosFetch BlockTxs).  `con_rs.rs` only —
+    // the receiver doesn't trust the inline `eb.txs` payload and
+    // fetches missing tx bodies via this triplet instead.  `linear_leios.rs`
+    // leaves the receiver waiting for normal tx diffusion to fill its
+    // mempool.
+    //
+    // Wire-format mapping: `AnnounceEBTxs` ↔ `MsgLeiosBlockTxsOffer`,
+    // `RequestEBTxs` ↔ `MsgLeiosBlockTxsRequest` (bitmap-addressed),
+    // `EBTxs` ↔ `MsgLeiosBlockTxs` (body list).
+    AnnounceEBTxs(EndorserBlockId),
+    RequestEBTxs(EndorserBlockId, BTreeMap<u16, u64>),
+    EBTxs(EndorserBlockId, Vec<Arc<Transaction>>),
+
     // Vote propagation — bundle path used by `linear_leios.rs`.
     // Aggregates multiple votes for one voter into a single message;
     // sim-only, not in the CIP.
@@ -90,6 +103,10 @@ impl SimMessage for Message {
             Self::RequestEB(_) => MiniProtocol::EB,
             Self::EB(_) => MiniProtocol::EB,
 
+            Self::AnnounceEBTxs(_) => MiniProtocol::EB,
+            Self::RequestEBTxs(_, _) => MiniProtocol::EB,
+            Self::EBTxs(_, _) => MiniProtocol::EB,
+
             Self::AnnounceVotes(_) => MiniProtocol::Vote,
             Self::RequestVotes(_) => MiniProtocol::Vote,
             Self::Votes(_) => MiniProtocol::Vote,
@@ -117,6 +134,15 @@ impl SimMessage for Message {
             Self::AnnounceEB(_) => 8,
             Self::RequestEB(_) => 8,
             Self::EB(eb) => eb.bytes,
+
+            Self::AnnounceEBTxs(_) => 8,
+            // CIP-0164 wire shape: EB point (40b) + bitmap entries
+            // (2-byte u16 index + 8-byte u64 word = 10 bytes per
+            // segment, plus a CBOR map overhead).
+            Self::RequestEBTxs(_, bitmap) => 40 + 10 * bitmap.len() as u64,
+            Self::EBTxs(_, txs) => {
+                40 + txs.iter().map(|tx| tx.bytes).sum::<u64>()
+            }
 
             Self::AnnounceVotes(_) => 8,
             Self::RequestVotes(_) => 8,
