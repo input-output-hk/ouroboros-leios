@@ -1,5 +1,5 @@
 //! Wire-level types shared between every Linear Leios adapter
-//! (`linear_leios.rs`, `con_rs.rs`).  Holds the inter-node [`Message`]
+//! (`linear_leios.rs`, `shared_consensus.rs`).  Holds the inter-node [`Message`]
 //! enum, the CPU work-unit [`CpuTask`] enum, and the [`TimedEvent`]
 //! enum used by the scheduler.
 //!
@@ -11,7 +11,7 @@
 //! Per-traffic-class encoding choice differs by adapter:
 //! - `linear_leios.rs` uses the `Votes`/`VoteBundle` triplet (a
 //!   sim-only aggregation, predates CIP-0164's per-vote model).
-//! - `con-rs.rs` uses the per-vote `Vote` triplet to mirror the
+//! - `shared-consensus.rs` uses the per-vote `Vote` triplet to mirror the
 //!   real CIP wire (one BLS signature per message).
 //!
 //! Variants intended only for one adapter are made unreachable in the
@@ -57,7 +57,7 @@ pub enum Message {
     RequestEB(EndorserBlockId),
     EB(Arc<EndorserBlock>),
 
-    // EB-tx fetch (CIP-0164 LeiosFetch BlockTxs).  `con_rs.rs` only —
+    // EB-tx fetch (CIP-0164 LeiosFetch BlockTxs).  `shared_consensus.rs` only —
     // the receiver doesn't trust the inline `eb.txs` payload and
     // fetches missing tx bodies via this triplet instead.  `linear_leios.rs`
     // leaves the receiver waiting for normal tx diffusion to fill its
@@ -77,7 +77,7 @@ pub enum Message {
     RequestVotes(VoteBundleId),
     Votes(Arc<VoteBundle>),
 
-    // Vote propagation — per-vote path used by `con_rs.rs`.  One BLS
+    // Vote propagation — per-vote path used by `shared_consensus.rs`.  One BLS
     // signature, one wire message; mirrors the CIP-0164 wire format.
     AnnounceVote(VoteId),
     RequestVote(VoteId),
@@ -176,20 +176,20 @@ pub enum CpuTask {
     /// (`linear_leios.rs` only)
     VTBundleValidated(NodeId, Arc<VoteBundle>),
     /// A single CIP-0164 vote has been generated and is ready to propagate
-    /// (`con_rs.rs` only — one BLS signature per CpuTask)
+    /// (`shared_consensus.rs` only — one BLS signature per CpuTask)
     VoteGenerated(Arc<Vote>),
     /// A single CIP-0164 vote has been received and validated, ready to propagate
-    /// (`con_rs.rs` only)
+    /// (`shared_consensus.rs` only)
     VoteValidated(NodeId, Arc<Vote>),
     /// A ranking block has been validated and is now being applied to
     /// ledger state — distinct from `RBBlockValidated` (block-body
     /// signature / structure check).  Scales with tx count because
     /// applying a real Cardano block walks every input + output.
-    /// (`con_rs.rs` only — `linear_leios.rs` collapses validate+apply.)
+    /// (`shared_consensus.rs` only — `linear_leios.rs` collapses validate+apply.)
     RBBlockApplied(Arc<RankingBlock>),
     /// An endorser block's closure has been validated and is now being
     /// applied to ledger state.  Gates mempool pruning of the EB's
-    /// referenced txs.  (`con_rs.rs` only.)
+    /// referenced txs.  (`shared_consensus.rs` only.)
     EBBlockApplied(Arc<EndorserBlock>),
 }
 

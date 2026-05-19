@@ -1,4 +1,4 @@
-# con-rs
+# shared-consensus
 
 Sans-IO Cardano consensus core. Hosts the protocol pieces that every
 Cardano-Leios implementation must agree on: longest-chain selection
@@ -6,12 +6,15 @@ Cardano-Leios implementation must agree on: longest-chain selection
 selection (wFA + LS), pipeline phase math, vote aggregation.
 
 This crate is a **peer of `net-rs/` and `sim-rs/`**, not a child of
-either. Both consume it via `path = "../con-rs"`.
+either. Both consume it via
+`path = "../../shared-rs/consensus"`. It lives under the `shared-rs/`
+workspace so additional shared crates (e.g. `tcp-model`) can sit
+alongside it without a circular dependency on either consumer.
 
 ## Discipline
 
-These rules are why `con-rs` exists. Breaking them defeats the point of
-the extraction.
+These rules are why this crate exists. Breaking them defeats the point
+of the extraction.
 
 ### 1. Sans-IO
 
@@ -41,7 +44,7 @@ channel (network, validator, telemetry).
 
 ### 3. Determinism
 
-`sim-rs` replays runs from a seed. con-rs must not introduce
+`sim-rs` replays runs from a seed. shared-consensus must not introduce
 non-deterministic ordering.
 
 - `BTreeMap` / `BTreeSet` everywhere. No `HashMap` iteration in hot
@@ -55,7 +58,7 @@ non-deterministic ordering.
 
 ### 4. Format-agnostic
 
-Block bodies, headers, vote bodies cross the con-rs boundary as opaque
+Block bodies, headers, vote bodies cross the crate boundary as opaque
 `Vec<u8>`. CBOR parsing is the I/O wrapper's job.
 
 - `CachedBlock` carries `header: Vec<u8>, body: Vec<u8>`.
@@ -67,9 +70,10 @@ Block bodies, headers, vote bodies cross the con-rs boundary as opaque
 
 ### 5. Comments stay consumer-neutral
 
-Don't name `net-node` or `sim-rs` (or any future consumer) in con-rs
-doc comments. Describe the contract from con-rs's own perspective —
-"the I/O wrapper" / "the caller", never "net-node uses this for X."
+Don't name `net-node` or `sim-rs` (or any future consumer) in
+shared-consensus doc comments. Describe the contract from this crate's
+own perspective — "the I/O wrapper" / "the caller", never "net-node
+uses this for X."
 
 ## Module map
 
@@ -120,24 +124,25 @@ Common test helpers in each module:
 ## Building
 
 ```
-cd /home/prc/leios-net-rs/con-rs
-cargo build       # standalone
+cd /home/prc/leios-net-rs/shared-rs
+cargo build       # workspace build
 cargo test        # all unit tests (each module has its own mod tests)
 cargo clippy --all-targets -- -D warnings
 ```
 
-When working from net-rs's worktree, con-rs writes need
-`dangerouslyDisableSandbox: true` because con-rs lives outside the
-project sandbox.
+When working from net-rs's or sim-rs's worktree, shared-consensus
+writes need `dangerouslyDisableSandbox: true` because the crate lives
+outside their project sandboxes.
 
 ## Sequencing context
 
-con-rs was extracted from `net-rs` first (branch `prc/con-rs`).
-`sim-rs` adoption is the next big step — it requires merging
-`prc/sim-rs-voting` into the same branch and unifying on the wFA
-voting model (sim-rs currently uses a per-voter VRF trial schedule).
-Until that lands, treat con-rs's API as still-shaping; net-rs's needs
-have full priority.
+shared-consensus was first extracted from `net-rs` as `con-rs` (branch
+`prc/con-rs`), then moved under the `shared-rs/` workspace so that
+other consumer-neutral crates (e.g. `tcp-model`) could share its
+top-level. `sim-rs` adoption is in progress — it required unifying
+on the wFA voting model (sim-rs originally used a per-voter VRF trial
+schedule). Treat the crate's API as still-shaping; net-rs's needs have
+priority where they conflict.
 
 Future trait surface (deferred): `Mempool`, `Ledger`. Both will be
 dyn-trait boundaries that each consumer implements with its own

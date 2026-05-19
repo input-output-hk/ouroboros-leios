@@ -6,7 +6,7 @@
 //! is set.  Empty bitmap selects nothing; use [`select_all`] for "every
 //! tx".
 //!
-//! Lives in con-rs because the trait surface
+//! Lives in shared-consensus because the trait surface
 //! ([`crate::fetch::EbTxsFetchPolicy::pick`] and friends) already speaks
 //! the encoded `BTreeMap<u16, u64>` form.  Net-core re-exports these
 //! helpers as `net_core::protocols::leios_fetch::bitmap` for wire-codec

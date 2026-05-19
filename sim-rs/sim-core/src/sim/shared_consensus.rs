@@ -1,15 +1,15 @@
-//! Sim-rs adapter for the shared con-rs consensus crate.
+//! Sim-rs adapter for the shared-consensus crate.
 //!
 //! This module is the W2.2 work item from
-//! `sim-rs/merge-con-rs-plan.md`: replace `linear_leios.rs` with a thin
-//! wrapper that drives `con_rs::leios::LeiosState`,
-//! `con_rs::praos::PraosState`, and `con_rs::mempool::MempoolState`
+//! `sim-rs/merge-shared-consensus-plan.md`: replace `linear_leios.rs` with a thin
+//! wrapper that drives `shared_consensus::leios::LeiosState`,
+//! `shared_consensus::praos::PraosState`, and `shared_consensus::mempool::MempoolState`
 //! directly. The handlers fill in incrementally — today only the TX
-//! propagation path is wired, so selecting `variant: con-rs` exercises
+//! propagation path is wired, so selecting `variant: shared-consensus` exercises
 //! `MempoolState` end-to-end but emits no RBs, EBs, or votes yet.
 //!
 //! Wire format (`Message`, `CpuTask`, `TimedEvent`) is reused from
-//! `linear_leios` so cross-variant comparisons (`linear` vs `con-rs`)
+//! `linear_leios` so cross-variant comparisons (`linear` vs `shared-consensus`)
 //! and the byte-equivalent event-stream determinism check in W2.5 line
 //! up directly.
 //!
@@ -22,10 +22,10 @@
 //! The translation lives in [`derive_pipeline`],
 //! [`derive_committee_selection`], and [`derive_quorum_fraction`].
 //! Anything not in this table either:
-//! - has no con-rs analog (sim-only knobs), or
+//! - has no shared-consensus analog (sim-only knobs), or
 //! - hasn't been wired yet (TODOs called out in the helpers).
 //!
-//! | YAML key                                | con-rs destination                                 |
+//! | YAML key                                | shared-consensus destination                                 |
 //! |-----------------------------------------|----------------------------------------------------|
 //! | `leios-header-diffusion-time-ms`        | `PipelineConfig.delta_hdr` (in slots, ceil)        |
 //! | `linear-vote-stage-length-slots`        | `PipelineConfig.vote_window` (CIP-0164 L_vote)     |
@@ -44,7 +44,7 @@
 //!
 //! Hardcoded defaults (no YAML source yet):
 //!
-//! | con-rs field                  | Value | Rationale                                         |
+//! | shared-consensus field                  | Value | Rationale                                         |
 //! |-------------------------------|-------|---------------------------------------------------|
 //! | `WfaLs.non_persistent_voters` | `0`   | sim collapses PV/NPV into one probability         |
 //! | `StakeCentile.top_centile_of_stake` | `0.95` | sim's `committee-stake-fraction-threshold` isn't propagated to `SimConfiguration` |
@@ -60,7 +60,7 @@ use std::{
 use rand_chacha::ChaChaRng;
 use tokio::sync::mpsc;
 
-use con_rs::{
+use shared_consensus::{
     config::{CommitteeSelection, StakeEntry},
     elections::{Elections, ElectionsConfig},
     leios::{
@@ -106,9 +106,9 @@ fn build_stake_registry(sim_config: &SimConfiguration) -> Vec<StakeEntry> {
         .collect()
 }
 
-/// Derive con-rs's [`PipelineConfig`] from the sim config.
+/// Derive shared-consensus's [`PipelineConfig`] from the sim config.
 ///
-/// | con-rs field   | sim source                                                  |
+/// | shared-consensus field   | sim source                                                  |
 /// |----------------|-------------------------------------------------------------|
 /// | `delta_hdr`    | ceil(`leios-header-diffusion-time-ms` / 1000)               |
 /// | `vote_window`  | `linear-vote-stage-length-slots` (CIP-0164 L_vote)          |
@@ -138,10 +138,10 @@ fn derive_pipeline(sim_config: &SimConfiguration) -> PipelineConfig {
     }
 }
 
-/// Derive con-rs's [`CommitteeSelection`] from sim's
+/// Derive shared-consensus's [`CommitteeSelection`] from sim's
 /// [`CommitteeSelectionAlgorithm`].
 ///
-/// | con-rs variant                | sim algorithm                                     |
+/// | shared-consensus variant                | sim algorithm                                     |
 /// |-------------------------------|---------------------------------------------------|
 /// | `WfaLs { persistent_voters }` | `wfa-ls` — sim collapses PV/NPV into a single     |
 /// |                               | probability, so the entire expected committee     |
@@ -153,7 +153,7 @@ fn derive_pipeline(sim_config: &SimConfiguration) -> PipelineConfig {
 /// (despite the name) are the *expected total committee weight per
 /// EB* — each voter runs `probability` VRF trials whose individual
 /// success rate is stake-weighted, so the across-voters sum already
-/// totals `probability`.  con-rs's `persistent_voters` is the
+/// totals `probability`.  shared-consensus's `persistent_voters` is the
 /// seat-count distributed across pools, also dimensioned as "total
 /// weight per EB".  The two map directly without scaling by node
 /// count.
@@ -184,7 +184,7 @@ fn derive_committee_selection(sim_config: &SimConfiguration) -> CommitteeSelecti
 }
 
 /// Quorum fraction = `vote_threshold / expected_committee_size`.  Sim
-/// stores quorum as an absolute vote count; con-rs wants the same
+/// stores quorum as an absolute vote count; shared-consensus wants the same
 /// boundary as a fraction of expected total weight.  Falls back to
 /// 0.75 (CIP-0164 default) when the divisor is zero.
 fn derive_quorum_fraction(sim_config: &SimConfiguration, expected: u32) -> f64 {
@@ -194,7 +194,7 @@ fn derive_quorum_fraction(sim_config: &SimConfiguration, expected: u32) -> f64 {
     sim_config.vote_threshold as f64 / expected as f64
 }
 
-/// Canonical mapping from sim's `TransactionId` to con-rs's opaque
+/// Canonical mapping from sim's `TransactionId` to shared-consensus's opaque
 /// `TxId`.  Returns a 32-byte vec so the same value can serve as the
 /// `[u8; 32]` hash slots use in EB manifests and in the
 /// `MissingTX` voting predicate's `tx_known` callback — see
@@ -220,7 +220,7 @@ fn tx_id_hash(id: TransactionId) -> [u8; 32] {
     out
 }
 
-pub struct ConRs {
+pub struct SharedConsensus {
     id: NodeId,
     #[allow(dead_code)] // used once handle_new_slot drives the production lottery
     sim_config: Arc<SimConfiguration>,
@@ -239,9 +239,9 @@ pub struct ConRs {
     praos: PraosState,
     mempool: MempoolState,
 
-    /// Lookup from con-rs `TxId` back to the sim's `Arc<Transaction>`.
+    /// Lookup from shared-consensus `TxId` back to the sim's `Arc<Transaction>`.
     /// Sim emits `Message::Tx(Arc<Transaction>)` and the lottery / EB
-    /// production paths consume `Arc<Transaction>`; con-rs's mempool
+    /// production paths consume `Arc<Transaction>`; shared-consensus's mempool
     /// only knows opaque byte ids and bodies. The side-table bridges
     /// the two.
     tx_arcs: BTreeMap<TxId, Arc<Transaction>>,
@@ -279,7 +279,7 @@ pub struct ConRs {
     /// candidate set when the multi-peer fetch policy lands.
     eb_announcers: BTreeMap<EndorserBlockId, Vec<NodeId>>,
 
-    /// Reverse lookup from con-rs's 32-byte EB hash back to sim's
+    /// Reverse lookup from shared-consensus's 32-byte EB hash back to sim's
     /// `EndorserBlockId`.  Populated whenever an EB enters
     /// [`LeiosState`] via `record_eb_in_leios`.
     eb_hash_to_id: BTreeMap<[u8; 32], EndorserBlockId>,
@@ -290,18 +290,18 @@ pub struct ConRs {
     votes: BTreeMap<VoteId, VoteState>,
 
     /// NodeId → pool name lookup, cached so the vote-aggregation path
-    /// (which keys by con-rs's `voter_key: Vec<u8>` over the pool name)
+    /// (which keys by shared-consensus's `voter_key: Vec<u8>` over the pool name)
     /// doesn't pay a `sim_config.nodes` linear scan per vote.
     node_names: BTreeMap<NodeId, String>,
 
-    /// Sim-side mirror of con-rs's aggregator, keyed by EB so the
+    /// Sim-side mirror of shared-consensus's aggregator, keyed by EB so the
     /// endorsement assembly path can answer "who voted, with what
     /// weight, for the certified EB?" without scanning private
     /// `Elections` state.  Populated by `record_bundle_into_elections`
     /// alongside `Elections::record_vote`.
     votes_by_eb: BTreeMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
 
-    /// Reverse lookup from con-rs's 32-byte RB hash back to sim's
+    /// Reverse lookup from shared-consensus's 32-byte RB hash back to sim's
     /// `BlockId`.  Populated whenever an RB is fed to [`PraosState`]
     /// (self-produced via `register_self_produced`, peer-received via
     /// `on_block_received`).  `pick_parent` projects PraosState's
@@ -310,7 +310,7 @@ pub struct ConRs {
     rb_hash_to_id: BTreeMap<[u8; 32], BlockId>,
 
     /// Real-clock anchor for converting sim `Timestamp`s into
-    /// `Instant`s when calling con-rs APIs that take `now: Instant`
+    /// `Instant`s when calling shared-consensus APIs that take `now: Instant`
     /// (Praos cooldowns, fetch-policy RTT math).  Captured once at
     /// adapter construction; all calls to `instant_now` return
     /// `epoch + (clock.now() - Timestamp::zero())`, so deltas inside
@@ -318,7 +318,7 @@ pub struct ConRs {
     /// time, not real time.
     instant_epoch: Instant,
 
-    /// Dedup set for `LeiosEffect::NoVote` telemetry.  con-rs's
+    /// Dedup set for `LeiosEffect::NoVote` telemetry.  shared-consensus's
     /// election lifecycle re-fires `NoVote` once per voting-window
     /// slot for transient reasons (WrongEB / MissingTX / LateRBHeader)
     /// until the predicate succeeds or the EB ages out.  At 750
@@ -407,9 +407,9 @@ impl RbState {
     }
 }
 
-type EventResult = super::EventResult<ConRs>;
+type EventResult = super::EventResult<SharedConsensus>;
 
-impl NodeImpl for ConRs {
+impl NodeImpl for SharedConsensus {
     type Message = Message;
     type Task = CpuTask;
     type TimedEvent = TimedEvent;
@@ -648,11 +648,11 @@ impl NodeImpl for ConRs {
             Message::AnnounceVotes(_)
             | Message::RequestVotes(_)
             | Message::Votes(_) => {
-                // con-rs adapter emits per-vote, never bundles — every
+                // shared-consensus adapter emits per-vote, never bundles — every
                 // node in a sim run uses the same adapter, so the
                 // bundle variants can't reach this handler.
                 unreachable!(
-                    "con-rs adapter does not exchange VoteBundles; the bundle \
+                    "shared-consensus adapter does not exchange VoteBundles; the bundle \
                      Message variants are linear_leios.rs-only"
                 );
             }
@@ -735,7 +735,7 @@ impl NodeImpl for ConRs {
             CpuTask::EBBlockValidated(eb, seen) => self.finish_validating_eb(&mut out, eb, seen),
             CpuTask::VTBundleGenerated(_, _) | CpuTask::VTBundleValidated(_, _) => {
                 unreachable!(
-                    "con-rs adapter does not schedule bundle CpuTasks; the bundle \
+                    "shared-consensus adapter does not schedule bundle CpuTasks; the bundle \
                      variants are linear_leios.rs-only"
                 );
             }
@@ -756,7 +756,7 @@ impl NodeImpl for ConRs {
     }
 }
 
-impl ConRs {
+impl SharedConsensus {
     /// Lottery win for slot `slot` (winning draw `vrf`): pick the body
     /// path via [`BodyPath::decide`] and schedule
     /// `CpuTask::RBBlockGenerated`.  The `Eb` path also commits the
@@ -1163,7 +1163,7 @@ impl ConRs {
                     .insert(eb_id);
             }
             self.eb_pending_txs.insert(eb_id, missing);
-            let bitmap = con_rs::bitmap::from_indices(&missing_indices);
+            let bitmap = shared_consensus::bitmap::from_indices(&missing_indices);
             out.send_to(from, Message::RequestEBTxs(eb_id, bitmap));
         }
     }
@@ -1349,7 +1349,7 @@ impl ConRs {
     }
 
     /// Pick the parent `BlockId` for a newly produced RB.  Reads
-    /// con-rs's adopted tip (`PraosState::local_tip`) and projects it
+    /// shared-consensus's adopted tip (`PraosState::local_tip`) and projects it
     /// back through `rb_hash_to_id` so the produced header carries the
     /// sim-native form of the parent reference.  Returns `None` until
     /// the first RB has been validated locally.
@@ -1578,7 +1578,7 @@ impl ConRs {
         let all_nodes_mb = (node_total * num_nodes) as f64 / (1024.0 * 1024.0);
 
         tracing::info!(
-            "ConRs memory stats at slot {} (node 0, x{} nodes):\n\
+            "SharedConsensus memory stats at slot {} (node 0, x{} nodes):\n\
              \x20 tx_arcs:              {:>8} entries  ~ {:>6.1} MB\n\
              \x20 announced_or_known:   {:>8} entries  ~ {:>6.1} MB\n\
              \x20 tx_seen_slot:         {:>8} entries  ~ {:>6.1} MB\n\
@@ -1629,7 +1629,7 @@ impl ConRs {
         );
     }
 
-    /// Project sim time onto a real-clock `Instant` for con-rs APIs
+    /// Project sim time onto a real-clock `Instant` for shared-consensus APIs
     /// that take `now: Instant`.  Anchored at `instant_epoch` (captured
     /// at adapter construction), so identical sim-time deltas yield
     /// identical `Instant` deltas across runs — PraosState's cooldowns
@@ -1648,7 +1648,7 @@ impl ConRs {
         for fx in effects {
             match fx {
                 // Sim has its own AnnounceRBHeader / RequestRBHeader
-                // handshake; fetch routing through con-rs's pluggable
+                // handshake; fetch routing through shared-consensus's pluggable
                 // policy isn't wired here yet.
                 PraosEffect::FetchBlockRange { .. } => {}
                 // No ChainSync mini-protocol in the sim.
@@ -1715,7 +1715,7 @@ impl ConRs {
     ) {
         let eb_hash = synthesize_eb_hash(eb_id);
         self.eb_hash_to_id.insert(eb_hash, eb_id);
-        let point = con_rs::types::Point::Specific {
+        let point = shared_consensus::types::Point::Specific {
             slot: eb_id.slot,
             hash: eb_hash,
         };
@@ -1732,7 +1732,7 @@ impl ConRs {
     fn record_eb_in_leios(&mut self, eb_id: EndorserBlockId, eb: &LinearEndorserBlock) {
         self.record_eb_manifest_in_leios(eb_id, eb);
         let eb_hash = synthesize_eb_hash(eb_id);
-        let point = con_rs::types::Point::Specific {
+        let point = shared_consensus::types::Point::Specific {
             slot: eb_id.slot,
             hash: eb_hash,
         };
@@ -1743,7 +1743,7 @@ impl ConRs {
     /// (manifest was already registered at header-validation time).
     fn record_eb_validated_in_leios(&mut self, eb_id: EndorserBlockId) {
         let eb_hash = synthesize_eb_hash(eb_id);
-        let point = con_rs::types::Point::Specific {
+        let point = shared_consensus::types::Point::Specific {
             slot: eb_id.slot,
             hash: eb_hash,
         };
@@ -1783,7 +1783,7 @@ impl ConRs {
         if missing_indices.is_empty() {
             return;
         }
-        let bitmap = con_rs::bitmap::from_indices(&missing_indices);
+        let bitmap = shared_consensus::bitmap::from_indices(&missing_indices);
         out.send_to(from, Message::RequestEBTxs(id, bitmap));
     }
 
@@ -1801,7 +1801,7 @@ impl ConRs {
         let Some(EbState::Received { eb, .. }) = self.ebs.get(&id) else {
             return;
         };
-        let bodies: Vec<Arc<Transaction>> = con_rs::bitmap::iter_indices(&bitmap)
+        let bodies: Vec<Arc<Transaction>> = shared_consensus::bitmap::iter_indices(&bitmap)
             .filter_map(|i| eb.txs.get(i as usize).cloned())
             .collect();
         if bodies.is_empty() {
@@ -1970,7 +1970,7 @@ impl ConRs {
     /// Forward Leios-side effects to sim's `EventResult` and tracker.
     /// Fetch / validate effects stay no-op: sim drives RB/EB/vote
     /// flows directly via the `Message` enum (see the handlers above)
-    /// and validation timing through `CpuTask`, so the con-rs
+    /// and validation timing through `CpuTask`, so the shared-consensus
     /// abstractions for those channels don't need translation here.
     fn apply_leios_effects(&mut self, out: &mut EventResult, effects: Vec<LeiosEffect>) {
         for fx in effects {
@@ -2001,7 +2001,7 @@ impl ConRs {
                             SimNoVoteReason::EquivocatingRB
                         }
                     };
-                    // con-rs re-fires NoVote per slot per EB on
+                    // shared-consensus re-fires NoVote per slot per EB on
                     // transient reasons until the election expires.
                     // Collapse the duplicate telemetry stream here.
                     if !self.noted_no_vote.insert((eb_hash, sim_reason.clone())) {
@@ -2020,7 +2020,7 @@ impl ConRs {
                 }
                 // Fetch effects stay no-op: sim drives RB/EB/vote
                 // fetches directly through its `Message` enum, so
-                // con-rs's fetch-policy abstraction isn't on the
+                // shared-consensus's fetch-policy abstraction isn't on the
                 // path.  Validation effects similarly: sim's
                 // `CpuTask` already models the validation hop.
                 LeiosEffect::FetchLeiosBlock { .. }
@@ -2063,7 +2063,7 @@ impl ConRs {
                 self.leios.voting_config.persistent_seats,
             ),
             (false, Some(sig)) => {
-                let npv_wins = con_rs::wfa::count_npv_wins(
+                let npv_wins = shared_consensus::wfa::count_npv_wins(
                     &sig,
                     self.leios.voting_config.stake,
                     self.leios.voting_config.total_stake,
@@ -2129,7 +2129,7 @@ impl ConRs {
                         // `AlreadyKnown` is dedup, not loss — skip. A
                         // `ValidationFailed` outcome doesn't surface in
                         // sim today; the wrapper that introduced it
-                        // (con-rs) would only emit it if we called
+                        // (shared-consensus) would only emit it if we called
                         // `on_tx_validation_failed`, which we never do.
                         TxRejectReason::AlreadyKnown
                         | TxRejectReason::ValidationFailed(_) => None,
@@ -2143,7 +2143,7 @@ impl ConRs {
     }
 }
 
-/// Recover a `TransactionId` from its 32-byte con-rs encoding.
+/// Recover a `TransactionId` from its 32-byte shared-consensus encoding.
 /// Inverse of [`tx_id_for`].  Used in the rejection telemetry path
 /// when the body arc has already been evicted from `tx_arcs`.
 fn sim_id_from_bytes(bytes: &[u8]) -> Option<TransactionId> {
@@ -2154,7 +2154,7 @@ fn sim_id_from_bytes(bytes: &[u8]) -> Option<TransactionId> {
     Some(TransactionId::new(u64::from_le_bytes(arr)))
 }
 
-/// Build the NodeId → pool-name lookup once at startup.  con-rs's
+/// Build the NodeId → pool-name lookup once at startup.  shared-consensus's
 /// vote aggregator keys voters by their pool name (the same string
 /// that appears in [`StakeEntry::node_id`] and the persistent
 /// committee map), so the adapter needs to translate sim's
@@ -2197,7 +2197,7 @@ fn synthesize_rb_hash(id: BlockId) -> [u8; 32] {
     out
 }
 
-/// Wrap a sim [`BlockId`] in con-rs's [`Point::Specific`].  Pairs with
+/// Wrap a sim [`BlockId`] in shared-consensus's [`Point::Specific`].  Pairs with
 /// [`synthesize_rb_hash`] and the `rb_hash_to_id` reverse table.
 fn block_id_to_point(id: BlockId) -> Point {
     Point::Specific {
@@ -2206,7 +2206,7 @@ fn block_id_to_point(id: BlockId) -> Point {
     }
 }
 
-/// Translate a sim `LinearRankingBlockHeader` to con-rs's
+/// Translate a sim `LinearRankingBlockHeader` to shared-consensus's
 /// [`ParsedHeaderInfo`].  `block_number = slot` keeps PraosState's
 /// chain-tree weight monotonic along the sim's chain (slots strictly
 /// increase per chain link).  `prev_hash` is the synthesized hash of
@@ -2230,7 +2230,7 @@ fn parsed_header_from_rb(rb: &LinearRankingBlock) -> ParsedHeaderInfo {
     }
 }
 
-/// Sim `NodeId` (a `usize` newtype) → con-rs `PeerId` (a `u64`
+/// Sim `NodeId` (a `usize` newtype) → shared-consensus `PeerId` (a `u64`
 /// newtype).  Width-only cast; sim node counts fit comfortably in
 /// `u64` on every platform we target.
 fn node_id_to_peer_id(id: NodeId) -> PeerId {

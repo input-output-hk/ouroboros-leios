@@ -883,7 +883,7 @@ impl LeiosNode {
             LeiosVariant::FullWithoutIbs
             | LeiosVariant::Linear
             | LeiosVariant::LinearWithTxReferences
-            | LeiosVariant::ConRs => {
+            | LeiosVariant::SharedConsensus => {
                 unreachable!("wrong implementation")
             }
         };

@@ -1,4 +1,4 @@
-# con-rs
+# shared-consensus
 
 Sans-IO Cardano consensus core. The protocol pieces every
 Cardano-Leios implementation must agree on, packaged as a single crate
@@ -37,7 +37,7 @@ graph TD
         Tel[Telemetry sink]
     end
 
-    subgraph Con["con-rs (sans-IO)"]
+    subgraph Con["shared-consensus (sans-IO)"]
         Praos["PraosState<br/>chain_tree, block_cache,<br/>peer_chains, in_flight"]
         Leios["LeiosState<br/>elections, eb_tx_hashes,<br/>pending_eb_tx_fetches"]
         Elections["Elections<br/>per-EB voting state"]
@@ -192,8 +192,8 @@ graph LR
 
 ## Determinism
 
-`sim-rs` replays whole runs from a seed; con-rs must not introduce
-non-determinism. The constraints:
+`sim-rs` replays whole runs from a seed; shared-consensus must not
+introduce non-determinism. The constraints:
 
 - All iteration is over `BTreeMap` / `BTreeSet`. No `HashMap` iteration
   in hot paths.
@@ -229,8 +229,8 @@ graph TD
     wfa --> config
 ```
 
-Nothing in con-rs depends on `tokio`, `hyper`, or any networking
-crate.
+Nothing in shared-consensus depends on `tokio`, `hyper`, or any
+networking crate.
 
 ## Building and testing
 

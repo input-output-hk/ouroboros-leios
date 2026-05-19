@@ -38,7 +38,7 @@ use crate::store::leios_store::TxBodyResolver;
 /// Per-peer RTT measurement observer.  Invoked from the coordinator
 /// when a `LatencyMeasured` event arrives (with `Some(rtt)`) and on
 /// peer disconnect (with `None`).  Net-rs wires this to a shared
-/// `con_rs::fetch::PeerRttCache` so the consensus state machines'
+/// `shared_consensus::fetch::PeerRttCache` so the consensus state machines'
 /// fetch policies can rank candidates by real measured latency.
 pub type PeerRttObserver = Arc<dyn Fn(PeerId, Option<Duration>) + Send + Sync>;
 

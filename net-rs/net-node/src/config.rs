@@ -86,13 +86,13 @@ pub struct PeerConfig {
 // Fetch policy
 // ---------------------------------------------------------------------------
 
-/// How con-rs should pick peers for a given traffic class.  Each variant
-/// maps onto a stock policy in `con_rs::fetch`.
+/// How shared-consensus should pick peers for a given traffic class.  Each variant
+/// maps onto a stock policy in `shared_consensus::fetch`.
 #[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum FetchPolicyKind {
     /// Send the request to the single candidate with the lowest measured
-    /// RTT.  Matches con-rs's default (`LowestRttFirst`).
+    /// RTT.  Matches shared-consensus's default (`LowestRttFirst`).
     #[default]
     LowestRtt,
     /// Send the request to the `n` candidates with the lowest measured
@@ -110,8 +110,8 @@ pub enum FetchPolicyKind {
 
 impl FetchPolicyKind {
     /// Build a [`BlockFetchPolicy`] handle from this config.
-    pub fn into_block_policy(self) -> Box<dyn con_rs::fetch::BlockFetchPolicy + Send + Sync> {
-        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+    pub fn into_block_policy(self) -> Box<dyn shared_consensus::fetch::BlockFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
             FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
@@ -122,8 +122,8 @@ impl FetchPolicyKind {
     }
 
     /// Build an [`EbFetchPolicy`] handle from this config.
-    pub fn into_eb_policy(self) -> Box<dyn con_rs::fetch::EbFetchPolicy + Send + Sync> {
-        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+    pub fn into_eb_policy(self) -> Box<dyn shared_consensus::fetch::EbFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
             FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
@@ -134,8 +134,8 @@ impl FetchPolicyKind {
     }
 
     /// Build an [`EbTxsFetchPolicy`] handle from this config.
-    pub fn into_eb_txs_policy(self) -> Box<dyn con_rs::fetch::EbTxsFetchPolicy + Send + Sync> {
-        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+    pub fn into_eb_txs_policy(self) -> Box<dyn shared_consensus::fetch::EbTxsFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
             FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
@@ -146,8 +146,8 @@ impl FetchPolicyKind {
     }
 
     /// Build a [`VoteFetchPolicy`] handle from this config.
-    pub fn into_vote_policy(self) -> Box<dyn con_rs::fetch::VoteFetchPolicy + Send + Sync> {
-        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+    pub fn into_vote_policy(self) -> Box<dyn shared_consensus::fetch::VoteFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
             FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
@@ -271,11 +271,11 @@ pub struct NodeConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Committee selection (Leios voting) — defined in con-rs, re-exported here
+// Committee selection (Leios voting) — defined in shared-consensus, re-exported here
 // for callers that import via `crate::config`.
 // ---------------------------------------------------------------------------
 
-pub use con_rs::{CommitteeSelection, StakeEntry};
+pub use shared_consensus::{CommitteeSelection, StakeEntry};
 
 fn default_quorum_stake_fraction() -> f64 {
     0.75
@@ -949,15 +949,15 @@ kind = "lowest_rtt"
     #[test]
     fn fetch_policy_kind_builds_boxed_policies() {
         // Just make sure the conversions don't panic and produce
-        // distinguishable types; behavioural coverage lives in con-rs.
-        let _: Box<dyn con_rs::fetch::BlockFetchPolicy + Send + Sync> =
+        // distinguishable types; behavioural coverage lives in shared-consensus.
+        let _: Box<dyn shared_consensus::fetch::BlockFetchPolicy + Send + Sync> =
             FetchPolicyKind::LowestRtt.into_block_policy();
-        let _: Box<dyn con_rs::fetch::EbFetchPolicy + Send + Sync> =
+        let _: Box<dyn shared_consensus::fetch::EbFetchPolicy + Send + Sync> =
             FetchPolicyKind::Broadcast { n: Some(3) }.into_eb_policy();
-        let _: Box<dyn con_rs::fetch::EbTxsFetchPolicy + Send + Sync> =
+        let _: Box<dyn shared_consensus::fetch::EbTxsFetchPolicy + Send + Sync> =
             FetchPolicyKind::Broadcast { n: Some(1) }.into_eb_txs_policy();
         // `n = None` => broadcast to all candidates.
-        let _: Box<dyn con_rs::fetch::VoteFetchPolicy + Send + Sync> =
+        let _: Box<dyn shared_consensus::fetch::VoteFetchPolicy + Send + Sync> =
             FetchPolicyKind::Broadcast { n: None }.into_vote_policy();
     }
 

@@ -25,7 +25,7 @@ tx_size_min = 250
 tx_size_max = 16384
 
 # Per-traffic-class fetch policy.  Defaults to `lowest_rtt` for every
-# class — that matches the historical behaviour where con-rs picks the
+# class — that matches the historical behaviour where shared-consensus picks the
 # single lowest-RTT candidate.  Switch a class to `broadcast` with an
 # explicit `n` to fan a request out to the N lowest-RTT peers, or omit
 # `n` to broadcast to every available candidate; useful for studying

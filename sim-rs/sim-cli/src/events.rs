@@ -479,7 +479,7 @@ impl EventMonitor {
                     vote_messages.received += 1;
                 }
 
-                // CIP-0164 per-vote events (con-rs adapter).
+                // CIP-0164 per-vote events (shared-consensus adapter).
                 Event::VoteGenerated {
                     eb, voter, weight, ..
                 } => {

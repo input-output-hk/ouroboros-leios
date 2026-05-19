@@ -11,7 +11,7 @@ pub(crate) mod peer_task;
 pub mod server_handlers;
 pub mod types;
 
-pub use con_rs::PeerId;
+pub use shared_consensus::PeerId;
 pub use types::{PeerCommand, PeerEvent};
 
 /// Connection mode determines which protocol roles the peer task runs.

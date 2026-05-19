@@ -861,8 +861,8 @@ pub(super) fn build(
         LeiosVariant::Linear | LeiosVariant::LinearWithTxReferences => {
             build_typed::<LinearLeiosNode>(config, event_sender, &mut rng)
         }
-        LeiosVariant::ConRs => {
-            build_typed::<super::con_rs::ConRs>(config, event_sender, &mut rng)
+        LeiosVariant::SharedConsensus => {
+            build_typed::<super::shared_consensus::SharedConsensus>(config, event_sender, &mut rng)
         }
         LeiosVariant::FullWithoutIbs => {
             build_typed::<StracciatellaLeiosNode>(config, event_sender, &mut rng)

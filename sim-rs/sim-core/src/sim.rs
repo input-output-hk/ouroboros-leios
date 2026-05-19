@@ -14,7 +14,7 @@ use crate::{
 
 pub(crate) mod actor;
 mod common;
-pub(crate) mod con_rs;
+pub(crate) mod shared_consensus;
 mod cpu;
 mod driver;
 mod leios;

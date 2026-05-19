@@ -14,7 +14,7 @@
 //!   the CIP-0164 `MissingTX` voting predicate) consult both
 //!   transparently via [`MempoolState::has_tx`] / [`get_body_by_id`].
 //!
-//! Validation crosses the con-rs boundary as an effect / response pair,
+//! Validation crosses this crate's boundary as an effect / response pair,
 //! the same pattern Praos uses for block validation and Leios uses for
 //! EB / vote validation:
 //!
@@ -49,7 +49,7 @@ pub struct EbKey {
 }
 
 /// Opaque transaction identifier.  Conventionally Blake2b-256 of the
-/// body, but con-rs doesn't enforce that — the wrapper picks the hash
+/// body, but this crate doesn't enforce that — the wrapper picks the hash
 /// scheme and supplies it on every entry path.
 pub type TxId = Vec<u8>;
 

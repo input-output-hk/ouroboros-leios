@@ -83,13 +83,13 @@ pub enum ShardStrategy {
     MinCut,
 }
 
-/// Which stock policy in `con_rs::fetch` to use for a given traffic
+/// Which stock policy in `shared_consensus::fetch` to use for a given traffic
 /// class.  Mirrors net-rs's `FetchPolicyKind` so YAML configs round-
 /// trip between the two consumers.
 #[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum FetchPolicyKind {
-    /// Single-peer pick by lowest measured RTT.  Matches con-rs's
+    /// Single-peer pick by lowest measured RTT.  Matches shared-consensus's
     /// `LeiosState::new` default.
     #[default]
     LowestRtt,
@@ -105,7 +105,7 @@ pub enum FetchPolicyKind {
     NoFetch,
 }
 
-/// Per-traffic-class fetch-policy selection for the con-rs adapter.
+/// Per-traffic-class fetch-policy selection for the shared-consensus adapter.
 /// Defaults map onto `LeiosState::new`'s constructor: every class
 /// uses `LowestRttFirst` with a zero-RTT oracle (sim drives fetches
 /// via its own Message enum; the policy still picks which peer).
@@ -122,8 +122,8 @@ pub struct FetchPolicy {
 }
 
 impl FetchPolicyKind {
-    pub fn into_block_policy(self) -> Box<dyn con_rs::fetch::BlockFetchPolicy + Send + Sync> {
-        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+    pub fn into_block_policy(self) -> Box<dyn shared_consensus::fetch::BlockFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
             FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
@@ -133,8 +133,8 @@ impl FetchPolicyKind {
         }
     }
 
-    pub fn into_eb_policy(self) -> Box<dyn con_rs::fetch::EbFetchPolicy + Send + Sync> {
-        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+    pub fn into_eb_policy(self) -> Box<dyn shared_consensus::fetch::EbFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
             FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
@@ -144,8 +144,8 @@ impl FetchPolicyKind {
         }
     }
 
-    pub fn into_eb_txs_policy(self) -> Box<dyn con_rs::fetch::EbTxsFetchPolicy + Send + Sync> {
-        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+    pub fn into_eb_txs_policy(self) -> Box<dyn shared_consensus::fetch::EbTxsFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
             FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
@@ -155,8 +155,8 @@ impl FetchPolicyKind {
         }
     }
 
-    pub fn into_vote_policy(self) -> Box<dyn con_rs::fetch::VoteFetchPolicy + Send + Sync> {
-        use con_rs::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+    pub fn into_vote_policy(self) -> Box<dyn shared_consensus::fetch::VoteFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
             FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
@@ -208,11 +208,11 @@ pub struct RawParameters {
     pub linear_eb_propagation_criteria: EBPropagationCriteria,
     pub linear_tx_max_age_slots: Option<u64>,
 
-    // Fetch routing (con-rs adapter only)
+    // Fetch routing (shared-consensus adapter only)
     /// Per-traffic-class fetch-policy selection.  Defaults to
     /// `lowest-rtt` for every class (matching `LeiosState::new`).
     /// Mirrors net-rs's `FetchPolicyConfig` shape.  Only consumed by
-    /// the con-rs adapter; `linear_leios.rs` has its own diffusion path.
+    /// the shared-consensus adapter; `linear_leios.rs` has its own diffusion path.
     #[serde(default)]
     pub fetch_policy: FetchPolicy,
 
@@ -229,7 +229,7 @@ pub struct RawParameters {
     /// Default `true` matches the CIP reading.  `false` gives a
     /// single decision per `(voter, EB)` and one NPV trial — matches
     /// `linear_leios.rs`'s single-shot lottery behaviour.  Useful for
-    /// like-for-like comparisons.  con-rs adapter only.
+    /// like-for-like comparisons.  shared-consensus adapter only.
     #[serde(default = "default_retry_vote_in_window")]
     pub retry_vote_in_window: bool,
 
@@ -262,7 +262,7 @@ pub struct RawParameters {
     /// the body-validation signature/structure check has passed).
     /// Scales by tx count; defaults are minimal-but-nonzero so the
     /// `PraosState::on_block_applied` accounting fires without
-    /// skewing throughput.  (`con-rs` adapter only — `linear_leios`
+    /// skewing throughput.  (`shared-consensus` adapter only — `linear_leios`
     /// collapses validate+apply into one step.)
     #[serde(default = "default_rb_apply_cpu_time_ms")]
     pub rb_apply_cpu_time_ms: f64,
@@ -301,7 +301,7 @@ pub struct RawParameters {
     /// CPU cost to apply an EB closure to ledger state — the EB's
     /// referenced txs land on-chain via the certifying RB's
     /// endorsement.  Parallel pathway to `rb_apply_cpu_time_ms` and
-    /// gates mempool-prune of the EB's tx set.  (`con-rs` adapter
+    /// gates mempool-prune of the EB's tx set.  (`shared-consensus` adapter
     /// only.)
     #[serde(default = "default_eb_apply_cpu_time_ms")]
     pub eb_apply_cpu_time_ms: f64,
@@ -316,7 +316,7 @@ pub struct RawParameters {
     // `non-persistent-vote-generation-probability` are still accepted
     // (the values were always voter counts, never probabilities; the
     // old names date from a pre-CIP-0164 framing).  Linear sums them
-    // into one VRF-lottery probability; con-rs uses them directly as
+    // into one VRF-lottery probability; shared-consensus uses them directly as
     // PV / NPV committee sizes for `CommitteeSelection::WfaLs`.
     #[serde(alias = "persistent-vote-generation-probability")]
     pub persistent_voters: f64,
@@ -367,7 +367,7 @@ pub enum LeiosVariant {
     FullWithTxReferences,
     Linear,
     LinearWithTxReferences,
-    ConRs,
+    SharedConsensus,
 }
 
 impl LeiosVariant {
@@ -377,7 +377,7 @@ impl LeiosVariant {
             Self::FullWithoutIbs
                 | Self::Linear
                 | Self::LinearWithTxReferences
-                | Self::ConRs
+                | Self::SharedConsensus
         )
     }
 }
@@ -769,7 +769,7 @@ impl BlockSizeConfig {
 
     pub fn linear_eb(&self, txs: &[Arc<Transaction>]) -> u64 {
         let body_size = match self.variant {
-            LeiosVariant::LinearWithTxReferences | LeiosVariant::ConRs => {
+            LeiosVariant::LinearWithTxReferences | LeiosVariant::SharedConsensus => {
                 txs.len() as u64 * self.eb_per_ib
             }
             _ => txs.iter().map(|tx| tx.bytes).sum::<u64>(),
@@ -1002,10 +1002,10 @@ pub struct SimConfiguration {
     /// Sum of `persistent_voters + non_persistent_voters`.  Linear
     /// uses this as a single VRF-lottery probability per (voter, EB).
     pub(crate) vote_probability: f64,
-    /// CIP-0164 PV / NPV committee sizes.  con-rs uses these
-    /// directly via [`con_rs::config::CommitteeSelection::WfaLs`];
+    /// CIP-0164 PV / NPV committee sizes.  shared-consensus uses these
+    /// directly via [`shared_consensus::config::CommitteeSelection::WfaLs`];
     /// linear collapses them into `vote_probability`.  Stored as
-    /// f64 (PV/NPV can be non-integer); con-rs casts at the
+    /// f64 (PV/NPV can be non-integer); shared-consensus casts at the
     /// boundary.
     pub(crate) persistent_voters: f64,
     pub(crate) non_persistent_voters: f64,

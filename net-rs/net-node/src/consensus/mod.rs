@@ -12,9 +12,9 @@ use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::{mpsc, watch};
 
-use con_rs::chain_tree::ChainTreeEntry;
-use con_rs::fetch::PeerRttCache;
-use con_rs::leios::ChainTipContext;
+use shared_consensus::chain_tree::ChainTreeEntry;
+use shared_consensus::fetch::PeerRttCache;
+use shared_consensus::leios::ChainTipContext;
 use crate::config::{CommitteeSelection, DynamicConfig, FetchPolicyConfig, StakeEntry};
 use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerOutcome, Validator};
@@ -213,7 +213,7 @@ impl Consensus {
     /// Borrow the underlying `LeiosState`.  Used by `try_produce_block`
     /// to consult the producer-side EB-safety gate
     /// (`BodyPath::decide` reads `has_endorsed_unvalidated_eb`).
-    pub fn leios_state(&self) -> &con_rs::leios::LeiosState {
+    pub fn leios_state(&self) -> &shared_consensus::leios::LeiosState {
         &self.leios.state
     }
 

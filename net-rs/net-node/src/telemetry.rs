@@ -11,7 +11,7 @@ use net_core::multi_peer::types::PeerInfo;
 use serde::Serialize;
 use tracing::info;
 
-use con_rs::chain_tree::ChainTreeEntry;
+use shared_consensus::chain_tree::ChainTreeEntry;
 use crate::config::{EventSinkConfig, StatsSinkConfig, TelemetryConfig};
 
 // ---------------------------------------------------------------------------

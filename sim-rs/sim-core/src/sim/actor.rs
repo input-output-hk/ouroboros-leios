@@ -76,8 +76,8 @@ impl ActorSimulation {
                     super::linear_leios::register_actors,
                 )
             }
-            LeiosVariant::ConRs => {
-                Self::new_generic::<super::con_rs::ConRs, _>(
+            LeiosVariant::SharedConsensus => {
+                Self::new_generic::<super::shared_consensus::SharedConsensus, _>(
                     config,
                     event_sender,
                     no_additional_actors,

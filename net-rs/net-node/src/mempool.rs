@@ -1,10 +1,10 @@
-//! Transaction pool wrapper around `con_rs::mempool::MempoolState`.
+//! Transaction pool wrapper around `shared_consensus::mempool::MempoolState`.
 //!
 //! Translates between net-core's wire-format `PendingTx`/`TxId`/`TxBody`
-//! and the opaque-bytes shape `con-rs` uses, plus the per-peer
-//! `net_core::peer::PeerId` ↔ `con_rs::peer::PeerId` mapping.  The
+//! and the opaque-bytes shape `shared-consensus` uses, plus the per-peer
+//! `net_core::peer::PeerId` ↔ `shared_consensus::peer::PeerId` mapping.  The
 //! actual queue, capacity, eviction, per-peer advertised set, and
-//! validation-effect surface live in `con_rs::mempool`.
+//! validation-effect surface live in `shared_consensus::mempool`.
 //!
 //! `spawn_tx_generator` and `spawn_tx_validator` stay here — they are
 //! the I/O-side actors that drive the state machine.
@@ -18,7 +18,7 @@ use rand::{Rng, SeedableRng};
 use tokio::sync::{mpsc, watch};
 use tracing::info;
 
-use con_rs::mempool::{EbKey, MempoolState};
+use shared_consensus::mempool::{EbKey, MempoolState};
 use net_core::peer::PeerId;
 use net_core::protocols::txsubmission::{PendingTx, TxBody, TxId};
 
@@ -27,13 +27,13 @@ use crate::config::{DynamicConfig, TxConfig};
 /// Shared handle to the mempool.
 pub type SharedMempool = Arc<Mutex<Mempool>>;
 
-/// Translate a net-core peer id to the con-rs one.  Both are
+/// Translate a net-core peer id to the shared-consensus one.  Both are
 /// `pub struct PeerId(pub u64)`; this is a single field copy.
-fn to_con_pid(id: PeerId) -> con_rs::peer::PeerId {
-    con_rs::peer::PeerId(id.0)
+fn to_con_pid(id: PeerId) -> shared_consensus::peer::PeerId {
+    shared_consensus::peer::PeerId(id.0)
 }
 
-fn from_con_tx(tx: con_rs::mempool::PendingTx) -> PendingTx {
+fn from_con_tx(tx: shared_consensus::mempool::PendingTx) -> PendingTx {
     PendingTx {
         tx_id: TxId(tx.tx_id),
         body: TxBody(tx.body),
@@ -42,7 +42,7 @@ fn from_con_tx(tx: con_rs::mempool::PendingTx) -> PendingTx {
 }
 
 /// Pad/truncate a `Vec<u8>` tx-id into the wrapper's 32-byte hash form.
-/// con-rs's `TxId = Vec<u8>` is hash-scheme-agnostic; net-rs's wire
+/// shared-consensus's `TxId = Vec<u8>` is hash-scheme-agnostic; net-rs's wire
 /// format pins it at Blake2b-256.
 fn to_hash_32(id: Vec<u8>) -> [u8; 32] {
     let mut h = [0u8; 32];
@@ -52,7 +52,7 @@ fn to_hash_32(id: Vec<u8>) -> [u8; 32] {
 }
 
 /// Which body the next self-produced RB carries — wire-typed sibling of
-/// [`con_rs::production::BodyPath`].
+/// [`shared_consensus::production::BodyPath`].
 #[derive(Debug, Clone)]
 pub enum BodyPath {
     /// Producer-side EB-safety gate fired: the local node holds a
@@ -70,8 +70,8 @@ pub enum BodyPath {
     Eb { manifest_hashes: Vec<[u8; 32]> },
 }
 
-/// I/O-side wrapper around `con_rs::mempool::MempoolState`.  Public
-/// methods preserve the net-core wire types at the boundary; con-rs
+/// I/O-side wrapper around `shared_consensus::mempool::MempoolState`.  Public
+/// methods preserve the net-core wire types at the boundary; shared-consensus
 /// holds the actual state.
 pub struct Mempool {
     state: MempoolState,
@@ -84,7 +84,7 @@ impl Mempool {
         }
     }
 
-    /// Borrow the underlying con-rs state for read-only operations
+    /// Borrow the underlying shared-consensus state for read-only operations
     /// that consult the mempool but don't mutate it (e.g.
     /// `LeiosState::missing_eb_tx_bitmap`).
     pub fn as_inner(&self) -> &MempoolState {
@@ -141,26 +141,26 @@ impl Mempool {
     /// to attach a Leios certificate to this RB; the body-path
     /// decision enforces the CIP-0164 cert-XOR-inline-body rule.
     ///
-    /// Policy lives in [`con_rs::production::BodyPath::decide`].
+    /// Policy lives in [`shared_consensus::production::BodyPath::decide`].
     pub fn decide_body_path(
         &mut self,
         rb_body_max_bytes: usize,
         eb_body_max_bytes: usize,
-        leios: &con_rs::leios::LeiosState,
+        leios: &shared_consensus::leios::LeiosState,
         endorsement_present: bool,
     ) -> BodyPath {
-        match con_rs::production::BodyPath::decide(
+        match shared_consensus::production::BodyPath::decide(
             &mut self.state,
             rb_body_max_bytes,
             eb_body_max_bytes,
             leios,
             endorsement_present,
         ) {
-            con_rs::production::BodyPath::Empty => BodyPath::Empty,
-            con_rs::production::BodyPath::Inline(txs) => {
+            shared_consensus::production::BodyPath::Empty => BodyPath::Empty,
+            shared_consensus::production::BodyPath::Inline(txs) => {
                 BodyPath::Inline(txs.into_iter().map(from_con_tx).collect())
             }
-            con_rs::production::BodyPath::Eb { manifest } => BodyPath::Eb {
+            shared_consensus::production::BodyPath::Eb { manifest } => BodyPath::Eb {
                 manifest_hashes: manifest.into_iter().map(to_hash_32).collect(),
             },
         }
@@ -408,7 +408,7 @@ mod tests {
         assert!((0.4..=0.6).contains(&mean), "mean={mean}, expected ~0.5");
     }
 
-    // -- Wrapper translation tests (algorithmic behaviour lives in con-rs) --
+    // -- Wrapper translation tests (algorithmic behaviour lives in shared-consensus) --
 
     #[tokio::test]
     async fn mempool_resolver_serves_body_through_trait() {
@@ -453,7 +453,7 @@ mod tests {
 
     #[test]
     fn peek_unannounced_translates_peer_ids() {
-        // Net-core's PeerId(u64) maps to con-rs's PeerId(u64); verify
+        // Net-core's PeerId(u64) maps to shared-consensus's PeerId(u64); verify
         // the wrapper preserves per-peer dedup across the boundary.
         let mut pool = Mempool::new(10);
         pool.push(make_tx_with_id(1, 100));

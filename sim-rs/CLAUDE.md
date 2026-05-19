@@ -77,13 +77,14 @@ All node variants implement `NodeImpl` trait (`sim-core/src/sim/node.rs`), which
 
 ### Leios Variants
 
-Three node implementations selected by `config.variant`:
+Four node implementations selected by `config.variant`:
 
 | Module | Variants |
 |---|---|
 | `sim/leios.rs` | `Short`, `Full`, `FullWithTxReferences` |
 | `sim/stracciatella.rs` | `FullWithoutIbs` (EBs reference TXs directly) |
 | `sim/linear_leios.rs` | `Linear`, `LinearWithTxReferences` |
+| `sim/shared_consensus.rs` | `SharedConsensus` (YAML: `shared-consensus` — thin adapter over `shared-consensus` crate at `shared-rs/consensus/`) |
 
 `Simulation::new()` in `sim-core/src/sim.rs` dispatches on variant to construct the appropriate node types.
 

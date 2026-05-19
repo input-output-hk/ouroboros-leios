@@ -10,7 +10,7 @@
 //! pure query result.
 //!
 //! Block bodies and headers are carried as opaque `Vec<u8>`.  CBOR
-//! parsing happens at the I/O boundary; con-rs never interprets the
+//! parsing happens at the I/O boundary; this crate never interprets the
 //! bytes.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -1453,7 +1453,7 @@ impl PraosState {
 // ---------------------------------------------------------------------------
 
 /// Header metadata extracted from a wire-format header by the I/O
-/// wrapper.  con-rs never parses headers itself.
+/// wrapper.  This crate never parses headers itself.
 #[derive(Debug, Clone, Default)]
 pub struct ParsedHeaderInfo {
     pub block_number: u64,

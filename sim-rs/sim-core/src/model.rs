@@ -320,7 +320,7 @@ impl<Node: Display> Serialize for VoteId<Node> {
 /// from `id.voter`; NPV: explicit 48-byte signature) but no weight —
 /// weight is recomputed at verification time from the local
 /// persistent-committee + stake registry, matching
-/// `con_rs::elections::Elections::weight_for`.
+/// `shared_consensus::elections::Elections::weight_for`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Vote {
     pub id: VoteId,

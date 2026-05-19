@@ -8,7 +8,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use tokio::sync::watch;
 
-use con_rs::mempool::EbKey;
+use shared_consensus::mempool::EbKey;
 use net_core::protocols::txsubmission::PendingTx;
 use net_core::types::{BlockBody, Point, WrappedHeader};
 
@@ -252,7 +252,7 @@ impl BlockProducer {
         block_number: u64,
         certified_eb: bool,
         mempool: &crate::mempool::SharedMempool,
-        leios: &con_rs::leios::LeiosState,
+        leios: &shared_consensus::leios::LeiosState,
     ) -> Option<ProducedRb> {
         if !self.is_active() {
             return None;
@@ -266,7 +266,7 @@ impl BlockProducer {
         self.block_count += 1;
 
         // CIP-0164 overflow rule plus producer-side EB-safety gate
-        // both live in con-rs (`production::BodyPath`).
+        // both live in shared-consensus (`production::BodyPath`).
         let mut pool = mempool.lock().unwrap();
         let (txs, announced_eb) = match pool.decide_body_path(
             self.rb_body_max_bytes,
@@ -329,10 +329,10 @@ impl BlockProducer {
     }
 
     /// Run the Praos f_block lottery.  Returns true on win.  Threshold
-    /// math lives in [`con_rs::lottery::rb_win_threshold`]; this site
+    /// math lives in [`shared_consensus::lottery::rb_win_threshold`]; this site
     /// just supplies the `f64` draw.
     fn run_lottery(&mut self, probability: f64) -> bool {
-        let threshold = con_rs::lottery::rb_win_threshold(probability, self.stake);
+        let threshold = shared_consensus::lottery::rb_win_threshold(probability, self.stake);
         let roll: f64 = self.rng.gen();
         roll < threshold as f64 / self.total_stake as f64
     }
@@ -543,11 +543,11 @@ mod tests {
     /// producer-side EB-safety gate — `has_endorsed_unvalidated_eb`
     /// is false on a fresh state, so `BodyPath::decide` falls through
     /// to the regular overflow rule.
-    fn empty_leios() -> con_rs::leios::LeiosState {
-        use con_rs::config::CommitteeSelection;
-        use con_rs::elections::{Elections, ElectionsConfig};
-        use con_rs::leios::{LeiosState, VotingConfig};
-        use con_rs::pipeline::PipelineConfig;
+    fn empty_leios() -> shared_consensus::leios::LeiosState {
+        use shared_consensus::config::CommitteeSelection;
+        use shared_consensus::elections::{Elections, ElectionsConfig};
+        use shared_consensus::leios::{LeiosState, VotingConfig};
+        use shared_consensus::pipeline::PipelineConfig;
         use std::collections::BTreeMap;
 
         let pipeline = PipelineConfig {

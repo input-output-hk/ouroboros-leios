@@ -17,7 +17,7 @@
 //! (`endorsed_unvalidated_ebs`); `decide` reads it and returns
 //! [`BodyPath::Empty`] when set, leaving the mempool untouched.
 //!
-//! Wire encoding stays with the consumer.  con-rs picks the path and
+//! Wire encoding stays with the consumer.  This crate picks the path and
 //! either drains txs (inline) or returns the manifest (EB).  The
 //! consumer then computes the EB's hash from its wire bytes and
 //! commits the drain-and-pin via [`crate::mempool::MempoolState::produce_eb`].

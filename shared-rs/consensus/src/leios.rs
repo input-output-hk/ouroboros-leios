@@ -16,7 +16,7 @@
 //! vote, the state emits an [`LeiosEffect::EmitVote`] carrying logical
 //! args (PV flag, NPV eligibility signature); the I/O layer encodes the
 //! wire-format vote body and sends it.  Same principle as `praos`:
-//! con-rs is format-agnostic.
+//! this crate is format-agnostic.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::{Duration, Instant};
@@ -901,7 +901,7 @@ impl LeiosState {
     /// Vote validation succeeded; attribute each vote to its EB
     /// election.  `vote_bodies` is an iterator yielding decoded vote
     /// bodies — the I/O layer decoded them already (the vote-body wire
-    /// format lives outside con-rs).  Returns telemetry effects for
+    /// format lives outside this crate).  Returns telemetry effects for
     /// any quorums newly formed.
     pub fn on_validated_votes<'a, I>(&mut self, vote_bodies: I) -> Vec<LeiosEffect>
     where
@@ -953,7 +953,7 @@ impl LeiosState {
     /// manifest are dropped silently.
     ///
     /// The hashing is the caller's responsibility because it depends
-    /// on the concrete body wire format; con-rs is format-agnostic.
+    /// on the concrete body wire format; this crate is format-agnostic.
     pub fn match_eb_tx_response(
         &mut self,
         point: &Point,

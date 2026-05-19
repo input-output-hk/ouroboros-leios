@@ -283,17 +283,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
-name = "con-rs"
-version = "0.1.0"
-dependencies = [
- "blake2b_simd",
- "minicbor",
- "rand 0.8.5",
- "serde",
- "tracing",
-]
-
-[[package]]
 name = "constant_time_eq"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -829,8 +818,8 @@ dependencies = [
  "blake2b_simd",
  "byteorder",
  "bytes",
- "con-rs",
  "minicbor",
+ "shared-consensus",
  "socket2 0.5.10",
  "thiserror",
  "tokio",
@@ -844,7 +833,6 @@ dependencies = [
  "async-trait",
  "blake2b_simd",
  "clap",
- "con-rs",
  "figment",
  "minicbor",
  "net-core",
@@ -852,6 +840,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "shared-consensus",
  "tikv-jemallocator",
  "tokio",
  "toml",
@@ -1254,6 +1243,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
 dependencies = [
  "lazy_static",
+]
+
+[[package]]
+name = "shared-consensus"
+version = "0.1.0"
+dependencies = [
+ "blake2b_simd",
+ "minicbor",
+ "rand 0.8.5",
+ "serde",
+ "tracing",
 ]
 
 [[package]]

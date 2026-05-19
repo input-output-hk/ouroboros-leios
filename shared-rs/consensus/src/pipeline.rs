@@ -28,7 +28,7 @@ pub enum PipelinePhase {
 /// `voter_weights` is a `BTreeMap` so iteration order is deterministic.
 /// Election-side aggregations (`Σ weight`, `len()`) are commutative, so
 /// determinism isn't strictly needed here, but the simulator's contract
-/// is uniform: no `HashMap` traversal anywhere in con-rs.
+/// is uniform: no `HashMap` traversal anywhere in shared-consensus.
 pub struct EbElection {
     pub announced_slot: u64,
     pub phase: PipelinePhase,

@@ -1,5 +1,5 @@
 //! Praos longest-chain consensus.  Thin I/O wrapper around the
-//! sans-IO `con_rs::praos::PraosState` state machine.
+//! sans-IO `shared_consensus::praos::PraosState` state machine.
 //!
 //! Each public method on `PraosConsensus` translates wire-format
 //! network events / validator outcomes into logical args, calls into
@@ -14,17 +14,17 @@ use net_core::peer::PeerId;
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::mpsc;
 
-use con_rs::chain_tree::ChainTreeEntry;
-use con_rs::praos::{ParsedHeaderInfo, PraosEffect, PraosState};
+use shared_consensus::chain_tree::ChainTreeEntry;
+use shared_consensus::praos::{ParsedHeaderInfo, PraosEffect, PraosState};
 
 use crate::validation::{LedgerCommand, LedgerOutcome, Validator};
 
 // Re-export the selection types so callers (tests, telemetry,
 // production code) can keep importing them from `crate::consensus::praos`.
 #[cfg(test)]
-pub use con_rs::praos::{CachedBlock, HybridWalk, SelectionDecision};
+pub use shared_consensus::praos::{CachedBlock, HybridWalk, SelectionDecision};
 
-/// I/O wrapper around `con_rs::praos::PraosState`.
+/// I/O wrapper around `shared_consensus::praos::PraosState`.
 ///
 /// Public methods take wire-format args (`NetworkEvent`, `WrappedHeader`,
 /// `BlockBody`, `LedgerOutcome`), translate to logical ones, run the
@@ -66,18 +66,18 @@ impl PraosConsensus {
 
     /// Replace the per-peer RTT oracle the BlockFetchPolicy consults.
     /// The Consensus facade calls this with the shared
-    /// [`con_rs::fetch::PeerRttCache`] that the coordinator's
+    /// [`shared_consensus::fetch::PeerRttCache`] that the coordinator's
     /// `peer_rtt_observer` callback writes into.
-    pub fn set_rtt(&mut self, rtt: con_rs::fetch::PeerRttCache) {
+    pub fn set_rtt(&mut self, rtt: shared_consensus::fetch::PeerRttCache) {
         self.state.set_rtt(Box::new(rtt));
     }
 
-    /// Replace the BlockFetchPolicy con-rs consults when emitting
+    /// Replace the BlockFetchPolicy shared-consensus consults when emitting
     /// `FetchBlockRange`.  Used by the `Consensus` facade to honour the
     /// node's `fetch_policy.block` config setting.
     pub fn set_block_policy(
         &mut self,
-        policy: Box<dyn con_rs::fetch::BlockFetchPolicy + Send + Sync>,
+        policy: Box<dyn shared_consensus::fetch::BlockFetchPolicy + Send + Sync>,
     ) {
         self.state.set_fetch_policy(policy);
     }
@@ -90,7 +90,7 @@ impl PraosConsensus {
         for effect in effects {
             match effect {
                 PraosEffect::FetchBlockRange { from, to, peers } => {
-                    // con-rs's BlockFetchPolicy already picked the peer
+                    // shared-consensus's BlockFetchPolicy already picked the peer
                     // set; emit one fetch command per peer (the empty
                     // case becomes a no-op).
                     for peer_id in peers {
@@ -449,8 +449,8 @@ mod tests {
 
     use crate::validation::{LedgerOutcome, Validator};
 
-    use con_rs::peer_chain::PeerChainEntry;
-    use con_rs::praos::{IN_FLIGHT_TTL, SelectionDecision};
+    use shared_consensus::peer_chain::PeerChainEntry;
+    use shared_consensus::praos::{IN_FLIGHT_TTL, SelectionDecision};
     use super::*;
 
     /// Placeholder peer id for tests that don't care which peer announced

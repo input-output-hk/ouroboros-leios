@@ -239,13 +239,13 @@ impl NodeImpl for LinearLeiosNode {
             Message::RequestVotes(id) => self.receive_request_votes(from, id),
             Message::Votes(votes) => self.receive_votes(from, votes),
 
-            // Per-vote variants are emitted exclusively by the con-rs
+            // Per-vote variants are emitted exclusively by the shared-consensus
             // adapter; a sim run uses one adapter throughout so this
             // arm is unreachable.
             Message::AnnounceVote(_) | Message::RequestVote(_) | Message::Vote(_) => {
                 unreachable!("linear_leios.rs does not exchange per-vote messages");
             }
-            // EB-tx fetch triplet is con-rs-only.  `linear_leios.rs`
+            // EB-tx fetch triplet is shared-consensus-only.  `linear_leios.rs`
             // delivers tx bodies via the inline `Message::EB` payload
             // and falls back to normal tx diffusion for the missing
             // set, so these variants don't reach this dispatch.
@@ -277,7 +277,7 @@ impl NodeImpl for LinearLeiosNode {
             }
             CpuTask::RBBlockApplied(_) | CpuTask::EBBlockApplied(_) => {
                 unreachable!(
-                    "linear_leios.rs collapses validate+apply; ledger-apply CpuTasks are con-rs only"
+                    "linear_leios.rs collapses validate+apply; ledger-apply CpuTasks are shared-consensus only"
                 );
             }
         }

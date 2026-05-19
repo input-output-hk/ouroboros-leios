@@ -65,11 +65,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Shared per-peer RTT cache.  The coordinator's keepalive task
     // writes measurements via the observer callback below; the
     // consensus state machines read at fetch-decision time.
-    let rtt_cache = con_rs::fetch::PeerRttCache::new();
+    let rtt_cache = shared_consensus::fetch::PeerRttCache::new();
     let peer_rtt_observer: net_core::multi_peer::PeerRttObserver = {
         let cache = rtt_cache.clone();
         std::sync::Arc::new(move |pid, rtt| {
-            let con_pid = con_rs::peer::PeerId(pid.0);
+            let con_pid = shared_consensus::peer::PeerId(pid.0);
             match rtt {
                 Some(d) => cache.set(con_pid, d),
                 None => cache.forget(con_pid),

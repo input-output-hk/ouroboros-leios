@@ -1,8 +1,8 @@
-# Plan: lift CIP-0164 features into con-rs, then collapse sim-rs's linear_leios onto it
+# Plan: lift CIP-0164 features into shared-consensus, then collapse sim-rs's linear_leios onto it
 
 ## Context
 
-`con-rs` was extracted from `net-rs` first (branch `prc/con-rs`) as a sans-IO
+`shared-consensus` was extracted from `net-rs` first (branch `prc/con-rs`) as a sans-IO
 peer of both `net-rs/` and `sim-rs/`. The eventual goal is to retire
 `sim-core/src/sim/linear_leios.rs` (≈2.3 kloc, including a ~600-line broken
 mempool with unbounded backlogs) and have `sim-rs` drive `LeiosState` /
@@ -12,7 +12,7 @@ VRF schedule → con-rs's persistent committee + NPV lottery) is already in
 place.
 
 This plan does **not** start by migrating `sim-rs`. It starts by upgrading
-`con-rs` to host the CIP-0164 pieces that currently live in either `sim-rs`
+`shared-consensus` to host the CIP-0164 pieces that currently live in either `sim-rs`
 or `net-rs`'s wrapper, then verifying `net-rs` still drives correctly. The
 sim-rs collapse is a follow-on phase.
 
@@ -68,7 +68,7 @@ CIP-0164 voting validity checks currently in sim-rs's `should_vote_for`
   preserved).
 
 These are real CIP-0164 voting predicates and belong in con-rs. Land them
-inside `LeiosState::decide_vote` (currently in `con-rs/src/leios.rs:256`).
+inside `LeiosState::decide_vote` (currently in `shared-rs/consensus/src/leios.rs:256`).
 Inputs the predicate needs:
 
 - EB-arrival timestamp (already implicitly tracked via `on_eb_offered` /
@@ -88,9 +88,9 @@ to `EmitVote`, simpler to match in adapters, mirrors sim-rs's existing
 `track_no_vote` telemetry shape.
 
 **Files touched:**
-- `con-rs/src/leios.rs` (decide_vote, LeiosEffect, on_slot's
+- `shared-rs/consensus/src/leios.rs` (decide_vote, LeiosEffect, on_slot's
   EligibleToVote handling)
-- `con-rs/src/elections.rs` (extend `EbElection` with `seen_at`,
+- `shared-rs/consensus/src/elections.rs` (extend `EbElection` with `seen_at`,
   thread through `announce`)
 
 ### 2. Pluggable multi-peer fetch strategy
@@ -107,7 +107,7 @@ traffic class — so each can be swapped independently as algorithms
 evolve:
 
 ```rust
-// con-rs/src/fetch.rs (new)
+// shared-rs/consensus/src/fetch.rs (new)
 pub trait BlockFetchPolicy {
     fn pick(&self, point: &Point, candidates: &[PeerId]) -> Vec<PeerId>;
 }
@@ -140,17 +140,17 @@ RTT-min for blocks).
 
 The candidate-peer set itself (`offered_by[point] = Set<PeerId>` + RTT
 cache) — currently `net-core/src/multi_peer/leios_tracker.rs` — moves
-into `con-rs/src/fetch.rs` next to `FetchPolicy`. Pure bookkeeping; both
+into `shared-rs/consensus/src/fetch.rs` next to `FetchPolicy`. Pure bookkeeping; both
 consumers need the same shape; net-core's tracker collapses to a thin
 re-export or is deleted.
 
 **Files touched:**
-- `con-rs/src/fetch.rs` (new; four `*FetchPolicy` traits + stock impls +
+- `shared-rs/consensus/src/fetch.rs` (new; four `*FetchPolicy` traits + stock impls +
   candidate-set tracker)
-- `con-rs/src/lib.rs` (re-export)
-- `con-rs/src/praos.rs` (FetchBlockRange effect; `PraosState::new` takes
+- `shared-rs/consensus/src/lib.rs` (re-export)
+- `shared-rs/consensus/src/praos.rs` (FetchBlockRange effect; `PraosState::new` takes
   `Box<dyn BlockFetchPolicy>`; in_flight policy adapts)
-- `con-rs/src/leios.rs` (FetchLeiosBlock / FetchLeiosBlockTxs /
+- `shared-rs/consensus/src/leios.rs` (FetchLeiosBlock / FetchLeiosBlockTxs /
   FetchLeiosVotes effects; `LeiosState::new` takes
   `Box<dyn EbFetchPolicy>`, `Box<dyn EbTxsFetchPolicy>`,
   `Box<dyn VoteFetchPolicy>`)
@@ -161,7 +161,7 @@ re-export or is deleted.
 
 ### 3. Common mempool — sans-IO state machine, validation via effects
 
-Pull `net-node/src/mempool.rs::Mempool` into `con-rs/src/mempool.rs` as
+Pull `net-node/src/mempool.rs::Mempool` into `shared-rs/consensus/src/mempool.rs` as
 a third sans-IO state machine alongside `PraosState` and `LeiosState`.
 Sim-rs's mempool is **not** the source of truth — its design (unbounded
 local + peer backlog `VecDeque`s, conflict-by-`input_id`,
@@ -219,8 +219,8 @@ mock validator (currently `TransactionConfig::Mock` / `Real`). The
 unbounded backlog is gone.
 
 **Files touched:**
-- `con-rs/src/mempool.rs` (new; lifted from `net-rs/net-node/src/mempool.rs`)
-- `con-rs/src/lib.rs` (re-export `MempoolState`, `MempoolEffect`,
+- `shared-rs/consensus/src/mempool.rs` (new; lifted from `net-rs/net-node/src/mempool.rs`)
+- `shared-rs/consensus/src/lib.rs` (re-export `MempoolState`, `MempoolEffect`,
   `TxRejectReason`)
 - `net-rs/net-node/src/consensus/leios/mod.rs` updated to drive the
   con-rs `MempoolState` via its effect/on_xx surface.
@@ -246,17 +246,17 @@ net-rs's node before we even *open* the sim-rs collapse.
 
 ## Critical files
 
-- `con-rs/src/leios.rs` — adds NoVote, RBHeader/EB-context inputs to
+- `shared-rs/consensus/src/leios.rs` — adds NoVote, RBHeader/EB-context inputs to
   `decide_vote`, expands `LeiosEffect`.
-- `con-rs/src/elections.rs` — `EbElection.seen_at`; `announce` API.
-- `con-rs/src/praos.rs` — `FetchBlockRange::peers: Vec<PeerId>`;
+- `shared-rs/consensus/src/elections.rs` — `EbElection.seen_at`; `announce` API.
+- `shared-rs/consensus/src/praos.rs` — `FetchBlockRange::peers: Vec<PeerId>`;
   accessors for adapters.
-- `con-rs/src/fetch.rs` — **new**; four `*FetchPolicy` traits + stock
+- `shared-rs/consensus/src/fetch.rs` — **new**; four `*FetchPolicy` traits + stock
   impls + candidate-set tracker (lifted from net-rs `LeiosTracker`).
-- `con-rs/src/mempool.rs` — **new**; lifted from
+- `shared-rs/consensus/src/mempool.rs` — **new**; lifted from
   `net-rs/net-node/src/mempool.rs` as a sans-IO `MempoolState` with
   `MempoolEffect::{ValidateTx, AdvertiseTx, TxRejected}` surface.
-- `con-rs/src/lib.rs` — new re-exports.
+- `shared-rs/consensus/src/lib.rs` — new re-exports.
 - `net-rs/net-node/src/consensus/leios/mod.rs` — adapter updates.
 - `net-rs/net-node/src/consensus/praos/mod.rs` — adapter updates.
 - `net-rs/net-node/src/mempool.rs` — **deleted**, replaced by re-export.

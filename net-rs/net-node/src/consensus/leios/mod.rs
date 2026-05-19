@@ -1,4 +1,4 @@
-//! Leios consensus layer — thin I/O wrapper around `con_rs::leios::LeiosState`.
+//! Leios consensus layer — thin I/O wrapper around `shared_consensus::leios::LeiosState`.
 //!
 //! Public methods take wire-format args (`NetworkEvent`, `LedgerOutcome`,
 //! `BlockBody`/`WrappedHeader` indirectly via the production wire codec),
@@ -11,13 +11,13 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use con_rs::elections::{Elections, ElectionsConfig};
-use con_rs::leios::{
+use shared_consensus::elections::{Elections, ElectionsConfig};
+use shared_consensus::leios::{
     ChainTipContext, LeiosEffect, LeiosState, LeiosTelemetryEvent, ValidatedVote, VotingConfig,
 };
-pub use con_rs::leios::EbTxMatchOutcome;
-pub use con_rs::pipeline::PipelineConfig;
-use con_rs::wfa;
+pub use shared_consensus::leios::EbTxMatchOutcome;
+pub use shared_consensus::pipeline::PipelineConfig;
+use shared_consensus::wfa;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::Point;
 use rand::rngs::StdRng;
@@ -147,37 +147,37 @@ impl LeiosConsensus {
 
     /// Replace the per-peer RTT oracle the EB / EB-tx / vote fetch
     /// policies consult.  The Consensus facade calls this with the
-    /// shared [`con_rs::fetch::PeerRttCache`] the coordinator's
+    /// shared [`shared_consensus::fetch::PeerRttCache`] the coordinator's
     /// `peer_rtt_observer` callback writes into.
-    pub fn set_rtt(&mut self, rtt: con_rs::fetch::PeerRttCache) {
+    pub fn set_rtt(&mut self, rtt: shared_consensus::fetch::PeerRttCache) {
         self.state.set_rtt(Box::new(rtt));
     }
 
-    /// Replace the EbFetchPolicy con-rs consults when emitting
+    /// Replace the EbFetchPolicy shared-consensus consults when emitting
     /// `FetchLeiosBlock`.
     pub fn set_eb_policy(
         &mut self,
-        policy: Box<dyn con_rs::fetch::EbFetchPolicy + Send + Sync>,
+        policy: Box<dyn shared_consensus::fetch::EbFetchPolicy + Send + Sync>,
     ) {
         self.state.set_eb_policy(policy);
     }
 
-    /// Replace the EbTxsFetchPolicy con-rs consults when emitting
+    /// Replace the EbTxsFetchPolicy shared-consensus consults when emitting
     /// `FetchLeiosBlockTxs`.  Driven by `fetch_policy.eb_txs` — fanning
     /// out EB-txs is the primary research lever we have to characterise
     /// the cluster collapse mode.
     pub fn set_eb_txs_policy(
         &mut self,
-        policy: Box<dyn con_rs::fetch::EbTxsFetchPolicy + Send + Sync>,
+        policy: Box<dyn shared_consensus::fetch::EbTxsFetchPolicy + Send + Sync>,
     ) {
         self.state.set_eb_txs_policy(policy);
     }
 
-    /// Replace the VoteFetchPolicy con-rs consults when emitting
+    /// Replace the VoteFetchPolicy shared-consensus consults when emitting
     /// `FetchLeiosVotes`.
     pub fn set_vote_policy(
         &mut self,
-        policy: Box<dyn con_rs::fetch::VoteFetchPolicy + Send + Sync>,
+        policy: Box<dyn shared_consensus::fetch::VoteFetchPolicy + Send + Sync>,
     ) {
         self.state.set_vote_policy(policy);
     }
@@ -297,7 +297,7 @@ impl LeiosConsensus {
 
     /// Verify a `LeiosBlockTxsReceived` response against the cached
     /// manifest.  Bodies are blake2b-hashed here (the wire-format body
-    /// hash) before being matched, since con-rs is format-agnostic.
+    /// hash) before being matched, since shared-consensus is format-agnostic.
     pub fn match_eb_tx_response(
         &mut self,
         point: &Point,
@@ -325,7 +325,7 @@ impl LeiosConsensus {
 
     /// Build the sparse bitmap of transactions we don't already have
     /// for an EB-tx offer.  Delegates to
-    /// [`con_rs::leios::LeiosState::missing_eb_tx_bitmap`]; an empty
+    /// [`shared_consensus::leios::LeiosState::missing_eb_tx_bitmap`]; an empty
     /// result here suppresses the fetch (manifest unknown or every
     /// referenced tx already locally available).
     fn bitmap_for_missing_txs(&self, point: &Point) -> BTreeMap<u16, u64> {
@@ -448,7 +448,7 @@ impl LeiosConsensus {
     }
 
     /// Build and inject the vote bodies for an EB.  Encodes the
-    /// wire-format vote body — con-rs handed us the logical args.
+    /// wire-format vote body — shared-consensus handed us the logical args.
     async fn emit_vote(
         &mut self,
         eb_slot: u64,
@@ -610,7 +610,7 @@ mod tests {
     }
 
     // Pure election-lifecycle / pipeline-phase behaviour is covered in
-    // `con-rs/src/elections.rs` and `con-rs/src/pipeline.rs`.  The tests
+    // `shared-consensus/src/elections.rs` and `shared-consensus/src/pipeline.rs`.  The tests
     // below exercise only the wrapper-side translation work: effects →
     // NetworkCommands, validator submissions, telemetry mapping, and
     // the mempool-aware bitmap computation.
@@ -1068,7 +1068,7 @@ mod tests {
             .await;
 
         // With no manifest cached, the wrapper computes an empty bitmap
-        // and con-rs short-circuits before emitting a fetch.
+        // and shared-consensus short-circuits before emitting a fetch.
         assert!(
             no_fetch_cmd_within(&mut rx, Duration::from_millis(50)).await,
             "fetch should be deferred until the manifest is received"
@@ -1165,7 +1165,7 @@ mod tests {
         assert_eq!(remaining, vec![0, 2]);
 
         // A second peer offers the same EB-txs, giving the retry a
-        // fresh candidate (con-rs's EbTxsFetchPolicy excludes the
+        // fresh candidate (shared-consensus's EbTxsFetchPolicy excludes the
         // previously-attempted peer).
         leios
             .handle_event(&NetworkEvent::LeiosBlockTxsOffered {

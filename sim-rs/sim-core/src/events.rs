@@ -287,7 +287,7 @@ pub enum Event {
         recipient: Node,
     },
 
-    /// CIP-0164 single-vote emission (con-rs adapter only — one BLS
+    /// CIP-0164 single-vote emission (shared-consensus adapter only — one BLS
     /// signature per event, no multi-EB bundling).
     /// `weight` is the verifier-derived seat count this vote
     /// represents (PV: persistent-committee seats; NPV: lottery wins).
@@ -921,7 +921,7 @@ impl EventTracker {
         });
     }
 
-    // -- CIP-0164 per-vote trackers (con-rs adapter) ----------------------
+    // -- CIP-0164 per-vote trackers (shared-consensus adapter) ----------------------
 
     pub fn track_vote_generated(&self, vote: &Vote, weight: u32) {
         self.send(Event::VoteGenerated {

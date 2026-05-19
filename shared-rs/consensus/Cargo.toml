@@ -1,7 +1,8 @@
 [package]
-name = "con-rs"
+name = "shared-consensus"
 version = "0.1.0"
 edition = "2021"
+description = "Sans-IO Cardano consensus core (Praos chain selection, Linear Leios CIP-0164 voting and EB elections) shared by Cardano Leios simulators and node implementations."
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

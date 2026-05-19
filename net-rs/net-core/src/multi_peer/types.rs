@@ -160,19 +160,19 @@ pub enum NetworkCommand {
     /// Roll back the chain store to a point (for responder peers).
     InjectRollback { point: Point },
 
-    /// Fetch a Leios block from a specific peer (chosen by con-rs's
+    /// Fetch a Leios block from a specific peer (chosen by shared-consensus's
     /// EbFetchPolicy).  The coordinator routes directly to that peer.
     FetchLeiosBlock { peer_id: PeerId, point: Point },
 
     /// Fetch selective transactions from an EB on a specific peer
-    /// (chosen by con-rs's EbTxsFetchPolicy).
+    /// (chosen by shared-consensus's EbTxsFetchPolicy).
     FetchLeiosBlockTxs {
         peer_id: PeerId,
         point: Point,
         bitmap: BTreeMap<u16, u64>,
     },
 
-    /// Fetch specific votes from a specific peer (chosen by con-rs's
+    /// Fetch specific votes from a specific peer (chosen by shared-consensus's
     /// VoteFetchPolicy — the consensus dispatcher emits one of these
     /// per peer in the policy's per-peer grouping).
     FetchLeiosVotes {

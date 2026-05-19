@@ -533,7 +533,7 @@ impl Coordinator {
 
             PeerEvent::LeiosBlockOffered { point } => {
                 // Per-peer offer tracking + multi-peer accumulation lives
-                // in con-rs's CandidateTracker, but each peer's notify
+                // in shared-consensus's CandidateTracker, but each peer's notify
                 // loop replays still-relevant EBs every iteration —
                 // dedup `(peer, slot, hash)` here so a single peer
                 // re-announce doesn't flood `network_events`.
@@ -563,7 +563,7 @@ impl Coordinator {
             }
 
             PeerEvent::LeiosBlockFetched { point, block } => {
-                // Pending-fetch dedup lives in con-rs's CandidateTracker now;
+                // Pending-fetch dedup lives in shared-consensus's CandidateTracker now;
                 // the consensus layer clears the entry on `on_eb_received`.
                 // Populate leios store for responder peers.
                 if let Some(ref store) = self.leios_store {
@@ -760,7 +760,7 @@ impl Coordinator {
             }
 
             NetworkCommand::FetchLeiosBlock { peer_id, point } => {
-                // Peer already chosen by con-rs's EbFetchPolicy; just dispatch.
+                // Peer already chosen by shared-consensus's EbFetchPolicy; just dispatch.
                 self.send_peer_command(peer_id, PeerCommand::FetchLeiosBlock { point });
             }
 
@@ -893,7 +893,7 @@ impl Coordinator {
             }
 
             self.emit_event(NetworkEvent::PeerDisconnected { peer_id, reason });
-            // Per-peer offer / fetch cleanup lives in con-rs's
+            // Per-peer offer / fetch cleanup lives in shared-consensus's
             // CandidateTracker now; the consensus layer prunes on the
             // PeerDisconnected event.
             if let Some(obs) = &self.config.peer_rtt_observer {
