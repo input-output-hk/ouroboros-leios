@@ -1642,7 +1642,6 @@ mod tests {
     #[test]
     fn two_distinct_headers_same_slot_issuer_flag_slot() {
         let mut s = fresh();
-        let now = Instant::now();
         s.on_block_received(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
         s.on_block_received(pt(100, 2), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
         assert!(s.is_equivocating_slot(100));

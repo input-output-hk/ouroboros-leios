@@ -553,8 +553,7 @@ impl NodeImpl for SharedConsensus {
         // Praos RB lottery — shared formula with net-rs, sim-rs keeps
         // its own VRF draw form (`Rng::draw_range`).
         let success_rate = self.sim_config.block_generation_probability;
-        let target =
-            con_lottery::rb_win_threshold(success_rate, self.config_stake) as u64;
+        let target = con_lottery::rb_win_threshold(success_rate, self.config_stake);
         let total_stake = self.total_stake;
         let rng = Rng::new(self.sim_config.seed);
         let draw = rng.draw_range(self.id, slot, DrawSite::RbLottery, total_stake);
@@ -1083,8 +1082,8 @@ impl SharedConsensus {
         if should_request {
             self.ebs.insert(id, EbState::Requested);
             out.send_to(from, Message::RequestEB(id));
-        } else if !self.ebs.contains_key(&id) {
-            self.ebs.insert(id, EbState::Pending);
+        } else {
+            self.ebs.entry(id).or_insert(EbState::Pending);
         }
     }
 
