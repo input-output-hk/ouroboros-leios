@@ -7,6 +7,7 @@
 //! drive them with their own I/O layer.
 
 pub mod aggregation;
+pub mod behaviour;
 pub mod bitmap;
 pub mod chain_tree;
 pub mod config;

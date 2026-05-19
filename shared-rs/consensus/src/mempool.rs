@@ -32,6 +32,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use tracing::info;
 
+use crate::behaviour::{Behaviour, BehaviourOutcome, HonestBehaviour};
 use crate::peer::PeerId;
 
 /// Slot-window retention for EB-pinned bodies.  Holds wide enough that
@@ -148,6 +149,10 @@ pub struct MempoolState {
     /// than `max_eb_slot - eb_retention_slots` are evicted on every
     /// `record_eb_manifest` / `produce_eb` call.
     pub eb_retention_slots: u64,
+    /// Pluggable behaviour for tx-acceptance and admission hooks.  See
+    /// [`crate::behaviour`].  Always `Some` between public method
+    /// calls; take/restored around hook dispatch.
+    pub behaviour: Option<Box<dyn Behaviour>>,
 }
 
 impl MempoolState {
@@ -168,7 +173,28 @@ impl MempoolState {
             eb_pinned: BTreeMap::new(),
             max_eb_slot: 0,
             eb_retention_slots,
+            behaviour: Some(Box::new(HonestBehaviour)),
         }
+    }
+
+    /// Replace the behaviour.
+    pub fn set_behaviour(&mut self, behaviour: Box<dyn Behaviour>) {
+        self.behaviour = Some(behaviour);
+    }
+
+    /// Take the behaviour out, call the hook with
+    /// `(&mut dyn Behaviour, &MempoolState)`, restore.
+    fn invoke_hook<F>(&mut self, hook: F) -> BehaviourOutcome<MempoolEffect>
+    where
+        F: FnOnce(&mut dyn Behaviour, &MempoolState) -> BehaviourOutcome<MempoolEffect>,
+    {
+        let mut behaviour = self
+            .behaviour
+            .take()
+            .expect("behaviour is Some between public calls");
+        let outcome = hook(behaviour.as_mut(), self);
+        self.behaviour = Some(behaviour);
+        outcome
     }
 
     // -- Network event handlers --------------------------------------------
@@ -179,14 +205,24 @@ impl MempoolState {
     /// emits `ValidateTx`; the wrapper validates and reports back via
     /// [`Self::on_tx_validated`] or [`Self::on_tx_validation_failed`].
     pub fn on_tx_received(&mut self, tx_id: TxId, body: Vec<u8>) -> Vec<MempoolEffect> {
+        let appended: Vec<MempoolEffect> =
+            match self.invoke_hook(|b, s| b.on_tx_received(s, &tx_id, &body)) {
+                BehaviourOutcome::Continue => Vec::new(),
+                BehaviourOutcome::Replace(effects) => return effects,
+                BehaviourOutcome::Append(extra) => extra,
+            };
         if self.pending_validation.contains_key(&tx_id) || self.contains(&tx_id) {
-            return vec![MempoolEffect::TxRejected {
+            let mut fx = vec![MempoolEffect::TxRejected {
                 tx_id,
                 reason: TxRejectReason::AlreadyKnown,
             }];
+            fx.extend(appended);
+            return fx;
         }
         self.pending_validation.insert(tx_id.clone(), body.clone());
-        vec![MempoolEffect::ValidateTx { tx_id, body }]
+        let mut fx = vec![MempoolEffect::ValidateTx { tx_id, body }];
+        fx.extend(appended);
+        fx
     }
 
     // -- Validation outcomes -----------------------------------------------
@@ -196,10 +232,18 @@ impl MempoolState {
     /// `TxRejected { reason: QueueFull }` for it.  No-op if the
     /// tx_id wasn't pending validation.
     pub fn on_tx_validated(&mut self, tx_id: TxId, size: u32) -> Vec<MempoolEffect> {
+        let appended: Vec<MempoolEffect> =
+            match self.invoke_hook(|b, s| b.on_tx_validated(s, &tx_id, size)) {
+                BehaviourOutcome::Continue => Vec::new(),
+                BehaviourOutcome::Replace(effects) => return effects,
+                BehaviourOutcome::Append(extra) => extra,
+            };
         let Some(body) = self.pending_validation.remove(&tx_id) else {
-            return Vec::new();
+            return appended;
         };
-        self.admit_internal(tx_id, body, size)
+        let mut fx = self.admit_internal(tx_id, body, size);
+        fx.extend(appended);
+        fx
     }
 
     /// Validator rejected `tx_id`.  Drops the pending body and emits

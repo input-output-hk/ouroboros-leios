@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 use tracing::info;
 
 use crate::aggregation::QuorumFormed;
+use crate::behaviour::{Behaviour, BehaviourOutcome, HonestBehaviour};
 use crate::config::CommitteeSelection;
 use crate::elections::{Elections, SlotEffect};
 use crate::fetch::{
@@ -85,7 +86,8 @@ pub struct VotingConfig {
 /// Why a CIP-0164 voting predicate rejected this EB at decision time.
 /// Surfaced via [`LeiosEffect::NoVote`] so the I/O layer can emit
 /// matching telemetry.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum NoVoteReason {
     /// The EB was first seen too late to fit within its voting window
     /// (`announced_slot + 3·Δhdr + L_vote`).
@@ -301,6 +303,14 @@ pub struct LeiosState {
     pub vote_policy: Box<dyn VoteFetchPolicy + Send + Sync>,
     /// Live per-peer RTT lookup, consulted by every fetch policy.
     pub rtt: Box<dyn PeerRtt + Send + Sync>,
+
+    /// Pluggable behaviour — defaults to [`HonestBehaviour`].  Wrapped in
+    /// [`Option`] so the dispatch helpers can `take` / restore around
+    /// each hook call (the borrow checker won't let a behaviour-method
+    /// receive `&LeiosState` while being held in a field of it).  The
+    /// option is always `Some` between public method calls; the
+    /// take/restore is confined to the entry-point preamble.
+    pub behaviour: Option<Box<dyn Behaviour>>,
 }
 
 impl LeiosState {
@@ -352,7 +362,39 @@ impl LeiosState {
             eb_txs_policy,
             vote_policy,
             rtt,
+            behaviour: Some(Box::new(HonestBehaviour)),
         }
+    }
+
+    /// Replace the behaviour.  Use to install a non-honest variant at
+    /// startup or in response to a runtime config update.
+    pub fn set_behaviour(&mut self, behaviour: Box<dyn Behaviour>) {
+        self.behaviour = Some(behaviour);
+    }
+
+    /// Short name of the current behaviour, e.g. `"honest"`,
+    /// `"rb-equivocator"`.  Useful for telemetry and structured logs.
+    pub fn behaviour_name(&self) -> &'static str {
+        self.behaviour.as_ref().map_or("honest", |b| b.name())
+    }
+
+    /// Take the behaviour out, call the hook with
+    /// `(&mut dyn Behaviour, &LeiosState)`, put the behaviour back, and
+    /// return the resulting outcome.  Lets a handler invoke a hook on
+    /// itself without fighting the borrow checker: while the closure
+    /// runs, the trait object lives in a local and `self`'s remaining
+    /// fields are reachable as `&LeiosState`.
+    fn invoke_hook<F>(&mut self, hook: F) -> BehaviourOutcome<LeiosEffect>
+    where
+        F: FnOnce(&mut dyn Behaviour, &LeiosState) -> BehaviourOutcome<LeiosEffect>,
+    {
+        let mut behaviour = self
+            .behaviour
+            .take()
+            .expect("behaviour is Some between public calls");
+        let outcome = hook(behaviour.as_mut(), self);
+        self.behaviour = Some(behaviour);
+        outcome
     }
 
     /// Update the chain-tip metadata used by the voting predicates.
@@ -438,6 +480,16 @@ impl LeiosState {
         slot: u64,
         tx_known: &dyn Fn(&[u8; 32]) -> bool,
     ) -> Vec<LeiosEffect> {
+        // Behaviour reactive hook.  Replace short-circuits the honest
+        // path; Append accumulates extras to splice in after the
+        // honest fx.
+        let appended: Vec<LeiosEffect> =
+            match self.invoke_hook(|b, s| b.on_slot_leios(s, slot)) {
+                BehaviourOutcome::Continue => Vec::new(),
+                BehaviourOutcome::Replace(effects) => return effects,
+                BehaviourOutcome::Append(extra) => extra,
+            };
+
         let mut fx: Vec<LeiosEffect> = Vec::new();
         for eff in self.elections.on_slot(slot) {
             match eff {
@@ -446,7 +498,17 @@ impl LeiosState {
                     eb_slot,
                     eb_seen_slot,
                 } => {
-                    match self.decide_vote(&eb_hash, eb_slot, eb_seen_slot, tx_known) {
+                    let honest_vote = self.decide_vote(&eb_hash, eb_slot, eb_seen_slot, tx_known);
+                    // Decision hook: behaviours can override the honest
+                    // predicate result (lazy voter, wrong-EB voter).
+                    let mut behaviour = self
+                        .behaviour
+                        .take()
+                        .expect("behaviour is Some between public calls");
+                    let decision = behaviour.decide_vote(self, &eb_hash, eb_slot, &honest_vote);
+                    self.behaviour = Some(behaviour);
+                    let resolved = decision.resolve(honest_vote);
+                    match resolved {
                         Ok((emit_pv, npv_signature))
                             if emit_pv || npv_signature.is_some() =>
                         {
@@ -567,6 +629,7 @@ impl LeiosState {
             + pipeline.dedup_window;
         let min_keep = slot.saturating_sub(pipeline_window);
         self.candidates.prune_below_slot(min_keep);
+        fx.extend(appended);
         fx
     }
 
@@ -685,17 +748,23 @@ impl LeiosState {
         peer: PeerId,
         now: Instant,
     ) -> Vec<LeiosEffect> {
+        let appended: Vec<LeiosEffect> =
+            match self.invoke_hook(|b, s| b.on_eb_offered(s, &point, peer)) {
+                BehaviourOutcome::Continue => Vec::new(),
+                BehaviourOutcome::Replace(effects) => return effects,
+                BehaviourOutcome::Append(extra) => extra,
+            };
         self.evict_stale_in_flight(now);
         self.candidates.note_eb_offered(point.clone(), peer);
         if self.in_flight.contains_key(&point) {
-            return Vec::new();
+            return appended;
         }
         let candidates = self.candidates.eb_candidates(&point);
         let peers = self
             .eb_policy
             .pick(&point, &candidates, self.rtt.as_ref());
         if peers.is_empty() {
-            return Vec::new();
+            return appended;
         }
         self.in_flight.insert(point.clone(), now);
         info!(
@@ -704,7 +773,9 @@ impl LeiosState {
             peer_count = peers.len(),
             "fetching leios block"
         );
-        vec![LeiosEffect::FetchLeiosBlock { point, peers }]
+        let mut fx = vec![LeiosEffect::FetchLeiosBlock { point, peers }];
+        fx.extend(appended);
+        fx
     }
 
     /// A peer offered EB transactions.  Caller has already computed the
@@ -719,10 +790,17 @@ impl LeiosState {
         bitmap: BTreeMap<u16, u64>,
         now: Instant,
     ) -> Vec<LeiosEffect> {
+        let appended: Vec<LeiosEffect> = match self
+            .invoke_hook(|b, s| b.on_eb_txs_offered(s, &point, peer, &bitmap))
+        {
+            BehaviourOutcome::Continue => Vec::new(),
+            BehaviourOutcome::Replace(effects) => return effects,
+            BehaviourOutcome::Append(extra) => extra,
+        };
         self.evict_stale_in_flight(now);
         let slot = match &point {
             Point::Specific { slot, .. } => *slot,
-            _ => return Vec::new(),
+            _ => return appended,
         };
         self.candidates.note_eb_txs_offered(point.clone(), peer);
         // Empty bitmap means the consumer has nothing to fetch (either
@@ -731,7 +809,7 @@ impl LeiosState {
         // indices). Don't engage the per-slot gate or emit a fetch; wait
         // for the next offer once the manifest lands.
         if bitmap.is_empty() {
-            return Vec::new();
+            return appended;
         }
         // Per-slot gate keeps multiple offers from triggering parallel
         // fetches; the synthetic hash distinguishes the gate from an
@@ -741,14 +819,14 @@ impl LeiosState {
             hash: [0xFE; 32],
         };
         if self.in_flight.contains_key(&gate_key) {
-            return Vec::new();
+            return appended;
         }
         let candidates = self.candidates.eb_txs_candidates(&point);
         let peers =
             self.eb_txs_policy
                 .pick(&point, &bitmap, &candidates, self.rtt.as_ref());
         if peers.is_empty() {
-            return Vec::new();
+            return appended;
         }
         self.in_flight.insert(gate_key, now);
         if let Point::Specific { slot, hash } = &point {
@@ -763,11 +841,13 @@ impl LeiosState {
             peer_count = peers.len(),
             "fetching leios block txs"
         );
-        vec![LeiosEffect::FetchLeiosBlockTxs {
+        let mut fx = vec![LeiosEffect::FetchLeiosBlockTxs {
             point,
             bitmap,
             peers,
-        }]
+        }];
+        fx.extend(appended);
+        fx
     }
 
     /// A peer offered votes.  Records each (slot, voter_id) offer in
@@ -780,8 +860,14 @@ impl LeiosState {
         peer: PeerId,
         votes: Vec<VoteId>,
     ) -> Vec<LeiosEffect> {
+        let appended: Vec<LeiosEffect> =
+            match self.invoke_hook(|b, s| b.on_votes_offered(s, peer, &votes)) {
+                BehaviourOutcome::Continue => Vec::new(),
+                BehaviourOutcome::Replace(effects) => return effects,
+                BehaviourOutcome::Append(extra) => extra,
+            };
         if votes.is_empty() {
-            return Vec::new();
+            return appended;
         }
         for v in &votes {
             self.candidates.note_vote_offered(v.clone(), peer);
@@ -791,7 +877,7 @@ impl LeiosState {
             self.vote_policy
                 .pick(&votes, &lookup, self.rtt.as_ref());
         if per_peer.is_empty() {
-            return Vec::new();
+            return appended;
         }
         info!(
             node_id = %self.node_id,
@@ -799,7 +885,9 @@ impl LeiosState {
             peer_count = per_peer.len(),
             "fetching leios votes"
         );
-        vec![LeiosEffect::FetchLeiosVotes { per_peer }]
+        let mut fx = vec![LeiosEffect::FetchLeiosVotes { per_peer }];
+        fx.extend(appended);
+        fx
     }
 
     /// An EB body arrived.  `manifest_hashes` is the decoded tx-hash
@@ -810,6 +898,14 @@ impl LeiosState {
         point: Point,
         manifest_hashes: Option<Vec<[u8; 32]>>,
     ) -> Vec<LeiosEffect> {
+        let hashes_for_hook: &[[u8; 32]] = manifest_hashes.as_deref().unwrap_or(&[]);
+        let appended: Vec<LeiosEffect> = match self.invoke_hook(|b, s| {
+            b.on_eb_received(s, &point, hashes_for_hook)
+        }) {
+            BehaviourOutcome::Continue => Vec::new(),
+            BehaviourOutcome::Replace(effects) => return effects,
+            BehaviourOutcome::Append(extra) => extra,
+        };
         self.in_flight.remove(&point);
         let mut fx = Vec::new();
         if let (Some(hashes), Point::Specific { slot, hash }) = (manifest_hashes, &point) {
@@ -820,6 +916,7 @@ impl LeiosState {
             });
         }
         fx.push(LeiosEffect::ValidateEb { point });
+        fx.extend(appended);
         fx
     }
 
@@ -829,10 +926,19 @@ impl LeiosState {
         vote_ids: Vec<(u64, Vec<u8>)>,
         vote_data: Vec<Vec<u8>>,
     ) -> Vec<LeiosEffect> {
-        vec![LeiosEffect::ValidateVotes {
+        let appended: Vec<LeiosEffect> = match self
+            .invoke_hook(|b, s| b.on_votes_received(s, &vote_ids, &vote_data))
+        {
+            BehaviourOutcome::Continue => Vec::new(),
+            BehaviourOutcome::Replace(effects) => return effects,
+            BehaviourOutcome::Append(extra) => extra,
+        };
+        let mut fx = vec![LeiosEffect::ValidateVotes {
             vote_ids,
             vote_data,
-        }]
+        }];
+        fx.extend(appended);
+        fx
     }
 
     /// EB transactions arrived; clear the per-slot in-flight gate so
@@ -1894,5 +2000,137 @@ mod tests {
 
         let bitmap = state.missing_eb_tx_bitmap(&h(0xCD), &mempool);
         assert!(bitmap.is_empty());
+    }
+
+    // -- Behaviour-hook integration ----------------------------------------
+
+    /// Stub behaviour that returns a configurable outcome on
+    /// `on_slot_leios` and counts its invocations.  Allows the test to
+    /// observe both the call count and the surrounding state at hook
+    /// time without leaking into the host state.
+    #[derive(Default)]
+    struct StubBehaviour {
+        slot_calls: u32,
+        slot_reply: Option<BehaviourOutcome<LeiosEffect>>,
+        vote_override: Option<NoVoteReason>,
+    }
+
+    impl crate::behaviour::Behaviour for StubBehaviour {
+        fn name(&self) -> &'static str {
+            "stub"
+        }
+        fn on_slot_leios(
+            &mut self,
+            _state: &LeiosState,
+            _slot: u64,
+        ) -> BehaviourOutcome<LeiosEffect> {
+            self.slot_calls += 1;
+            self.slot_reply.clone().unwrap_or(BehaviourOutcome::Continue)
+        }
+        fn decide_vote(
+            &mut self,
+            _state: &LeiosState,
+            eb_hash: &[u8; 32],
+            eb_slot: u64,
+            _honest: &Result<(bool, Option<Vec<u8>>), NoVoteReason>,
+        ) -> crate::behaviour::DecisionOutcome<
+            Result<(bool, Option<Vec<u8>>), NoVoteReason>,
+        > {
+            if let Some(r) = self.vote_override {
+                let _ = (eb_hash, eb_slot);
+                crate::behaviour::DecisionOutcome::Override(Err(r))
+            } else {
+                crate::behaviour::DecisionOutcome::Continue
+            }
+        }
+    }
+
+    #[test]
+    fn behaviour_continue_leaves_honest_flow_unchanged() {
+        // Golden: HonestBehaviour vs. no-op stub produces identical effects.
+        let mut honest = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        honest.elections.announce(10, h(1));
+        tip_for(&mut honest, 10, h(1));
+        let baseline = honest.on_slot(13, &tx_all);
+
+        let mut stubbed = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        stubbed.set_behaviour(Box::new(StubBehaviour::default()));
+        stubbed.elections.announce(10, h(1));
+        tip_for(&mut stubbed, 10, h(1));
+        let with_stub = stubbed.on_slot(13, &tx_all);
+
+        // Effects compare by Debug formatting — the inner variants don't
+        // all implement PartialEq.
+        assert_eq!(format!("{baseline:?}"), format!("{with_stub:?}"));
+    }
+
+    #[test]
+    fn behaviour_replace_short_circuits_honest_effects() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        state.set_behaviour(Box::new(StubBehaviour {
+            slot_reply: Some(BehaviourOutcome::Replace(vec![])),
+            ..Default::default()
+        }));
+        state.elections.announce(10, h(1));
+        tip_for(&mut state, 10, h(1));
+        let fx = state.on_slot(13, &tx_all);
+        // EmitVote would normally fire — Replace([]) suppresses it.
+        assert!(fx.is_empty());
+        // The election was not marked voted because honest flow never ran.
+        assert!(!state.elections.voted(&h(1)));
+    }
+
+    #[test]
+    fn behaviour_append_adds_to_honest_effects() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        state.set_behaviour(Box::new(StubBehaviour {
+            slot_reply: Some(BehaviourOutcome::Append(vec![LeiosEffect::EmitTelemetry(
+                LeiosTelemetryEvent::QuorumReached {
+                    eb_slot: 99,
+                    voted_weight: 1,
+                    voters: 1,
+                },
+            )])),
+            ..Default::default()
+        }));
+        state.elections.announce(10, h(1));
+        tip_for(&mut state, 10, h(1));
+        let fx = state.on_slot(13, &tx_all);
+        // Honest EmitVote plus the appended telemetry.
+        assert_eq!(fx.len(), 2);
+        assert!(matches!(fx[0], LeiosEffect::EmitVote { .. }));
+        assert!(matches!(
+            fx[1],
+            LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::QuorumReached { .. })
+        ));
+    }
+
+    #[test]
+    fn behaviour_decide_vote_override_forces_abstain() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        state.set_behaviour(Box::new(StubBehaviour {
+            vote_override: Some(NoVoteReason::WrongEB),
+            ..Default::default()
+        }));
+        state.elections.announce(10, h(1));
+        tip_for(&mut state, 10, h(1));
+        let fx = state.on_slot(13, &tx_all);
+        // Despite the seated PV that honest would have emitted, the
+        // override forced NoVote { WrongEB }.
+        assert_eq!(fx.len(), 1);
+        match &fx[0] {
+            LeiosEffect::NoVote { reason, .. } => {
+                assert_eq!(*reason, NoVoteReason::WrongEB);
+            }
+            other => panic!("expected NoVote, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn behaviour_set_and_name_query() {
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        assert_eq!(state.behaviour_name(), "honest");
+        state.set_behaviour(Box::new(StubBehaviour::default()));
+        assert_eq!(state.behaviour_name(), "stub");
     }
 }

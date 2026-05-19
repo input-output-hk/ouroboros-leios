@@ -236,6 +236,10 @@ pub struct PraosState {
     /// Live per-peer RTT lookup, consulted by `block_policy` at every
     /// fetch decision.
     pub rtt: Box<dyn PeerRtt + Send + Sync>,
+
+    /// Pluggable behaviour; see [`crate::behaviour`].  Always `Some`
+    /// between public method calls.
+    pub behaviour: Option<Box<dyn crate::behaviour::Behaviour>>,
 }
 
 impl PraosState {
@@ -280,7 +284,36 @@ impl PraosState {
             equivocating_rb_slots: BTreeSet::new(),
             block_policy,
             rtt,
+            behaviour: Some(Box::new(crate::behaviour::HonestBehaviour)),
         }
+    }
+
+    /// Replace the behaviour.
+    pub fn set_behaviour(&mut self, behaviour: Box<dyn crate::behaviour::Behaviour>) {
+        self.behaviour = Some(behaviour);
+    }
+
+    /// Short name of the current behaviour.
+    pub fn behaviour_name(&self) -> &'static str {
+        self.behaviour.as_ref().map_or("honest", |b| b.name())
+    }
+
+    /// Take/restore helper for behaviour hooks; mirrors the pattern in
+    /// `LeiosState`.
+    fn invoke_hook<F>(&mut self, hook: F) -> crate::behaviour::BehaviourOutcome<PraosEffect>
+    where
+        F: FnOnce(
+            &mut dyn crate::behaviour::Behaviour,
+            &PraosState,
+        ) -> crate::behaviour::BehaviourOutcome<PraosEffect>,
+    {
+        let mut behaviour = self
+            .behaviour
+            .take()
+            .expect("behaviour is Some between public calls");
+        let outcome = hook(behaviour.as_mut(), self);
+        self.behaviour = Some(behaviour);
+        outcome
     }
 
     /// Replace the block-fetch policy.
@@ -514,6 +547,14 @@ impl PraosState {
         header_prev_hash: Option<[u8; 32]>,
         now: Instant,
     ) -> Vec<PraosEffect> {
+        use crate::behaviour::BehaviourOutcome;
+        let tip_clone = tip_point.clone();
+        let appended: Vec<PraosEffect> =
+            match self.invoke_hook(|b, s| b.on_tip_advanced(s, peer_id, &tip_clone)) {
+                BehaviourOutcome::Continue => Vec::new(),
+                BehaviourOutcome::Replace(effects) => return effects,
+                BehaviourOutcome::Append(extra) => extra,
+            };
         self.record_peer_tip(
             peer_id,
             tip_point,
@@ -525,6 +566,7 @@ impl PraosState {
         );
         let mut fx = Vec::new();
         self.evaluate_and_fetch_internal(now, &mut fx);
+        fx.extend(appended);
         fx
     }
 
@@ -540,16 +582,27 @@ impl PraosState {
         body_bytes: Vec<u8>,
         parsed_header: Option<ParsedHeaderInfo>,
     ) -> Vec<PraosEffect> {
+        use crate::behaviour::BehaviourOutcome;
+        let appended: Vec<PraosEffect> =
+            match self.invoke_hook(|b, s| b.on_block_received(s, &point)) {
+                BehaviourOutcome::Continue => Vec::new(),
+                BehaviourOutcome::Replace(effects) => return effects,
+                BehaviourOutcome::Append(extra) => extra,
+            };
         let mut fx = Vec::new();
         let hash = match &point {
             Point::Specific { hash, .. } => *hash,
-            _ => return fx,
+            _ => {
+                fx.extend(appended);
+                return fx;
+            }
         };
         // Dedup.
         if self.block_cache.contains_key(&hash)
             || self.validated.contains(&hash)
             || self.in_flight_validation.contains(&hash)
         {
+            fx.extend(appended);
             return fx;
         }
         let header_was_parsed = parsed_header.is_some();
@@ -607,6 +660,7 @@ impl PraosState {
             "block received and cached"
         );
         self.try_switch_and_execute_internal(hash, &mut fx);
+        fx.extend(appended);
         fx
     }
 
@@ -665,9 +719,17 @@ impl PraosState {
         peer_id: PeerId,
         now: Instant,
     ) -> Vec<PraosEffect> {
+        use crate::behaviour::BehaviourOutcome;
+        let appended: Vec<PraosEffect> =
+            match self.invoke_hook(|b, s| b.on_peer_disconnected(s, peer_id)) {
+                BehaviourOutcome::Continue => Vec::new(),
+                BehaviourOutcome::Replace(effects) => return effects,
+                BehaviourOutcome::Append(extra) => extra,
+            };
         self.record_peer_disconnected(peer_id);
         let mut fx = Vec::new();
         self.evaluate_and_fetch_internal(now, &mut fx);
+        fx.extend(appended);
         fx
     }
 
