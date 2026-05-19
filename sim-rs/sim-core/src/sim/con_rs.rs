@@ -1269,19 +1269,49 @@ impl ConRs {
         }
     }
 
+    /// Build a sim [`Endorsement`] for the parent RB's announced EB,
+    /// if and only if that EB has reached the CertEligible phase and
+    /// the local aggregator has quorum on it.  CIP-0164 reads a cert
+    /// as endorsing the EB announced by *the* preceding block, so the
+    /// candidate is tied to the parent (matches `linear_leios.rs`'s
+    /// `ebs_by_rb.get(&parent_rb_id)` lookup).
+    ///
+    /// Quorum is read off `votes_by_eb` (always populated at vote
+    /// receipt) and `elections.quorum(hash)` (true for placeholder
+    /// elections too once enough votes accumulate), so a cert can
+    /// assemble for an EB whose body the producer hasn't received —
+    /// the producer-side EB-safety gate
+    /// (`LeiosState::has_endorsed_unvalidated_eb`) then forces an
+    /// empty RB body until the closure validates.
     fn try_build_endorsement(&self) -> Option<Endorsement> {
-        let cert_slot = self.leios.certified_eb_slot()?;
-        let (eb_id, voters) = self
-            .votes_by_eb
-            .iter()
-            .find(|(eb_id, _)| {
-                eb_id.slot == cert_slot
-                    && self.leios.elections.quorum(&synthesize_eb_hash(**eb_id))
-            })
-            .map(|(eb_id, voters)| (*eb_id, voters.clone()))?;
+        let parent_id = self.pick_parent()?;
+        let parent_rb = match self.rbs.get(&parent_id)? {
+            RbState::Received { rb, .. } => rb,
+            _ => return None,
+        };
+        let parent_eb_id = parent_rb.header.eb_announcement?;
+        let parent_eb_hash = synthesize_eb_hash(parent_eb_id);
+
+        // Wait until the parent's EB has cleared its voting + diffusion
+        // windows.  No upper bound: quorum-reached elections survive
+        // pipeline expiry (see `Elections::on_slot`), so a cert remains
+        // assemblable for the parent's EB even when the producer's
+        // own RB lands well past the dedup window.
+        let pipeline = self.leios.pipeline;
+        let cert_eligible_start =
+            3 * pipeline.delta_hdr + pipeline.vote_window + pipeline.diffuse_window;
+        let elapsed = self.current_slot.saturating_sub(parent_eb_id.slot);
+        if elapsed < cert_eligible_start {
+            return None;
+        }
+        if !self.leios.elections.quorum(&parent_eb_hash) {
+            return None;
+        }
+
+        let voters = self.votes_by_eb.get(&parent_eb_id)?.clone();
         let size_bytes = self.sim_config.sizes.cert(voters.len());
         Some(Endorsement {
-            eb: eb_id,
+            eb: parent_eb_id,
             size_bytes,
             votes: voters,
         })
