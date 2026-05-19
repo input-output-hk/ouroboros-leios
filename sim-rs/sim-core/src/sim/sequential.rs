@@ -974,30 +974,29 @@ where
 
         // Build connections
         let mut connections: HashMap<Link, ConnectionKind<MiniProtocol, N::Message>> = HashMap::new();
+        let net_oracle = crate::rng::Rng::new(config.seed);
+        let make_conn = |from, to, lc: &crate::config::LinkConfiguration| {
+            let envelope = lc.tcp_envelope.as_ref().map(|cfg| {
+                crate::network::connection::EnvelopeWiring::new(
+                    cfg.clone(),
+                    net_oracle,
+                    from,
+                    to,
+                )
+            });
+            ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp, envelope)
+        };
         for lc in &config.links {
             let (from, to) = lc.nodes;
             let fs = shard_lookup[&from];
             let ts = shard_lookup[&to];
             if shard_count == 1 || (fs == shard_idx && ts == shard_idx) {
-                // Intra-shard (or single-shard): both directions
-                connections.insert(
-                    Link { from, to },
-                    ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp, None),
-                );
-                connections.insert(
-                    Link { from: to, to: from },
-                    ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp, None),
-                );
+                connections.insert(Link { from, to }, make_conn(from, to, lc));
+                connections.insert(Link { from: to, to: from }, make_conn(to, from, lc));
             } else if ts == shard_idx {
-                connections.insert(
-                    Link { from, to },
-                    ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp, None),
-                );
+                connections.insert(Link { from, to }, make_conn(from, to, lc));
             } else if fs == shard_idx {
-                connections.insert(
-                    Link { from: to, to: from },
-                    ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp, None),
-                );
+                connections.insert(Link { from: to, to: from }, make_conn(to, from, lc));
             }
         }
 
