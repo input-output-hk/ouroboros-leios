@@ -202,7 +202,7 @@ pub enum LeiosEffect {
 
     /// The local node entered the Voting phase for this EB but a
     /// CIP-0164 voting predicate failed; no vote was emitted.  Sibling
-    /// to [`EmitVote`] — the election is `mark_voted` either way, so
+    /// to [`LeiosEffect::EmitVote`] — the election is `mark_voted` either way, so
     /// this fires at most once per EB.
     NoVote {
         eb_slot: u64,

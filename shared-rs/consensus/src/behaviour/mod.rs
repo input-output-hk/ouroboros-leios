@@ -82,8 +82,8 @@ pub mod outbound;
 pub mod registry;
 
 pub mod behaviours {
-    //! Concrete [`Behaviour`] implementations.  Each lives in its own
-    //! file so contributors can add one without touching the others.
+    //! Concrete [`super::Behaviour`] implementations.  Each lives in its
+    //! own file so contributors can add one without touching the others.
     pub mod lazy_voter;
     pub mod rb_equivocator;
 
@@ -351,7 +351,7 @@ pub trait Behaviour: Send + Sync {
     /// shared-consensus does not own the wire-format RB construction
     /// path, the actual artefact is built by the wrapper from the
     /// honest body-path decision (already overridable via
-    /// [`decide_body_path`]).
+    /// [`Self::decide_body_path`]).
     fn rb_production_strategy(
         &mut self,
         _leios: &LeiosState,
@@ -395,7 +395,7 @@ pub trait Behaviour: Send + Sync {
     /// crate does not enumerate peers, it only routes per-peer decisions
     /// when the wrapper asks.  Determinism is the behaviour's
     /// responsibility (see the seed accepted at
-    /// [`registry::build`](crate::behaviour::registry::build)).
+    /// [`registry::build`]).
     fn transform_outbound(
         &mut self,
         _peer: PeerId,

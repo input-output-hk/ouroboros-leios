@@ -8,7 +8,7 @@ use crate::leios::{LeiosState, NoVoteReason};
 
 #[derive(Debug, Clone)]
 pub struct LazyVoter {
-    /// Reason reported via [`LeiosEffect::NoVote`].  Defaults to
+    /// Reason reported via [`crate::leios::LeiosEffect::NoVote`].  Defaults to
     /// `Declined` so telemetry can tell policy abstentions apart from
     /// honest predicate failures (`WrongEB` / `MissingTX` /
     /// `LateRBHeader`); set to one of those if a sweep specifically

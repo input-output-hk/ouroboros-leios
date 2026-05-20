@@ -116,7 +116,7 @@ pub struct CachedBlock {
     pub announced_eb_hash: Option<[u8; 32]>,
     /// Whether this block's header certifies the parent RB's
     /// announced EB (CIP-0164 Leios extension).  The EB being
-    /// certified is resolved via [`PraosState::parent_announced_eb`].
+    /// certified is resolved via [`PraosState::parent_announced_eb_for_cert`].
     pub certified_eb: bool,
 }
 
@@ -223,7 +223,7 @@ pub struct PraosState {
     /// tracker is fed from every path that surfaces a parsed header
     /// (`on_block_received`, `register_self_produced`); insertions
     /// that grow a set past size 1 flag the slot in
-    /// [`equivocating_rb_slots`].
+    /// [`PraosState::equivocating_rb_slots`].
     pub header_hashes_by_slot_issuer:
         BTreeMap<(u64, Vec<u8>), BTreeSet<[u8; 32]>>,
     /// Slots at which RB-header equivocation has been detected.
@@ -364,7 +364,7 @@ impl PraosState {
 
     /// Slot at which the adopted tip RB's header was first observed
     /// locally.  Falls back to the RB's own slot if the I/O wrapper
-    /// never called [`note_header_first_seen`] for this hash — that's a
+    /// never called [`PraosState::note_header_first_seen`] for this hash — that's a
     /// conservative best-case ("header can't have arrived before its
     /// own slot") and is what the CIP-0164 `LateRBHeader` voting
     /// predicate consults via the chain-tip context.
@@ -457,7 +457,7 @@ impl PraosState {
     }
 
     /// True iff RB-header equivocation has been detected at `slot`.
-    /// Consulted by [`crate::leios::LeiosState::decide_vote`] via
+    /// Surfaced to the Leios voting predicate through
     /// [`crate::leios::ChainTipContext::equivocating_slots`].
     pub fn is_equivocating_slot(&self, slot: u64) -> bool {
         self.equivocating_rb_slots.contains(&slot)

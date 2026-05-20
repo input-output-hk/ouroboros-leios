@@ -12,7 +12,8 @@
 //! - `eb_pinned` — bodies pinned because they're referenced by an EB
 //!   that hasn't been settled yet.  Lookups (LeiosFetch BlockTxs server,
 //!   the CIP-0164 `MissingTX` voting predicate) consult both
-//!   transparently via [`MempoolState::has_tx`] / [`get_body_by_id`].
+//!   transparently via [`MempoolState::has_tx`] /
+//!   [`MempoolState::get_body_by_id`].
 //!
 //! Validation crosses this crate's boundary as an effect / response pair,
 //! the same pattern Praos uses for block validation and Leios uses for

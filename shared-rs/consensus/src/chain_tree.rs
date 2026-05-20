@@ -5,7 +5,7 @@
 //! (via `on_block_received`) and self-production (via `register_self_produced`)
 //! — and maintains a cached `best_tip` for the highest-block-number chain.
 //!
-//! Its primary consumer is [`select_chain_once`](super::consensus::praos),
+//! Its primary consumer is [`PraosState::select_chain_once`](crate::praos::PraosState::select_chain_once),
 //! which calls [`ancestors()`](ChainTree::ancestors) to compute the adopted
 //! chain's ancestry, then walks a peer's announced headers looking for a
 //! hash in that ancestry set.
