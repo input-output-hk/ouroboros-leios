@@ -444,9 +444,15 @@ impl PraosState {
         }
         let key = (slot, issuer.to_vec());
         let set = self.header_hashes_by_slot_issuer.entry(key).or_default();
-        set.insert(header_hash);
-        if set.len() > 1 {
+        let was_new = set.insert(header_hash);
+        if set.len() > 1 && was_new {
             self.equivocating_rb_slots.insert(slot);
+            info!(
+                node_id = %self.node_id,
+                slot,
+                hashes = set.len(),
+                "RB-header equivocation detected"
+            );
         }
     }
 
@@ -542,6 +548,7 @@ impl PraosState {
 
     /// A peer announced a new tip.  Records it and runs chain selection.
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)]
     pub fn on_tip_advanced(
         &mut self,
         peer_id: PeerId,
@@ -551,6 +558,7 @@ impl PraosState {
         header_hash: [u8; 32],
         header_slot: u64,
         header_prev_hash: Option<[u8; 32]>,
+        header_issuer: &[u8],
         now: Instant,
     ) -> Vec<PraosEffect> {
         use crate::behaviour::BehaviourOutcome;
@@ -561,6 +569,13 @@ impl PraosState {
                 BehaviourOutcome::Replace(effects) => return effects,
                 BehaviourOutcome::Append(extra) => extra,
             };
+        // CIP-0164 RB-header equivocation: detect as soon as a second
+        // distinct header hash arrives at the same `(slot, issuer)` via
+        // the ChainSync announce path, without waiting for the body
+        // fetch.  Without this, an adversary that advertises divergent
+        // headers to disjoint peer subsets can prevent detection for
+        // any peer that follows only one variant's body.
+        self.note_header_for_equivocation(header_slot, header_issuer, header_hash);
         self.record_peer_tip(
             peer_id,
             tip_point,
@@ -2197,8 +2212,17 @@ mod tests {
     fn on_tip_advanced_better_peer_emits_fetch() {
         let mut s = fresh();
         let pid = PeerId(7);
-        let fx =
-            s.on_tip_advanced(pid, pt(100, 1), 1, 1, h(1), 100, None, Instant::now());
+        let fx = s.on_tip_advanced(
+            pid,
+            pt(100, 1),
+            1,
+            1,
+            h(1),
+            100,
+            None,
+            &[0xAA; 4],
+            Instant::now(),
+        );
         assert!(fx
             .iter()
             .any(|e| matches!(e, PraosEffect::FetchBlockRange { .. })));
@@ -2240,6 +2264,7 @@ mod tests {
             h(99),
             200,
             Some(h(88)),
+            &[0xAA; 4],
             Instant::now(),
         );
         assert!(fx

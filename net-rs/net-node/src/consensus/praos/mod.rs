@@ -251,6 +251,7 @@ impl PraosConsensus {
                             hash,
                             info.slot,
                             info.prev_hash,
+                            &info.issuer,
                             now,
                         )
                     }
