@@ -1000,6 +1000,14 @@ impl SharedConsensus {
         self.praos.note_header_first_seen(hash, self.current_slot);
         let point = block_id_to_point(id);
         let prev_hash = header.parent.map(synthesize_rb_hash);
+        // CIP-0164 RB-header equivocation tracks `(slot, issuer)` pairs;
+        // sim's notion of an issuer is the producing `NodeId`, so use
+        // its little-endian bytes as the opaque issuer identifier.  The
+        // honest-only sims this adapter currently exercises never
+        // produce two distinct headers at the same `(slot, issuer)`,
+        // but feeding the issuer in correctly keeps the predicate
+        // ready for behaviour-driven adversarial runs.
+        let issuer_bytes = (id.producer.to_inner() as u64).to_le_bytes();
         let _ = self.praos.on_tip_advanced(
             node_id_to_peer_id(from),
             point,
@@ -1008,6 +1016,7 @@ impl SharedConsensus {
             hash,
             id.slot,
             prev_hash,
+            &issuer_bytes,
             self.instant_now(),
         );
         self.rbs.insert(
