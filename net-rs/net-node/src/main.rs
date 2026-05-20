@@ -205,6 +205,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let leios = config.leios_enabled;
     let node_id = config.node_id.clone();
 
+    // Pull the mempool's admit notifier and tracked peer set.  Each
+    // successful mempool admit fires the notify; the select! arm below
+    // fans the new txs out to every connected peer via `ProvideTxs`.
+    // Without this push-on-admit signal, txsubmission's pull cadence
+    // can stall after the startup flurry — the consumer settles into a
+    // non-blocking poll loop, the provider's per-peer channel runs dry
+    // mid-cycle, and the natural `TxsRequested` wakeup never re-fires.
+    let admit_notify = mempool.lock().unwrap().admit_notify();
+    let mut connected_peers: std::collections::BTreeSet<net_core::peer::PeerId> =
+        std::collections::BTreeSet::new();
+
     let mut retry_counter: u64 = 0;
     loop {
         tokio::select! {
@@ -415,8 +426,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     .await;
                             }
                         }
+                        // Maintain the per-peer fanout set.
+                        if let NetworkEvent::PeerConnected { peer_id, .. } = &event {
+                            connected_peers.insert(*peer_id);
+                        }
                         // Drop per-peer advertised state when a peer goes away.
                         if let NetworkEvent::PeerDisconnected { peer_id, .. } = &event {
+                            connected_peers.remove(peer_id);
                             mempool.lock().unwrap().forget_peer(*peer_id);
                         }
                         record_network_event(&mut telem, &node_id, &event, &consensus).await;
@@ -427,6 +443,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     None => {
                         warn!("coordinator channel closed");
                         break;
+                    }
+                }
+            }
+            _ = admit_notify.notified() => {
+                // A tx just entered the mempool (locally generated, peer-
+                // received-and-validated, or merged from a LeiosFetch
+                // body).  Synthesise a `ProvideTxs` for every connected
+                // peer whose advertised set doesn't already cover it —
+                // this is the push-on-admit signal sim-rs gets for free
+                // from its in-process `Message::AnnounceTx` fan-out
+                // (`linear_leios.rs::propagate_tx`) and that net-rs's
+                // pull-only TxSubmission lacks otherwise.  Capping the
+                // batch at `MAX_UNACKED` keeps the per-peer `tx_submit`
+                // channel from being overwhelmed; subsequent admits
+                // re-fire the notify so any remaining unannounced txs
+                // are picked up on the next wake.
+                use net_core::protocols::txsubmission::MAX_UNACKED;
+                let peer_ids: Vec<_> = connected_peers.iter().copied().collect();
+                for peer_id in peer_ids {
+                    let txs = {
+                        let mut pool = mempool.lock().unwrap();
+                        pool.peek_unannounced_for_peer(peer_id, MAX_UNACKED)
+                    };
+                    if !txs.is_empty() {
+                        let _ = commands
+                            .send(NetworkCommand::ProvideTxs { peer_id, txs })
+                            .await;
                     }
                 }
             }

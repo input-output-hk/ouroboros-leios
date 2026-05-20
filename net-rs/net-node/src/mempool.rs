@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use tokio::sync::{mpsc, watch};
+use tokio::sync::{mpsc, watch, Notify};
 use tracing::info;
 
 use shared_consensus::mempool::{EbKey, MempoolState};
@@ -75,13 +75,28 @@ pub enum BodyPath {
 /// holds the actual state.
 pub struct Mempool {
     state: MempoolState,
+    /// Fires once per successful admit so the main loop can fan the new
+    /// tx out to every connected peer.  TxSubmission is pull-based at
+    /// the wire, but the consumer's poll cadence on its own doesn't
+    /// wake a provider whose per-peer channel went briefly empty — the
+    /// notify closes that gap and makes diffusion latency RTT-bound
+    /// rather than poll-cycle-bound.
+    admit_notify: Arc<Notify>,
 }
 
 impl Mempool {
     pub fn new(capacity: usize) -> Self {
         Self {
             state: MempoolState::new(capacity),
+            admit_notify: Arc::new(Notify::new()),
         }
+    }
+
+    /// Shared handle to the admit notifier.  The main loop awaits on it
+    /// and synthesises a `ProvideTxs` to every connected peer on each
+    /// wake.
+    pub fn admit_notify(&self) -> Arc<Notify> {
+        self.admit_notify.clone()
     }
 
     /// Borrow the underlying shared-consensus state for read-only operations
@@ -105,8 +120,16 @@ impl Mempool {
     /// produced by `spawn_tx_validator` after its delay).  TxRejected
     /// effects (queue-full evictions, dedup) are dropped silently —
     /// telemetry plumbing for them is a follow-up.
+    ///
+    /// Signals `admit_notify` so the main loop can fan the new tx out
+    /// to every connected peer's TxSubmission provider channel.  The
+    /// notify fires regardless of whether the admit was accepted —
+    /// duplicate-rejected txs are harmless to peek again (already in
+    /// the per-peer advertised set), and capacity-rejected txs leave
+    /// nothing to fan out so the wake is a no-op.
     pub fn push(&mut self, tx: PendingTx) {
         let _ = self.state.admit_validated(tx.tx_id.0, tx.body.0, tx.size);
+        self.admit_notify.notify_one();
     }
 
     #[cfg(test)]
@@ -195,9 +218,14 @@ impl Mempool {
     /// Receiver-side: insert a body fetched via LeiosFetch.  Idempotent
     /// against duplicates already in either compartment.  Hashes the
     /// body to derive the tx_id (the wire-format manifest reference).
+    ///
+    /// Also signals `admit_notify` so the main loop can fan the body
+    /// out to peers via TxSubmission — sibling nodes that received the
+    /// EB header but lost the txsubmission race will pick it up here.
     pub fn merge_eb_body(&mut self, body: Vec<u8>) {
         let tx = tx_from_received_bytes(body);
         self.state.merge_eb_body(tx.tx_id.0, tx.body.0, tx.size);
+        self.admit_notify.notify_one();
     }
 
     /// Snapshot of every locally available tx id — free pool plus

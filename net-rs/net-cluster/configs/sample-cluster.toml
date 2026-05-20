@@ -42,3 +42,10 @@ stake_distribution = "equal"
 # `WrongEB` and certification fails.  Stay near mainnet rates for
 # realistic Leios behaviour.
 rb_generation_probability = 0.05
+
+# Per-node transaction generation rate (tx/s).  Mainnet.toml's base
+# value is 0.0 (chain follower mode); the smoke cluster needs a
+# non-zero rate to exercise EB production, voting, and certification
+# end-to-end.  1.0 tx/s/node × 25 nodes ≈ 25 tx/s aggregate is enough
+# to overflow RB bodies into EBs without saturating txsubmission.
+tx_rate = 1.0
