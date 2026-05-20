@@ -1,0 +1,39 @@
+# Sample cluster configuration for local testing.
+#
+# Run with:
+#   cargo run -p net-cluster -- --config net-cluster/configs/sample-cluster.toml
+#
+# This spawns 25 nodes with degree-3 random topology, 5–250ms latency
+# (matching real intercontinental geography), and equal stake distribution.
+
+num_nodes = 25
+degree = 3
+min_latency_ms = 5
+max_latency_ms = 250
+
+# Base config shared by all nodes (genesis, protocol params, etc.)
+base_config = "net-node/configs/mainnet.toml"
+
+# Port allocation: nodes get 30000, 30001, ..., 30024
+base_port = 30000
+
+# Reproducible topology
+seed = 42
+
+# Merged event output
+output_events = "cluster-events.jsonl"
+
+# Time window for cross-node event ordering
+ordering_window_secs = 1.0
+
+# Telemetry aggregator port
+aggregator_port = 9100
+
+# Stats reporting interval (seconds)
+stats_interval_secs = 1
+
+# Stake distribution
+stake_distribution = "equal"
+
+# Override block production rate (default from base config is 0.05)
+rb_generation_probability = 0.2

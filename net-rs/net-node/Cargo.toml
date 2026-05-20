@@ -1,0 +1,21 @@
+[package]
+name = "net-node"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+net-core = { path = "../net-core" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "signal", "io-std", "io-util"] }
+clap = { version = "4", features = ["derive"] }
+figment = { version = "0.10", features = ["toml"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+blake2b_simd = "1"
+minicbor = { version = "0.25", features = ["std"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+rand = "0.8"
+async-trait = "0.1"
+tikv-jemallocator = "0.6"

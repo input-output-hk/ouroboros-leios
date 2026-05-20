@@ -1,0 +1,27 @@
+# Node 0: block producer with telemetry
+#
+# Overlay on top of mainnet.toml:
+#   cargo run -p net-node -- --config configs/mainnet.toml --config configs/node0.toml
+
+node_id = "node-0"
+listen_address = "127.0.0.1:30000"
+seed = 42
+
+[production]
+stake = 500
+
+[transactions]
+tx_rate = 1.0
+
+[telemetry]
+stats_interval_secs = 5
+
+[[telemetry.event_sinks]]
+type = "file"
+path = "node0-events.jsonl"
+
+[[telemetry.stats_sinks]]
+type = "log"
+
+[[peers]]
+address = "127.0.0.1:30001"

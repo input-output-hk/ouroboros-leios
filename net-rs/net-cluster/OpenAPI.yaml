@@ -1,0 +1,238 @@
+openapi: 3.0.3
+info:
+  title: net-cluster API
+  description: REST API for the net-cluster test network orchestrator.
+  version: 0.1.0
+
+servers:
+  - url: http://127.0.0.1:9100
+    description: Local cluster aggregator
+
+paths:
+  /events:
+    post:
+      summary: Receive event batch from a net-node
+      description: Called by net-node HttpEventSink. Batches of OutputEvent JSON objects.
+      tags: [Telemetry]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/OutputEvent'
+      responses:
+        '200':
+          description: Events accepted
+        '503':
+          description: Aggregator channel full, batch dropped
+
+  /stats:
+    post:
+      summary: Receive stats snapshot from a net-node
+      description: Called by net-node HttpStatsSink.
+      tags: [Telemetry]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatsSnapshot'
+      responses:
+        '200':
+          description: Stats accepted
+
+  /api/topology:
+    get:
+      summary: Get cluster topology
+      description: Returns the full node/edge graph with latencies and peer links.
+      tags: [UI API]
+      responses:
+        '200':
+          description: Cluster topology
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Topology'
+
+  /api/stats:
+    get:
+      summary: Get latest stats for all nodes
+      description: Returns a map of node_id to latest StatsSnapshot.
+      tags: [UI API]
+      responses:
+        '200':
+          description: Stats map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/StatsSnapshot'
+
+  /api/stats/{node_id}:
+    get:
+      summary: Get latest stats for a single node
+      tags: [UI API]
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: node-0
+      responses:
+        '200':
+          description: Node stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsSnapshot'
+        '404':
+          description: Node not found
+
+  /api/events:
+    get:
+      summary: Get recent events
+      description: Returns events from the in-memory window with time_s > after.
+      tags: [UI API]
+      parameters:
+        - name: after
+          in: query
+          required: false
+          schema:
+            type: number
+            format: double
+            default: 0
+          description: Return events with time_s strictly greater than this value.
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OutputEvent'
+
+components:
+  schemas:
+    OutputEvent:
+      type: object
+      properties:
+        time_s:
+          type: number
+          format: double
+          description: Seconds since genesis
+        message:
+          type: object
+          description: Tagged event (type field discriminates)
+          properties:
+            type:
+              type: string
+            node:
+              type: string
+
+    StatsSnapshot:
+      type: object
+      required: [node_id, uptime_secs, slot, blocks_produced, blocks_received, blocks_validated, txs_generated, peer_count, peers]
+      properties:
+        node_id:
+          type: string
+        uptime_secs:
+          type: number
+          format: double
+        slot:
+          type: integer
+          format: int64
+        tip_block_no:
+          type: integer
+          format: int64
+          nullable: true
+        blocks_produced:
+          type: integer
+        blocks_received:
+          type: integer
+        blocks_validated:
+          type: integer
+        txs_generated:
+          type: integer
+        peer_count:
+          type: integer
+        peers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PeerStatsEntry'
+
+    PeerStatsEntry:
+      type: object
+      properties:
+        peer_id:
+          type: string
+        address:
+          type: string
+        mode:
+          type: string
+        rtt_ms:
+          type: number
+          nullable: true
+        tip_block_no:
+          type: integer
+          nullable: true
+        inbound_delay_ms:
+          type: integer
+        bytes_sent:
+          type: integer
+        bytes_received:
+          type: integer
+
+    Topology:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeTopology'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/Edge'
+
+    NodeTopology:
+      type: object
+      properties:
+        index:
+          type: integer
+        node_id:
+          type: string
+        listen_address:
+          type: string
+        listen_port:
+          type: integer
+        stake:
+          type: integer
+        seed:
+          type: integer
+        peers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PeerLink'
+
+    PeerLink:
+      type: object
+      properties:
+        address:
+          type: string
+        inbound_delay_ms:
+          type: integer
+
+    Edge:
+      type: object
+      properties:
+        from:
+          type: integer
+        to:
+          type: integer
+        latency_ms:
+          type: integer
