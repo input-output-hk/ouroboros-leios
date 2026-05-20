@@ -37,9 +37,10 @@ pub enum OwnedOutbound {
 }
 
 /// What the behaviour decided for this peer-targeted send.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum OutboundDecision {
     /// Send the artefact unchanged.  The default.
+    #[default]
     Send,
     /// Suppress delivery — the wire path emits nothing for this peer.
     Drop,
@@ -49,12 +50,6 @@ pub enum OutboundDecision {
     Replace(OwnedOutbound),
     /// Send the original artefact AND these extras.
     Augment(Vec<OwnedOutbound>),
-}
-
-impl Default for OutboundDecision {
-    fn default() -> Self {
-        Self::Send
-    }
 }
 
 impl OutboundDecision {

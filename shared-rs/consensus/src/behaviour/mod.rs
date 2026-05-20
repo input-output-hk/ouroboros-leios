@@ -48,7 +48,7 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
-use crate::leios::{LeiosEffect, LeiosState, NoVoteReason};
+use crate::leios::{LeiosEffect, LeiosState, VoteDecision};
 use crate::mempool::{MempoolEffect, MempoolState, TxId};
 use crate::peer::PeerId;
 use crate::praos::{PraosEffect, PraosState};
@@ -104,17 +104,12 @@ pub use registry::{build, build_handle, seed_from_node_id, swap_handle, Behaviou
 /// What a reactive hook returns.  `Continue` lets honest flow proceed
 /// unchanged; `Replace` discards the honest effects and uses these
 /// instead; `Append` runs the honest flow AND appends these extras.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum BehaviourOutcome<E> {
+    #[default]
     Continue,
     Replace(Vec<E>),
     Append(Vec<E>),
-}
-
-impl<E> Default for BehaviourOutcome<E> {
-    fn default() -> Self {
-        Self::Continue
-    }
 }
 
 impl<E> BehaviourOutcome<E> {
@@ -125,16 +120,11 @@ impl<E> BehaviourOutcome<E> {
 
 /// What a `decide_*` hook returns.  `Continue` keeps the honest
 /// decision; `Override` substitutes it.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum DecisionOutcome<T> {
+    #[default]
     Continue,
     Override(T),
-}
-
-impl<T> Default for DecisionOutcome<T> {
-    fn default() -> Self {
-        Self::Continue
-    }
 }
 
 impl<T> DecisionOutcome<T> {
@@ -153,9 +143,10 @@ impl<T> DecisionOutcome<T> {
 /// Production-time strategy for self-produced RBs.  Consulted by the
 /// wrapper before it signs an RB header.  Honest nodes always return
 /// [`RbProductionStrategy::Normal`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum RbProductionStrategy {
     /// Produce one honest RB (the default).
+    #[default]
     Normal,
     /// Produce no RB this slot — the lottery win is wasted.  Selective
     /// withholding adversaries use this to drop blocks without
@@ -170,12 +161,6 @@ pub enum RbProductionStrategy {
     /// duplicates as they gossip and detect the equivocation via the
     /// CIP-0164 RB-header equivocation rule.  `ways >= 2`.
     Equivocate { ways: u8 },
-}
-
-impl Default for RbProductionStrategy {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -269,8 +254,8 @@ pub trait Behaviour: Send + Sync {
         _state: &LeiosState,
         _eb_hash: &[u8; 32],
         _eb_slot: u64,
-        _honest: &Result<(bool, Option<Vec<u8>>), NoVoteReason>,
-    ) -> DecisionOutcome<Result<(bool, Option<Vec<u8>>), NoVoteReason>> {
+        _honest: &VoteDecision,
+    ) -> DecisionOutcome<VoteDecision> {
         DecisionOutcome::Continue
     }
 
@@ -554,8 +539,8 @@ impl Behaviour for CompositeBehaviour {
         state: &LeiosState,
         eb_hash: &[u8; 32],
         eb_slot: u64,
-        honest: &Result<(bool, Option<Vec<u8>>), NoVoteReason>,
-    ) -> DecisionOutcome<Result<(bool, Option<Vec<u8>>), NoVoteReason>> {
+        honest: &VoteDecision,
+    ) -> DecisionOutcome<VoteDecision> {
         for c in self.children.iter_mut() {
             if let DecisionOutcome::Override(v) = c.decide_vote(state, eb_hash, eb_slot, honest) {
                 return DecisionOutcome::Override(v);

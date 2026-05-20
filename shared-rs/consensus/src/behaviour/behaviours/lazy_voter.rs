@@ -4,7 +4,7 @@
 //! their stake but contribute no Leios votes.
 
 use crate::behaviour::{Behaviour, DecisionOutcome};
-use crate::leios::{LeiosState, NoVoteReason};
+use crate::leios::{LeiosState, NoVoteReason, VoteDecision};
 
 #[derive(Debug, Clone)]
 pub struct LazyVoter {
@@ -34,8 +34,8 @@ impl Behaviour for LazyVoter {
         _state: &LeiosState,
         _eb_hash: &[u8; 32],
         _eb_slot: u64,
-        _honest: &Result<(bool, Option<Vec<u8>>), NoVoteReason>,
-    ) -> DecisionOutcome<Result<(bool, Option<Vec<u8>>), NoVoteReason>> {
+        _honest: &VoteDecision,
+    ) -> DecisionOutcome<VoteDecision> {
         DecisionOutcome::Override(Err(self.reason))
     }
 }

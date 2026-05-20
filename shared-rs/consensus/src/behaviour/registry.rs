@@ -24,10 +24,11 @@ use crate::leios::NoVoteReason;
 /// Serialisable description of a node's behaviour.  Concrete behaviours
 /// add variants here; each variant carries its own parameters.  The
 /// `kind` field is the discriminant (`#[serde(tag = "kind")]`).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum BehaviourSpec {
     /// Default no-op.  Indistinguishable from no behaviour at all.
+    #[default]
     Honest,
     /// Compose multiple behaviours.  Hooks dispatch in declaration
     /// order; first non-`Continue` wins.
@@ -60,12 +61,6 @@ fn default_lazy_reason() -> NoVoteReason {
 
 fn default_equivocator_ways() -> u8 {
     2
-}
-
-impl Default for BehaviourSpec {
-    fn default() -> Self {
-        Self::Honest
-    }
 }
 
 /// Materialise a [`BehaviourSpec`] into a shared

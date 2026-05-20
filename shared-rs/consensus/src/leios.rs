@@ -130,6 +130,15 @@ pub enum NoVoteReason {
     Declined,
 }
 
+/// Result of evaluating the CIP-0164 voting predicates for one EB.
+///
+/// `Ok((emit_pv, npv_signature))` means the voter cast at least one
+/// body: `emit_pv` flags the persistent committee body, and
+/// `npv_signature` carries the eligibility signature when the
+/// non-persistent lottery hit (`None` otherwise).  `Err(reason)` means
+/// abstention with a structured cause; see [`NoVoteReason`].
+pub type VoteDecision = Result<(bool, Option<Vec<u8>>), NoVoteReason>;
+
 /// Chain-tip metadata the I/O wrapper feeds into [`LeiosState`] so the
 /// `LateRBHeader` / `WrongEB` voting predicates can run.
 ///
@@ -672,7 +681,7 @@ impl LeiosState {
         eb_slot: u64,
         eb_seen_slot: u64,
         tx_known: &dyn Fn(&[u8; 32]) -> bool,
-    ) -> Result<(bool, Option<Vec<u8>>), NoVoteReason> {
+    ) -> VoteDecision {
         // Predicate 1: LateEB.  The EB must have arrived before its
         // voting window closes.  The phase machine already filters out
         // most late arrivals (EligibleToVote only fires during Voting),
@@ -2056,10 +2065,8 @@ mod tests {
             _state: &LeiosState,
             eb_hash: &[u8; 32],
             eb_slot: u64,
-            _honest: &Result<(bool, Option<Vec<u8>>), NoVoteReason>,
-        ) -> crate::behaviour::DecisionOutcome<
-            Result<(bool, Option<Vec<u8>>), NoVoteReason>,
-        > {
+            _honest: &VoteDecision,
+        ) -> crate::behaviour::DecisionOutcome<VoteDecision> {
             if let Some(r) = self.vote_override {
                 let _ = (eb_hash, eb_slot);
                 crate::behaviour::DecisionOutcome::Override(Err(r))
