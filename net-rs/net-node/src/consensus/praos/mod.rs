@@ -82,11 +82,22 @@ impl PraosConsensus {
         self.state.set_fetch_policy(policy);
     }
 
-    /// Materialise the given behaviour spec and install it on the
-    /// underlying [`PraosState`](shared_consensus::praos::PraosState).
-    pub fn set_behaviour(&mut self, spec: &shared_consensus::behaviour::BehaviourSpec) {
-        self.state
-            .set_behaviour(shared_consensus::behaviour::build(spec));
+    /// Install a shared behaviour handle on the underlying state.  The
+    /// `Consensus` facade calls this with the same handle for every
+    /// owned state machine and the coordinator, so one behaviour
+    /// instance sees events from every layer.
+    pub fn install_behaviour_handle(
+        &mut self,
+        handle: shared_consensus::behaviour::BehaviourHandle,
+    ) {
+        self.state.behaviour = handle;
+    }
+
+    /// Borrow the node identifier the state was constructed with.  The
+    /// `Consensus` facade uses this to derive a deterministic behaviour
+    /// seed when no explicit `rng_seed` is configured.
+    pub fn node_id_str(&self) -> &str {
+        &self.state.node_id
     }
 
     /// Borrow the underlying [`PraosState`](shared_consensus::praos::PraosState)

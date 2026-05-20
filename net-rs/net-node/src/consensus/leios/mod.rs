@@ -182,11 +182,14 @@ impl LeiosConsensus {
         self.state.set_vote_policy(policy);
     }
 
-    /// Materialise the given behaviour spec and install it on the
-    /// underlying [`LeiosState`].
-    pub fn set_behaviour(&mut self, spec: &shared_consensus::behaviour::BehaviourSpec) {
-        self.state
-            .set_behaviour(shared_consensus::behaviour::build(spec));
+    /// Install a shared behaviour handle on the underlying state.  The
+    /// `Consensus` facade hands the same handle to every owned state
+    /// machine and the coordinator.
+    pub fn install_behaviour_handle(
+        &mut self,
+        handle: shared_consensus::behaviour::BehaviourHandle,
+    ) {
+        self.state.behaviour = handle;
     }
 
     /// Mutable borrow of [`LeiosState`] for the few wrapper paths that

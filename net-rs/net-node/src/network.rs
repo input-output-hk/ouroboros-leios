@@ -33,6 +33,7 @@ pub async fn start(
     config: &NodeConfig,
     tx_body_resolver: Option<Arc<dyn TxBodyResolver>>,
     peer_rtt_observer: Option<PeerRttObserver>,
+    outbound_behaviour: Option<shared_consensus::behaviour::BehaviourHandle>,
 ) -> Result<CoordinatorHandle, Box<dyn std::error::Error + Send + Sync>> {
     // Build per-peer delay map from config.
     let peer_delays: HashMap<String, Duration> = config
@@ -63,6 +64,7 @@ pub async fn start(
         peer_delays,
         tx_body_resolver,
         peer_rtt_observer,
+        outbound_behaviour,
     };
 
     let handle = spawn_coordinator(coordinator_config);

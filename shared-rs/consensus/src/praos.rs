@@ -14,6 +14,7 @@
 //! bytes.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use tracing::{debug, info, warn};
@@ -237,9 +238,12 @@ pub struct PraosState {
     /// fetch decision.
     pub rtt: Box<dyn PeerRtt + Send + Sync>,
 
-    /// Pluggable behaviour; see [`crate::behaviour`].  Always `Some`
-    /// between public method calls.
-    pub behaviour: Option<Box<dyn crate::behaviour::Behaviour>>,
+    /// Pluggable behaviour; see [`crate::behaviour`].  Shared with the
+    /// I/O wrapper as an `Arc<Mutex<Box<dyn _>>>` so out-of-band callers
+    /// (e.g. per-peer outbound transforms) can lock the same behaviour
+    /// instance.  Swapping the inner `Box` under the lock changes the
+    /// live behaviour for every Arc holder.
+    pub behaviour: Arc<Mutex<Box<dyn crate::behaviour::Behaviour>>>,
 }
 
 impl PraosState {
@@ -284,22 +288,28 @@ impl PraosState {
             equivocating_rb_slots: BTreeSet::new(),
             block_policy,
             rtt,
-            behaviour: Some(Box::new(crate::behaviour::HonestBehaviour)),
+            behaviour: Arc::new(Mutex::new(Box::new(crate::behaviour::HonestBehaviour))),
         }
     }
 
-    /// Replace the behaviour.
+    /// Replace the behaviour.  Swaps the trait object under the mutex;
+    /// other Arc holders observe the new behaviour from their next hook
+    /// call.
     pub fn set_behaviour(&mut self, behaviour: Box<dyn crate::behaviour::Behaviour>) {
-        self.behaviour = Some(behaviour);
+        *self.behaviour.lock().expect("behaviour mutex poisoned") = behaviour;
     }
 
     /// Short name of the current behaviour.
     pub fn behaviour_name(&self) -> &'static str {
-        self.behaviour.as_ref().map_or("honest", |b| b.name())
+        self.behaviour
+            .lock()
+            .expect("behaviour mutex poisoned")
+            .name()
     }
 
-    /// Take/restore helper for behaviour hooks; mirrors the pattern in
-    /// `LeiosState`.
+    /// Lock the behaviour and call the hook with `(&mut dyn Behaviour,
+    /// &PraosState)`.  The Arc clone breaks the borrow chain so the
+    /// hook can see an immutable view of `self`.
     fn invoke_hook<F>(&mut self, hook: F) -> crate::behaviour::BehaviourOutcome<PraosEffect>
     where
         F: FnOnce(
@@ -307,13 +317,9 @@ impl PraosState {
             &PraosState,
         ) -> crate::behaviour::BehaviourOutcome<PraosEffect>,
     {
-        let mut behaviour = self
-            .behaviour
-            .take()
-            .expect("behaviour is Some between public calls");
-        let outcome = hook(behaviour.as_mut(), self);
-        self.behaviour = Some(behaviour);
-        outcome
+        let arc = self.behaviour.clone();
+        let mut guard = arc.lock().expect("behaviour mutex poisoned");
+        hook(&mut **guard, self)
     }
 
     /// Replace the block-fetch policy.

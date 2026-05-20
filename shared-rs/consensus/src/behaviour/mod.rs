@@ -26,15 +26,17 @@
 //! is the default no-op; [`CompositeBehaviour`] composes children in
 //! order (first non-`Continue` wins).
 //!
-//! ## Borrowing pattern
+//! ## Ownership and access
 //!
 //! Hooks receive `&mut self` (so they can carry their own state) and
 //! `&LeiosState` / `&PraosState` / `&MempoolState` (read-only views of
-//! the host).  Because the behaviour is itself a field of the host
-//! state, call sites use the take/restore pattern — see
-//! [`with_behaviour`]: take the behaviour out, call the hook, put it
-//! back.  The pattern is contained in a small set of helpers; new
-//! handlers don't repeat the boilerplate.
+//! the host).  Each host state stores the behaviour as
+//! `Arc<Mutex<Box<dyn Behaviour>>>`.  The Arc lets the I/O wrapper hold
+//! a shared handle and call out-of-band hooks (e.g. per-peer outbound
+//! transforms) on the same trait object; the Mutex serialises those
+//! calls against the state's own dispatch.  The inner `Box` is the
+//! swap point: replacing it under the lock (via `set_behaviour`)
+//! changes the live behaviour for every Arc holder at once.
 //!
 //! ## Determinism
 //!
@@ -44,6 +46,7 @@
 //! receives or can read from the host state).
 
 use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
 
 use crate::leios::{LeiosEffect, LeiosState, NoVoteReason};
 use crate::mempool::{MempoolEffect, MempoolState, TxId};
@@ -52,7 +55,30 @@ use crate::praos::{PraosEffect, PraosState};
 use crate::production::BodyPath;
 use crate::types::Point;
 
+/// Shared handle to a per-node behaviour.  The I/O wrapper holds one
+/// `BehaviourHandle` per node; cloning it (cheap `Arc::clone`) gives
+/// out-of-band callers — e.g. per-peer server tasks evaluating
+/// `transform_outbound` — access to the same trait object the state
+/// machines call.  Locking is short-lived: hook bodies are synchronous
+/// and must not await while the guard is held.
+pub type BehaviourHandle = Arc<Mutex<Box<dyn Behaviour>>>;
+
+/// One RB variant the I/O wrapper just produced for a single
+/// equivocation slot, handed to the behaviour via
+/// [`Behaviour::record_rb_variants`].  `hash` is the wire-format
+/// header hash (the same `[u8; 32]` that ends up inside the
+/// `Point::Specific` peers see); the wrapper computes it because the
+/// CBOR-envelope decoding required to derive it lives in the wire
+/// layer, not in this sans-IO crate.
+#[derive(Debug, Clone)]
+pub struct RbVariantInput {
+    pub hash: [u8; 32],
+    pub header: Vec<u8>,
+    pub body: Vec<u8>,
+}
+
 pub mod delay;
+pub mod outbound;
 pub mod registry;
 
 pub mod behaviours {
@@ -62,11 +88,14 @@ pub mod behaviours {
     pub mod rb_equivocator;
 
     pub use lazy_voter::LazyVoter;
-    pub use rb_equivocator::RbEquivocator;
+    pub use rb_equivocator::RbHeaderEquivocator;
 }
 
 pub use delay::DelayQueue;
-pub use registry::{build, BehaviourSpec};
+pub use outbound::{Outbound, OutboundDecision, OwnedOutbound};
+pub use registry::{build, build_handle, seed_from_node_id, swap_handle, BehaviourSpec};
+
+// `BehaviourHandle` is defined at the top of this module.
 
 // ---------------------------------------------------------------------------
 // Outcome types
@@ -132,11 +161,15 @@ pub enum RbProductionStrategy {
     /// withholding adversaries use this to drop blocks without
     /// equivocating.
     Suppress,
-    /// Produce two RBs for the same lottery, differing in body content.
-    /// The wrapper signs both; honest peers detect the equivocation
-    /// (CIP-0164 RB-header equivocation rule) and abstain from voting
-    /// for any EB associated with the slot.
-    Equivocate,
+    /// Produce `ways` RBs for the same lottery, all differing in body
+    /// content.  The wrapper signs them, registers the first as the
+    /// primary (so its own chain follows it), and hands the full set
+    /// to the behaviour via [`Behaviour::record_rb_variants`].  The
+    /// behaviour then routes a different variant to each peer subset
+    /// via [`Behaviour::transform_outbound`]; honest peers see the
+    /// duplicates as they gossip and detect the equivocation via the
+    /// CIP-0164 RB-header equivocation rule.  `ways >= 2`.
+    Equivocate { ways: u8 },
 }
 
 impl Default for RbProductionStrategy {
@@ -314,7 +347,7 @@ pub trait Behaviour: Send + Sync {
     /// the strategy (one honest, suppress, equivocate).
     ///
     /// This is a strategy hook, not a reactive one: the wrapper acts on
-    /// the returned value by producing zero, one, or two RBs.  Because
+    /// the returned value by producing zero, one, or many RBs.  Because
     /// shared-consensus does not own the wire-format RB construction
     /// path, the actual artefact is built by the wrapper from the
     /// honest body-path decision (already overridable via
@@ -326,6 +359,49 @@ pub trait Behaviour: Send + Sync {
         _slot: u64,
     ) -> RbProductionStrategy {
         RbProductionStrategy::Normal
+    }
+
+    /// Hand the I/O wrapper's freshly-produced RB variants to the
+    /// behaviour, so a peer-split adversary can stash them for the
+    /// upcoming [`transform_outbound`](Self::transform_outbound) calls
+    /// and the body-server fallback
+    /// ([`find_variant_body`](Self::find_variant_body)).  `slot` is the
+    /// production slot; `variants` is the full set (`variants[0]` is
+    /// the primary the wrapper registered locally, `variants[1..]` are
+    /// the duplicates).  The default is a no-op.
+    fn record_rb_variants(&mut self, _slot: u64, _variants: &[RbVariantInput]) {}
+
+    /// Look up the body of a variant the behaviour stashed earlier via
+    /// [`record_rb_variants`](Self::record_rb_variants).  The I/O
+    /// wrapper's BlockFetch server consults this when a peer asks for
+    /// a body that is not in the local chain store — typically because
+    /// the behaviour advertised a peer-split variant to that peer via
+    /// [`transform_outbound`](Self::transform_outbound) and the peer
+    /// is now asking for its body.  Default is `None`.
+    fn find_variant_body(&self, _slot: u64, _hash: &[u8; 32]) -> Option<Vec<u8>> {
+        None
+    }
+
+    // -- Outbound transform --------------------------------------------------
+
+    /// Per-peer outbound rewrite.  Called by the I/O wrapper before
+    /// every peer-targeted send.  The default lets the artefact pass
+    /// through unchanged; adversarial behaviours return
+    /// [`Drop`](OutboundDecision::Drop) (partition, eclipse mute),
+    /// [`Replace`](OutboundDecision::Replace) (peer-split equivocation,
+    /// eclipse fake tip), or [`Augment`](OutboundDecision::Augment).
+    ///
+    /// `peer` is an opaque token assigned by the I/O wrapper; this
+    /// crate does not enumerate peers, it only routes per-peer decisions
+    /// when the wrapper asks.  Determinism is the behaviour's
+    /// responsibility (see the seed accepted at
+    /// [`registry::build`](crate::behaviour::registry::build)).
+    fn transform_outbound(
+        &mut self,
+        _peer: PeerId,
+        _out: Outbound<'_>,
+    ) -> OutboundDecision {
+        OutboundDecision::Send
     }
 }
 
@@ -588,6 +664,41 @@ impl Behaviour for CompositeBehaviour {
         }
         RbProductionStrategy::Normal
     }
+
+    fn transform_outbound(
+        &mut self,
+        peer: PeerId,
+        out: Outbound<'_>,
+    ) -> OutboundDecision {
+        for c in self.children.iter_mut() {
+            let d = c.transform_outbound(peer, out);
+            if !d.is_send() {
+                return d;
+            }
+        }
+        OutboundDecision::Send
+    }
+
+    /// Notification — fan out to every child.  No short-circuit: a
+    /// composite "logger + equivocator" should record on both, not just
+    /// the first.
+    fn record_rb_variants(&mut self, slot: u64, variants: &[RbVariantInput]) {
+        for c in self.children.iter_mut() {
+            c.record_rb_variants(slot, variants);
+        }
+    }
+
+    /// First child to answer wins.  Variant stores are usually disjoint
+    /// — composite of equivocator + lazy-voter only has bodies in the
+    /// equivocator — so first-wins is the right shape.
+    fn find_variant_body(&self, slot: u64, hash: &[u8; 32]) -> Option<Vec<u8>> {
+        for c in self.children.iter() {
+            if let Some(body) = c.find_variant_body(slot, hash) {
+                return Some(body);
+            }
+        }
+        None
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -597,10 +708,11 @@ impl Behaviour for CompositeBehaviour {
 /// Apply a `BehaviourOutcome` to an honest-effects builder.  Pattern:
 ///
 /// ```ignore
-/// let mut behaviour = state.behaviour.take().unwrap();
-/// let outcome = behaviour.on_slot_leios(state, slot);
+/// let arc = state.behaviour.clone();
+/// let mut guard = arc.lock().unwrap();
+/// let outcome = guard.on_slot_leios(state, slot);
+/// drop(guard);
 /// let fx = apply_reactive(outcome, || /* honest fx */ );
-/// state.behaviour = Some(behaviour);
 /// ```
 ///
 /// The honest closure is only evaluated when the outcome is `Continue`

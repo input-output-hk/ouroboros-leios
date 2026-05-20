@@ -343,7 +343,7 @@ impl BlockProducer {
     /// issuer and slot as `primary` but a fresh body — yields a
     /// distinct header hash that triggers CIP-0164 RB-header
     /// equivocation detection on every honest peer.  Used by the
-    /// `RbEquivocator` behaviour via the wrapper's
+    /// `RbHeaderEquivocator` behaviour via the wrapper's
     /// [`RbProductionStrategy::Equivocate`] branch.
     pub fn produce_equivocation_extra(
         &mut self,

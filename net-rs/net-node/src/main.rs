@@ -77,7 +77,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         })
     };
 
-    let mut handle = network::start(&config, Some(tx_body_resolver), Some(peer_rtt_observer)).await?;
+    // Materialise the per-node behaviour handle once and share clones
+    // with the coordinator (for the per-peer outbound transform path)
+    // and the consensus state machines (for reactive + decision hooks).
+    let behaviour_seed = config
+        .seed
+        .unwrap_or_else(|| shared_consensus::behaviour::seed_from_node_id(&config.node_id));
+    let behaviour_spec = config
+        .behaviour
+        .clone()
+        .unwrap_or(shared_consensus::behaviour::BehaviourSpec::Honest);
+    info!(?behaviour_spec, behaviour_seed, "materialising per-node behaviour");
+    let behaviour_handle =
+        shared_consensus::behaviour::build_handle(&behaviour_spec, behaviour_seed);
+
+    let mut handle = network::start(
+        &config,
+        Some(tx_body_resolver),
+        Some(peer_rtt_observer),
+        Some(behaviour_handle.clone()),
+    )
+    .await?;
     let commands = handle.commands.clone();
 
     // Dynamic config watch channel (hot-reloadable parameters).
@@ -132,7 +152,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         dyn_rx.clone(),
         rtt_cache,
         config.fetch_policy,
-        config.behaviour.clone(),
+        behaviour_handle.clone(),
     );
 
     // Transaction validator (validates received txs before mempool entry).
@@ -264,37 +284,65 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             .await;
                     }
 
+                    // For Equivocate{ways}: build the variants and
+                    // hand them to the behaviour BEFORE
+                    // `register_self_produced` fires the ChainStore
+                    // subscription.  Otherwise serve_chainsync wakes
+                    // and reads the primary while the behaviour's
+                    // variant map is still empty, so transform_outbound
+                    // returns Send and the substitution is missed.
+                    if let RbProductionStrategy::Equivocate { ways } = strategy {
+                        use shared_consensus::behaviour::RbVariantInput;
+                        let mut variant_records: Vec<RbVariantInput> =
+                            Vec::with_capacity(ways as usize);
+                        let primary_hash = match &produced.point {
+                            net_core::types::Point::Specific { hash, .. } => *hash,
+                            net_core::types::Point::Origin => [0u8; 32],
+                        };
+                        variant_records.push(RbVariantInput {
+                            hash: primary_hash,
+                            header: produced.header.raw.clone(),
+                            body: produced.body.raw.clone(),
+                        });
+                        for i in 1..ways {
+                            let extra = producer.produce_equivocation_extra(
+                                &produced,
+                                prev_hash,
+                                next_block_no,
+                            );
+                            let extra_hash = match &extra.point {
+                                net_core::types::Point::Specific { hash, .. } => *hash,
+                                net_core::types::Point::Origin => [0u8; 32],
+                            };
+                            info!(
+                                node_id = %node_id,
+                                primary = %produced.point,
+                                extra = %extra.point,
+                                variant = i,
+                                "produced equivocation variant RB"
+                            );
+                            telem.record(NodeEvent::RBGenerated {
+                                node: node_id.clone(),
+                                slot,
+                                size_bytes: extra.body.raw.len(),
+                            }).await;
+                            variant_records.push(RbVariantInput {
+                                hash: extra_hash,
+                                header: extra.header.raw.clone(),
+                                body: extra.body.raw.clone(),
+                            });
+                        }
+                        {
+                            let mut guard = behaviour_handle
+                                .lock()
+                                .expect("behaviour mutex poisoned");
+                            guard.record_rb_variants(slot, &variant_records);
+                        }
+                    }
+
                     consensus
                         .register_self_produced(&produced.point, &produced.header, &produced.body)
                         .await;
-
-                    if strategy == RbProductionStrategy::Equivocate {
-                        // Build a duplicate header sharing (slot,
-                        // issuer) but with an empty body, register and
-                        // inject it.  Peers detect the equivocation
-                        // via the shared-consensus
-                        // `note_header_for_equivocation` path on
-                        // `on_block_received`.
-                        let extra = producer.produce_equivocation_extra(
-                            &produced,
-                            prev_hash,
-                            next_block_no,
-                        );
-                        info!(
-                            node_id = %node_id,
-                            primary = %produced.point,
-                            extra = %extra.point,
-                            "emitting equivocation extra RB"
-                        );
-                        telem.record(NodeEvent::RBGenerated {
-                            node: node_id.clone(),
-                            slot,
-                            size_bytes: extra.body.raw.len(),
-                        }).await;
-                        consensus
-                            .register_self_produced(&extra.point, &extra.header, &extra.body)
-                            .await;
-                    }
                     }
                 }
 

@@ -29,6 +29,7 @@
 //! [`MempoolState::admit_validated`].
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::sync::{Arc, Mutex};
 
 use tracing::info;
 
@@ -150,9 +151,9 @@ pub struct MempoolState {
     /// `record_eb_manifest` / `produce_eb` call.
     pub eb_retention_slots: u64,
     /// Pluggable behaviour for tx-acceptance and admission hooks.  See
-    /// [`crate::behaviour`].  Always `Some` between public method
-    /// calls; take/restored around hook dispatch.
-    pub behaviour: Option<Box<dyn Behaviour>>,
+    /// [`crate::behaviour`].  Shared with the I/O wrapper via
+    /// `Arc<Mutex<>>` so out-of-band callers can lock the same instance.
+    pub behaviour: Arc<Mutex<Box<dyn Behaviour>>>,
 }
 
 impl MempoolState {
@@ -173,28 +174,24 @@ impl MempoolState {
             eb_pinned: BTreeMap::new(),
             max_eb_slot: 0,
             eb_retention_slots,
-            behaviour: Some(Box::new(HonestBehaviour)),
+            behaviour: Arc::new(Mutex::new(Box::new(HonestBehaviour))),
         }
     }
 
-    /// Replace the behaviour.
+    /// Replace the behaviour.  Swaps the trait object under the mutex.
     pub fn set_behaviour(&mut self, behaviour: Box<dyn Behaviour>) {
-        self.behaviour = Some(behaviour);
+        *self.behaviour.lock().expect("behaviour mutex poisoned") = behaviour;
     }
 
-    /// Take the behaviour out, call the hook with
-    /// `(&mut dyn Behaviour, &MempoolState)`, restore.
+    /// Lock the behaviour and call the hook with `(&mut dyn Behaviour,
+    /// &MempoolState)`.
     fn invoke_hook<F>(&mut self, hook: F) -> BehaviourOutcome<MempoolEffect>
     where
         F: FnOnce(&mut dyn Behaviour, &MempoolState) -> BehaviourOutcome<MempoolEffect>,
     {
-        let mut behaviour = self
-            .behaviour
-            .take()
-            .expect("behaviour is Some between public calls");
-        let outcome = hook(behaviour.as_mut(), self);
-        self.behaviour = Some(behaviour);
-        outcome
+        let arc = self.behaviour.clone();
+        let mut guard = arc.lock().expect("behaviour mutex poisoned");
+        hook(&mut **guard, self)
     }
 
     // -- Network event handlers --------------------------------------------

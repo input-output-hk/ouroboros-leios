@@ -26,6 +26,20 @@ pub use praos::PraosConsensus;
 pub struct Consensus {
     praos: PraosConsensus,
     leios: LeiosConsensus,
+    /// Deterministic seed handed to
+    /// [`shared_consensus::behaviour::build`] whenever the per-node
+    /// behaviour is materialised — at startup and again from each
+    /// runtime config swap.  Derived once from `rng_seed` (or the node
+    /// identifier) and reused so a behaviour that hashes peer ids for
+    /// partitioning always lands on the same buckets across re-runs.
+    behaviour_seed: u64,
+    /// Shared handle to the per-node behaviour.  All three state
+    /// machines (praos, leios, mempool) point at the same `Arc<Mutex>`
+    /// so a single behaviour instance observes events from every layer
+    /// and so a runtime swap propagates to all of them at once.  The
+    /// coordinator holds its own clone for the per-peer outbound
+    /// transform path.
+    behaviour_handle: shared_consensus::behaviour::BehaviourHandle,
 }
 
 impl Consensus {
@@ -48,7 +62,7 @@ impl Consensus {
         dyn_config: watch::Receiver<DynamicConfig>,
         rtt: PeerRttCache,
         fetch_policy: FetchPolicyConfig,
-        behaviour: Option<shared_consensus::behaviour::BehaviourSpec>,
+        behaviour_handle: shared_consensus::behaviour::BehaviourHandle,
     ) -> Self {
         let mut praos = PraosConsensus::new(
             node_id.clone(),
@@ -78,41 +92,41 @@ impl Consensus {
         leios.set_eb_policy(fetch_policy.eb.into_eb_policy());
         leios.set_eb_txs_policy(fetch_policy.eb_txs.into_eb_txs_policy());
         leios.set_vote_policy(fetch_policy.votes.into_vote_policy());
-        // Apply the per-node behaviour spec to every state machine.  Each
-        // state owns its own materialised behaviour; behaviours holding
-        // observed-by-host state (DelayQueue, "have I attacked yet"
-        // flags) therefore see only one host.  Stateless adversaries
-        // (RbEquivocator, LazyVoter) are unaffected.
-        if let Some(spec) = behaviour.as_ref() {
-            tracing::info!(?spec, "installing per-node behaviour");
-            praos.set_behaviour(spec);
-            leios.set_behaviour(spec);
-            // Mempool is owned by the wrapper; reach in and apply.  The
-            // SharedMempool lock is the I/O-side concurrency surface; we
-            // hold it just long enough to swap.
-            if let Ok(mut m) = mempool.lock() {
-                m.set_behaviour(spec);
-            }
+        let behaviour_seed = rng_seed.unwrap_or_else(|| {
+            shared_consensus::behaviour::seed_from_node_id(praos.node_id_str())
+        });
+        // Install the shared behaviour handle on every state machine so
+        // a stateful behaviour (equivocation variant store, peer
+        // partition map, …) sees events from every layer and the
+        // coordinator's outbound transform path observes the same
+        // instance.  Runtime swaps replace the trait object inside this
+        // handle; clones held elsewhere observe the new behaviour from
+        // their next hook call.
+        praos.install_behaviour_handle(behaviour_handle.clone());
+        leios.install_behaviour_handle(behaviour_handle.clone());
+        if let Ok(mut m) = mempool.lock() {
+            m.install_behaviour_handle(behaviour_handle.clone());
         }
-        Self { praos, leios }
+        Self {
+            praos,
+            leios,
+            behaviour_seed,
+            behaviour_handle,
+        }
     }
 
-    /// Swap the per-node behaviour on every owned state machine.  Called
-    /// at startup (from the config field) and at runtime from the
-    /// stdin-driven `DynamicConfigUpdate` path.  The mempool side has
-    /// to grab the shared lock; the praos and leios sides own their
-    /// state directly.
+    /// Swap the per-node behaviour by replacing the trait object inside
+    /// the shared handle.  Every state machine and the coordinator's
+    /// outbound transform path observe the new behaviour from their
+    /// next hook call.  Called at runtime from the stdin-driven
+    /// `DynamicConfigUpdate` path.
     pub fn set_behaviour(
         &mut self,
         spec: &shared_consensus::behaviour::BehaviourSpec,
-        mempool: &crate::mempool::SharedMempool,
+        _mempool: &crate::mempool::SharedMempool,
     ) {
-        tracing::info!(?spec, "swapping per-node behaviour");
-        self.praos.set_behaviour(spec);
-        self.leios.set_behaviour(spec);
-        if let Ok(mut m) = mempool.lock() {
-            m.set_behaviour(spec);
-        }
+        tracing::info!(?spec, behaviour_seed = self.behaviour_seed, "swapping per-node behaviour");
+        shared_consensus::behaviour::swap_handle(&self.behaviour_handle, spec, self.behaviour_seed);
     }
 
     /// Ask the per-node behaviour what to do for this slot's

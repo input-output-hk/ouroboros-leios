@@ -325,6 +325,7 @@ impl Coordinator {
                 leios_store: self.leios_store.clone(),
                 traffic_class_overrides: self.config.traffic_class_overrides.clone(),
                 scheduler_type: self.config.scheduler_type,
+                outbound_behaviour: self.config.outbound_behaviour.clone(),
             };
             (
                 tokio::spawn(run_duplex_task(task_config)),
@@ -962,6 +963,7 @@ impl Coordinator {
             command_receiver: cmd_receiver,
             leios_enabled: self.config.leios_enabled,
             leios_store: self.leios_store.clone(),
+            outbound_behaviour: self.config.outbound_behaviour.clone(),
         };
 
         let task_handle = tokio::spawn(run_accepted_duplex_task(task_config));

@@ -19,6 +19,7 @@
 //! this crate is format-agnostic.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use tracing::info;
@@ -304,13 +305,14 @@ pub struct LeiosState {
     /// Live per-peer RTT lookup, consulted by every fetch policy.
     pub rtt: Box<dyn PeerRtt + Send + Sync>,
 
-    /// Pluggable behaviour — defaults to [`HonestBehaviour`].  Wrapped in
-    /// [`Option`] so the dispatch helpers can `take` / restore around
-    /// each hook call (the borrow checker won't let a behaviour-method
-    /// receive `&LeiosState` while being held in a field of it).  The
-    /// option is always `Some` between public method calls; the
-    /// take/restore is confined to the entry-point preamble.
-    pub behaviour: Option<Box<dyn Behaviour>>,
+    /// Pluggable behaviour — defaults to [`HonestBehaviour`].  Held
+    /// behind `Arc<Mutex<Box<dyn _>>>` so the I/O wrapper can hold a
+    /// shared handle for out-of-band hook calls (e.g. per-peer outbound
+    /// transforms) while this state machine still locks to invoke its
+    /// own hooks.  The inner `Box` is the swap point: replacing it under
+    /// the lock changes the live behaviour for every Arc holder at once
+    /// (used by runtime config updates).
+    pub behaviour: Arc<Mutex<Box<dyn Behaviour>>>,
 }
 
 impl LeiosState {
@@ -362,14 +364,16 @@ impl LeiosState {
             eb_txs_policy,
             vote_policy,
             rtt,
-            behaviour: Some(Box::new(HonestBehaviour)),
+            behaviour: Arc::new(Mutex::new(Box::new(HonestBehaviour))),
         }
     }
 
     /// Replace the behaviour.  Use to install a non-honest variant at
-    /// startup or in response to a runtime config update.
+    /// startup or in response to a runtime config update.  Swaps the
+    /// trait object under the mutex; any other `Arc` clones of the
+    /// handle observe the new behaviour from their next hook call.
     pub fn set_behaviour(&mut self, behaviour: Box<dyn Behaviour>) {
-        self.behaviour = Some(behaviour);
+        *self.behaviour.lock().expect("behaviour mutex poisoned") = behaviour;
     }
 
     /// Ask the installed behaviour what to do for this slot's
@@ -377,46 +381,38 @@ impl LeiosState {
     /// [`crate::behaviour::RbProductionStrategy::Normal`]; adversarial
     /// behaviours can return `Suppress` (drop the win silently) or
     /// `Equivocate` (the wrapper should also emit a duplicate RB
-    /// carrying the same issuer + slot but a different body).  Routed
-    /// through the standard take/restore helper so the behaviour can
-    /// see `&LeiosState` + `&PraosState` without borrow conflicts.
+    /// carrying the same issuer + slot but a different body).
     pub fn ask_rb_production_strategy(
         &mut self,
         praos: &crate::praos::PraosState,
         slot: u64,
     ) -> crate::behaviour::RbProductionStrategy {
-        let mut behaviour = self
-            .behaviour
-            .take()
-            .expect("behaviour is Some between public calls");
-        let strategy = behaviour.rb_production_strategy(self, praos, slot);
-        self.behaviour = Some(behaviour);
-        strategy
+        let arc = self.behaviour.clone();
+        let mut guard = arc.lock().expect("behaviour mutex poisoned");
+        guard.rb_production_strategy(self, praos, slot)
     }
 
     /// Short name of the current behaviour, e.g. `"honest"`,
-    /// `"rb-equivocator"`.  Useful for telemetry and structured logs.
+    /// `"rb-header-equivocator"`.  Useful for telemetry and structured logs.
     pub fn behaviour_name(&self) -> &'static str {
-        self.behaviour.as_ref().map_or("honest", |b| b.name())
+        self.behaviour
+            .lock()
+            .expect("behaviour mutex poisoned")
+            .name()
     }
 
-    /// Take the behaviour out, call the hook with
-    /// `(&mut dyn Behaviour, &LeiosState)`, put the behaviour back, and
-    /// return the resulting outcome.  Lets a handler invoke a hook on
-    /// itself without fighting the borrow checker: while the closure
-    /// runs, the trait object lives in a local and `self`'s remaining
-    /// fields are reachable as `&LeiosState`.
+    /// Lock the behaviour, call the hook with `(&mut dyn Behaviour,
+    /// &LeiosState)`, and return the resulting outcome.  Cloning the
+    /// `Arc` to a local before locking breaks the borrow chain — the
+    /// guard borrows the local clone, not `self`, so the hook can
+    /// receive an immutable view of `self` alongside.
     fn invoke_hook<F>(&mut self, hook: F) -> BehaviourOutcome<LeiosEffect>
     where
         F: FnOnce(&mut dyn Behaviour, &LeiosState) -> BehaviourOutcome<LeiosEffect>,
     {
-        let mut behaviour = self
-            .behaviour
-            .take()
-            .expect("behaviour is Some between public calls");
-        let outcome = hook(behaviour.as_mut(), self);
-        self.behaviour = Some(behaviour);
-        outcome
+        let arc = self.behaviour.clone();
+        let mut guard = arc.lock().expect("behaviour mutex poisoned");
+        hook(&mut **guard, self)
     }
 
     /// Update the chain-tip metadata used by the voting predicates.
@@ -523,12 +519,10 @@ impl LeiosState {
                     let honest_vote = self.decide_vote(&eb_hash, eb_slot, eb_seen_slot, tx_known);
                     // Decision hook: behaviours can override the honest
                     // predicate result (lazy voter, wrong-EB voter).
-                    let mut behaviour = self
-                        .behaviour
-                        .take()
-                        .expect("behaviour is Some between public calls");
-                    let decision = behaviour.decide_vote(self, &eb_hash, eb_slot, &honest_vote);
-                    self.behaviour = Some(behaviour);
+                    let arc = self.behaviour.clone();
+                    let mut guard = arc.lock().expect("behaviour mutex poisoned");
+                    let decision = guard.decide_vote(self, &eb_hash, eb_slot, &honest_vote);
+                    drop(guard);
                     let resolved = decision.resolve(honest_vote);
                     match resolved {
                         Ok((emit_pv, npv_signature))
