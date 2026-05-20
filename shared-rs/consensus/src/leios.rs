@@ -120,6 +120,14 @@ pub enum NoVoteReason {
     /// this detection; once voting opens, the flag is consulted from
     /// [`ChainTipContext::equivocating_slots`].
     EquivocatingRB,
+    /// Voluntary abstention — the voter chose not to cast a vote for
+    /// policy reasons rather than because a CIP-0164 predicate
+    /// rejected the EB.  Never emitted by the honest voting
+    /// predicates; only via a [`crate::behaviour::Behaviour`] override
+    /// (e.g. `LazyVoter`).  Useful as a telemetry distinguisher so
+    /// sweeps can tell adversarial-stake abstentions apart from real
+    /// `WrongEB` / `MissingTX` / `LateRBHeader` predicate failures.
+    Declined,
 }
 
 /// Chain-tip metadata the I/O wrapper feeds into [`LeiosState`] so the

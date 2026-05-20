@@ -9,15 +9,17 @@ use crate::leios::{LeiosState, NoVoteReason};
 #[derive(Debug, Clone)]
 pub struct LazyVoter {
     /// Reason reported via [`LeiosEffect::NoVote`].  Defaults to
-    /// `WrongEB` — the most innocuous-looking abstention from the
-    /// telemetry side (just looks like the voter hasn't caught up).
+    /// `Declined` so telemetry can tell policy abstentions apart from
+    /// honest predicate failures (`WrongEB` / `MissingTX` /
+    /// `LateRBHeader`); set to one of those if a sweep specifically
+    /// wants to mimic an undetectable lazy voter.
     pub reason: NoVoteReason,
 }
 
 impl Default for LazyVoter {
     fn default() -> Self {
         Self {
-            reason: NoVoteReason::WrongEB,
+            reason: NoVoteReason::Declined,
         }
     }
 }
@@ -90,8 +92,8 @@ mod tests {
         };
         let state = LeiosState::new("t".to_string(), elections, voting, pipeline);
         match voter.decide_vote(&state, &dummy_hash, 10, &honest) {
-            DecisionOutcome::Override(Err(r)) => assert_eq!(r, NoVoteReason::WrongEB),
-            other => panic!("expected Override(Err(WrongEB)), got {other:?}"),
+            DecisionOutcome::Override(Err(r)) => assert_eq!(r, NoVoteReason::Declined),
+            other => panic!("expected Override(Err(Declined)), got {other:?}"),
         }
     }
 }

@@ -349,6 +349,12 @@ pub enum NoVoteReason {
     /// honest voters abstain from voting for any EB associated with
     /// the equivocating slot.
     EquivocatingRB,
+    /// Voluntary policy abstention from an adversarial / experimental
+    /// behaviour (e.g. `LazyVoter`).  Never produced by honest sim
+    /// voting predicates — useful as a telemetry distinguisher so
+    /// sweeps can tell policy abstentions apart from real predicate
+    /// failures.
+    Declined,
 }
 
 #[derive(Debug, Clone, Serialize)]

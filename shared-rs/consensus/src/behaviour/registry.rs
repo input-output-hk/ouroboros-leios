@@ -44,8 +44,9 @@ pub enum BehaviourSpec {
         ways: u8,
     },
     /// Never casts a vote — always overrides the CIP-0164 voting
-    /// predicate to abstain with `reason`.  Defaults to `WrongEB` (the
-    /// most innocuous-looking abstention).
+    /// predicate to abstain with `reason`.  Defaults to `Declined` so
+    /// the abstention is visible in telemetry as policy abstention,
+    /// not an honest predicate failure.
     #[serde(rename = "lazy-voter")]
     LazyVoter {
         #[serde(default = "default_lazy_reason")]
@@ -54,7 +55,7 @@ pub enum BehaviourSpec {
 }
 
 fn default_lazy_reason() -> NoVoteReason {
-    NoVoteReason::WrongEB
+    NoVoteReason::Declined
 }
 
 fn default_equivocator_ways() -> u8 {

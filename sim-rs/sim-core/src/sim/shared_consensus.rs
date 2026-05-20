@@ -1999,6 +1999,7 @@ impl SharedConsensus {
                         NoVoteReason::EquivocatingRB => {
                             SimNoVoteReason::EquivocatingRB
                         }
+                        NoVoteReason::Declined => SimNoVoteReason::Declined,
                     };
                     // shared-consensus re-fires NoVote per slot per EB on
                     // transient reasons until the election expires.
