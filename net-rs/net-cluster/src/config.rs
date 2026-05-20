@@ -88,6 +88,15 @@ pub struct ClusterConfig {
     /// Override rb_generation_probability for all nodes.
     pub rb_generation_probability: Option<f64>,
 
+    /// Override the per-node Poisson transaction generation rate
+    /// (`[transactions] tx_rate`).  Useful for cluster scenarios that
+    /// need to drive EB production without authoring a dedicated base
+    /// config — e.g. abstention-pressure experiments where the cluster
+    /// must keep the mempool busy enough to overflow into EBs.  When
+    /// `None`, the base config's value is used (`mainnet.toml` defaults
+    /// to `0.0` = no generation).
+    pub tx_rate: Option<f64>,
+
     /// Per-node adversarial / experimental behaviour.  See
     /// `shared_consensus::behaviour::BehaviourSpec` for the catalogue.
     /// When set, every node whose index is listed in `behaviour_nodes`
@@ -155,6 +164,7 @@ impl Default for ClusterConfig {
             stats_interval_secs: default_stats_interval(),
             event_window_size: default_event_window_size(),
             rb_generation_probability: None,
+            tx_rate: None,
             behaviour: None,
             behaviour_nodes: Vec::new(),
             external_peers: Vec::new(),
@@ -205,6 +215,11 @@ impl ClusterConfig {
                 "production.rb_generation_probability".into(),
                 serde_json::json!(p),
             );
+        }
+        // Same pattern for `[transactions] tx_rate`: when the cluster
+        // config sets it, it overrides whatever the base config has.
+        if let Some(r) = self.tx_rate {
+            node_config.insert("transactions.tx_rate".into(), serde_json::json!(r));
         }
         ClusterControlConfig {
             num_nodes: Some(self.num_nodes),
@@ -275,6 +290,11 @@ fn read_node_config_defaults(
                 "validation.rb_body_validation_ms_constant".into(),
                 serde_json::json!(v),
             );
+        }
+    }
+    if let Some(transactions) = table.get("transactions") {
+        if let Some(v) = transactions.get("tx_rate").and_then(|v| v.as_float()) {
+            map.insert("transactions.tx_rate".into(), serde_json::json!(v));
         }
     }
     map
