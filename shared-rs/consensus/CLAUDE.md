@@ -14,7 +14,9 @@ alongside it without a circular dependency on either consumer.
 ## Discipline
 
 These rules are why this crate exists. Breaking them defeats the point
-of the extraction.
+of the extraction. The behaviour subsystem has its own narrower
+rule-set in [`src/behaviour/README.md`](src/behaviour/README.md);
+everything below applies to it as well.
 
 ### 1. Sans-IO
 
@@ -85,13 +87,36 @@ peer.rs             PeerId(u64) wrapper
 config.rs           CommitteeSelection enum, StakeEntry
 pipeline.rs         PipelineConfig — phase math (Voting/CertEligible/Expired)
 wfa.rs              wFA + LS committee selection, NPV lottery
+lottery.rs          Praos f_block stake-weighted threshold formula
 aggregation.rs      record_vote, QuorumFormed
+bitmap.rs           sparse BTreeMap<u16, u64> for MsgLeiosBlockTxsRequest
 chain_tree.rs       in-memory chain DAG, best-tip selection, prune_below
 peer_chain.rs       per-peer announced fragment (cap-bounded VecDeque)
+fetch.rs            per-channel fetch policies + CandidateTracker + PeerRtt
 elections.rs        Elections sans-IO state machine — slot ticks → SlotEffect
 praos.rs            PraosState — chain state + selection → PraosEffect
 leios.rs            LeiosState — EB voting + tx fetch state → LeiosEffect
+mempool.rs          MempoolState — bounded tx pool + EB-pinned bodies
+                    → MempoolEffect
+production.rs       BodyPath::decide — inline-RB vs EB vs empty-for-safety
+behaviour/          Pluggable per-node hooks (lazy voter, RB equivocator,
+                    …); see behaviour/README.md
 ```
+
+## Behaviours
+
+Each host state machine owns an `Arc<Mutex<Box<dyn Behaviour>>>` that
+adversarial / experimental variants slot into. The trait surface (four
+hook kinds — reactive, decision, strategy, notification — plus a
+per-peer outbound transform), the registry that materialises a
+[`BehaviourSpec`] from config, the composition rules, and the recipe
+for shipping a new behaviour all live in
+[`src/behaviour/README.md`](src/behaviour/README.md).
+
+When adding or modifying a behaviour, the rules above still apply —
+no `Instant::now()`, no `HashMap` iteration, no `thread_rng`. Random
+behaviours take a `u64` seed at construction and feed it through
+`blake2b_simd` along with the per-decision key (peer id, slot, …).
 
 ## When adding a new method
 
