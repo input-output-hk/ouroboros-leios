@@ -539,12 +539,19 @@ const MempoolPlotBlock = (() => {
     const xs = Array.from({ length: K + 1 }, (_, i) => i);
     // ColorBrewer-style sequential blue ramp, light → dark for M = 0..5.
     const colors = ["#c6dbef", "#9ecae1", "#6baed6", "#3182bd", "#08519c", "#08306b"];
+    // Plot each curve as fill-to-zero, in *descending* M. The largest band (M=5) goes down
+    // first and is then progressively overwritten by smaller bands (M=4, M=3, …) drawn on
+    // top. The net effect is contiguous stacked bands: [0, P(j≤0)] = c0, [P(j≤0), P(j≤1)] =
+    // c1, …, [P(j≤4), P(j≤5)] = c5. legendrank keeps the legend in the natural M=0..5 order.
     const traces = [];
-    for (let M = 0; M <= 5; M++) {
+    for (let M = 5; M >= 0; M--) {
       traces.push({
         x: xs, y: probs[M], type: "scatter", mode: "lines",
-        line: { color: colors[M], shape: "hv", width: 2 },
+        line: { color: "#000", shape: "hv", width: 1 },
+        fill: "tozeroy",
+        fillcolor: colors[M],
         name: `M = ${M}`,
+        legendrank: M,
         hovertemplate: `k=%{x}<br>P(≤ ${M} jumps) = %{y:.4g}<extra></extra>`,
       });
     }
