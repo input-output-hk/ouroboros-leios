@@ -174,8 +174,10 @@ loki.process "extract_ptrace_logs" {
 		stage.json {
 			expressions = {
 				event    = "event",
-				label    = "label",
-				thread   = "thread_id",
+				call     = "call",
+				parent   = "parent",
+				function = "function",
+				thread   = "thread",
 				argument = "argument",
 				host     = "host",
 			}
@@ -191,9 +193,9 @@ loki.process "extract_ptrace_logs" {
 
 		stage.labels {
 			values = {
-				ptrace_label  = "label",
-				ptrace_thread = "thread",
-				ptrace_event  = "event",
+				ptrace_function = "function",
+				ptrace_thread   = "thread",
+				ptrace_event    = "event",
 			}
 		}
 
