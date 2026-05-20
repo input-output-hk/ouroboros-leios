@@ -99,17 +99,18 @@ pub struct ClusterConfig {
 
     /// Per-node adversarial / experimental behaviour.  See
     /// `shared_consensus::behaviour::BehaviourSpec` for the catalogue.
-    /// When set, every node whose index is listed in `behaviour_nodes`
-    /// is started with this behaviour; the remaining nodes stay honest.
-    /// Empty `behaviour_nodes` with a non-`None` spec means *all* nodes
-    /// run the same behaviour (rare; useful for isolated experiments).
+    /// When set, the nodes selected by [`Self::behaviour_selection`]
+    /// are started with this behaviour; the remaining nodes stay
+    /// honest.
     #[serde(default)]
     pub behaviour: Option<shared_consensus::behaviour::BehaviourSpec>,
 
-    /// Node indices that should run [`Self::behaviour`].  Ignored when
-    /// `behaviour` is `None`.
+    /// Which nodes should run [`Self::behaviour`].  See
+    /// [`BehaviourSelection`] for the variants.  When `None` and
+    /// `behaviour` is set, no node runs the behaviour (use
+    /// `{ kind = "all" }` to attach it everywhere).
     #[serde(default)]
-    pub behaviour_nodes: Vec<usize>,
+    pub behaviour_selection: Option<BehaviourSelection>,
 
     /// External peers injected into random nodes.
     #[serde(default)]
@@ -166,10 +167,53 @@ impl Default for ClusterConfig {
             rb_generation_probability: None,
             tx_rate: None,
             behaviour: None,
-            behaviour_nodes: Vec::new(),
+            behaviour_selection: None,
             external_peers: Vec::new(),
         }
     }
+}
+
+/// Which subset of nodes runs the cluster's configured behaviour.
+///
+/// Serialised as a tagged TOML table:
+///
+/// ```toml
+/// [behaviour_selection]
+/// kind = "stake-fraction"
+/// fraction = 0.2
+/// ```
+///
+/// All variants are deterministic for a given [`ClusterConfig::seed`]
+/// so re-runs land on the same nodes.  Stake-aware variants ignore
+/// zero-stake nodes (i.e. relays under `mainnet-shaped`).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum BehaviourSelection {
+    /// Attach the behaviour to every node in the cluster.
+    All,
+    /// Attach the behaviour to a hand-listed set of node indices.
+    Nodes {
+        #[serde(default)]
+        indices: Vec<usize>,
+    },
+    /// Pick `count` random nodes (deterministically, seeded from
+    /// [`ClusterConfig::seed`]) from those with `stake > 0`.  Useful
+    /// for "this many adversaries somewhere in the voting set" without
+    /// concentrating on the largest pools.
+    StakeRandom { count: usize },
+    /// Pick `count` nodes from those with `stake > 0`, ordered by
+    /// stake descending and tie-broken by index ascending.  Targets
+    /// the largest pools first.
+    StakeOrdered { count: usize },
+    /// Pick the smallest prefix of stake-bearing nodes (ordered by
+    /// stake descending, tie-broken by index ascending) whose
+    /// cumulative stake covers `fraction` of the total cluster stake.
+    /// This is the same shape as CIP-0164 top-stake committee
+    /// selection (`top_centile_of_stake`) and is the right knob for
+    /// abstention-pressure experiments — `fraction = 0.2` makes 20%
+    /// of the *voting weight* run the behaviour, regardless of how
+    /// many nodes that turns out to be.
+    StakeFraction { fraction: f64 },
 }
 
 impl ClusterConfig {

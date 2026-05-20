@@ -6,7 +6,7 @@
 use rand::prelude::*;
 use serde::Serialize;
 
-use crate::config::ClusterConfig;
+use crate::config::{BehaviourSelection, ClusterConfig};
 
 /// A peer link from one node to another.
 #[derive(Debug, Clone, Serialize)]
@@ -73,15 +73,11 @@ pub fn generate(config: &ClusterConfig, total_stake: u64) -> Topology {
     let stakes = distribute_stake(n, total_stake, &config.stake_distribution);
 
     // Step 3: Build node topologies.
-    let behaviour_set: std::collections::BTreeSet<usize> =
-        config.behaviour_nodes.iter().copied().collect();
-    let attach_to_all = config.behaviour.is_some() && behaviour_set.is_empty();
+    let behaviour_set = resolve_behaviour_nodes(config, &stakes);
     let mut nodes: Vec<NodeTopology> = (0..n)
         .map(|i| {
             let port = config.base_port + i as u16;
-            let behaviour = if config.behaviour.is_some()
-                && (attach_to_all || behaviour_set.contains(&i))
-            {
+            let behaviour = if config.behaviour.is_some() && behaviour_set.contains(&i) {
                 config.behaviour.clone()
             } else {
                 None
@@ -217,6 +213,102 @@ fn find_components(n: usize, adj: &[std::collections::HashSet<usize>]) -> Vec<Ve
 /// `mainnet-shaped`. Derived from analysis of
 /// data/simulation/pseudo-mainnet/topology-v2.yaml: 534 / 750 = 0.712.
 const MAINNET_RELAY_FRACTION: f64 = 0.71;
+
+/// Resolve the set of node indices that should run the configured
+/// per-node behaviour.
+///
+/// Walks the [`BehaviourSelection`] variant on the cluster config; all
+/// stake-aware variants ignore zero-stake nodes (relays under
+/// `mainnet-shaped`).  Selections are deterministic for a given seed
+/// so re-runs land on the same nodes:
+///
+/// - [`All`] — every node in the cluster.
+/// - [`Nodes`] — verbatim list of indices.
+/// - [`StakeRandom`] — `count` random stake-bearing nodes; the RNG is
+///   seeded from [`ClusterConfig::seed`] (defaulting to `0` when
+///   absent).
+/// - [`StakeOrdered`] — first `count` stake-bearing nodes by stake
+///   descending, ties broken by index ascending.
+/// - [`StakeFraction`] — smallest prefix of stake-bearing nodes whose
+///   cumulative stake covers `fraction` of total cluster stake (same
+///   prefix discipline as [`StakeOrdered`]).
+///
+/// `None` (no selection set) returns the empty set even when
+/// `behaviour` is `Some` — to attach to every node, use
+/// `{ kind = "all" }`.
+///
+/// [`All`]: BehaviourSelection::All
+/// [`Nodes`]: BehaviourSelection::Nodes
+/// [`StakeRandom`]: BehaviourSelection::StakeRandom
+/// [`StakeOrdered`]: BehaviourSelection::StakeOrdered
+/// [`StakeFraction`]: BehaviourSelection::StakeFraction
+fn resolve_behaviour_nodes(
+    config: &ClusterConfig,
+    stakes: &[u64],
+) -> std::collections::BTreeSet<usize> {
+    use std::collections::BTreeSet;
+    let Some(selection) = &config.behaviour_selection else {
+        return BTreeSet::new();
+    };
+    match selection {
+        BehaviourSelection::All => (0..stakes.len()).collect(),
+        BehaviourSelection::Nodes { indices } => indices.iter().copied().collect(),
+        BehaviourSelection::StakeOrdered { count } => {
+            stake_ranked(stakes).into_iter().take(*count).collect()
+        }
+        BehaviourSelection::StakeRandom { count } => {
+            let mut bearers: Vec<usize> = stakes
+                .iter()
+                .enumerate()
+                .filter(|(_, &s)| s > 0)
+                .map(|(i, _)| i)
+                .collect();
+            let seed = config.seed.unwrap_or(0);
+            let mut rng = StdRng::seed_from_u64(seed);
+            bearers.shuffle(&mut rng);
+            bearers.into_iter().take(*count).collect()
+        }
+        BehaviourSelection::StakeFraction { fraction } => {
+            let total: u128 = stakes.iter().map(|&s| s as u128).sum();
+            if total == 0 {
+                return BTreeSet::new();
+            }
+            let f = fraction.clamp(0.0, 1.0);
+            let target = (total as f64 * f).ceil() as u128;
+            let mut chosen = BTreeSet::new();
+            let mut acc: u128 = 0;
+            for (idx, stake) in stake_ranked_with_stake(stakes) {
+                if acc >= target {
+                    break;
+                }
+                chosen.insert(idx);
+                acc += stake as u128;
+            }
+            chosen
+        }
+    }
+}
+
+/// Stake-bearing nodes sorted by stake descending, ties broken by
+/// index ascending.  Returns indices only; pair with
+/// [`stake_ranked_with_stake`] when you also need the stake.
+fn stake_ranked(stakes: &[u64]) -> Vec<usize> {
+    stake_ranked_with_stake(stakes)
+        .into_iter()
+        .map(|(i, _)| i)
+        .collect()
+}
+
+fn stake_ranked_with_stake(stakes: &[u64]) -> Vec<(usize, u64)> {
+    let mut ranked: Vec<(usize, u64)> = stakes
+        .iter()
+        .enumerate()
+        .filter(|(_, &s)| s > 0)
+        .map(|(i, &s)| (i, s))
+        .collect();
+    ranked.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    ranked
+}
 
 /// Distribute stake among nodes.
 ///
@@ -377,6 +469,140 @@ mod tests {
         let min = *pool_stakes.iter().min().unwrap();
         let max = *pool_stakes.iter().max().unwrap();
         assert!(max - min <= 1, "expected near-uniform, got {min}..{max}");
+    }
+
+    // -- resolve_behaviour_nodes ----------------------------------------------
+
+    fn cfg_with_selection(selection: BehaviourSelection) -> ClusterConfig {
+        ClusterConfig {
+            behaviour_selection: Some(selection),
+            ..ClusterConfig::default()
+        }
+    }
+
+    #[test]
+    fn resolve_none_returns_empty() {
+        let cfg = ClusterConfig::default();
+        let set = resolve_behaviour_nodes(&cfg, &[1, 1, 1]);
+        assert!(set.is_empty());
+    }
+
+    #[test]
+    fn resolve_all_picks_every_node() {
+        let cfg = cfg_with_selection(BehaviourSelection::All);
+        let set = resolve_behaviour_nodes(&cfg, &[0, 5, 0, 5, 0]);
+        assert_eq!(set.iter().copied().collect::<Vec<_>>(), vec![0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn resolve_nodes_verbatim() {
+        let cfg = cfg_with_selection(BehaviourSelection::Nodes {
+            indices: vec![1, 3],
+        });
+        let set = resolve_behaviour_nodes(&cfg, &[1, 1, 1, 1]);
+        assert_eq!(set.iter().copied().collect::<Vec<_>>(), vec![1, 3]);
+    }
+
+    #[test]
+    fn resolve_stake_ordered_filters_zero_stake_and_takes_top_n() {
+        let cfg = cfg_with_selection(BehaviourSelection::StakeOrdered { count: 2 });
+        let stakes = vec![10, 100, 50, 0, 200];
+        let set = resolve_behaviour_nodes(&cfg, &stakes);
+        // Sorted desc by stake: 4 (200), 1 (100), 2 (50), 0 (10); top 2 = {1, 4}.
+        assert_eq!(set.iter().copied().collect::<Vec<_>>(), vec![1, 4]);
+    }
+
+    #[test]
+    fn resolve_stake_ordered_count_zero_returns_empty() {
+        let cfg = cfg_with_selection(BehaviourSelection::StakeOrdered { count: 0 });
+        let set = resolve_behaviour_nodes(&cfg, &[10, 10, 10]);
+        assert!(set.is_empty());
+    }
+
+    #[test]
+    fn resolve_stake_ordered_count_exceeds_pool_takes_all_bearers() {
+        let cfg = cfg_with_selection(BehaviourSelection::StakeOrdered { count: 99 });
+        let stakes = vec![10, 0, 20, 0, 30];
+        let set = resolve_behaviour_nodes(&cfg, &stakes);
+        assert_eq!(set.iter().copied().collect::<Vec<_>>(), vec![0, 2, 4]);
+    }
+
+    #[test]
+    fn resolve_stake_random_is_deterministic_for_seed() {
+        let stakes = vec![10, 0, 20, 0, 30, 0, 40, 0, 50];
+        let mk = |seed: u64| -> std::collections::BTreeSet<usize> {
+            let cfg = ClusterConfig {
+                seed: Some(seed),
+                behaviour_selection: Some(BehaviourSelection::StakeRandom { count: 2 }),
+                ..ClusterConfig::default()
+            };
+            resolve_behaviour_nodes(&cfg, &stakes)
+        };
+        // Re-runs with the same seed produce the same set.
+        assert_eq!(mk(42), mk(42));
+        // Distinct seeds usually produce distinct sets (no determinism
+        // requirement, but at least demonstrate the seed matters).
+        let a = mk(42);
+        let b = mk(43);
+        assert_ne!(a, b, "seed should change the selection");
+        // Returned set is always a subset of stake-bearers and never
+        // includes zero-stake indices.
+        let bearers: std::collections::BTreeSet<usize> = [0, 2, 4, 6, 8].into_iter().collect();
+        for node in &a {
+            assert!(bearers.contains(node));
+        }
+    }
+
+    #[test]
+    fn resolve_stake_random_count_zero_returns_empty() {
+        let cfg = cfg_with_selection(BehaviourSelection::StakeRandom { count: 0 });
+        let set = resolve_behaviour_nodes(&cfg, &[10, 20, 30]);
+        assert!(set.is_empty());
+    }
+
+    #[test]
+    fn resolve_stake_fraction_picks_smallest_prefix_covering_target() {
+        // 5 pools, equal stake.  fraction 0.4 → need 40% = 2 pools.
+        let cfg = cfg_with_selection(BehaviourSelection::StakeFraction { fraction: 0.4 });
+        let stakes = vec![100, 100, 100, 100, 100];
+        let set = resolve_behaviour_nodes(&cfg, &stakes);
+        assert_eq!(set.iter().copied().collect::<Vec<_>>(), vec![0, 1]);
+    }
+
+    #[test]
+    fn resolve_stake_fraction_with_uneven_pools() {
+        // Stakes [10, 100, 50, 200] sorted desc: 200, 100, 50, 10 (indices 3, 1, 2, 0).
+        // Total = 360.  fraction 0.5 → target 180.
+        // After 200 alone (index 3) we already exceed 180 → stop.
+        let cfg = cfg_with_selection(BehaviourSelection::StakeFraction { fraction: 0.5 });
+        let stakes = vec![10, 100, 50, 200];
+        let set = resolve_behaviour_nodes(&cfg, &stakes);
+        assert_eq!(set.iter().copied().collect::<Vec<_>>(), vec![3]);
+    }
+
+    #[test]
+    fn resolve_stake_fraction_skips_relays() {
+        // mainnet-shaped: pools at low indices, zero-stake relays elsewhere.
+        let cfg = cfg_with_selection(BehaviourSelection::StakeFraction { fraction: 0.3 });
+        let stakes = vec![100, 100, 100, 0, 0, 0, 0];
+        let set = resolve_behaviour_nodes(&cfg, &stakes);
+        // total 300, target 90 → one pool (100) covers it.
+        assert_eq!(set.iter().copied().collect::<Vec<_>>(), vec![0]);
+    }
+
+    #[test]
+    fn resolve_stake_fraction_zero_returns_empty() {
+        let cfg = cfg_with_selection(BehaviourSelection::StakeFraction { fraction: 0.0 });
+        let set = resolve_behaviour_nodes(&cfg, &[100, 100]);
+        assert!(set.is_empty());
+    }
+
+    #[test]
+    fn resolve_stake_fraction_one_picks_all_bearers() {
+        let cfg = cfg_with_selection(BehaviourSelection::StakeFraction { fraction: 1.0 });
+        let stakes = vec![10, 0, 20, 0, 30];
+        let set = resolve_behaviour_nodes(&cfg, &stakes);
+        assert_eq!(set.iter().copied().collect::<Vec<_>>(), vec![0, 2, 4]);
     }
 
     #[test]
