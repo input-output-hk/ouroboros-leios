@@ -7,15 +7,16 @@
 # (stake = 0, no votes) and ~29% are pools sharing the total stake
 # uniformly.  With `num_nodes = 30` that yields ~9 pool nodes.
 #
-# `behaviour_fraction = 0.2` + `behaviour_source = "stake-bearing"`
-# selects the top 20% of stake-bearing nodes by stake (tie-broken by
-# index ascending) and installs `LazyVoter` on them.  With 9 pools
-# sharing stake equally, this is 2 lazy voters representing ~22.2% of
-# voting stake — just under the default 75% quorum threshold, which
-# tolerates abstentions up to 25%.  Honest pools (7 of 9, ~77.8% of
-# voting stake) should still reach quorum; the margin is narrow on
-# purpose, so any extra packet loss or scheduling jitter can push a
-# slot below quorum.
+# Committee selection is top-stake-fraction (TSF) inherited from
+# `mainnet.toml`: every pool in the top 99% of stake casts one
+# weight-1 vote, so the committee size is 9 and the quorum threshold
+# is `floor(0.75 × 9) = 6` voters.
+#
+# `behaviour_selection.fraction = 0.2` selects the top 20% of staked
+# nodes for LazyVoter; with 9 mainnet-shaped pools that's 2 lazy
+# voters ≈ 22% of voting stake.  Honest pools (7 of 9) clear quorum
+# (7 ≥ 6); raise `fraction` to 0.34 or above to push 4+ pools lazy
+# and force quorum failure.
 
 num_nodes = 30
 degree = 3

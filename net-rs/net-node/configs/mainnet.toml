@@ -19,6 +19,15 @@ rb_generation_probability = 0.05
 vote_generation_probability = 0.8
 stage_length_slots = 20
 
+# Top-stake-fraction committee selection: every pool covered by the
+# top `top_centile_of_stake` of stake casts one weight-1 vote, so the
+# quorum threshold is `floor(0.75 × committee_size)`.  Keeps the
+# threshold proportional to the cluster's actual voter count rather
+# than the wFA-LS reserve, which assumes mainnet-scale pool counts.
+[production.committee_selection]
+type = "StakeCentile"
+top_centile_of_stake = 0.99
+
 [transactions]
 tx_rate = 0.0
 tx_size_min = 250
