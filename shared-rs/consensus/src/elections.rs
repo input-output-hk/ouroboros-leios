@@ -157,11 +157,10 @@ impl Elections {
         }
 
         // Pass 2: update phase or emit Expired and drop, in BTreeMap order.
-        // Quorum-reached elections survive expiry — a quorum is an
-        // assemblable cert and remains usable for future RB endorsements
-        // until something newer supersedes it.  Matches linear's
-        // "prune when a later EB is endorsed" semantics; pruning at
-        // the chain-cutoff is the caller's responsibility.
+        // CertEligible lasts `dedup_window` slots from quorum (the linear
+        // protocol's window for an RB to attach the cert); past that, the
+        // election is gone regardless of whether quorum was reached.  No
+        // sticky-cert behaviour.
         self.elections.retain(|hash, election| {
             match pipeline.phase_for_elapsed(slot.saturating_sub(election.announced_slot)) {
                 Some(phase) => {
@@ -176,7 +175,7 @@ impl Elections {
                         voted_weight: election.voter_weights.values().map(|w| *w as u64).sum(),
                         voters: election.voter_weights.len(),
                     });
-                    election.quorum_reached
+                    false
                 }
             }
         });
@@ -311,14 +310,17 @@ impl Elections {
             .any(|e| e.quorum_reached && e.phase == PipelinePhase::CertEligible)
     }
 
-    /// Slot of the earliest EB that's both at quorum and CertEligible.
-    /// Used by an RB producer to populate certificate telemetry.
+    /// Slot of the latest EB that's both at quorum and CertEligible.
+    /// Used by an RB producer to populate certificate telemetry.  The
+    /// latest is chosen so chain progress carries the freshest cert
+    /// available; older quorum-reached elections age out via the normal
+    /// dedup-window pruning in [`Self::on_slot`].
     pub fn certified_eb_slot(&self) -> Option<u64> {
         self.elections
             .values()
             .filter(|e| e.quorum_reached && e.phase == PipelinePhase::CertEligible)
             .map(|e| e.announced_slot)
-            .min()
+            .max()
     }
 }
 

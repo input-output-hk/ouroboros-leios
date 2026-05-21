@@ -905,7 +905,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn certified_eb_slot_returns_min_quorum_election() {
+    async fn certified_eb_slot_returns_latest_quorum_election() {
         let (tx, _rx) = mpsc::channel(8);
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
@@ -933,12 +933,14 @@ mod tests {
         assert_eq!(leios.certified_eb_slot(), None);
 
         // Advance to make EB at slot 0 CertEligible (elapsed=13 from slot 0).
+        // EB at slot 5 is still Diffusing (elapsed=8), so slot 0 is the only
+        // CertEligible candidate.
         leios.on_slot(13).await;
         assert_eq!(leios.certified_eb_slot(), Some(0));
 
-        // Advance further; both eligible — earliest wins.
+        // Advance further; both eligible — latest wins.
         leios.on_slot(18).await;
-        assert_eq!(leios.certified_eb_slot(), Some(0));
+        assert_eq!(leios.certified_eb_slot(), Some(5));
     }
 
     // -- Bitmap construction tests ------------------------------------------
