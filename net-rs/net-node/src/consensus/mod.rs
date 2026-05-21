@@ -162,10 +162,12 @@ impl Consensus {
         let arrival = self.praos.adopted_tip_header_arrival_slot();
         let eb_announcement = self.praos.adopted_tip_announced_eb();
         let equivocating_slots = self.praos.equivocating_rb_slots().clone();
+        let tip_rb_slot = self.praos.state().adopted_tip_rb_slot();
         self.leios.set_chain_tip_context(ChainTipContext {
             rb_header_arrival_slot: arrival,
             eb_announcement,
             equivocating_slots,
+            tip_rb_slot,
         });
     }
 
@@ -277,11 +279,6 @@ impl Consensus {
         self.praos.next_block_number()
     }
 
-    /// Whether any EB has a valid certificate (quorum + pipeline elapsed).
-    pub fn has_certified_eb(&self) -> bool {
-        self.leios.has_certified_eb()
-    }
-
     /// Borrow the underlying `LeiosState`.  Used by `try_produce_block`
     /// to consult the producer-side EB-safety gate
     /// (`BodyPath::decide` reads `has_endorsed_unvalidated_eb`).
@@ -289,10 +286,24 @@ impl Consensus {
         &self.leios.state
     }
 
-    /// Slot of the earliest certified EB, if any. Used to populate the
-    /// eb_slot field on the `RbCertifiedEb` telemetry event.
-    pub fn certified_eb_slot(&self) -> Option<u64> {
-        self.leios.certified_eb_slot()
+    /// Linear-Leios producer rule: an RB may attach a cert only for the
+    /// EB its **parent RB** announced, and only once that EB has reached
+    /// quorum and entered CertEligible.  Returns the announced slot of
+    /// that EB (to populate the `RbCertifiedEb` telemetry event); `None`
+    /// means no cert candidate — the producer leaves `certified_eb` off
+    /// and the parent's EB is dropped from the chain's perspective.
+    pub fn cert_for_parent(&self) -> Option<u64> {
+        let eb_hash = self.praos.adopted_tip_announced_eb()?;
+        self.leios.eb_certifiable_slot(&eb_hash)
+    }
+
+    /// Emit per-subsystem `info!` lines summarising internal state
+    /// collection sizes.  Used as a periodic diagnostic to identify
+    /// unbounded growth — grep `state sizes` in node logs to read the
+    /// time series.
+    pub fn log_state_sizes(&self) {
+        self.praos.state().log_state_sizes();
+        self.leios.state.log_state_sizes();
     }
 
     /// Drain Leios-side telemetry events buffered since the last call.

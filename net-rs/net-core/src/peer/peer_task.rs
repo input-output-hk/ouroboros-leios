@@ -97,8 +97,13 @@ pub(crate) fn client_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
             egress_queue_size: LOW_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
+            // TxSubmission is best-effort gossip, not chain progress, so
+            // it shares the Default class with the Leios protocols.
+            // Keeping it Priority would let a sustained tx-submit stream
+            // starve EB / vote / EB-tx fetch on the same TCP connection,
+            // which blocks chain progress in Linear Leios.
             id: txsubmission::PROTOCOL_ID,
-            traffic_class: TrafficClass::Priority,
+            traffic_class: TrafficClass::Default(1),
             ingress_limit: txsubmission::INGRESS_LIMIT,
             egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
@@ -137,8 +142,11 @@ pub(crate) fn server_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
             egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
+            // See client side for rationale: TxSubmission shares the
+            // Default class with Leios protocols so a sustained tx
+            // stream can't starve EB/vote/EB-tx fetches.
             id: txsubmission::PROTOCOL_ID,
-            traffic_class: TrafficClass::Priority,
+            traffic_class: TrafficClass::Default(1),
             ingress_limit: txsubmission::INGRESS_LIMIT,
             egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
@@ -646,11 +654,15 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
         .next()
         .expect("txsubmission channel registered fifth");
 
-    // Internal channels for dispatching commands to sub-tasks.
-    let (fetch_sender, fetch_receiver) = mpsc::channel::<(Point, Point)>(16);
-    let (peer_share_sender, peer_share_receiver) = mpsc::channel::<u8>(4);
-    let (tx_submit_sender, tx_submit_receiver) = mpsc::channel::<PendingTx>(16);
-    let (cs_reintersect_sender, cs_reintersect_receiver) = mpsc::channel::<()>(4);
+    // Internal channels for dispatching commands to sub-tasks.  Sized
+    // for high-throughput tx and Leios fetch bursts: small caps here
+    // back-pressure the dispatch loop's `.send().await`, which stalls
+    // the per-peer command channel and triggers a "command channel
+    // full" disconnect at the coordinator.
+    let (fetch_sender, fetch_receiver) = mpsc::channel::<(Point, Point)>(256);
+    let (peer_share_sender, peer_share_receiver) = mpsc::channel::<u8>(16);
+    let (tx_submit_sender, tx_submit_receiver) = mpsc::channel::<PendingTx>(1024);
+    let (cs_reintersect_sender, cs_reintersect_receiver) = mpsc::channel::<()>(16);
 
     // Spawn protocol sub-tasks.
     let mut cs_handle = spawn_chainsync(
@@ -698,7 +710,7 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
         let (lf_send, lf_recv) = channels
             .next()
             .expect("leios_fetch channel registered sixth");
-        let (lf_cmd_sender, lf_cmd_receiver) = mpsc::channel::<LeiosFetchCommand>(16);
+        let (lf_cmd_sender, lf_cmd_receiver) = mpsc::channel::<LeiosFetchCommand>(256);
         let ln_handle = spawn_leios_notify(ln_send, ln_recv, peer_id, event_sender.clone());
         let lf_handle = spawn_leios_fetch(
             lf_send,

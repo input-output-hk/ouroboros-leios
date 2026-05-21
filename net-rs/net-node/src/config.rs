@@ -546,6 +546,15 @@ pub struct TelemetryConfig {
     #[serde(default = "default_stats_interval")]
     pub stats_interval_secs: u64,
 
+    /// Emit per-subsystem state-size `info!` lines every N stats ticks
+    /// (one tick = `stats_interval_secs`).  0 = disabled (default).
+    /// Useful for triaging memory / CPU growth: each tick logs one
+    /// line per state machine (`praos state sizes`, `leios state
+    /// sizes`, `mempool state sizes`) with every internal collection's
+    /// length.
+    #[serde(default)]
+    pub state_sizes_log_every_n_ticks: u64,
+
     /// Event sinks.
     #[serde(default)]
     pub event_sinks: Vec<EventSinkConfig>,
@@ -563,6 +572,7 @@ impl Default for TelemetryConfig {
     fn default() -> Self {
         Self {
             stats_interval_secs: default_stats_interval(),
+            state_sizes_log_every_n_ticks: 0,
             event_sinks: Vec::new(),
             stats_sinks: Vec::new(),
         }
@@ -620,7 +630,14 @@ fn default_chain_store_capacity() -> usize {
 }
 
 fn default_leios_dedup_window() -> u64 {
-    1000
+    // CIP-0164 dedup window: slot horizon over which the coordinator
+    // refuses to re-process the same Leios offer (EB / EB-tx / vote)
+    // it has already seen from a peer.  Per-EB pipeline state is
+    // independently bounded by the chain-progress prune in
+    // [`shared_consensus::leios::LeiosState::on_slot`], which drops
+    // dead EBs as soon as the chain moves past them — so this value
+    // no longer affects state retention.
+    10
 }
 
 fn default_security_param_k() -> u64 {

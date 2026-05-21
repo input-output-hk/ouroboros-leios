@@ -125,15 +125,13 @@ impl LeiosConsensus {
         std::mem::take(&mut self.pending_telemetry)
     }
 
-    /// Slot of the earliest EB that's both at quorum and CertEligible.
-    /// Used by the RB producer to populate `RbCertifiedEb` telemetry.
-    pub fn certified_eb_slot(&self) -> Option<u64> {
-        self.state.certified_eb_slot()
-    }
-
-    /// Whether any EB has a valid certificate.
-    pub fn has_certified_eb(&self) -> bool {
-        self.state.has_certified_eb()
+    /// If the EB at `eb_hash` has reached quorum and entered
+    /// CertEligible, return its announced slot; otherwise `None`.
+    /// The Praos adapter combines this with the parent RB's announced
+    /// EB hash to decide whether to attach a cert (linear-Leios rule:
+    /// the cert can only target the parent RB's EB).
+    pub fn eb_certifiable_slot(&self, eb_hash: &[u8; 32]) -> Option<u64> {
+        self.state.eb_certifiable_slot(eb_hash)
     }
 
     /// Update the adopted-chain-tip metadata used by the CIP-0164
@@ -874,38 +872,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pruned_election_emits_expired_telemetry() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(0).await;
-        leios.on_validated_eb(point(0));
-        let _ = leios.drain_telemetry(); // discard creation-side events
-
-        // Advance past expiry (dedup_window=10, full pipeline=23).
-        leios.on_slot(23).await;
-
-        let drained = leios.drain_telemetry();
-        let expired = drained
-            .iter()
-            .find(|e| matches!(e, NodeEvent::LeiosElectionExpired { .. }))
-            .expect("LeiosElectionExpired emitted");
-        if let NodeEvent::LeiosElectionExpired {
-            eb_slot,
-            had_quorum,
-            voters,
-            ..
-        } = expired
-        {
-            assert_eq!(*eb_slot, 0);
-            assert!(!*had_quorum);
-            assert_eq!(*voters, 0);
-        }
-    }
-
-    #[tokio::test]
-    async fn certified_eb_slot_returns_min_quorum_election() {
+    async fn eb_certifiable_slot_targets_specific_hash() {
         let (tx, _rx) = mpsc::channel(8);
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
@@ -915,6 +882,8 @@ mod tests {
         leios.on_slot(5).await;
         leios.on_validated_eb(point(5));
 
+        let hash0 = point_hash(0);
+        let hash5 = point_hash(5);
         let voters = [
             "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5",
         ];
@@ -930,15 +899,22 @@ mod tests {
         leios.on_validated_votes(&all_bodies);
 
         // Neither is CertEligible yet.
-        assert_eq!(leios.certified_eb_slot(), None);
+        assert_eq!(leios.eb_certifiable_slot(&hash0), None);
+        assert_eq!(leios.eb_certifiable_slot(&hash5), None);
 
         // Advance to make EB at slot 0 CertEligible (elapsed=13 from slot 0).
+        // EB at slot 5 is still Diffusing (elapsed=8).
         leios.on_slot(13).await;
-        assert_eq!(leios.certified_eb_slot(), Some(0));
+        assert_eq!(leios.eb_certifiable_slot(&hash0), Some(0));
+        assert_eq!(leios.eb_certifiable_slot(&hash5), None);
 
-        // Advance further; both eligible — earliest wins.
+        // Both reach CertEligible — each lookup is independent.
         leios.on_slot(18).await;
-        assert_eq!(leios.certified_eb_slot(), Some(0));
+        assert_eq!(leios.eb_certifiable_slot(&hash0), Some(0));
+        assert_eq!(leios.eb_certifiable_slot(&hash5), Some(5));
+
+        // An unrelated hash never matches.
+        assert_eq!(leios.eb_certifiable_slot(&[0xAA; 32]), None);
     }
 
     // -- Bitmap construction tests ------------------------------------------

@@ -342,6 +342,41 @@ impl PraosState {
         (self.security_param_k as usize).saturating_mul(2).max(64)
     }
 
+    /// Emit an `info!` line summarising the sizes of every internal
+    /// collection.  Used by adapters to monitor memory growth — if any
+    /// collection grows without bound across consecutive lines, that's
+    /// the leak.
+    pub fn log_state_sizes(&self) {
+        let peer_chain_total: usize =
+            self.peer_chains.values().map(|c| c.len()).sum();
+        let peer_chain_max: usize =
+            self.peer_chains.values().map(|c| c.len()).max().unwrap_or(0);
+        let issuer_hashes_total: usize = self
+            .header_hashes_by_slot_issuer
+            .values()
+            .map(|s| s.len())
+            .sum();
+        info!(
+            node_id = %self.node_id,
+            chain_tree = self.chain_tree.len(),
+            block_cache = self.block_cache.len(),
+            validated = self.validated.len(),
+            in_flight = self.in_flight.len(),
+            in_flight_validation = self.in_flight_validation.len(),
+            self_produced = self.self_produced.len(),
+            peer_chains = self.peer_chains.len(),
+            peer_chain_total,
+            peer_chain_max,
+            header_first_seen = self.header_first_seen.len(),
+            header_hashes_by_slot_issuer = self.header_hashes_by_slot_issuer.len(),
+            issuer_hashes_total,
+            equivocating_rb_slots = self.equivocating_rb_slots.len(),
+            orphan_cooldown = self.orphan_cooldown.len(),
+            block_fetch_cooldown = self.block_fetch_cooldown.len(),
+            "praos state sizes"
+        );
+    }
+
     /// Hash of the currently adopted tip, if any.
     pub fn tip_hash(&self) -> Option<[u8; 32]> {
         self.adopted_tip_hash
@@ -360,6 +395,17 @@ impl PraosState {
         self.chain_tree
             .best_tip()
             .map(|(point, block_no)| (point.clone(), block_no))
+    }
+
+    /// Production slot of the adopted RB tip, if any.  Feeds
+    /// [`crate::leios::ChainTipContext::tip_rb_slot`] for the chain-
+    /// progress prune in [`crate::leios::LeiosState::on_slot`].
+    pub fn adopted_tip_rb_slot(&self) -> Option<u64> {
+        let hash = self.adopted_tip_hash?;
+        self.chain_tree.point(&hash).and_then(|p| match p {
+            Point::Specific { slot, .. } => Some(*slot),
+            Point::Origin => None,
+        })
     }
 
     /// Slot at which the adopted tip RB's header was first observed
@@ -1081,9 +1127,16 @@ impl PraosState {
             if let Some(oldest) = candidate.iter().next() {
                 match oldest.prev_hash {
                     None => {
-                        if self.adopted_tip_hash.is_none() {
-                            ancestor = Some([0u8; 32]);
-                        }
+                        // Candidate's oldest entry claims genesis as its
+                        // parent.  Genesis is a universal common ancestor —
+                        // every valid chain descends from it — so accept it
+                        // here regardless of whether we have an adopted tip.
+                        // Without this, a fork that diverges all the way
+                        // back at block 1 produces a permanent
+                        // OrphanCandidate verdict and the two sides never
+                        // reconcile, even though `is_better_tip` would
+                        // otherwise have picked a winner.
+                        ancestor = Some([0u8; 32]);
                     }
                     Some(parent) => {
                         // Two paths to accept the parent as ancestor:
@@ -2105,6 +2158,39 @@ mod tests {
             s.select_chain_once(&HashSet::new()),
             SelectionDecision::OrphanCandidate { .. }
         ));
+    }
+
+    #[test]
+    fn select_chain_genesis_rooted_fork_is_not_orphan() {
+        // Local node has adopted block 1 with hash h(0xFF).  A peer
+        // announces a competing block 1 with hash h(1) and
+        // prev_hash=None (rooted at genesis).  The peer's tip wins the
+        // `is_better_tip` comparison (lower hash at the same height) and
+        // the fork's only entry roots at genesis — so we should treat
+        // genesis as the common ancestor and request the peer's body,
+        // not declare the chain an orphan.
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 0xFF, 1, None);
+        s.adopted_tip_hash = Some(h(0xFF));
+
+        let pid = PeerId(7);
+        s.record_peer_tip(pid, pt(100, 1), 1, 1, h(1), 100, None);
+
+        match s.select_chain_once(&HashSet::new()) {
+            SelectionDecision::WaitingForBlocks {
+                peer_id,
+                ancestor,
+                missing,
+                tip_block_no,
+                ..
+            } => {
+                assert_eq!(peer_id, pid);
+                assert_eq!(ancestor, [0u8; 32]);
+                assert_eq!(missing, vec![pt(100, 1)]);
+                assert_eq!(tip_block_no, 1);
+            }
+            other => panic!("expected WaitingForBlocks, got {other:?}"),
+        }
     }
 
     #[test]

@@ -896,9 +896,10 @@ impl SharedConsensus {
         self.rb_hash_to_id.insert(hash, rb_id);
         let point = block_id_to_point(rb_id);
         self.praos.note_header_first_seen(hash, self.current_slot);
+        let tx_count = rb.transactions.len() as u32;
         let fx = self
             .praos
-            .register_self_produced(point, Vec::new(), Vec::new(), Some(parsed));
+            .register_self_produced(point, Vec::new(), Vec::new(), Some(parsed), tx_count);
         self.dispatch_praos_effects(out, fx);
         for peer in &self.consumers {
             out.send_to(*peer, Message::AnnounceRBHeader(rb_id));
@@ -1701,6 +1702,7 @@ impl SharedConsensus {
         let ctx = ChainTipContext {
             rb_header_arrival_slot: self.praos.adopted_tip_header_arrival_slot(),
             eb_announcement: self.praos.adopted_tip_announced_eb(),
+            tip_rb_slot: self.praos.adopted_tip_rb_slot(),
             // CIP-0164 RB-header equivocation set, fed from PraosState
             // on every chain-tip refresh.  Clone is cheap here — the
             // set holds at most O(pipeline-window) entries.
@@ -1888,9 +1890,10 @@ impl SharedConsensus {
         let hash = synthesize_rb_hash(id);
         self.rb_hash_to_id.insert(hash, id);
         let parsed = parsed_header_from_rb(&rb);
+        let tx_count = rb.transactions.len() as u32;
         let fx = self
             .praos
-            .on_block_received(point, Vec::new(), Vec::new(), Some(parsed));
+            .on_block_received(point, Vec::new(), Vec::new(), Some(parsed), tx_count);
         self.dispatch_praos_effects(out, fx);
     }
 

@@ -388,6 +388,29 @@ impl CandidateTracker {
 
     // -- Candidate queries --------------------------------------------------
 
+    /// Return the size of each internal map for diagnostic logging.
+    /// `(block_offers, eb_offers, eb_txs_offers, vote_offers,
+    /// pending_block, pending_eb, pending_eb_txs, pending_vote,
+    /// eb_txs_attempts)`.
+    #[allow(clippy::type_complexity)]
+    pub fn state_sizes(
+        &self,
+    ) -> (
+        usize, usize, usize, usize, usize, usize, usize, usize, usize,
+    ) {
+        (
+            self.block_offers.len(),
+            self.eb_offers.len(),
+            self.eb_txs_offers.len(),
+            self.vote_offers.len(),
+            self.pending_block_fetches.len(),
+            self.pending_eb_fetches.len(),
+            self.pending_eb_txs_fetches.len(),
+            self.pending_vote_fetches.len(),
+            self.eb_txs_attempts.len(),
+        )
+    }
+
     pub fn block_candidates(&self, point: &Point) -> Vec<PeerId> {
         self.block_offers
             .get(point)
