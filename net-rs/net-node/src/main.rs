@@ -216,7 +216,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // can stall after the startup flurry — the consumer settles into a
     // non-blocking poll loop, the provider's per-peer channel runs dry
     // mid-cycle, and the natural `TxsRequested` wakeup never re-fires.
-    let admit_notify = mempool.lock().unwrap().admit_notify();
+    let mut admit_rx = mempool
+        .lock()
+        .unwrap()
+        .take_admit_rx()
+        .expect("admit_rx already taken");
     let mut connected_peers: std::collections::BTreeSet<net_core::peer::PeerId> =
         std::collections::BTreeSet::new();
 
@@ -450,29 +454,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                 }
             }
-            _ = admit_notify.notified() => {
-                // A tx just entered the mempool (locally generated, peer-
-                // received-and-validated, or merged from a LeiosFetch
-                // body).  Synthesise a `ProvideTxs` for every connected
-                // peer whose advertised set doesn't already cover it —
-                // this is the push-on-admit signal sim-rs gets for free
-                // from its in-process `Message::AnnounceTx` fan-out
-                // (`linear_leios.rs::propagate_tx`) and that net-rs's
-                // pull-only TxSubmission lacks otherwise.  Capping the
-                // batch at `MAX_UNACKED` keeps the per-peer `tx_submit`
-                // channel from being overwhelmed; subsequent admits
-                // re-fire the notify so any remaining unannounced txs
-                // are picked up on the next wake.
-                use net_core::protocols::txsubmission::MAX_UNACKED;
+            Some(admitted) = admit_rx.recv() => {
+                // A tx just entered the free pool (locally generated or
+                // peer-received-and-validated).  Announce it to every
+                // connected peer that hasn't already been told,
+                // O(log N) per peer via `mark_announced_to_peer`.
                 let peer_ids: Vec<_> = connected_peers.iter().copied().collect();
                 for peer_id in peer_ids {
-                    let txs = {
+                    let should_send = {
                         let mut pool = mempool.lock().unwrap();
-                        pool.peek_unannounced_for_peer(peer_id, MAX_UNACKED)
+                        pool.mark_announced_to_peer(peer_id, &admitted.tx_id)
                     };
-                    if !txs.is_empty() {
+                    if should_send {
                         let _ = commands
-                            .send(NetworkCommand::ProvideTxs { peer_id, txs })
+                            .send(NetworkCommand::ProvideTxs {
+                                peer_id,
+                                txs: vec![admitted.clone()],
+                            })
                             .await;
                     }
                 }

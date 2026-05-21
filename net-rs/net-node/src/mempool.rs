@@ -15,8 +15,8 @@ use std::time::Duration;
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use tokio::sync::{mpsc, watch, Notify};
-use tracing::info;
+use tokio::sync::{mpsc, watch};
+use tracing::{info, warn};
 
 use shared_consensus::mempool::{EbKey, MempoolState};
 use net_core::peer::PeerId;
@@ -72,31 +72,42 @@ pub enum BodyPath {
 
 /// I/O-side wrapper around `shared_consensus::mempool::MempoolState`.  Public
 /// methods preserve the net-core wire types at the boundary; shared-consensus
+/// Capacity of the admit-fanout channel.  Sized for short bursts of
+/// admits without backpressuring `push`; on overflow `try_send` drops
+/// the wake-up and the tx is picked up on the next `TxsRequested`
+/// pull.
+const ADMIT_FANOUT_CAPACITY: usize = 1024;
+
 /// holds the actual state.
 pub struct Mempool {
     state: MempoolState,
-    /// Fires once per successful admit so the main loop can fan the new
-    /// tx out to every connected peer.  TxSubmission is pull-based at
-    /// the wire, but the consumer's poll cadence on its own doesn't
-    /// wake a provider whose per-peer channel went briefly empty — the
-    /// notify closes that gap and makes diffusion latency RTT-bound
-    /// rather than poll-cycle-bound.
-    admit_notify: Arc<Notify>,
+    /// Carries each just-admitted [`PendingTx`] to the main loop's
+    /// fan-out branch, which announces it to every connected peer in
+    /// O(log N) per peer via [`Self::mark_announced_to_peer`].
+    /// `try_send`: overflow drops the wake-up; the tx remains in the
+    /// mempool and reaches peers via the pull path on the next
+    /// `MsgRequestTxIds`.
+    admit_tx: mpsc::Sender<PendingTx>,
+    /// Receiver half handed to the main loop exactly once.  The
+    /// `Option` lets `take_admit_rx` move it out — the channel is
+    /// single-consumer.
+    admit_rx: Option<mpsc::Receiver<PendingTx>>,
 }
 
 impl Mempool {
     pub fn new(capacity: usize) -> Self {
+        let (admit_tx, admit_rx) = mpsc::channel(ADMIT_FANOUT_CAPACITY);
         Self {
             state: MempoolState::new(capacity),
-            admit_notify: Arc::new(Notify::new()),
+            admit_tx,
+            admit_rx: Some(admit_rx),
         }
     }
 
-    /// Shared handle to the admit notifier.  The main loop awaits on it
-    /// and synthesises a `ProvideTxs` to every connected peer on each
-    /// wake.
-    pub fn admit_notify(&self) -> Arc<Notify> {
-        self.admit_notify.clone()
+    /// Take the admit-fanout receiver.  Returns `None` on subsequent
+    /// calls — there is one consumer (the main loop).
+    pub fn take_admit_rx(&mut self) -> Option<mpsc::Receiver<PendingTx>> {
+        self.admit_rx.take()
     }
 
     /// Borrow the underlying shared-consensus state for read-only operations
@@ -121,15 +132,28 @@ impl Mempool {
     /// effects (queue-full evictions, dedup) are dropped silently —
     /// telemetry plumbing for them is a follow-up.
     ///
-    /// Signals `admit_notify` so the main loop can fan the new tx out
-    /// to every connected peer's TxSubmission provider channel.  The
-    /// notify fires regardless of whether the admit was accepted —
-    /// duplicate-rejected txs are harmless to peek again (already in
-    /// the per-peer advertised set), and capacity-rejected txs leave
-    /// nothing to fan out so the wake is a no-op.
+    /// On successful admit, sends the tx through the admit-fanout
+    /// channel so the main loop can announce it per-peer.  Duplicate
+    /// admits do not signal — nothing new to fan out.
     pub fn push(&mut self, tx: PendingTx) {
-        let _ = self.state.admit_validated(tx.tx_id.0, tx.body.0, tx.size);
-        self.admit_notify.notify_one();
+        use shared_consensus::mempool::{MempoolEffect, TxRejectReason};
+        let effects = self.state.admit_validated(
+            tx.tx_id.0.clone(),
+            tx.body.0.clone(),
+            tx.size,
+        );
+        let admitted = !effects.iter().any(|e| matches!(
+            e,
+            MempoolEffect::TxRejected { reason: TxRejectReason::AlreadyKnown, .. }
+        ));
+        if admitted {
+            if let Err(mpsc::error::TrySendError::Full(_)) = self.admit_tx.try_send(tx) {
+                // Fanout channel full — peer will pick the tx up via
+                // the next pull.  Warn so the operator notices if it
+                // happens persistently.
+                warn!("mempool admit fanout channel full; dropping notification");
+            }
+        }
     }
 
     #[cfg(test)]
@@ -219,13 +243,22 @@ impl Mempool {
     /// against duplicates already in either compartment.  Hashes the
     /// body to derive the tx_id (the wire-format manifest reference).
     ///
-    /// Also signals `admit_notify` so the main loop can fan the body
-    /// out to peers via TxSubmission — sibling nodes that received the
-    /// EB header but lost the txsubmission race will pick it up here.
+    /// EB-pinned bodies live in `eb_pinned`, not the free pool that
+    /// `peek_unannounced_for_peer` iterates, so no admit-fanout
+    /// notification fires here — peers fetch these via LeiosFetch
+    /// BlockTxs, not TxSubmission.
     pub fn merge_eb_body(&mut self, body: Vec<u8>) {
         let tx = tx_from_received_bytes(body);
         self.state.merge_eb_body(tx.tx_id.0, tx.body.0, tx.size);
-        self.admit_notify.notify_one();
+    }
+
+    /// Mark a tx as advertised to the given peer; returns `true` iff
+    /// the entry was newly inserted (caller should send the body).
+    /// The admit-fanout path uses this to announce a single tx in
+    /// O(log N) per peer instead of rescanning the mempool.
+    pub fn mark_announced_to_peer(&mut self, peer_id: PeerId, tx_id: &TxId) -> bool {
+        self.state
+            .mark_announced_to_peer(to_con_pid(peer_id), &tx_id.0)
     }
 
     /// Snapshot of every locally available tx id — free pool plus

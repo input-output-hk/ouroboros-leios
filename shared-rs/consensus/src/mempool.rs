@@ -352,7 +352,9 @@ impl MempoolState {
     /// Return up to `max_count` txs not yet advertised to `peer_id`,
     /// recording them so subsequent calls skip them.  The per-peer
     /// advertised set is pruned automatically when txs leave the
-    /// mempool.
+    /// mempool.  Hot path under TxSubmission pull traffic; the
+    /// `contains` check before the clone-and-insert avoids the heap
+    /// allocation for tx ids the peer already has.
     pub fn peek_unannounced_for_peer(
         &mut self,
         peer_id: PeerId,
@@ -364,11 +366,24 @@ impl MempoolState {
             if result.len() >= max_count {
                 break;
             }
-            if advertised.insert(tx.tx_id.clone()) {
+            if !advertised.contains(&tx.tx_id) {
+                advertised.insert(tx.tx_id.clone());
                 result.push(tx.clone());
             }
         }
         result
+    }
+
+    /// Mark `tx_id` as advertised to `peer_id`.  Returns `true` iff the
+    /// entry was newly inserted (the caller still needs to send the tx
+    /// body to that peer).  Used by the admit-fanout path to announce
+    /// a single just-admitted tx to every connected peer in O(log N)
+    /// per peer.
+    pub fn mark_announced_to_peer(&mut self, peer_id: PeerId, tx_id: &TxId) -> bool {
+        self.peer_advertised
+            .entry(peer_id)
+            .or_default()
+            .insert(tx_id.clone())
     }
 
     /// Drain txs from the front of the queue up to `max_bytes`.  At
