@@ -129,6 +129,50 @@ impl BlockBody {
         Some(super::WrappedHeader::new(buf))
     }
 
+    /// Count the transactions in the Praos block body's `tx_bodies` field.
+    ///
+    /// Walks `#6.24(bytes .cbor [era_tag, [header, tx_bodies, …]])` and
+    /// returns the array length of `tx_bodies` (field 1). Returns `None`
+    /// for Byron blocks or unparseable data.
+    pub fn praos_tx_count(&self) -> Option<u32> {
+        self.try_praos_tx_count().ok()
+    }
+
+    fn try_praos_tx_count(&self) -> Result<u32, DecodeError> {
+        let mut d = Decoder::new(&self.raw);
+
+        let tag = d.tag()?;
+        if tag.as_u64() != 24 {
+            return Err(DecodeError::message("expected CBOR tag 24"));
+        }
+        let inner_bytes = d.bytes()?;
+
+        let mut inner = Decoder::new(inner_bytes);
+        let _outer_len = inner.array()?;
+        let era = inner.u32()?;
+        if era < 2 {
+            return Err(DecodeError::message("Byron block"));
+        }
+
+        let block_len = match inner.array()? {
+            Some(n) => n,
+            None => return Err(DecodeError::message("indefinite block array")),
+        };
+        if block_len < 2 {
+            return Err(DecodeError::message("block array too short"));
+        }
+
+        // Field 0: header — skip.
+        inner.skip()?;
+        // Field 1: tx_bodies — `[* transaction_body]` per Cardano CDDL.
+        let tx_count = match inner.array()? {
+            Some(n) => n,
+            None => return Err(DecodeError::message("indefinite tx_bodies array")),
+        };
+        u32::try_from(tx_count)
+            .map_err(|_| DecodeError::message("tx_bodies length exceeds u32"))
+    }
+
     /// Extract the header from this block in ChainSync wire format:
     /// `[era_tag, #6.24(header_cbor)]`.
     ///
@@ -237,6 +281,15 @@ mod tests {
     /// Build a fake Shelley+ block body for testing.
     /// Produces: #6.24(bytes .cbor [era_tag, [header, txs, witnesses, aux, ?cert]])
     fn build_test_block(era: u8, eb_certificate: Option<&[u8]>) -> Vec<u8> {
+        build_test_block_with_tx_count(era, 0, eb_certificate)
+    }
+
+    /// Like `build_test_block` but with a configurable `tx_bodies` array length.
+    fn build_test_block_with_tx_count(
+        era: u8,
+        tx_count: u64,
+        eb_certificate: Option<&[u8]>,
+    ) -> Vec<u8> {
         use std::io::Write as _;
         let field_count = BLOCK_BASE_FIELDS + if eb_certificate.is_some() { 1 } else { 0 };
 
@@ -245,7 +298,10 @@ mod tests {
         let mut be = Encoder::new(&mut block_buf);
         be.array(field_count).unwrap();
         be.bytes(&[0x80]).unwrap(); // dummy header
-        be.array(0).unwrap(); // empty tx_bodies
+        be.array(tx_count).unwrap(); // tx_bodies (variable length, empty entries)
+        for _ in 0..tx_count {
+            be.null().unwrap();
+        }
         be.array(0).unwrap(); // empty tx_witnesses
         be.null().unwrap(); // null auxiliary_data
         if let Some(cert) = eb_certificate {
@@ -438,5 +494,39 @@ mod tests {
     fn block_body_point_invalid_returns_none() {
         let body = BlockBody::opaque(vec![0xFF]);
         assert!(body.point().is_none());
+    }
+
+    #[test]
+    fn praos_tx_count_empty() {
+        let raw = build_test_block_with_tx_count(7, 0, None);
+        let body = BlockBody::new(raw);
+        assert_eq!(body.praos_tx_count(), Some(0));
+    }
+
+    #[test]
+    fn praos_tx_count_several() {
+        let raw = build_test_block_with_tx_count(7, 5, None);
+        let body = BlockBody::new(raw);
+        assert_eq!(body.praos_tx_count(), Some(5));
+    }
+
+    #[test]
+    fn praos_tx_count_with_eb_certificate() {
+        let raw = build_test_block_with_tx_count(7, 3, Some(&[0xCA, 0xFE]));
+        let body = BlockBody::new(raw);
+        assert_eq!(body.praos_tx_count(), Some(3));
+    }
+
+    #[test]
+    fn praos_tx_count_byron_returns_none() {
+        let raw = build_test_block_with_tx_count(0, 0, None);
+        let body = BlockBody::new(raw);
+        assert_eq!(body.praos_tx_count(), None);
+    }
+
+    #[test]
+    fn praos_tx_count_invalid_returns_none() {
+        let body = BlockBody::opaque(vec![0xFF]);
+        assert_eq!(body.praos_tx_count(), None);
     }
 }

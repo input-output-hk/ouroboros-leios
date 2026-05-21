@@ -36,6 +36,10 @@ export interface ChainTreeEntry {
   block_number: number;
   hash: string;
   prev_hash: string | null;
+  tx_count: number;
+  announced_eb: boolean;
+  certified_eb: boolean;
+  eb_tx_count: number | null;
 }
 
 export interface StatsSnapshot {

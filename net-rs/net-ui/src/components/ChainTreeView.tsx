@@ -4,8 +4,8 @@ import { Box } from "@mui/material";
 import type { ChainTreeEntry } from "@/types";
 
 const BLOCK_W = 52;
-const BLOCK_H = 28;
-const GAP_X = 12;
+const BLOCK_H = 38;
+const GAP_X = 22;
 const GAP_Y = 6;
 const COL_W = BLOCK_W + GAP_X;
 const ROW_H = BLOCK_H + GAP_Y;
@@ -14,6 +14,7 @@ const MAIN_COLOR = "#90caf9";
 const FORK_COLOR = "#ffb74d";
 const TIP_COLOR = "#4caf50";
 const LINE_COLOR = "#555";
+const GOLD = "#FFD700";
 
 interface LayoutBlock {
   entry: ChainTreeEntry;
@@ -173,15 +174,18 @@ export function ChainTreeView({
 
   if (layout.blocks.length === 0) return null;
 
-  const PAD_TOP = tipCounts ? 10 : 0;
-  const svgW = layout.cols * COL_W;
-  const svgH = layout.rows * ROW_H + PAD_TOP;
+  const PAD_TOP = 8;
+  const PAD_LEFT = 8;
+  const PAD_RIGHT = 16;
+  const PAD_BOTTOM = tipCounts ? 12 : 0;
+  const svgW = layout.cols * COL_W + PAD_LEFT + PAD_RIGHT;
+  const svgH = layout.rows * ROW_H + PAD_TOP + PAD_BOTTOM;
 
   // Build hash->position map for connectors.
   const posMap = new Map<string, { x: number; y: number }>();
   for (const b of layout.blocks) {
     posMap.set(b.entry.hash, {
-      x: b.col * COL_W + BLOCK_W / 2,
+      x: b.col * COL_W + BLOCK_W / 2 + PAD_LEFT,
       y: b.row * ROW_H + BLOCK_H / 2 + PAD_TOP,
     });
   }
@@ -209,7 +213,7 @@ export function ChainTreeView({
         })}
         {/* Blocks */}
         {layout.blocks.map((b) => {
-          const x = b.col * COL_W;
+          const x = b.col * COL_W + PAD_LEFT;
           const y = b.row * ROW_H + PAD_TOP;
           return (
             <g key={`block-${b.entry.hash}`}>
@@ -244,6 +248,50 @@ export function ChainTreeView({
               >
                 #{b.entry.hash}
               </text>
+              <text
+                x={x + BLOCK_W / 2}
+                y={y + 32}
+                textAnchor="middle"
+                fill="#aaa"
+                fontSize={8}
+                fontFamily="monospace"
+              >
+                {b.entry.tx_count}
+                {b.entry.eb_tx_count !== null && b.entry.eb_tx_count !== undefined
+                  ? ` / ${b.entry.eb_tx_count}`
+                  : ""}
+              </text>
+              {b.entry.certified_eb && (
+                <g>
+                  <circle cx={x} cy={y} r={7} fill={GOLD} />
+                  <text
+                    x={x}
+                    y={y + 4}
+                    textAnchor="middle"
+                    fill="#000"
+                    fontSize={15}
+                    fontFamily="monospace"
+                  >
+                    ★
+                  </text>
+                </g>
+              )}
+              {b.entry.announced_eb && (
+                <g>
+                  <circle cx={x + BLOCK_W} cy={y} r={7} fill={GOLD} />
+                  <text
+                    x={x + BLOCK_W}
+                    y={y + 4}
+                    textAnchor="middle"
+                    fill="#000"
+                    fontSize={13}
+                    fontWeight="bold"
+                    fontFamily="monospace"
+                  >
+                    +
+                  </text>
+                </g>
+              )}
             </g>
           );
         })}
@@ -251,7 +299,7 @@ export function ChainTreeView({
         {tipCounts && layout.blocks
           .filter((b) => tipCounts[b.entry.hash] !== undefined)
           .map((b) => {
-            const bx = b.col * COL_W;
+            const bx = b.col * COL_W + PAD_LEFT;
             const by = b.row * ROW_H + PAD_TOP;
             const nodes = tipCounts[b.entry.hash];
             const label = String(nodes.length);
@@ -259,8 +307,8 @@ export function ChainTreeView({
             const padY = 2;
             const badgeW = label.length * 7 + padX * 2;
             const badgeH = 14 + padY * 2;
-            const rx = bx + BLOCK_W - badgeW + 4;
-            const ry = by - badgeH / 2 + 2;
+            const rx = bx + BLOCK_W - badgeW / 2;
+            const ry = by + BLOCK_H - badgeH / 2;
             return (
               <g
                 key={`count-${b.entry.hash}`}

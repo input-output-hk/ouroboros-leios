@@ -260,7 +260,13 @@ impl Consensus {
     }
 
     pub fn chain_tree_snapshot(&self) -> (Vec<ChainTreeEntry>, Option<u64>, Option<String>) {
-        self.praos.chain_tree_snapshot()
+        let leios_state = &self.leios.state;
+        self.praos.chain_tree_snapshot(|eb_hash| {
+            leios_state
+                .eb_tx_hashes
+                .get(eb_hash)
+                .map(|(_, hashes)| hashes.len() as u32)
+        })
     }
 
     pub fn tip_hash(&self) -> Option<[u8; 32]> {
