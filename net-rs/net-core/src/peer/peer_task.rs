@@ -97,8 +97,13 @@ pub(crate) fn client_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
             egress_queue_size: LOW_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
+            // TxSubmission is best-effort gossip, not chain progress, so
+            // it shares the Default class with the Leios protocols.
+            // Keeping it Priority would let a sustained tx-submit stream
+            // starve EB / vote / EB-tx fetch on the same TCP connection,
+            // which blocks chain progress in Linear Leios.
             id: txsubmission::PROTOCOL_ID,
-            traffic_class: TrafficClass::Priority,
+            traffic_class: TrafficClass::Default(1),
             ingress_limit: txsubmission::INGRESS_LIMIT,
             egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
@@ -137,8 +142,11 @@ pub(crate) fn server_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
             egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
+            // See client side for rationale: TxSubmission shares the
+            // Default class with Leios protocols so a sustained tx
+            // stream can't starve EB/vote/EB-tx fetches.
             id: txsubmission::PROTOCOL_ID,
-            traffic_class: TrafficClass::Priority,
+            traffic_class: TrafficClass::Default(1),
             ingress_limit: txsubmission::INGRESS_LIMIT,
             egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
