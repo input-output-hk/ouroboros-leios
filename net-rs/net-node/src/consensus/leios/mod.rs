@@ -872,37 +872,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pruned_election_emits_expired_telemetry() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(0).await;
-        leios.on_validated_eb(point(0));
-        let _ = leios.drain_telemetry(); // discard creation-side events
-
-        // Advance past expiry (dedup_window=10, full pipeline=23).
-        leios.on_slot(23).await;
-
-        let drained = leios.drain_telemetry();
-        let expired = drained
-            .iter()
-            .find(|e| matches!(e, NodeEvent::LeiosElectionExpired { .. }))
-            .expect("LeiosElectionExpired emitted");
-        if let NodeEvent::LeiosElectionExpired {
-            eb_slot,
-            had_quorum,
-            voters,
-            ..
-        } = expired
-        {
-            assert_eq!(*eb_slot, 0);
-            assert!(!*had_quorum);
-            assert_eq!(*voters, 0);
-        }
-    }
-
-    #[tokio::test]
     async fn eb_certifiable_slot_targets_specific_hash() {
         let (tx, _rx) = mpsc::channel(8);
         let (validator, _) = test_validator();

@@ -105,9 +105,7 @@ impl Elections {
             return false;
         }
         let elapsed = self.current_slot.saturating_sub(eb_slot);
-        let Some(phase) = self.cfg.pipeline.phase_for_elapsed(elapsed) else {
-            return false;
-        };
+        let phase = self.cfg.pipeline.phase_for_elapsed(elapsed);
         info!(
             node_id = %self.cfg.node_id,
             eb_slot,
@@ -143,10 +141,7 @@ impl Elections {
         // Pass 1: collect EligibleToVote in BTreeMap order.
         for (hash, election) in &self.elections {
             let elapsed = slot.saturating_sub(election.announced_slot);
-            if matches!(
-                pipeline.phase_for_elapsed(elapsed),
-                Some(PipelinePhase::Voting)
-            ) && !election.voted
+            if pipeline.phase_for_elapsed(elapsed) == PipelinePhase::Voting && !election.voted
             {
                 effects.push(SlotEffect::EligibleToVote {
                     eb_hash: *hash,
@@ -156,29 +151,16 @@ impl Elections {
             }
         }
 
-        // Pass 2: update phase or emit Expired and drop, in BTreeMap order.
-        // CertEligible lasts `dedup_window` slots from quorum (the linear
-        // protocol's window for an RB to attach the cert); past that, the
-        // election is gone regardless of whether quorum was reached.  No
-        // sticky-cert behaviour.
-        self.elections.retain(|hash, election| {
-            match pipeline.phase_for_elapsed(slot.saturating_sub(election.announced_slot)) {
-                Some(phase) => {
-                    election.phase = phase;
-                    true
-                }
-                None => {
-                    effects.push(SlotEffect::Expired {
-                        eb_hash: *hash,
-                        eb_slot: election.announced_slot,
-                        had_quorum: election.quorum_reached,
-                        voted_weight: election.voter_weights.values().map(|w| *w as u64).sum(),
-                        voters: election.voter_weights.len(),
-                    });
-                    false
-                }
-            }
-        });
+        // Pass 2: refresh phase on every election.  No time-based
+        // expiry: under the strict parent-only cert rule, an EB stays
+        // CertEligible for as long as it's the chain tip's
+        // announcement.  Lifetime is governed exclusively by the
+        // chain-progress prune in [`crate::leios::LeiosState::on_slot`]
+        // (via [`Self::prune_below_slot`]), not by elapsed slots.
+        for election in self.elections.values_mut() {
+            election.phase = pipeline
+                .phase_for_elapsed(slot.saturating_sub(election.announced_slot));
+        }
         effects
     }
 
@@ -304,6 +286,16 @@ impl Elections {
             .unwrap_or(0)
     }
 
+    /// Drop every election with `announced_slot < min_slot`.  Used by
+    /// the chain-progress prune in [`crate::leios::LeiosState::on_slot`]:
+    /// under the strict parent-only cert rule, an EB whose announcing
+    /// RB is no longer the chain tip is permanently dead, and its
+    /// election state is dead weight.
+    pub fn prune_below_slot(&mut self, min_slot: u64) {
+        self.elections
+            .retain(|_, e| e.announced_slot >= min_slot);
+    }
+
     /// Slot of the EB at `eb_hash` if it is both at quorum and
     /// CertEligible — the only state in which a producer can attach a
     /// cert for it.  Linear Leios requires the cert to target the EB
@@ -370,15 +362,6 @@ mod tests {
     }
 
     #[test]
-    fn announce_after_expiry_returns_false() {
-        let mut e = test_elections();
-        // Total lifespan = 3 + 5 + 5 + 10 = 23 slots.
-        e.on_slot(100);
-        assert!(!e.announce(50, h(1)));
-        assert_eq!(e.count(), 0);
-    }
-
-    #[test]
     fn on_slot_emits_eligible_to_vote_in_voting_phase() {
         let mut e = test_elections();
         e.on_slot(10);
@@ -411,23 +394,19 @@ mod tests {
     }
 
     #[test]
-    fn on_slot_emits_expired_after_dedup_window() {
+    fn prune_below_slot_drops_old_elections() {
+        // Chain-progress prune: drop elections at slot < min_keep.
         let mut e = test_elections();
         e.on_slot(10);
         e.announce(10, h(1));
-        // Expired at elapsed=23 (slot 33).
-        let fx = e.on_slot(33);
-        assert_eq!(fx.len(), 1);
-        match &fx[0] {
-            SlotEffect::Expired {
-                eb_hash, eb_slot, ..
-            } => {
-                assert_eq!(eb_hash, &h(1));
-                assert_eq!(*eb_slot, 10);
-            }
-            other => panic!("expected Expired, got {other:?}"),
-        }
-        assert_eq!(e.count(), 0);
+        e.announce(15, h(2));
+        e.announce(20, h(3));
+        assert_eq!(e.count(), 3);
+        e.prune_below_slot(15);
+        assert_eq!(e.count(), 2);
+        assert!(e.phase(&h(1)).is_none());
+        assert!(e.phase(&h(2)).is_some());
+        assert!(e.phase(&h(3)).is_some());
     }
 
     #[test]

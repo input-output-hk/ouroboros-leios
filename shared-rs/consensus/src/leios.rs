@@ -158,6 +158,13 @@ pub struct ChainTipContext {
     pub rb_header_arrival_slot: Option<u64>,
     /// EB hash announced by the adopted RB header, if any.
     pub eb_announcement: Option<[u8; 32]>,
+    /// Production slot of the adopted RB.  Drives chain-progress
+    /// pruning in [`LeiosState::on_slot`]: under the strict
+    /// parent-only cert rule, every EB announced at a slot < tip_rb_slot
+    /// is permanently dead (no future RB can certify it).  Per-EB state
+    /// — elections, manifests, offers, fetches — can be dropped
+    /// immediately once the chain has moved past.
+    pub tip_rb_slot: Option<u64>,
 }
 
 // ---------------------------------------------------------------------------
@@ -627,41 +634,24 @@ impl LeiosState {
                 }
             }
         }
-        // Prune EB manifests and in-progress tx-fetch state by slot age.
-        let pipeline = self.pipeline;
-        self.eb_tx_hashes.retain(|_, (eb_slot, _)| {
-            pipeline
-                .phase_for_elapsed(slot.saturating_sub(*eb_slot))
-                .is_some()
-        });
-        self.pending_eb_tx_fetches.retain(|_, (eb_slot, _)| {
-            pipeline
-                .phase_for_elapsed(slot.saturating_sub(*eb_slot))
-                .is_some()
-        });
-        // Age out gate entries on the same pipeline timeline as the
-        // election itself — an EB past its lifetime can no longer be
-        // applied as an endorsement, so it no longer threatens future
-        // RB bodies.
-        self.endorsed_unvalidated_ebs.retain(|_, eb_slot| {
-            pipeline
-                .phase_for_elapsed(slot.saturating_sub(*eb_slot))
-                .is_some()
-        });
-        // Bound CandidateTracker memory: drop offer / pending-fetch /
-        // attempts entries below the pipeline-window horizon.  Without
-        // this, every peer announcement accumulates per-EB / per-vote
-        // entries indefinitely.  At scale (long runs × many peers × per-
-        // vote offers) the unpruned tracker is the dominant memory cost
-        // of `LeiosState`.  Pruning to `slot - pipeline_window` is safe:
-        // any fetch decision for an older EB or vote has already
-        // happened (the election itself is past expiry).
-        let pipeline_window = 3 * pipeline.delta_hdr
-            + pipeline.vote_window
-            + pipeline.diffuse_window
-            + pipeline.dedup_window;
-        let min_keep = slot.saturating_sub(pipeline_window);
-        self.candidates.prune_below_slot(min_keep);
+        // Chain-progress prune (Linear Leios with strict parent-only
+        // cert rule): once the adopted chain tip moves to RB N+1, the
+        // EB announced by RB N is permanently dead — no future RB can
+        // certify it because the cert target is fixed to the parent.
+        // So per-EB state at slot < tip_rb_slot is dead weight no
+        // matter how recent it is.  Conversely, on a stuck chain the
+        // tip's own EB stays at slot == tip_rb_slot and is preserved
+        // (it can still be attached as a cert by whatever child RB
+        // eventually arrives).  Before the local node has adopted any
+        // RB (`tip_rb_slot = None`), no prune fires — every received
+        // EB is potentially relevant to the chain we'll soon adopt.
+        if let Some(min_keep) = self.chain_tip_ctx.tip_rb_slot {
+            self.eb_tx_hashes.retain(|_, (s, _)| *s >= min_keep);
+            self.pending_eb_tx_fetches.retain(|_, (s, _)| *s >= min_keep);
+            self.endorsed_unvalidated_ebs.retain(|_, s| *s >= min_keep);
+            self.elections.prune_below_slot(min_keep);
+            self.candidates.prune_below_slot(min_keep);
+        }
         fx.extend(appended);
         fx
     }
@@ -1212,6 +1202,52 @@ impl LeiosState {
         self.elections.eb_certifiable_slot(eb_hash)
     }
 
+    /// Emit an `info!` line summarising the sizes of every internal
+    /// collection.  Used by adapters to monitor memory growth — if any
+    /// collection grows without bound across consecutive lines, that's
+    /// the leak.
+    pub fn log_state_sizes(&self) {
+        let eb_tx_hash_entries_total: usize =
+            self.eb_tx_hashes.values().map(|(_, hs)| hs.len()).sum();
+        let pending_eb_tx_bitmaps_total: usize = self
+            .pending_eb_tx_fetches
+            .values()
+            .map(|(_, bm)| bm.len())
+            .sum();
+        let (
+            cand_block_offers,
+            cand_eb_offers,
+            cand_eb_txs_offers,
+            cand_vote_offers,
+            cand_pending_block,
+            cand_pending_eb,
+            cand_pending_eb_txs,
+            cand_pending_vote,
+            cand_eb_txs_attempts,
+        ) = self.candidates.state_sizes();
+        info!(
+            node_id = %self.node_id,
+            elections = self.elections.count(),
+            eb_tx_hashes = self.eb_tx_hashes.len(),
+            eb_tx_hash_entries_total,
+            pending_eb_tx_fetches = self.pending_eb_tx_fetches.len(),
+            pending_eb_tx_bitmaps_total,
+            endorsed_unvalidated_ebs = self.endorsed_unvalidated_ebs.len(),
+            in_flight = self.in_flight.len(),
+            equivocating_slots = self.chain_tip_ctx.equivocating_slots.len(),
+            cand_block_offers,
+            cand_eb_offers,
+            cand_eb_txs_offers,
+            cand_vote_offers,
+            cand_pending_block,
+            cand_pending_eb,
+            cand_pending_eb_txs,
+            cand_pending_vote,
+            cand_eb_txs_attempts,
+            "leios state sizes"
+        );
+    }
+
     // -- Internal helpers ---------------------------------------------------
 
     fn evict_stale_in_flight(&mut self, now: Instant) {
@@ -1505,12 +1541,21 @@ mod tests {
     }
 
     #[test]
-    fn slot_tick_prunes_stale_eb_tx_state() {
+    fn slot_tick_prunes_stale_eb_tx_state_via_chain_progress() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
         state.eb_tx_hashes.insert(h(1), (10, vec![h(0xAA)]));
         state.pending_eb_tx_fetches.insert(h(1), (10, BTreeMap::new()));
-        // Lifespan = 3+5+5+10 = 23.  At elapsed=23 (slot 33), expired.
-        state.on_slot(33, &tx_all);
+        // No chain tip set → no prune, EB stays even far past the
+        // old time-based expiry.
+        state.on_slot(1_000_000, &tx_all);
+        assert_eq!(state.eb_tx_hashes.len(), 1);
+        assert_eq!(state.pending_eb_tx_fetches.len(), 1);
+        // Chain advances past slot 10 → EB pruned.
+        state.set_chain_tip_context(ChainTipContext {
+            tip_rb_slot: Some(11),
+            ..Default::default()
+        });
+        state.on_slot(20, &tx_all);
         assert!(state.eb_tx_hashes.is_empty());
         assert!(state.pending_eb_tx_fetches.is_empty());
     }
@@ -1745,19 +1790,6 @@ mod tests {
     }
 
     #[test]
-    fn election_expired_emits_telemetry() {
-        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        state.on_slot(10, &tx_all);
-        state.elections.announce(10, h(1));
-        // Lifespan = 3+5+5+10 = 23.  Tick past expiry.
-        let fx = state.on_slot(34, &tx_all);
-        assert!(fx.iter().any(|e| matches!(
-            e,
-            LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::ElectionExpired { .. })
-        )));
-    }
-
-    #[test]
     fn quorum_emits_telemetry_with_weighted_voter() {
         // Set up an Elections with a persistent committee that hands node
         // "voter-a" enough seats to single-handedly form quorum.
@@ -1873,9 +1905,10 @@ mod tests {
     }
 
     #[test]
-    fn on_slot_prunes_candidate_tracker_below_pipeline_window() {
-        // Pipeline = 3·1 + 5 + 5 + 10 = 23 slots.  At slot 30, anything
-        // ≤ slot 7 should drop; entries at slot 8 and above stay.
+    fn on_slot_prunes_candidate_tracker_below_chain_tip() {
+        // Chain-progress prune: anything at slot < tip_rb_slot is dead
+        // under the strict parent-only cert rule.  With tip_rb_slot=8,
+        // slot-5 entries drop and slot-8 entries stay.
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
         let peer = crate::peer::PeerId(1);
         state.candidates.note_eb_offered(point(5, 0xAA), peer);
@@ -1889,9 +1922,12 @@ mod tests {
             .candidates
             .note_vote_offered((8, b"voter".to_vec()), peer);
 
+        state.set_chain_tip_context(ChainTipContext {
+            tip_rb_slot: Some(8),
+            ..Default::default()
+        });
         let _ = state.on_slot(30, &tx_all);
 
-        // Slot 5 is below `30 - 23 = 7` → dropped.
         assert!(state.candidates.eb_candidates(&point(5, 0xAA)).is_empty());
         assert!(state.candidates.eb_txs_candidates(&point(5, 0xCC)).is_empty());
         assert!(
@@ -1900,7 +1936,6 @@ mod tests {
                 .vote_candidates(&(5, b"voter".to_vec()))
                 .is_empty()
         );
-        // Slot 8 ≥ 7 → kept.
         assert_eq!(state.candidates.eb_candidates(&point(8, 0xBB)), vec![peer]);
         assert_eq!(
             state.candidates.eb_txs_candidates(&point(8, 0xDD)),
@@ -1910,6 +1945,18 @@ mod tests {
             state.candidates.vote_candidates(&(8, b"voter".to_vec())),
             vec![peer]
         );
+    }
+
+    #[test]
+    fn on_slot_skips_prune_without_chain_tip() {
+        // Before adopting any RB (`tip_rb_slot = None`), no prune fires
+        // — incoming EB / vote offers may belong to the chain we're
+        // about to adopt.
+        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(1), pipeline());
+        let peer = crate::peer::PeerId(1);
+        state.candidates.note_eb_offered(point(5, 0xAA), peer);
+        let _ = state.on_slot(1000, &tx_all);
+        assert_eq!(state.candidates.eb_candidates(&point(5, 0xAA)), vec![peer]);
     }
 
     #[test]

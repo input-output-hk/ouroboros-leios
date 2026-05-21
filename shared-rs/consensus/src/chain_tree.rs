@@ -213,13 +213,11 @@ impl ChainTree {
     }
 
     /// Number of blocks in the tree.
-    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.nodes.len()
     }
 
     /// True if the tree contains no blocks.
-    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
     }

@@ -421,6 +421,37 @@ impl MempoolState {
         self.txs.is_empty()
     }
 
+    /// Emit an `info!` line summarising the sizes of every internal
+    /// collection.  Used by adapters to monitor memory growth — if any
+    /// collection grows without bound across consecutive lines, that's
+    /// the leak.
+    pub fn log_state_sizes(&self, node_id: &str) {
+        let peer_advertised_total: usize =
+            self.peer_advertised.values().map(|s| s.len()).sum();
+        let peer_advertised_max: usize = self
+            .peer_advertised
+            .values()
+            .map(|s| s.len())
+            .max()
+            .unwrap_or(0);
+        let eb_manifest_entries_total: usize =
+            self.eb_manifests.values().map(|v| v.len()).sum();
+        info!(
+            node_id,
+            txs = self.txs.len(),
+            tx_index = self.tx_index.len(),
+            total_bytes = self.total_bytes,
+            peer_advertised = self.peer_advertised.len(),
+            peer_advertised_total,
+            peer_advertised_max,
+            pending_validation = self.pending_validation.len(),
+            eb_manifests = self.eb_manifests.len(),
+            eb_manifest_entries_total,
+            eb_pinned = self.eb_pinned.len(),
+            "mempool state sizes"
+        );
+    }
+
     // -- EB body management ------------------------------------------------
 
     /// Producer-side: drain the first `count` free txs, pin their
@@ -448,6 +479,12 @@ impl MempoolState {
             let tx = self.txs.pop_front().expect("checked len");
             self.tx_index.remove(&tx.tx_id);
             self.total_bytes -= tx.size as usize;
+            // Drained txs leave the free pool and become EB-pinned; the
+            // chain commits them, so they no longer need re-advertising
+            // via TxSubmission.  Without this prune, every peer's
+            // advertised-tx set grows unboundedly across the lifetime
+            // of the producer.
+            self.prune_from_peer_sets(&tx.tx_id);
             drained.push(tx);
         }
         let manifest: Vec<TxId> = drained.iter().map(|tx| tx.tx_id.clone()).collect();

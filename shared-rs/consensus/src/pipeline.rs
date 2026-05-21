@@ -64,23 +64,25 @@ pub struct PipelineConfig {
 
 impl PipelineConfig {
     /// Compute the pipeline phase for an EB given the number of slots
-    /// elapsed since its announcement. Returns `None` if the election
-    /// has expired (past dedup_window after CertEligible).
-    pub fn phase_for_elapsed(&self, elapsed: u64) -> Option<PipelinePhase> {
+    /// elapsed since its announcement.  Under the strict parent-only
+    /// cert rule, an EB stays attachable as a cert for as long as it
+    /// is the chain tip's announcement; lifetime is governed by the
+    /// chain-progress prune in [`crate::leios::LeiosState::on_slot`],
+    /// not by elapsed slots.  CertEligible therefore has no time
+    /// upper bound — once an EB has passed Diffusing it stays
+    /// CertEligible forever (or until pruned).
+    pub fn phase_for_elapsed(&self, elapsed: u64) -> PipelinePhase {
         let equivocation_end = 3 * self.delta_hdr;
         let voting_end = equivocation_end + self.vote_window;
         let diffuse_end = voting_end + self.diffuse_window;
-        let expiry = diffuse_end + self.dedup_window;
         if elapsed < equivocation_end {
-            Some(PipelinePhase::EquivocationCheck)
+            PipelinePhase::EquivocationCheck
         } else if elapsed < voting_end {
-            Some(PipelinePhase::Voting)
+            PipelinePhase::Voting
         } else if elapsed < diffuse_end {
-            Some(PipelinePhase::Diffusing)
-        } else if elapsed < expiry {
-            Some(PipelinePhase::CertEligible)
+            PipelinePhase::Diffusing
         } else {
-            None
+            PipelinePhase::CertEligible
         }
     }
 }
@@ -91,7 +93,7 @@ mod tests {
 
     /// Pipeline config: delta_hdr=1, vote=5, diffuse=5, dedup=10
     /// Boundaries: EquivCheck [0,3), Voting [3,8), Diffusing [8,13),
-    /// CertEligible [13,23), expired ≥23
+    /// CertEligible [13, ∞)
     fn test_pipeline() -> PipelineConfig {
         PipelineConfig {
             delta_hdr: 1,
@@ -104,26 +106,16 @@ mod tests {
     #[test]
     fn phase_for_elapsed_boundaries() {
         let p = test_pipeline();
-        // EquivocationCheck: elapsed 0..3
-        assert_eq!(
-            p.phase_for_elapsed(0),
-            Some(PipelinePhase::EquivocationCheck)
-        );
-        assert_eq!(
-            p.phase_for_elapsed(2),
-            Some(PipelinePhase::EquivocationCheck)
-        );
-        // Voting: elapsed 3..8
-        assert_eq!(p.phase_for_elapsed(3), Some(PipelinePhase::Voting));
-        assert_eq!(p.phase_for_elapsed(7), Some(PipelinePhase::Voting));
-        // Diffusing: elapsed 8..13
-        assert_eq!(p.phase_for_elapsed(8), Some(PipelinePhase::Diffusing));
-        assert_eq!(p.phase_for_elapsed(12), Some(PipelinePhase::Diffusing));
-        // CertEligible: elapsed 13..23
-        assert_eq!(p.phase_for_elapsed(13), Some(PipelinePhase::CertEligible));
-        assert_eq!(p.phase_for_elapsed(22), Some(PipelinePhase::CertEligible));
-        // Expired: elapsed ≥23
-        assert_eq!(p.phase_for_elapsed(23), None);
-        assert_eq!(p.phase_for_elapsed(100), None);
+        assert_eq!(p.phase_for_elapsed(0), PipelinePhase::EquivocationCheck);
+        assert_eq!(p.phase_for_elapsed(2), PipelinePhase::EquivocationCheck);
+        assert_eq!(p.phase_for_elapsed(3), PipelinePhase::Voting);
+        assert_eq!(p.phase_for_elapsed(7), PipelinePhase::Voting);
+        assert_eq!(p.phase_for_elapsed(8), PipelinePhase::Diffusing);
+        assert_eq!(p.phase_for_elapsed(12), PipelinePhase::Diffusing);
+        assert_eq!(p.phase_for_elapsed(13), PipelinePhase::CertEligible);
+        // CertEligible has no upper bound — chain-progress prune in
+        // LeiosState::on_slot is what bounds the lifetime.
+        assert_eq!(p.phase_for_elapsed(100), PipelinePhase::CertEligible);
+        assert_eq!(p.phase_for_elapsed(1_000_000), PipelinePhase::CertEligible);
     }
 }

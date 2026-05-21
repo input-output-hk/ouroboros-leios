@@ -50,7 +50,7 @@ pub fn record_vote(
         Some(e) => e,
         None => {
             let elapsed = current_slot.saturating_sub(eb_slot);
-            let phase = pipeline.phase_for_elapsed(elapsed)?;
+            let phase = pipeline.phase_for_elapsed(elapsed);
             elections
                 .entry(*eb_hash)
                 .or_insert(EbElection {
@@ -251,29 +251,6 @@ mod tests {
         assert_eq!(e.announced_slot, EB_SLOT);
         assert!(!e.body_validated_locally);
         assert_eq!(e.voter_weights.len(), 1);
-    }
-
-    #[test]
-    fn vote_for_expired_eb_is_dropped() {
-        // If the EB's pipeline window has already closed, the
-        // placeholder is not created and the vote is dropped silently.
-        let mut elections = BTreeMap::new();
-        let unknown_hash = [0xFE; 32];
-        // current_slot far past dedup_window — phase_for_elapsed
-        // returns None, so the placeholder path bails.
-        record_vote(
-            &mut elections,
-            &unknown_hash,
-            EB_SLOT,
-            vec![1],
-            500,
-            QUORUM_FRACTION,
-            EXPECTED_COMMITTEE_SIZE,
-            EB_SLOT + 1_000_000,
-            test_pipeline(),
-            "test",
-        );
-        assert!(elections.is_empty());
     }
 
     #[test]

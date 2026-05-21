@@ -162,10 +162,12 @@ impl Consensus {
         let arrival = self.praos.adopted_tip_header_arrival_slot();
         let eb_announcement = self.praos.adopted_tip_announced_eb();
         let equivocating_slots = self.praos.equivocating_rb_slots().clone();
+        let tip_rb_slot = self.praos.state().adopted_tip_rb_slot();
         self.leios.set_chain_tip_context(ChainTipContext {
             rb_header_arrival_slot: arrival,
             eb_announcement,
             equivocating_slots,
+            tip_rb_slot,
         });
     }
 
@@ -293,6 +295,15 @@ impl Consensus {
     pub fn cert_for_parent(&self) -> Option<u64> {
         let eb_hash = self.praos.adopted_tip_announced_eb()?;
         self.leios.eb_certifiable_slot(&eb_hash)
+    }
+
+    /// Emit per-subsystem `info!` lines summarising internal state
+    /// collection sizes.  Used as a periodic diagnostic to identify
+    /// unbounded growth — grep `state sizes` in node logs to read the
+    /// time series.
+    pub fn log_state_sizes(&self) {
+        self.praos.state().log_state_sizes();
+        self.leios.state.log_state_sizes();
     }
 
     /// Drain Leios-side telemetry events buffered since the last call.

@@ -193,6 +193,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     });
     stats_tick.tick().await; // consume initial immediate tick
 
+    // Counter to throttle state-size logging: emit one diagnostic line
+    // every Nth stats tick rather than every tick.
+    let mut state_size_tick: u64 = 0;
+    const STATE_SIZE_LOG_EVERY_N_TICKS: u64 = 10;
+
     // Graceful shutdown on Ctrl-C.
     let shutdown = tokio::signal::ctrl_c();
     tokio::pin!(shutdown);
@@ -496,6 +501,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             _ = stats_tick.tick(), if stats_interval > 0 => {
                 telem.flush().await;
                 let _ = commands.send(NetworkCommand::QueryPeers).await;
+                state_size_tick = state_size_tick.wrapping_add(1);
+                if state_size_tick % STATE_SIZE_LOG_EVERY_N_TICKS == 0 {
+                    consensus.log_state_sizes();
+                    mempool.lock().expect("mempool mutex poisoned").as_inner()
+                        .log_state_sizes(&node_id);
+                }
             }
             result = stdin_reader.read_line(&mut stdin_line) => {
                 match result {

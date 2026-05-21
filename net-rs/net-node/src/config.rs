@@ -620,7 +620,14 @@ fn default_chain_store_capacity() -> usize {
 }
 
 fn default_leios_dedup_window() -> u64 {
-    1000
+    // CIP-0164 dedup window: slot horizon over which the coordinator
+    // refuses to re-process the same Leios offer (EB / EB-tx / vote)
+    // it has already seen from a peer.  Per-EB pipeline state is
+    // independently bounded by the chain-progress prune in
+    // [`shared_consensus::leios::LeiosState::on_slot`], which drops
+    // dead EBs as soon as the chain moves past them — so this value
+    // no longer affects state retention.
+    10
 }
 
 fn default_security_param_k() -> u64 {
