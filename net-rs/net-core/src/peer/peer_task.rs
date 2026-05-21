@@ -44,6 +44,30 @@ pub(crate) struct PeerTaskConfig {
     pub scheduler_type: crate::mux::scheduler::SchedulerType,
 }
 
+/// Per-protocol channel capacity for high-volume Cardano protocols
+/// (chainsync, blockfetch, txsubmission, leios_notify).
+/// `egress_queue_size` is the bound shared by both the egress and
+/// ingress mpsc channels per protocol — when the ingress channel
+/// fills, the mux demuxer returns `IngressChannelFull` and the
+/// whole connection tears down.  These protocols carry kilobyte-
+/// sized messages; 256 segments at the 12 KiB SDU max is ~3 MiB
+/// of headroom which absorbs reconnect-time bursts comfortably.
+const HIGH_VOLUME_QUEUE_SIZE: usize = 256;
+
+/// Per-protocol channel capacity for bulk-fetch protocols
+/// (leios_fetch).  EB block bodies and EB-tx responses are
+/// multi-megabyte and fragment into hundreds of SDU segments; a
+/// single ~3 MiB EB-tx response alone is ~256 segments, so the
+/// regular channel size cannot hold one without immediate
+/// overflow.  Sized to fit a worst-case EB plus headroom for the
+/// next request.
+const BULK_FETCH_QUEUE_SIZE: usize = 4096;
+
+/// Per-protocol channel capacity for low-volume protocols
+/// (keepalive, peersharing).  These exchange small fixed-size
+/// messages on a slow cadence and don't need the same headroom.
+const LOW_VOLUME_QUEUE_SIZE: usize = 4;
+
 /// Protocol configs for client-side protocols (excluding handshake).
 /// When `leios_enabled`, also registers LeiosNotify and LeiosFetch.
 pub(crate) fn client_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig> {
@@ -52,31 +76,36 @@ pub(crate) fn client_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
             id: chainsync::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: chainsync::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: keepalive::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: keepalive::INGRESS_LIMIT,
-            egress_queue_size: 4,
+            egress_queue_size: LOW_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: blockfetch::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: blockfetch::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: peersharing::PROTOCOL_ID,
             traffic_class: TrafficClass::Default(1),
             ingress_limit: peersharing::INGRESS_LIMIT,
-            egress_queue_size: 4,
+            egress_queue_size: LOW_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
+            // TxSubmission is best-effort gossip, not chain progress, so
+            // it shares the Default class with the Leios protocols.
+            // Keeping it Priority would let a sustained tx-submit stream
+            // starve EB / vote / EB-tx fetch on the same TCP connection,
+            // which blocks chain progress in Linear Leios.
             id: txsubmission::PROTOCOL_ID,
-            traffic_class: TrafficClass::Priority,
+            traffic_class: TrafficClass::Default(1),
             ingress_limit: txsubmission::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
     ];
     if leios_enabled {
@@ -84,13 +113,13 @@ pub(crate) fn client_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
             id: leios_notify::PROTOCOL_ID,
             traffic_class: TrafficClass::Default(1),
             ingress_limit: leios_notify::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         });
         configs.push(ProtocolConfig {
             id: leios_fetch::PROTOCOL_ID,
             traffic_class: TrafficClass::Default(1),
             ingress_limit: leios_fetch::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: BULK_FETCH_QUEUE_SIZE,
         });
     }
     configs
@@ -104,31 +133,34 @@ pub(crate) fn server_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
             id: chainsync::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: chainsync::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: blockfetch::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: blockfetch::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
+            // See client side for rationale: TxSubmission shares the
+            // Default class with Leios protocols so a sustained tx
+            // stream can't starve EB/vote/EB-tx fetches.
             id: txsubmission::PROTOCOL_ID,
-            traffic_class: TrafficClass::Priority,
+            traffic_class: TrafficClass::Default(1),
             ingress_limit: txsubmission::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: peersharing::PROTOCOL_ID,
             traffic_class: TrafficClass::Default(1),
             ingress_limit: peersharing::INGRESS_LIMIT,
-            egress_queue_size: 4,
+            egress_queue_size: LOW_VOLUME_QUEUE_SIZE,
         },
         ProtocolConfig {
             id: keepalive::PROTOCOL_ID,
             traffic_class: TrafficClass::Priority,
             ingress_limit: keepalive::INGRESS_LIMIT,
-            egress_queue_size: 4,
+            egress_queue_size: LOW_VOLUME_QUEUE_SIZE,
         },
     ];
     if leios_enabled {
@@ -136,13 +168,13 @@ pub(crate) fn server_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
             id: leios_notify::PROTOCOL_ID,
             traffic_class: TrafficClass::Default(1),
             ingress_limit: leios_notify::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: HIGH_VOLUME_QUEUE_SIZE,
         });
         configs.push(ProtocolConfig {
             id: leios_fetch::PROTOCOL_ID,
             traffic_class: TrafficClass::Default(1),
             ingress_limit: leios_fetch::INGRESS_LIMIT,
-            egress_queue_size: 16,
+            egress_queue_size: BULK_FETCH_QUEUE_SIZE,
         });
     }
     configs
@@ -622,11 +654,15 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
         .next()
         .expect("txsubmission channel registered fifth");
 
-    // Internal channels for dispatching commands to sub-tasks.
-    let (fetch_sender, fetch_receiver) = mpsc::channel::<(Point, Point)>(16);
-    let (peer_share_sender, peer_share_receiver) = mpsc::channel::<u8>(4);
-    let (tx_submit_sender, tx_submit_receiver) = mpsc::channel::<PendingTx>(16);
-    let (cs_reintersect_sender, cs_reintersect_receiver) = mpsc::channel::<()>(4);
+    // Internal channels for dispatching commands to sub-tasks.  Sized
+    // for high-throughput tx and Leios fetch bursts: small caps here
+    // back-pressure the dispatch loop's `.send().await`, which stalls
+    // the per-peer command channel and triggers a "command channel
+    // full" disconnect at the coordinator.
+    let (fetch_sender, fetch_receiver) = mpsc::channel::<(Point, Point)>(256);
+    let (peer_share_sender, peer_share_receiver) = mpsc::channel::<u8>(16);
+    let (tx_submit_sender, tx_submit_receiver) = mpsc::channel::<PendingTx>(1024);
+    let (cs_reintersect_sender, cs_reintersect_receiver) = mpsc::channel::<()>(16);
 
     // Spawn protocol sub-tasks.
     let mut cs_handle = spawn_chainsync(
@@ -674,7 +710,7 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
         let (lf_send, lf_recv) = channels
             .next()
             .expect("leios_fetch channel registered sixth");
-        let (lf_cmd_sender, lf_cmd_receiver) = mpsc::channel::<LeiosFetchCommand>(16);
+        let (lf_cmd_sender, lf_cmd_receiver) = mpsc::channel::<LeiosFetchCommand>(256);
         let ln_handle = spawn_leios_notify(ln_send, ln_recv, peer_id, event_sender.clone());
         let lf_handle = spawn_leios_fetch(
             lf_send,

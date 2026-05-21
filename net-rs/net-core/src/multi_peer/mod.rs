@@ -19,7 +19,6 @@
 
 pub(crate) mod chain_fragment;
 mod coordinator;
-pub(crate) mod leios_tracker;
 pub mod types;
 
 pub use coordinator::spawn_coordinator;
@@ -33,7 +32,15 @@ pub use types::{NetworkCommand, NetworkEvent};
 
 use crate::mux::scheduler::{SchedulerType, TrafficClass};
 use crate::mux::ProtocolId;
+use crate::peer::PeerId;
 use crate::store::leios_store::TxBodyResolver;
+
+/// Per-peer RTT measurement observer.  Invoked from the coordinator
+/// when a `LatencyMeasured` event arrives (with `Some(rtt)`) and on
+/// peer disconnect (with `None`).  Net-rs wires this to a shared
+/// `shared_consensus::fetch::PeerRttCache` so the consensus state machines'
+/// fetch policies can rank candidates by real measured latency.
+pub type PeerRttObserver = Arc<dyn Fn(PeerId, Option<Duration>) + Send + Sync>;
 
 /// Configuration for the coordinator.
 #[derive(Clone)]
@@ -77,6 +84,19 @@ pub struct CoordinatorConfig {
     /// be served from the application's mempool rather than a duplicate
     /// `LeiosStore::block_txs`. None = receivers cannot re-serve EB txs.
     pub tx_body_resolver: Option<Arc<dyn TxBodyResolver>>,
+    /// Hook invoked on every per-peer RTT measurement.  See
+    /// [`PeerRttObserver`].  None = measurements are recorded only in
+    /// the coordinator's internal `PeerState.rtt` (legacy behaviour).
+    pub peer_rtt_observer: Option<PeerRttObserver>,
+    /// Shared handle to the per-node behaviour.  When set, server-side
+    /// per-peer outbound paths (currently the ChainSync RB-header
+    /// advertisement) call
+    /// [`shared_consensus::behaviour::Behaviour::transform_outbound`]
+    /// before each send, letting the behaviour route different headers
+    /// to different peer subsets (peer-split equivocation), suppress
+    /// sends for a partition / eclipse target, or augment with extras.
+    /// `None` = no transform; the I/O wrapper sends artefacts as-is.
+    pub outbound_behaviour: Option<shared_consensus::behaviour::BehaviourHandle>,
 }
 
 impl Default for CoordinatorConfig {
@@ -98,6 +118,8 @@ impl Default for CoordinatorConfig {
             max_connections_per_ip: 3,
             peer_delays: HashMap::new(),
             tx_body_resolver: None,
+            peer_rtt_observer: None,
+            outbound_behaviour: None,
         }
     }
 }

@@ -50,6 +50,25 @@ export interface DashboardState {
   // Node flash (block produced/received/rolled back)
   nodeFlash: Record<string, "rb-produced" | "rb-certified" | "rb-received" | "eb-produced" | "eb-received" | "vote-produced" | "vote-received" | "rolledback" | null>;
 
+  // Edge flash queue (peer connect/disconnect).  Keyed by normalized
+  // edge id `${min(from,to)}-${max(from,to)}`.  Stored as a queue so a
+  // disconnect-then-reconnect (common during churn) shows red → green
+  // in sequence rather than the latter overwriting the former.  The
+  // display reads `edgeFlash[key][0]`; a per-edge timer shifts the
+  // queue forward.
+  edgeFlash: Record<string, ("connected" | "disconnected")[]>;
+  // Steady-state edge status.  `connected` = at least one event for
+  // this edge ended in PeerConnected; `disconnected` = the most
+  // recent event was PeerDisconnected.  Edges with no events stay
+  // undefined (gray default).  Drives the steady-state colour: pink
+  // for disconnected, gray for connected/unknown.  Independent of
+  // the flash queue.
+  edgeStatus: Record<string, "connected" | "disconnected">;
+  // (node_id, peer_id) → address learnt on PeerConnected; consulted
+  // on PeerDisconnected (which carries no address) so we can map
+  // back to the topology edge.
+  peerAddrMap: Record<string, string>;
+
   // Selection
   selectedNodeId: string | null;
   selectedEdge: { from: number; to: number } | null;
@@ -265,20 +284,97 @@ export const useStore = create<DashboardState>()((set, get) => ({
     type FlashType = "rb-produced" | "rb-certified" | "rb-received" | "eb-produced" | "eb-received" | "vote-produced" | "vote-received" | "rolledback";
     const produced = new Set(["rb-produced", "rb-certified", "eb-produced", "vote-produced"]);
     const flashes: Record<string, FlashType> = {};
+
+    // Edge flashes: PeerConnected → green, PeerDisconnected → red.
+    // Resolved via the topology's listen_address index; events with
+    // ephemeral source ports (inbound connections) won't match and
+    // simply don't flash — which is fine, the outbound-side event
+    // for the same connection will.  A queue per edge so rapid
+    // disconnect→reconnect plays as red→green in sequence.
+    type EdgeFlashType = "connected" | "disconnected";
+    const edgeFlashes: Record<string, EdgeFlashType[]> = {};
+    const statusUpdates: Record<string, EdgeFlashType> = {};
+    const peerAddrUpdates: Record<string, string> = {};
+    const topology = get().topology;
+    const addrToNodeIdx: Map<string, number> | null = topology
+      ? new Map(
+          topology.nodes.map((n) => [
+            `${n.listen_address}`,
+            n.index,
+          ]),
+        )
+      : null;
+    const nodeIdToIdx: Map<string, number> | null = topology
+      ? new Map(topology.nodes.map((n) => [n.node_id, n.index]))
+      : null;
+    const peerAddrMap = get().peerAddrMap;
+    const resolvePeerAddr = (node: string, peer_id: string): string | undefined => {
+      return (
+        peerAddrUpdates[`${node}|${peer_id}`] ?? peerAddrMap[`${node}|${peer_id}`]
+      );
+    };
+    const edgeKey = (a: number, b: number) => {
+      const lo = Math.min(a, b);
+      const hi = Math.max(a, b);
+      return `${lo}-${hi}`;
+    };
+
     for (const e of newEvents) {
-      const node = e.message?.node;
-      const type = e.message?.type;
+      const node = e.message?.node as string | undefined;
+      const type = e.message?.type as string | undefined;
       if (!node) continue;
-      if (type === "RolledBack") { flashes[node] = "rolledback"; continue; }
-      const cur = flashes[node];
-      if (cur === "rolledback") continue;
-      if (type === "RbCertifiedEb") flashes[node] = "rb-certified";
-      else if (type === "RBGenerated" && cur !== "rb-certified") flashes[node] = "rb-produced";
-      else if (type === "EBGenerated") flashes[node] = "eb-produced";
-      else if (type === "VTBundleGenerated") flashes[node] = "vote-produced";
-      else if (type === "RBReceived" && (!cur || !produced.has(cur))) flashes[node] = "rb-received";
-      else if (type === "EBReceived" && (!cur || !produced.has(cur))) flashes[node] = "eb-received";
-      else if (type === "VTBundleReceived" && (!cur || !produced.has(cur))) flashes[node] = "vote-received";
+
+      // -- Node flash --
+      if (type === "RolledBack") {
+        flashes[node] = "rolledback";
+      } else {
+        const cur = flashes[node];
+        if (cur !== "rolledback") {
+          if (type === "RbCertifiedEb") flashes[node] = "rb-certified";
+          else if (type === "RBGenerated" && cur !== "rb-certified") flashes[node] = "rb-produced";
+          else if (type === "EBGenerated") flashes[node] = "eb-produced";
+          else if (type === "VTBundleGenerated") flashes[node] = "vote-produced";
+          else if (type === "RBReceived" && (!cur || !produced.has(cur))) flashes[node] = "rb-received";
+          else if (type === "EBReceived" && (!cur || !produced.has(cur))) flashes[node] = "eb-received";
+          else if (type === "VTBundleReceived" && (!cur || !produced.has(cur))) flashes[node] = "vote-received";
+        }
+      }
+
+      // -- Edge flash + steady-state status --
+      // Each event flashes in temporal order.  In this cluster the
+      // typical churn cycle is connect → die rather than die →
+      // reconnect, so the user sees green → red on each flicker.
+      // After the flash clears, edgeStatus determines the steady
+      // colour: pink if the most recent event was a disconnect,
+      // gray if the most recent was a connect (or no events yet).
+      if (type === "PeerConnected" || type === "PeerDisconnected") {
+        const peer_id = e.message?.peer_id as string | undefined;
+        if (!peer_id || !addrToNodeIdx || !nodeIdToIdx) continue;
+        let addr: string | undefined;
+        if (type === "PeerConnected") {
+          addr = e.message?.address as string | undefined;
+          if (addr) peerAddrUpdates[`${node}|${peer_id}`] = addr;
+        } else {
+          addr = resolvePeerAddr(node, peer_id);
+        }
+        if (!addr) continue;
+        const peerIdx = addrToNodeIdx.get(addr);
+        const localIdx = nodeIdToIdx.get(node);
+        if (peerIdx === undefined || localIdx === undefined) continue;
+        const key = edgeKey(localIdx, peerIdx);
+        const state: EdgeFlashType =
+          type === "PeerConnected" ? "connected" : "disconnected";
+        const seq = (edgeFlashes[key] ??= []);
+        // Dedup consecutive duplicates so a re-announce of the same
+        // state doesn't elongate the animation pointlessly.
+        if (seq[seq.length - 1] !== state) {
+          seq.push(state);
+        }
+        // edgeStatus is the most recent state per edge.  Repeatedly
+        // overwritten as events arrive; settled value drives the
+        // steady-state colour after the flash queue drains.
+        statusUpdates[key] = state;
+      }
     }
 
     // Mutate ring buffer in place — no immutable copy in store state.
@@ -287,13 +383,42 @@ export const useStore = create<DashboardState>()((set, get) => ({
       eventRing.push(e);
     }
 
-    set((s) => ({
-      eventVersion: s.eventVersion + 1,
-      lastEventTime: maxTime,
-      nodeFlash: { ...s.nodeFlash, ...flashes },
-    }));
+    // Merge edge-flash queues with whatever's already pending for each
+    // edge.  An edge that's actively animating gets its incoming
+    // events appended to the existing queue (with consecutive-duplicate
+    // dedup); an edge that's idle starts fresh and gets a timer.
+    const newlyAnimating: string[] = [];
+    set((s) => {
+      const mergedEdge: typeof s.edgeFlash = { ...s.edgeFlash };
+      for (const [key, incoming] of Object.entries(edgeFlashes)) {
+        const existing = mergedEdge[key];
+        if (existing && existing.length > 0) {
+          // Concat; suppress same-state duplicates at the seam.
+          let i = 0;
+          if (existing[existing.length - 1] === incoming[0]) i = 1;
+          mergedEdge[key] = [...existing, ...incoming.slice(i)];
+        } else {
+          mergedEdge[key] = incoming;
+          newlyAnimating.push(key);
+        }
+      }
+      return {
+        eventVersion: s.eventVersion + 1,
+        lastEventTime: maxTime,
+        nodeFlash: { ...s.nodeFlash, ...flashes },
+        edgeFlash: mergedEdge,
+        edgeStatus:
+          Object.keys(statusUpdates).length > 0
+            ? { ...s.edgeStatus, ...statusUpdates }
+            : s.edgeStatus,
+        peerAddrMap:
+          Object.keys(peerAddrUpdates).length > 0
+            ? { ...s.peerAddrMap, ...peerAddrUpdates }
+            : s.peerAddrMap,
+      };
+    });
 
-    // Clear flashes after 600ms
+    // Clear node flashes after 600ms
     if (Object.keys(flashes).length > 0) {
       setTimeout(() => {
         set((s) => {
@@ -305,6 +430,24 @@ export const useStore = create<DashboardState>()((set, get) => ({
         });
       }, 600);
     }
+    // Per-edge animator: shift the queue every 450ms until empty.
+    // Only kick off animators for edges that just transitioned from
+    // idle → animating; edges already in flight have their own timer
+    // running.  Each step displays the head of the queue for 450ms.
+    const advance = (key: string) => {
+      setTimeout(() => {
+        let shouldContinue = false;
+        set((s) => {
+          const cur = s.edgeFlash[key] ?? [];
+          if (cur.length === 0) return s;
+          const next = cur.slice(1);
+          shouldContinue = next.length > 0;
+          return { edgeFlash: { ...s.edgeFlash, [key]: next } };
+        });
+        if (shouldContinue) advance(key);
+      }, 450);
+    };
+    for (const key of newlyAnimating) advance(key);
   },
 
   pollEvents: async () => {
@@ -320,6 +463,9 @@ export const useStore = create<DashboardState>()((set, get) => ({
 
   // --- Flash ---
   nodeFlash: {},
+  edgeFlash: {},
+  edgeStatus: {},
+  peerAddrMap: {},
 
   // --- Selection ---
   selectedNodeId: null,
@@ -360,6 +506,9 @@ export const useStore = create<DashboardState>()((set, get) => ({
           eventVersion: 0,
           lastEventTime: 0,
           nodeFlash: {},
+          edgeFlash: {},
+          edgeStatus: {},
+          peerAddrMap: {},
           topology: null,
           layoutReady: false,
           nodePositions: {},

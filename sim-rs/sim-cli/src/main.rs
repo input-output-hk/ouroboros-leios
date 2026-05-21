@@ -48,6 +48,11 @@ struct Args {
     conformance_events: bool,
     #[clap(short, long)]
     aggregate_events: bool,
+    /// Emit per-component memory stats every 60 slots from node 0.
+    /// Off by default — synchronous on the slot tick, visible as a
+    /// CPU heartbeat when on.
+    #[clap(long)]
+    memory_stats: bool,
 }
 
 fn get_default_topology() -> Result<String> {
@@ -99,6 +104,9 @@ fn read_config(args: &Args) -> Result<SimConfiguration> {
     }
     if args.aggregate_events {
         config.aggregate_events = true;
+    }
+    if args.memory_stats {
+        config.log_memory_stats = true;
     }
     for id in &args.trace_node {
         config.trace_nodes.insert(NodeId::new(*id));
@@ -174,6 +182,7 @@ mod tests {
                 slots: None,
                 conformance_events: false,
                 aggregate_events: false,
+                memory_stats: false,
             };
             read_config(&args)?;
         }

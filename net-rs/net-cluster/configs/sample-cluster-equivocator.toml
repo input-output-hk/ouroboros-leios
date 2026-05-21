@@ -1,0 +1,44 @@
+# Cluster with one Praos RB-header equivocator node.
+#
+# Run with:
+#   cargo run -p net-cluster -- --config net-cluster/configs/sample-cluster-equivocator.toml
+#
+# Node 3 runs `RbHeaderEquivocator` with `ways = 2`: every slot it
+# wins the RB lottery it produces two Ranking Blocks sharing
+# `(slot, issuer)` but with different `body_hash` (hence different
+# header hashes), and advertises a different one to each deterministic
+# half of its peer set (CIP-0164 RB-header equivocation).
+#
+# Detection: any honest peer that sees both header hashes — directly
+# from this node across two connections or by joining variants
+# gossiped through the topology — flags the slot in
+# `equivocating_rb_slots` via `note_header_for_equivocation`.
+
+num_nodes = 10
+degree = 3
+min_latency_ms = 5
+max_latency_ms = 100
+
+base_config = "net-node/configs/mainnet.toml"
+base_port = 30200
+seed = 42
+output_events = "cluster-events-equivocator.jsonl"
+ordering_window_secs = 1.0
+aggregator_port = 9200
+stats_interval_secs = 1
+stake_distribution = "equal"
+rb_generation_probability = 0.05
+
+# Per-node adversarial behaviour: install RbHeaderEquivocator on node 3.
+# Swap the selection variant for a different placement strategy —
+# `{ kind = "all" }`, `{ kind = "stake-ordered", count = N }`,
+# `{ kind = "stake-random", count = N }`, or
+# `{ kind = "stake-fraction", fraction = F }`.
+
+[behaviour]
+kind = "rb-header-equivocator"
+ways = 2
+
+[behaviour_selection]
+kind = "nodes"
+indices = [3]

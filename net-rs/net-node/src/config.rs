@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DynamicConfig {
     pub rb_generation_probability: f64,
-    pub eb_generation_probability: f64,
     pub vote_generation_probability: f64,
     pub rb_head_validation_ms: f64,
     pub rb_body_validation_ms_constant: f64,
@@ -32,7 +31,6 @@ pub struct DynamicConfig {
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct DynamicConfigUpdate {
     pub rb_generation_probability: Option<f64>,
-    pub eb_generation_probability: Option<f64>,
     pub vote_generation_probability: Option<f64>,
     pub rb_head_validation_ms: Option<f64>,
     pub rb_body_validation_ms_constant: Option<f64>,
@@ -40,6 +38,11 @@ pub struct DynamicConfigUpdate {
     pub eb_validation_ms: Option<f64>,
     pub vote_validation_ms: Option<f64>,
     pub tx_rate: Option<f64>,
+    /// Hot-swap the per-node behaviour.  Carried separately from the
+    /// other fields because the swap mutates live state machines
+    /// rather than feeding a watch channel — see
+    /// `Consensus::set_behaviour`.
+    pub behaviour: Option<shared_consensus::behaviour::BehaviourSpec>,
 }
 
 impl DynamicConfig {
@@ -48,9 +51,6 @@ impl DynamicConfig {
     pub fn apply_update(&mut self, update: &DynamicConfigUpdate) {
         if let Some(v) = update.rb_generation_probability {
             self.rb_generation_probability = v;
-        }
-        if let Some(v) = update.eb_generation_probability {
-            self.eb_generation_probability = v;
         }
         if let Some(v) = update.vote_generation_probability {
             self.vote_generation_probability = v;
@@ -85,6 +85,101 @@ pub struct PeerConfig {
     /// Simulated inbound delay in milliseconds (events from this peer are
     /// delayed before delivery to the node). None = no delay.
     pub inbound_delay_ms: Option<u64>,
+}
+
+// ---------------------------------------------------------------------------
+// Fetch policy
+// ---------------------------------------------------------------------------
+
+/// How shared-consensus should pick peers for a given traffic class.  Each variant
+/// maps onto a stock policy in `shared_consensus::fetch`.
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum FetchPolicyKind {
+    /// Send the request to the single candidate with the lowest measured
+    /// RTT.  Matches shared-consensus's default (`LowestRttFirst`).
+    #[default]
+    LowestRtt,
+    /// Send the request to the `n` candidates with the lowest measured
+    /// RTT.  Omitting `n` fans out to every available candidate
+    /// (equivalent to `BroadcastN::all()`).  `n = 1` mimics `LowestRtt`.
+    Broadcast {
+        #[serde(default)]
+        n: Option<usize>,
+    },
+    /// Suppress this fetch class entirely.  Only EB-txs has an organic
+    /// fallback (normal tx diffusion); using `no_fetch` on the other
+    /// classes will stall the corresponding pipeline.
+    NoFetch,
+}
+
+impl FetchPolicyKind {
+    /// Build a [`BlockFetchPolicy`] handle from this config.
+    pub fn into_block_policy(self) -> Box<dyn shared_consensus::fetch::BlockFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
+        }
+    }
+
+    /// Build an [`EbFetchPolicy`] handle from this config.
+    pub fn into_eb_policy(self) -> Box<dyn shared_consensus::fetch::EbFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
+        }
+    }
+
+    /// Build an [`EbTxsFetchPolicy`] handle from this config.
+    pub fn into_eb_txs_policy(self) -> Box<dyn shared_consensus::fetch::EbTxsFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
+        }
+    }
+
+    /// Build a [`VoteFetchPolicy`] handle from this config.
+    pub fn into_vote_policy(self) -> Box<dyn shared_consensus::fetch::VoteFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
+        }
+    }
+}
+
+/// Per-traffic-class fetch-policy selection.  Each class is set
+/// independently so research configs can fan out only EB-txs without
+/// also fanning out blocks or votes.
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+pub struct FetchPolicyConfig {
+    /// Policy for Praos block-range fetches.
+    #[serde(default)]
+    pub block: FetchPolicyKind,
+    /// Policy for fetching EB bodies (`FetchLeiosBlock`).
+    #[serde(default)]
+    pub eb: FetchPolicyKind,
+    /// Policy for fetching EB transaction bodies (`FetchLeiosBlockTxs`).
+    #[serde(default)]
+    pub eb_txs: FetchPolicyKind,
+    /// Policy for fetching missing votes (`FetchLeiosVotes`).
+    #[serde(default)]
+    pub votes: FetchPolicyKind,
 }
 
 /// Top-level node configuration.
@@ -170,61 +265,30 @@ pub struct NodeConfig {
     #[serde(default)]
     pub telemetry: TelemetryConfig,
 
+    /// Per-traffic-class fetch-policy selection.  Defaults preserve the
+    /// historical behaviour (`LowestRtt` for every class).
+    #[serde(default)]
+    pub fetch_policy: FetchPolicyConfig,
+
+    /// Pluggable per-node adversarial / experimental behaviour.  See
+    /// `shared_consensus::behaviour` for the trait and the catalogue
+    /// of concrete impls.  `None` (the default) installs the no-op
+    /// honest behaviour and is indistinguishable from the historical
+    /// behaviour-less build.
+    #[serde(default)]
+    pub behaviour: Option<shared_consensus::behaviour::BehaviourSpec>,
+
     /// Outbound peer list.
     #[serde(default)]
     pub peers: Vec<PeerConfig>,
 }
 
 // ---------------------------------------------------------------------------
-// Committee selection (Leios voting)
+// Committee selection (Leios voting) — defined in shared-consensus, re-exported here
+// for callers that import via `crate::config`.
 // ---------------------------------------------------------------------------
 
-/// Committee selection mechanism for Leios voting.
-///
-/// Determines which nodes vote and what type of vote they produce.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(tag = "type")]
-pub enum CommitteeSelection {
-    /// CIP-0164 spec: weighted Fait Accompli persistent committee (wFA) +
-    /// Local Sortition non-persistent voters (LS).
-    ///
-    /// Per-epoch wFA allocates `persistent_voters` seats deterministically
-    /// across pools by stake-weighted lottery (same seed everywhere → same
-    /// committee). Each EB also runs a per-pool NPV lottery: each pool
-    /// runs `non_persistent_voters` Bernoulli trials at p = stake/total,
-    /// and contributes one NPV vote whose eligibility proof carries the
-    /// number of wins.
-    WfaLs {
-        #[serde(default = "default_persistent_voters")]
-        persistent_voters: u32,
-        #[serde(default = "default_non_persistent_voters")]
-        non_persistent_voters: u32,
-    },
-
-    /// Each pool with stake casts one vote with weight 1.
-    /// Used for testing without sortition / committee allocation.
-    EveryoneVotes,
-
-    /// Pools whose cumulative stake (sorted descending) covers the top
-    /// `top_centile_of_stake` of total stake each cast one vote with
-    /// weight 1.
-    StakeCentile {
-        #[serde(default = "default_top_centile")]
-        top_centile_of_stake: f64,
-    },
-}
-
-fn default_persistent_voters() -> u32 {
-    480
-}
-
-fn default_non_persistent_voters() -> u32 {
-    120
-}
-
-fn default_top_centile() -> f64 {
-    0.95
-}
+pub use shared_consensus::{CommitteeSelection, StakeEntry};
 
 fn default_quorum_stake_fraction() -> f64 {
     0.75
@@ -236,29 +300,6 @@ fn default_persistent_vote_bytes() -> usize {
 
 fn default_non_persistent_vote_bytes() -> usize {
     180
-}
-
-impl Default for CommitteeSelection {
-    fn default() -> Self {
-        CommitteeSelection::WfaLs {
-            persistent_voters: default_persistent_voters(),
-            non_persistent_voters: default_non_persistent_voters(),
-        }
-    }
-}
-
-impl CommitteeSelection {
-    /// Number of NPV trials this node should run per EB. Only WfaLs has
-    /// non-persistent voters; the simpler modes return 0.
-    pub fn non_persistent_voters(&self) -> u32 {
-        match self {
-            CommitteeSelection::WfaLs {
-                non_persistent_voters,
-                ..
-            } => *non_persistent_voters,
-            _ => 0,
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -286,10 +327,6 @@ pub struct ProductionConfig {
     /// Per-slot probability of producing a ranking block.
     #[serde(default = "default_rb_probability")]
     pub rb_generation_probability: f64,
-
-    /// Per-stage probability of producing an endorser block (Leios).
-    #[serde(default)]
-    pub eb_generation_probability: f64,
 
     /// Per-stage probability of producing a vote (Leios).
     /// Used as the sortition lottery probability for WfaLs non-persistent voters.
@@ -332,15 +369,13 @@ pub struct ProductionConfig {
     /// exceeds this, transactions go into an EB instead.
     #[serde(default = "default_rb_body_max_bytes")]
     pub rb_body_max_bytes: usize,
-}
 
-/// One entry in the network-wide stake registry. The pair is what each
-/// node uses to make ranked-stake committee decisions (top-N, persistent
-/// committee), independently arriving at the same answer everywhere.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-pub struct StakeEntry {
-    pub node_id: String,
-    pub stake: u64,
+    /// Maximum bytes of transaction data referenced by a single EB.
+    /// When the EB-overflow path fires, the FIFO-ordered manifest is
+    /// truncated at this byte cap; the remainder stays in the mempool
+    /// for the next RB.
+    #[serde(default = "default_eb_body_max_bytes")]
+    pub eb_body_max_bytes: usize,
 }
 
 fn default_total_stake() -> u64 {
@@ -371,6 +406,10 @@ fn default_rb_body_max_bytes() -> usize {
     65_536
 }
 
+fn default_eb_body_max_bytes() -> usize {
+    16_384_000
+}
+
 impl Default for ProductionConfig {
     fn default() -> Self {
         Self {
@@ -378,7 +417,6 @@ impl Default for ProductionConfig {
             total_stake: default_total_stake(),
             stake_registry: Vec::new(),
             rb_generation_probability: default_rb_probability(),
-            eb_generation_probability: 0.0,
             vote_generation_probability: 0.0,
             stage_length_slots: default_stage_length(),
             committee_selection: CommitteeSelection::default(),
@@ -389,6 +427,7 @@ impl Default for ProductionConfig {
             leios_vote_window_slots: default_vote_window(),
             leios_diffuse_window_slots: default_diffuse_window(),
             rb_body_max_bytes: default_rb_body_max_bytes(),
+            eb_body_max_bytes: default_eb_body_max_bytes(),
         }
     }
 }
@@ -507,6 +546,15 @@ pub struct TelemetryConfig {
     #[serde(default = "default_stats_interval")]
     pub stats_interval_secs: u64,
 
+    /// Emit per-subsystem state-size `info!` lines every N stats ticks
+    /// (one tick = `stats_interval_secs`).  0 = disabled (default).
+    /// Useful for triaging memory / CPU growth: each tick logs one
+    /// line per state machine (`praos state sizes`, `leios state
+    /// sizes`, `mempool state sizes`) with every internal collection's
+    /// length.
+    #[serde(default)]
+    pub state_sizes_log_every_n_ticks: u64,
+
     /// Event sinks.
     #[serde(default)]
     pub event_sinks: Vec<EventSinkConfig>,
@@ -524,6 +572,7 @@ impl Default for TelemetryConfig {
     fn default() -> Self {
         Self {
             stats_interval_secs: default_stats_interval(),
+            state_sizes_log_every_n_ticks: 0,
             event_sinks: Vec::new(),
             stats_sinks: Vec::new(),
         }
@@ -581,7 +630,14 @@ fn default_chain_store_capacity() -> usize {
 }
 
 fn default_leios_dedup_window() -> u64 {
-    1000
+    // CIP-0164 dedup window: slot horizon over which the coordinator
+    // refuses to re-process the same Leios offer (EB / EB-tx / vote)
+    // it has already seen from a peer.  Per-EB pipeline state is
+    // independently bounded by the chain-progress prune in
+    // [`shared_consensus::leios::LeiosState::on_slot`], which drops
+    // dead EBs as soon as the chain moves past them — so this value
+    // no longer affects state retention.
+    10
 }
 
 fn default_security_param_k() -> u64 {
@@ -619,6 +675,8 @@ impl Default for NodeConfig {
             transactions: TxConfig::default(),
             validation: ValidationConfig::default(),
             telemetry: TelemetryConfig::default(),
+            fetch_policy: FetchPolicyConfig::default(),
+            behaviour: None,
             peers: Vec::new(),
         }
     }
@@ -629,7 +687,6 @@ impl NodeConfig {
     pub fn dynamic_config(&self) -> DynamicConfig {
         DynamicConfig {
             rb_generation_probability: self.production.rb_generation_probability,
-            eb_generation_probability: self.production.eb_generation_probability,
             vote_generation_probability: self.production.vote_generation_probability,
             rb_head_validation_ms: self.validation.rb_head_validation_ms,
             rb_body_validation_ms_constant: self.validation.rb_body_validation_ms_constant,
@@ -863,6 +920,76 @@ stake = 0
         assert_eq!(config.persistent_vote_bytes, 130);
         assert_eq!(config.non_persistent_vote_bytes, 180);
         assert!((config.quorum_stake_fraction - 0.75).abs() < f64::EPSILON);
+    }
+
+    // -- Fetch policy tests --
+
+    #[test]
+    fn fetch_policy_default_is_lowest_rtt_for_all_classes() {
+        let cfg = FetchPolicyConfig::default();
+        assert!(matches!(cfg.block, FetchPolicyKind::LowestRtt));
+        assert!(matches!(cfg.eb, FetchPolicyKind::LowestRtt));
+        assert!(matches!(cfg.eb_txs, FetchPolicyKind::LowestRtt));
+        assert!(matches!(cfg.votes, FetchPolicyKind::LowestRtt));
+    }
+
+    #[test]
+    fn fetch_policy_parses_per_class_broadcast() {
+        let toml_text = r#"
+[fetch_policy.eb_txs]
+kind = "broadcast"
+n = 2
+
+[fetch_policy.votes]
+kind = "broadcast"
+"#;
+        let figment = Figment::from(Serialized::defaults(NodeConfig::default()))
+            .merge(Toml::string(toml_text));
+        let config: NodeConfig = figment.extract().unwrap();
+        assert!(matches!(
+            config.fetch_policy.block,
+            FetchPolicyKind::LowestRtt
+        ));
+        assert!(matches!(config.fetch_policy.eb, FetchPolicyKind::LowestRtt));
+        assert!(matches!(
+            config.fetch_policy.eb_txs,
+            FetchPolicyKind::Broadcast { n: Some(2) }
+        ));
+        // Omitting `n` means "broadcast to all candidates".
+        assert!(matches!(
+            config.fetch_policy.votes,
+            FetchPolicyKind::Broadcast { n: None }
+        ));
+    }
+
+    #[test]
+    fn fetch_policy_lowest_rtt_parses_without_extra_fields() {
+        let toml_text = r#"
+[fetch_policy.block]
+kind = "lowest_rtt"
+"#;
+        let figment = Figment::from(Serialized::defaults(NodeConfig::default()))
+            .merge(Toml::string(toml_text));
+        let config: NodeConfig = figment.extract().unwrap();
+        assert!(matches!(
+            config.fetch_policy.block,
+            FetchPolicyKind::LowestRtt
+        ));
+    }
+
+    #[test]
+    fn fetch_policy_kind_builds_boxed_policies() {
+        // Just make sure the conversions don't panic and produce
+        // distinguishable types; behavioural coverage lives in shared-consensus.
+        let _: Box<dyn shared_consensus::fetch::BlockFetchPolicy + Send + Sync> =
+            FetchPolicyKind::LowestRtt.into_block_policy();
+        let _: Box<dyn shared_consensus::fetch::EbFetchPolicy + Send + Sync> =
+            FetchPolicyKind::Broadcast { n: Some(3) }.into_eb_policy();
+        let _: Box<dyn shared_consensus::fetch::EbTxsFetchPolicy + Send + Sync> =
+            FetchPolicyKind::Broadcast { n: Some(1) }.into_eb_txs_policy();
+        // `n = None` => broadcast to all candidates.
+        let _: Box<dyn shared_consensus::fetch::VoteFetchPolicy + Send + Sync> =
+            FetchPolicyKind::Broadcast { n: None }.into_vote_policy();
     }
 
     #[test]

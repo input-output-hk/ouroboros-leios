@@ -39,6 +39,8 @@ pub async fn run(
         max_connections_per_ip,
         peer_delays: std::collections::HashMap::new(),
         tx_body_resolver: None,
+        peer_rtt_observer: None,
+        outbound_behaviour: None,
     };
 
     let mut handle = spawn_coordinator(config);
@@ -99,14 +101,14 @@ pub async fn run(
             NetworkEvent::LeiosBlockAnnounced { .. } => {
                 println!("  leios: EB announced via RB header");
             }
-            NetworkEvent::LeiosBlockOffered { point } => {
-                println!("  leios: EB offered at {point}");
+            NetworkEvent::LeiosBlockOffered { peer_id, point } => {
+                println!("  leios: EB offered at {point} by {peer_id}");
             }
-            NetworkEvent::LeiosBlockTxsOffered { point } => {
-                println!("  leios: EB transactions offered at {point}");
+            NetworkEvent::LeiosBlockTxsOffered { peer_id, point } => {
+                println!("  leios: EB transactions offered at {point} by {peer_id}");
             }
-            NetworkEvent::LeiosVotesOffered { votes } => {
-                println!("  leios: {} vote(s) offered", votes.len());
+            NetworkEvent::LeiosVotesOffered { peer_id, votes } => {
+                println!("  leios: {} vote(s) offered by {peer_id}", votes.len());
             }
             NetworkEvent::LeiosBlockReceived { point, block } => {
                 println!("  leios: EB received at {point} ({} bytes)", block.len());
@@ -123,7 +125,7 @@ pub async fn run(
                     transactions.len()
                 );
             }
-            NetworkEvent::BlockFetchFailed { from, to } => {
+            NetworkEvent::BlockFetchFailed { from, to, .. } => {
                 if from == to {
                     println!("  block fetch failed: {from}");
                 } else {

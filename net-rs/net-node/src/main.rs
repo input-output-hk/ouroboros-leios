@@ -1,4 +1,3 @@
-mod chain_tree;
 mod clock;
 mod config;
 mod consensus;
@@ -63,7 +62,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let tx_body_resolver: std::sync::Arc<dyn net_core::store::leios_store::TxBodyResolver> =
         std::sync::Arc::new(mempool::MempoolTxBodyResolver::new(mempool.clone()));
 
-    let mut handle = network::start(&config, Some(tx_body_resolver)).await?;
+    // Shared per-peer RTT cache.  The coordinator's keepalive task
+    // writes measurements via the observer callback below; the
+    // consensus state machines read at fetch-decision time.
+    let rtt_cache = shared_consensus::fetch::PeerRttCache::new();
+    let peer_rtt_observer: net_core::multi_peer::PeerRttObserver = {
+        let cache = rtt_cache.clone();
+        std::sync::Arc::new(move |pid, rtt| {
+            let con_pid = shared_consensus::peer::PeerId(pid.0);
+            match rtt {
+                Some(d) => cache.set(con_pid, d),
+                None => cache.forget(con_pid),
+            }
+        })
+    };
+
+    // Materialise the per-node behaviour handle once and share clones
+    // with the coordinator (for the per-peer outbound transform path)
+    // and the consensus state machines (for reactive + decision hooks).
+    let behaviour_seed = config
+        .seed
+        .unwrap_or_else(|| shared_consensus::behaviour::seed_from_node_id(&config.node_id));
+    let behaviour_spec = config
+        .behaviour
+        .clone()
+        .unwrap_or(shared_consensus::behaviour::BehaviourSpec::Honest);
+    info!(?behaviour_spec, behaviour_seed, "materialising per-node behaviour");
+    let behaviour_handle =
+        shared_consensus::behaviour::build_handle(&behaviour_spec, behaviour_seed);
+
+    let mut handle = network::start(
+        &config,
+        Some(tx_body_resolver),
+        Some(peer_rtt_observer),
+        Some(behaviour_handle.clone()),
+    )
+    .await?;
     let commands = handle.commands.clone();
 
     // Dynamic config watch channel (hot-reloadable parameters).
@@ -78,7 +112,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             stake = config.production.stake,
             total_stake = config.production.total_stake,
             rb_prob = config.production.rb_generation_probability,
-            eb_prob = config.production.eb_generation_probability,
             vote_prob = config.production.vote_generation_probability,
             "block production enabled"
         );
@@ -117,6 +150,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         config.genesis_time_unix,
         config.seed,
         dyn_rx.clone(),
+        rtt_cache,
+        config.fetch_policy,
+        behaviour_handle.clone(),
     );
 
     // Transaction validator (validates received txs before mempool entry).
@@ -157,6 +193,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     });
     stats_tick.tick().await; // consume initial immediate tick
 
+    // State-size diagnostic logging is gated by config; 0 = off.
+    let state_size_log_every_n_ticks = config.telemetry.state_sizes_log_every_n_ticks;
+    let mut state_size_tick: u64 = 0;
+
     // Graceful shutdown on Ctrl-C.
     let shutdown = tokio::signal::ctrl_c();
     tokio::pin!(shutdown);
@@ -168,6 +208,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let leios = config.leios_enabled;
     let node_id = config.node_id.clone();
+
+    // Pull the mempool's admit notifier and tracked peer set.  Each
+    // successful mempool admit fires the notify; the select! arm below
+    // fans the new txs out to every connected peer via `ProvideTxs`.
+    // Without this push-on-admit signal, txsubmission's pull cadence
+    // can stall after the startup flurry — the consumer settles into a
+    // non-blocking poll loop, the provider's per-peer channel runs dry
+    // mid-cycle, and the natural `TxsRequested` wakeup never re-fires.
+    let mut admit_rx = mempool
+        .lock()
+        .unwrap()
+        .take_admit_rx()
+        .expect("admit_rx already taken");
+    let mut connected_peers: std::collections::BTreeSet<net_core::peer::PeerId> =
+        std::collections::BTreeSet::new();
 
     let mut retry_counter: u64 = 0;
     loop {
@@ -189,9 +244,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 // instead of embedding txs in the RB body.
                 let prev_hash = consensus.tip_hash();
                 let next_block_no = consensus.next_block_number();
-                let certified_eb = leios && consensus.has_certified_eb();
-                let certified_eb_slot = if certified_eb { consensus.certified_eb_slot() } else { None };
-                if let Some(produced) = producer.try_produce_block(slot, prev_hash, next_block_no, certified_eb, &mempool) {
+                let certified_eb_slot = if leios { consensus.cert_for_parent() } else { None };
+                let certified_eb = certified_eb_slot.is_some();
+                if let Some(produced) = producer.try_produce_block(slot, prev_hash, next_block_no, certified_eb, &mempool, consensus.leios_state()) {
+                    // Consult the per-node behaviour: an adversarial
+                    // `Suppress` drops the win silently; `Equivocate`
+                    // produces a duplicate RB with the same issuer +
+                    // slot but a different body, triggering CIP-0164
+                    // detection on every honest peer.
+                    use shared_consensus::behaviour::RbProductionStrategy;
+                    let strategy = consensus.rb_production_strategy(slot);
+                    if strategy == RbProductionStrategy::Suppress {
+                        info!(
+                            node_id = %node_id,
+                            slot,
+                            "suppressing produced RB (behaviour=suppress)"
+                        );
+                    } else {
                     info!(
                         node_id = %node_id,
                         point = %produced.point,
@@ -215,6 +284,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
 
                     // If an EB was produced (overflow path), inject it.
+                    // Tx bodies are already pinned in the mempool by
+                    // `BlockProducer::try_produce_block` via
+                    // `Mempool::produce_eb`; the LeiosStore serves them
+                    // through its `TxBodyResolver` fallback.
                     if let Some(ref eb) = produced.announced_eb {
                         info!(node_id = %node_id, %eb.point, "produced endorser block (overflow)");
                         telem.record(NodeEvent::EBGenerated {
@@ -225,15 +298,71 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             point: eb.point.clone(),
                             block: eb.data.clone(),
                         }).await;
-                        let _ = commands.send(NetworkCommand::InjectLeiosBlockTxs {
-                            point: eb.point.clone(),
-                            transactions: eb.transactions.clone(),
-                        }).await;
+                        consensus
+                            .register_self_produced_eb(eb.point.clone(), &eb.data)
+                            .await;
+                    }
+
+                    // For Equivocate{ways}: build the variants and
+                    // hand them to the behaviour BEFORE
+                    // `register_self_produced` fires the ChainStore
+                    // subscription.  Otherwise serve_chainsync wakes
+                    // and reads the primary while the behaviour's
+                    // variant map is still empty, so transform_outbound
+                    // returns Send and the substitution is missed.
+                    if let RbProductionStrategy::Equivocate { ways } = strategy {
+                        use shared_consensus::behaviour::RbVariantInput;
+                        let mut variant_records: Vec<RbVariantInput> =
+                            Vec::with_capacity(ways as usize);
+                        let primary_hash = match &produced.point {
+                            net_core::types::Point::Specific { hash, .. } => *hash,
+                            net_core::types::Point::Origin => [0u8; 32],
+                        };
+                        variant_records.push(RbVariantInput {
+                            hash: primary_hash,
+                            header: produced.header.raw.clone(),
+                            body: produced.body.raw.clone(),
+                        });
+                        for i in 1..ways {
+                            let extra = producer.produce_equivocation_extra(
+                                &produced,
+                                prev_hash,
+                                next_block_no,
+                            );
+                            let extra_hash = match &extra.point {
+                                net_core::types::Point::Specific { hash, .. } => *hash,
+                                net_core::types::Point::Origin => [0u8; 32],
+                            };
+                            info!(
+                                node_id = %node_id,
+                                primary = %produced.point,
+                                extra = %extra.point,
+                                variant = i,
+                                "produced equivocation variant RB"
+                            );
+                            telem.record(NodeEvent::RBGenerated {
+                                node: node_id.clone(),
+                                slot,
+                                size_bytes: extra.body.raw.len(),
+                            }).await;
+                            variant_records.push(RbVariantInput {
+                                hash: extra_hash,
+                                header: extra.header.raw.clone(),
+                                body: extra.body.raw.clone(),
+                            });
+                        }
+                        {
+                            let mut guard = behaviour_handle
+                                .lock()
+                                .expect("behaviour mutex poisoned");
+                            guard.record_rb_variants(slot, &variant_records);
+                        }
                     }
 
                     consensus
                         .register_self_produced(&produced.point, &produced.header, &produced.body)
                         .await;
+                    }
                 }
 
                 // Periodic retry: re-run chain selection every 5 slots
@@ -266,6 +395,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     "leios block txs response is partial — retrying"
                                 );
                             }
+                            // Pin the bodies in the mempool synchronously
+                            // so the next on_slot's MissingTX predicate sees
+                            // them — the validator pipeline still runs for
+                            // ledger-validity checking, but the predicate
+                            // is content-addressed and doesn't need to wait.
+                            {
+                                let mut pool = mempool.lock().unwrap();
+                                for body in &outcome.matched_bodies {
+                                    pool.merge_eb_body(body.clone());
+                                }
+                            }
                             for body in &outcome.matched_bodies {
                                 let _ = tx_valid_tx.try_send(body.clone());
                             }
@@ -294,8 +434,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     .await;
                             }
                         }
+                        // Maintain the per-peer fanout set.
+                        if let NetworkEvent::PeerConnected { peer_id, .. } = &event {
+                            connected_peers.insert(*peer_id);
+                        }
                         // Drop per-peer advertised state when a peer goes away.
                         if let NetworkEvent::PeerDisconnected { peer_id, .. } = &event {
+                            connected_peers.remove(peer_id);
                             mempool.lock().unwrap().forget_peer(*peer_id);
                         }
                         record_network_event(&mut telem, &node_id, &event, &consensus).await;
@@ -306,6 +451,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     None => {
                         warn!("coordinator channel closed");
                         break;
+                    }
+                }
+            }
+            Some(admitted) = admit_rx.recv() => {
+                // A tx just entered the free pool (locally generated or
+                // peer-received-and-validated).  Announce it to every
+                // connected peer that hasn't already been told,
+                // O(log N) per peer via `mark_announced_to_peer`.
+                let peer_ids: Vec<_> = connected_peers.iter().copied().collect();
+                for peer_id in peer_ids {
+                    let should_send = {
+                        let mut pool = mempool.lock().unwrap();
+                        pool.mark_announced_to_peer(peer_id, &admitted.tx_id)
+                    };
+                    if should_send {
+                        let _ = commands
+                            .send(NetworkCommand::ProvideTxs {
+                                peer_id,
+                                txs: vec![admitted.clone()],
+                            })
+                            .await;
                     }
                 }
             }
@@ -332,6 +498,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             _ = stats_tick.tick(), if stats_interval > 0 => {
                 telem.flush().await;
                 let _ = commands.send(NetworkCommand::QueryPeers).await;
+                if state_size_log_every_n_ticks > 0 {
+                    state_size_tick = state_size_tick.wrapping_add(1);
+                    if state_size_tick % state_size_log_every_n_ticks == 0 {
+                        consensus.log_state_sizes();
+                        mempool.lock().expect("mempool mutex poisoned").as_inner()
+                            .log_state_sizes(&node_id);
+                    }
+                }
             }
             result = stdin_reader.read_line(&mut stdin_line) => {
                 match result {
@@ -342,6 +516,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 let mut current = dyn_tx.borrow().clone();
                                 current.apply_update(&update);
                                 let _ = dyn_tx.send(current);
+                                // Behaviour swap is separate from the
+                                // watch-channel ambient config: it
+                                // mutates the live state machines.
+                                if let Some(spec) = &update.behaviour {
+                                    consensus.set_behaviour(spec, &mempool);
+                                }
                                 info!(node_id = %node_id, "dynamic config updated");
                             }
                             Err(e) => {

@@ -5,7 +5,7 @@
 //! (via `on_block_received`) and self-production (via `register_self_produced`)
 //! — and maintains a cached `best_tip` for the highest-block-number chain.
 //!
-//! Its primary consumer is [`select_chain_once`](super::consensus::praos),
+//! Its primary consumer is [`PraosState::select_chain_once`](crate::praos::PraosState::select_chain_once),
 //! which calls [`ancestors()`](ChainTree::ancestors) to compute the adopted
 //! chain's ancestry, then walks a peer's announced headers looking for a
 //! hash in that ancestry set.
@@ -37,8 +37,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use net_core::types::Point;
 use serde::Serialize;
+
+use crate::types::Point;
 
 /// A block entry in a chain tree snapshot, for UI display.
 #[derive(Debug, Clone, Serialize)]
@@ -46,6 +47,16 @@ pub struct ChainTreeEntry {
     pub block_number: u64,
     pub hash: String,
     pub prev_hash: Option<String>,
+    /// Number of transactions in the Praos block body.
+    pub tx_count: u32,
+    /// True if the block's header announces a new endorser block.
+    pub announced_eb: bool,
+    /// True if the block carries an EB vote certificate for the previous RB.
+    pub certified_eb: bool,
+    /// Length of the announced EB's tx-hash manifest, if known.
+    /// `None` when the block does not announce an EB or the manifest
+    /// hasn't been fetched yet.
+    pub eb_tx_count: Option<u32>,
 }
 
 /// Returns true if tip A is better than tip B.
@@ -75,6 +86,15 @@ struct ChainNode {
     #[allow(dead_code)] // stored for future use (e.g., slot-based tiebreaking)
     slot: u64,
     prev_hash: Option<[u8; 32]>,
+    /// Praos block-body tx count, for UI display. Zero when the body
+    /// hasn't been parsed (opaque-header path) or when the count is
+    /// genuinely zero.
+    tx_count: u32,
+    /// Hash of the EB this block announces, if any. Used at snapshot
+    /// time to resolve the manifest tx count via the caller's closure.
+    announced_eb_hash: Option<[u8; 32]>,
+    /// True if the block's header has `certified_eb == Some(true)`.
+    certified_eb: bool,
 }
 
 /// Tree of block headers for fork tracking and longest-chain selection.
@@ -88,6 +108,12 @@ struct ChainNode {
 pub struct ChainTree {
     nodes: HashMap<[u8; 32], ChainNode>,
     best_tip: Option<(Point, u64)>, // (point, block_number)
+}
+
+impl Default for ChainTree {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ChainTree {
@@ -106,6 +132,7 @@ impl ChainTree {
     ///
     /// Idempotent: re-inserting an existing hash returns false with no
     /// changes.
+    #[allow(clippy::too_many_arguments)]
     pub fn insert(
         &mut self,
         hash: [u8; 32],
@@ -113,6 +140,9 @@ impl ChainTree {
         block_number: u64,
         slot: u64,
         prev_hash: Option<[u8; 32]>,
+        tx_count: u32,
+        announced_eb_hash: Option<[u8; 32]>,
+        certified_eb: bool,
     ) -> bool {
         // Duplicate — no change.
         if self.nodes.contains_key(&hash) {
@@ -126,6 +156,9 @@ impl ChainTree {
                 block_number,
                 slot,
                 prev_hash,
+                tx_count,
+                announced_eb_hash,
+                certified_eb,
             },
         );
 
@@ -163,19 +196,30 @@ impl ChainTree {
     }
 
     /// Look up the point for a given hash.
-    pub(crate) fn point(&self, hash: &[u8; 32]) -> Option<&Point> {
+    pub fn point(&self, hash: &[u8; 32]) -> Option<&Point> {
         self.nodes.get(hash).map(|n| &n.point)
     }
 
     /// Look up the prev_hash for a given hash.
-    pub(crate) fn prev_hash(&self, hash: &[u8; 32]) -> Option<[u8; 32]> {
+    pub fn prev_hash(&self, hash: &[u8; 32]) -> Option<[u8; 32]> {
         self.nodes.get(hash).and_then(|n| n.prev_hash)
     }
 
+    /// Look up the EB hash announced by the RB at `hash`, if any.  Drives
+    /// the linear-Leios cert rule: the producer of the *next* RB can only
+    /// certify the EB this RB announced.
+    pub fn announced_eb_hash_by(&self, hash: &[u8; 32]) -> Option<[u8; 32]> {
+        self.nodes.get(hash).and_then(|n| n.announced_eb_hash)
+    }
+
     /// Number of blocks in the tree.
-    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.nodes.len()
+    }
+
+    /// True if the tree contains no blocks.
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
     }
 
     /// Prune blocks with block_number below the threshold.
@@ -209,6 +253,40 @@ impl ChainTree {
         }
     }
 
+    /// Test-only convenience: insert with default metadata
+    /// (`tx_count = 0`, no announced EB, no certification).
+    #[cfg(test)]
+    fn insert_simple(
+        &mut self,
+        hash: [u8; 32],
+        point: Point,
+        block_number: u64,
+        slot: u64,
+        prev_hash: Option<[u8; 32]>,
+    ) -> bool {
+        self.insert(
+            hash,
+            point,
+            block_number,
+            slot,
+            prev_hash,
+            0,
+            None,
+            false,
+        )
+    }
+
+    /// Test-only convenience: snapshot with a no-op EB-manifest lookup.
+    #[cfg(test)]
+    fn snapshot_simple(
+        &self,
+        tip_hash: [u8; 32],
+        depth: usize,
+        max_block_number: Option<u64>,
+    ) -> Vec<ChainTreeEntry> {
+        self.snapshot(tip_hash, depth, max_block_number, |_| None)
+    }
+
     /// Walk the prev_hash chain from `hash` back to genesis (or a gap),
     /// collecting hashes in reverse order (tip first).
     ///
@@ -221,7 +299,7 @@ impl ChainTree {
     /// result may mean the chain is incomplete, not that it's short.
     /// `select_chain_once` depends on a complete ancestry to find common
     /// ancestors with peers — gaps cause false `OrphanCandidate` results.
-    pub(crate) fn ancestors(&self, mut hash: [u8; 32]) -> Vec<[u8; 32]> {
+    pub fn ancestors(&self, mut hash: [u8; 32]) -> Vec<[u8; 32]> {
         let mut chain = vec![hash];
         while let Some(node) = self.nodes.get(&hash) {
             match node.prev_hash {
@@ -247,6 +325,7 @@ impl ChainTree {
         tip_hash: [u8; 32],
         depth: usize,
         max_block_number: Option<u64>,
+        eb_manifest_count: impl Fn(&[u8; 32]) -> Option<u32>,
     ) -> Vec<ChainTreeEntry> {
         if !self.nodes.contains_key(&tip_hash) {
             return Vec::new();
@@ -311,10 +390,15 @@ impl ChainTree {
             .iter()
             .filter_map(|h| {
                 let node = self.nodes.get(h)?;
+                let eb_tx_count = node.announced_eb_hash.as_ref().and_then(&eb_manifest_count);
                 Some(ChainTreeEntry {
                     block_number: node.block_number,
                     hash: short_hash(h),
                     prev_hash: node.prev_hash.as_ref().map(short_hash),
+                    tx_count: node.tx_count,
+                    announced_eb: node.announced_eb_hash.is_some(),
+                    certified_eb: node.certified_eb,
+                    eb_tx_count,
                 })
             })
             .collect();
@@ -335,7 +419,7 @@ mod tests {
     fn linear_chain() {
         let mut tree = ChainTree::new();
 
-        assert!(tree.insert(
+        assert!(tree.insert_simple(
             [1; 32],
             Point::Specific {
                 slot: 1,
@@ -345,7 +429,7 @@ mod tests {
             1,
             None
         ));
-        assert!(tree.insert(
+        assert!(tree.insert_simple(
             [2; 32],
             Point::Specific {
                 slot: 2,
@@ -355,7 +439,7 @@ mod tests {
             2,
             Some([1; 32])
         ));
-        assert!(tree.insert(
+        assert!(tree.insert_simple(
             [3; 32],
             Point::Specific {
                 slot: 3,
@@ -376,7 +460,7 @@ mod tests {
         let mut tree = ChainTree::new();
 
         // Chain A: 3 blocks.
-        tree.insert(
+        tree.insert_simple(
             [1; 32],
             Point::Specific {
                 slot: 1,
@@ -386,7 +470,7 @@ mod tests {
             1,
             None,
         );
-        tree.insert(
+        tree.insert_simple(
             [2; 32],
             Point::Specific {
                 slot: 2,
@@ -396,7 +480,7 @@ mod tests {
             2,
             Some([1; 32]),
         );
-        tree.insert(
+        tree.insert_simple(
             [3; 32],
             Point::Specific {
                 slot: 3,
@@ -408,7 +492,7 @@ mod tests {
         );
 
         // Chain B: fork from block 1, extends to 4.
-        tree.insert(
+        tree.insert_simple(
             [0xB2; 32],
             Point::Specific {
                 slot: 2,
@@ -418,7 +502,7 @@ mod tests {
             2,
             Some([1; 32]),
         );
-        tree.insert(
+        tree.insert_simple(
             [0xB3; 32],
             Point::Specific {
                 slot: 3,
@@ -428,7 +512,7 @@ mod tests {
             3,
             Some([0xB2; 32]),
         );
-        let switched = tree.insert(
+        let switched = tree.insert_simple(
             [0xB4; 32],
             Point::Specific {
                 slot: 4,
@@ -456,7 +540,7 @@ mod tests {
         let mut tree = ChainTree::new();
 
         // Chain A: 3 blocks.
-        tree.insert(
+        tree.insert_simple(
             [1; 32],
             Point::Specific {
                 slot: 1,
@@ -466,7 +550,7 @@ mod tests {
             1,
             None,
         );
-        tree.insert(
+        tree.insert_simple(
             [2; 32],
             Point::Specific {
                 slot: 2,
@@ -476,7 +560,7 @@ mod tests {
             2,
             Some([1; 32]),
         );
-        tree.insert(
+        tree.insert_simple(
             [3; 32],
             Point::Specific {
                 slot: 3,
@@ -488,7 +572,7 @@ mod tests {
         );
 
         // Chain B: fork from block 1, only 2 blocks total.
-        let switched = tree.insert(
+        let switched = tree.insert_simple(
             [0xC2; 32],
             Point::Specific {
                 slot: 2,
@@ -507,7 +591,7 @@ mod tests {
     #[test]
     fn duplicate_ignored() {
         let mut tree = ChainTree::new();
-        tree.insert(
+        tree.insert_simple(
             [1; 32],
             Point::Specific {
                 slot: 1,
@@ -517,7 +601,7 @@ mod tests {
             1,
             None,
         );
-        let dup = tree.insert(
+        let dup = tree.insert_simple(
             [1; 32],
             Point::Specific {
                 slot: 1,
@@ -536,7 +620,7 @@ mod tests {
         let mut tree = ChainTree::new();
 
         // Insert block with higher hash first.
-        tree.insert(
+        tree.insert_simple(
             [0xBB; 32],
             Point::Specific {
                 slot: 1,
@@ -549,7 +633,7 @@ mod tests {
         assert_eq!(tree.best_tip_hash(), Some([0xBB; 32]));
 
         // Insert block with same block_number but lower hash — should become best.
-        let switched = tree.insert(
+        let switched = tree.insert_simple(
             [0xAA; 32],
             Point::Specific {
                 slot: 1,
@@ -563,7 +647,7 @@ mod tests {
         assert_eq!(tree.best_tip_hash(), Some([0xAA; 32]));
 
         // Insert block with same block_number but higher hash — should NOT switch.
-        let not_switched = tree.insert(
+        let not_switched = tree.insert_simple(
             [0xCC; 32],
             Point::Specific {
                 slot: 1,
@@ -587,7 +671,7 @@ mod tests {
             } else {
                 None
             };
-            tree.insert(hash, Point::Specific { slot: i, hash }, i, i, prev);
+            tree.insert_simple(hash, Point::Specific { slot: i, hash }, i, i, prev);
         }
         assert_eq!(tree.len(), 10);
 
@@ -601,7 +685,7 @@ mod tests {
     #[test]
     fn snapshot_empty_tree() {
         let tree = ChainTree::new();
-        assert!(tree.snapshot([1; 32], 10, None).is_empty());
+        assert!(tree.snapshot_simple([1; 32], 10, None).is_empty());
     }
 
     #[test]
@@ -614,10 +698,10 @@ mod tests {
             } else {
                 None
             };
-            tree.insert(hash, Point::Specific { slot: i, hash }, i, i, prev);
+            tree.insert_simple(hash, Point::Specific { slot: i, hash }, i, i, prev);
         }
 
-        let entries = tree.snapshot([15; 32], 10, None);
+        let entries = tree.snapshot_simple([15; 32], 10, None);
         assert_eq!(entries.len(), 10);
         assert_eq!(entries[0].block_number, 6);
         assert_eq!(entries[9].block_number, 15);
@@ -634,10 +718,10 @@ mod tests {
             } else {
                 None
             };
-            tree.insert(hash, Point::Specific { slot: i, hash }, i, i, prev);
+            tree.insert_simple(hash, Point::Specific { slot: i, hash }, i, i, prev);
         }
         // Fork at block 3: 3 -> F4
-        tree.insert(
+        tree.insert_simple(
             [0xF4; 32],
             Point::Specific {
                 slot: 4,
@@ -648,7 +732,7 @@ mod tests {
             Some([3; 32]),
         );
 
-        let entries = tree.snapshot([5; 32], 10, None);
+        let entries = tree.snapshot_simple([5; 32], 10, None);
         // Should include all 5 main + 1 fork = 6
         assert_eq!(entries.len(), 6);
         // Fork block should be present
@@ -668,10 +752,10 @@ mod tests {
             } else {
                 None
             };
-            tree.insert(hash, Point::Specific { slot: i, hash }, i, i, prev);
+            tree.insert_simple(hash, Point::Specific { slot: i, hash }, i, i, prev);
         }
         // Fork from block 4: 4 -> F7 (block_number 7, within the 10-block window 6..15)
-        tree.insert(
+        tree.insert_simple(
             [0xF7; 32],
             Point::Specific {
                 slot: 7,
@@ -682,7 +766,7 @@ mod tests {
             Some([4; 32]),
         );
 
-        let entries = tree.snapshot([15; 32], 10, None);
+        let entries = tree.snapshot_simple([15; 32], 10, None);
         // Window is 6..15 (10 main blocks), but fork parent is block 4.
         // Should extend down to include block 4 as fork point.
         let has_block_4 = entries.iter().any(|e| e.block_number == 4);
@@ -697,7 +781,7 @@ mod tests {
     fn ancestors_stops_at_gap() {
         let mut tree = ChainTree::new();
         // Insert blocks 1, 2, 4, 5 — skip 3, creating a gap.
-        tree.insert(
+        tree.insert_simple(
             [1; 32],
             Point::Specific {
                 slot: 1,
@@ -707,7 +791,7 @@ mod tests {
             1,
             None,
         );
-        tree.insert(
+        tree.insert_simple(
             [2; 32],
             Point::Specific {
                 slot: 2,
@@ -718,7 +802,7 @@ mod tests {
             Some([1; 32]),
         );
         // Block 3 is missing.
-        tree.insert(
+        tree.insert_simple(
             [4; 32],
             Point::Specific {
                 slot: 4,
@@ -728,7 +812,7 @@ mod tests {
             4,
             Some([3; 32]),
         );
-        tree.insert(
+        tree.insert_simple(
             [5; 32],
             Point::Specific {
                 slot: 5,
@@ -748,7 +832,7 @@ mod tests {
     #[test]
     fn ancestors_reaches_genesis() {
         let mut tree = ChainTree::new();
-        tree.insert(
+        tree.insert_simple(
             [1; 32],
             Point::Specific {
                 slot: 1,
@@ -758,7 +842,7 @@ mod tests {
             1,
             None,
         );
-        tree.insert(
+        tree.insert_simple(
             [2; 32],
             Point::Specific {
                 slot: 2,
@@ -768,7 +852,7 @@ mod tests {
             2,
             Some([1; 32]),
         );
-        tree.insert(
+        tree.insert_simple(
             [3; 32],
             Point::Specific {
                 slot: 3,
@@ -793,7 +877,7 @@ mod tests {
             } else {
                 None
             };
-            tree.insert(hash, Point::Specific { slot: i, hash }, i, i, prev);
+            tree.insert_simple(hash, Point::Specific { slot: i, hash }, i, i, prev);
         }
         assert_eq!(tree.best_tip().map(|(_, bn)| bn), Some(10));
 
@@ -807,7 +891,7 @@ mod tests {
     fn prune_recomputes_best_tip() {
         let mut tree = ChainTree::new();
         // Two forks: A at heights 1-3, B at heights 1-5 (best tip).
-        tree.insert(
+        tree.insert_simple(
             [1; 32],
             Point::Specific {
                 slot: 1,
@@ -817,7 +901,7 @@ mod tests {
             1,
             None,
         );
-        tree.insert(
+        tree.insert_simple(
             [2; 32],
             Point::Specific {
                 slot: 2,
@@ -827,7 +911,7 @@ mod tests {
             2,
             Some([1; 32]),
         );
-        tree.insert(
+        tree.insert_simple(
             [3; 32],
             Point::Specific {
                 slot: 3,
@@ -837,7 +921,7 @@ mod tests {
             3,
             Some([2; 32]),
         );
-        tree.insert(
+        tree.insert_simple(
             [0xB4; 32],
             Point::Specific {
                 slot: 4,
@@ -847,7 +931,7 @@ mod tests {
             4,
             Some([2; 32]),
         );
-        tree.insert(
+        tree.insert_simple(
             [0xB5; 32],
             Point::Specific {
                 slot: 5,
@@ -870,7 +954,7 @@ mod tests {
     #[test]
     fn prune_all_clears_best_tip() {
         let mut tree = ChainTree::new();
-        tree.insert(
+        tree.insert_simple(
             [1; 32],
             Point::Specific {
                 slot: 1,

@@ -107,10 +107,12 @@ where
             Err(mpsc::error::TrySendError::Full(_)) => {
                 // Undo the counter increment since we didn't actually deliver.
                 state.counter.sub(payload_len);
-                return Err(MuxError::IngressOverflow {
+                let capacity = state.tx.max_capacity();
+                let queued = capacity.saturating_sub(state.tx.capacity());
+                return Err(MuxError::IngressChannelFull {
                     protocol: protocol_id,
-                    size: state.counter.load() + payload_len,
-                    limit: state.limit.load(),
+                    queued,
+                    capacity,
                 });
             }
             Err(mpsc::error::TrySendError::Closed(_)) => {

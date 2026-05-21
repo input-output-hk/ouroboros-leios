@@ -60,7 +60,9 @@ pub fn allocate_persistent_seats(
 /// Build the persistent committee for any committee-selection mode.
 ///
 /// - `WfaLs`: stake-weighted lottery for `persistent_voters` seats.
-/// - `EveryoneVotes`: every pool with non-zero stake gets one seat.
+/// - `EveryoneVotes`: every registered node gets one seat regardless of
+///   stake.  This is an extreme-test mode used to drive the maximum
+///   possible voter set; not a realistic selection scheme.
 /// - `StakeCentile`: pools whose cumulative stake (sorted descending)
 ///   covers the top `top_centile_of_stake` of total stake each get one
 ///   seat.
@@ -75,7 +77,6 @@ pub fn build_committee(
         } => allocate_persistent_seats(stake_registry, *persistent_voters, seed),
         CommitteeSelection::EveryoneVotes => stake_registry
             .iter()
-            .filter(|e| e.stake > 0)
             .map(|e| (e.node_id.clone(), 1u32))
             .collect(),
         CommitteeSelection::StakeCentile {
@@ -301,10 +302,12 @@ mod tests {
             entry("pool-b", 500),
         ];
         let committee = build_committee(&CommitteeSelection::EveryoneVotes, &registry, 0);
-        assert_eq!(committee.len(), 2);
+        // Extreme-test mode: every registered node gets a seat,
+        // regardless of stake.  Drives the maximum voter set.
+        assert_eq!(committee.len(), 3);
+        assert_eq!(committee["relay"], 1);
         assert_eq!(committee["pool-a"], 1);
         assert_eq!(committee["pool-b"], 1);
-        assert!(!committee.contains_key("relay"));
     }
 
     #[test]

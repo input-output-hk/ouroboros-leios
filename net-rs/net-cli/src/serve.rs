@@ -159,6 +159,8 @@ pub async fn run(
         max_connections_per_ip,
         peer_delays: std::collections::HashMap::new(),
         tx_body_resolver: None,
+        peer_rtt_observer: None,
+        outbound_behaviour: None,
     };
 
     let mut handle = spawn_coordinator(config);

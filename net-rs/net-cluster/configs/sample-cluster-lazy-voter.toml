@@ -1,0 +1,54 @@
+# Cluster with lazy-voter abstention pressed against the quorum threshold.
+#
+# Run with:
+#   cargo run -p net-cluster -- --config net-cluster/configs/sample-cluster-lazy-voter.toml
+#
+# Stake distribution is `mainnet-shaped`: ~71% of nodes are relays
+# (stake = 0, no votes) and ~29% are pools sharing the total stake
+# uniformly.  With `num_nodes = 30` that yields ~9 pool nodes.
+#
+# Committee selection is top-stake-fraction (TSF) inherited from
+# `mainnet.toml`: every pool in the top 99% of stake casts one
+# weight-1 vote, so the committee size is 9 and the quorum threshold
+# is `floor(0.75 × 9) = 6` voters.
+#
+# `behaviour_selection.fraction = 0.2` selects the top 20% of staked
+# nodes for LazyVoter; with 9 mainnet-shaped pools that's 2 lazy
+# voters ≈ 22% of voting stake.  Honest pools (7 of 9) clear quorum
+# (7 ≥ 6); raise `fraction` to 0.34 or above to push 4+ pools lazy
+# and force quorum failure.
+
+num_nodes = 30
+degree = 3
+min_latency_ms = 5
+max_latency_ms = 100
+
+base_config = "net-node/configs/mainnet.toml"
+base_port = 30300
+seed = 42
+output_events = "cluster-events-lazy-voter.jsonl"
+ordering_window_secs = 1.0
+aggregator_port = 9300
+stats_interval_secs = 1
+stake_distribution = "mainnet-shaped"
+rb_generation_probability = 0.05
+
+# Drive the mempool from each node at 1 tx/s so RBs overflow into EBs
+# and Leios voting elections fire.  Without this the inherited base
+# config leaves `tx_rate = 0` and there is nothing for lazy voters to
+# abstain on.  Higher rates (>= 5 tx/s × 30 nodes) press net-rs's
+# hub-spoke EB-tx fetch hard enough that MissingTX dominates the
+# no-vote signal and masks the lazy-stake effect.
+tx_rate = 1.0
+
+[behaviour]
+kind = "lazy-voter"
+
+# `stake-fraction` selects the smallest prefix of stake-bearing nodes
+# (sorted by stake descending) whose cumulative stake covers
+# `fraction` of total cluster stake — the same shape as CIP-0164
+# top-stake committee selection.  With `mainnet-shaped` distribution
+# and `fraction = 0.2`, this catches the largest ~20% of voting weight.
+[behaviour_selection]
+kind = "stake-fraction"
+fraction = 0.2

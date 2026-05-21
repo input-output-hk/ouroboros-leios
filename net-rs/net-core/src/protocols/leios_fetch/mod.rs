@@ -16,14 +16,23 @@ use crate::types::Point;
 /// LeiosFetch protocol ID in the multiplexer.
 pub const PROTOCOL_ID: u16 = 19;
 
-/// Ingress buffer limit for LeiosFetch (16 MB — carries full EBs and tx lists).
-pub const INGRESS_LIMIT: usize = 16_777_216;
+/// Ingress buffer limit for LeiosFetch (24 MB — carries full EBs and tx
+/// lists, with headroom over `SIZE_LIMIT_LARGE` so the demuxer can buffer
+/// one full-sized message in flight while the codec is still draining
+/// earlier segments).  Without that slack, the very last SDU of a
+/// max-size delivery overshoots the limit and tears the connection down.
+pub const INGRESS_LIMIT: usize = 25_165_824;
 
 /// Max message size for request messages (StIdle).
 pub const SIZE_LIMIT_SMALL: usize = 65_535;
 
-/// Max message size for delivery messages (StBlock, StBlockTxs, StVotes, StBlockRange).
-pub const SIZE_LIMIT_LARGE: usize = 16_777_216;
+/// Max buffer size while a delivery is in flight (StBlock, StBlockTxs,
+/// StVotes, StBlockRange).  This is a *buffer* bound enforced at the
+/// mux demuxer, not a per-message size cap; the actual per-message
+/// caps (MAX_BLOCK_SIZE, MAX_TRANSACTIONS, MAX_VOTES, MAX_TRANSACTION_SIZE)
+/// are checked during CBOR decoding.  The 50% headroom over those caps
+/// absorbs the segments that arrive while the consumer is mid-decode.
+pub const SIZE_LIMIT_LARGE: usize = 25_165_824;
 
 /// Maximum entries in a bitmap TX request.
 pub const MAX_BITMAP_ENTRIES: usize = 1024;

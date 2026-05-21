@@ -323,7 +323,7 @@ mod tests {
 
         let wait2 = actor2.wait_until(t2);
         assert_eq!(poll!(wait2), Poll::Pending);
-        while let Poll::Pending = poll!(&mut wait1) {
+        while poll!(&mut wait1).is_pending() {
             assert_eq!(poll!(&mut run_future), Poll::Pending);
         }
         // We expect a long time to have passed, because the "short" wait was cancelled

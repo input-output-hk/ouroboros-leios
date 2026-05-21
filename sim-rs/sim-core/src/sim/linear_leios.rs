@@ -16,7 +16,7 @@ use rand_chacha::ChaChaRng;
 use crate::{
     clock::{Clock, Timestamp},
     config::{
-        CommitteeSelectionAlgorithm, CpuTimeConfig, EBPropagationCriteria, LeiosVariant,
+        CommitteeSelectionAlgorithm, EBPropagationCriteria, LeiosVariant,
         MempoolSamplingStrategy, NodeBehaviours, NodeConfiguration, NodeId, RelayStrategy,
         SimConfiguration, TransactionConfig,
     },
@@ -24,202 +24,16 @@ use crate::{
     model::{
         BlockId, Endorsement, EndorserBlockId, LinearEndorserBlock as EndorserBlock,
         LinearRankingBlock as RankingBlock, LinearRankingBlockHeader as RankingBlockHeader,
-        NoVoteReason, Transaction, TransactionId, TransactionLostReason, VoteBundle,
-        VoteBundleId,
+        NoVoteReason, Transaction, TransactionId, TransactionLostReason, VoteBundle, VoteBundleId,
     },
     rng::{DrawSite, Rng},
     sim::{
-        MiniProtocol, NodeImpl, SimCpuTask, SimMessage,
+        NodeImpl,
         linear_leios::attackers::{EBWithholdingEvent, EBWithholdingSender},
+        linear_wire::{CpuTask, Message, TimedEvent},
         lottery::{LotteryConfig, LotteryKind, MockLotteryResults, vrf_probabilities},
     },
 };
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Message {
-    // TX propagation
-    AnnounceTx(TransactionId),
-    RequestTx(TransactionId),
-    Tx(Arc<Transaction>),
-
-    // RB header propagation
-    AnnounceRBHeader(BlockId),
-    RequestRBHeader(BlockId),
-    RBHeader(
-        RankingBlockHeader,
-        bool, /* has_body */
-        bool, /* has_eb */
-    ),
-
-    // RB body propagation
-    AnnounceRB(BlockId),
-    RequestRB(BlockId),
-    RB(Arc<RankingBlock>),
-
-    // EB propagation
-    AnnounceEB(EndorserBlockId),
-    RequestEB(EndorserBlockId),
-    EB(Arc<EndorserBlock>),
-
-    // Vote propagation
-    AnnounceVotes(VoteBundleId),
-    RequestVotes(VoteBundleId),
-    Votes(Arc<VoteBundle>),
-}
-
-impl SimMessage for Message {
-    fn protocol(&self) -> MiniProtocol {
-        match self {
-            Self::AnnounceTx(_) => MiniProtocol::Tx,
-            Self::RequestTx(_) => MiniProtocol::Tx,
-            Self::Tx(_) => MiniProtocol::Tx,
-
-            Self::AnnounceRBHeader(_) => MiniProtocol::Block,
-            Self::RequestRBHeader(_) => MiniProtocol::Block,
-            Self::RBHeader(_, _, _) => MiniProtocol::Block,
-
-            Self::AnnounceRB(_) => MiniProtocol::Block,
-            Self::RequestRB(_) => MiniProtocol::Block,
-            Self::RB(_) => MiniProtocol::Block,
-
-            Self::AnnounceEB(_) => MiniProtocol::EB,
-            Self::RequestEB(_) => MiniProtocol::EB,
-            Self::EB(_) => MiniProtocol::EB,
-
-            Self::AnnounceVotes(_) => MiniProtocol::Vote,
-            Self::RequestVotes(_) => MiniProtocol::Vote,
-            Self::Votes(_) => MiniProtocol::Vote,
-        }
-    }
-
-    fn bytes_size(&self) -> u64 {
-        match self {
-            Self::AnnounceTx(_) => 8,
-            Self::RequestTx(_) => 8,
-            Self::Tx(tx) => tx.bytes,
-
-            Self::AnnounceRBHeader(_) => 8,
-            Self::RequestRBHeader(_) => 8,
-            Self::RBHeader(header, _, _) => header.bytes,
-
-            Self::AnnounceRB(_) => 8,
-            Self::RequestRB(_) => 8,
-            Self::RB(rb) => rb.bytes(),
-
-            Self::AnnounceEB(_) => 8,
-            Self::RequestEB(_) => 8,
-            Self::EB(eb) => eb.bytes,
-
-            Self::AnnounceVotes(_) => 8,
-            Self::RequestVotes(_) => 8,
-            Self::Votes(v) => v.bytes,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CpuTask {
-    /// A transaction has been received and validated, and is ready to propagate
-    TransactionValidated(NodeId, Arc<Transaction>),
-    /// A ranking block has been generated and is ready to propagate
-    RBBlockGenerated(RankingBlock, Option<(EndorserBlock, Vec<Arc<Transaction>>)>),
-    /// An RB header has been received and validated, and ready to propagate
-    RBHeaderValidated(NodeId, RankingBlockHeader, bool, bool),
-    /// A ranking block has been received and validated, and is ready to propagate
-    RBBlockValidated(Arc<RankingBlock>),
-    /// An endorser block has been received, and its header has been validated. It is ready to propagate.
-    EBHeaderValidated(NodeId, Arc<EndorserBlock>),
-    /// An endorser block has been received and validated, and is ready to propagate
-    EBBlockValidated(Arc<EndorserBlock>, Timestamp),
-    /// A bundle of votes has been generated and is ready to propagate
-    VTBundleGenerated(VoteBundle, Arc<EndorserBlock>),
-    /// A bundle of votes has been received and validated, and is ready to propagate
-    VTBundleValidated(NodeId, Arc<VoteBundle>),
-}
-
-impl SimCpuTask for CpuTask {
-    fn name(&self) -> String {
-        match self {
-            Self::TransactionValidated(_, _) => "ValTX",
-            Self::RBBlockGenerated(_, _) => "GenRB",
-            Self::RBHeaderValidated(_, _, _, _) => "ValRH",
-            Self::RBBlockValidated(_) => "ValRB",
-            Self::EBHeaderValidated(_, _) => "ValEH",
-            Self::EBBlockValidated(_, _) => "ValEB",
-            Self::VTBundleGenerated(_, _) => "GenVote",
-            Self::VTBundleValidated(_, _) => "ValVote",
-        }
-        .to_string()
-    }
-
-    fn extra(&self) -> String {
-        match self {
-            Self::TransactionValidated(_, _) => "".to_string(),
-            Self::RBBlockGenerated(_, _) => "".to_string(),
-            Self::RBHeaderValidated(_, _, _, _) => "".to_string(),
-            Self::RBBlockValidated(_) => "".to_string(),
-            Self::EBHeaderValidated(_, _) => "".to_string(),
-            Self::EBBlockValidated(_, _) => "".to_string(),
-            Self::VTBundleGenerated(_, _) => "".to_string(),
-            Self::VTBundleValidated(_, _) => "".to_string(),
-        }
-    }
-
-    fn times(&self, config: &CpuTimeConfig) -> Vec<Duration> {
-        match self {
-            Self::TransactionValidated(_, tx) => vec![
-                config.tx_validation_constant + config.tx_validation_per_byte * tx.bytes as u32,
-            ],
-            Self::RBBlockGenerated(rb, eb) => {
-                let mut rb_time = config.rb_generation + config.rb_body_validation_constant;
-                let rb_bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
-                rb_time += config.rb_validation_per_byte * (rb_bytes as u32);
-                if let Some(endorsement) = &rb.endorsement {
-                    let nodes = endorsement.votes.len();
-                    rb_time += config.cert_generation_constant
-                        + (config.cert_generation_per_node * nodes as u32);
-                }
-                let mut times = vec![rb_time];
-
-                if let Some((eb, _)) = eb {
-                    let mut eb_time = config.eb_generation + config.eb_body_validation_constant;
-                    let eb_bytes: u64 = eb.txs.iter().map(|tx| tx.bytes).sum();
-                    eb_time += config.eb_body_validation_per_byte * (eb_bytes as u32);
-                    times.push(eb_time);
-                }
-                times
-            }
-            Self::RBHeaderValidated(_, _, _, _) => vec![config.rb_head_validation],
-            Self::RBBlockValidated(rb) => {
-                let mut time = config.rb_body_validation_constant;
-                let bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
-                time += config.rb_validation_per_byte * (bytes as u32);
-                if let Some(endorsement) = &rb.endorsement {
-                    let nodes = endorsement.votes.len();
-                    time += config.cert_validation_constant
-                        + (config.cert_validation_per_node * nodes as u32);
-                }
-                vec![time]
-            }
-            Self::EBHeaderValidated(_, _) => vec![config.eb_header_validation],
-            Self::EBBlockValidated(eb, _) => {
-                let mut time = config.eb_body_validation_constant;
-                let bytes: u64 = eb.txs.iter().map(|tx| tx.bytes).sum();
-                time += config.eb_body_validation_per_byte * (bytes as u32);
-                vec![time]
-            }
-            Self::VTBundleGenerated(_, eb) => vec![
-                config.vote_generation_constant
-                    + (config.vote_generation_per_tx * eb.txs.len() as u32),
-            ],
-            Self::VTBundleValidated(_, _) => vec![config.vote_validation],
-        }
-    }
-}
-
-pub enum TimedEvent {
-    TryVote(Arc<EndorserBlock>, Timestamp),
-}
 
 enum TransactionView {
     Pending { seen_slot: u64 },
@@ -424,6 +238,22 @@ impl NodeImpl for LinearLeiosNode {
             Message::AnnounceVotes(id) => self.receive_announce_votes(from, id),
             Message::RequestVotes(id) => self.receive_request_votes(from, id),
             Message::Votes(votes) => self.receive_votes(from, votes),
+
+            // Per-vote variants are emitted exclusively by the shared-consensus
+            // adapter; a sim run uses one adapter throughout so this
+            // arm is unreachable.
+            Message::AnnounceVote(_) | Message::RequestVote(_) | Message::Vote(_) => {
+                unreachable!("linear_leios.rs does not exchange per-vote messages");
+            }
+            // EB-tx fetch triplet is shared-consensus-only.  `linear_leios.rs`
+            // delivers tx bodies via the inline `Message::EB` payload
+            // and falls back to normal tx diffusion for the missing
+            // set, so these variants don't reach this dispatch.
+            Message::AnnounceEBTxs(_)
+            | Message::RequestEBTxs(_, _)
+            | Message::EBTxs(_, _) => {
+                unreachable!("linear_leios.rs does not exchange EB-tx fetch messages");
+            }
         }
         std::mem::take(&mut self.queued)
     }
@@ -441,6 +271,14 @@ impl NodeImpl for LinearLeiosNode {
             CpuTask::VTBundleGenerated(votes, _) => self.finish_generating_vote_bundle(votes),
             CpuTask::VTBundleValidated(from, votes) => {
                 self.finish_validating_vote_bundle(from, votes)
+            }
+            CpuTask::VoteGenerated(_) | CpuTask::VoteValidated(_, _) => {
+                unreachable!("linear_leios.rs does not schedule per-vote CpuTasks");
+            }
+            CpuTask::RBBlockApplied(_) | CpuTask::EBBlockApplied(_) => {
+                unreachable!(
+                    "linear_leios.rs collapses validate+apply; ledger-apply CpuTasks are shared-consensus only"
+                );
             }
         }
         std::mem::take(&mut self.queued)

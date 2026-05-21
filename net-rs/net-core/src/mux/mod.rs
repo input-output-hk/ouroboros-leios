@@ -110,6 +110,13 @@ pub enum MuxError {
         limit: usize,
     },
 
+    #[error("ingress channel full for protocol {protocol}: {queued} segments queued (capacity {capacity}); consumer not draining fast enough")]
+    IngressChannelFull {
+        protocol: ProtocolId,
+        queued: usize,
+        capacity: usize,
+    },
+
     #[error("unknown protocol {0}")]
     UnknownProtocol(ProtocolId),
 

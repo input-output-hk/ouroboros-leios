@@ -1,24 +1,23 @@
-//! Leios consensus layer.
+//! Leios consensus layer — thin I/O wrapper around `shared_consensus::leios::LeiosState`.
 //!
-//! Tracks per-EB elections following the CIP-0164 Linear Leios pipeline model.
-//! Each validated EB gets its own election with phases driven by slot ticks
-//! and pipeline timing parameters (3×Δhdr + L_vote + L_diff). When an election
-//! enters the Voting phase, committee selection determines whether this node
-//! votes, and if so, a structured vote body is injected into the network.
-//!
-//! Submodules:
-//! - `pipeline` — phase types, timing config, pure phase computation
-//! - `voting` — EB-triggered vote production with committee selection
-//! - `aggregation` — (future) vote tallies, quorum detection, certificates
+//! Public methods take wire-format args (`NetworkEvent`, `LedgerOutcome`,
+//! `BlockBody`/`WrappedHeader` indirectly via the production wire codec),
+//! translate to logical args, run the state machine, and dispatch the
+//! returned `Vec<LeiosEffect>` to the network-command channel and
+//! validator actor.  Vote-body construction lives here too: the state
+//! machine emits `EmitVote` carrying logical args (PV flag, NPV
+//! eligibility signature) and this layer encodes the wire-format body.
 
-mod aggregation;
-mod pipeline;
-pub(crate) mod voting;
-mod wfa;
+use std::collections::BTreeMap;
+use std::time::Instant;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::time::{Duration, Instant};
-
+use shared_consensus::elections::{Elections, ElectionsConfig};
+use shared_consensus::leios::{
+    ChainTipContext, LeiosEffect, LeiosState, LeiosTelemetryEvent, ValidatedVote, VotingConfig,
+};
+pub use shared_consensus::leios::EbTxMatchOutcome;
+pub use shared_consensus::pipeline::PipelineConfig;
+use shared_consensus::wfa;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::Point;
 use rand::rngs::StdRng;
@@ -27,78 +26,17 @@ use tokio::sync::{mpsc, watch};
 use tracing::info;
 
 use crate::config::{CommitteeSelection, DynamicConfig, StakeEntry};
+use crate::production::{decode_overflow_eb, VoteBody};
 use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerCommand, Validator};
 
-use pipeline::EbElection;
-pub use pipeline::PipelineConfig;
-use pipeline::PipelinePhase;
-pub use voting::VotingConfig;
-
-/// Result of matching a `LeiosBlockTxsReceived` response against the
-/// cached manifest. Lets the caller forward only verified bodies into
-/// the validator and detect partial responses.
-#[derive(Debug)]
-pub struct EbTxMatchOutcome {
-    /// Bodies whose blake2b hash maps to a requested manifest index,
-    /// in ascending manifest-index order.
-    pub matched_bodies: Vec<Vec<u8>>,
-    /// Number of indices that the original request bitmap selected.
-    /// Zero means "manifest not cached at request time" (fallback path).
-    pub requested: usize,
-    /// Indices we requested but didn't receive a matching body for.
-    /// If non-empty, the caller should issue another `FetchLeiosBlockTxs`
-    /// to a different peer with this bitmap.
-    pub remaining_bitmap: std::collections::BTreeMap<u16, u64>,
-}
-
-/// How long an in-flight Leios fetch entry remains active before being
-/// considered stale. Matches the Praos in-flight TTL.
-const IN_FLIGHT_TTL: Duration = Duration::from_secs(15);
-
 pub struct LeiosConsensus {
-    node_id: String,
+    pub(crate) state: LeiosState,
     commands: mpsc::Sender<NetworkCommand>,
     validator: Validator,
     /// Local mempool. Used to compute the bitmap of missing txs when a
     /// peer announces an EB's transactions.
     mempool: crate::mempool::SharedMempool,
-    /// Per-EB ordered tx hash list, decoded from the EB manifest on
-    /// `LeiosBlockReceived`. Drives the missing-tx bitmap on
-    /// `LeiosBlockTxsOffered`. Tagged with the EB's announced slot so
-    /// stale entries (manifest received but never validated, or kept
-    /// past pipeline expiry) can be pruned in `on_slot`.
-    eb_tx_hashes: HashMap<[u8; 32], (u64, Vec<[u8; 32]>)>,
-    /// Per-EB requested bitmap. Set when a `FetchLeiosBlockTxs` command
-    /// is issued; used at response time to verify which manifest indices
-    /// were actually fulfilled (response[i] semantics aren't recoverable
-    /// from the wire, so we hash each body and look it up in the manifest).
-    /// Tagged with the EB's announced slot for the same reason as
-    /// `eb_tx_hashes`.
-    pending_eb_tx_fetches: HashMap<[u8; 32], (u64, std::collections::BTreeMap<u16, u64>)>,
-    /// Leios points currently being fetched.
-    in_flight: HashMap<Point, Instant>,
-    /// Pipeline timing parameters.
-    pipeline: PipelineConfig,
-    /// Current slot (advanced by `on_slot`).
-    current_slot: u64,
-    /// Per-EB elections, keyed by EB hash.
-    elections: HashMap<[u8; 32], EbElection>,
-    /// Committee selection mode.
-    committee_selection: CommitteeSelection,
-    /// Voting configuration (committee selection, stake, vote sizes).
-    voting_config: VotingConfig,
-    /// Per-pool persistent committee allocation, identical on every node.
-    persistent_committee: BTreeMap<String, u32>,
-    /// Network-wide stake registry. Used to look up a voter's stake when
-    /// re-running the NPV lottery for incoming votes.
-    stake_registry: BTreeMap<String, u64>,
-    /// Total network stake (sum of stake_registry).
-    total_stake: u64,
-    /// Fraction of expected committee weight required for quorum.
-    quorum_weight_fraction: f64,
-    /// Σ persistent_seats + non_persistent_voters. Threshold base.
-    expected_committee_size: u32,
     /// RNG reserved for future randomization (currently unused: PV is
     /// deterministic from the cached committee, NPV from the signature).
     #[allow(dead_code)]
@@ -145,6 +83,10 @@ impl LeiosConsensus {
             persistent_vote_bytes,
             non_persistent_vote_bytes,
             persistent_seats,
+            // Net-rs keeps the CIP-0164 retry semantics; the
+            // single-shot collapse is sim-only for like-for-like
+            // comparison against `linear_leios.rs`.
+            retry_vote_in_window: true,
         };
         info!(
             node_id = %node_id,
@@ -153,24 +95,22 @@ impl LeiosConsensus {
             committee_pools = persistent_committee.len(),
             "leios committee initialized"
         );
-        Self {
-            node_id,
-            commands,
-            validator,
-            mempool,
-            eb_tx_hashes: HashMap::new(),
-            pending_eb_tx_fetches: HashMap::new(),
-            in_flight: HashMap::new(),
+        let elections = Elections::new(ElectionsConfig {
+            node_id: node_id.clone(),
             pipeline,
-            current_slot: 0,
-            elections: HashMap::new(),
             committee_selection,
-            voting_config,
             persistent_committee,
             stake_registry,
             total_stake,
-            quorum_weight_fraction,
             expected_committee_size,
+            quorum_weight_fraction,
+        });
+        let state = LeiosState::new(node_id, elections, voting_config, pipeline);
+        Self {
+            state,
+            commands,
+            validator,
+            mempool,
             rng: match rng_seed {
                 Some(s) => StdRng::seed_from_u64(s),
                 None => StdRng::from_entropy(),
@@ -180,518 +120,428 @@ impl LeiosConsensus {
         }
     }
 
-    /// Drain buffered telemetry events. Caller emits each via the telemetry sink.
+    /// Drain buffered telemetry events.
     pub fn drain_telemetry(&mut self) -> Vec<NodeEvent> {
         std::mem::take(&mut self.pending_telemetry)
     }
 
-    /// Slot of the earliest EB that's both at quorum and CertEligible.
-    /// Used by the RB producer to populate `RbCertifiedEb` telemetry when
-    /// the produced header carries `certified_eb=true`.
-    pub fn certified_eb_slot(&self) -> Option<u64> {
-        self.elections
-            .values()
-            .filter(|e| e.quorum_reached && e.phase == PipelinePhase::CertEligible)
-            .map(|e| e.announced_slot)
-            .min()
+    /// If the EB at `eb_hash` has reached quorum and entered
+    /// CertEligible, return its announced slot; otherwise `None`.
+    /// The Praos adapter combines this with the parent RB's announced
+    /// EB hash to decide whether to attach a cert (linear-Leios rule:
+    /// the cert can only target the parent RB's EB).
+    pub fn eb_certifiable_slot(&self, eb_hash: &[u8; 32]) -> Option<u64> {
+        self.state.eb_certifiable_slot(eb_hash)
     }
 
-    // -- Slot tick ----------------------------------------------------------
+    /// Update the adopted-chain-tip metadata used by the CIP-0164
+    /// voting predicates (`LateRBHeader`, `WrongEB`).  The Praos
+    /// adapter calls this whenever a new RB is adopted as the chain
+    /// tip — passing the slot at which the RB header arrived locally
+    /// and the EB hash (if any) the header announces.
+    pub fn set_chain_tip_context(&mut self, ctx: ChainTipContext) {
+        self.state.set_chain_tip_context(ctx);
+    }
 
-    /// Advance slot tracking. Updates pipeline phases, triggers voting
-    /// for elections entering the Voting phase, and prunes expired ones.
+    /// Replace the per-peer RTT oracle the EB / EB-tx / vote fetch
+    /// policies consult.  The Consensus facade calls this with the
+    /// shared [`shared_consensus::fetch::PeerRttCache`] the coordinator's
+    /// `peer_rtt_observer` callback writes into.
+    pub fn set_rtt(&mut self, rtt: shared_consensus::fetch::PeerRttCache) {
+        self.state.set_rtt(Box::new(rtt));
+    }
+
+    /// Replace the EbFetchPolicy shared-consensus consults when emitting
+    /// `FetchLeiosBlock`.
+    pub fn set_eb_policy(
+        &mut self,
+        policy: Box<dyn shared_consensus::fetch::EbFetchPolicy + Send + Sync>,
+    ) {
+        self.state.set_eb_policy(policy);
+    }
+
+    /// Replace the EbTxsFetchPolicy shared-consensus consults when emitting
+    /// `FetchLeiosBlockTxs`.  Driven by `fetch_policy.eb_txs` — fanning
+    /// out EB-txs is the primary research lever we have to characterise
+    /// the cluster collapse mode.
+    pub fn set_eb_txs_policy(
+        &mut self,
+        policy: Box<dyn shared_consensus::fetch::EbTxsFetchPolicy + Send + Sync>,
+    ) {
+        self.state.set_eb_txs_policy(policy);
+    }
+
+    /// Replace the VoteFetchPolicy shared-consensus consults when emitting
+    /// `FetchLeiosVotes`.
+    pub fn set_vote_policy(
+        &mut self,
+        policy: Box<dyn shared_consensus::fetch::VoteFetchPolicy + Send + Sync>,
+    ) {
+        self.state.set_vote_policy(policy);
+    }
+
+    /// Install a shared behaviour handle on the underlying state.  The
+    /// `Consensus` facade hands the same handle to every owned state
+    /// machine and the coordinator.
+    pub fn install_behaviour_handle(
+        &mut self,
+        handle: shared_consensus::behaviour::BehaviourHandle,
+    ) {
+        self.state.behaviour = handle;
+    }
+
+    /// Mutable borrow of [`LeiosState`] for the few wrapper paths that
+    /// need to drive the take/restore behaviour helpers (e.g.
+    /// `ask_rb_production_strategy`).
+    pub(crate) fn state_mut(&mut self) -> &mut shared_consensus::leios::LeiosState {
+        &mut self.state
+    }
+
+    /// Advance slot tracking, drive elections, dispatch any effects.
     pub async fn on_slot(&mut self, slot: u64) {
-        self.current_slot = slot;
-
-        // Find elections that are in Voting phase and haven't been voted on.
-        let to_vote: Vec<([u8; 32], u64)> = self
-            .elections
-            .iter()
-            .filter(|(_, e)| {
-                let elapsed = slot.saturating_sub(e.announced_slot);
-                matches!(
-                    self.pipeline.phase_for_elapsed(elapsed),
-                    Some(PipelinePhase::Voting)
-                ) && !e.voted
-            })
-            .map(|(hash, e)| (*hash, e.announced_slot))
-            .collect();
-
-        // Vote on each eligible EB.
-        for (hash, eb_slot) in to_vote {
-            if voting::try_vote_on_eb(
-                &self.node_id,
-                &hash,
-                eb_slot,
-                &self.voting_config,
-                &self.commands,
-            )
-            .await
-            {
-                if let Some(election) = self.elections.get_mut(&hash) {
-                    election.voted = true;
-                }
-            }
-        }
-
-        // Update phases and prune expired. Emit telemetry for each pruned election.
-        let node_id = &self.node_id;
-        let pending = &mut self.pending_telemetry;
-        self.elections.retain(|_, election| {
-            match self
-                .pipeline
-                .phase_for_elapsed(slot.saturating_sub(election.announced_slot))
-            {
-                Some(phase) => {
-                    election.phase = phase;
-                    true
-                }
-                None => {
-                    pending.push(NodeEvent::LeiosElectionExpired {
-                        node: node_id.clone(),
-                        eb_slot: election.announced_slot,
-                        had_quorum: election.quorum_reached,
-                        voted_weight: election.voter_weights.values().map(|w| *w as u64).sum(),
-                        voters: election.voter_weights.len(),
-                    });
-                    false
-                }
-            }
-        });
-        // Prune EB manifests and in-progress tx-fetch state by slot age.
-        // Done independently of `elections` so a manifest that arrived
-        // but never produced a validated election still expires.
-        let pipeline = self.pipeline;
-        self.eb_tx_hashes.retain(|_, (eb_slot, _)| {
-            pipeline
-                .phase_for_elapsed(slot.saturating_sub(*eb_slot))
-                .is_some()
-        });
-        self.pending_eb_tx_fetches.retain(|_, (eb_slot, _)| {
-            pipeline
-                .phase_for_elapsed(slot.saturating_sub(*eb_slot))
-                .is_some()
-        });
+        // Snapshot every locally available tx id — the FIFO mempool
+        // plus EB-pinned bodies — so the CIP-0164 `MissingTX` predicate
+        // sees both the producer's own pinned EB closure and any bodies
+        // a receiver has merged via `LeiosFetch BlockTxs`.  Snapshot
+        // upfront so we don't hold the mempool lock across the call.
+        let known = self.mempool.lock().unwrap().all_known_tx_ids();
+        let tx_known = |h: &[u8; 32]| known.contains(h.as_slice());
+        let fx = self.state.on_slot(slot, &tx_known);
+        self.dispatch(fx).await;
     }
 
-    // -- Network event routing ----------------------------------------------
-
-    /// Handle one Leios-shaped network event. Returns true if the event was
-    /// consumed by this layer (caller should not log it separately).
+    /// Handle a Leios-shaped network event.
     pub async fn handle_event(&mut self, event: &NetworkEvent) -> bool {
-        self.evict_stale_in_flight();
-        match event {
-            NetworkEvent::LeiosBlockOffered { point } => {
-                if !self.in_flight.contains_key(point) {
-                    self.mark_in_flight(point.clone());
-                    info!(node_id = %self.node_id, %point, "fetching leios block");
-                    let _ = self
-                        .commands
-                        .send(NetworkCommand::FetchLeiosBlock {
-                            point: point.clone(),
-                        })
-                        .await;
-                }
-                true
+        let now = Instant::now();
+        let (consumed, fx): (bool, Vec<LeiosEffect>) = match event {
+            NetworkEvent::LeiosBlockOffered { peer_id, point } => (
+                true,
+                self.state.on_eb_offered(point.clone(), *peer_id, now),
+            ),
+            NetworkEvent::LeiosBlockTxsOffered { peer_id, point } => {
+                let bitmap = self.bitmap_for_missing_txs(point);
+                (
+                    true,
+                    self.state
+                        .on_eb_txs_offered(point.clone(), *peer_id, bitmap, now),
+                )
             }
-            NetworkEvent::LeiosBlockTxsOffered { point } => {
-                let key = Point::Specific {
-                    slot: match point {
-                        Point::Specific { slot, .. } => *slot,
-                        _ => 0,
-                    },
-                    hash: [0xFE; 32],
-                };
-                if !self.in_flight.contains_key(&key) {
-                    self.mark_in_flight(key);
-                    let bitmap = self.bitmap_for_missing_txs(point);
-                    info!(
-                        node_id = %self.node_id,
-                        %point,
-                        bitmap_segments = bitmap.len(),
-                        "fetching leios block txs"
-                    );
-                    if let Point::Specific { slot, hash } = point {
-                        self.pending_eb_tx_fetches
-                            .insert(*hash, (*slot, bitmap.clone()));
-                    }
-                    let _ = self
-                        .commands
-                        .send(NetworkCommand::FetchLeiosBlockTxs {
-                            point: point.clone(),
-                            bitmap,
-                        })
-                        .await;
-                }
-                true
-            }
-            NetworkEvent::LeiosVotesOffered { votes } => {
-                if !votes.is_empty() {
-                    info!(
-                        node_id = %self.node_id,
-                        count = votes.len(),
-                        "fetching leios votes"
-                    );
-                    let _ = self
-                        .commands
-                        .send(NetworkCommand::FetchLeiosVotes {
-                            votes: votes.clone(),
-                        })
-                        .await;
-                }
-                true
-            }
+            NetworkEvent::LeiosVotesOffered { peer_id, votes } => (
+                true,
+                self.state.on_votes_offered(*peer_id, votes.clone()),
+            ),
             NetworkEvent::LeiosBlockReceived { point, block } => {
-                self.in_flight.remove(point);
-                if let Point::Specific { slot, hash } = point {
-                    if let Some((_slot, hashes)) = crate::production::decode_overflow_eb(block) {
-                        self.eb_tx_hashes.insert(*hash, (*slot, hashes.clone()));
-                        // Tell the coordinator's LeiosStore so this node
-                        // can re-serve EB tx requests via the mempool-
-                        // backed resolver.
-                        let _ = self
-                            .commands
-                            .send(NetworkCommand::RecordLeiosEbManifest {
-                                point: point.clone(),
-                                tx_hashes: hashes,
-                            })
-                            .await;
-                    }
-                }
-                self.validator
-                    .submit(LedgerCommand::ValidateEb {
-                        point: point.clone(),
-                    })
-                    .await;
-                true
+                let manifest = decode_overflow_eb(block).map(|(_, hashes)| hashes);
+                (true, self.state.on_eb_received(point.clone(), manifest))
             }
             NetworkEvent::LeiosVotesReceived {
                 vote_ids,
                 vote_data,
-            } => {
-                self.validator
-                    .submit(LedgerCommand::ValidateVotes {
-                        vote_ids: vote_ids.clone(),
-                        vote_data: vote_data.clone(),
-                    })
-                    .await;
-                true
-            }
+            } => (
+                true,
+                self.state.on_votes_received(vote_ids.clone(), vote_data.clone()),
+            ),
             NetworkEvent::LeiosBlockTxsReceived {
                 point,
                 transactions,
             } => {
-                // Drop the in-flight gate so subsequent offers can trigger
-                // fresh fetches. Retries (partial-response handling) issue
-                // their own commands via `retry_eb_tx_fetch` and do not
-                // need the gate.
-                if let Point::Specific { slot, .. } = point {
-                    let gate_key = Point::Specific {
-                        slot: *slot,
-                        hash: [0xFE; 32],
-                    };
-                    self.in_flight.remove(&gate_key);
-                }
-                info!(
-                    node_id = %self.node_id,
-                    %point,
-                    count = transactions.len(),
-                    "leios block txs received"
-                );
-                true
+                self.state.on_eb_txs_received(point, transactions.len());
+                (true, Vec::new())
             }
-            _ => false,
-        }
-    }
-
-    // -- Validation outcome handlers ----------------------------------------
-
-    /// Called when EB validation completes. Creates a per-EB election
-    /// with the appropriate pipeline phase based on elapsed time.
-    pub fn on_validated_eb(&mut self, point: Point) {
-        let (slot, hash) = match &point {
-            Point::Specific { slot, hash } => (*slot, *hash),
-            Point::Origin => return,
+            _ => (false, Vec::new()),
         };
-
-        if self.elections.contains_key(&hash) {
-            return;
-        }
-
-        let elapsed = self.current_slot.saturating_sub(slot);
-        if let Some(phase) = self.pipeline.phase_for_elapsed(elapsed) {
-            info!(
-                node_id = %self.node_id,
-                %point,
-                ?phase,
-                "eb election created"
-            );
-            self.elections.insert(
-                hash,
-                EbElection {
-                    eb_point: point,
-                    announced_slot: slot,
-                    phase,
-                    validated_at: Instant::now(),
-                    voted: false,
-                    voter_weights: HashMap::new(),
-                    quorum_reached: false,
-                },
-            );
-        }
+        self.dispatch(fx).await;
+        consumed
     }
 
-    /// Called when vote validation completes. Derives each vote's weight
-    /// (PV: persistent committee lookup; NPV: re-run the lottery from
-    /// the embedded eligibility signature and the voter's ledger stake)
-    /// and attributes it to the relevant EB election, checking quorum.
+    /// EB validation completed; create an election.
+    pub fn on_validated_eb(&mut self, point: Point) {
+        self.state.on_validated_eb(point);
+    }
+
+    /// Register a self-produced EB.  Decodes the manifest, runs the
+    /// same `on_eb_received` path receivers go through (so the
+    /// `RecordLeiosEbManifest` effect lands in the LeiosStore and
+    /// peer offers fire), and marks the EB validated immediately —
+    /// the producer trusts its own work.
+    pub async fn register_self_produced_eb(&mut self, point: Point, eb_data: &[u8]) {
+        let manifest = decode_overflow_eb(eb_data).map(|(_, hashes)| hashes);
+        let fx = self.state.on_eb_received(point.clone(), manifest);
+        self.dispatch(fx).await;
+        self.state.on_validated_eb(point);
+    }
+
+    /// Vote validation completed; record each vote, fire quorum
+    /// telemetry if quorum forms.
     pub fn on_validated_votes(&mut self, vote_data: &[Vec<u8>]) {
-        for blob in vote_data {
-            let Some(body) = crate::production::VoteBody::decode(blob) else {
-                continue;
-            };
-            let voter_id_str = String::from_utf8_lossy(&body.voter_id).into_owned();
-            let weight = match (body.tag, &body.eligibility_signature) {
-                (0, _) => self
-                    .persistent_committee
-                    .get(&voter_id_str)
-                    .copied()
-                    .unwrap_or(0),
-                (1, Some(sig)) => {
-                    let stake = self.stake_registry.get(&voter_id_str).copied().unwrap_or(0);
-                    wfa::count_npv_wins(
-                        sig,
-                        stake,
-                        self.total_stake,
-                        self.committee_selection.non_persistent_voters(),
-                    )
-                }
-                _ => 0,
-            };
-            if weight == 0 {
-                continue;
-            }
-            // Dedup key: voter_id + tag (a node may issue both a PV and
-            // an NPV body for the same EB).
-            let mut key = body.voter_id.clone();
-            key.push(body.tag);
-            if let Some(formed) = aggregation::record_vote(
-                &mut self.elections,
-                &body.endorser_block_hash,
-                key,
-                weight,
-                self.quorum_weight_fraction,
-                self.expected_committee_size,
-                &self.node_id,
-            ) {
+        // Decode wire-format vote bodies up front so we can lend them
+        // to the state machine as borrowed `ValidatedVote` views.
+        let decoded: Vec<VoteBody> = vote_data
+            .iter()
+            .filter_map(|b| VoteBody::decode(b))
+            .collect();
+        let bodies: Vec<ValidatedVote> = decoded
+            .iter()
+            .map(|body| ValidatedVote {
+                voter_id: &body.voter_id,
+                tag: body.tag,
+                eligibility_signature: body.eligibility_signature.as_deref(),
+                endorser_block_hash: &body.endorser_block_hash,
+                endorser_block_slot: body.election_id,
+            })
+            .collect();
+        let fx = self.state.on_validated_votes(bodies);
+        // Only telemetry effects come out of this path; fold them into
+        // the pending buffer inline so the caller can stay sync.
+        for eff in fx {
+            if let LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::QuorumReached {
+                eb_slot,
+                voted_weight,
+                voters,
+            }) = eff
+            {
                 self.pending_telemetry.push(NodeEvent::LeiosQuorumReached {
-                    node: self.node_id.clone(),
-                    eb_slot: formed.eb_slot,
-                    voted_weight: formed.voted_weight,
-                    voters: formed.voters,
+                    node: self.state.node_id.clone(),
+                    eb_slot,
+                    voted_weight,
+                    voters,
                 });
             }
         }
     }
 
-    /// Verify a `LeiosBlockTxsReceived` response against the manifest.
-    /// Each body is hashed and matched against the cached manifest tx
-    /// hashes. Only bodies whose hash maps to a manifest index that we
-    /// requested are returned (in manifest order). Other bodies are
-    /// dropped silently — peer is misbehaving or off-by-one.
-    ///
-    /// Also reports `(matched, requested)` for partial-response detection.
-    pub fn match_eb_tx_response(&mut self, point: &Point, bodies: &[Vec<u8>]) -> EbTxMatchOutcome {
-        use net_core::protocols::leios_fetch::bitmap;
-        let (eb_slot, hash) = match point {
-            Point::Specific { slot, hash } => (*slot, *hash),
-            Point::Origin => {
-                return EbTxMatchOutcome {
-                    matched_bodies: Vec::new(),
-                    requested: 0,
-                    remaining_bitmap: BTreeMap::new(),
-                };
-            }
-        };
-        let Some((_, manifest)) = self.eb_tx_hashes.get(&hash) else {
-            // Manifest unknown — we have no way to verify. Pass bodies
-            // through; the validator will hash them and any unrelated
-            // tx will simply sit in the mempool unused.
-            self.pending_eb_tx_fetches.remove(&hash);
-            return EbTxMatchOutcome {
-                matched_bodies: bodies.to_vec(),
-                requested: 0,
-                remaining_bitmap: BTreeMap::new(),
-            };
-        };
-        let requested_bitmap = self.pending_eb_tx_fetches.remove(&hash).map(|(_, b)| b);
-        let requested_indices: Vec<u32> = requested_bitmap
-            .as_ref()
-            .map(|b| bitmap::iter_indices(b).collect())
-            .unwrap_or_default();
-        let requested = requested_indices.len();
-
-        // Build expected_hash → manifest_index map for the indices we asked
-        // for, restricting to those.
-        let expected: HashMap<[u8; 32], usize> = match &requested_bitmap {
-            Some(b) => bitmap::iter_indices(b)
-                .filter_map(|i| {
-                    let idx = i as usize;
-                    manifest.get(idx).map(|h| (*h, idx))
-                })
-                .collect(),
-            None => manifest.iter().enumerate().map(|(i, h)| (*h, i)).collect(),
-        };
-
-        // For each body, hash and look up. Track which manifest indices
-        // we satisfied so we can compute the remaining bitmap below.
-        let mut satisfied: HashSet<usize> = HashSet::new();
-        let mut keyed: Vec<(usize, Vec<u8>)> = Vec::new();
-        for body in bodies {
-            let h_arr = blake2b_simd::Params::new().hash_length(32).hash(body);
-            let mut hash_buf = [0u8; 32];
-            hash_buf.copy_from_slice(h_arr.as_bytes());
-            if let Some(&idx) = expected.get(&hash_buf) {
-                if satisfied.insert(idx) {
-                    keyed.push((idx, body.clone()));
-                }
-            }
-        }
-        keyed.sort_by_key(|(i, _)| *i);
-        let matched_bodies: Vec<Vec<u8>> = keyed.into_iter().map(|(_, b)| b).collect();
-
-        // What did we ask for but not get?
-        let remaining_indices: Vec<u32> = requested_indices
-            .into_iter()
-            .filter(|i| !satisfied.contains(&(*i as usize)))
-            .collect();
-        let remaining_bitmap = bitmap::from_indices(&remaining_indices);
-        if !remaining_bitmap.is_empty() {
-            // Carry forward so the next response can be matched against
-            // exactly the still-missing indices.
-            self.pending_eb_tx_fetches
-                .insert(hash, (eb_slot, remaining_bitmap.clone()));
-        }
-
-        EbTxMatchOutcome {
-            matched_bodies,
-            requested,
-            remaining_bitmap,
-        }
-    }
-
-    /// Issue another `FetchLeiosBlockTxs` for the given EB and bitmap.
-    /// Used by the partial-response handler to retry the still-missing
-    /// indices on a different peer (the coordinator's leios_tracker
-    /// excludes already-attempted peers).
-    pub async fn retry_eb_tx_fetch(
+    /// Verify a `LeiosBlockTxsReceived` response against the cached
+    /// manifest.  Bodies are blake2b-hashed here (the wire-format body
+    /// hash) before being matched, since shared-consensus is format-agnostic.
+    pub fn match_eb_tx_response(
         &mut self,
-        point: Point,
-        bitmap: std::collections::BTreeMap<u16, u64>,
-    ) {
-        if bitmap.is_empty() {
-            return;
-        }
-        let _ = self
-            .commands
-            .send(NetworkCommand::FetchLeiosBlockTxs { point, bitmap })
-            .await;
+        point: &Point,
+        bodies: &[Vec<u8>],
+    ) -> EbTxMatchOutcome {
+        let bodies_with_hashes: Vec<(Vec<u8>, [u8; 32])> = bodies
+            .iter()
+            .map(|body| {
+                let h = blake2b_simd::Params::new().hash_length(32).hash(body);
+                let mut hash = [0u8; 32];
+                hash.copy_from_slice(h.as_bytes());
+                (body.clone(), hash)
+            })
+            .collect();
+        self.state.match_eb_tx_response(point, &bodies_with_hashes)
     }
 
-    /// Build the sparse bitmap of transactions we don't already have for
-    /// a peer's `LeiosBlockTxsOffered` for `point`. If the EB manifest
-    /// is unknown (we haven't received the EB yet, or it failed to
-    /// decode), fall back to selecting all transactions so the request
-    /// is still useful.
-    fn bitmap_for_missing_txs(&self, point: &Point) -> std::collections::BTreeMap<u16, u64> {
-        use net_core::protocols::leios_fetch::bitmap;
+    /// Re-issue a `FetchLeiosBlockTxs` for the still-missing indices.
+    pub async fn retry_eb_tx_fetch(&mut self, point: Point, bitmap: BTreeMap<u16, u64>) {
+        let fx = self.state.retry_eb_tx_fetch(point, bitmap);
+        self.dispatch(fx).await;
+    }
+
+    // -- Helpers ------------------------------------------------------------
+
+    /// Build the sparse bitmap of transactions we don't already have
+    /// for an EB-tx offer.  Delegates to
+    /// [`shared_consensus::leios::LeiosState::missing_eb_tx_bitmap`]; an empty
+    /// result here suppresses the fetch (manifest unknown or every
+    /// referenced tx already locally available).
+    fn bitmap_for_missing_txs(&self, point: &Point) -> BTreeMap<u16, u64> {
         let hash = match point {
             Point::Specific { hash, .. } => hash,
             Point::Origin => return BTreeMap::new(),
         };
-        let Some((_, tx_hashes)) = self.eb_tx_hashes.get(hash) else {
-            // We learned about txs before fetching/validating the EB
-            // (notification re-flooded ahead of our local EB fetch).
-            // Fall back to "every tx the protocol supports"; the server
-            // returns only what it actually has.
-            let max_txs =
-                (net_core::protocols::leios_fetch::MAX_BITMAP_ENTRIES as u32).saturating_mul(64);
-            return bitmap::select_all(max_txs);
-        };
-        let have = self.mempool.lock().unwrap().current_tx_ids();
-        let missing: Vec<u32> = tx_hashes
-            .iter()
-            .enumerate()
-            .filter_map(|(i, h)| {
-                if have.contains(h.as_slice()) {
-                    None
-                } else {
-                    Some(i as u32)
+        let mempool = self.mempool.lock().unwrap();
+        self.state.missing_eb_tx_bitmap(hash, mempool.as_inner())
+    }
+
+    async fn dispatch(&mut self, fx: Vec<LeiosEffect>) {
+        for eff in fx {
+            match eff {
+                LeiosEffect::FetchLeiosBlock { point, peers } => {
+                    for peer_id in peers {
+                        let _ = self
+                            .commands
+                            .send(NetworkCommand::FetchLeiosBlock {
+                                peer_id,
+                                point: point.clone(),
+                            })
+                            .await;
+                    }
                 }
-            })
-            .collect();
-        bitmap::from_indices(&missing)
+                LeiosEffect::FetchLeiosBlockTxs {
+                    point,
+                    bitmap,
+                    peers,
+                } => {
+                    for peer_id in peers {
+                        let _ = self
+                            .commands
+                            .send(NetworkCommand::FetchLeiosBlockTxs {
+                                peer_id,
+                                point: point.clone(),
+                                bitmap: bitmap.clone(),
+                            })
+                            .await;
+                    }
+                }
+                LeiosEffect::FetchLeiosVotes { per_peer } => {
+                    for (peer_id, votes) in per_peer {
+                        let _ = self
+                            .commands
+                            .send(NetworkCommand::FetchLeiosVotes { peer_id, votes })
+                            .await;
+                    }
+                }
+                LeiosEffect::RecordLeiosEbManifest { point, tx_hashes } => {
+                    let _ = self
+                        .commands
+                        .send(NetworkCommand::RecordLeiosEbManifest { point, tx_hashes })
+                        .await;
+                }
+                LeiosEffect::EmitVote {
+                    eb_slot,
+                    eb_hash,
+                    emit_pv,
+                    npv_signature,
+                } => {
+                    self.emit_vote(eb_slot, eb_hash, emit_pv, npv_signature)
+                        .await;
+                }
+                LeiosEffect::NoVote {
+                    eb_slot, reason, ..
+                } => {
+                    self.pending_telemetry.push(NodeEvent::LeiosNoVote {
+                        node: self.state.node_id.clone(),
+                        eb_slot,
+                        reason: format!("{reason:?}"),
+                    });
+                }
+                LeiosEffect::ValidateEb { point } => {
+                    self.validator
+                        .submit(LedgerCommand::ValidateEb { point })
+                        .await;
+                }
+                LeiosEffect::ValidateVotes {
+                    vote_ids,
+                    vote_data,
+                } => {
+                    self.validator
+                        .submit(LedgerCommand::ValidateVotes {
+                            vote_ids,
+                            vote_data,
+                        })
+                        .await;
+                }
+                LeiosEffect::EmitTelemetry(event) => {
+                    let node_id = self.state.node_id.clone();
+                    let node_event = match event {
+                        LeiosTelemetryEvent::QuorumReached {
+                            eb_slot,
+                            voted_weight,
+                            voters,
+                        } => NodeEvent::LeiosQuorumReached {
+                            node: node_id,
+                            eb_slot,
+                            voted_weight,
+                            voters,
+                        },
+                        LeiosTelemetryEvent::ElectionExpired {
+                            eb_slot,
+                            had_quorum,
+                            voted_weight,
+                            voters,
+                        } => NodeEvent::LeiosElectionExpired {
+                            node: node_id,
+                            eb_slot,
+                            had_quorum,
+                            voted_weight,
+                            voters,
+                        },
+                    };
+                    self.pending_telemetry.push(node_event);
+                }
+            }
+        }
     }
 
-    // -- Queries ------------------------------------------------------------
-
-    /// Returns true if any EB election has reached quorum and is in
-    /// CertEligible phase (full pipeline elapsed). Used by the RB
-    /// producer to set the certified_eb header flag.
-    pub fn has_certified_eb(&self) -> bool {
-        self.elections
-            .values()
-            .any(|e| e.quorum_reached && e.phase == PipelinePhase::CertEligible)
+    /// Build and inject the vote bodies for an EB.  Encodes the
+    /// wire-format vote body — shared-consensus handed us the logical args.
+    async fn emit_vote(
+        &mut self,
+        eb_slot: u64,
+        eb_hash: [u8; 32],
+        emit_pv: bool,
+        npv_signature: Option<Vec<u8>>,
+    ) {
+        let voter_id = self.state.node_id.as_bytes().to_vec();
+        let stake = self.state.voting_config.stake;
+        let pv_size = self.state.voting_config.persistent_vote_bytes;
+        let npv_size = self.state.voting_config.non_persistent_vote_bytes;
+        let pv_seats = self.state.voting_config.persistent_seats;
+        let mut votes = Vec::new();
+        let mut data = Vec::new();
+        if emit_pv {
+            let body = VoteBody::stub_persistent(eb_slot, &voter_id, stake, &eb_hash);
+            let encoded = body.encode(pv_size);
+            info!(
+                node_id = %self.state.node_id,
+                eb_slot, tag = body.tag, pv_seats, size = encoded.len(),
+                "vote produced for eb"
+            );
+            let mut id = voter_id.clone();
+            id.push(0);
+            votes.push((eb_slot, id));
+            data.push(encoded);
+        }
+        if let Some(sig) = npv_signature {
+            let body =
+                VoteBody::stub_non_persistent(eb_slot, &voter_id, stake, sig, &eb_hash);
+            let encoded = body.encode(npv_size);
+            info!(
+                node_id = %self.state.node_id,
+                eb_slot, tag = body.tag, pv_seats, size = encoded.len(),
+                "vote produced for eb"
+            );
+            let mut id = voter_id.clone();
+            id.push(1);
+            votes.push((eb_slot, id));
+            data.push(encoded);
+        }
+        if !votes.is_empty() {
+            self.pending_telemetry.push(NodeEvent::VTBundleGenerated {
+                node: self.state.node_id.clone(),
+                slot: eb_slot,
+                count: votes.len(),
+            });
+            let _ = self
+                .commands
+                .send(NetworkCommand::InjectLeiosVotes { votes, data })
+                .await;
+        }
     }
 
-    #[cfg(test)]
-    fn election_phase(&self, hash: &[u8; 32]) -> Option<PipelinePhase> {
-        self.elections.get(hash).map(|e| e.phase)
-    }
-
-    #[cfg(test)]
-    fn election_count(&self) -> usize {
-        self.elections.len()
-    }
+    // -- Test helpers (delegate through state) -----------------------------
 
     #[cfg(test)]
     fn election_voted(&self, hash: &[u8; 32]) -> bool {
-        self.elections.get(hash).map(|e| e.voted).unwrap_or(false)
+        self.state.elections.voted(hash)
     }
 
     #[cfg(test)]
     fn election_quorum(&self, hash: &[u8; 32]) -> bool {
-        self.elections
-            .get(hash)
-            .map(|e| e.quorum_reached)
-            .unwrap_or(false)
+        self.state.elections.quorum(hash)
     }
 
     #[cfg(test)]
     fn election_voter_count(&self, hash: &[u8; 32]) -> usize {
-        self.elections
-            .get(hash)
-            .map(|e| e.voter_weights.len())
-            .unwrap_or(0)
-    }
-
-    // -- Housekeeping -------------------------------------------------------
-
-    fn mark_in_flight(&mut self, point: Point) {
-        self.in_flight.insert(point, Instant::now());
-    }
-
-    fn evict_stale_in_flight(&mut self) {
-        let now = Instant::now();
-        self.in_flight
-            .retain(|_, started| now.duration_since(*started) < IN_FLIGHT_TTL);
+        self.state.elections.voter_count(hash)
     }
 }
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::CommitteeSelection;
+    use std::time::Duration;
 
     fn point(slot: u64) -> Point {
         Point::Specific {
@@ -707,7 +557,6 @@ mod tests {
     fn test_dyn_config() -> watch::Receiver<DynamicConfig> {
         let config = DynamicConfig {
             rb_generation_probability: 0.0,
-            eb_generation_probability: 0.0,
             vote_generation_probability: 1.0, // always vote in tests
             rb_head_validation_ms: 0.0,
             rb_body_validation_ms_constant: 0.0,
@@ -775,146 +624,11 @@ mod tests {
         )
     }
 
-    // -- Election lifecycle tests -------------------------------------------
-
-    #[tokio::test]
-    async fn eb_creates_election() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(10).await;
-        leios.on_validated_eb(point(10));
-        assert_eq!(leios.election_count(), 1);
-        assert_eq!(
-            leios.election_phase(&point_hash(10)),
-            Some(PipelinePhase::EquivocationCheck)
-        );
-    }
-
-    #[tokio::test]
-    async fn election_advances_to_voting() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(10).await;
-        leios.on_validated_eb(point(10));
-        leios.on_slot(13).await;
-        assert_eq!(
-            leios.election_phase(&point_hash(10)),
-            Some(PipelinePhase::Voting)
-        );
-    }
-
-    #[tokio::test]
-    async fn election_advances_through_all_phases() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(0).await;
-        leios.on_validated_eb(point(0));
-
-        assert_eq!(
-            leios.election_phase(&point_hash(0)),
-            Some(PipelinePhase::EquivocationCheck)
-        );
-
-        leios.on_slot(3).await;
-        assert_eq!(
-            leios.election_phase(&point_hash(0)),
-            Some(PipelinePhase::Voting)
-        );
-
-        leios.on_slot(8).await;
-        assert_eq!(
-            leios.election_phase(&point_hash(0)),
-            Some(PipelinePhase::Diffusing)
-        );
-
-        leios.on_slot(13).await;
-        assert_eq!(
-            leios.election_phase(&point_hash(0)),
-            Some(PipelinePhase::CertEligible)
-        );
-
-        leios.on_slot(23).await;
-        assert_eq!(leios.election_phase(&point_hash(0)), None);
-        assert_eq!(leios.election_count(), 0);
-    }
-
-    #[tokio::test]
-    async fn duplicate_eb_deduped() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(10).await;
-        leios.on_validated_eb(point(10));
-        leios.on_validated_eb(point(10));
-        assert_eq!(leios.election_count(), 1);
-    }
-
-    #[tokio::test]
-    async fn old_election_pruned() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(0).await;
-        leios.on_validated_eb(point(0));
-        assert_eq!(leios.election_count(), 1);
-
-        leios.on_slot(23).await;
-        assert_eq!(leios.election_count(), 0);
-    }
-
-    #[tokio::test]
-    async fn multiple_ebs_concurrent() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(5).await;
-        leios.on_validated_eb(point(0));
-        leios.on_validated_eb(point(5));
-
-        assert_eq!(leios.election_count(), 2);
-        assert_eq!(
-            leios.election_phase(&point_hash(0)),
-            Some(PipelinePhase::Voting)
-        );
-        assert_eq!(
-            leios.election_phase(&point_hash(5)),
-            Some(PipelinePhase::EquivocationCheck)
-        );
-    }
-
-    #[tokio::test]
-    async fn eb_arriving_late_starts_in_correct_phase() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(10).await;
-        leios.on_validated_eb(point(0));
-        assert_eq!(
-            leios.election_phase(&point_hash(0)),
-            Some(PipelinePhase::Diffusing)
-        );
-    }
-
-    #[tokio::test]
-    async fn expired_eb_not_tracked() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(30).await;
-        leios.on_validated_eb(point(0));
-        assert_eq!(leios.election_count(), 0);
-    }
+    // Pure election-lifecycle / pipeline-phase behaviour is covered in
+    // `shared-consensus/src/elections.rs` and `shared-consensus/src/pipeline.rs`.  The tests
+    // below exercise only the wrapper-side translation work: effects →
+    // NetworkCommands, validator submissions, telemetry mapping, and
+    // the mempool-aware bitmap computation.
 
     // -- Voting tests -------------------------------------------------------
 
@@ -926,6 +640,13 @@ mod tests {
 
         leios.on_slot(0).await;
         leios.on_validated_eb(point(0));
+        // Make the chain-tip context match the EB so the CIP-0164
+        // predicates (LateRBHeader, WrongEB) accept this vote.
+        leios.set_chain_tip_context(ChainTipContext {
+            rb_header_arrival_slot: Some(0),
+            eb_announcement: Some(point_hash(0)),
+            ..Default::default()
+        });
         // No vote yet — still in EquivocationCheck.
         assert!(!leios.election_voted(&point_hash(0)));
 
@@ -951,6 +672,11 @@ mod tests {
 
         leios.on_slot(0).await;
         leios.on_validated_eb(point(0));
+        leios.set_chain_tip_context(ChainTipContext {
+            rb_header_arrival_slot: Some(0),
+            eb_announcement: Some(point_hash(0)),
+            ..Default::default()
+        });
 
         // First slot in Voting → vote produced.
         leios.on_slot(3).await;
@@ -958,21 +684,6 @@ mod tests {
 
         // Second slot in Voting → no duplicate vote.
         leios.on_slot(4).await;
-        assert!(rx.try_recv().is_err());
-    }
-
-    #[tokio::test]
-    async fn no_vote_during_equivocation_check() {
-        let (tx, mut rx) = mpsc::channel(16);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(0).await;
-        leios.on_validated_eb(point(0));
-
-        // Still in EquivocationCheck (elapsed=2).
-        leios.on_slot(2).await;
-        assert!(!leios.election_voted(&point_hash(0)));
         assert!(rx.try_recv().is_err());
     }
 
@@ -987,35 +698,17 @@ mod tests {
         let p = point(100);
         assert!(
             leios
-                .handle_event(&NetworkEvent::LeiosBlockOffered { point: p.clone() })
+                .handle_event(&NetworkEvent::LeiosBlockOffered {
+                peer_id: net_core::peer::PeerId(1),
+                point: p.clone(),
+            })
                 .await
         );
 
         match rx.try_recv() {
-            Ok(NetworkCommand::FetchLeiosBlock { point: got }) => assert_eq!(got, p),
+            Ok(NetworkCommand::FetchLeiosBlock { point: got, .. }) => assert_eq!(got, p),
             other => panic!("expected FetchLeiosBlock, got {:?}", other),
         }
-    }
-
-    #[tokio::test]
-    async fn duplicate_block_offer_dedup() {
-        let (tx, mut rx) = mpsc::channel(8);
-        let (validator, _outcome_rx) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        let p = point(100);
-        leios
-            .handle_event(&NetworkEvent::LeiosBlockOffered { point: p.clone() })
-            .await;
-        leios
-            .handle_event(&NetworkEvent::LeiosBlockOffered { point: p.clone() })
-            .await;
-
-        assert!(matches!(
-            rx.try_recv(),
-            Ok(NetworkCommand::FetchLeiosBlock { .. })
-        ));
-        assert!(rx.try_recv().is_err());
     }
 
     #[tokio::test]
@@ -1026,7 +719,10 @@ mod tests {
 
         let p = point(200);
         leios
-            .handle_event(&NetworkEvent::LeiosBlockOffered { point: p.clone() })
+            .handle_event(&NetworkEvent::LeiosBlockOffered {
+                peer_id: net_core::peer::PeerId(1),
+                point: p.clone(),
+            })
             .await;
         leios
             .handle_event(&NetworkEvent::LeiosBlockReceived {
@@ -1034,7 +730,7 @@ mod tests {
                 block: vec![],
             })
             .await;
-        assert!(!leios.in_flight.contains_key(&p));
+        assert!(!leios.state.in_flight.contains_key(&p));
     }
 
     #[tokio::test]
@@ -1060,7 +756,10 @@ mod tests {
 
         let p = point(99);
         leios
-            .handle_event(&NetworkEvent::LeiosBlockOffered { point: p.clone() })
+            .handle_event(&NetworkEvent::LeiosBlockOffered {
+                peer_id: net_core::peer::PeerId(1),
+                point: p.clone(),
+            })
             .await;
         leios
             .handle_event(&NetworkEvent::LeiosBlockReceived {
@@ -1124,34 +823,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn quorum_reached_after_enough_voters() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(0).await;
-        leios.on_validated_eb(point(0));
-
-        // expected_committee_size=10 (10 pools × 1 PV seat each), quorum
-        // at 0.75 → 7 distinct voters needed.
-        let eb_hash = point_hash(0);
-        let voters = [
-            "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5",
-        ];
-        let bodies: Vec<Vec<u8>> = voters
-            .iter()
-            .map(|v| {
-                crate::production::VoteBody::stub_persistent(0, v.as_bytes(), 100, &eb_hash)
-                    .encode(130)
-            })
-            .collect();
-        leios.on_validated_votes(&bodies);
-
-        assert_eq!(leios.election_voter_count(&eb_hash), 7);
-        assert!(leios.election_quorum(&eb_hash));
-    }
-
-    #[tokio::test]
     async fn quorum_emits_cert_formed_telemetry() {
         let (tx, _rx) = mpsc::channel(8);
         let (validator, _) = test_validator();
@@ -1201,76 +872,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pruned_election_emits_expired_telemetry() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(0).await;
-        leios.on_validated_eb(point(0));
-        let _ = leios.drain_telemetry(); // discard creation-side events
-
-        // Advance past expiry (dedup_window=10, full pipeline=23).
-        leios.on_slot(23).await;
-
-        let drained = leios.drain_telemetry();
-        let expired = drained
-            .iter()
-            .find(|e| matches!(e, NodeEvent::LeiosElectionExpired { .. }))
-            .expect("LeiosElectionExpired emitted");
-        if let NodeEvent::LeiosElectionExpired {
-            eb_slot,
-            had_quorum,
-            voters,
-            ..
-        } = expired
-        {
-            assert_eq!(*eb_slot, 0);
-            assert!(!*had_quorum);
-            assert_eq!(*voters, 0);
-        }
-    }
-
-    #[tokio::test]
-    async fn pruned_election_drops_eb_manifests() {
-        // Once an election is pruned, eb_tx_hashes and
-        // pending_eb_tx_fetches for that EB hash should also be dropped.
-        // Otherwise a long-running node leaks one manifest per EB seen.
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(0).await;
-        leios.on_validated_eb(point(0));
-
-        // Simulate the LeiosBlockReceived insert + a pending tx fetch.
-        let hash0 = point_hash(0);
-        leios
-            .eb_tx_hashes
-            .insert(hash0, (0, vec![[0xAAu8; 32], [0xBBu8; 32]]));
-        leios
-            .pending_eb_tx_fetches
-            .insert(hash0, (0, std::collections::BTreeMap::from([(0u16, 1u64)])));
-        assert_eq!(leios.eb_tx_hashes.len(), 1);
-        assert_eq!(leios.pending_eb_tx_fetches.len(), 1);
-
-        // Advance past the pipeline expiry (test pipeline expires at 23).
-        leios.on_slot(23).await;
-
-        assert_eq!(
-            leios.eb_tx_hashes.len(),
-            0,
-            "eb_tx_hashes should drop entries whose election expired"
-        );
-        assert_eq!(
-            leios.pending_eb_tx_fetches.len(),
-            0,
-            "pending_eb_tx_fetches should drop entries whose election expired"
-        );
-    }
-
-    #[tokio::test]
-    async fn certified_eb_slot_returns_min_quorum_election() {
+    async fn eb_certifiable_slot_targets_specific_hash() {
         let (tx, _rx) = mpsc::channel(8);
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
@@ -1280,6 +882,8 @@ mod tests {
         leios.on_slot(5).await;
         leios.on_validated_eb(point(5));
 
+        let hash0 = point_hash(0);
+        let hash5 = point_hash(5);
         let voters = [
             "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5",
         ];
@@ -1295,15 +899,22 @@ mod tests {
         leios.on_validated_votes(&all_bodies);
 
         // Neither is CertEligible yet.
-        assert_eq!(leios.certified_eb_slot(), None);
+        assert_eq!(leios.eb_certifiable_slot(&hash0), None);
+        assert_eq!(leios.eb_certifiable_slot(&hash5), None);
 
         // Advance to make EB at slot 0 CertEligible (elapsed=13 from slot 0).
+        // EB at slot 5 is still Diffusing (elapsed=8).
         leios.on_slot(13).await;
-        assert_eq!(leios.certified_eb_slot(), Some(0));
+        assert_eq!(leios.eb_certifiable_slot(&hash0), Some(0));
+        assert_eq!(leios.eb_certifiable_slot(&hash5), None);
 
-        // Advance further; both eligible — earliest wins.
+        // Both reach CertEligible — each lookup is independent.
         leios.on_slot(18).await;
-        assert_eq!(leios.certified_eb_slot(), Some(0));
+        assert_eq!(leios.eb_certifiable_slot(&hash0), Some(0));
+        assert_eq!(leios.eb_certifiable_slot(&hash5), Some(5));
+
+        // An unrelated hash never matches.
+        assert_eq!(leios.eb_certifiable_slot(&[0xAA; 32]), None);
     }
 
     // -- Bitmap construction tests ------------------------------------------
@@ -1338,6 +949,28 @@ mod tests {
             let cmd = rx.recv().await.expect("command emitted");
             if matches!(cmd, NetworkCommand::FetchLeiosBlockTxs { .. }) {
                 return cmd;
+            }
+        }
+    }
+
+    /// Returns true if no `FetchLeiosBlockTxs` arrives within `window`.
+    /// Drains and ignores any other command kinds so the assertion only
+    /// cares about the fetch effect.
+    async fn no_fetch_cmd_within(
+        rx: &mut mpsc::Receiver<NetworkCommand>,
+        window: Duration,
+    ) -> bool {
+        let deadline = tokio::time::Instant::now() + window;
+        loop {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
+                return true;
+            }
+            match tokio::time::timeout(remaining, rx.recv()).await {
+                Err(_) => return true,
+                Ok(None) => return true,
+                Ok(Some(NetworkCommand::FetchLeiosBlockTxs { .. })) => return false,
+                Ok(Some(_)) => continue,
             }
         }
     }
@@ -1392,13 +1025,14 @@ mod tests {
         // Tx availability announcement → should fetch only the missing index (#1).
         leios
             .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                peer_id: net_core::peer::PeerId(1),
                 point: eb_point.clone(),
             })
             .await;
 
         let cmd = next_fetch_cmd(&mut rx).await;
         match cmd {
-            NetworkCommand::FetchLeiosBlockTxs { point, bitmap } => {
+            NetworkCommand::FetchLeiosBlockTxs { point, bitmap, .. } => {
                 assert_eq!(point, eb_point);
                 let indices: Vec<u32> = bitmap_helpers::iter_indices(&bitmap).collect();
                 assert_eq!(indices, vec![1]);
@@ -1408,7 +1042,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn bitmap_for_offered_txs_falls_back_to_select_all_when_manifest_unknown() {
+    async fn no_fetch_emitted_when_manifest_unknown() {
         let (tx, mut rx) = mpsc::channel(8);
         let (validator, _) = test_validator();
         let mempool = crate::mempool::new_mempool(1000);
@@ -1420,26 +1054,22 @@ mod tests {
             hash: [0xCC; 32],
         };
         leios
-            .handle_event(&NetworkEvent::LeiosBlockTxsOffered { point: eb_point })
+            .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                peer_id: net_core::peer::PeerId(1),
+                point: eb_point,
+            })
             .await;
 
-        let cmd = next_fetch_cmd(&mut rx).await;
-        match cmd {
-            NetworkCommand::FetchLeiosBlockTxs { bitmap, .. } => {
-                // Spec-faithful fallback: select_all up to the protocol's
-                // max bitmap entries.
-                assert_eq!(
-                    bitmap.len(),
-                    net_core::protocols::leios_fetch::MAX_BITMAP_ENTRIES,
-                    "fallback should fill the bitmap"
-                );
-            }
-            other => panic!("expected FetchLeiosBlockTxs, got {other:?}"),
-        }
+        // With no manifest cached, the wrapper computes an empty bitmap
+        // and shared-consensus short-circuits before emitting a fetch.
+        assert!(
+            no_fetch_cmd_within(&mut rx, Duration::from_millis(50)).await,
+            "fetch should be deferred until the manifest is received"
+        );
     }
 
     #[tokio::test]
-    async fn bitmap_is_empty_when_mempool_already_has_every_tx() {
+    async fn no_fetch_emitted_when_mempool_already_has_every_tx() {
         let (tx, mut rx) = mpsc::channel(8);
         let (validator, _) = test_validator();
         let mempool = crate::mempool::new_mempool(1000);
@@ -1463,16 +1093,16 @@ mod tests {
             })
             .await;
         leios
-            .handle_event(&NetworkEvent::LeiosBlockTxsOffered { point: eb_point })
+            .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                peer_id: net_core::peer::PeerId(1),
+                point: eb_point,
+            })
             .await;
 
-        let cmd = next_fetch_cmd(&mut rx).await;
-        match cmd {
-            NetworkCommand::FetchLeiosBlockTxs { bitmap, .. } => {
-                assert!(bitmap.is_empty(), "every tx is local; nothing to request");
-            }
-            other => panic!("expected FetchLeiosBlockTxs, got {other:?}"),
-        }
+        assert!(
+            no_fetch_cmd_within(&mut rx, Duration::from_millis(50)).await,
+            "every tx is local; nothing to request, so no fetch should be emitted"
+        );
     }
 
     // -- Response matching tests --------------------------------------------
@@ -1483,72 +1113,6 @@ mod tests {
         let mut buf = [0u8; 32];
         buf.copy_from_slice(h.as_bytes());
         buf
-    }
-
-    #[tokio::test]
-    async fn match_eb_tx_response_keeps_only_manifest_hashes_in_order() {
-        let (tx, mut rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mempool = crate::mempool::new_mempool(1000);
-        let mut leios = test_leios_with_mempool(tx, validator, mempool);
-
-        // Three bodies → three manifest hashes. We want indices 0 and 2.
-        let body0 = b"body-zero".to_vec();
-        let body1 = b"body-one".to_vec();
-        let body2 = b"body-two".to_vec();
-        let h0 = body_hash(&body0);
-        let h1 = body_hash(&body1);
-        let h2 = body_hash(&body2);
-        let bogus = b"unrelated-tx".to_vec();
-
-        let (manifest, eb_hash) = make_manifest(11, &[h0, h1, h2]);
-        let eb_point = Point::Specific {
-            slot: 11,
-            hash: eb_hash,
-        };
-
-        leios
-            .handle_event(&NetworkEvent::LeiosBlockReceived {
-                point: eb_point.clone(),
-                block: manifest,
-            })
-            .await;
-        leios
-            .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
-                point: eb_point.clone(),
-            })
-            .await;
-        let _record = next_record_cmd(&mut rx).await; // drain manifest record
-        let cmd = next_fetch_cmd(&mut rx).await;
-        // Sanity: the bitmap was {0,1,2}.
-        if let NetworkCommand::FetchLeiosBlockTxs { bitmap, .. } = cmd {
-            let indices: Vec<u32> = bitmap_helpers::iter_indices(&bitmap).collect();
-            assert_eq!(indices, vec![0, 1, 2]);
-        }
-
-        // Server returns only [body0, body2] plus a bogus tx out of nowhere.
-        let outcome = leios.match_eb_tx_response(&eb_point, &[body0.clone(), body2.clone(), bogus]);
-        assert_eq!(outcome.requested, 3);
-        assert_eq!(outcome.matched_bodies, vec![body0, body2]);
-    }
-
-    #[tokio::test]
-    async fn match_eb_tx_response_with_unknown_manifest_passes_through() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mempool = crate::mempool::new_mempool(1000);
-        let mut leios = test_leios_with_mempool(tx, validator, mempool);
-
-        // No EB cached for this point.
-        let eb_point = Point::Specific {
-            slot: 99,
-            hash: [0xAA; 32],
-        };
-        let body = vec![1, 2, 3];
-        let outcome = leios.match_eb_tx_response(&eb_point, &[body.clone()]);
-        // Manifest unknown → requested=0 (we can't verify), bodies forwarded.
-        assert_eq!(outcome.requested, 0);
-        assert_eq!(outcome.matched_bodies, vec![body]);
     }
 
     #[tokio::test]
@@ -1580,17 +1144,28 @@ mod tests {
             .await;
         leios
             .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                peer_id: net_core::peer::PeerId(1),
                 point: eb_point.clone(),
             })
             .await;
         let _ = next_record_cmd(&mut rx).await;
         let _ = next_fetch_cmd(&mut rx).await;
 
-        let outcome = leios.match_eb_tx_response(&eb_point, &[body1.clone()]);
+        let outcome = leios.match_eb_tx_response(&eb_point, std::slice::from_ref(&body1));
         assert_eq!(outcome.matched_bodies, vec![body1]);
         assert_eq!(outcome.requested, 3);
         let remaining: Vec<u32> = bitmap_helpers::iter_indices(&outcome.remaining_bitmap).collect();
         assert_eq!(remaining, vec![0, 2]);
+
+        // A second peer offers the same EB-txs, giving the retry a
+        // fresh candidate (shared-consensus's EbTxsFetchPolicy excludes the
+        // previously-attempted peer).
+        leios
+            .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
+                peer_id: net_core::peer::PeerId(2),
+                point: eb_point.clone(),
+            })
+            .await;
 
         // Retry path: caller issues a fresh fetch with the remaining bitmap.
         leios
@@ -1598,7 +1173,7 @@ mod tests {
             .await;
         let cmd = next_fetch_cmd(&mut rx).await;
         match cmd {
-            NetworkCommand::FetchLeiosBlockTxs { point, bitmap } => {
+            NetworkCommand::FetchLeiosBlockTxs { point, bitmap, .. } => {
                 assert_eq!(point, eb_point);
                 let indices: Vec<u32> = bitmap_helpers::iter_indices(&bitmap).collect();
                 assert_eq!(indices, vec![0, 2]);
@@ -1613,75 +1188,4 @@ mod tests {
         assert!(outcome2.remaining_bitmap.is_empty());
     }
 
-    #[tokio::test]
-    async fn retry_eb_tx_fetch_with_empty_bitmap_is_noop() {
-        let (tx, mut rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mempool = crate::mempool::new_mempool(1000);
-        let mut leios = test_leios_with_mempool(tx, validator, mempool);
-        let p = Point::Specific {
-            slot: 1,
-            hash: [0; 32],
-        };
-        leios
-            .retry_eb_tx_fetch(p, std::collections::BTreeMap::new())
-            .await;
-        // Channel should have nothing.
-        assert!(rx.try_recv().is_err());
-    }
-
-    #[tokio::test]
-    async fn match_eb_tx_response_pending_bitmap_cleared_after_match() {
-        let (tx, mut rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mempool = crate::mempool::new_mempool(1000);
-        let mut leios = test_leios_with_mempool(tx, validator, mempool);
-
-        let body = b"x".to_vec();
-        let h = body_hash(&body);
-        let (manifest, eb_hash) = make_manifest(2, &[h]);
-        let eb_point = Point::Specific {
-            slot: 2,
-            hash: eb_hash,
-        };
-
-        leios
-            .handle_event(&NetworkEvent::LeiosBlockReceived {
-                point: eb_point.clone(),
-                block: manifest,
-            })
-            .await;
-        leios
-            .handle_event(&NetworkEvent::LeiosBlockTxsOffered {
-                point: eb_point.clone(),
-            })
-            .await;
-        let _ = next_record_cmd(&mut rx).await;
-        let _ = next_fetch_cmd(&mut rx).await;
-
-        // First match.
-        let outcome = leios.match_eb_tx_response(&eb_point, &[body.clone()]);
-        assert_eq!(outcome.requested, 1);
-        // Second match — pending bitmap was consumed, so requested=0 now.
-        let outcome2 = leios.match_eb_tx_response(&eb_point, &[body]);
-        assert_eq!(outcome2.requested, 0);
-    }
-
-    #[tokio::test]
-    async fn duplicate_voter_not_counted() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, _) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        leios.on_slot(0).await;
-        leios.on_validated_eb(point(0));
-
-        let eb_hash = point_hash(0);
-        let body = crate::production::VoteBody::stub_persistent(0, b"peer-0", 100, &eb_hash);
-        let encoded = body.encode(130);
-
-        leios.on_validated_votes(&[encoded.clone()]);
-        leios.on_validated_votes(&[encoded]);
-        assert_eq!(leios.election_voter_count(&eb_hash), 1);
-    }
 }

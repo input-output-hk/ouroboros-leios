@@ -9,7 +9,8 @@ use crate::{
     config::{NodeConfiguration, NodeId},
     model::{
         Block, BlockId, CpuTaskId, EndorserBlockId, InputBlockId, LinearRankingBlock, NoVoteReason,
-        Transaction, TransactionId, TransactionLostReason, VoteBundle, VoteBundleId,
+        Transaction, TransactionId, TransactionLostReason, Vote, VoteBundle, VoteBundleId, VoteId,
+        VoteKind,
     },
 };
 
@@ -285,6 +286,43 @@ pub enum Event {
         sender: Node,
         recipient: Node,
     },
+
+    /// CIP-0164 single-vote emission (shared-consensus adapter only — one BLS
+    /// signature per event, no multi-EB bundling).
+    /// `weight` is the verifier-derived seat count this vote
+    /// represents (PV: persistent-committee seats; NPV: lottery wins).
+    /// Carried on the telemetry event for stats aggregation; NOT on
+    /// the wire (the real protocol re-derives weight at verification
+    /// time from the persistent-committee registry / VRF check).
+    VoteGenerated {
+        id: VoteId<Node>,
+        slot: u64,
+        voter: Node,
+        eb: EndorserBlockId<Node>,
+        kind: VoteKind,
+        size_bytes: u64,
+        weight: u32,
+    },
+    VoteSent {
+        id: VoteId<Node>,
+        slot: u64,
+        voter: Node,
+        eb: EndorserBlockId<Node>,
+        kind: VoteKind,
+        sender: Node,
+        recipient: Node,
+        msg_size_bytes: u64,
+    },
+    VoteReceived {
+        id: VoteId<Node>,
+        slot: u64,
+        voter: Node,
+        eb: EndorserBlockId<Node>,
+        kind: VoteKind,
+        sender: Node,
+        recipient: Node,
+    },
+
     #[cfg(test)]
     TestNodeEvent {
         node: String,
@@ -329,6 +367,9 @@ impl Event {
             | Self::VTBundleNotGenerated { producer, .. } => Some(producer.id),
             Self::VTBundleSent { sender, .. } => Some(sender.id),
             Self::VTBundleReceived { recipient, .. } => Some(recipient.id),
+            Self::VoteGenerated { voter, .. } => Some(voter.id),
+            Self::VoteSent { sender, .. } => Some(sender.id),
+            Self::VoteReceived { recipient, .. } => Some(recipient.id),
             #[cfg(test)]
             Self::TestNodeEvent { .. } => None,
         }
@@ -880,6 +921,45 @@ impl EventTracker {
         });
     }
 
+    // -- CIP-0164 per-vote trackers (shared-consensus adapter) ----------------------
+
+    pub fn track_vote_generated(&self, vote: &Vote, weight: u32) {
+        self.send(Event::VoteGenerated {
+            id: self.to_vote_id(vote.id),
+            slot: vote.id.slot,
+            voter: self.to_node(vote.id.voter),
+            eb: self.to_endorser_block(vote.id.eb),
+            kind: vote.id.kind,
+            size_bytes: vote.bytes,
+            weight,
+        });
+    }
+
+    pub fn track_vote_sent(&self, vote: &Vote, sender: NodeId, recipient: NodeId) {
+        self.send(Event::VoteSent {
+            id: self.to_vote_id(vote.id),
+            slot: vote.id.slot,
+            voter: self.to_node(vote.id.voter),
+            eb: self.to_endorser_block(vote.id.eb),
+            kind: vote.id.kind,
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
+            msg_size_bytes: vote.bytes,
+        });
+    }
+
+    pub fn track_vote_received(&self, vote: &Vote, sender: NodeId, recipient: NodeId) {
+        self.send(Event::VoteReceived {
+            id: self.to_vote_id(vote.id),
+            slot: vote.id.slot,
+            voter: self.to_node(vote.id.voter),
+            eb: self.to_endorser_block(vote.id.eb),
+            kind: vote.id.kind,
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
+        });
+    }
+
     fn send(&self, event: Event) {
         if self.sender.send((event, self.clock.now())).is_err() {
             warn!("tried sending event after aggregator finished");
@@ -922,6 +1002,15 @@ impl EventTracker {
             slot: id.slot,
             pipeline: id.pipeline,
             producer: self.to_node(id.producer),
+        }
+    }
+
+    fn to_vote_id(&self, id: VoteId) -> VoteId<Node> {
+        VoteId {
+            slot: id.slot,
+            voter: self.to_node(id.voter),
+            eb: self.to_endorser_block(id.eb),
+            kind: id.kind,
         }
     }
 

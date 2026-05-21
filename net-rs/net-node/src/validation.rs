@@ -134,11 +134,17 @@ impl Validator {
     ) -> (Self, mpsc::Receiver<LedgerOutcome>) {
         // Bounded channels give natural backpressure: if consensus
         // submits commands faster than the ledger can process them,
-        // `send().await` blocks. 64 is enough for typical per-node
-        // pipelines without being so deep that a stuck ledger
-        // accumulates arbitrary work.
-        let (cmd_tx, cmd_rx) = mpsc::channel(64);
-        let (outcome_tx, outcome_rx) = mpsc::channel(64);
+        // `send().await` blocks. Sized to absorb the validate-votes
+        // burst when an EB reaches quorum at degree >~ 10: at that
+        // density a node sees O(peers × votes-per-bundle) vote bundles
+        // arrive in milliseconds, and each is a `submit().await` from
+        // the main loop. A 64-deep channel filled in that window blocks
+        // consensus, which stops draining `network_events`, which
+        // closes the peer_events gate, which backpressures TCP — full
+        // circular wait. 4096 covers comfortably-larger fan-outs while
+        // staying bounded.
+        let (cmd_tx, cmd_rx) = mpsc::channel(4096);
+        let (outcome_tx, outcome_rx) = mpsc::channel(4096);
         tokio::spawn(run_validator_actor(ledger, cmd_rx, outcome_tx, dyn_config));
         (Self { commands: cmd_tx }, outcome_rx)
     }
@@ -260,7 +266,6 @@ mod tests {
     ) -> watch::Receiver<DynamicConfig> {
         let config = DynamicConfig {
             rb_generation_probability: 0.05,
-            eb_generation_probability: 0.0,
             vote_generation_probability: 0.0,
             rb_head_validation_ms: head_ms,
             rb_body_validation_ms_constant: body_const_ms,

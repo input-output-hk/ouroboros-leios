@@ -36,8 +36,22 @@ pub(crate) async fn dispatch_command(
             let _ = senders.peer_share.send(amount).await;
         }
         Some(PeerCommand::ProvideTxs { txs }) => {
+            // `try_send` + drop on overflow: tx submission is
+            // best-effort gossip — another peer will re-broadcast.
+            // Blocking the dispatch loop here would back-pressure the
+            // per-peer command channel and trip the coordinator's
+            // "command channel full" disconnect.
+            use tokio::sync::mpsc::error::TrySendError;
+            let mut dropped = 0usize;
             for tx in txs {
-                let _ = senders.tx_submit.send(tx).await;
+                match senders.tx_submit.try_send(tx) {
+                    Ok(()) => {}
+                    Err(TrySendError::Full(_)) => dropped += 1,
+                    Err(TrySendError::Closed(_)) => return false,
+                }
+            }
+            if dropped > 0 {
+                tracing::warn!(dropped, "tx_submit channel saturated; dropping txs");
             }
         }
         Some(PeerCommand::FetchLeiosBlock { point }) => {

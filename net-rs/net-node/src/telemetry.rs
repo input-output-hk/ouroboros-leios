@@ -11,7 +11,7 @@ use net_core::multi_peer::types::PeerInfo;
 use serde::Serialize;
 use tracing::info;
 
-use crate::chain_tree::ChainTreeEntry;
+use shared_consensus::chain_tree::ChainTreeEntry;
 use crate::config::{EventSinkConfig, StatsSinkConfig, TelemetryConfig};
 
 // ---------------------------------------------------------------------------
@@ -107,6 +107,11 @@ pub enum NodeEvent {
         had_quorum: bool,
         voted_weight: u64,
         voters: usize,
+    },
+    LeiosNoVote {
+        node: String,
+        eb_slot: u64,
+        reason: String,
     },
 }
 

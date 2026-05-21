@@ -8,7 +8,11 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
-use crate::types::Point;
+use shared_consensus::behaviour::{
+    BehaviourHandle, Outbound, OutboundDecision, OwnedOutbound,
+};
+
+use crate::types::{BlockBody, Point, Tip, WrappedHeader};
 
 use crate::mux::{CodecRecv, CodecSend};
 use crate::protocols::blockfetch::{BlockFetch, Message as BfMsg};
@@ -29,7 +33,20 @@ use crate::store::leios_store::LeiosStore;
 ///
 /// Responds to intersection queries and streams headers as the chain
 /// advances. Uses `ChainStore::subscribe()` to wake when new blocks arrive.
-pub async fn serve_chainsync(cs_send: CodecSend, cs_recv: CodecRecv, store: Arc<ChainStore>) {
+///
+/// When `behaviour` is `Some`, every `MsgRollForward` is filtered
+/// through
+/// [`Behaviour::transform_outbound`](shared_consensus::behaviour::Behaviour::transform_outbound)
+/// before going on the wire — the behaviour can substitute a different
+/// header for this `peer` (peer-split equivocation), suppress the send
+/// (partition / eclipse mute), or augment with extras.
+pub async fn serve_chainsync(
+    cs_send: CodecSend,
+    cs_recv: CodecRecv,
+    store: Arc<ChainStore>,
+    peer: PeerId,
+    behaviour: Option<BehaviourHandle>,
+) {
     let mut runner = Runner::<ChainSync>::new(Role::Server, cs_send, cs_recv);
     let mut read_index: Option<usize> = None;
     let mut read_point: Option<Point> = None;
@@ -75,12 +92,15 @@ pub async fn serve_chainsync(cs_send: CodecSend, cs_recv: CodecRecv, store: Arc<
                         read_index = store.index_of(&block.point);
                         read_point = Some(block.point.clone());
                         let tip = store.tip();
-                        let _ = runner
-                            .send(&CsMsg::MsgRollForward {
-                                header: block.header.clone(),
-                                tip,
-                            })
-                            .await;
+                        send_roll_forward(
+                            &mut runner,
+                            block.header.clone(),
+                            &block.point,
+                            tip,
+                            peer,
+                            behaviour.as_ref(),
+                        )
+                        .await;
                     } else {
                         let _ = runner.send(&CsMsg::MsgAwaitReply).await;
 
@@ -108,12 +128,15 @@ pub async fn serve_chainsync(cs_send: CodecSend, cs_recv: CodecRecv, store: Arc<
                                 read_index = store.index_of(&block.point);
                                 read_point = Some(block.point.clone());
                                 let tip = store.tip();
-                                let _ = runner
-                                    .send(&CsMsg::MsgRollForward {
-                                        header: block.header.clone(),
-                                        tip,
-                                    })
-                                    .await;
+                                send_roll_forward(
+                                    &mut runner,
+                                    block.header.clone(),
+                                    &block.point,
+                                    tip,
+                                    peer,
+                                    behaviour.as_ref(),
+                                )
+                                .await;
                                 break;
                             }
                         }
@@ -126,10 +149,124 @@ pub async fn serve_chainsync(cs_send: CodecSend, cs_recv: CodecRecv, store: Arc<
     }
 }
 
+/// Apply the behaviour's per-peer outbound transform to one
+/// `MsgRollForward` and dispatch the resulting send(s).  Wraps the four
+/// [`OutboundDecision`] variants:
+///
+/// - `Send`: send the original header + tip.
+/// - `Drop`: emit nothing for this peer.
+/// - `Replace`: rebuild a `WrappedHeader` from the substituted bytes
+///   and re-derive the tip from its point; block number is borrowed
+///   from the original tip (variants live at the same chain position).
+/// - `Augment`: send the original then each extra in order.
+async fn send_roll_forward(
+    runner: &mut Runner<ChainSync>,
+    header: WrappedHeader,
+    block_point: &Point,
+    tip: Tip,
+    peer: PeerId,
+    behaviour: Option<&BehaviourHandle>,
+) {
+    let Some(handle) = behaviour else {
+        let _ = runner.send(&CsMsg::MsgRollForward { header, tip }).await;
+        return;
+    };
+
+    let slot = match block_point {
+        Point::Specific { slot, .. } => *slot,
+        Point::Origin => 0,
+    };
+    let decision = {
+        let mut guard = handle.lock().expect("behaviour mutex poisoned");
+        guard.transform_outbound(
+            peer,
+            Outbound::RbHeader {
+                slot,
+                header: &header.raw,
+            },
+        )
+    };
+
+    match decision {
+        OutboundDecision::Send => {
+            let _ = runner.send(&CsMsg::MsgRollForward { header, tip }).await;
+        }
+        OutboundDecision::Drop => {
+            tracing::debug!(
+                peer = peer.0,
+                slot,
+                "behaviour dropped chainsync roll-forward"
+            );
+        }
+        OutboundDecision::Replace(OwnedOutbound::RbHeader {
+            slot: _,
+            header: new_bytes,
+        }) => {
+            let new_header = WrappedHeader::new(new_bytes);
+            let new_tip = match new_header.point() {
+                Some(p) => Tip {
+                    point: p,
+                    block_no: tip.block_no,
+                },
+                None => tip,
+            };
+            tracing::info!(
+                peer = peer.0,
+                slot,
+                "behaviour replaced chainsync roll-forward header for peer"
+            );
+            let _ = runner
+                .send(&CsMsg::MsgRollForward {
+                    header: new_header,
+                    tip: new_tip,
+                })
+                .await;
+        }
+        OutboundDecision::Augment(extras) => {
+            let _ = runner
+                .send(&CsMsg::MsgRollForward {
+                    header: header.clone(),
+                    tip: tip.clone(),
+                })
+                .await;
+            for extra in extras {
+                let OwnedOutbound::RbHeader {
+                    slot: _,
+                    header: extra_bytes,
+                } = extra;
+                let extra_header = WrappedHeader::new(extra_bytes);
+                let extra_tip = match extra_header.point() {
+                    Some(p) => Tip {
+                        point: p,
+                        block_no: tip.block_no,
+                    },
+                    None => tip.clone(),
+                };
+                let _ = runner
+                    .send(&CsMsg::MsgRollForward {
+                        header: extra_header,
+                        tip: extra_tip,
+                    })
+                    .await;
+            }
+        }
+    }
+}
+
 /// Serve BlockFetch for one connection.
 ///
 /// Responds to range requests by streaming blocks from the chain store.
-pub async fn serve_blockfetch(bf_send: CodecSend, bf_recv: CodecRecv, store: Arc<ChainStore>) {
+/// When `behaviour` is `Some` and the store has nothing for a
+/// single-block range, the behaviour is consulted via
+/// [`Behaviour::find_variant_body`](shared_consensus::behaviour::Behaviour::find_variant_body)
+/// — lets a peer-split equivocator serve the body of an advertised
+/// variant that the local chain selection did not adopt.
+pub async fn serve_blockfetch(
+    bf_send: CodecSend,
+    bf_recv: CodecRecv,
+    store: Arc<ChainStore>,
+    behaviour: Option<BehaviourHandle>,
+) {
     let mut runner = Runner::<BlockFetch>::new(Role::Server, bf_send, bf_recv);
 
     loop {
@@ -141,9 +278,7 @@ pub async fn serve_blockfetch(bf_send: CodecSend, bf_recv: CodecRecv, store: Arc
         match msg {
             BfMsg::MsgRequestRange { from, to } => {
                 let blocks = store.get_range(&from, &to);
-                if blocks.is_empty() {
-                    let _ = runner.send(&BfMsg::MsgNoBlocks).await;
-                } else {
+                if !blocks.is_empty() {
                     let _ = runner.send(&BfMsg::MsgStartBatch).await;
                     for block in &blocks {
                         let _ = runner
@@ -153,12 +288,44 @@ pub async fn serve_blockfetch(bf_send: CodecSend, bf_recv: CodecRecv, store: Arc
                             .await;
                     }
                     let _ = runner.send(&BfMsg::MsgBatchDone).await;
+                } else if let Some(body) = lookup_variant_body(behaviour.as_ref(), &from, &to) {
+                    // Behaviour-side fallback: the requested header is
+                    // a peer-split variant that never entered the local
+                    // chain tree.
+                    let _ = runner.send(&BfMsg::MsgStartBatch).await;
+                    let _ = runner.send(&BfMsg::MsgBlock { body }).await;
+                    let _ = runner.send(&BfMsg::MsgBatchDone).await;
+                } else {
+                    let _ = runner.send(&BfMsg::MsgNoBlocks).await;
                 }
             }
             BfMsg::MsgClientDone => break,
             _ => break,
         }
     }
+}
+
+/// If the behaviour stashed a variant whose header hashes to `from`
+/// (and `from == to`, a single-block request), return its body wrapped
+/// in a `BlockBody`.  Used as a fallback when the local chain store
+/// has nothing for the requested range.
+fn lookup_variant_body(
+    behaviour: Option<&BehaviourHandle>,
+    from: &Point,
+    to: &Point,
+) -> Option<BlockBody> {
+    if from != to {
+        return None;
+    }
+    let (slot, hash) = match from {
+        Point::Specific { slot, hash } => (*slot, *hash),
+        Point::Origin => return None,
+    };
+    let handle = behaviour?;
+    let guard = handle.lock().expect("behaviour mutex poisoned");
+    let body_bytes = guard.find_variant_body(slot, &hash)?;
+    drop(guard);
+    Some(BlockBody::new(body_bytes))
 }
 
 /// Serve KeepAlive for one connection. Stateless echo.
@@ -568,7 +735,13 @@ mod tests {
         }
 
         // Start server.
-        let server_handle = tokio::spawn(serve_chainsync(server_send, server_recv, store));
+        let server_handle = tokio::spawn(serve_chainsync(
+            server_send,
+            server_recv,
+            store,
+            PeerId(0),
+            None,
+        ));
 
         // Client: find intersection at Origin.
         let mut client = Runner::<ChainSync>::new(Role::Client, client_send, client_recv);
@@ -619,7 +792,7 @@ mod tests {
             );
         }
 
-        let server_handle = tokio::spawn(serve_blockfetch(server_send, server_recv, store));
+        let server_handle = tokio::spawn(serve_blockfetch(server_send, server_recv, store, None));
 
         let mut client = Runner::<BlockFetch>::new(Role::Client, client_send, client_recv);
 
@@ -815,7 +988,7 @@ mod tests {
         let hash = [0x77u8; 32];
         let point = Point::Specific { slot: 50, hash };
         let txs: Vec<Vec<u8>> = (0..100u8).map(|i| vec![i, i, i]).collect();
-        store.inject_block_txs(point.clone(), txs);
+        store.inject_block_txs_full(point.clone(), txs);
 
         let server_handle =
             tokio::spawn(serve_leios_fetch(server_send, server_recv, store.clone()));

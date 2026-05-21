@@ -2,11 +2,11 @@
 
 use std::collections::VecDeque;
 
-use net_core::types::Point;
+use crate::types::Point;
 
 /// One header in a per-peer candidate chain.
 #[derive(Debug, Clone)]
-pub(crate) struct PeerChainEntry {
+pub struct PeerChainEntry {
     pub hash: [u8; 32],
     pub point: Point,
     pub block_no: u64,
@@ -44,19 +44,19 @@ pub(crate) struct PeerChainEntry {
 ///   can use it as a guaranteed common ancestor even when the entry
 ///   window is too narrow.
 #[derive(Debug)]
-pub(crate) struct PeerChain {
-    pub(super) entries: VecDeque<PeerChainEntry>,
-    pub(super) cap: usize,
+pub struct PeerChain {
+    pub entries: VecDeque<PeerChainEntry>,
+    pub cap: usize,
     /// The ChainSync intersection point — a guaranteed common ancestor
     /// between the local chain and this peer's chain. Set when
     /// `IntersectionFound` arrives, persists through rollbacks, replaced
     /// on reconnect (new intersection), dropped on disconnect.
-    pub(super) anchor: Option<PeerChainAnchor>,
+    pub anchor: Option<PeerChainAnchor>,
 }
 
 /// The ChainSync intersection point stored as a peer chain anchor.
 #[derive(Debug, Clone)]
-pub(crate) struct PeerChainAnchor {
+pub struct PeerChainAnchor {
     pub hash: [u8; 32],
     pub point: Point,
 }
@@ -128,6 +128,12 @@ impl PeerChain {
         self.entries.len()
     }
 
+    /// True if no entries are currently held.
+    #[allow(dead_code)] // paired with `len`
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
     /// Iterate entries from oldest to newest.
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = &PeerChainEntry> {
         self.entries.iter()
@@ -138,33 +144,117 @@ impl PeerChain {
 mod tests {
     use super::*;
 
+    fn entry(seed: u8, prev_seed: Option<u8>) -> PeerChainEntry {
+        PeerChainEntry {
+            hash: [seed; 32],
+            point: Point::Specific {
+                slot: seed as u64,
+                hash: [seed; 32],
+            },
+            block_no: seed as u64,
+            prev_hash: prev_seed.map(|p| [p; 32]),
+        }
+    }
+
     #[test]
-    fn peer_chain_rollback_to_anchor_clears_entries() {
+    fn empty_chain_has_no_tip() {
+        let chain = PeerChain::new(64);
+        assert!(chain.tip().is_none());
+        assert!(chain.is_empty());
+        assert_eq!(chain.len(), 0);
+    }
+
+    #[test]
+    fn append_in_order_yields_tip() {
+        let mut chain = PeerChain::new(64);
+        chain.append(entry(1, None));
+        chain.append(entry(2, Some(1)));
+        chain.append(entry(3, Some(2)));
+        assert_eq!(chain.len(), 3);
+        assert_eq!(chain.tip().unwrap().block_no, 3);
+    }
+
+    #[test]
+    fn append_dedups_same_hash() {
+        let mut chain = PeerChain::new(64);
+        chain.append(entry(1, None));
+        chain.append(entry(1, None));
+        assert_eq!(chain.len(), 1);
+    }
+
+    #[test]
+    fn append_drops_oldest_when_cap_exceeded() {
+        let mut chain = PeerChain::new(2);
+        chain.append(entry(1, None));
+        chain.append(entry(2, Some(1)));
+        chain.append(entry(3, Some(2)));
+        assert_eq!(chain.len(), 2);
+        assert_eq!(chain.iter().next().unwrap().hash, [2; 32]);
+        assert_eq!(chain.tip().unwrap().hash, [3; 32]);
+    }
+
+    #[test]
+    fn rollback_to_known_point_truncates_inclusive() {
+        let mut chain = PeerChain::new(64);
+        chain.append(entry(1, None));
+        chain.append(entry(2, Some(1)));
+        chain.append(entry(3, Some(2)));
+        chain.rollback_to(&Point::Specific {
+            slot: 2,
+            hash: [2; 32],
+        });
+        assert_eq!(chain.len(), 2);
+        assert_eq!(chain.tip().unwrap().hash, [2; 32]);
+    }
+
+    #[test]
+    fn rollback_to_unknown_point_is_noop() {
+        let mut chain = PeerChain::new(64);
+        chain.append(entry(1, None));
+        chain.append(entry(2, Some(1)));
+        chain.rollback_to(&Point::Specific {
+            slot: 99,
+            hash: [99; 32],
+        });
+        assert_eq!(chain.len(), 2);
+    }
+
+    #[test]
+    fn rollback_to_anchor_clears_entries() {
         let mut chain = PeerChain::new(64);
         let anchor_point = Point::Specific {
             slot: 5,
             hash: [5; 32],
         };
         chain.set_anchor(anchor_point.clone());
-
-        // Add entries after the anchor.
         for i in 6..=10 {
-            chain.append(PeerChainEntry {
-                hash: [i; 32],
-                point: Point::Specific {
-                    slot: i as u64,
-                    hash: [i; 32],
-                },
-                block_no: i as u64,
-                prev_hash: Some([(i - 1); 32]),
-            });
+            chain.append(entry(i, Some(i - 1)));
         }
         assert_eq!(chain.len(), 5);
-
-        // Rolling back to the anchor should clear all entries.
         chain.rollback_to(&anchor_point);
         assert_eq!(chain.len(), 0);
-        // Anchor preserved.
         assert!(chain.anchor().is_some());
+    }
+
+    #[test]
+    fn clear_entries_keeps_anchor() {
+        let mut chain = PeerChain::new(64);
+        chain.set_anchor(Point::Specific {
+            slot: 5,
+            hash: [5; 32],
+        });
+        chain.append(entry(6, Some(5)));
+        chain.clear_entries();
+        assert!(chain.is_empty());
+        assert!(chain.anchor().is_some());
+    }
+
+    #[test]
+    fn set_anchor_origin_uses_zero_hash() {
+        let mut chain = PeerChain::new(64);
+        chain.set_anchor(Point::Origin);
+        let a = chain.anchor().unwrap();
+        assert_eq!(a.hash, [0u8; 32]);
+        assert_eq!(a.point, Point::Origin);
     }
 }

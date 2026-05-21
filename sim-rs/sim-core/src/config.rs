@@ -83,6 +83,90 @@ pub enum ShardStrategy {
     MinCut,
 }
 
+/// Which stock policy in `shared_consensus::fetch` to use for a given traffic
+/// class.  Mirrors net-rs's `FetchPolicyKind` so YAML configs round-
+/// trip between the two consumers.
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum FetchPolicyKind {
+    /// Single-peer pick by lowest measured RTT.  Matches shared-consensus's
+    /// `LeiosState::new` default.
+    #[default]
+    LowestRtt,
+    /// Fan out to `n` lowest-RTT candidates.  Omitting `n` fans to
+    /// every candidate (`BroadcastN::all()`); `n = 1` mimics LowestRtt.
+    Broadcast {
+        #[serde(default)]
+        n: Option<usize>,
+    },
+    /// Suppress this class of fetch entirely.  Only meaningful for
+    /// `eb-txs` (organic tx diffusion fills the gap); the other
+    /// classes have no fallback and will stall.
+    NoFetch,
+}
+
+/// Per-traffic-class fetch-policy selection for the shared-consensus adapter.
+/// Defaults map onto `LeiosState::new`'s constructor: every class
+/// uses `LowestRttFirst` with a zero-RTT oracle (sim drives fetches
+/// via its own Message enum; the policy still picks which peer).
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+pub struct FetchPolicy {
+    #[serde(default)]
+    pub block: FetchPolicyKind,
+    #[serde(default)]
+    pub eb: FetchPolicyKind,
+    #[serde(default)]
+    pub eb_txs: FetchPolicyKind,
+    #[serde(default)]
+    pub votes: FetchPolicyKind,
+}
+
+impl FetchPolicyKind {
+    pub fn into_block_policy(self) -> Box<dyn shared_consensus::fetch::BlockFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
+        }
+    }
+
+    pub fn into_eb_policy(self) -> Box<dyn shared_consensus::fetch::EbFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
+        }
+    }
+
+    pub fn into_eb_txs_policy(self) -> Box<dyn shared_consensus::fetch::EbTxsFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
+        }
+    }
+
+    pub fn into_vote_policy(self) -> Box<dyn shared_consensus::fetch::VoteFetchPolicy + Send + Sync> {
+        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
+        match self {
+            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
+            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
+                n: n.unwrap_or(usize::MAX),
+            }),
+            FetchPolicyKind::NoFetch => Box::new(NoFetch),
+        }
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawParameters {
@@ -124,6 +208,31 @@ pub struct RawParameters {
     pub linear_eb_propagation_criteria: EBPropagationCriteria,
     pub linear_tx_max_age_slots: Option<u64>,
 
+    // Fetch routing (shared-consensus adapter only)
+    /// Per-traffic-class fetch-policy selection.  Defaults to
+    /// `lowest-rtt` for every class (matching `LeiosState::new`).
+    /// Mirrors net-rs's `FetchPolicyConfig` shape.  Only consumed by
+    /// the shared-consensus adapter; `linear_leios.rs` has its own diffusion path.
+    #[serde(default)]
+    pub fetch_policy: FetchPolicy,
+
+    /// Should a voter retry across slots of the CIP-0164 voting
+    /// window when an in-window vote attempt didn't succeed?  Covers
+    /// both retry paths:
+    ///
+    /// - transient predicate failure (`WrongEB` / `LateRBHeader` /
+    ///   `MissingTX`) — a later slot may see chain-tip / mempool
+    ///   state that flips the predicate to success;
+    /// - lottery loss (no PV seat, no NPV win) — the NPV trial re-runs
+    ///   with a fresh per-slot VRF input.
+    ///
+    /// Default `true` matches the CIP reading.  `false` gives a
+    /// single decision per `(voter, EB)` and one NPV trial — matches
+    /// `linear_leios.rs`'s single-shot lottery behaviour.  Useful for
+    /// like-for-like comparisons.  shared-consensus adapter only.
+    #[serde(default = "default_retry_vote_in_window")]
+    pub retry_vote_in_window: bool,
+
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
     pub tx_size_bytes_distribution: DistributionConfig,
@@ -148,6 +257,17 @@ pub struct RawParameters {
     pub rb_body_legacy_praos_payload_validation_cpu_time_ms_constant: f64,
     pub rb_body_legacy_praos_payload_validation_cpu_time_ms_per_byte: f64,
     pub rb_body_legacy_praos_payload_avg_size_bytes: u64,
+
+    /// CPU cost to apply an RB to ledger state (UTXO mutation, after
+    /// the body-validation signature/structure check has passed).
+    /// Scales by tx count; defaults are minimal-but-nonzero so the
+    /// `PraosState::on_block_applied` accounting fires without
+    /// skewing throughput.  (`shared-consensus` adapter only — `linear_leios`
+    /// collapses validate+apply into one step.)
+    #[serde(default = "default_rb_apply_cpu_time_ms")]
+    pub rb_apply_cpu_time_ms: f64,
+    #[serde(default = "default_rb_apply_cpu_time_ms_per_tx")]
+    pub rb_apply_cpu_time_ms_per_tx: f64,
 
     // Input block configuration
     pub ib_generation_probability: f64,
@@ -178,9 +298,30 @@ pub struct RawParameters {
     pub eb_body_avg_size_bytes: u64,
     pub eb_include_txs_from_previous_stage: bool,
 
+    /// CPU cost to apply an EB closure to ledger state — the EB's
+    /// referenced txs land on-chain via the certifying RB's
+    /// endorsement.  Parallel pathway to `rb_apply_cpu_time_ms` and
+    /// gates mempool-prune of the EB's tx set.  (`shared-consensus` adapter
+    /// only.)
+    #[serde(default = "default_eb_apply_cpu_time_ms")]
+    pub eb_apply_cpu_time_ms: f64,
+    #[serde(default = "default_eb_apply_cpu_time_ms_per_tx")]
+    pub eb_apply_cpu_time_ms_per_tx: f64,
+
     // Vote configuration
-    pub persistent_vote_generation_probability: f64,
-    pub non_persistent_vote_generation_probability: f64,
+    //
+    // The two voter-count fields are the expected size of the
+    // persistent / non-persistent voter committees per EB.  Historic
+    // YAML keys `persistent-vote-generation-probability` /
+    // `non-persistent-vote-generation-probability` are still accepted
+    // (the values were always voter counts, never probabilities; the
+    // old names date from a pre-CIP-0164 framing).  Linear sums them
+    // into one VRF-lottery probability; shared-consensus uses them directly as
+    // PV / NPV committee sizes for `CommitteeSelection::WfaLs`.
+    #[serde(alias = "persistent-vote-generation-probability")]
+    pub persistent_voters: f64,
+    #[serde(alias = "non-persistent-vote-generation-probability")]
+    pub non_persistent_voters: f64,
     pub persistent_vote_generation_cpu_time_ms: f64,
     pub non_persistent_vote_generation_cpu_time_ms: f64,
     pub vote_generation_cpu_time_ms_per_tx: f64,
@@ -226,13 +367,17 @@ pub enum LeiosVariant {
     FullWithTxReferences,
     Linear,
     LinearWithTxReferences,
+    SharedConsensus,
 }
 
 impl LeiosVariant {
     pub fn has_ibs(&self) -> bool {
         !matches!(
             self,
-            Self::FullWithoutIbs | Self::Linear | Self::LinearWithTxReferences
+            Self::FullWithoutIbs
+                | Self::Linear
+                | Self::LinearWithTxReferences
+                | Self::SharedConsensus
         )
     }
 }
@@ -480,12 +625,11 @@ fn vote_weighted_average(params: &RawParameters, persistent: f64, non_persistent
         CommitteeSelectionAlgorithm::Everyone
         | CommitteeSelectionAlgorithm::TopStakeFraction => persistent,
         CommitteeSelectionAlgorithm::WfaLs => {
-            let total = params.persistent_vote_generation_probability
-                + params.non_persistent_vote_generation_probability;
+            let total = params.persistent_voters + params.non_persistent_voters;
             if total == 0.0 {
                 return 0.0;
             }
-            let frac = params.persistent_vote_generation_probability / total;
+            let frac = params.persistent_voters / total;
             frac * persistent + (1.0 - frac) * non_persistent
         }
     }
@@ -516,6 +660,10 @@ pub(crate) struct CpuTimeConfig {
     pub cert_generation_per_node: Duration,
     pub cert_validation_constant: Duration,
     pub cert_validation_per_node: Duration,
+    pub rb_apply_constant: Duration,
+    pub rb_apply_per_tx: Duration,
+    pub eb_apply_constant: Duration,
+    pub eb_apply_per_tx: Duration,
 }
 impl CpuTimeConfig {
     fn new(params: &RawParameters) -> Self {
@@ -563,6 +711,10 @@ impl CpuTimeConfig {
             cert_generation_per_node: duration_ms(params.cert_generation_cpu_time_ms_per_node),
             cert_validation_constant: duration_ms(params.cert_validation_cpu_time_ms_constant),
             cert_validation_per_node: duration_ms(params.cert_validation_cpu_time_ms_per_node),
+            rb_apply_constant: duration_ms(params.rb_apply_cpu_time_ms),
+            rb_apply_per_tx: duration_ms(params.rb_apply_cpu_time_ms_per_tx),
+            eb_apply_constant: duration_ms(params.eb_apply_cpu_time_ms),
+            eb_apply_per_tx: duration_ms(params.eb_apply_cpu_time_ms_per_tx),
         }
     }
 }
@@ -617,7 +769,9 @@ impl BlockSizeConfig {
 
     pub fn linear_eb(&self, txs: &[Arc<Transaction>]) -> u64 {
         let body_size = match self.variant {
-            LeiosVariant::LinearWithTxReferences => txs.len() as u64 * self.eb_per_ib,
+            LeiosVariant::LinearWithTxReferences | LeiosVariant::SharedConsensus => {
+                txs.len() as u64 * self.eb_per_ib
+            }
             _ => txs.iter().map(|tx| tx.bytes).sum::<u64>(),
         };
         self.eb_constant + body_size
@@ -818,6 +972,9 @@ pub struct SimConfiguration {
     pub slots: Option<u64>,
     pub emit_conformance_events: bool,
     pub aggregate_events: bool,
+    pub log_memory_stats: bool,
+    pub fetch_policy: FetchPolicy,
+    pub retry_vote_in_window: bool,
     pub trace_nodes: HashSet<NodeId>,
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
@@ -842,7 +999,16 @@ pub struct SimConfiguration {
     pub(crate) eb_generation_probability: f64,
     pub(crate) committee_selection: CommitteeSelectionAlgorithm,
     pub(crate) vote_eligible_nodes: HashSet<NodeId>,
+    /// Sum of `persistent_voters + non_persistent_voters`.  Linear
+    /// uses this as a single VRF-lottery probability per (voter, EB).
     pub(crate) vote_probability: f64,
+    /// CIP-0164 PV / NPV committee sizes.  shared-consensus uses these
+    /// directly via [`shared_consensus::config::CommitteeSelection::WfaLs`];
+    /// linear collapses them into `vote_probability`.  Stored as
+    /// f64 (PV/NPV can be non-integer); shared-consensus casts at the
+    /// boundary.
+    pub(crate) persistent_voters: f64,
+    pub(crate) non_persistent_voters: f64,
     pub(crate) vote_slot_length: u64,
     pub(crate) eb_include_txs_from_previous_stage: bool,
     pub(crate) linear_vote_stage_length: u64,
@@ -926,6 +1092,9 @@ impl SimConfiguration {
             slots: None,
             emit_conformance_events: false,
             aggregate_events: false,
+            log_memory_stats: false,
+            fetch_policy: params.fetch_policy,
+            retry_vote_in_window: params.retry_vote_in_window,
             trace_nodes: HashSet::new(),
             nodes: topology.nodes,
             links: topology.links,
@@ -949,8 +1118,9 @@ impl SimConfiguration {
             eb_generation_probability: params.eb_generation_probability,
             committee_selection: params.committee_selection_algorithm,
             vote_eligible_nodes,
-            vote_probability: params.persistent_vote_generation_probability
-                + params.non_persistent_vote_generation_probability,
+            vote_probability: params.persistent_voters + params.non_persistent_voters,
+            persistent_voters: params.persistent_voters,
+            non_persistent_voters: params.non_persistent_voters,
             vote_threshold: params.vote_threshold,
             vote_slot_length: params.leios_stage_active_voting_slots,
             eb_include_txs_from_previous_stage: params.eb_include_txs_from_previous_stage,
@@ -990,6 +1160,26 @@ fn default_shard_max_size_pct() -> u64 {
 
 fn default_parallel_threshold() -> usize {
     10
+}
+
+fn default_retry_vote_in_window() -> bool {
+    true
+}
+
+fn default_rb_apply_cpu_time_ms() -> f64 {
+    0.5
+}
+
+fn default_rb_apply_cpu_time_ms_per_tx() -> f64 {
+    0.05
+}
+
+fn default_eb_apply_cpu_time_ms() -> f64 {
+    0.5
+}
+
+fn default_eb_apply_cpu_time_ms_per_tx() -> f64 {
+    0.05
 }
 #[derive(Debug, Clone)]
 pub struct NodeConfiguration {

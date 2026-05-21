@@ -9,6 +9,8 @@ import {
 interface TopologyEdgeData {
   latency_ms: number;
   selected: boolean;
+  flash?: "connected" | "disconnected" | null;
+  status?: "connected" | "disconnected" | null;
 }
 
 type Props = EdgeProps & { data: TopologyEdgeData };
@@ -29,6 +31,26 @@ function TopologyEdgeInner({
   });
 
   const selected = data?.selected ?? false;
+  const flash = data?.flash ?? null;
+  const status = data?.status ?? null;
+
+  // Flash takes priority (event animation), then selection, then
+  // steady-state status, then default.  Connected edges render
+  // light green; disconnected edges render pink; unknown (no
+  // events yet) stays gray.  Width is bumped only during flashes.
+  const stroke =
+    flash === "connected"
+      ? "#4caf50"
+      : flash === "disconnected"
+        ? "#e53935"
+        : selected
+          ? "#90caf9"
+          : status === "disconnected"
+            ? "#f48fb1"
+            : status === "connected"
+              ? "#a5d6a7"
+              : "#555";
+  const strokeWidth = flash ? 3 : selected ? 2 : 1;
 
   return (
     <>
@@ -36,8 +58,8 @@ function TopologyEdgeInner({
         id={id}
         path={edgePath}
         style={{
-          stroke: selected ? "#90caf9" : "#555",
-          strokeWidth: selected ? 2 : 1,
+          stroke,
+          strokeWidth,
         }}
       />
       <EdgeLabelRenderer>

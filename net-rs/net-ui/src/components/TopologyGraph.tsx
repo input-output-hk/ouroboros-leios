@@ -21,6 +21,8 @@ export function TopologyGraph() {
   const nodePositions = useStore((s) => s.nodePositions);
   const selectedNodeId = useStore((s) => s.selectedNodeId);
   const selectedEdge = useStore((s) => s.selectedEdge);
+  const edgeFlash = useStore((s) => s.edgeFlash);
+  const edgeStatus = useStore((s) => s.edgeStatus);
   const selectNode = useStore((s) => s.selectNode);
   const selectEdge = useStore((s) => s.selectEdge);
   const setNodePosition = useStore((s) => s.setNodePosition);
@@ -44,6 +46,12 @@ export function TopologyGraph() {
     return topology.edges.map((e) => {
       const sourceId = topology.nodes[e.from]?.node_id ?? "";
       const targetId = topology.nodes[e.to]?.node_id ?? "";
+      const lo = Math.min(e.from, e.to);
+      const hi = Math.max(e.from, e.to);
+      const key = `${lo}-${hi}`;
+      const seq = edgeFlash[key];
+      const flash = seq && seq.length > 0 ? seq[0] : null;
+      const status = edgeStatus[key] ?? null;
       return {
         id: `${e.from}-${e.to}`,
         source: sourceId,
@@ -53,10 +61,12 @@ export function TopologyGraph() {
           latency_ms: e.latency_ms,
           selected:
             selectedEdge?.from === e.from && selectedEdge?.to === e.to,
+          flash,
+          status,
         },
       };
     });
-  }, [topology, selectedEdge]);
+  }, [topology, selectedEdge, edgeFlash, edgeStatus]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {

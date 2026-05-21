@@ -1,21 +1,24 @@
-//! Transaction pool and fake transaction generation.
+//! Transaction pool wrapper around `shared_consensus::mempool::MempoolState`.
 //!
-//! `Mempool` accumulates transactions from both local generation and received
-//! from peers. The block producer drains it when producing ranking blocks
-//! (txs fit in RB body) or endorser blocks (overflow → EB manifest).
+//! Translates between net-core's wire-format `PendingTx`/`TxId`/`TxBody`
+//! and the opaque-bytes shape `shared-consensus` uses, plus the per-peer
+//! `net_core::peer::PeerId` ↔ `shared_consensus::peer::PeerId` mapping.  The
+//! actual queue, capacity, eviction, per-peer advertised set, and
+//! validation-effect surface live in `shared_consensus::mempool`.
 //!
-//! `spawn_tx_generator` runs a background Poisson process that pushes fake
-//! transactions into the mempool and broadcasts them via the coordinator.
+//! `spawn_tx_generator` and `spawn_tx_validator` stay here — they are
+//! the I/O-side actors that drive the state machine.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use tokio::sync::{mpsc, watch};
-use tracing::info;
+use tracing::{info, warn};
 
+use shared_consensus::mempool::{EbKey, MempoolState};
 use net_core::peer::PeerId;
 use net_core::protocols::txsubmission::{PendingTx, TxBody, TxId};
 
@@ -24,153 +27,247 @@ use crate::config::{DynamicConfig, TxConfig};
 /// Shared handle to the mempool.
 pub type SharedMempool = Arc<Mutex<Mempool>>;
 
-/// Transaction accumulator for block production.
-///
-/// Collects pending transactions from local generation and peer receipt.
-/// The block producer drains it on each RB production attempt.
-///
-/// Per-peer "already advertised" sets live alongside the queue so we never
-/// re-announce the same tx_id to the same peer. Whenever a tx leaves the
-/// mempool (capacity eviction, drain_up_to, drain_all) it is purged from
-/// every peer set automatically — bounding total state by mempool size.
+/// Translate a net-core peer id to the shared-consensus one.  Both are
+/// `pub struct PeerId(pub u64)`; this is a single field copy.
+fn to_con_pid(id: PeerId) -> shared_consensus::peer::PeerId {
+    shared_consensus::peer::PeerId(id.0)
+}
+
+fn from_con_tx(tx: shared_consensus::mempool::PendingTx) -> PendingTx {
+    PendingTx {
+        tx_id: TxId(tx.tx_id),
+        body: TxBody(tx.body),
+        size: tx.size,
+    }
+}
+
+/// Pad/truncate a `Vec<u8>` tx-id into the wrapper's 32-byte hash form.
+/// shared-consensus's `TxId = Vec<u8>` is hash-scheme-agnostic; net-rs's wire
+/// format pins it at Blake2b-256.
+fn to_hash_32(id: Vec<u8>) -> [u8; 32] {
+    let mut h = [0u8; 32];
+    let n = id.len().min(32);
+    h[..n].copy_from_slice(&id[..n]);
+    h
+}
+
+/// Which body the next self-produced RB carries — wire-typed sibling of
+/// [`shared_consensus::production::BodyPath`].
+#[derive(Debug, Clone)]
+pub enum BodyPath {
+    /// Producer-side EB-safety gate fired: the local node holds a
+    /// chain-committed cert for an EB whose body it has not validated
+    /// locally.  The RB body must be empty and no fresh EB announced;
+    /// the cert itself is independent and remains the caller's
+    /// responsibility.
+    Empty,
+    /// RB body inlines these txs; mempool has been drained.
+    Inline(Vec<PendingTx>),
+    /// RB body is empty; the listed manifest is announced via an EB.
+    /// Caller hashes the encoded manifest bytes and finishes the
+    /// drain-and-pin via [`Mempool::produce_eb`] with the resulting
+    /// `EbKey`.
+    Eb { manifest_hashes: Vec<[u8; 32]> },
+}
+
+/// I/O-side wrapper around `shared_consensus::mempool::MempoolState`.  Public
+/// methods preserve the net-core wire types at the boundary; shared-consensus
+/// Capacity of the admit-fanout channel.  Sized for short bursts of
+/// admits without backpressuring `push`; on overflow `try_send` drops
+/// the wake-up and the tx is picked up on the next `TxsRequested`
+/// pull.
+const ADMIT_FANOUT_CAPACITY: usize = 1024;
+
+/// holds the actual state.
 pub struct Mempool {
-    txs: VecDeque<PendingTx>,
-    total_bytes: usize,
-    capacity: usize,
-    peer_advertised: HashMap<PeerId, HashSet<[u8; 32]>>,
+    state: MempoolState,
+    /// Carries each just-admitted [`PendingTx`] to the main loop's
+    /// fan-out branch, which announces it to every connected peer in
+    /// O(log N) per peer via [`Self::mark_announced_to_peer`].
+    /// `try_send`: overflow drops the wake-up; the tx remains in the
+    /// mempool and reaches peers via the pull path on the next
+    /// `MsgRequestTxIds`.
+    admit_tx: mpsc::Sender<PendingTx>,
+    /// Receiver half handed to the main loop exactly once.  The
+    /// `Option` lets `take_admit_rx` move it out — the channel is
+    /// single-consumer.
+    admit_rx: Option<mpsc::Receiver<PendingTx>>,
 }
 
 impl Mempool {
-    /// Create an empty mempool with the given max transaction count.
     pub fn new(capacity: usize) -> Self {
+        let (admit_tx, admit_rx) = mpsc::channel(ADMIT_FANOUT_CAPACITY);
         Self {
-            txs: VecDeque::new(),
-            total_bytes: 0,
-            capacity,
-            peer_advertised: HashMap::new(),
+            state: MempoolState::new(capacity),
+            admit_tx,
+            admit_rx: Some(admit_rx),
         }
     }
 
-    /// Drop `tx_id` from every per-peer advertised set. Called whenever a
-    /// tx leaves the mempool so peer state never outlives the txs it
-    /// references. Tx ids that aren't 32 bytes are silently ignored —
-    /// every mempool tx hashes to Blake2b-256, so this can't happen in
-    /// practice.
-    fn prune_from_peer_sets(&mut self, tx_id: &[u8]) {
-        let Ok(key): Result<[u8; 32], _> = tx_id.try_into() else {
-            return;
-        };
-        for set in self.peer_advertised.values_mut() {
-            set.remove(&key);
-        }
+    /// Take the admit-fanout receiver.  Returns `None` on subsequent
+    /// calls — there is one consumer (the main loop).
+    pub fn take_admit_rx(&mut self) -> Option<mpsc::Receiver<PendingTx>> {
+        self.admit_rx.take()
     }
 
-    /// Add a transaction. Drops the oldest tx if at capacity.
+    /// Borrow the underlying shared-consensus state for read-only operations
+    /// that consult the mempool but don't mutate it (e.g.
+    /// `LeiosState::missing_eb_tx_bitmap`).
+    pub fn as_inner(&self) -> &MempoolState {
+        &self.state
+    }
+
+    /// Install a shared behaviour handle on the underlying mempool
+    /// state.  The `Consensus` facade hands the same handle to every
+    /// owned state machine.
+    pub fn install_behaviour_handle(
+        &mut self,
+        handle: shared_consensus::behaviour::BehaviourHandle,
+    ) {
+        self.state.behaviour = handle;
+    }
+
+    /// Admit a tx that's already been validated (locally generated, or
+    /// produced by `spawn_tx_validator` after its delay).  TxRejected
+    /// effects (queue-full evictions, dedup) are dropped silently —
+    /// telemetry plumbing for them is a follow-up.
+    ///
+    /// On successful admit, sends the tx through the admit-fanout
+    /// channel so the main loop can announce it per-peer.  Duplicate
+    /// admits do not signal — nothing new to fan out.
     pub fn push(&mut self, tx: PendingTx) {
-        if self.txs.len() >= self.capacity {
-            if let Some(old) = self.txs.pop_front() {
-                self.total_bytes -= old.size as usize;
-                let evicted_id = old.tx_id.0.clone();
-                drop(old);
-                self.prune_from_peer_sets(&evicted_id);
+        use shared_consensus::mempool::{MempoolEffect, TxRejectReason};
+        let effects = self.state.admit_validated(
+            tx.tx_id.0.clone(),
+            tx.body.0.clone(),
+            tx.size,
+        );
+        let admitted = !effects.iter().any(|e| matches!(
+            e,
+            MempoolEffect::TxRejected { reason: TxRejectReason::AlreadyKnown, .. }
+        ));
+        if admitted {
+            if let Err(mpsc::error::TrySendError::Full(_)) = self.admit_tx.try_send(tx) {
+                // Fanout channel full — peer will pick the tx up via
+                // the next pull.  Warn so the operator notices if it
+                // happens persistently.
+                warn!("mempool admit fanout channel full; dropping notification");
             }
         }
-        self.total_bytes += tx.size as usize;
-        self.txs.push_back(tx);
     }
 
-    /// Total bytes of pending transactions.
-    pub fn total_bytes(&self) -> usize {
-        self.total_bytes
-    }
-
-    /// Number of pending transactions.
     #[cfg(test)]
     pub fn len(&self) -> usize {
-        self.txs.len()
+        self.state.len()
     }
 
-    /// Drain all transactions (for EB overflow path).
-    pub fn drain_all(&mut self) -> Vec<PendingTx> {
-        self.total_bytes = 0;
-        let drained: Vec<PendingTx> = self.txs.drain(..).collect();
-        for tx in &drained {
-            self.prune_from_peer_sets(&tx.tx_id.0);
-        }
-        drained
-    }
-
-    /// Peek at up to `max_count` transactions without removing them.
-    /// Used by TxSubmission pull model — txs stay available for other
-    /// peers and block production.
-    pub fn peek_up_to(&self, max_count: usize) -> Vec<PendingTx> {
-        self.txs.iter().take(max_count).cloned().collect()
-    }
-
-    /// Like `peek_up_to`, but only returns txs not yet advertised to
-    /// `peer_id`, and records the returned ids so subsequent calls skip
-    /// them. The set is pruned automatically when txs leave the mempool.
     pub fn peek_unannounced_for_peer(
         &mut self,
         peer_id: PeerId,
         max_count: usize,
     ) -> Vec<PendingTx> {
-        let mut result = Vec::with_capacity(max_count);
-        let advertised = self.peer_advertised.entry(peer_id).or_default();
-        for tx in &self.txs {
-            if result.len() >= max_count {
-                break;
-            }
-            let Ok(key): Result<[u8; 32], _> = tx.tx_id.0.as_slice().try_into() else {
-                continue;
-            };
-            if advertised.insert(key) {
-                result.push(tx.clone());
-            }
-        }
-        result
+        self.state
+            .peek_unannounced_for_peer(to_con_pid(peer_id), max_count)
+            .into_iter()
+            .map(from_con_tx)
+            .collect()
     }
 
-    /// Drop all per-peer advertised state for a peer that has disconnected.
     pub fn forget_peer(&mut self, peer_id: PeerId) {
-        self.peer_advertised.remove(&peer_id);
+        self.state.forget_peer(to_con_pid(peer_id));
     }
 
-    /// Snapshot of all current `tx_id` byte vectors. Used by the Leios
-    /// receiver to decide which EB transactions need to be fetched.
-    pub fn current_tx_ids(&self) -> HashSet<Vec<u8>> {
-        self.txs.iter().map(|tx| tx.tx_id.0.clone()).collect()
-    }
 
-    /// Look up a transaction body by its `tx_id`. Linear scan; for the
-    /// mempool sizes this prototype targets that's acceptable.
     pub fn get_body_by_id(&self, id: &[u8]) -> Option<Vec<u8>> {
-        self.txs
-            .iter()
-            .find(|tx| tx.tx_id.0 == id)
-            .map(|tx| tx.body.0.clone())
+        self.state.get_body_by_id(id)
     }
 
-    /// Drain transactions up to a byte limit (for RB body path).
-    pub fn drain_up_to(&mut self, max_bytes: usize) -> Vec<PendingTx> {
-        let mut result = Vec::new();
-        let mut bytes = 0;
-        while let Some(front) = self.txs.front() {
-            if bytes + front.size as usize > max_bytes && !result.is_empty() {
-                break;
+    /// Run the CIP-0164 overflow rule.  Returns the body path the next
+    /// self-produced RB should take:
+    ///
+    /// - `Empty` when `leios`'s producer-side EB-safety gate is set
+    ///   (chain-committed cert for an EB whose body the local node
+    ///   has not validated).  Mempool is untouched.
+    /// - `Inline(txs)` when the mempool fits in the RB body cap
+    ///   (drained on return).
+    /// - `Eb { manifest_hashes }` when the mempool overflows the cap
+    ///   (mempool untouched; caller commits the drain via
+    ///   [`Mempool::produce_eb`] once it has the EB hash).
+    ///
+    /// `endorsement_present` must reflect whether the caller is about
+    /// to attach a Leios certificate to this RB; the body-path
+    /// decision enforces the CIP-0164 cert-XOR-inline-body rule.
+    ///
+    /// Policy lives in [`shared_consensus::production::BodyPath::decide`].
+    pub fn decide_body_path(
+        &mut self,
+        rb_body_max_bytes: usize,
+        eb_body_max_bytes: usize,
+        leios: &shared_consensus::leios::LeiosState,
+        endorsement_present: bool,
+    ) -> BodyPath {
+        match shared_consensus::production::BodyPath::decide(
+            &mut self.state,
+            rb_body_max_bytes,
+            eb_body_max_bytes,
+            leios,
+            endorsement_present,
+        ) {
+            shared_consensus::production::BodyPath::Empty => BodyPath::Empty,
+            shared_consensus::production::BodyPath::Inline(txs) => {
+                BodyPath::Inline(txs.into_iter().map(from_con_tx).collect())
             }
-            let tx = self.txs.pop_front().unwrap();
-            bytes += tx.size as usize;
-            self.total_bytes -= tx.size as usize;
-            result.push(tx);
-            if bytes >= max_bytes {
-                break;
-            }
+            shared_consensus::production::BodyPath::Eb { manifest } => BodyPath::Eb {
+                manifest_hashes: manifest.into_iter().map(to_hash_32).collect(),
+            },
         }
-        for tx in &result {
-            self.prune_from_peer_sets(&tx.tx_id.0);
-        }
-        result
+    }
+
+    /// Drain the first `count` free txs into an EB pin under `eb_key`.
+    /// `count` must come from the `BodyPath::Eb` manifest's length so
+    /// the drain matches the size-capped selection.  After this the
+    /// drained txs stay locally available via `has_tx` /
+    /// `get_body_by_id` but no longer count toward `total_bytes` /
+    /// `drain_up_to` — i.e. they won't be double-included in a
+    /// subsequent RB body.
+    ///
+    /// `MempoolEffect::TxRejected{EbClosurePruned}` evictions of older
+    /// closures aging past the retention window are dropped on the
+    /// floor here; net-rs has no telemetry plumbing for them yet, and
+    /// sim-rs's adapter will surface them directly.
+    pub fn produce_eb(&mut self, eb_key: EbKey, count: usize) {
+        let _ = self.state.produce_eb(eb_key, count);
+    }
+
+    /// Receiver-side: insert a body fetched via LeiosFetch.  Idempotent
+    /// against duplicates already in either compartment.  Hashes the
+    /// body to derive the tx_id (the wire-format manifest reference).
+    ///
+    /// EB-pinned bodies live in `eb_pinned`, not the free pool that
+    /// `peek_unannounced_for_peer` iterates, so no admit-fanout
+    /// notification fires here — peers fetch these via LeiosFetch
+    /// BlockTxs, not TxSubmission.
+    pub fn merge_eb_body(&mut self, body: Vec<u8>) {
+        let tx = tx_from_received_bytes(body);
+        self.state.merge_eb_body(tx.tx_id.0, tx.body.0, tx.size);
+    }
+
+    /// Mark a tx as advertised to the given peer; returns `true` iff
+    /// the entry was newly inserted (caller should send the body).
+    /// The admit-fanout path uses this to announce a single tx in
+    /// O(log N) per peer instead of rescanning the mempool.
+    pub fn mark_announced_to_peer(&mut self, peer_id: PeerId, tx_id: &TxId) -> bool {
+        self.state
+            .mark_announced_to_peer(to_con_pid(peer_id), &tx_id.0)
+    }
+
+    /// Snapshot of every locally available tx id — free pool plus
+    /// EB-pinned bodies.  Used by the CIP-0164 `MissingTX` voting
+    /// predicate.
+    pub fn all_known_tx_ids(&self) -> HashSet<Vec<u8>> {
+        let mut ids: HashSet<Vec<u8>> = self.state.txs.iter().map(|t| t.tx_id.clone()).collect();
+        ids.extend(self.state.eb_pinned.keys().cloned());
+        ids
     }
 }
 
@@ -179,9 +276,9 @@ pub fn new_mempool(capacity: usize) -> SharedMempool {
     Arc::new(Mutex::new(Mempool::new(capacity)))
 }
 
-/// Mempool-backed `TxBodyResolver`. Wraps `SharedMempool` and exposes
+/// Mempool-backed `TxBodyResolver`.  Wraps `SharedMempool` and exposes
 /// the body-by-hash lookup that the Leios store uses when receivers
-/// re-serve EB tx requests for EBs whose manifests they cache.
+/// re-serve EB tx requests.
 pub struct MempoolTxBodyResolver(SharedMempool);
 
 impl MempoolTxBodyResolver {
@@ -212,8 +309,8 @@ pub fn tx_from_received_bytes(body: Vec<u8>) -> PendingTx {
 ///
 /// The generator reads `tx_rate` from the watch channel each iteration,
 /// so rate changes take effect immediately. Each generated tx is pushed
-/// into the local mempool for block inclusion and peer advertisement via
-/// the TxSubmission pull model.
+/// into the local mempool for block inclusion and peer advertisement
+/// via the TxSubmission pull model.
 pub fn spawn_tx_generator(
     config: &TxConfig,
     seed: Option<u64>,
@@ -234,9 +331,8 @@ pub fn spawn_tx_generator(
         loop {
             let rate = dyn_config.borrow().tx_rate;
             if rate <= 0.0 {
-                // Wait for a config update that might set a positive rate.
                 if dyn_config.changed().await.is_err() {
-                    break; // sender dropped
+                    break;
                 }
                 continue;
             }
@@ -253,7 +349,6 @@ pub fn spawn_tx_generator(
             let tx = make_fake_tx(&mut rng, size);
             tx_count += 1;
 
-            // Push into local mempool for block inclusion.
             {
                 let mut pool = mempool.lock().unwrap();
                 pool.push(tx);
@@ -272,8 +367,9 @@ pub fn spawn_tx_generator(
 /// Spawn the transaction validator as a background task.
 ///
 /// Received transactions go through a simulated validation delay before
-/// entering the mempool. Each tx is validated concurrently (Phase 1
-/// validation is independent per tx). Concurrency is gated by a semaphore.
+/// entering the mempool.  Each tx is validated concurrently (Phase 1
+/// validation is independent per tx).  Concurrency is gated by a
+/// semaphore.
 pub fn spawn_tx_validator(
     tx_validation_ms: f64,
     tx_validation_ms_per_byte: f64,
@@ -289,7 +385,7 @@ pub fn spawn_tx_validator(
             tokio::spawn(async move {
                 let _permit = permit;
                 if ms > 0.0 {
-                    tokio::time::sleep(std::time::Duration::from_secs_f64(ms / 1000.0)).await;
+                    tokio::time::sleep(Duration::from_secs_f64(ms / 1000.0)).await;
                 }
                 let tx = tx_from_received_bytes(body);
                 let mut pool = mempool.lock().unwrap();
@@ -299,7 +395,7 @@ pub fn spawn_tx_validator(
     })
 }
 
-/// Build a fake transaction. The `tx_id` is `blake2b256(body)` so it
+/// Build a fake transaction.  The `tx_id` is `blake2b256(body)` so it
 /// matches what `tx_from_received_bytes` would compute on a peer; the
 /// EB manifest carries this hash, and receivers hash bodies the same
 /// way to match them back to manifest indices.
@@ -309,7 +405,7 @@ fn make_fake_tx(rng: &mut StdRng, size: usize) -> PendingTx {
     tx_from_received_bytes(body_buf)
 }
 
-/// Sample an exponential inter-arrival time: -ln(U) / lambda.
+/// Sample an exponential inter-arrival time: `-ln(U) / lambda`.
 fn exp_sample(rng: &mut StdRng, rate: f64) -> Duration {
     let u: f64 = rng.gen_range(0.001..1.0);
     Duration::from_secs_f64(-u.ln() / rate)
@@ -319,77 +415,12 @@ fn exp_sample(rng: &mut StdRng, rate: f64) -> Duration {
 mod tests {
     use super::*;
 
-    fn make_tx(size: usize) -> PendingTx {
-        let mut rng = StdRng::seed_from_u64(42);
-        make_fake_tx(&mut rng, size)
-    }
-
     fn make_tx_with_id(id: u8, size: usize) -> PendingTx {
         PendingTx {
             tx_id: TxId(vec![id; 32]),
             body: TxBody(vec![0; size]),
             size: size as u32,
         }
-    }
-
-    // -- Mempool tests --
-
-    #[test]
-    fn mempool_push_and_len() {
-        let mut pool = Mempool::new(100);
-        assert_eq!(pool.len(), 0);
-        assert_eq!(pool.total_bytes(), 0);
-
-        pool.push(make_tx_with_id(1, 500));
-        assert_eq!(pool.len(), 1);
-        assert_eq!(pool.total_bytes(), 500);
-
-        pool.push(make_tx_with_id(2, 300));
-        assert_eq!(pool.len(), 2);
-        assert_eq!(pool.total_bytes(), 800);
-    }
-
-    #[test]
-    fn capacity_drops_oldest() {
-        let mut pool = Mempool::new(3);
-        pool.push(make_tx_with_id(1, 100));
-        pool.push(make_tx_with_id(2, 200));
-        pool.push(make_tx_with_id(3, 300));
-        assert_eq!(pool.len(), 3);
-        assert_eq!(pool.total_bytes(), 600);
-
-        // Push a 4th — oldest (100 bytes) should be dropped.
-        pool.push(make_tx_with_id(4, 400));
-        assert_eq!(pool.len(), 3);
-        assert_eq!(pool.total_bytes(), 900); // 200 + 300 + 400
-    }
-
-    #[test]
-    fn current_tx_ids_returns_pushed_ids() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 50));
-        pool.push(make_tx_with_id(2, 50));
-        let ids = pool.current_tx_ids();
-        assert_eq!(ids.len(), 2);
-        assert!(ids.contains(&vec![1u8; 32]));
-        assert!(ids.contains(&vec![2u8; 32]));
-    }
-
-    #[test]
-    fn get_body_by_id_round_trip() {
-        let mut pool = Mempool::new(100);
-        let tx = PendingTx {
-            tx_id: TxId(vec![0xAB; 32]),
-            body: TxBody(vec![0x01, 0x02, 0x03]),
-            size: 3,
-        };
-        pool.push(tx);
-
-        assert_eq!(
-            pool.get_body_by_id(&[0xAB; 32]),
-            Some(vec![0x01, 0x02, 0x03])
-        );
-        assert_eq!(pool.get_body_by_id(&[0x00; 32]), None);
     }
 
     #[test]
@@ -402,81 +433,13 @@ mod tests {
         assert_eq!(tx.tx_id, recomputed.tx_id);
     }
 
-    #[tokio::test]
-    async fn mempool_resolver_serves_body_through_trait() {
-        use net_core::store::leios_store::TxBodyResolver;
-        let pool = new_mempool(100);
-        {
-            let mut p = pool.lock().unwrap();
-            p.push(PendingTx {
-                tx_id: TxId(vec![0xCC; 32]),
-                body: TxBody(vec![0xDE, 0xAD]),
-                size: 2,
-            });
-        }
-        let resolver = MempoolTxBodyResolver::new(pool);
-        assert_eq!(resolver.resolve_body(&[0xCC; 32]), Some(vec![0xDE, 0xAD]));
-        assert_eq!(resolver.resolve_body(&[0x99; 32]), None);
-    }
-
     #[test]
-    fn drain_all_empties_pool() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 100));
-        pool.push(make_tx_with_id(2, 200));
-
-        let drained = pool.drain_all();
-        assert_eq!(drained.len(), 2);
-        assert_eq!(pool.len(), 0);
-        assert_eq!(pool.total_bytes(), 0);
-    }
-
-    #[test]
-    fn drain_up_to_respects_limit() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 100));
-        pool.push(make_tx_with_id(2, 200));
-        pool.push(make_tx_with_id(3, 300));
-
-        // Drain up to 250 bytes — gets tx 1 (100), then tx 2 (200) would
-        // push to 300 > 250, so stops after tx 1 only.
-        let drained = pool.drain_up_to(250);
-        assert_eq!(drained.len(), 1);
-        assert_eq!(pool.len(), 2);
-        assert_eq!(pool.total_bytes(), 500);
-    }
-
-    #[test]
-    fn drain_up_to_takes_all_if_under_limit() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 100));
-        pool.push(make_tx_with_id(2, 200));
-
-        let drained = pool.drain_up_to(1000);
-        assert_eq!(drained.len(), 2);
-        assert_eq!(pool.len(), 0);
-        assert_eq!(pool.total_bytes(), 0);
-    }
-
-    #[test]
-    fn drain_up_to_empty_pool() {
-        let mut pool = Mempool::new(100);
-        let drained = pool.drain_up_to(1000);
-        assert!(drained.is_empty());
-    }
-
-    #[test]
-    fn total_bytes_tracks_correctly() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 100));
-        pool.push(make_tx_with_id(2, 200));
-        assert_eq!(pool.total_bytes(), 300);
-
-        pool.drain_up_to(150);
-        assert_eq!(pool.total_bytes(), 200);
-
-        pool.drain_all();
-        assert_eq!(pool.total_bytes(), 0);
+    fn make_fake_tx_correct_size() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let tx = make_fake_tx(&mut rng, 500);
+        assert_eq!(tx.body.0.len(), 500);
+        assert_eq!(tx.size, 500);
+        assert_eq!(tx.tx_id.0.len(), 32);
     }
 
     #[test]
@@ -493,127 +456,6 @@ mod tests {
         let tx1 = tx_from_received_bytes(vec![0xAA; 100]);
         let tx2 = tx_from_received_bytes(vec![0xBB; 100]);
         assert_ne!(tx1.tx_id.0, tx2.tx_id.0);
-    }
-
-    // -- Per-peer announced state tests --
-
-    #[test]
-    fn peek_unannounced_returns_each_tx_once_per_peer() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 100));
-        pool.push(make_tx_with_id(2, 100));
-        pool.push(make_tx_with_id(3, 100));
-
-        let peer = PeerId(0);
-        let first = pool.peek_unannounced_for_peer(peer, 10);
-        assert_eq!(first.len(), 3);
-
-        // Second call returns nothing — all three already advertised.
-        let second = pool.peek_unannounced_for_peer(peer, 10);
-        assert!(second.is_empty());
-    }
-
-    #[test]
-    fn peek_unannounced_independent_per_peer() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 100));
-        pool.push(make_tx_with_id(2, 100));
-
-        let a = PeerId(0);
-        let b = PeerId(1);
-        let to_a = pool.peek_unannounced_for_peer(a, 10);
-        let to_b = pool.peek_unannounced_for_peer(b, 10);
-        assert_eq!(to_a.len(), 2);
-        assert_eq!(to_b.len(), 2);
-    }
-
-    #[test]
-    fn peek_unannounced_returns_only_new_txs_after_push() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 100));
-        let peer = PeerId(0);
-        assert_eq!(pool.peek_unannounced_for_peer(peer, 10).len(), 1);
-
-        // New tx arrives — peek returns just the new one.
-        pool.push(make_tx_with_id(2, 100));
-        let next = pool.peek_unannounced_for_peer(peer, 10);
-        assert_eq!(next.len(), 1);
-        assert_eq!(next[0].tx_id.0, vec![2; 32]);
-    }
-
-    #[test]
-    fn drain_up_to_prunes_peer_sets() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 100));
-        pool.push(make_tx_with_id(2, 100));
-        let peer = PeerId(0);
-        let _ = pool.peek_unannounced_for_peer(peer, 10);
-
-        // Drain takes both txs. Their ids should be removed from the
-        // peer-advertised set so the same ids can be re-advertised if
-        // they ever return to the mempool.
-        let drained = pool.drain_up_to(10_000);
-        assert_eq!(drained.len(), 2);
-        assert!(pool
-            .peer_advertised
-            .get(&peer)
-            .map(|s| s.is_empty())
-            .unwrap_or(true));
-    }
-
-    #[test]
-    fn drain_all_prunes_peer_sets() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 100));
-        let peer = PeerId(0);
-        let _ = pool.peek_unannounced_for_peer(peer, 10);
-
-        let _ = pool.drain_all();
-        assert!(pool
-            .peer_advertised
-            .get(&peer)
-            .map(|s| s.is_empty())
-            .unwrap_or(true));
-    }
-
-    #[test]
-    fn capacity_eviction_prunes_peer_sets() {
-        let mut pool = Mempool::new(2);
-        pool.push(make_tx_with_id(1, 100));
-        pool.push(make_tx_with_id(2, 100));
-        let peer = PeerId(0);
-        let _ = pool.peek_unannounced_for_peer(peer, 10);
-
-        // Pushing a third tx evicts the oldest (id=1). Its peer record
-        // must be cleaned up so the same id can be advertised again if
-        // it ever re-enters the mempool.
-        pool.push(make_tx_with_id(3, 100));
-        let advertised = pool.peer_advertised.get(&peer).unwrap();
-        assert!(!advertised.contains(&[1u8; 32]));
-        assert!(advertised.contains(&[2u8; 32]));
-    }
-
-    #[test]
-    fn forget_peer_drops_state() {
-        let mut pool = Mempool::new(10);
-        pool.push(make_tx_with_id(1, 100));
-        let peer = PeerId(0);
-        let _ = pool.peek_unannounced_for_peer(peer, 10);
-        assert!(pool.peer_advertised.contains_key(&peer));
-
-        pool.forget_peer(peer);
-        assert!(!pool.peer_advertised.contains_key(&peer));
-    }
-
-    // -- Existing generator tests --
-
-    #[test]
-    fn make_fake_tx_correct_size() {
-        let mut rng = StdRng::seed_from_u64(42);
-        let tx = make_fake_tx(&mut rng, 500);
-        assert_eq!(tx.body.0.len(), 500);
-        assert_eq!(tx.size, 500);
-        assert_eq!(tx.tx_id.0.len(), 32);
     }
 
     #[test]
@@ -634,35 +476,27 @@ mod tests {
             .map(|_| exp_sample(&mut rng, rate).as_secs_f64())
             .sum();
         let mean = total / n as f64;
-        // Expected mean = 1/rate = 0.5. Allow ±20%.
         assert!((0.4..=0.6).contains(&mean), "mean={mean}, expected ~0.5");
     }
 
-    // -- peek_up_to tests --
+    // -- Wrapper translation tests (algorithmic behaviour lives in shared-consensus) --
 
-    #[test]
-    fn peek_up_to_doesnt_remove() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 100));
-        pool.push(make_tx_with_id(2, 200));
-        pool.push(make_tx_with_id(3, 300));
-
-        let peeked = pool.peek_up_to(2);
-        assert_eq!(peeked.len(), 2);
-        assert_eq!(pool.len(), 3);
+    #[tokio::test]
+    async fn mempool_resolver_serves_body_through_trait() {
+        use net_core::store::leios_store::TxBodyResolver;
+        let pool = new_mempool(100);
+        {
+            let mut p = pool.lock().unwrap();
+            p.push(PendingTx {
+                tx_id: TxId(vec![0xCC; 32]),
+                body: TxBody(vec![0xDE, 0xAD]),
+                size: 2,
+            });
+        }
+        let resolver = MempoolTxBodyResolver::new(pool);
+        assert_eq!(resolver.resolve_body(&[0xCC; 32]), Some(vec![0xDE, 0xAD]));
+        assert_eq!(resolver.resolve_body(&[0x99; 32]), None);
     }
-
-    #[test]
-    fn peek_up_to_clamps_to_available() {
-        let mut pool = Mempool::new(100);
-        pool.push(make_tx_with_id(1, 100));
-        pool.push(make_tx_with_id(2, 200));
-
-        let peeked = pool.peek_up_to(10);
-        assert_eq!(peeked.len(), 2);
-    }
-
-    // -- spawn_tx_validator tests --
 
     #[tokio::test]
     async fn validator_pushes_received_body_into_mempool_with_hash_id() {
@@ -673,9 +507,8 @@ mod tests {
         let body = vec![0xDE, 0xAD, 0xBE, 0xEF];
         tx.send(body.clone()).await.unwrap();
 
-        // Validator runs validation in a child task; poll briefly.
         for _ in 0..50 {
-            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            tokio::time::sleep(Duration::from_millis(5)).await;
             if pool.lock().unwrap().len() == 1 {
                 break;
             }
@@ -683,6 +516,21 @@ mod tests {
         let pool_locked = pool.lock().unwrap();
         assert_eq!(pool_locked.len(), 1);
         let expected = tx_from_received_bytes(body);
-        assert_eq!(pool_locked.txs.front().unwrap().tx_id, expected.tx_id);
+        assert_eq!(
+            pool_locked.get_body_by_id(&expected.tx_id.0),
+            Some(expected.body.0)
+        );
+    }
+
+    #[test]
+    fn peek_unannounced_translates_peer_ids() {
+        // Net-core's PeerId(u64) maps to shared-consensus's PeerId(u64); verify
+        // the wrapper preserves per-peer dedup across the boundary.
+        let mut pool = Mempool::new(10);
+        pool.push(make_tx_with_id(1, 100));
+        pool.push(make_tx_with_id(2, 100));
+        let peer = PeerId(0);
+        assert_eq!(pool.peek_unannounced_for_peer(peer, 10).len(), 2);
+        assert!(pool.peek_unannounced_for_peer(peer, 10).is_empty());
     }
 }

@@ -88,6 +88,30 @@ pub struct ClusterConfig {
     /// Override rb_generation_probability for all nodes.
     pub rb_generation_probability: Option<f64>,
 
+    /// Override the per-node Poisson transaction generation rate
+    /// (`[transactions] tx_rate`).  Useful for cluster scenarios that
+    /// need to drive EB production without authoring a dedicated base
+    /// config — e.g. abstention-pressure experiments where the cluster
+    /// must keep the mempool busy enough to overflow into EBs.  When
+    /// `None`, the base config's value is used (`mainnet.toml` defaults
+    /// to `0.0` = no generation).
+    pub tx_rate: Option<f64>,
+
+    /// Per-node adversarial / experimental behaviour.  See
+    /// `shared_consensus::behaviour::BehaviourSpec` for the catalogue.
+    /// When set, the nodes selected by [`Self::behaviour_selection`]
+    /// are started with this behaviour; the remaining nodes stay
+    /// honest.
+    #[serde(default)]
+    pub behaviour: Option<shared_consensus::behaviour::BehaviourSpec>,
+
+    /// Which nodes should run [`Self::behaviour`].  See
+    /// [`BehaviourSelection`] for the variants.  When `None` and
+    /// `behaviour` is set, no node runs the behaviour (use
+    /// `{ kind = "all" }` to attach it everywhere).
+    #[serde(default)]
+    pub behaviour_selection: Option<BehaviourSelection>,
+
     /// External peers injected into random nodes.
     #[serde(default)]
     pub external_peers: Vec<ExternalPeerConfig>,
@@ -141,9 +165,55 @@ impl Default for ClusterConfig {
             stats_interval_secs: default_stats_interval(),
             event_window_size: default_event_window_size(),
             rb_generation_probability: None,
+            tx_rate: None,
+            behaviour: None,
+            behaviour_selection: None,
             external_peers: Vec::new(),
         }
     }
+}
+
+/// Which subset of nodes runs the cluster's configured behaviour.
+///
+/// Serialised as a tagged TOML table:
+///
+/// ```toml
+/// [behaviour_selection]
+/// kind = "stake-fraction"
+/// fraction = 0.2
+/// ```
+///
+/// All variants are deterministic for a given [`ClusterConfig::seed`]
+/// so re-runs land on the same nodes.  Stake-aware variants ignore
+/// zero-stake nodes (i.e. relays under `mainnet-shaped`).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum BehaviourSelection {
+    /// Attach the behaviour to every node in the cluster.
+    All,
+    /// Attach the behaviour to a hand-listed set of node indices.
+    Nodes {
+        #[serde(default)]
+        indices: Vec<usize>,
+    },
+    /// Pick `count` random nodes (deterministically, seeded from
+    /// [`ClusterConfig::seed`]) from those with `stake > 0`.  Useful
+    /// for "this many adversaries somewhere in the voting set" without
+    /// concentrating on the largest pools.
+    StakeRandom { count: usize },
+    /// Pick `count` nodes from those with `stake > 0`, ordered by
+    /// stake descending and tie-broken by index ascending.  Targets
+    /// the largest pools first.
+    StakeOrdered { count: usize },
+    /// Pick the smallest prefix of stake-bearing nodes (ordered by
+    /// stake descending, tie-broken by index ascending) whose
+    /// cumulative stake covers `fraction` of the total cluster stake.
+    /// This is the same shape as CIP-0164 top-stake committee
+    /// selection (`top_centile_of_stake`) and is the right knob for
+    /// abstention-pressure experiments — `fraction = 0.2` makes 20%
+    /// of the *voting weight* run the behaviour, regardless of how
+    /// many nodes that turns out to be.
+    StakeFraction { fraction: f64 },
 }
 
 impl ClusterConfig {
@@ -189,6 +259,11 @@ impl ClusterConfig {
                 "production.rb_generation_probability".into(),
                 serde_json::json!(p),
             );
+        }
+        // Same pattern for `[transactions] tx_rate`: when the cluster
+        // config sets it, it overrides whatever the base config has.
+        if let Some(r) = self.tx_rate {
+            node_config.insert("transactions.tx_rate".into(), serde_json::json!(r));
         }
         ClusterControlConfig {
             num_nodes: Some(self.num_nodes),
@@ -259,6 +334,11 @@ fn read_node_config_defaults(
                 "validation.rb_body_validation_ms_constant".into(),
                 serde_json::json!(v),
             );
+        }
+    }
+    if let Some(transactions) = table.get("transactions") {
+        if let Some(v) = transactions.get("tx_rate").and_then(|v| v.as_float()) {
+            map.insert("transactions.tx_rate".into(), serde_json::json!(v));
         }
     }
     map

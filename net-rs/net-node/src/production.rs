@@ -8,20 +8,20 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use tokio::sync::watch;
 
+use shared_consensus::mempool::EbKey;
 use net_core::protocols::txsubmission::PendingTx;
 use net_core::types::{BlockBody, Point, WrappedHeader};
 
 use crate::config::{DynamicConfig, ProductionConfig};
 
-/// A produced Leios endorser block.
+/// A produced Leios endorser block.  The bodies of the referenced
+/// transactions stay pinned in the mempool under the EB's key — peers
+/// fetch them via `MsgLeiosBlockTxsRequest`, served through the
+/// LeiosStore's `TxBodyResolver` fallback path.
 pub struct ProducedEb {
     pub point: Point,
     /// CBOR-encoded manifest `[slot, [tx_hash, ...]]`.
     pub data: Vec<u8>,
-    /// Transaction bodies referenced by the manifest, in the same order
-    /// as the hashes. Published to the Leios store so peers can fetch
-    /// them via `MsgLeiosBlockTxsRequest`.
-    pub transactions: Vec<Vec<u8>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -207,8 +207,15 @@ pub struct BlockProducer {
     stake: u64,
     total_stake: u64,
     rb_body_max_bytes: usize,
+    eb_body_max_bytes: usize,
     dyn_config: watch::Receiver<DynamicConfig>,
     block_count: u64,
+    /// Issuer vkey used by `make_fake_block`.  Refreshed at the top of
+    /// every honest production call; the equivocation-extra path reuses
+    /// the unchanged value so the duplicate header shares the issuer
+    /// (CIP-0164 equivocation requires same-issuer same-slot distinct
+    /// headers).
+    last_issuer_vkey: [u8; 32],
 }
 
 impl BlockProducer {
@@ -227,8 +234,10 @@ impl BlockProducer {
             stake: config.stake,
             total_stake: config.total_stake,
             rb_body_max_bytes: config.rb_body_max_bytes,
+            eb_body_max_bytes: config.eb_body_max_bytes,
             dyn_config,
             block_count: 0,
+            last_issuer_vkey: [0u8; 32],
         }
     }
 
@@ -239,8 +248,10 @@ impl BlockProducer {
 
     /// Run the VRF lottery for a Praos ranking block. On win, drains the
     /// mempool: if pending txs fit in `rb_body_max_bytes`, they go in the
-    /// RB body (RB path). Otherwise, ALL txs go into an EB manifest and
-    /// the RB body is empty (EB path).
+    /// RB body (RB path). Otherwise the EB-overflow path fires: an EB
+    /// announcement carries a FIFO-ordered manifest capped at
+    /// `eb_body_max_bytes` worth of tx bodies, the RB body is empty,
+    /// and the remainder stays in the mempool for the next RB.
     pub fn try_produce_block(
         &mut self,
         slot: u64,
@@ -248,6 +259,7 @@ impl BlockProducer {
         block_number: u64,
         certified_eb: bool,
         mempool: &crate::mempool::SharedMempool,
+        leios: &shared_consensus::leios::LeiosState,
     ) -> Option<ProducedRb> {
         if !self.is_active() {
             return None;
@@ -258,19 +270,49 @@ impl BlockProducer {
             return None;
         }
 
+        // Fresh issuer for this slot's honest block; equivocation
+        // extras then reuse the same value.
+        self.rng.fill(&mut self.last_issuer_vkey);
+
         self.block_count += 1;
 
-        // Drain mempool and decide RB vs EB path.
+        // CIP-0164 overflow rule plus producer-side EB-safety gate
+        // both live in shared-consensus (`production::BodyPath`).
         let mut pool = mempool.lock().unwrap();
-        let (txs, announced_eb) = if pool.total_bytes() > self.rb_body_max_bytes {
-            // EB path: all txs → EB manifest, RB body empty.
-            let all_txs = pool.drain_all();
-            let eb = make_overflow_eb(slot, &all_txs);
-            (Vec::new(), Some(eb))
-        } else {
-            // RB path: txs in RB body, no EB.
-            let txs = pool.drain_up_to(self.rb_body_max_bytes);
-            (txs, None)
+        let (txs, announced_eb) = match pool.decide_body_path(
+            self.rb_body_max_bytes,
+            self.eb_body_max_bytes,
+            leios,
+            certified_eb,
+        ) {
+            crate::mempool::BodyPath::Empty => (Vec::new(), None),
+            crate::mempool::BodyPath::Inline(txs) => (txs, None),
+            crate::mempool::BodyPath::Eb { manifest_hashes } => {
+                // Encode wire bytes, hash them, then commit the
+                // drain-and-pin under the resulting EB key.  Bodies stay
+                // pinned in the mempool under `eb_pinned` so the producer
+                // can vote for its own EB (MissingTX predicate sees them)
+                // and serve `LeiosFetch BlockTxs` (resolver finds them by
+                // tx_id).
+                let manifest_len = manifest_hashes.len();
+                let eb_data = encode_overflow_eb(slot, &manifest_hashes);
+                let eb_hash = blake2b_256(&eb_data);
+                let eb_key = EbKey {
+                    slot,
+                    hash: eb_hash,
+                };
+                pool.produce_eb(eb_key, manifest_len);
+                (
+                    Vec::new(),
+                    Some(ProducedEb {
+                        point: Point::Specific {
+                            slot,
+                            hash: eb_hash,
+                        },
+                        data: eb_data,
+                    }),
+                )
+            }
         };
         drop(pool);
 
@@ -297,11 +339,44 @@ impl BlockProducer {
         self.block_count
     }
 
-    /// Run the VRF lottery for a given success rate. Returns true on win.
+    /// Produce a duplicate RB for the same lottery win, with the same
+    /// issuer and slot as `primary` but a fresh body — yields a
+    /// distinct header hash that triggers CIP-0164 RB-header
+    /// equivocation detection on every honest peer.  Used by the
+    /// `RbHeaderEquivocator` behaviour via the wrapper's
+    /// [`RbProductionStrategy::Equivocate`] branch.
+    pub fn produce_equivocation_extra(
+        &mut self,
+        primary: &ProducedRb,
+        prev_hash: Option<[u8; 32]>,
+        block_number: u64,
+    ) -> ProducedRb {
+        let slot = match primary.point {
+            Point::Specific { slot, .. } => slot,
+            Point::Origin => unreachable!("primary RB is never at Origin"),
+        };
+        // Reuse `self.last_issuer_vkey` (still the primary's issuer)
+        // and use an empty body — different body_hash → different
+        // block_hash → different header_hash, but same (slot, issuer)
+        // so the detection rule fires.
+        let (point, header, body) =
+            self.make_fake_block(slot, prev_hash, block_number, false, &[], None);
+        ProducedRb {
+            point,
+            header,
+            body,
+            announced_eb: None,
+            included_tx_count: 0,
+        }
+    }
+
+    /// Run the Praos f_block lottery.  Returns true on win.  Threshold
+    /// math lives in [`shared_consensus::lottery::rb_win_threshold`]; this site
+    /// just supplies the `f64` draw.
     fn run_lottery(&mut self, probability: f64) -> bool {
-        let per_node = probability * self.stake as f64 / self.total_stake as f64;
+        let threshold = shared_consensus::lottery::rb_win_threshold(probability, self.stake);
         let roll: f64 = self.rng.gen();
-        roll < per_node
+        roll < threshold as f64 / self.total_stake as f64
     }
 
     /// Build a fake block with valid Shelley+ CBOR structure.
@@ -325,8 +400,10 @@ impl BlockProducer {
         txs: &[PendingTx],
         announced_eb: Option<([u8; 32], u32)>,
     ) -> (Point, WrappedHeader, BlockBody) {
-        let mut issuer_vkey = [0u8; 32];
-        self.rng.fill(&mut issuer_vkey);
+        // `last_issuer_vkey` is refreshed by `try_produce_block` at the
+        // start of every honest call; equivocation-extra reuses the
+        // previous value.
+        let issuer_vkey = self.last_issuer_vkey;
         let mut body_hash = [0u8; 32];
         self.rng.fill(&mut body_hash);
 
@@ -406,14 +483,13 @@ impl BlockProducer {
         let _ = minicbor::Encoder::new(&mut block_inner).array(4);
         block_inner.extend_from_slice(&header_inner);
 
-        // tx_bodies: map of {index => bytes(tx_body)}
-        let _ = minicbor::Encoder::new(&mut block_inner).map(txs.len() as u64);
-        for (i, tx) in txs.iter().enumerate() {
-            let _ = minicbor::Encoder::new(&mut block_inner).u32(i as u32);
+        // tx_bodies: `[* transaction_body]` per Cardano CDDL.
+        let _ = minicbor::Encoder::new(&mut block_inner).array(txs.len() as u64);
+        for tx in txs.iter() {
             let _ = minicbor::Encoder::new(&mut block_inner).bytes(&tx.body.0);
         }
-        // tx_witnesses (empty map)
-        let _ = minicbor::Encoder::new(&mut block_inner).map(0);
+        // tx_witnesses: `[* transaction_witness_set]` per Cardano CDDL.
+        let _ = minicbor::Encoder::new(&mut block_inner).array(0);
         // metadata (null)
         let _ = minicbor::Encoder::new(&mut block_inner).null();
 
@@ -450,31 +526,29 @@ pub fn decode_overflow_eb(blob: &[u8]) -> Option<(u64, Vec<[u8; 32]>)> {
     Some((slot, hashes))
 }
 
-/// Build an EB manifest from overflow transactions. The EB body is a CBOR
-/// array `[slot, [tx_hash, ...]]` and the point hash is Blake2b-256 of
-/// the manifest bytes (content-addressed).
-fn make_overflow_eb(slot: u64, txs: &[PendingTx]) -> ProducedEb {
+/// Encode an EB body as CBOR `[slot, [tx_hash, ...]]` — pure function
+/// over the manifest hashes; lets the caller hash the bytes to derive
+/// the EB key before committing the drain in the mempool.
+pub fn encode_overflow_eb(slot: u64, manifest: &[[u8; 32]]) -> Vec<u8> {
     let mut data = Vec::new();
     let mut enc = minicbor::Encoder::new(&mut data);
     let _ = enc
         .array(2)
         .and_then(|e| e.u64(slot))
-        .and_then(|e| e.array(txs.len() as u64));
-    for tx in txs {
-        let _ = minicbor::Encoder::new(&mut data).bytes(&tx.tx_id.0);
+        .and_then(|e| e.array(manifest.len() as u64));
+    for h in manifest {
+        let _ = minicbor::Encoder::new(&mut data).bytes(h);
     }
+    data
+}
 
-    let hash_result = blake2b_simd::Params::new().hash_length(32).hash(&data);
-    let mut hash = [0u8; 32];
-    hash.copy_from_slice(hash_result.as_bytes());
-    let point = Point::Specific { slot, hash };
-
-    let transactions = txs.iter().map(|tx| tx.body.0.clone()).collect();
-    ProducedEb {
-        point,
-        data,
-        transactions,
-    }
+/// Blake2b-256 of arbitrary bytes — matches the EB-key derivation used
+/// across the wire and the `tx_from_received_bytes` tx-id derivation.
+pub fn blake2b_256(bytes: &[u8]) -> [u8; 32] {
+    let result = blake2b_simd::Params::new().hash_length(32).hash(bytes);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(result.as_bytes());
+    out
 }
 
 #[cfg(test)]
@@ -493,7 +567,6 @@ mod tests {
     fn dyn_rx(config: &ProductionConfig) -> watch::Receiver<DynamicConfig> {
         let dyn_config = DynamicConfig {
             rb_generation_probability: config.rb_generation_probability,
-            eb_generation_probability: config.eb_generation_probability,
             vote_generation_probability: config.vote_generation_probability,
             rb_head_validation_ms: 1.0,
             rb_body_validation_ms_constant: 1000.0,
@@ -507,6 +580,45 @@ mod tests {
 
     fn empty_mempool() -> crate::mempool::SharedMempool {
         crate::mempool::new_mempool(1000)
+    }
+
+    /// Minimal `LeiosState` for tests that don't exercise the
+    /// producer-side EB-safety gate — `has_endorsed_unvalidated_eb`
+    /// is false on a fresh state, so `BodyPath::decide` falls through
+    /// to the regular overflow rule.
+    fn empty_leios() -> shared_consensus::leios::LeiosState {
+        use shared_consensus::config::CommitteeSelection;
+        use shared_consensus::elections::{Elections, ElectionsConfig};
+        use shared_consensus::leios::{LeiosState, VotingConfig};
+        use shared_consensus::pipeline::PipelineConfig;
+        use std::collections::BTreeMap;
+
+        let pipeline = PipelineConfig {
+            delta_hdr: 1,
+            vote_window: 5,
+            diffuse_window: 5,
+            dedup_window: 10,
+        };
+        let elections = Elections::new(ElectionsConfig {
+            node_id: "test".to_string(),
+            pipeline,
+            committee_selection: CommitteeSelection::EveryoneVotes,
+            persistent_committee: BTreeMap::new(),
+            stake_registry: BTreeMap::new(),
+            total_stake: 1000,
+            expected_committee_size: 100,
+            quorum_weight_fraction: 0.75,
+        });
+        let voting = VotingConfig {
+            committee_selection: CommitteeSelection::EveryoneVotes,
+            stake: 100,
+            total_stake: 1000,
+            persistent_vote_bytes: 130,
+            non_persistent_vote_bytes: 180,
+            persistent_seats: 1,
+            retry_vote_in_window: true,
+        };
+        LeiosState::new("test".into(), elections, voting, pipeline)
     }
 
     fn make_test_tx(id: u8, size: usize) -> PendingTx {
@@ -538,7 +650,7 @@ mod tests {
         assert!(!producer.is_active());
         for slot in 0..100 {
             assert!(producer
-                .try_produce_block(slot, None, slot + 1, false, &mempool)
+                .try_produce_block(slot, None, slot + 1, false, &mempool, &empty_leios())
                 .is_none());
         }
     }
@@ -554,7 +666,7 @@ mod tests {
         let mempool = empty_mempool();
         assert!(producer.is_active());
         for slot in 0..100 {
-            let result = producer.try_produce_block(slot, None, slot + 1, false, &mempool);
+            let result = producer.try_produce_block(slot, None, slot + 1, false, &mempool, &empty_leios());
             assert!(result.is_some(), "should produce at slot {slot}");
             match result.unwrap().point {
                 Point::Specific { slot: s, .. } => assert_eq!(s, slot),
@@ -577,7 +689,7 @@ mod tests {
             (0..1000)
                 .filter_map(|slot| {
                     producer
-                        .try_produce_block(slot, None, slot + 1, false, &mempool)
+                        .try_produce_block(slot, None, slot + 1, false, &mempool, &empty_leios())
                         .map(|_| slot)
                 })
                 .collect::<Vec<_>>()
@@ -600,7 +712,7 @@ mod tests {
         let wins: usize = (0..10_000)
             .filter(|slot| {
                 producer
-                    .try_produce_block(*slot, None, 1, false, &mempool)
+                    .try_produce_block(*slot, None, 1, false, &mempool, &empty_leios())
                     .is_some()
             })
             .count();
@@ -624,7 +736,7 @@ mod tests {
         let mempool = mempool_with_txs(vec![make_test_tx(1, 500), make_test_tx(2, 300)]);
 
         let produced = producer
-            .try_produce_block(100, None, 1, false, &mempool)
+            .try_produce_block(100, None, 1, false, &mempool, &empty_leios())
             .unwrap();
 
         assert_eq!(produced.included_tx_count, 2);
@@ -647,7 +759,7 @@ mod tests {
         let mempool = empty_mempool();
 
         let produced = producer
-            .try_produce_block(100, None, 1, false, &mempool)
+            .try_produce_block(100, None, 1, false, &mempool, &empty_leios())
             .unwrap();
 
         assert_eq!(produced.included_tx_count, 0);
@@ -674,7 +786,7 @@ mod tests {
         ]);
 
         let produced = producer
-            .try_produce_block(100, None, 1, false, &mempool)
+            .try_produce_block(100, None, 1, false, &mempool, &empty_leios())
             .unwrap();
 
         // EB path: RB body is empty, EB is announced.
@@ -698,27 +810,21 @@ mod tests {
     }
 
     #[test]
-    fn overflow_eb_is_content_addressed() {
-        let txs = vec![make_test_tx(1, 100), make_test_tx(2, 200)];
-        let eb1 = make_overflow_eb(50, &txs);
-        let eb2 = make_overflow_eb(50, &txs);
-        match (&eb1.point, &eb2.point) {
-            (Point::Specific { hash: h1, .. }, Point::Specific { hash: h2, .. }) => {
-                assert_eq!(h1, h2, "same inputs should produce same hash");
-            }
-            _ => panic!("expected Specific points"),
-        }
+    fn encode_overflow_eb_is_deterministic() {
+        let manifest = vec![[0x10u8; 32], [0x20u8; 32]];
+        let a = encode_overflow_eb(50, &manifest);
+        let b = encode_overflow_eb(50, &manifest);
+        assert_eq!(a, b);
+        assert_eq!(blake2b_256(&a), blake2b_256(&b));
     }
 
     #[test]
     fn decode_overflow_eb_round_trip() {
-        let txs = vec![make_test_tx(0x10, 50), make_test_tx(0x20, 70)];
-        let eb = make_overflow_eb(99, &txs);
-        let (slot, hashes) = decode_overflow_eb(&eb.data).expect("decode");
+        let manifest = vec![[0x10u8; 32], [0x20u8; 32]];
+        let data = encode_overflow_eb(99, &manifest);
+        let (slot, hashes) = decode_overflow_eb(&data).expect("decode");
         assert_eq!(slot, 99);
-        assert_eq!(hashes.len(), 2);
-        assert_eq!(hashes[0], [0x10; 32]);
-        assert_eq!(hashes[1], [0x20; 32]);
+        assert_eq!(hashes, manifest);
     }
 
     #[test]
@@ -728,32 +834,19 @@ mod tests {
     }
 
     #[test]
-    fn overflow_eb_carries_tx_bodies_in_manifest_order() {
-        let txs = vec![make_test_tx(0xAA, 100), make_test_tx(0xBB, 200)];
-        let eb = make_overflow_eb(42, &txs);
-
-        assert_eq!(eb.transactions.len(), 2);
-        assert_eq!(eb.transactions[0], vec![0xAA; 100]);
-        assert_eq!(eb.transactions[1], vec![0xBB; 200]);
-    }
-
-    #[test]
-    fn overflow_eb_encodes_tx_hashes() {
-        let txs = vec![make_test_tx(0xAA, 100), make_test_tx(0xBB, 200)];
-        let eb = make_overflow_eb(42, &txs);
-
+    fn encode_overflow_eb_layout() {
+        let manifest = vec![[0xAAu8; 32], [0xBBu8; 32]];
+        let data = encode_overflow_eb(42, &manifest);
         // Decode the manifest: [slot, [hash, ...]]
-        let mut dec = minicbor::Decoder::new(&eb.data);
+        let mut dec = minicbor::Decoder::new(&data);
         let outer_len = dec.array().unwrap().unwrap();
         assert_eq!(outer_len, 2);
         let slot = dec.u64().unwrap();
         assert_eq!(slot, 42);
         let inner_len = dec.array().unwrap().unwrap();
         assert_eq!(inner_len, 2);
-        let hash1 = dec.bytes().unwrap();
-        assert_eq!(hash1, &[0xAA; 32]);
-        let hash2 = dec.bytes().unwrap();
-        assert_eq!(hash2, &[0xBB; 32]);
+        assert_eq!(dec.bytes().unwrap(), &[0xAA; 32]);
+        assert_eq!(dec.bytes().unwrap(), &[0xBB; 32]);
     }
 
     // -- Header roundtrip tests --
@@ -768,7 +861,7 @@ mod tests {
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         let mempool = empty_mempool();
         let produced = producer
-            .try_produce_block(12345, None, 1, false, &mempool)
+            .try_produce_block(12345, None, 1, false, &mempool, &empty_leios())
             .unwrap();
 
         assert!(produced.header.parsed.is_some(), "header should parse");
@@ -792,7 +885,7 @@ mod tests {
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         let mempool = empty_mempool();
         let produced = producer
-            .try_produce_block(100, None, 1, true, &mempool)
+            .try_produce_block(100, None, 1, true, &mempool, &empty_leios())
             .unwrap();
 
         let info = produced.header.parsed.as_ref().unwrap();
@@ -810,7 +903,7 @@ mod tests {
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         let mempool = empty_mempool();
         let produced = producer
-            .try_produce_block(100, None, 1, false, &mempool)
+            .try_produce_block(100, None, 1, false, &mempool, &empty_leios())
             .unwrap();
 
         let info = produced.header.parsed.as_ref().unwrap();
@@ -830,7 +923,7 @@ mod tests {
         let mempool = mempool_with_txs(vec![make_test_tx(1, 200)]);
 
         let produced = producer
-            .try_produce_block(100, None, 1, true, &mempool)
+            .try_produce_block(100, None, 1, true, &mempool, &empty_leios())
             .unwrap();
 
         let info = produced.header.parsed.as_ref().unwrap();
@@ -847,7 +940,6 @@ mod tests {
         };
         let dyn_config = DynamicConfig {
             rb_generation_probability: 0.0,
-            eb_generation_probability: 0.0,
             vote_generation_probability: 0.0,
             rb_head_validation_ms: 1.0,
             rb_body_validation_ms_constant: 1000.0,
@@ -863,7 +955,7 @@ mod tests {
         let wins_before: usize = (0..100)
             .filter(|slot| {
                 producer
-                    .try_produce_block(*slot, None, 1, false, &mempool)
+                    .try_produce_block(*slot, None, 1, false, &mempool, &empty_leios())
                     .is_some()
             })
             .count();
@@ -876,7 +968,7 @@ mod tests {
         let wins_after: usize = (100..200)
             .filter(|slot| {
                 producer
-                    .try_produce_block(*slot, None, 1, false, &mempool)
+                    .try_produce_block(*slot, None, 1, false, &mempool, &empty_leios())
                     .is_some()
             })
             .count();

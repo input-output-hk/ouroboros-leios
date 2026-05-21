@@ -12,8 +12,10 @@ use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::{mpsc, watch};
 
-use crate::chain_tree::ChainTreeEntry;
-use crate::config::{CommitteeSelection, DynamicConfig, StakeEntry};
+use shared_consensus::chain_tree::ChainTreeEntry;
+use shared_consensus::fetch::PeerRttCache;
+use shared_consensus::leios::ChainTipContext;
+use crate::config::{CommitteeSelection, DynamicConfig, FetchPolicyConfig, StakeEntry};
 use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerOutcome, Validator};
 
@@ -24,6 +26,20 @@ pub use praos::PraosConsensus;
 pub struct Consensus {
     praos: PraosConsensus,
     leios: LeiosConsensus,
+    /// Deterministic seed handed to
+    /// [`shared_consensus::behaviour::build`] whenever the per-node
+    /// behaviour is materialised — at startup and again from each
+    /// runtime config swap.  Derived once from `rng_seed` (or the node
+    /// identifier) and reused so a behaviour that hashes peer ids for
+    /// partitioning always lands on the same buckets across re-runs.
+    behaviour_seed: u64,
+    /// Shared handle to the per-node behaviour.  All three state
+    /// machines (praos, leios, mempool) point at the same `Arc<Mutex>`
+    /// so a single behaviour instance observes events from every layer
+    /// and so a runtime swap propagates to all of them at once.  The
+    /// coordinator holds its own clone for the per-peer outbound
+    /// transform path.
+    behaviour_handle: shared_consensus::behaviour::BehaviourHandle,
 }
 
 impl Consensus {
@@ -44,18 +60,23 @@ impl Consensus {
         committee_seed: u64,
         rng_seed: Option<u64>,
         dyn_config: watch::Receiver<DynamicConfig>,
+        rtt: PeerRttCache,
+        fetch_policy: FetchPolicyConfig,
+        behaviour_handle: shared_consensus::behaviour::BehaviourHandle,
     ) -> Self {
-        let praos = PraosConsensus::new(
+        let mut praos = PraosConsensus::new(
             node_id.clone(),
             commands.clone(),
             validator.clone(),
             security_param_k,
         );
-        let leios = LeiosConsensus::new(
+        praos.set_rtt(rtt.clone());
+        praos.set_block_policy(fetch_policy.block.into_block_policy());
+        let mut leios = LeiosConsensus::new(
             node_id,
             commands,
             validator,
-            mempool,
+            mempool.clone(),
             pipeline,
             committee_selection,
             stake,
@@ -67,12 +88,87 @@ impl Consensus {
             rng_seed,
             dyn_config,
         );
-        Self { praos, leios }
+        leios.set_rtt(rtt);
+        leios.set_eb_policy(fetch_policy.eb.into_eb_policy());
+        leios.set_eb_txs_policy(fetch_policy.eb_txs.into_eb_txs_policy());
+        leios.set_vote_policy(fetch_policy.votes.into_vote_policy());
+        let behaviour_seed = rng_seed.unwrap_or_else(|| {
+            shared_consensus::behaviour::seed_from_node_id(praos.node_id_str())
+        });
+        // Install the shared behaviour handle on every state machine so
+        // a stateful behaviour (equivocation variant store, peer
+        // partition map, …) sees events from every layer and the
+        // coordinator's outbound transform path observes the same
+        // instance.  Runtime swaps replace the trait object inside this
+        // handle; clones held elsewhere observe the new behaviour from
+        // their next hook call.
+        praos.install_behaviour_handle(behaviour_handle.clone());
+        leios.install_behaviour_handle(behaviour_handle.clone());
+        if let Ok(mut m) = mempool.lock() {
+            m.install_behaviour_handle(behaviour_handle.clone());
+        }
+        Self {
+            praos,
+            leios,
+            behaviour_seed,
+            behaviour_handle,
+        }
+    }
+
+    /// Swap the per-node behaviour by replacing the trait object inside
+    /// the shared handle.  Every state machine and the coordinator's
+    /// outbound transform path observe the new behaviour from their
+    /// next hook call.  Called at runtime from the stdin-driven
+    /// `DynamicConfigUpdate` path.
+    pub fn set_behaviour(
+        &mut self,
+        spec: &shared_consensus::behaviour::BehaviourSpec,
+        _mempool: &crate::mempool::SharedMempool,
+    ) {
+        tracing::info!(?spec, behaviour_seed = self.behaviour_seed, "swapping per-node behaviour");
+        shared_consensus::behaviour::swap_handle(&self.behaviour_handle, spec, self.behaviour_seed);
+    }
+
+    /// Ask the per-node behaviour what to do for this slot's
+    /// self-produced RB.  See
+    /// [`shared_consensus::behaviour::RbProductionStrategy`].  Default
+    /// `HonestBehaviour` always returns `Normal`.
+    pub fn rb_production_strategy(
+        &mut self,
+        slot: u64,
+    ) -> shared_consensus::behaviour::RbProductionStrategy {
+        // The behaviour lives on `LeiosState` (chosen during the
+        // initial scaffolding because the Leios side has the broadest
+        // hook surface); the strategy method takes a `&PraosState`
+        // alongside.  Borrow split is done by passing `praos.state()`
+        // before mutably borrowing the leios layer.
+        let praos = self.praos.state();
+        self.leios.state_mut().ask_rb_production_strategy(praos, slot)
     }
 
     /// Notify the Leios layer of a new slot tick.
     pub async fn on_slot(&mut self, slot: u64) {
+        // Bump Praos's slot first so subsequent header-arrival paths
+        // (TipAdvanced, BlockReceived, register_self_produced) stamp
+        // the right slot on `note_header_first_seen`.  Then refresh the
+        // chain-tip context Leios uses for the CIP-0164 voting
+        // predicates before driving elections forward.
+        self.praos.set_current_slot(slot);
+        self.refresh_chain_tip_ctx();
         self.leios.on_slot(slot).await;
+    }
+
+    fn refresh_chain_tip_ctx(&mut self) {
+        let arrival = self.praos.adopted_tip_header_arrival_slot();
+        let eb_announcement = self.praos.adopted_tip_announced_eb();
+        let equivocating_slots = self.praos.equivocating_rb_slots().clone();
+        let tip_rb_slot = self.praos.state().adopted_tip_rb_slot();
+        self.leios.set_chain_tip_context(ChainTipContext {
+            rb_header_arrival_slot: arrival,
+            eb_announcement,
+            equivocating_slots,
+            tip_rb_slot,
+        });
     }
 
     /// Register a self-produced ranking block with Praos consensus.
@@ -83,6 +179,13 @@ impl Consensus {
         body: &BlockBody,
     ) {
         self.praos.register_self_produced(point, header, body).await
+    }
+
+    /// Register a self-produced endorser block with Leios consensus —
+    /// records the manifest, fires the offer notifications, and marks
+    /// the EB validated.
+    pub async fn register_self_produced_eb(&mut self, point: Point, eb_data: &[u8]) {
+        self.leios.register_self_produced_eb(point, eb_data).await;
     }
 
     /// Route a network event to Praos or Leios. Returns true if the event
@@ -135,6 +238,20 @@ impl Consensus {
                 self.leios.on_validated_votes(&vote_data);
                 false
             }
+            LedgerOutcome::Applied { ref point } => {
+                // Producer-side EB-safety gate: an RB carrying a cert
+                // for the parent's announced EB needs that EB recorded
+                // in `LeiosState` until its body validates locally.
+                // `BodyPath::decide` reads this for the next own RB.
+                if let Some((eb_slot, eb_hash)) =
+                    self.praos.parent_announced_eb_for_cert(point)
+                {
+                    self.leios
+                        .state
+                        .on_chain_endorsement(eb_slot, eb_hash);
+                }
+                self.praos.on_validation_outcome(outcome).await
+            }
             other => self.praos.on_validation_outcome(other).await,
         }
     }
@@ -145,7 +262,13 @@ impl Consensus {
     }
 
     pub fn chain_tree_snapshot(&self) -> (Vec<ChainTreeEntry>, Option<u64>, Option<String>) {
-        self.praos.chain_tree_snapshot()
+        let leios_state = &self.leios.state;
+        self.praos.chain_tree_snapshot(|eb_hash| {
+            leios_state
+                .eb_tx_hashes
+                .get(eb_hash)
+                .map(|(_, hashes)| hashes.len() as u32)
+        })
     }
 
     pub fn tip_hash(&self) -> Option<[u8; 32]> {
@@ -156,15 +279,31 @@ impl Consensus {
         self.praos.next_block_number()
     }
 
-    /// Whether any EB has a valid certificate (quorum + pipeline elapsed).
-    pub fn has_certified_eb(&self) -> bool {
-        self.leios.has_certified_eb()
+    /// Borrow the underlying `LeiosState`.  Used by `try_produce_block`
+    /// to consult the producer-side EB-safety gate
+    /// (`BodyPath::decide` reads `has_endorsed_unvalidated_eb`).
+    pub fn leios_state(&self) -> &shared_consensus::leios::LeiosState {
+        &self.leios.state
     }
 
-    /// Slot of the earliest certified EB, if any. Used to populate the
-    /// eb_slot field on the `RbCertifiedEb` telemetry event.
-    pub fn certified_eb_slot(&self) -> Option<u64> {
-        self.leios.certified_eb_slot()
+    /// Linear-Leios producer rule: an RB may attach a cert only for the
+    /// EB its **parent RB** announced, and only once that EB has reached
+    /// quorum and entered CertEligible.  Returns the announced slot of
+    /// that EB (to populate the `RbCertifiedEb` telemetry event); `None`
+    /// means no cert candidate — the producer leaves `certified_eb` off
+    /// and the parent's EB is dropped from the chain's perspective.
+    pub fn cert_for_parent(&self) -> Option<u64> {
+        let eb_hash = self.praos.adopted_tip_announced_eb()?;
+        self.leios.eb_certifiable_slot(&eb_hash)
+    }
+
+    /// Emit per-subsystem `info!` lines summarising internal state
+    /// collection sizes.  Used as a periodic diagnostic to identify
+    /// unbounded growth — grep `state sizes` in node logs to read the
+    /// time series.
+    pub fn log_state_sizes(&self) {
+        self.praos.state().log_state_sizes();
+        self.leios.state.log_state_sizes();
     }
 
     /// Drain Leios-side telemetry events buffered since the last call.

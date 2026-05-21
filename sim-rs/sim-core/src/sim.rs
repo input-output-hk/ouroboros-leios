@@ -14,10 +14,12 @@ use crate::{
 
 pub(crate) mod actor;
 mod common;
+pub(crate) mod shared_consensus;
 mod cpu;
 mod driver;
 mod leios;
-mod linear_leios;
+pub(crate) mod linear_leios;
+pub(crate) mod linear_wire;
 mod lottery;
 pub(crate) mod sequential;
 mod slot;

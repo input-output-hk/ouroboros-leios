@@ -44,6 +44,9 @@ pub(crate) struct DuplexTaskConfig {
     pub leios_store: Option<Arc<LeiosStore>>,
     pub traffic_class_overrides: std::collections::HashMap<u16, TrafficClass>,
     pub scheduler_type: crate::mux::scheduler::SchedulerType,
+    /// Optional behaviour handle consulted by the ChainSync server's
+    /// per-peer RB-header advertisement.  `None` = no transform.
+    pub outbound_behaviour: Option<shared_consensus::behaviour::BehaviourHandle>,
 }
 
 /// Configuration for a duplex peer task from an already-accepted connection.
@@ -57,6 +60,8 @@ pub(crate) struct AcceptedDuplexTaskConfig {
     pub command_receiver: mpsc::Receiver<PeerCommand>,
     pub leios_enabled: bool,
     pub leios_store: Option<Arc<LeiosStore>>,
+    /// See [`DuplexTaskConfig::outbound_behaviour`].
+    pub outbound_behaviour: Option<shared_consensus::behaviour::BehaviourHandle>,
 }
 
 /// Run a duplex peer task. Connects outbound, then runs both client and
@@ -119,6 +124,7 @@ pub(crate) async fn run_duplex_task(config: DuplexTaskConfig) {
             leios_store: config.leios_store,
             event_sender: config.event_sender,
             command_receiver: config.command_receiver,
+            outbound_behaviour: config.outbound_behaviour,
         },
     )
     .await;
@@ -150,6 +156,7 @@ pub(crate) async fn run_accepted_duplex_task(config: AcceptedDuplexTaskConfig) {
             leios_store: config.leios_store,
             event_sender: config.event_sender,
             command_receiver: config.command_receiver,
+            outbound_behaviour: config.outbound_behaviour,
         },
     )
     .await;
@@ -165,6 +172,7 @@ struct DuplexProtocolParams {
     leios_store: Option<Arc<LeiosStore>>,
     event_sender: mpsc::Sender<(PeerId, PeerEvent)>,
     command_receiver: mpsc::Receiver<PeerCommand>,
+    outbound_behaviour: Option<shared_consensus::behaviour::BehaviourHandle>,
 }
 
 /// Shared protocol wiring for duplex connections (both outbound and accepted).
@@ -178,6 +186,7 @@ async fn run_duplex_protocols(conn: DuplexConnection, params: DuplexProtocolPara
         leios_store,
         event_sender,
         mut command_receiver,
+        outbound_behaviour,
     } = params;
     // --- Initiator (client) sub-tasks ---
     let mut init_channels = conn.initiator_channels.into_iter();
@@ -189,10 +198,13 @@ async fn run_duplex_protocols(conn: DuplexConnection, params: DuplexProtocolPara
         .next()
         .expect("txsubmission initiator channel");
 
-    let (fetch_sender, fetch_receiver) = mpsc::channel::<(Point, Point)>(16);
-    let (peer_share_sender, peer_share_receiver) = mpsc::channel::<u8>(4);
-    let (tx_submit_sender, tx_submit_receiver) = mpsc::channel::<PendingTx>(16);
-    let (cs_reintersect_sender, cs_reintersect_receiver) = mpsc::channel::<()>(4);
+    // See peer_task.rs for sizing rationale: small caps here back-pressure
+    // the dispatch loop's `.send().await`, which stalls the per-peer
+    // command channel and trips "command channel full" disconnects.
+    let (fetch_sender, fetch_receiver) = mpsc::channel::<(Point, Point)>(256);
+    let (peer_share_sender, peer_share_receiver) = mpsc::channel::<u8>(16);
+    let (tx_submit_sender, tx_submit_receiver) = mpsc::channel::<PendingTx>(1024);
+    let (cs_reintersect_sender, cs_reintersect_receiver) = mpsc::channel::<()>(16);
 
     let mut cs_client = spawn_chainsync(
         cs_send,
@@ -237,7 +249,7 @@ async fn run_duplex_protocols(conn: DuplexConnection, params: DuplexProtocolPara
             .next()
             .expect("leios_notify initiator channel");
         let (lf_send, lf_recv) = init_channels.next().expect("leios_fetch initiator channel");
-        let (lf_cmd_sender, lf_cmd_receiver) = mpsc::channel::<LeiosFetchCommand>(16);
+        let (lf_cmd_sender, lf_cmd_receiver) = mpsc::channel::<LeiosFetchCommand>(256);
         let ln_handle = spawn_leios_notify(ln_send, ln_recv, peer_id, event_sender.clone());
         let lf_handle = spawn_leios_fetch(
             lf_send,
@@ -265,11 +277,14 @@ async fn run_duplex_protocols(conn: DuplexConnection, params: DuplexProtocolPara
         cs_srv_send,
         cs_srv_recv,
         chain_store.clone(),
+        peer_id,
+        outbound_behaviour.clone(),
     ));
     let bf_server = tokio::spawn(server_handlers::serve_blockfetch(
         bf_srv_send,
         bf_srv_recv,
         chain_store.clone(),
+        outbound_behaviour,
     ));
     let ts_server = tokio::spawn(server_handlers::serve_txsubmission(
         ts_srv_send,

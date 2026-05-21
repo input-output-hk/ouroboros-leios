@@ -16,18 +16,47 @@ security_param_k = 2160
 [production]
 total_stake = 1000
 rb_generation_probability = 0.05
-eb_generation_probability = 0.5
 vote_generation_probability = 0.8
 stage_length_slots = 20
+
+# Top-stake-fraction committee selection: every pool covered by the
+# top `top_centile_of_stake` of stake casts one weight-1 vote, so the
+# quorum threshold is `floor(0.75 × committee_size)`.  Keeps the
+# threshold proportional to the cluster's actual voter count rather
+# than the wFA-LS reserve, which assumes mainnet-scale pool counts.
+[production.committee_selection]
+type = "StakeCentile"
+top_centile_of_stake = 0.99
 
 [transactions]
 tx_rate = 0.0
 tx_size_min = 250
 tx_size_max = 16384
 
+# Per-traffic-class fetch policy.  Defaults to `lowest_rtt` for every
+# class — that matches the historical behaviour where shared-consensus picks the
+# single lowest-RTT candidate.  Switch a class to `broadcast` with an
+# explicit `n` to fan a request out to the N lowest-RTT peers, or omit
+# `n` to broadcast to every available candidate; useful for studying
+# tail-latency / collapse trade-offs on EB-tx fetch in particular.
+#
+# [fetch_policy.eb_txs]
+# kind = "broadcast"
+# n = 2
+#
+# [fetch_policy.votes]
+# kind = "broadcast"   # broadcast to all candidates
+
 [validation]
+# Mirror sim-rs `parameters/config.default.yaml` legacy-Praos
+# payload-validation cost (rb-body-legacy-praos-payload-validation-
+# cpu-time-ms-constant=0.3539, -per-byte=2.151e-05).  At 90 KiB max
+# RB body that's ~2.4 ms, so 3-hop propagation finishes well within
+# the pre-voting buffer.  `tx_validation_ms = 0.6201` matches sim-rs's
+# `tx-validation-cpu-time-ms` (an amortised Plutus-inclusive figure).
 rb_head_validation_ms = 1.0
-rb_body_validation_ms_constant = 1000.0
-rb_body_validation_ms_per_byte = 0.001
+rb_body_validation_ms_constant = 0.3539
+rb_body_validation_ms_per_byte = 0.0000215
+tx_validation_ms = 0.6201
 eb_validation_ms = 2.0
 vote_validation_ms = 1.0
