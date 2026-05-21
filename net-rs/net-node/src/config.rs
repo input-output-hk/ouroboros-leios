@@ -546,6 +546,15 @@ pub struct TelemetryConfig {
     #[serde(default = "default_stats_interval")]
     pub stats_interval_secs: u64,
 
+    /// Emit per-subsystem state-size `info!` lines every N stats ticks
+    /// (one tick = `stats_interval_secs`).  0 = disabled (default).
+    /// Useful for triaging memory / CPU growth: each tick logs one
+    /// line per state machine (`praos state sizes`, `leios state
+    /// sizes`, `mempool state sizes`) with every internal collection's
+    /// length.
+    #[serde(default)]
+    pub state_sizes_log_every_n_ticks: u64,
+
     /// Event sinks.
     #[serde(default)]
     pub event_sinks: Vec<EventSinkConfig>,
@@ -563,6 +572,7 @@ impl Default for TelemetryConfig {
     fn default() -> Self {
         Self {
             stats_interval_secs: default_stats_interval(),
+            state_sizes_log_every_n_ticks: 0,
             event_sinks: Vec::new(),
             stats_sinks: Vec::new(),
         }
