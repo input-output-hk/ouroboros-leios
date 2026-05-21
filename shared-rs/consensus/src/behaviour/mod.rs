@@ -86,9 +86,11 @@ pub mod behaviours {
     //! own file so contributors can add one without touching the others.
     pub mod lazy_voter;
     pub mod rb_equivocator;
+    pub mod t22;
 
     pub use lazy_voter::LazyVoter;
     pub use rb_equivocator::RbHeaderEquivocator;
+    pub use t22::T22ThreatBehaviour;
 }
 
 pub use delay::DelayQueue;

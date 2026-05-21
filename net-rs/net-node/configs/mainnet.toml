@@ -29,7 +29,7 @@ type = "StakeCentile"
 top_centile_of_stake = 0.99
 
 [transactions]
-tx_rate = 0.0
+tx_rate = 1.0
 tx_size_min = 250
 tx_size_max = 16384
 
