@@ -1899,9 +1899,10 @@ mod tests {
         );
     }
 
-    /// An adopted node whose only common ancestor with a peer is Origin
-    /// (genesis) must accept the peer's chain. This is the core regression
-    /// test for the Origin-as-ancestor fix.
+    /// An adopted node whose only common ancestor with a peer is genesis
+    /// must accept the peer's chain when the peer's tip is better.  Genesis
+    /// is a universal common ancestor; an adversary cannot exploit this
+    /// because each replayed block still goes through the validator.
     #[tokio::test]
     async fn select_chain_accepts_genesis_ancestor_for_adopted_node() {
         let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
@@ -1931,7 +1932,8 @@ mod tests {
 
         // Peer announces a completely separate chain of 5 blocks, also
         // rooted at genesis (prev_hash=None for block 1). Different slots
-        // produce different hashes — the chains share NO common blocks.
+        // produce different hashes — the chains share NO common blocks
+        // above genesis.
         let (p1_tip, p1_hdr) = make_tip(100, 1, None);
         let p1_hash = match &p1_tip.point {
             Point::Specific { hash, .. } => *hash,
@@ -1963,19 +1965,23 @@ mod tests {
         let (p5_tip, p5_hdr) = make_tip(500, 5, Some(p4_hash));
         consensus.record_peer_tip(peer, &p5_tip, &p5_hdr);
 
-        // The peer has 5 blocks vs our 3 — strictly better. The chains
-        // share no common blocks, but an adopted node does NOT roll back
-        // to Origin (that's only for fresh nodes). The re-intersect
-        // mechanism handles this via OrphanCandidate.
+        // The peer has 5 blocks vs our 3 — strictly better.  The chains
+        // share no common blocks above genesis, but the peer's oldest
+        // entry roots at genesis (`prev_hash=None`), so genesis is the
+        // common ancestor and select_chain must ask for the peer's
+        // bodies.
         match consensus.select_chain_once(&HashSet::new()) {
-            SelectionDecision::OrphanCandidate {
-                peer_id: orphan_peer,
+            SelectionDecision::WaitingForBlocks {
+                peer_id,
+                ancestor,
                 tip_block_no,
+                ..
             } => {
-                assert_eq!(orphan_peer, peer);
+                assert_eq!(peer_id, peer);
+                assert_eq!(ancestor, [0u8; 32]);
                 assert_eq!(tip_block_no, 5);
             }
-            other => panic!("expected OrphanCandidate, got {other:?}"),
+            other => panic!("expected WaitingForBlocks, got {other:?}"),
         }
     }
 
