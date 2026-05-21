@@ -14,6 +14,14 @@ pub struct ChainTreeEntry {
     pub block_number: u64,
     pub hash: String,
     pub prev_hash: Option<String>,
+    #[serde(default)]
+    pub tx_count: u32,
+    #[serde(default)]
+    pub announced_eb: bool,
+    #[serde(default)]
+    pub certified_eb: bool,
+    #[serde(default)]
+    pub eb_tx_count: Option<u32>,
 }
 
 /// Stats snapshot received from a net-node instance.

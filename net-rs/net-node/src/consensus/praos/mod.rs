@@ -210,11 +210,13 @@ impl PraosConsensus {
         if let Point::Specific { hash, .. } = point {
             self.state.note_header_first_seen(*hash, self.current_slot);
         }
+        let tx_count = body.praos_tx_count().unwrap_or(0);
         let fx = self.state.register_self_produced(
             point.clone(),
             header.raw.clone(),
             body.raw.clone(),
             parsed,
+            tx_count,
         );
         self.dispatch(fx).await;
     }
@@ -269,11 +271,13 @@ impl PraosConsensus {
                 if let Point::Specific { hash, .. } = point {
                     self.state.note_header_first_seen(*hash, self.current_slot);
                 }
+                let tx_count = body.praos_tx_count().unwrap_or(0);
                 let fx = self.state.on_block_received(
                     point.clone(),
                     header.raw.clone(),
                     body.raw.clone(),
                     parsed,
+                    tx_count,
                 );
                 (true, fx)
             }
@@ -351,8 +355,11 @@ impl PraosConsensus {
         })
     }
 
-    pub fn chain_tree_snapshot(&self) -> (Vec<ChainTreeEntry>, Option<u64>, Option<String>) {
-        self.state.chain_tree_snapshot()
+    pub fn chain_tree_snapshot(
+        &self,
+        eb_manifest_count: impl Fn(&[u8; 32]) -> Option<u32>,
+    ) -> (Vec<ChainTreeEntry>, Option<u64>, Option<String>) {
+        self.state.chain_tree_snapshot(eb_manifest_count)
     }
 
     pub fn tip_hash(&self) -> Option<[u8; 32]> {
@@ -453,11 +460,13 @@ impl PraosConsensus {
             .header()
             .unwrap_or_else(|| WrappedHeader::opaque(Vec::new()));
         let parsed = Self::parse_header(&header);
+        let tx_count = body.praos_tx_count().unwrap_or(0);
         let fx = self.state.on_block_received(
             point.clone(),
             header.raw.clone(),
             body.raw.clone(),
             parsed,
+            tx_count,
         );
         self.dispatch(fx).await;
     }
@@ -1090,13 +1099,13 @@ mod tests {
         // Insert blocks 1, 2, 3 with prev_hash links, 1 has prev=None.
         consensus
             .state.chain_tree
-            .insert(h1, Point::Specific { slot: 1, hash: h1 }, 1, 1, None);
+            .insert(h1, Point::Specific { slot: 1, hash: h1 }, 1, 1, None, 0, None, false);
         consensus
             .state.chain_tree
-            .insert(h2, Point::Specific { slot: 2, hash: h2 }, 2, 2, Some(h1));
+            .insert(h2, Point::Specific { slot: 2, hash: h2 }, 2, 2, Some(h1), 0, None, false);
         consensus
             .state.chain_tree
-            .insert(h3, Point::Specific { slot: 3, hash: h3 }, 3, 3, Some(h2));
+            .insert(h3, Point::Specific { slot: 3, hash: h3 }, 3, 3, Some(h2), 0, None, false);
 
         let walk = consensus.walk_ancestors_hybrid(h3);
         assert_eq!(walk.chain, vec![h3, h2, h1]);
@@ -1124,6 +1133,9 @@ mod tests {
             10,
             10,
             None,
+            0,
+            None,
+            false,
         );
         consensus.state.chain_tree.insert(
             h_tip,
@@ -1134,6 +1146,9 @@ mod tests {
             12,
             12,
             Some(h_mid),
+            0,
+            None,
+            false,
         );
         consensus
             .state.block_cache
@@ -1168,6 +1183,9 @@ mod tests {
             99,
             99,
             Some(h_missing),
+            0,
+            None,
+            false,
         );
 
         let walk = consensus.walk_ancestors_hybrid(h_tip);
@@ -1189,7 +1207,7 @@ mod tests {
         // h1 goes into chain_tree as a valid genesis child.
         consensus
             .state.chain_tree
-            .insert(h1, Point::Specific { slot: 1, hash: h1 }, 1, 1, None);
+            .insert(h1, Point::Specific { slot: 1, hash: h1 }, 1, 1, None, 0, None, false);
         // h2 goes ONLY into block_cache.
         consensus.state.block_cache.insert(h2, cached(Some(h1), 2, 2, h2));
 

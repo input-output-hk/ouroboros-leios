@@ -464,11 +464,19 @@ impl PraosState {
     }
 
     /// Snapshot the recent chain tree for UI display.
-    pub fn chain_tree_snapshot(&self) -> (Vec<ChainTreeEntry>, Option<u64>, Option<String>) {
+    ///
+    /// `eb_manifest_count` resolves an announced-EB hash to the length
+    /// of its tx-hash manifest (typically `LeiosState::eb_tx_hashes`
+    /// lookup at the wrapper boundary). Returns `None` when the manifest
+    /// hasn't been cached yet.
+    pub fn chain_tree_snapshot(
+        &self,
+        eb_manifest_count: impl Fn(&[u8; 32]) -> Option<u32>,
+    ) -> (Vec<ChainTreeEntry>, Option<u64>, Option<String>) {
         match self.adopted_tip_hash {
             Some(hash) => {
                 let block_no = self.chain_tree.block_number(&hash);
-                let entries = self.chain_tree.snapshot(hash, 10, block_no);
+                let entries = self.chain_tree.snapshot(hash, 10, block_no, eb_manifest_count);
                 let tip_hash = Some(format!("{:02x}{:02x}", hash[30], hash[31]));
                 (entries, block_no, tip_hash)
             }
@@ -602,6 +610,7 @@ impl PraosState {
         header_bytes: Vec<u8>,
         body_bytes: Vec<u8>,
         parsed_header: Option<ParsedHeaderInfo>,
+        tx_count: u32,
     ) -> Vec<PraosEffect> {
         use crate::behaviour::BehaviourOutcome;
         let appended: Vec<PraosEffect> =
@@ -659,8 +668,16 @@ impl PraosState {
         // (parsed header) or, for opaque headers, when fallback metadata
         // is non-default.  Inserting block_no=0 confuses pruning.
         if header_was_parsed || block_no > 0 {
-            self.chain_tree
-                .insert(hash, point.clone(), block_no, slot, prev_hash);
+            self.chain_tree.insert(
+                hash,
+                point.clone(),
+                block_no,
+                slot,
+                prev_hash,
+                tx_count,
+                announced_eb_hash,
+                certified_eb,
+            );
         }
         self.block_cache.insert(
             hash,
@@ -758,12 +775,14 @@ impl PraosState {
 
     /// Register a block we produced ourselves.  Caches it, hands it to
     /// the validator, and runs a fork-switch attempt.
+    #[allow(clippy::too_many_arguments)]
     pub fn register_self_produced(
         &mut self,
         point: Point,
         header_bytes: Vec<u8>,
         body_bytes: Vec<u8>,
         parsed_header: Option<ParsedHeaderInfo>,
+        tx_count: u32,
     ) -> Vec<PraosEffect> {
         let mut fx = Vec::new();
         self.self_produced.insert(point.clone());
@@ -785,6 +804,9 @@ impl PraosState {
                     info.block_number,
                     info.slot,
                     info.prev_hash,
+                    tx_count,
+                    info.announced_eb_hash,
+                    info.certified_eb,
                 );
                 self.block_cache
                     .entry(hash)
@@ -1604,7 +1626,7 @@ mod tests {
         let prev_hash = prev_seed.map(h);
         state
             .chain_tree
-            .insert(hash, point.clone(), block_no, slot, prev_hash);
+            .insert(hash, point.clone(), block_no, slot, prev_hash, 0, None, false);
         state.block_cache.insert(
             hash,
             CachedBlock {
@@ -1660,7 +1682,7 @@ mod tests {
         let mut s = fresh();
         install_validated_block(&mut s, 100, 1, 5, None);
         s.adopted_tip_hash = Some(h(1));
-        let (entries, block_no, tip_hex) = s.chain_tree_snapshot();
+        let (entries, block_no, tip_hex) = s.chain_tree_snapshot(|_| None);
         assert!(!entries.is_empty());
         assert_eq!(block_no, Some(5));
         assert!(tip_hex.is_some());
@@ -1725,8 +1747,8 @@ mod tests {
     #[test]
     fn two_distinct_headers_same_slot_issuer_flag_slot() {
         let mut s = fresh();
-        s.on_block_received(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
-        s.on_block_received(pt(100, 2), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
+        s.on_block_received(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)), 0);
+        s.on_block_received(pt(100, 2), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)), 0);
         assert!(s.is_equivocating_slot(100));
         assert!(s.equivocating_rb_slots.contains(&100));
     }
@@ -1736,8 +1758,8 @@ mod tests {
         // Two different producers winning the same slot via VRF is a
         // legitimate Praos fork — not equivocation by CIP-0164.
         let mut s = fresh();
-        s.on_block_received(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
-        s.on_block_received(pt(100, 2), vec![], vec![], Some(parsed_with_issuer(100, 0xBB)));
+        s.on_block_received(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)), 0);
+        s.on_block_received(pt(100, 2), vec![], vec![], Some(parsed_with_issuer(100, 0xBB)), 0);
         assert!(!s.is_equivocating_slot(100));
     }
 
@@ -1746,8 +1768,8 @@ mod tests {
         // Pre-issuer callers (issuer = Vec::new()) get no-op detection,
         // preserving legacy behavior.
         let mut s = fresh();
-        s.on_block_received(pt(100, 1), vec![], vec![], Some(hi(100, 100, None)));
-        s.on_block_received(pt(100, 2), vec![], vec![], Some(hi(100, 100, None)));
+        s.on_block_received(pt(100, 1), vec![], vec![], Some(hi(100, 100, None)), 0);
+        s.on_block_received(pt(100, 2), vec![], vec![], Some(hi(100, 100, None)), 0);
         assert!(!s.is_equivocating_slot(100));
     }
 
@@ -1756,7 +1778,7 @@ mod tests {
         // Same hash arriving twice (e.g., from two peers) isn't
         // equivocation — it's the same header.
         let mut s = fresh();
-        s.on_block_received(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
+        s.on_block_received(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)), 0);
         // Second on_block_received with the same hash is a no-op via
         // the block_cache dedup; manually probe the tracker invariant.
         s.note_header_for_equivocation(100, &[0xAA; 4], h(1));
@@ -1769,8 +1791,8 @@ mod tests {
         // headers at the same slot equivocates against itself; the
         // tracker honors that.
         let mut s = fresh();
-        s.register_self_produced(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
-        s.register_self_produced(pt(100, 2), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)));
+        s.register_self_produced(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)), 0);
+        s.register_self_produced(pt(100, 2), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)), 0);
         assert!(s.is_equivocating_slot(100));
     }
 
@@ -1784,6 +1806,7 @@ mod tests {
             vec![0xAA],
             vec![0xBB],
             Some(hi(1, 100, None)),
+            0,
         );
         assert_eq!(fx.len(), 1);
         match &fx[0] {
@@ -1807,7 +1830,7 @@ mod tests {
     #[test]
     fn register_self_produced_opaque_header_skips_chain_tree() {
         let mut s = fresh();
-        let fx = s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], None);
+        let fx = s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], None, 0);
         assert_eq!(fx.len(), 1);
         assert!(matches!(fx[0], PraosEffect::ValidatorApply { .. }));
         assert!(s.chain_tree.block_number(&h(1)).is_none());
@@ -1818,7 +1841,7 @@ mod tests {
         let mut s = fresh();
         let mut info = hi(1, 100, None);
         info.announced_eb_hash = Some(h(0xEB));
-        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(info));
+        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(info), 0);
         // Without note_header_first_seen, the accessor falls back to
         // the RB's own slot.
         assert_eq!(s.adopted_tip_header_arrival_slot(), Some(100));
@@ -1835,7 +1858,7 @@ mod tests {
     #[test]
     fn adopted_tip_announced_eb_none_for_pre_leios_header() {
         let mut s = fresh();
-        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)));
+        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)), 0);
         // hi() defaults announced_eb_hash to None.
         assert_eq!(s.adopted_tip_announced_eb(), None);
     }
@@ -1843,7 +1866,7 @@ mod tests {
     #[test]
     fn note_header_first_seen_is_used_for_arrival() {
         let mut s = fresh();
-        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)));
+        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)), 0);
         // Wrapper observed the header at slot 102 (e.g., body arrived
         // 2 slots after the RB's own slot via fetch).
         s.note_header_first_seen(h(1), 102);
@@ -1853,7 +1876,7 @@ mod tests {
     #[test]
     fn note_header_first_seen_is_idempotent() {
         let mut s = fresh();
-        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)));
+        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)), 0);
         s.note_header_first_seen(h(1), 105);
         // Subsequent calls don't overwrite — only the first arrival counts.
         s.note_header_first_seen(h(1), 200);
@@ -1864,7 +1887,7 @@ mod tests {
     fn register_self_produced_origin_point_is_noop() {
         let mut s = fresh();
         let fx =
-            s.register_self_produced(Point::Origin, vec![], vec![], Some(hi(1, 0, None)));
+            s.register_self_produced(Point::Origin, vec![], vec![], Some(hi(1, 0, None)), 0);
         assert!(fx.is_empty());
         assert!(s.self_produced.contains(&Point::Origin));
     }
@@ -1874,7 +1897,7 @@ mod tests {
     #[test]
     fn on_block_applied_emits_inject_block() {
         let mut s = fresh();
-        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)));
+        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)), 0);
         let fx = s.on_block_applied(pt(100, 1), Instant::now());
         assert!(matches!(fx[0], PraosEffect::InjectBlock { .. }));
         assert!(s.validated.contains(&h(1)));
@@ -1896,7 +1919,7 @@ mod tests {
         install_validated_block(&mut s, 101, 2, 2, Some(1));
         install_validated_block(&mut s, 102, 3, 3, Some(2));
         // Stage block 4 in cache (not yet validated).
-        s.chain_tree.insert(h(4), pt(103, 4), 4, 103, Some(h(3)));
+        s.chain_tree.insert(h(4), pt(103, 4), 4, 103, Some(h(3)), 0, None, false);
         s.block_cache.insert(
             h(4),
             CachedBlock {
@@ -1923,13 +1946,14 @@ mod tests {
     #[test]
     fn on_block_apply_failed_rewinds_to_last_validated() {
         let mut s = fresh();
-        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)));
+        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)), 0);
         let _ = s.on_block_applied(pt(100, 1), Instant::now());
         s.register_self_produced(
             pt(101, 2),
             vec![0xAA],
             vec![0xBC],
             Some(hi(2, 101, Some(1))),
+            0,
         );
         s.on_block_apply_failed(pt(101, 2), "ledger error".to_string());
         assert_eq!(s.queued_validator_tip, Some(h(1)));
@@ -1968,14 +1992,14 @@ mod tests {
     fn on_block_received_dedups_via_cache() {
         let mut s = fresh();
         install_validated_block(&mut s, 100, 1, 1, None);
-        let fx = s.on_block_received(pt(100, 1), vec![], vec![], None);
+        let fx = s.on_block_received(pt(100, 1), vec![], vec![], None, 0);
         assert!(fx.is_empty());
     }
 
     #[test]
     fn on_block_received_origin_point_is_noop() {
         let mut s = fresh();
-        let fx = s.on_block_received(Point::Origin, vec![], vec![], None);
+        let fx = s.on_block_received(Point::Origin, vec![], vec![], None, 0);
         assert!(fx.is_empty());
     }
 
@@ -1987,6 +2011,7 @@ mod tests {
             vec![0xAA],
             vec![0xBB],
             Some(hi(1, 100, None)),
+            0,
         );
         assert!(fx.iter().any(|e| matches!(e, PraosEffect::ValidatorApply { .. })));
         assert!(s.block_cache.contains_key(&h(1)));
@@ -1996,7 +2021,7 @@ mod tests {
     #[test]
     fn on_block_received_opaque_header_no_chain_tree_insert() {
         let mut s = fresh();
-        let fx = s.on_block_received(pt(100, 1), vec![0xAA], vec![0xBB], None);
+        let fx = s.on_block_received(pt(100, 1), vec![0xAA], vec![0xBB], None, 0);
         // No chain_tree entry, so try_switch fails silently.
         assert!(fx.is_empty());
         assert!(s.chain_tree.block_number(&h(1)).is_none());
