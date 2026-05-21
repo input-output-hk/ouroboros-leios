@@ -16,9 +16,23 @@ use futures_util::stream::Stream;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tower_http::cors::CorsLayer;
 
-use crate::config::ClusterControlConfig;
+use crate::config::{ActiveAttack, AttackRequest, ClusterControlConfig};
 use crate::topology::Topology;
 use crate::types::{self, EventWindow, IngestedEvent, StatsSnapshot};
+
+/// Control message sent from the HTTP handlers to the main loop for
+/// the runtime attack-trigger feature.
+#[derive(Debug)]
+pub enum AttackCommand {
+    /// Install `request.behaviour` on the nodes picked by
+    /// `request.selection`.  Replaces any prior active attack (the
+    /// affected nodes are reset to their startup spec first).
+    Start(AttackRequest),
+    /// Reset every node currently part of the active attack back to
+    /// its startup spec and clear the active-attack state.  No-op when
+    /// no attack is active.
+    Stop,
+}
 
 /// Shared state for the HTTP server.
 pub struct ServerState {
@@ -36,8 +50,20 @@ pub struct ServerState {
     pub restart_tx: mpsc::Sender<ClusterControlConfig>,
     /// Channel to send node config updates (without restart) to the main loop.
     pub update_tx: mpsc::Sender<std::collections::HashMap<String, serde_json::Value>>,
+    /// Channel for runtime attack-trigger commands (start / stop).  The
+    /// main loop owns the per-node stdin pipes and the resolved
+    /// node-stake vector, so it does the actual installation.
+    pub attack_tx: mpsc::Sender<AttackCommand>,
     /// Current controllable config (updated on restart).
     pub current_config: RwLock<ClusterControlConfig>,
+    /// Per-node stake vector aligned with `topology.nodes`.  Read by
+    /// the main loop to resolve `BehaviourSelection` at attack-trigger
+    /// time, and refreshed on every restart.
+    pub stakes: RwLock<Vec<u64>>,
+    /// Currently-active runtime attack, or `None` if no attack is in
+    /// progress.  Maintained by the main loop; surfaced to the UI via
+    /// `GET /api/attack`.
+    pub active_attack: RwLock<Option<ActiveAttack>>,
     /// Guard against concurrent restarts.
     pub restarting: RwLock<bool>,
 }
@@ -54,7 +80,9 @@ pub async fn start(
     event_window: Arc<RwLock<EventWindow>>,
     restart_tx: mpsc::Sender<ClusterControlConfig>,
     update_tx: mpsc::Sender<HashMap<String, serde_json::Value>>,
+    attack_tx: mpsc::Sender<AttackCommand>,
     initial_config: ClusterControlConfig,
+    initial_stakes: Vec<u64>,
 ) -> Result<(Arc<ServerState>, tokio::task::JoinHandle<()>), Box<dyn std::error::Error + Send + Sync>>
 {
     let (event_broadcast, _) = broadcast::channel(256);
@@ -66,7 +94,10 @@ pub async fn start(
         event_broadcast,
         restart_tx,
         update_tx,
+        attack_tx,
         current_config: RwLock::new(initial_config),
+        stakes: RwLock::new(initial_stakes),
+        active_attack: RwLock::new(None),
         restarting: RwLock::new(false),
     });
 
@@ -84,6 +115,8 @@ pub async fn start(
         .route("/api/config", get(get_config))
         .route("/api/restart", post(restart_cluster))
         .route("/api/update-config", post(update_config))
+        .route("/api/attack", get(get_attack).post(start_attack))
+        .route("/api/attack/stop", post(stop_attack))
         .layer(CorsLayer::permissive())
         .with_state(state.clone());
 
@@ -253,6 +286,52 @@ async fn update_config(
     }
 }
 
+/// GET /api/attack — return the currently-active runtime attack, or
+/// `null` when no attack is in progress.
+async fn get_attack(State(state): State<Arc<ServerState>>) -> Json<Option<ActiveAttack>> {
+    Json(state.active_attack.read().await.clone())
+}
+
+/// POST /api/attack — install `request.behaviour` on the nodes picked
+/// by `request.selection`.  Replaces any prior active attack; the
+/// main loop resets the prior nodes to their startup spec before
+/// applying the new one.  Returns 202 once the command is queued.
+async fn start_attack(
+    State(state): State<Arc<ServerState>>,
+    Json(request): Json<AttackRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    match state.attack_tx.try_send(AttackCommand::Start(request)) {
+        Ok(()) => Ok(StatusCode::ACCEPTED),
+        Err(mpsc::error::TrySendError::Full(_)) => Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Attack channel full".into(),
+        )),
+        Err(mpsc::error::TrySendError::Closed(_)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Attack channel closed".into(),
+        )),
+    }
+}
+
+/// POST /api/attack/stop — reset every node currently part of the
+/// active attack back to its startup spec.  No-op when no attack is
+/// active.  Returns 202 once the command is queued.
+async fn stop_attack(
+    State(state): State<Arc<ServerState>>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    match state.attack_tx.try_send(AttackCommand::Stop) {
+        Ok(()) => Ok(StatusCode::ACCEPTED),
+        Err(mpsc::error::TrySendError::Full(_)) => Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Attack channel full".into(),
+        )),
+        Err(mpsc::error::TrySendError::Closed(_)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Attack channel closed".into(),
+        )),
+    }
+}
+
 /// GET /api/stats — return latest stats for all nodes.
 async fn get_all_stats(
     State(state): State<Arc<ServerState>>,
@@ -328,6 +407,7 @@ mod tests {
         let (event_broadcast, _) = broadcast::channel(256);
         let (restart_tx, _restart_rx) = mpsc::channel(1);
         let (update_tx, _update_rx) = mpsc::channel(16);
+        let (attack_tx, _attack_rx) = mpsc::channel(4);
         let state = Arc::new(ServerState {
             event_tx: tx,
             latest_stats: RwLock::new(HashMap::new()),
@@ -339,6 +419,7 @@ mod tests {
             event_broadcast,
             restart_tx,
             update_tx,
+            attack_tx,
             current_config: RwLock::new(ClusterControlConfig {
                 num_nodes: Some(5),
                 degree: Some(3),
@@ -347,6 +428,8 @@ mod tests {
                 seed: None,
                 node_config: HashMap::new(),
             }),
+            stakes: RwLock::new(Vec::new()),
+            active_attack: RwLock::new(None),
             restarting: RwLock::new(false),
         });
         (state, rx)

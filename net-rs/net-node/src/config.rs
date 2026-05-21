@@ -43,6 +43,13 @@ pub struct DynamicConfigUpdate {
     /// rather than feeding a watch channel — see
     /// `Consensus::set_behaviour`.
     pub behaviour: Option<shared_consensus::behaviour::BehaviourSpec>,
+    /// When `Some(true)` and `behaviour` is `None`, the node walks the
+    /// behaviour handle back to the spec it materialised at startup.
+    /// Set by net-cluster when stopping a runtime attack so each node
+    /// returns to its original config (Honest for most, but a
+    /// pre-configured attacker remains an attacker).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub behaviour_reset: Option<bool>,
 }
 
 impl DynamicConfig {

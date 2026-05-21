@@ -177,6 +177,35 @@ impl ProcessManager {
         }
     }
 
+    /// Send a JSON config update to the children at the given indices.
+    ///
+    /// Same line-format as [`Self::send_config_update`] but addressed
+    /// to a subset.  Out-of-range indices and children with no stdin
+    /// pipe are silently skipped.  Used by the runtime attack-trigger
+    /// path, where the orchestrator targets a specific subset of nodes
+    /// rather than broadcasting.
+    pub async fn send_config_update_to(
+        &mut self,
+        indices: &[usize],
+        json: &serde_json::Value,
+    ) {
+        let mut line = serde_json::to_string(json).unwrap_or_default();
+        line.push('\n');
+        let bytes = line.as_bytes();
+
+        for &i in indices {
+            let Some(child) = self.children.get_mut(i) else {
+                continue;
+            };
+            if let Some(stdin) = &mut child.stdin {
+                if let Err(e) = stdin.write_all(bytes).await {
+                    tracing::warn!("failed to send config update to {}: {e}", child.node_id);
+                    child.stdin = None;
+                }
+            }
+        }
+    }
+
     /// Number of children currently managed.
     pub fn count(&self) -> usize {
         self.children.len()

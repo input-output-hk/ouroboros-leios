@@ -12,10 +12,12 @@ import { ChainTreeView } from "@/components/ChainTreeView";
 import { EventLog } from "@/components/EventLog";
 import { IconSidebar } from "@/components/IconSidebar";
 import { ControlPanel } from "@/components/ControlPanel";
+import { AttackPanel } from "@/components/AttackPanel";
 
 export default function App() {
   const loadTopology = useStore((s) => s.loadTopology);
   const loadConfig = useStore((s) => s.loadConfig);
+  const loadActiveAttack = useStore((s) => s.loadActiveAttack);
   const pollStats = useStore((s) => s.pollStats);
   const topology = useStore((s) => s.topology);
   const restarting = useStore((s) => s.restarting);
@@ -27,11 +29,13 @@ export default function App() {
   const [chartsOpen, setChartsOpen] = useState(true);
   const [chainTreeOpen, setChainTreeOpen] = useState(true);
   const [controlPanelOpen, setControlPanelOpen] = useState(false);
+  const [attackPanelOpen, setAttackPanelOpen] = useState(false);
 
   useEffect(() => {
     loadTopology();
     loadConfig();
-  }, [loadTopology, loadConfig]);
+    loadActiveAttack();
+  }, [loadTopology, loadConfig, loadActiveAttack]);
 
   // Close control panel when restart completes.
   const wasRestarting = useRef(false);
@@ -44,6 +48,7 @@ export default function App() {
 
   useForceLayout();
   usePolling(pollStats, 1000);
+  usePolling(loadActiveAttack, 2000);
   useEventStream();
 
   return (
@@ -64,7 +69,15 @@ export default function App() {
         <Box sx={{ position: "absolute", top: 42, left: 0, bottom: 0, zIndex: 25, pointerEvents: "auto" }}>
           <IconSidebar
             controlPanelOpen={controlPanelOpen}
-            onToggleControlPanel={() => setControlPanelOpen((v) => !v)}
+            onToggleControlPanel={() => {
+              setControlPanelOpen((v) => !v);
+              setAttackPanelOpen(false);
+            }}
+            attackPanelOpen={attackPanelOpen}
+            onToggleAttackPanel={() => {
+              setAttackPanelOpen((v) => !v);
+              setControlPanelOpen(false);
+            }}
             chainTreeOpen={chainTreeOpen}
             onToggleChainTree={() => setChainTreeOpen((v) => !v)}
             chartsOpen={chartsOpen}
@@ -89,6 +102,25 @@ export default function App() {
             pointerEvents: "auto",
           }}>
             <ControlPanel />
+          </Box>
+        )}
+
+        {/* Attack panel slide-out — same anchor as control panel; only one
+            shows at a time because they share the same left strip. */}
+        {attackPanelOpen && (
+          <Box sx={{
+            position: "absolute",
+            top: 42,
+            left: 48,
+            zIndex: 24,
+            backdropFilter: "blur(8px)",
+            bgcolor: "rgba(13, 27, 42, 0.5)",
+            borderRight: "1px solid rgba(255,255,255,0.08)",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "0 0 8px 0",
+            pointerEvents: "auto",
+          }}>
+            <AttackPanel />
           </Box>
         )}
 

@@ -89,3 +89,31 @@ export interface ClusterControlConfig {
   seed?: number;
   node_config: Record<string, unknown>;
 }
+
+// Per-node behaviour spec — mirrors shared_consensus::behaviour::BehaviourSpec.
+// The Rust enum uses #[serde(tag = "kind", rename_all = "kebab-case")].
+export type BehaviourSpec =
+  | { kind: "honest" }
+  | { kind: "lazy-voter"; reason?: string }
+  | { kind: "rb-header-equivocator"; ways: number }
+  | { kind: "composite"; children: BehaviourSpec[] };
+
+// Mirrors net-cluster's BehaviourSelection enum (same serde tag layout).
+export type BehaviourSelection =
+  | { kind: "all" }
+  | { kind: "nodes"; indices: number[] }
+  | { kind: "stake-random"; count: number }
+  | { kind: "stake-ordered"; count: number }
+  | { kind: "stake-fraction"; fraction: number };
+
+export interface AttackRequest {
+  behaviour: BehaviourSpec;
+  selection: BehaviourSelection;
+}
+
+export interface ActiveAttack {
+  behaviour: BehaviourSpec;
+  selection: BehaviourSelection;
+  indices: number[];
+  started_at_s: number;
+}

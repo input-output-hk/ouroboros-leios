@@ -40,6 +40,11 @@ pub struct Consensus {
     /// coordinator holds its own clone for the per-peer outbound
     /// transform path.
     behaviour_handle: shared_consensus::behaviour::BehaviourHandle,
+    /// Spec the node materialised at startup.  Kept so a runtime
+    /// "reset" can walk the handle back to the original behaviour
+    /// (Honest for most nodes, but a node configured as a startup
+    /// attacker remains one).
+    startup_spec: shared_consensus::behaviour::BehaviourSpec,
 }
 
 impl Consensus {
@@ -63,6 +68,7 @@ impl Consensus {
         rtt: PeerRttCache,
         fetch_policy: FetchPolicyConfig,
         behaviour_handle: shared_consensus::behaviour::BehaviourHandle,
+        startup_spec: shared_consensus::behaviour::BehaviourSpec,
     ) -> Self {
         let mut praos = PraosConsensus::new(
             node_id.clone(),
@@ -112,6 +118,7 @@ impl Consensus {
             leios,
             behaviour_seed,
             behaviour_handle,
+            startup_spec,
         }
     }
 
@@ -127,6 +134,22 @@ impl Consensus {
     ) {
         tracing::info!(?spec, behaviour_seed = self.behaviour_seed, "swapping per-node behaviour");
         shared_consensus::behaviour::swap_handle(&self.behaviour_handle, spec, self.behaviour_seed);
+    }
+
+    /// Walk the per-node behaviour back to the spec materialised at
+    /// startup.  Used when net-cluster stops a runtime attack so each
+    /// node returns to its original configuration.
+    pub fn reset_behaviour(&mut self, _mempool: &crate::mempool::SharedMempool) {
+        tracing::info!(
+            startup_spec = ?self.startup_spec,
+            behaviour_seed = self.behaviour_seed,
+            "resetting per-node behaviour to startup spec"
+        );
+        shared_consensus::behaviour::swap_handle(
+            &self.behaviour_handle,
+            &self.startup_spec,
+            self.behaviour_seed,
+        );
     }
 
     /// Ask the per-node behaviour what to do for this slot's
