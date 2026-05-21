@@ -219,8 +219,8 @@ pub enum BehaviourSelection {
     T22 {
         #[serde(default = "default_t22_vote_threshold")]
         vote_threshold: u8,
-        #[serde(default = "default_t22_process_received")]
-        process_received: bool,
+        #[serde(default = "default_t22_hide_eb_tx_received")]
+        hide_eb_tx_received: bool,
     },
 }
 
@@ -228,7 +228,7 @@ fn default_t22_vote_threshold() -> u8 {
     50
 }
 
-fn default_t22_process_received() -> bool {
+fn default_t22_hide_eb_tx_received() -> bool {
     true
 }
 
@@ -238,10 +238,10 @@ impl BehaviourSelection {
         match self {
             Self::T22 {
                 vote_threshold,
-                process_received,
+                hide_eb_tx_received,
             } => Some(shared_consensus::behaviour::BehaviourSpec::T22 {
                 vote_threshold: *vote_threshold,
-                process_received: *process_received,
+                hide_eb_tx_received: *hide_eb_tx_received,
             }),
             _ => None,
         }

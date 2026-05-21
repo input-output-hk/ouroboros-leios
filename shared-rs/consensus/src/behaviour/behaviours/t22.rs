@@ -8,22 +8,22 @@ use tracing::info;
 #[derive(Debug, Default)]
 pub struct T22ThreatBehaviour {
     pub vote_threshold: u8,
-    pub process_received: bool,
+    pub hide_eb_tx_recieved: bool,
 }
 
 impl T22ThreatBehaviour {
-    pub fn new(vote_threshold: u8, process_received: bool) -> Self {
+    pub fn new(vote_threshold: u8, hide_eb_tx_received: bool) -> Self {
         Self {
             vote_threshold,
-            process_received,
+            hide_eb_tx_recieved: hide_eb_tx_received,
         }
     }
 
-    /// Возвращает true, если eb_data следует обработать.
+    /// Returns true, if eb_data should be processed.
     fn should_process_eb_data(&self, state: &LeiosState, point: &Point) -> bool {
         let persistent_seats = state.voting_config.persistent_seats;
         if persistent_seats == 0 {
-            return false;
+            return true;
         }
 
         let point_checksum = match point {
@@ -42,10 +42,7 @@ impl T22ThreatBehaviour {
 
     fn trace_decision(&self, fn_name: &str, processed: bool, persistent_seats: u32, point: Option<&Point>) {
         let decision = if processed { "processed" } else { "declined" };
-        info!(
-            "[T22] {}: decision={}, persistent_seats={}, point={:?}",
-            fn_name, decision, persistent_seats, point
-        );
+        info!("[T22] {}: decision={}, persistent_seats={}", fn_name, decision, persistent_seats);
     }
 }
 
@@ -101,17 +98,17 @@ impl Behaviour for T22ThreatBehaviour {
         point: &Point,
         _tx_hashes: &[[u8; 32]],
     ) -> BehaviourOutcome<LeiosEffect> {
-        let should_process = self.process_received && self.should_process_eb_data(state, point);
+        let skip_process = self.hide_eb_tx_recieved && !self.should_process_eb_data(state, point);
         self.trace_decision(
             "on_eb_received",
-            should_process,
+            !skip_process,
             state.voting_config.persistent_seats,
             Some(point),
         );
-        if should_process {
-            BehaviourOutcome::Continue
-        } else {
+        if skip_process {
             BehaviourOutcome::Replace(vec![])
+        } else {
+            BehaviourOutcome::Continue
         }
     }
 
@@ -121,12 +118,12 @@ impl Behaviour for T22ThreatBehaviour {
         _tx_id: &crate::mempool::TxId,
         _body: &[u8],
     ) -> BehaviourOutcome<crate::mempool::MempoolEffect> {
-        let should_process = self.process_received;
-        self.trace_decision("on_tx_received", should_process, 0, None);
-        if should_process {
-            BehaviourOutcome::Continue
-        } else {
+        let skip_process = self.hide_eb_tx_recieved;
+        self.trace_decision("on_tx_received", !skip_process, 0, None);
+        if skip_process {
             BehaviourOutcome::Replace(vec![])
+        } else {
+            BehaviourOutcome::Continue
         }
     }
 }

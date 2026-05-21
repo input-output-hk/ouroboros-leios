@@ -286,6 +286,7 @@ fn resolve_behaviour_nodes(
             }
             chosen
         }
+        BehaviourSelection::T22 { .. } => (0..stakes.len()).collect(),
     }
 }
 

@@ -59,8 +59,8 @@ pub enum BehaviourSpec {
     T22 {
         #[serde(default = "default_t22_vote_threshold")]
         vote_threshold: u8,
-        #[serde(default = "default_t22_process_received")]
-        process_received: bool,
+        #[serde(default = "default_t22_hide_eb_tx_received")]
+        hide_eb_tx_received: bool,
     },
 }
 
@@ -73,11 +73,11 @@ fn default_equivocator_ways() -> u8 {
 }
 
 fn default_t22_vote_threshold() -> u8 {
-    50
+    75+1
 }
 
-fn default_t22_process_received() -> bool {
-    true
+fn default_t22_hide_eb_tx_received() -> bool {
+    false
 }
 
 /// Materialise a [`BehaviourSpec`] into a shared
@@ -121,8 +121,8 @@ pub fn build(spec: &BehaviourSpec, seed: u64) -> Box<dyn Behaviour> {
         BehaviourSpec::LazyVoter { reason } => Box::new(LazyVoter { reason: *reason }),
         BehaviourSpec::T22 {
             vote_threshold,
-            process_received,
-        } => Box::new(T22ThreatBehaviour::new(*vote_threshold, *process_received)),
+            hide_eb_tx_received,
+        } => Box::new(T22ThreatBehaviour::new(*vote_threshold, *hide_eb_tx_received)),
     }
 }
 
@@ -170,7 +170,7 @@ mod tests {
                 BehaviourSpec::RbHeaderEquivocator { ways: 2 },
                 BehaviourSpec::T22 {
                     vote_threshold: 42,
-                    process_received: false,
+                    hide_eb_tx_received: false,
                 },
             ],
         };
@@ -185,7 +185,7 @@ mod tests {
                     children[2],
                     BehaviourSpec::T22 {
                         vote_threshold: 42,
-                        process_received: false
+                        hide_eb_tx_received: false
                     }
                 ));
             }
