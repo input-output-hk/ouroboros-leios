@@ -125,6 +125,10 @@ fn log_interesting_event(event: &IngestedEvent) {
             let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
             tracing::info!("{}: received block (slot {:?})", event.node_id, slot);
         }
+        Some("EBReceived") => {
+            let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
+            tracing::info!("{}: received block (slot {:?})", event.node_id, slot);
+        }
         _ => {}
     }
 }

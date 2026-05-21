@@ -101,7 +101,7 @@ impl Behaviour for T22ThreatBehaviour {
         point: &Point,
         _tx_hashes: &[[u8; 32]],
     ) -> BehaviourOutcome<LeiosEffect> {
-        let should_process = !self.process_received && self.should_process_eb_data(state, point);
+        let should_process = self.process_received && self.should_process_eb_data(state, point);
         self.trace_decision(
             "on_eb_received",
             should_process,
@@ -121,7 +121,7 @@ impl Behaviour for T22ThreatBehaviour {
         _tx_id: &crate::mempool::TxId,
         _body: &[u8],
     ) -> BehaviourOutcome<crate::mempool::MempoolEffect> {
-        let should_process = !self.process_received;
+        let should_process = self.process_received;
         self.trace_decision("on_tx_received", should_process, 0, None);
         if should_process {
             BehaviourOutcome::Continue
