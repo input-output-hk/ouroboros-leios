@@ -164,7 +164,17 @@ export const useStore = create<DashboardState>()((set, get) => ({
       for (const snap of Object.values(stats)) {
         if (snap.chain_tree) {
           for (const e of snap.chain_tree) {
-            mergedEntries.set(e.hash, e);
+            // Preserve `eb_tx_count` if a prior poll observed it.
+            // The backend drops the count once the EB manifest ages out
+            // of its short-lived cache; the chain-tree node's other
+            // fields (announced_eb, certified_eb, …) are permanent on
+            // ChainNode and never lose information across polls.
+            const prev = mergedEntries.get(e.hash);
+            const merged: ChainTreeEntry =
+              prev && prev.eb_tx_count != null && e.eb_tx_count == null
+                ? { ...e, eb_tx_count: prev.eb_tx_count }
+                : e;
+            mergedEntries.set(e.hash, merged);
           }
         }
         if (snap.tip_hash) {
