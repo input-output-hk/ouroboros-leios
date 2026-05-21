@@ -304,23 +304,20 @@ impl Elections {
             .unwrap_or(0)
     }
 
-    pub fn has_certified_eb(&self) -> bool {
-        self.elections
-            .values()
-            .any(|e| e.quorum_reached && e.phase == PipelinePhase::CertEligible)
-    }
-
-    /// Slot of the latest EB that's both at quorum and CertEligible.
-    /// Used by an RB producer to populate certificate telemetry.  The
-    /// latest is chosen so chain progress carries the freshest cert
-    /// available; older quorum-reached elections age out via the normal
-    /// dedup-window pruning in [`Self::on_slot`].
-    pub fn certified_eb_slot(&self) -> Option<u64> {
-        self.elections
-            .values()
-            .filter(|e| e.quorum_reached && e.phase == PipelinePhase::CertEligible)
-            .map(|e| e.announced_slot)
-            .max()
+    /// Slot of the EB at `eb_hash` if it is both at quorum and
+    /// CertEligible — the only state in which a producer can attach a
+    /// cert for it.  Linear Leios requires the cert to target the EB
+    /// announced by the parent RB specifically (see
+    /// [`crate::chain_tree::ChainTree::announced_eb_hash_by`]); the
+    /// producer threads the parent RB's announced EB hash through this
+    /// method to decide whether to set the `certified_eb` header bit.
+    pub fn eb_certifiable_slot(&self, eb_hash: &[u8; 32]) -> Option<u64> {
+        let e = self.elections.get(eb_hash)?;
+        if e.quorum_reached && e.phase == PipelinePhase::CertEligible {
+            Some(e.announced_slot)
+        } else {
+            None
+        }
     }
 }
 
@@ -465,8 +462,9 @@ mod tests {
         // After Voting+Diffusing windows, phase should be CertEligible.
         e.on_slot(23);
         assert_eq!(e.phase(&h(1)), Some(PipelinePhase::CertEligible));
-        assert!(e.has_certified_eb());
-        assert_eq!(e.certified_eb_slot(), Some(10));
+        assert_eq!(e.eb_certifiable_slot(&h(1)), Some(10));
+        // Different hash → no cert.
+        assert_eq!(e.eb_certifiable_slot(&h(2)), None);
     }
 
     #[test]

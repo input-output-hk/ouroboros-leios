@@ -1204,12 +1204,12 @@ impl LeiosState {
 
     // -- Queries ------------------------------------------------------------
 
-    pub fn has_certified_eb(&self) -> bool {
-        self.elections.has_certified_eb()
-    }
-
-    pub fn certified_eb_slot(&self) -> Option<u64> {
-        self.elections.certified_eb_slot()
+    /// If the EB at `eb_hash` has reached quorum and entered
+    /// CertEligible, return its announced slot; otherwise `None`.
+    /// Linear Leios producers use this with the EB announced by the
+    /// parent RB to decide whether to attach a cert.
+    pub fn eb_certifiable_slot(&self, eb_hash: &[u8; 32]) -> Option<u64> {
+        self.elections.eb_certifiable_slot(eb_hash)
     }
 
     // -- Internal helpers ---------------------------------------------------

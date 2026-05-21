@@ -236,8 +236,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 // instead of embedding txs in the RB body.
                 let prev_hash = consensus.tip_hash();
                 let next_block_no = consensus.next_block_number();
-                let certified_eb = leios && consensus.has_certified_eb();
-                let certified_eb_slot = if certified_eb { consensus.certified_eb_slot() } else { None };
+                let certified_eb_slot = if leios { consensus.cert_for_parent() } else { None };
+                let certified_eb = certified_eb_slot.is_some();
                 if let Some(produced) = producer.try_produce_block(slot, prev_hash, next_block_no, certified_eb, &mempool, consensus.leios_state()) {
                     // Consult the per-node behaviour: an adversarial
                     // `Suppress` drops the win silently; `Equivocate`

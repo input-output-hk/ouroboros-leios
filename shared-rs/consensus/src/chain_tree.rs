@@ -205,6 +205,13 @@ impl ChainTree {
         self.nodes.get(hash).and_then(|n| n.prev_hash)
     }
 
+    /// Look up the EB hash announced by the RB at `hash`, if any.  Drives
+    /// the linear-Leios cert rule: the producer of the *next* RB can only
+    /// certify the EB this RB announced.
+    pub fn announced_eb_hash_by(&self, hash: &[u8; 32]) -> Option<[u8; 32]> {
+        self.nodes.get(hash).and_then(|n| n.announced_eb_hash)
+    }
+
     /// Number of blocks in the tree.
     #[cfg(test)]
     pub fn len(&self) -> usize {

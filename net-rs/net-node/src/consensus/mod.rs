@@ -277,11 +277,6 @@ impl Consensus {
         self.praos.next_block_number()
     }
 
-    /// Whether any EB has a valid certificate (quorum + pipeline elapsed).
-    pub fn has_certified_eb(&self) -> bool {
-        self.leios.has_certified_eb()
-    }
-
     /// Borrow the underlying `LeiosState`.  Used by `try_produce_block`
     /// to consult the producer-side EB-safety gate
     /// (`BodyPath::decide` reads `has_endorsed_unvalidated_eb`).
@@ -289,10 +284,15 @@ impl Consensus {
         &self.leios.state
     }
 
-    /// Slot of the earliest certified EB, if any. Used to populate the
-    /// eb_slot field on the `RbCertifiedEb` telemetry event.
-    pub fn certified_eb_slot(&self) -> Option<u64> {
-        self.leios.certified_eb_slot()
+    /// Linear-Leios producer rule: an RB may attach a cert only for the
+    /// EB its **parent RB** announced, and only once that EB has reached
+    /// quorum and entered CertEligible.  Returns the announced slot of
+    /// that EB (to populate the `RbCertifiedEb` telemetry event); `None`
+    /// means no cert candidate — the producer leaves `certified_eb` off
+    /// and the parent's EB is dropped from the chain's perspective.
+    pub fn cert_for_parent(&self) -> Option<u64> {
+        let eb_hash = self.praos.adopted_tip_announced_eb()?;
+        self.leios.eb_certifiable_slot(&eb_hash)
     }
 
     /// Drain Leios-side telemetry events buffered since the last call.

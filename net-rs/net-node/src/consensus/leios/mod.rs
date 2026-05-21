@@ -125,15 +125,13 @@ impl LeiosConsensus {
         std::mem::take(&mut self.pending_telemetry)
     }
 
-    /// Slot of the earliest EB that's both at quorum and CertEligible.
-    /// Used by the RB producer to populate `RbCertifiedEb` telemetry.
-    pub fn certified_eb_slot(&self) -> Option<u64> {
-        self.state.certified_eb_slot()
-    }
-
-    /// Whether any EB has a valid certificate.
-    pub fn has_certified_eb(&self) -> bool {
-        self.state.has_certified_eb()
+    /// If the EB at `eb_hash` has reached quorum and entered
+    /// CertEligible, return its announced slot; otherwise `None`.
+    /// The Praos adapter combines this with the parent RB's announced
+    /// EB hash to decide whether to attach a cert (linear-Leios rule:
+    /// the cert can only target the parent RB's EB).
+    pub fn eb_certifiable_slot(&self, eb_hash: &[u8; 32]) -> Option<u64> {
+        self.state.eb_certifiable_slot(eb_hash)
     }
 
     /// Update the adopted-chain-tip metadata used by the CIP-0164
@@ -905,7 +903,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn certified_eb_slot_returns_latest_quorum_election() {
+    async fn eb_certifiable_slot_targets_specific_hash() {
         let (tx, _rx) = mpsc::channel(8);
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
@@ -915,6 +913,8 @@ mod tests {
         leios.on_slot(5).await;
         leios.on_validated_eb(point(5));
 
+        let hash0 = point_hash(0);
+        let hash5 = point_hash(5);
         let voters = [
             "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5",
         ];
@@ -930,17 +930,22 @@ mod tests {
         leios.on_validated_votes(&all_bodies);
 
         // Neither is CertEligible yet.
-        assert_eq!(leios.certified_eb_slot(), None);
+        assert_eq!(leios.eb_certifiable_slot(&hash0), None);
+        assert_eq!(leios.eb_certifiable_slot(&hash5), None);
 
         // Advance to make EB at slot 0 CertEligible (elapsed=13 from slot 0).
-        // EB at slot 5 is still Diffusing (elapsed=8), so slot 0 is the only
-        // CertEligible candidate.
+        // EB at slot 5 is still Diffusing (elapsed=8).
         leios.on_slot(13).await;
-        assert_eq!(leios.certified_eb_slot(), Some(0));
+        assert_eq!(leios.eb_certifiable_slot(&hash0), Some(0));
+        assert_eq!(leios.eb_certifiable_slot(&hash5), None);
 
-        // Advance further; both eligible — latest wins.
+        // Both reach CertEligible — each lookup is independent.
         leios.on_slot(18).await;
-        assert_eq!(leios.certified_eb_slot(), Some(5));
+        assert_eq!(leios.eb_certifiable_slot(&hash0), Some(0));
+        assert_eq!(leios.eb_certifiable_slot(&hash5), Some(5));
+
+        // An unrelated hash never matches.
+        assert_eq!(leios.eb_certifiable_slot(&[0xAA; 32]), None);
     }
 
     // -- Bitmap construction tests ------------------------------------------
