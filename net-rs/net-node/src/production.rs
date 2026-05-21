@@ -483,14 +483,13 @@ impl BlockProducer {
         let _ = minicbor::Encoder::new(&mut block_inner).array(4);
         block_inner.extend_from_slice(&header_inner);
 
-        // tx_bodies: map of {index => bytes(tx_body)}
-        let _ = minicbor::Encoder::new(&mut block_inner).map(txs.len() as u64);
-        for (i, tx) in txs.iter().enumerate() {
-            let _ = minicbor::Encoder::new(&mut block_inner).u32(i as u32);
+        // tx_bodies: `[* transaction_body]` per Cardano CDDL.
+        let _ = minicbor::Encoder::new(&mut block_inner).array(txs.len() as u64);
+        for tx in txs.iter() {
             let _ = minicbor::Encoder::new(&mut block_inner).bytes(&tx.body.0);
         }
-        // tx_witnesses (empty map)
-        let _ = minicbor::Encoder::new(&mut block_inner).map(0);
+        // tx_witnesses: `[* transaction_witness_set]` per Cardano CDDL.
+        let _ = minicbor::Encoder::new(&mut block_inner).array(0);
         // metadata (null)
         let _ = minicbor::Encoder::new(&mut block_inner).null();
 
