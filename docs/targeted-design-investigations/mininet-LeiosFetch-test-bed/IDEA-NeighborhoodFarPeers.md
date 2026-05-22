@@ -20,7 +20,7 @@ Peers with low latency can utilize resources (e.g. kernel buffers, shared networ
 Two concrete examples:
 
 - The timeout for a request-reply exchange can be much tighter on a low latency connection.
-  (TODO even if the timeout is fatal?)
+  (TODO even if the timeout is fatal, ie causes disconnection?)
 
 - The fetch decision logic can afford to aggressively limit the cumulative size of the outstanding requests for a low latency peer.
   In other words, their Bandwidth-Delay Product is low.
