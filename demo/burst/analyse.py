@@ -137,16 +137,12 @@ def load_block_arrivals(df_headers: pd.DataFrame, log_path: str, node_id: str):
         # that pandas hands back.
         return df.assign(latency_ms=pd.Series(dtype="Int64"))
 
-    if df["slot"].isna().any():
-        print(
-            f"Error: {node_id} downloaded somes blocks with unknown slot.",
-            file=sys.stderr,
-        )
-        print(
-            df[df["slot"].isnull()],
-            file=sys.stderr,
-        )
-        raise
+    # Blocks forged locally never produce a ChainSync DownloadedHeader, so
+    # they show up here with no slot/slot_onset. They don't have a
+    # peer-download latency to report; drop them from the latency table.
+    df = df.dropna(subset=["slot"])
+    if df.empty:
+        return df.assign(latency_ms=pd.Series(dtype="Int64"))
 
     # Use 'Int64' to allow NaNs; see https://stackoverflow.com/a/54194908
     df["latency_ms"] = (
