@@ -14,12 +14,14 @@ mod validation;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+use std::hash::Hash;
 use clap::Parser;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use tokio::io::AsyncBufReadExt;
 use tracing::{info, warn};
 
 use telemetry::NodeEvent;
+use crate::production::blake2b_256;
 
 #[derive(Parser)]
 #[command(name = "net-node", about = "Cardano Leios test node")]
@@ -592,12 +594,13 @@ async fn record_network_event(
                 })
                 .await;
         }
-        NetworkEvent::BlockReceived { .. } => {
+        NetworkEvent::BlockReceived { body, .. } => {
             telem.blocks_received += 1;
             telem
                 .record(NodeEvent::RBReceived {
                     node: node_id.into(),
                     slot: telem.current_slot,
+                    len: body.raw.len(),
                 })
                 .await;
         }
@@ -610,13 +613,21 @@ async fn record_network_event(
                 .emit_stats(peers, chain_tree, tip_block_no, tip_hash)
                 .await;
         }
-        NetworkEvent::LeiosBlockReceived { .. } => {
+        NetworkEvent::LeiosBlockReceived { block, .. } => {
             telem
                 .record(NodeEvent::EBReceived {
                     node: node_id.into(),
                     slot: telem.current_slot,
+                    len: block.len(),
                 })
                 .await;
+        }
+        NetworkEvent::LeiosBlockTxsReceived { transactions, .. } => {
+            telem.record(NodeEvent::EBTxsReceived {
+                node: node_id.into(),
+                slot: telem.current_slot,
+                len: transactions.len()
+            }).await
         }
         NetworkEvent::LeiosVotesReceived { ref vote_data, .. } => {
             telem

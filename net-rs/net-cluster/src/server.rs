@@ -123,11 +123,18 @@ fn log_interesting_event(event: &IngestedEvent) {
         }
         Some("RBReceived") => {
             let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
-            tracing::info!("{}: received block (slot {:?})", event.node_id, slot);
+            let len = msg.and_then(|m| m.get("len")).and_then(|l| l.as_u64());
+            tracing::info!("{}: received block (slot {:?}, len {:?})", event.node_id, slot, len);
         }
         Some("EBReceived") => {
             let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
-            tracing::info!("{}: received block (slot {:?})", event.node_id, slot);
+            let len = msg.and_then(|m| m.get("len")).and_then(|l| l.as_u64());
+            tracing::info!("{}: received EB (slot {:?}, len {:?})", event.node_id, slot, len);
+        }
+        Some("EBTxsReceived") => {
+            let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
+            let len = msg.and_then(|m| m.get("len")).and_then(|c| c.as_u64());
+            tracing::info!("{}: received EB txs (slot {:?}, count {:?})", event.node_id, slot, len);
         }
         _ => {}
     }
