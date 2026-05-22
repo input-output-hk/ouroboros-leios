@@ -45,9 +45,10 @@ Those two observations together justify the following resource-efficient scheme 
 If the adversary can increase the probability of it being the first high-latency peer to offer some datum to all nodes in a neighborhood, then they could be a slow loris such that _none_ of the nodes in that neighborhood receive the datum from a high-latency peer.
 The whole neighborhood would be delayed by at least one timeout and potentially more.
 
-If that risk is unarmed, then some node in the neighborhood will receive the payload from a high-latency peer, and then it will spread quickly among the neighborhood.
+If that risk is unarmed, then some node in the neighborhood will promptly receive the payload from a high-latency peer, and then it will spread quickly among the neighborhood.
 It's as if all of the nodes in the neighborhood shared their collective high-latency peers.
-So, unless the risk above is armed, each neighborhood can only be deprived of messages originating outside the neighborhood if _all_ of the nodes in that neighborhood happen to choose a slow loris peer.
+So, unless the risk above is armed, each neighborhood can only be temporarily deprived of messages originating outside the neighborhood if _all_ of the nodes in that neighborhood happen to choose a slow loris peer.
+(Once it times out, then at least one neighbor will request it from an honest high-latency peer.)
 
 The key ideas are as follows.
 
