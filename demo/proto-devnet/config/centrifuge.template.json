@@ -11,9 +11,9 @@
     "params": {
       "inputs_per_tx": 1,
       "outputs_per_tx": 1,
-      "fee": 1000000,
-      "optimistic_recycle": false
-    }
+      "fee": 1000000
+    },
+    "recycle": {"type": "on_build"}
   },
   "rate_limit": {
     "type": "token_bucket",
