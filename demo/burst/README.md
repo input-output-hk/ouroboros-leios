@@ -90,7 +90,7 @@ Install these prerequisites:
 - `process-compose` for orchestrating the demo processes
 - `cardano-node` patched with Leios support
 - `immdb-server` for the upstream node (mock server)
-- `leiosdemo202510` for generating Leios schedules (TODO: cleanup/rename)
+- `leios-schedule-gen` for generating Leios schedules
 - `ss_http_exporter` for socket statistics monitoring
 - `sqlite3` for creating Leios databases
 - `jq` for config modifications
@@ -124,8 +124,9 @@ export RATE_DOWN_TO_N0="100Mbps"
 export DELAY_DOWN_TO_N0="20ms"
 
 # Timing
-export REF_SLOT=41
+export REF_SLOT=170
 export SECONDS_UNTIL_REF_SLOT=5
+export BURST_SLOT=219.9
 
 # Working directory
 export WORKING_DIR=my-experiment

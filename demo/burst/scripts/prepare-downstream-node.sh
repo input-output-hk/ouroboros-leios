@@ -15,3 +15,9 @@ jq \
   "$DATA_DIR/topology.template.json" >"$DOWNSTREAM_NODE_DIR/topology.json"
 
 cp -f "$DATA_DIR/downstream-node/config.json" "$DOWNSTREAM_NODE_DIR/config.json"
+
+# Pre-seed the Leios DB so downstream can resolve EBs that the recorded
+# Praos chain announces / certifies. See prepare-node0.sh for details.
+if [ -f "$CLUSTER_RUN/leios.db" ]; then
+  cp -f "$CLUSTER_RUN/leios.db" "$DOWNSTREAM_NODE_DIR/leios.db"
+fi

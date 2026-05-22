@@ -5,7 +5,7 @@
     "slotLength": 1,
     "activeSlotsCoeff": 5.0e-2,
     "securityParam": 2160,
-    "epochLength": 86400,
+    "epochLength": 432000,
     "slotsPerKESPeriod": 129600,
     "maxKESEvolutions": 60,
     "maxLovelaceSupply": 100000000000000,
