@@ -217,44 +217,9 @@ pub enum BehaviourSelection {
     /// Shortcut variant: configure T22 behaviour directly in
     /// `[behaviour_selection]` and apply it to all nodes.
     T22 {
-        #[serde(default = "default_t22_vote_threshold")]
         vote_threshold: u8,
-        #[serde(default = "default_t22_hide_eb_tx_received")]
         hide_eb_tx_received: bool,
     },
-}
-
-fn default_t22_vote_threshold() -> u8 {
-    50
-}
-
-fn default_t22_hide_eb_tx_received() -> bool {
-    true
-}
-
-impl BehaviourSelection {
-    /// If this selection variant embeds behaviour config, return it.
-    pub fn to_behaviour_spec(&self) -> Option<shared_consensus::behaviour::BehaviourSpec> {
-        match self {
-            Self::T22 {
-                vote_threshold,
-                hide_eb_tx_received,
-            } => Some(shared_consensus::behaviour::BehaviourSpec::T22 {
-                vote_threshold: *vote_threshold,
-                hide_eb_tx_received: *hide_eb_tx_received,
-            }),
-            _ => None,
-        }
-    }
-
-    /// For embedded-behaviour variants, return the actual node selector
-    /// to use in assignment logic.
-    pub fn to_selection(&self) -> BehaviourSelection {
-        match self {
-            Self::T22 { .. } => BehaviourSelection::All,
-            _ => self.clone(),
-        }
-    }
 }
 
 impl ClusterConfig {

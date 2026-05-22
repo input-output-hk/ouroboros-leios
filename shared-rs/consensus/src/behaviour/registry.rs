@@ -57,9 +57,7 @@ pub enum BehaviourSpec {
     /// checksum threshold policy.
     #[serde(rename = "t22")]
     T22 {
-        #[serde(default = "default_t22_vote_threshold")]
         vote_threshold: u8,
-        #[serde(default = "default_t22_hide_eb_tx_received")]
         hide_eb_tx_received: bool,
     },
 }
@@ -70,14 +68,6 @@ fn default_lazy_reason() -> NoVoteReason {
 
 fn default_equivocator_ways() -> u8 {
     2
-}
-
-fn default_t22_vote_threshold() -> u8 {
-    75+1
-}
-
-fn default_t22_hide_eb_tx_received() -> bool {
-    false
 }
 
 /// Materialise a [`BehaviourSpec`] into a shared

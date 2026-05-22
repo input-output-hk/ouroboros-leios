@@ -20,7 +20,7 @@ impl T22ThreatBehaviour {
     }
 
     /// Returns true, if eb_data should be processed.
-    fn should_process_eb_data(&self, state: &LeiosState, point: &Point) -> bool {
+    fn should_process_eb_data(&self, nm: &str, state: &LeiosState, point: &Point) -> bool {
         let persistent_seats = state.voting_config.persistent_seats;
         if persistent_seats == 0 {
             return true;
@@ -37,12 +37,12 @@ impl T22ThreatBehaviour {
             .fold(0u32, |acc, b| acc + *b as u32);
 
         let checksum = point_checksum + node_id_checksum;
-        (checksum % 100) as u8 <= self.vote_threshold
-    }
-
-    fn trace_decision(&self, fn_name: &str, processed: bool, persistent_seats: u32, point: Option<&Point>) {
-        let decision = if processed { "processed" } else { "declined" };
-        info!("[T22] {}: decision={}, persistent_seats={}", fn_name, decision, persistent_seats);
+        let decision = (checksum % 100) as u8 <= self.vote_threshold;
+        info!(
+            "[T22] {nm}: decision={decision}, sum={checksum}, threshold={}, persistent_seats={persistent_seats}",
+            self.vote_threshold
+        );
+        decision
     }
 }
 
@@ -57,17 +57,11 @@ impl Behaviour for T22ThreatBehaviour {
         point: &Point,
         _peer: PeerId,
     ) -> BehaviourOutcome<LeiosEffect> {
-        let should_process = self.should_process_eb_data(state, point);
-        self.trace_decision(
-            "on_eb_offered",
-            should_process,
-            state.voting_config.persistent_seats,
-            Some(point),
-        );
+        let should_process = self.should_process_eb_data("on_eb_offered", state, point);
         if should_process {
             BehaviourOutcome::Continue
         } else {
-            BehaviourOutcome::Replace(vec![]) // отклонить EB
+            BehaviourOutcome::Replace(vec![])
         }
     }
 
@@ -78,17 +72,11 @@ impl Behaviour for T22ThreatBehaviour {
         _peer: PeerId,
         _bitmap: &BTreeMap<u16, u64>,
     ) -> BehaviourOutcome<LeiosEffect> {
-        let should_process = self.should_process_eb_data(state, point);
-        self.trace_decision(
-            "on_eb_txs_offered",
-            should_process,
-            state.voting_config.persistent_seats,
-            Some(point),
-        );
+        let should_process = self.should_process_eb_data("on_eb_txs_offered", state, point);
         if should_process {
             BehaviourOutcome::Continue
         } else {
-            BehaviourOutcome::Replace(vec![]) // отклонить EB txs
+            BehaviourOutcome::Replace(vec![])
         }
     }
 
@@ -98,13 +86,8 @@ impl Behaviour for T22ThreatBehaviour {
         point: &Point,
         _tx_hashes: &[[u8; 32]],
     ) -> BehaviourOutcome<LeiosEffect> {
-        let skip_process = self.hide_eb_tx_recieved && !self.should_process_eb_data(state, point);
-        self.trace_decision(
-            "on_eb_received",
-            !skip_process,
-            state.voting_config.persistent_seats,
-            Some(point),
-        );
+        let skip_process =
+            self.hide_eb_tx_recieved && !self.should_process_eb_data("on_eb_received", state, point);
         if skip_process {
             BehaviourOutcome::Replace(vec![])
         } else {
@@ -119,7 +102,6 @@ impl Behaviour for T22ThreatBehaviour {
         _body: &[u8],
     ) -> BehaviourOutcome<crate::mempool::MempoolEffect> {
         let skip_process = self.hide_eb_tx_recieved;
-        self.trace_decision("on_tx_received", !skip_process, 0, None);
         if skip_process {
             BehaviourOutcome::Replace(vec![])
         } else {
