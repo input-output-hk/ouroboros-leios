@@ -530,6 +530,17 @@ impl PraosState {
         }
     }
 
+    /// Stash the tx-count of an EB once its manifest is known locally.
+    /// The I/O wrapper calls this from both the self-produce path and
+    /// the LeiosFetch receive path.  The count is cached on the
+    /// chain-tree node that announced the EB, so
+    /// [`Self::chain_tree_snapshot`] can surface it after the wrapper's
+    /// short-lived manifest cache has aged out.
+    pub fn record_announced_eb_tx_count(&mut self, eb_hash: &[u8; 32], count: u32) {
+        self.chain_tree
+            .record_announced_eb_tx_count(eb_hash, count);
+    }
+
     // -- Peer-event mutations (no effects) ----------------------------------
 
     /// Append a peer's announced header to its candidate chain.  The
