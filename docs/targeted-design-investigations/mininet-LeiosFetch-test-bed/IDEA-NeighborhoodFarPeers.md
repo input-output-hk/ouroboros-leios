@@ -33,7 +33,7 @@ Those two observations together justify the following resource-efficient scheme 
 
 - Do not send redundant requests (a.k.a. _hedge requests_) to high-latency peers.
 - A request to a high-latency peer should request as much (useful) data as possible (e.g. all missing transactions from the EB closure).
-  This ensures the sender will utilize as much of the link's bandwidth capacity as possible (i.e. up to the large Bandwith-Delay Product/Mathis ceiling/etc) instead of being unnecessarily application-limited.
+  This ensures the sender will utilize as much of the link's bandwidth capacity as possible (i.e. up to the large Bandwidth-Delay Product/Mathis ceiling/etc) instead of being unnecessarily application-limited.
 - A request to a high-latency peer must have a relatively generous timeout, something like 1 second.
   Once that timeout fires, the node should switch its requests to a different high-latency peer.
 - In contrast, requests to a low-latency peer should request a limited cumulative amount of data (and hence resource utilization) and a tight timeout.
