@@ -86,3 +86,67 @@ TODO so the optimistic logic is:
 
 A fetch decision logic that definitely utilizes any and all of its low-latency peers, both promptly and fully, will essentially inherit the high-latency honest peers of its low-latency honest peers.
 Therefore, we don't need that logic to _also_ definitely utilize any and all of its high-latency peers promptly and fully---as long as at least *one* node in each "neighborhood" happens to utilize one of its high-latency peers promptly and fully, then the whole neighborhood benefits from that with minimal additional latency.
+
+-----
+
+## Appendix
+
+This appendix proposes a very concrete policy, as a catalyst for consideration and criticism.
+
+- The LeiosFetch logic should schedule its requests for the node's 5 big ledger peers and the node's 20 other peers independently.
+    - Their only interaction is that data that has already _arrived_ (and passed an integrity check) from one doesn't need to be requested from the other: they're acquiring the same data.
+- When an EB body arrives, arrange the closure's still-missing txs into ~64 kB chunks.
+- For the big ledger peers:
+    - Set the socket's congestion control algorithm to BBR.
+        - (TODO this setting must be on the sender side, not the receiver side :disappointed:)
+        - (TODO so relays should set it for their downstream sockets?)
+    - Set each upstream socket's receive buffer to a fixed size of at least 12 MB.
+    - Never request the same EB body or parts of the same EB closure from more than one big ledger peer at a time.
+    - Request a desirable EB body from _any one_ big ledger peer that has offered that body.
+    - Request all still-missing chunks from a desirable EB closure from _any one_ big ledger peer that as offered that closure.
+        - For reference, 12 MB ÷ 64 kB = 187.5 chunks.
+- For the non-big-ledger peers (NBL peers):
+    - The EB issuer uses a Merkle tree root to sign each individual 32 kB chunk of the EB body.
+    - Request one still-missing chunk at a time of a desirable EB body from _every_ NBL peer that has offered that body.
+        - Whenever a chunk arrives, request another still-missing chunk from the peer.
+        - TODO also send a cancel to the big-ledger peer?
+        - For reference, 512 kB ÷ 32 kB = 16 chunks.
+        - For reference, 32 kB ÷ 25 ms = 1.28 MBps = 10.24 Mbps.
+        - For reference, 512 kB ÷ 10.24 Mbps and 16 × 25 ms both equal 400 ms.
+    - Request 5 still-missing ~64 kB chunks at a time of a desirable EB closure from _every_ NBL peer that has offered that closure.
+        - Whenever a chunk arrives, request another still-missing chunk from the peer.
+        - TODO also send a cancel to the big-ledger peer?
+        - For reference, 5 × 64 kB = 320 kB.
+        - For reference, 12 MB ÷ 320 kB = 37.5 batches.
+        - For reference, 320 kB ÷ 25 ms = 12.8 MBps = 102.4 Mbps.
+        - For reference, 12 MB ÷ 102.4 Mbps and 37.5 × 25 ms both equal 937.5 ms.
+    - Avoid requesting the same chunk from multiple NBL peers unless all still-missing chunks are already in-flight with other NBL peers.
+- If any chunk hasn't arrived 60 s after it was requested, disconnect from the peer.
+    - This timeout is not for tail latencies; it merely reaps useless peers.
+    - It's the use of _every_ NBL peer that reduces tail latencies: by assumption, at least one will be honest and also on the shortest path to some honest big-ledger peer near the EB issuer.
+
+Note that the 937.5 ms duration is the approximate duration to download the entire EB closure from a single 25 ms RTT peer with ≥ 100 Mbps goodput.
+As additional peers that offer the EB closure, the rate of acquisition will increase.
+
+On the other hand, in the worst case, the request for the final 320 kB of the EB closure will be simultaneously in-flight with 20 NBL peers.
+So at most 320 kB × (20 - 1) = 6.08 MB of egress will ultimately be wasted among the NBL.
+(Even if the initial missing parts of the EB closure has a meager total size of 320 kB.)
+
+TODO to what extent could the requests to the one big ledger peer and the requests to the NBL peers overlap, leading to even more wasted egress?
+How do the various timeouts constrain the coincidences necessary for that to happen?
+
+Additional notes:
+
+- For reference, 70% of connections in data/simulation/pseudo-mainnet/topology-v2-cip.yaml have a `latency-ms` property that's 50 or less.
+  And 40% have a latency that's 25 or less.
+- Consider tuning KeepAlive to prevent Linux's default `tcp_slow_start_after_idle` setting from ever firing.
+- This appendix diverges from the memo in that it essentially assumes big-ledger peers are high latency and NBL peers are low latency.
+    - This mapping seems correct in spirit, and simplifies the mechanism: no RTT detection necessary.
+    - Important to note that as long as one NBL peer is low latency and honest, then we get what we need; high latency NBL peers are not harmful---merely wasted opportunities, if anything.
+    - On the other hand, actually monitoring RTT and categorizing according to that also seems fine.
+- A potential insight to fold back into the memo:
+    - High-latency peers need an immediate large request in order to reach useful levels of goodput.
+    - But sending sufficiently large requests to multiple peers risks severe waste of egress.
+    - So each node should only allocate one large request, and then restrict itself to small requests for _all_ of its remaining peers---each of which could be on the shortest path to a neighbor that allocated its one large request to an honest and well-provisioned peer.
+    - Big ledger peers are a nice trifecta: likely to be high latency, likely to be among the first to offer an EB, and likely to be honest.
+    - Also: tight timeouts aren't necessary here.
