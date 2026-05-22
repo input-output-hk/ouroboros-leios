@@ -7,8 +7,12 @@ The new insight that motivates this document is that the intended network dynami
 ## Observation 1
 
 Cardano architects leveraged technical reports from [Spyros Voulgaris](https://acropolis.aueb.gr/~spyros/) et al of Athens University of Economics and Business when designing the P2P peer sharing and selection algorithm.
-A key recommendation from these reports was that a significant fraction of a node's peers should be low latency and another significant fraction should be high latency (or random instead seems to suffice).
+A key recommendation from these reports was that a significant fraction of a node's peers should be low latency and another significant fraction should be high latency.
+(Choosing the "high latency" fraction of peers randomly instead of actually considering their apparent latency seemed to be just as effective and has the added benefit of mitigating the attacker who pretends to have higher latency.)
 The intended dynamics are for intercontinental peers to first deliver a message between distant neighborhoods, and then the low latency connections would ensure the message rapidly spreads within each neighborhood.
+And the current Cardano peer selection scheme has been observed to achieve those dynamics in the following way, according to personal communication with Marcin Wójtowicz.
+
+> Each node has a relatively sparse/small valency (eg. 10C10R from the AUEB reports) so to "ensure" prompt long distance transfer we want to grow our local cluster with some fraction of low RTT peers, such that this cluster as a whole has a high probability of direct connection to far away peer(s) by randomness alone / the random fraction of peers at each relay. The latter achieves the intended outcome for the cluster.
 
 ## Observation 2
 
