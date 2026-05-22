@@ -386,9 +386,16 @@ def load_sendrecv_node(log_path: str):
                     prevCount = cntrs.get((direction, msg, connection_id), 0)
                     cntrs[(direction, msg, connection_id)] = prevCount + 1
 
+                    # mux_at: the bearer-side timestamp for this message.
+                    # ouroboros-network plumbs a Time on TraceSendMsg/TraceRecvMsg
+                    # but the LogFormatting in Network/Tracing/Driver.hs currently
+                    # discards it, so the JSON has no data.mux_at. Fall back to the
+                    # outer 'at' so the joined table still renders; the resulting
+                    # send_/recv_/transport_latency columns degenerate to 0 until
+                    # the network side is fixed.
                     record = {
                         "at": log_entry["at"],
-                        "mux_at": log_entry["data"]["mux_at"],
+                        "mux_at": log_entry["data"].get("mux_at", log_entry["at"]),
                         "connection_id": connection_id,
                         "direction": direction,
                         "msg": msg,
