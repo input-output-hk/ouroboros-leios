@@ -1,12 +1,13 @@
-FROM ghcr.io/blinklabs-io/haskell:9.6.7-3.12.1.0-1 AS cardano-node-build
+FROM ghcr.io/blinklabs-io/haskell:9.6.7-3.12.1.0-3 AS cardano-node-build
 
 # From intersectmbo/cardano-node leios-prototype branch
 ARG CARDANO_NODE_VERSION=c53f7c0d9509675d0a5eddb5a45cd53dd09b1bff
 
-RUN git clone https://github.com/intersectmbo/cardano-node.git \
+RUN git init cardano-node \
     && cd cardano-node \
-    && git fetch --all --recurse-submodules --tags \
-    && git checkout ${CARDANO_NODE_VERSION} \
+    && git remote add origin https://github.com/intersectmbo/cardano-node.git \
+    && git fetch --depth 1 origin ${CARDANO_NODE_VERSION} \
+    && git checkout FETCH_HEAD \
     && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
     && echo "tests: False" >> cabal.project.local
 
@@ -37,6 +38,7 @@ RUN apt-get update -y && \
       liblmdb0 \
       libncursesw5 \
       libnuma1 \
+      libsnappy1v5 \
       libsystemd0 \
       libssl3 \
       libtinfo6 \
