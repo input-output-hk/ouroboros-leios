@@ -36,6 +36,7 @@ processes:
       UPSTREAM_NODE_DIR="${UPSTREAM_NODE_DIR}" \
       REF_SLOT="${REF_SLOT}" \
       ONSET_OF_REF_SLOT="${ONSET_OF_REF_SLOT}" \
+      IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
       PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
       ip netns exec leios-experiment:upstream bash "${SOURCE_DIR}/scripts/upstream-node.sh"
     log_location: "${WORKING_DIR}/upstream-node.log"
