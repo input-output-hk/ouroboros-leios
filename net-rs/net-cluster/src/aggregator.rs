@@ -162,10 +162,13 @@ impl AggregatorState {
                         mask.1 = true;
                     });
                 }
-                Some("Vote") => {
-                    self.aggregated_stats.update_for_slot_node(node_id, slot, |mask| {
-                        mask.2 = true;
-                    });
+                Some("VTBundleGenerated") => {
+                    let count = msg.and_then(|m| m.get("count"));
+                    if count.is_some() {
+                        self.aggregated_stats.update_for_slot_node(node_id, slot, |mask| {
+                            mask.2 = true;
+                        });
+                    }
                 }
                 _ => {}
             }

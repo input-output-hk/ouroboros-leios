@@ -3,44 +3,43 @@ use crate::leios::{LeiosEffect, LeiosState};
 use crate::peer::PeerId;
 use crate::types::Point;
 use std::collections::BTreeMap;
+use std::hash::{Hash, Hasher};
 use tracing::info;
 
 #[derive(Debug, Default)]
 pub struct T22ThreatBehaviour {
     pub vote_threshold: u8,
-    pub hide_eb_tx_recieved: bool,
+    pub non_voting_threshold: u8,
+    pub hide_eb_tx_received: bool,
 }
 
 impl T22ThreatBehaviour {
-    pub fn new(vote_threshold: u8, hide_eb_tx_received: bool) -> Self {
+    pub fn new(vote_threshold: u8, hide_eb_tx_received: bool, non_voting_threshold: u8) -> Self {
         Self {
             vote_threshold,
-            hide_eb_tx_recieved: hide_eb_tx_received,
+            hide_eb_tx_received,
+            non_voting_threshold
         }
     }
 
     /// Returns true, if eb_data should be processed.
     fn should_process_eb_data(&self, nm: &str, state: &LeiosState, point: &Point) -> bool {
         let persistent_seats = state.voting_config.persistent_seats;
-        if persistent_seats == 0 {
-            return true;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        if let Point::Specific { hash, .. } = point {
+            hash.hash(&mut hasher);
         }
+        state.node_id.hash(&mut hasher);
 
-        let point_checksum = match point {
-            Point::Specific { hash, .. } => hash.iter().fold(0u32, |acc, b| acc + *b as u32),
-            _ => 0,
-        };
-        let node_id_checksum = state
-            .node_id
-            .as_bytes()
-            .iter()
-            .fold(0u32, |acc, b| acc + *b as u32);
-
-        let checksum = point_checksum + node_id_checksum;
-        let decision = (checksum % 100) as u8 <= self.vote_threshold;
-        info!(
-            "[T22] {nm}: decision={decision}, sum={checksum}, threshold={}, persistent_seats={persistent_seats}",
+        let checksum = hasher.finish();
+        let threshold = if persistent_seats > 0 {
             self.vote_threshold
+        } else {
+            self.non_voting_threshold
+        };
+        let decision = (checksum % 100) as u8 <= threshold;
+        info!(
+            "[T22] {nm}: decision={decision}, sum={checksum}, threshold={threshold}, persistent_seats={persistent_seats}",
         );
         decision
     }
@@ -87,7 +86,7 @@ impl Behaviour for T22ThreatBehaviour {
         _tx_hashes: &[[u8; 32]],
     ) -> BehaviourOutcome<LeiosEffect> {
         let skip_process =
-            self.hide_eb_tx_recieved && !self.should_process_eb_data("on_eb_received", state, point);
+            self.hide_eb_tx_received && !self.should_process_eb_data("on_eb_received", state, point);
         if skip_process {
             BehaviourOutcome::Replace(vec![])
         } else {
@@ -101,7 +100,7 @@ impl Behaviour for T22ThreatBehaviour {
         _tx_id: &crate::mempool::TxId,
         _body: &[u8],
     ) -> BehaviourOutcome<crate::mempool::MempoolEffect> {
-        let skip_process = self.hide_eb_tx_recieved;
+        let skip_process = self.hide_eb_tx_received;
         if skip_process {
             BehaviourOutcome::Replace(vec![])
         } else {

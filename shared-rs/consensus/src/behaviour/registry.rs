@@ -58,6 +58,7 @@ pub enum BehaviourSpec {
     #[serde(rename = "t22")]
     T22 {
         vote_threshold: u8,
+        non_voting_threshold: u8,
         hide_eb_tx_received: bool,
     },
 }
@@ -111,8 +112,9 @@ pub fn build(spec: &BehaviourSpec, seed: u64) -> Box<dyn Behaviour> {
         BehaviourSpec::LazyVoter { reason } => Box::new(LazyVoter { reason: *reason }),
         BehaviourSpec::T22 {
             vote_threshold,
+            non_voting_threshold: non_voting_thrshold,
             hide_eb_tx_received,
-        } => Box::new(T22ThreatBehaviour::new(*vote_threshold, *hide_eb_tx_received)),
+        } => Box::new(T22ThreatBehaviour::new(*vote_threshold, *hide_eb_tx_received, *non_voting_thrshold)),
     }
 }
 

@@ -12,7 +12,7 @@
 # weight-1 vote, so the committee size is 9 and the quorum threshold
 # is `floor(0.75 × 9) = 6` voters.
 
-num_nodes = 50
+num_nodes = 25
 degree = 3
 min_latency_ms = 5
 max_latency_ms = 100
@@ -30,7 +30,8 @@ tx_rate = 1.0
 
 [behaviour]
 kind = "t22"
-vote_threshold = 100
+vote_threshold = 80
+non_voting_threshold = 100
 hide_eb_tx_received = true
 
 [behaviour_selection]
