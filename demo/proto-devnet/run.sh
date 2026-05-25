@@ -18,8 +18,8 @@ set -a
 # Traffic control (on by default, disable with TC=0)
 : "${TC:=1}"
 if [ "$TC" = "1" ]; then
-	: "${RATE:=10Mbps}"
-	: "${DELAY:=200ms}"
+	: "${RATE:=50Mbps}"
+	: "${DELAY:=100ms}"
 	: "${IP_HOST:=172.28.0.1}"
 	: "${IP_NODE1:=172.28.0.10}"
 	: "${IP_NODE2:=172.28.0.20}"

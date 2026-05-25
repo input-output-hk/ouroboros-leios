@@ -110,3 +110,22 @@ Where `<index>` is the zero-based index of the scenario in the scenarios.json ar
 - `?scenario=2` - Auto-connects to the third scenario (e.g., "Leios Demo 202511")
 
 This is useful for direct links, bookmarking, or embedding specific scenarios.
+
+### Selecting the network layout
+
+The network view defaults to the `auto` layout (a d3-force simulation seeded
+from the topology's `location` field). A different layout can be picked via the
+`layout` query parameter:
+
+```
+?layout=<mode>
+```
+
+Supported modes:
+
+- `auto` (default) - force-directed simulation
+- `original` - uses each node's `location` as raw canvas coordinates
+- `circular` - evenly spaces nodes on a circle
+- `mercator` - projects `location` as `[lat, lon]` onto a Mercator world map
+
+The parameter combines with `scenario`, e.g. `?scenario=2&layout=mercator`.
