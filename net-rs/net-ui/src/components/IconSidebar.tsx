@@ -141,6 +141,7 @@ interface IconSidebarProps {
   controlPanelOpen: boolean;
   onToggleControlPanel: () => void;
   attackPanelOpen: boolean;
+  attackActive: boolean;
   onToggleAttackPanel: () => void;
   chainTreeOpen: boolean;
   onToggleChainTree: () => void;
@@ -154,6 +155,7 @@ export function IconSidebar({
   controlPanelOpen,
   onToggleControlPanel,
   attackPanelOpen,
+  attackActive,
   onToggleAttackPanel,
   chainTreeOpen,
   onToggleChainTree,
@@ -187,9 +189,9 @@ export function IconSidebar({
           <ClusterIcon active={controlPanelOpen} />
         </IconButton>
       </Tooltip>
-      <Tooltip title="Attack trigger" placement="right">
+      <Tooltip title={attackActive ? "Attack in progress" : "Attack trigger"} placement="right">
         <IconButton onClick={onToggleAttackPanel} sx={buttonSx(attackPanelOpen)}>
-          <AttackIcon active={attackPanelOpen} />
+          <AttackIcon active={attackActive} />
         </IconButton>
       </Tooltip>
       <Tooltip title="Chain tree" placement="right">

@@ -21,6 +21,7 @@ export default function App() {
   const pollStats = useStore((s) => s.pollStats);
   const topology = useStore((s) => s.topology);
   const restarting = useStore((s) => s.restarting);
+  const activeAttack = useStore((s) => s.activeAttack);
   const networkChainTree = useStore((s) => s.networkChainTree);
   const networkTipCounts = useStore((s) => s.networkTipCounts);
   const selectedNodeId = useStore((s) => s.selectedNodeId);
@@ -74,6 +75,7 @@ export default function App() {
               setAttackPanelOpen(false);
             }}
             attackPanelOpen={attackPanelOpen}
+            attackActive={activeAttack !== null}
             onToggleAttackPanel={() => {
               setAttackPanelOpen((v) => !v);
               setControlPanelOpen(false);
