@@ -49,6 +49,10 @@ export interface IChainEB {
   slot: number;
   producer: string;
   sizeBytes: number;
+  // FIXME: temporary proxy — count of `Vote` records seen targeting this EB.
+  // Replace with proper sum-of-vote-weights / total-stake once the trace
+  // carries vote weights (especially from the real cardano-node prototype).
+  voteCount?: number;
 }
 
 export interface IChainState {
@@ -131,6 +135,13 @@ export interface IScenario {
   duration: number;
   trace?: string;
   loki?: string;
+  // Total vote weight per pipeline; used as the certification denominator
+  // in the chain view. For sim-rs wfa-ls traces this is the sum of
+  // `persistent-vote-generation-probability + non-persistent-...` (default
+  // 500), letting us treat lottery hit counts as stake-like weights.
+  // When absent we assume per-vote weights already sum to ≤1.0 (the
+  // prototype's eventual stake-weighted shape).
+  totalVotes?: number;
 }
 
 export interface ISelectedBlock {

@@ -30,6 +30,45 @@ const CERT_EDGE = "#f97316";
 const ANNOUNCE_EDGE = "#3b82f6";
 const TEXT_COLOR = "#111827";
 const SUBTLE_TEXT = "#6b7280";
+// Voting progress visualisation. Threshold is the (likely) certification
+// quorum at 75%. Once crossed, the EB recolors to votes-purple.
+const CERT_THRESHOLD = 0.75;
+const VOTES_COLOR = EMessageColor.VOTES;
+const EB_CERTIFIED_FILL = "#f3e8ff";
+
+// =============================================================================
+// FIXME: VOTING-PROGRESS PROXY
+// -----------------------------------------------------------------------------
+// Progress = min(1, voteWeight / totalVotes)
+//
+//   * `voteWeight` is summed in the aggregator (timelineAggregation.ts).
+//     For the simulator it sums lottery hit counts (the values of the
+//     `{ebId: count}` map). For the prototype it sums 1 per `Vote` until
+//     per-vote stake weights are added.
+//   * `totalVotes` comes from the active scenario (`scenarios.json`). For
+//     sim-rs wfa-ls the natural value is 500 (persistent 400 +
+//     non-persistent 100). When unset we default to 1.0, which is the
+//     shape we expect from the prototype once it emits per-vote stake
+//     fractions that sum to ≤1.
+//
+// Not yet protocol-correct, but a much better model than counting voters:
+//   * Treating lottery hit counts as stake-equivalents lets a single
+//     well-staked voter contribute proportionally more — matching how
+//     wfa-ls actually certifies an EB.
+//   * The 75% threshold (CERT_THRESHOLD above) is still a placeholder;
+//     sim-rs uses 300/500 = 60% by default. Surface via the trace/config
+//     once it stabilises.
+//   * The prototype's `Vote[]` has no weight field yet; the aggregator
+//     contributes 1 per vote in the meantime. Switch to summing `weight`
+//     once the field lands.
+// =============================================================================
+const computeVotingProgress = (
+  voteWeight: number | undefined,
+  totalVotes: number,
+): number => {
+  if (totalVotes <= 0) return 0;
+  return Math.min(1, (voteWeight ?? 0) / totalVotes);
+};
 
 const shortId = (id: string) => (id.length > 8 ? `${id.slice(0, 8)}…` : id);
 
@@ -130,9 +169,21 @@ const drawBlock = (
   ctx: CanvasRenderingContext2D,
   box: IBlockBox,
   selected: boolean,
+  votingProgress?: number,
 ) => {
-  const fill = box.ref.kind === "rb" ? RB_FILL : EB_FILL;
-  const border = box.ref.kind === "rb" ? RB_BORDER : EB_BORDER;
+  const certified = votingProgress !== undefined && votingProgress >= CERT_THRESHOLD;
+  const fill =
+    box.ref.kind === "rb"
+      ? RB_FILL
+      : certified
+        ? EB_CERTIFIED_FILL
+        : EB_FILL;
+  const border =
+    box.ref.kind === "rb"
+      ? RB_BORDER
+      : certified
+        ? VOTES_COLOR
+        : EB_BORDER;
 
   ctx.save();
   ctx.fillStyle = fill;
@@ -182,8 +233,6 @@ const drawBlock = (
         : `slot ${rb.slot}`;
     ctx.fillText(headerLine, box.x + padX, textY);
     textY += 12;
-    ctx.fillText(rb.producer, box.x + padX, textY);
-    textY += 12;
     ctx.fillText(`${(rb.sizeBytes / 1024).toFixed(1)} KB`, box.x + padX, textY);
   } else {
     const eb = box.ref.eb;
@@ -194,6 +243,30 @@ const drawBlock = (
     ctx.fillText(`slot ${eb.slot}`, box.x + padX, textY);
     textY += 12;
     ctx.fillText(`${(eb.sizeBytes / 1024).toFixed(1)} KB`, box.x + padX, textY);
+
+    if (votingProgress !== undefined) {
+      // Align horizontally with the text rows (same padX) and place the bar
+      // one "row" below the last text line so the vertical gap matches the
+      // 12px line spacing above.
+      const barH = 4;
+      const barX = box.x + padX;
+      const barW = box.width - padX * 2;
+      const barY = textY + 12;
+      // Track
+      ctx.fillStyle = "#e5e7eb";
+      ctx.fillRect(barX, barY, barW, barH);
+      // Fill (purple = votes colour)
+      ctx.fillStyle = VOTES_COLOR;
+      ctx.fillRect(barX, barY, barW * Math.min(1, votingProgress), barH);
+      // 75% threshold tick
+      const tickX = barX + barW * CERT_THRESHOLD;
+      ctx.strokeStyle = TEXT_COLOR;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(tickX, barY - 2);
+      ctx.lineTo(tickX, barY + barH + 2);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 };
@@ -234,9 +307,21 @@ export const ChainCanvas: FC = () => {
       selectedBlock,
       isPlaying,
       currentTime,
+      allScenarios,
+      activeScenario,
     },
     dispatch,
   } = useSimContext();
+
+  // Per-pipeline total vote weight (the certification denominator). When
+  // the scenario sets `totalVotes` we trust it (e.g. 500 for sim-rs wfa-ls
+  // configured with persistent 400 + non-persistent 100). Otherwise we
+  // assume per-vote weights already sum to ≤1.0 — the prototype's
+  // eventual stake-weighted shape. See voting-progress FIXME above.
+  const totalVotes = useMemo(() => {
+    const s = allScenarios.find((sc) => sc.name === activeScenario);
+    return s?.totalVotes ?? 1.0;
+  }, [allScenarios, activeScenario]);
 
   const layout = useChainLayout(chain);
 
@@ -390,8 +475,13 @@ export const ChainCanvas: FC = () => {
       ctx.stroke();
       ctx.restore();
     }
-    for (const box of layout.ebBoxes)
-      drawBlock(ctx, box, isSelected(selectedBlock, box));
+    for (const box of layout.ebBoxes) {
+      const progress =
+        box.ref.kind === "eb"
+          ? computeVotingProgress(box.ref.eb.voteCount, totalVotes)
+          : undefined;
+      drawBlock(ctx, box, isSelected(selectedBlock, box), progress);
+    }
     for (const box of layout.rbBoxes)
       drawBlock(ctx, box, isSelected(selectedBlock, box));
 
@@ -405,6 +495,8 @@ export const ChainCanvas: FC = () => {
     selectedBlock,
     tipRB,
     leadingEdgeX,
+    currentTime,
+    totalVotes,
   ]);
 
   const handlePointerDown = useCallback(

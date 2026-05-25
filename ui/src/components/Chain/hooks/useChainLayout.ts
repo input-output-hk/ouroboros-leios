@@ -7,9 +7,9 @@ import { useMemo } from "react";
 // in only when slots are within ~4 of each other.
 export const SLOT_WIDTH = 20;
 export const RB_WIDTH = 90;
-export const RB_HEIGHT = 56;
+export const RB_HEIGHT = 50;
 export const EB_WIDTH = 90;
-export const EB_HEIGHT = 44;
+export const EB_HEIGHT = 52;
 export const MIN_CARD_GAP = 5;
 export const ROW_SPACING = 80;
 export const RB_BASELINE_Y = 0;
