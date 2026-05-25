@@ -253,6 +253,10 @@ pub enum LeiosTelemetryEvent {
         voted_weight: u64,
         voters: usize,
     },
+    LeiosElectionInfo {
+        eb_slot: u64,
+        perm_committee: bool,
+    }
 }
 
 // ---------------------------------------------------------------------------

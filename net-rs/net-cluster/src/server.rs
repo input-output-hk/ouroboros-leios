@@ -15,7 +15,6 @@ use axum::Json;
 use futures_util::stream::Stream;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tower_http::cors::CorsLayer;
-
 use crate::config::ClusterControlConfig;
 use crate::topology::Topology;
 use crate::types::{self, EventWindow, IngestedEvent, StatsSnapshot};

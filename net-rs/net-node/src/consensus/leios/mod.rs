@@ -206,8 +206,14 @@ impl LeiosConsensus {
         // upfront so we don't hold the mempool lock across the call.
         let known = self.mempool.lock().unwrap().all_known_tx_ids();
         let tx_known = |h: &[u8; 32]| known.contains(h.as_slice());
-        let fx = self.state.on_slot(slot, &tx_known);
+        let mut fx = self.state.on_slot(slot, &tx_known);
+        fx.push(LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::LeiosElectionInfo {
+            eb_slot: slot,
+            perm_committee: self.state.voting_config.persistent_seats > 0,
+        }));
+        info!("Pushing leios telemetry, telemetry count = {}", self.pending_telemetry.len());
         self.dispatch(fx).await;
+        info!("Pushed leios telemetry, telemetry count = {}", self.pending_telemetry.len());
     }
 
     /// Handle a Leios-shaped network event.
@@ -455,6 +461,14 @@ impl LeiosConsensus {
                             voted_weight,
                             voters,
                         },
+                        LeiosTelemetryEvent::LeiosElectionInfo {
+                            eb_slot,
+                            perm_committee,
+                        } => NodeEvent::LeiosElectionInfo {
+                            node: node_id,
+                            slot: eb_slot,
+                            pers_committee_member: perm_committee,
+                        }
                     };
                     self.pending_telemetry.push(node_event);
                 }

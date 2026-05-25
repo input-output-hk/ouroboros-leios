@@ -148,6 +148,7 @@ impl Consensus {
 
     /// Notify the Leios layer of a new slot tick.
     pub async fn on_slot(&mut self, slot: u64) {
+        tracing::info!("on_slot {slot}");
         // Bump Praos's slot first so subsequent header-arrival paths
         // (TipAdvanced, BlockReceived, register_self_produced) stamp
         // the right slot on `note_header_first_seen`.  Then refresh the

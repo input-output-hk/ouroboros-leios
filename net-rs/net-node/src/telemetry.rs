@@ -103,6 +103,11 @@ pub enum NodeEvent {
         rb_slot: u64,
         eb_slot: u64,
     },
+    LeiosElectionInfo {
+        node: String,
+        slot: u64,
+        pers_committee_member: bool,
+    },
     LeiosElectionExpired {
         node: String,
         eb_slot: u64,

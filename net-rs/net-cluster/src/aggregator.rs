@@ -11,7 +11,6 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use tokio::sync::{mpsc, RwLock};
-
 use crate::types::{EventWindow, IngestedEvent};
 
 /// Run the aggregator as a tokio task.
@@ -54,7 +53,7 @@ pub async fn run(
                         break;
                     }
                 }
-                if last_log_time .elapsed() >= std::time::Duration::from_secs(5) {
+                if last_log_time.elapsed() >= std::time::Duration::from_secs(10) {
                     state.print_current_accumulated();
                     last_log_time = Instant::now();
                 }
@@ -118,13 +117,14 @@ struct AggregatedNodeStats {
     /// * RBReceived;
     /// * EBReceived;
     /// * Vote ('yes' if it was certified by current node);
-    pub cache: HashMap<u64, HashMap<String, (bool, bool, bool)>>,
+    /// * Member of persistent committee (for the slot) at the time of election.
+    pub cache: HashMap<u64, HashMap<String, (bool, bool, bool, bool)>>,
 }
 
 impl AggregatedNodeStats {
     fn update_for_slot_node<F>(&mut self, node_id: String, slot: u64, update: F)
     where
-        F: FnOnce(&mut (bool, bool, bool)),
+        F: FnOnce(&mut (bool, bool, bool, bool)),
     {
         let slot_entry = self.cache.entry(slot).or_default();
         let bitmask = slot_entry.entry(node_id).or_default();
@@ -169,6 +169,14 @@ impl AggregatorState {
                             mask.2 = true;
                         });
                     }
+                }
+                Some("LeiosElectionInfo") => {
+                    let pers_committee = msg.and_then(
+                        |m| m.get("pers_committee_member")).and_then(|c| c.as_bool()
+                    );
+                    self.aggregated_stats.update_for_slot_node(node_id, slot, |mask| {
+                        mask.3 = pers_committee.is_some_and(|x| x);
+                    });
                 }
                 _ => {}
             }
@@ -245,6 +253,8 @@ impl AggregatorState {
     }
 
     fn print_current_accumulated(&self) {
+        const MAX_LINES: usize = 10;
+
         let mut all_nodes = HashSet::new();
         for slot_stats in self.aggregated_stats
             .cache
@@ -259,45 +269,62 @@ impl AggregatorState {
         all_nodes.sort();
 
         let mut lines = Vec::new();
+
+        let Some(max_slot) = self.aggregated_stats.cache.keys().max() else {
+            return
+        };
+
+        let mut committee = HashSet::new();
+        for slot in (0..=*max_slot).rev() {
+            if let Some(per_node) = &self.aggregated_stats.cache.get(&slot) {
+                let mut line = format!("{slot:10} | ");
+                let mut has_any_event = false;
+                for node_id in &all_nodes {
+                    let (r, e, v, p) = per_node.get(node_id).unwrap_or(&(false, false, false, false));
+                    if *p {
+                        committee.insert(node_id.clone());
+                    }
+                    let mut c = '.';
+                    has_any_event |= *r || *e || *v;
+                    if *v {
+                        c = '1';
+                    } else if *e {
+                        if *r {
+                            c = 'E';
+                        } else {
+                            c = 'e';
+                        }
+                    } else if *r {
+                        c = 'R';
+                    }
+                    if c != '.' {
+                        has_any_event = true;
+                    }
+                    line.push(c);
+                }
+                if has_any_event {
+                    lines.push(line);
+                }
+            }
+            if lines.len() >= MAX_LINES {
+                break;
+            }
+        }
+
         let mut header = String::from("slot       | ");
-        for (idx,_) in all_nodes.iter().enumerate() {
-            if idx % 10 == 0 {
+        for (idx,node_id) in all_nodes.iter().enumerate() {
+            if committee.contains(node_id) {
+                header.push_str(&format!("C"));
+            }
+            else if idx % 10 == 0 {
                 header.push_str(&format!("*"));
             }
             else {
                 header.push_str(&format!(" "));
             }
         }
-        lines.push(header.clone());
-        lines.push("-".repeat(header.len()));
-
-        let Some(max_slot) = self.aggregated_stats.cache.keys().max() else {
-            return
-        };
-
-        for (slot, per_node) in &self.aggregated_stats.cache {
-            if max_slot - *slot > 10 {
-                continue;
-            }
-            let mut line = format!("{slot:10} | ");
-            for node_id in &all_nodes {
-                let (r, e, v) = per_node.get(node_id).unwrap_or(&(false, false, false));
-                let mut c = '.';
-                if *v {
-                    c = '1';
-                } else if *e {
-                    if *r {
-                        c = 'E';
-                    } else {
-                        c = 'e';
-                    }
-                } else if *r {
-                    c = 'R';
-                }
-                line.push(c);
-            }
-            lines.push(line);
-        }
+        lines.insert(0, header.clone());
+        lines.insert(1, "-".repeat(header.len()));
 
         for ln in lines {
             tracing::info!("{}", ln);
