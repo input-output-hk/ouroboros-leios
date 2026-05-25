@@ -4,19 +4,22 @@
       "name": "200 TxkB/s",
       "topology": "topologies/small.yaml",
       "duration": 120,
-      "trace": "traces/small-200txkbs-nocpu.jsonl.gz"
+      "trace": "traces/small-200txkbs-nocpu.jsonl.gz",
+      "totalVotes": 500
     },
     {
       "name": "1 TxkB/s",
       "topology": "topologies/small.yaml",
       "duration": 120,
-      "trace": "traces/small-1txkbs-nocpu.jsonl.gz"
+      "trace": "traces/small-1txkbs-nocpu.jsonl.gz",
+      "totalVotes": 500
     },
     {
       "name": "Linear Leios Micro Mainnet (100 nodes)",
       "topology": "topologies/topology-v3.yaml",
       "duration": 120,
-      "trace": "traces/micro-mainnet-linear-nocpu.jsonl.gz"
+      "trace": "traces/micro-mainnet-linear-nocpu.jsonl.gz",
+      "totalVotes": 500
     },
     {
       "name": "Demo Prototype Burst",

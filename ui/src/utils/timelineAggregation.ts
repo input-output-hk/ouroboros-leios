@@ -653,6 +653,35 @@ export const computeAggregatedDataAtTime = (
             (stats.generated.get(EMessageType.Votes) || 0) + 1,
           );
         }
+        // Accumulate vote "weight" per EB. The values mean different
+        // things across sources but are summed identically; the scenario's
+        // `totalVotes` (used in the renderer) normalises to [0,1].
+        //
+        // Simulator (`{ebId: lottery-hit-count}`): treat lottery hit
+        // counts as stake-like weights. For sim-rs defaults the total is
+        // 500 (persistent 400 + non-persistent 100).
+        //
+        // Prototype (`Vote[]`): no per-vote weight today, so each Vote
+        // contributes 1. Once the prototype exposes per-vote stake
+        // fractions, sum those instead (`totalVotes` would then be 1.0
+        // and is the default when the scenario omits it).
+        //
+        // FIXME: switch the prototype branch to sum `v.weight` once
+        // emitted; until then the bar will read 1 per Vote (which works
+        // sensibly only when totalVotes is set to the voter count for
+        // that scenario, or the trace happens to emit one Vote per
+        // voter).
+        if (Array.isArray(message.votes)) {
+          for (const v of message.votes) {
+            const eb = result.chain.ebs.get(v.ebHash);
+            if (eb) eb.voteCount = (eb.voteCount ?? 0) + 1;
+          }
+        } else {
+          for (const [ebId, count] of Object.entries(message.votes)) {
+            const eb = result.chain.ebs.get(ebId);
+            if (eb) eb.voteCount = (eb.voteCount ?? 0) + count;
+          }
+        }
         break;
       }
 
@@ -761,6 +790,22 @@ export const buildChainAtTime = (
           producer: message.producer,
           sizeBytes: message.size_bytes,
         });
+      }
+    } else if (message.type === EServerMessageType.VotesGenerated) {
+      // See computeAggregatedDataAtTime — accumulate "weight" per EB:
+      // lottery hit counts (sim) or 1 per Vote (prototype, until weights
+      // land). Normalisation by `scenario.totalVotes` happens in the
+      // renderer.
+      if (Array.isArray(message.votes)) {
+        for (const v of message.votes) {
+          const eb = chain.ebs.get(v.ebHash);
+          if (eb) eb.voteCount = (eb.voteCount ?? 0) + 1;
+        }
+      } else {
+        for (const [ebId, count] of Object.entries(message.votes)) {
+          const eb = chain.ebs.get(ebId);
+          if (eb) eb.voteCount = (eb.voteCount ?? 0) + count;
+        }
       }
     }
   }
