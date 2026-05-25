@@ -16,11 +16,11 @@ export const GraphWrapper: FC = ({}) => {
     <div className="w-full h-full relative">
       <Canvas />
       {currentNode ? (
-        <div className="absolute right-10 top-10">
+        <div className="absolute right-10 top-32">
           <NodeStats />
         </div>
       ) : currentEdge ? (
-        <div className="absolute right-10 top-10">
+        <div className="absolute right-10 top-32">
           <EdgeStats />
         </div>
       ) : null}
