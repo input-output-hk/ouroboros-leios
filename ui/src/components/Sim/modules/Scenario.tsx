@@ -2,7 +2,18 @@ import {
   useSimContext,
   defaultAggregatedData,
 } from "@/contexts/SimContext/context";
-import { EConnectionState, IScenario } from "@/contexts/SimContext/types";
+import {
+  EConnectionState,
+  IScenario,
+  LayoutMode,
+} from "@/contexts/SimContext/types";
+
+const LAYOUT_MODES: readonly LayoutMode[] = [
+  "original",
+  "auto",
+  "circular",
+  "mercator",
+];
 import { ChangeEvent, FC, useCallback, useEffect, useState } from "react";
 import { useStreamMessagesHandler } from "../hooks/useStreamMessagesHandler";
 import { useLokiWebSocket } from "../hooks/useLokiWebSocket";
@@ -43,8 +54,15 @@ export const Scenario: FC = () => {
       }));
       dispatch({ type: "SET_SCENARIOS", payload: scenarios });
 
-      // Check for scenario URL parameter
+      // Check for URL parameters
       const urlParams = new URLSearchParams(window.location.search);
+      const layoutParam = urlParams.get("layout");
+      if (layoutParam && LAYOUT_MODES.includes(layoutParam as LayoutMode)) {
+        dispatch({
+          type: "SET_LAYOUT_MODE",
+          payload: layoutParam as LayoutMode,
+        });
+      }
       const scenarioParam = urlParams.get("scenario");
       if (scenarioParam) {
         const scenarioIndex = parseInt(scenarioParam, 10);

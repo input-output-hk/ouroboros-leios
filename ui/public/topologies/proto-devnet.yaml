@@ -2,36 +2,36 @@ nodes:
   Node1:
     stake: 30000000000000
     location:
-      - 0
-      - 0
+      - 50.1109
+      - 8.6821
     producers:
       Node2:
-        latency-ms: 200.0
-        bandwidth-bytes-per-second: 1250000
+        latency-ms: 100.0
+        bandwidth-bytes-per-second: 6250000
       Node3:
-        latency-ms: 200.0
-        bandwidth-bytes-per-second: 1250000
+        latency-ms: 100.0
+        bandwidth-bytes-per-second: 6250000
   Node2:
     stake: 30000000000000
     location:
-      - 0
-      - 100
+      - 41.8781
+      - -87.6298
     producers:
       Node1:
-        latency-ms: 200.0
-        bandwidth-bytes-per-second: 1250000
+        latency-ms: 100.0
+        bandwidth-bytes-per-second: 6250000
       Node3:
-        latency-ms: 200.0
-        bandwidth-bytes-per-second: 1250000
+        latency-ms: 100.0
+        bandwidth-bytes-per-second: 6250000
   Node3:
     stake: 30000000000000
     location:
-      - 50
-      - 50
+      - 35.6762
+      - 139.6503
     producers:
       Node1:
-        latency-ms: 200.0
-        bandwidth-bytes-per-second: 1250000
+        latency-ms: 100.0
+        bandwidth-bytes-per-second: 6250000
       Node2:
-        latency-ms: 200.0
-        bandwidth-bytes-per-second: 1250000
+        latency-ms: 100.0
+        bandwidth-bytes-per-second: 6250000
