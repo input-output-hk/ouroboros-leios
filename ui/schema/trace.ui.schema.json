@@ -23,24 +23,8 @@
     },
     "UIEBGenerated": {
       "properties": {
-        "endorser_blocks": {
-          "items": {
-            "$ref": "#/definitions/BlockRef"
-          },
-          "type": "array"
-        },
         "id": {
           "type": "string"
-        },
-        "input_blocks": {
-          "description": "Carried by the simulator; omitted by the prototype.",
-          "items": {
-            "$ref": "#/definitions/BlockRef"
-          },
-          "type": "array"
-        },
-        "pipeline": {
-          "type": "number"
         },
         "producer": {
           "type": "string"
@@ -56,15 +40,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "endorser_blocks",
-        "id",
-        "pipeline",
-        "producer",
-        "size_bytes",
-        "slot",
-        "type"
-      ],
+      "required": ["id", "producer", "size_bytes", "slot", "type"],
       "type": "object"
     },
     "UIEBReceived": {
@@ -173,6 +149,21 @@
     },
     "UIRBGenerated": {
       "properties": {
+        "announces": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/BlockRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "EB announced by this RB's header. Header-level relation, distinct from\n`endorsement` (which is the body-level certification). Not yet emitted\nby either source."
+        },
+        "block_number": {
+          "description": "Sequential block height on the RB chain. Not yet emitted by either source.",
+          "type": "number"
+        },
         "endorsement": {
           "anyOf": [
             {
@@ -415,10 +406,6 @@
       "properties": {
         "id": {
           "type": "string"
-        },
-        "pipeline": {
-          "description": "Carried by the simulator; omitted by the prototype.",
-          "type": "number"
         },
         "producer": {
           "type": "string"

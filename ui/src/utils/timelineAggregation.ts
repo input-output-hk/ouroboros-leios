@@ -9,6 +9,7 @@ import {
   ISimulationAggregatedDataState,
   EMessageType,
   ActivityAction,
+  IChainState,
   IMessageTypeCounts,
   INodeActivityState,
 } from "@/contexts/SimContext/types";
@@ -257,6 +258,7 @@ export const computeAggregatedDataAtTime = (
       byType: {},
     },
     lastAggregatedTime: targetTime,
+    chain: { rbs: new Map(), ebs: new Map() },
   };
 
   // Process timeline events up to target time with early termination
@@ -449,6 +451,15 @@ export const computeAggregatedDataAtTime = (
           setMessageBytes(EMessageType.EB, message.id, message.size_bytes);
         }
 
+        if (!result.chain.ebs.has(message.id)) {
+          result.chain.ebs.set(message.id, {
+            id: message.id,
+            slot: message.slot,
+            producer: message.producer,
+            sizeBytes: message.size_bytes,
+          });
+        }
+
         // Track last activity for node coloring
         updateLastActivity(
           nodeStats,
@@ -537,6 +548,19 @@ export const computeAggregatedDataAtTime = (
             EMessageType.RB,
             (stats.generated.get(EMessageType.RB) || 0) + 1,
           );
+        }
+
+        if (!result.chain.rbs.has(message.id)) {
+          result.chain.rbs.set(message.id, {
+            id: message.id,
+            slot: message.slot,
+            blockNumber: message.block_number,
+            producer: message.producer,
+            sizeBytes: message.size_bytes,
+            parentId: message.parent?.id,
+            certifiesEbId: message.endorsement?.eb.id,
+            announcesEbId: message.announces?.id,
+          });
         }
 
         // Track last activity for node coloring
@@ -704,4 +728,41 @@ export const computeAggregatedDataAtTime = (
   });
 
   return result;
+};
+
+// Standalone chain builder for cases where we don't need to recompute the full
+// aggregated state (e.g. event-batch ingestion between playback ticks).
+export const buildChainAtTime = (
+  events: IServerMessage[],
+  targetTime: number,
+): IChainState => {
+  const chain: IChainState = { rbs: new Map(), ebs: new Map() };
+  for (const event of events) {
+    if (event.time_s > targetTime) break;
+    const { message } = event;
+    if (message.type === EServerMessageType.RBGenerated) {
+      if (!chain.rbs.has(message.id)) {
+        chain.rbs.set(message.id, {
+          id: message.id,
+          slot: message.slot,
+          blockNumber: message.block_number,
+          producer: message.producer,
+          sizeBytes: message.size_bytes,
+          parentId: message.parent?.id,
+          certifiesEbId: message.endorsement?.eb.id,
+          announcesEbId: message.announces?.id,
+        });
+      }
+    } else if (message.type === EServerMessageType.EBGenerated) {
+      if (!chain.ebs.has(message.id)) {
+        chain.ebs.set(message.id, {
+          id: message.id,
+          slot: message.slot,
+          producer: message.producer,
+          sizeBytes: message.size_bytes,
+        });
+      }
+    }
+  }
+  return chain;
 };

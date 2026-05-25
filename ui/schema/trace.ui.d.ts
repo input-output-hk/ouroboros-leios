@@ -20,23 +20,23 @@
 
 /** A single vote as carried in the prototype's `MsgLeiosVotes` payloads. */
 export interface Vote {
-    voterId: number;
-    ebHash: string;
-    /** Slot of the EB being voted on (current prototype trace format). */
-    slot?: number;
-    /** Legacy field name for `slot`, kept for older prototype traces. */
-    electionId?: number;
-    voteSignature?: boolean;
+  voterId: number;
+  ebHash: string;
+  /** Slot of the EB being voted on (current prototype trace format). */
+  slot?: number;
+  /** Legacy field name for `slot`, kept for older prototype traces. */
+  electionId?: number;
+  voteSignature?: boolean;
 }
 
 /** Reference to a block by its identifier. */
 export interface BlockRef {
-    id: string;
+  id: string;
 }
 
 /** Endorsement carried in a ranking block. */
 export interface Endorsement {
-    eb: BlockRef;
+  eb: BlockRef;
 }
 
 // --- Generated events -----------------------------------------------------
@@ -44,36 +44,38 @@ export interface Endorsement {
 /** Transaction-generation event. `TXGenerated` is the simulator name;
  *  `TxsGenerated` is the post-normalisation name used inside the UI. */
 export interface UITxsGenerated {
-    type: "TxsGenerated" | "TXGenerated";
-    id: string;
-    publisher: string;
-    size_bytes: number;
+  type: "TxsGenerated" | "TXGenerated";
+  id: string;
+  publisher: string;
+  size_bytes: number;
 }
 
 export interface UIRBGenerated {
-    type: "RBGenerated";
-    id: string;
-    slot: number;
-    producer: string;
-    size_bytes: number;
-    endorsement: Endorsement | null;
-    endorsements?: Endorsement[] | null;
-    /** Carried by the simulator; omitted by the prototype. */
-    parent?: BlockRef | null;
-    /** Carried by the simulator; omitted by the prototype. */
-    tx_payload_bytes?: number;
+  type: "RBGenerated";
+  id: string;
+  slot: number;
+  producer: string;
+  size_bytes: number;
+  endorsement: Endorsement | null;
+  endorsements?: Endorsement[] | null;
+  /** Carried by the simulator; omitted by the prototype. */
+  parent?: BlockRef | null;
+  /** Carried by the simulator; omitted by the prototype. */
+  tx_payload_bytes?: number;
+  /** Sequential block height on the RB chain. Not yet emitted by either source. */
+  block_number?: number;
+  /** EB announced by this RB's header. Header-level relation, distinct from
+   *  `endorsement` (which is the body-level certification). Not yet emitted
+   *  by either source. */
+  announces?: BlockRef | null;
 }
 
 export interface UIEBGenerated {
-    type: "EBGenerated";
-    id: string;
-    slot: number;
-    pipeline: number;
-    producer: string;
-    size_bytes: number;
-    endorser_blocks: BlockRef[];
-    /** Carried by the simulator; omitted by the prototype. */
-    input_blocks?: BlockRef[];
+  type: "EBGenerated";
+  id: string;
+  slot: number;
+  producer: string;
+  size_bytes: number;
 }
 
 /** Vote-generation event. `VTBundleGenerated` is the simulator name;
@@ -81,137 +83,135 @@ export interface UIEBGenerated {
  *  differs in shape: simulator emits a weight map keyed by voter id, the
  *  prototype emits an array of per-vote records. */
 export interface UIVotesGenerated {
-    type: "VotesGenerated" | "VTBundleGenerated";
-    id: string;
-    slot: number;
-    producer: string;
-    size_bytes: number;
-    /** Carried by the simulator; omitted by the prototype. */
-    pipeline?: number;
-    votes: { [voterId: string]: number } | Vote[];
+  type: "VotesGenerated" | "VTBundleGenerated";
+  id: string;
+  slot: number;
+  producer: string;
+  size_bytes: number;
+  votes: { [voterId: string]: number } | Vote[];
 }
 
 // --- Network: Sent --------------------------------------------------------
 
 export interface UIRBSent {
-    type: "RBSent";
-    id: string;
-    sender: string;
-    recipient: string;
-    /** Carried by the simulator; omitted by the prototype. */
-    msg_size_bytes?: number;
-    sending_s?: number;
-    slot: number;
-    ids?: string[];
+  type: "RBSent";
+  id: string;
+  sender: string;
+  recipient: string;
+  /** Carried by the simulator; omitted by the prototype. */
+  msg_size_bytes?: number;
+  sending_s?: number;
+  slot: number;
+  ids?: string[];
 }
 
 export interface UIEBSent {
-    type: "EBSent";
-    id: string;
-    sender: string;
-    recipient: string;
-    /** Carried by the simulator; omitted by the prototype. */
-    msg_size_bytes?: number;
-    sending_s?: number;
-    slot: number;
-    ids?: string[];
+  type: "EBSent";
+  id: string;
+  sender: string;
+  recipient: string;
+  /** Carried by the simulator; omitted by the prototype. */
+  msg_size_bytes?: number;
+  sending_s?: number;
+  slot: number;
+  ids?: string[];
 }
 
 /** Sent event for a vote-bundle message. `VTBundleSent` is the simulator
  *  name; `VotesSent` is what the prototype emits. */
 export interface UIVotesSent {
-    type: "VotesSent" | "VTBundleSent";
-    id: string;
-    sender: string;
-    recipient: string;
-    /** Carried by the simulator; omitted by the prototype. */
-    msg_size_bytes?: number;
-    sending_s?: number;
-    slot: number;
-    ids?: string[];
-    /** Per-vote records as emitted by the prototype; the simulator omits this. */
-    votes?: Vote[];
+  type: "VotesSent" | "VTBundleSent";
+  id: string;
+  sender: string;
+  recipient: string;
+  /** Carried by the simulator; omitted by the prototype. */
+  msg_size_bytes?: number;
+  sending_s?: number;
+  slot: number;
+  ids?: string[];
+  /** Per-vote records as emitted by the prototype; the simulator omits this. */
+  votes?: Vote[];
 }
 
 /** Sent event for transactions. `TXSent` is the simulator name; `TxsSent`
  *  is what the prototype emits. */
 export interface UITxsSent {
-    type: "TxsSent" | "TXSent";
-    id: string;
-    sender: string;
-    recipient: string;
-    msg_size_bytes: number;
-    sending_s?: number;
-    slot?: number;
-    ids?: string[];
-    /** Number of transactions in the message — prototype only. */
-    num_txs?: number;
+  type: "TxsSent" | "TXSent";
+  id: string;
+  sender: string;
+  recipient: string;
+  msg_size_bytes: number;
+  sending_s?: number;
+  slot?: number;
+  ids?: string[];
+  /** Number of transactions in the message — prototype only. */
+  num_txs?: number;
 }
 
 // --- Network: Received ----------------------------------------------------
 
 export interface UIRBReceived {
-    type: "RBReceived";
-    id: string;
-    recipient: string;
-    sender?: string;
-    slot: number;
-    ids?: string[];
+  type: "RBReceived";
+  id: string;
+  recipient: string;
+  sender?: string;
+  slot: number;
+  ids?: string[];
 }
 
 export interface UIEBReceived {
-    type: "EBReceived";
-    id: string;
-    recipient: string;
-    sender?: string;
-    slot: number;
-    ids?: string[];
+  type: "EBReceived";
+  id: string;
+  recipient: string;
+  sender?: string;
+  slot: number;
+  ids?: string[];
 }
 
 /** Received event for a vote-bundle message. `VTBundleReceived` is the
  *  simulator name; `VotesReceived` is what the prototype emits. */
 export interface UIVotesReceived {
-    type: "VotesReceived" | "VTBundleReceived";
-    id: string;
-    recipient: string;
-    sender?: string;
-    slot: number;
-    ids?: string[];
-    /** Per-vote records as emitted by the prototype; the simulator omits this. */
-    votes?: Vote[];
+  type: "VotesReceived" | "VTBundleReceived";
+  id: string;
+  recipient: string;
+  sender?: string;
+  slot: number;
+  ids?: string[];
+  /** Per-vote records as emitted by the prototype; the simulator omits this. */
+  votes?: Vote[];
 }
 
 /** Received event for transactions. `TXReceived` is the simulator name;
  *  `TxsReceived` is what the prototype emits. */
 export interface UITxsReceived {
-    type: "TxsReceived" | "TXReceived";
-    id: string;
-    recipient: string;
-    sender?: string;
-    slot?: number;
-    ids?: string[];
-    /** Carried by the prototype; the simulator omits this. */
-    msg_size_bytes?: number;
-    /** Number of transactions in the message — prototype only. */
-    num_txs?: number;
+  type: "TxsReceived" | "TXReceived";
+  id: string;
+  recipient: string;
+  sender?: string;
+  slot?: number;
+  ids?: string[];
+  /** Carried by the prototype; the simulator omits this. */
+  msg_size_bytes?: number;
+  /** Number of transactions in the message — prototype only. */
+  num_txs?: number;
 }
 
 // --- Union ----------------------------------------------------------------
 
 /** Union of every message shape the UI renders. */
 export type UIMessage =
-    | UITxsGenerated
-    | UIRBGenerated
-    | UIEBGenerated
-    | UIVotesGenerated
-    | UIRBSent
-    | UIEBSent
-    | UIVotesSent
-    | UITxsSent
-    | UIRBReceived
-    | UIEBReceived
-    | UIVotesReceived
-    | UITxsReceived;
+  | UITxsGenerated
+  | UIRBGenerated
+  | UIEBGenerated
+  | UIVotesGenerated
+  | UIRBSent
+  | UIEBSent
+  | UIVotesSent
+  | UITxsSent
+  | UIRBReceived
+  | UIEBReceived
+  | UIVotesReceived
+  | UITxsReceived;
 
 /** Set of `message.type` strings the UI renders — also used by CI to filter
  *  a trace before validating it against this schema. */
@@ -219,8 +219,8 @@ export type UIMessageType = UIMessage["type"];
 
 /** Top-level event entry as produced by either trace source. */
 export interface UITraceEvent {
-    time_s: number;
-    message: UIMessage;
+  time_s: number;
+  message: UIMessage;
 }
 
 /** A whole trace file represented as an array (e.g. after `jq -cs '.'`). */
