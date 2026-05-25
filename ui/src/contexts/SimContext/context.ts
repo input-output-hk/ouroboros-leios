@@ -35,6 +35,7 @@ export const defaultState: ISimContextState = {
     canvasScale: 6,
   },
   aggregatedData: defaultAggregatedData,
+  selectedBlock: undefined,
   tracePath: "",
   lokiHost: undefined,
   lokiConnectionState: EConnectionState.NotConnected,
