@@ -19,13 +19,13 @@
       "trace": "traces/micro-mainnet-linear-nocpu.jsonl.gz"
     },
     {
-      "name": "Leios Demo 202511",
-      "topology": "topologies/prototype.yaml",
+      "name": "Demo Prototype Burst",
+      "topology": "topologies/burst.yaml",
       "duration": 300,
       "loki": "localhost:3100"
     },
     {
-      "name": "Leios Prototype Devnet",
+      "name": "Demo Prototype Devnet",
       "topology": "topologies/proto-devnet.yaml",
       "duration": 300,
       "loki": "localhost:3100"
