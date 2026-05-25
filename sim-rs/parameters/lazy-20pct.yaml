@@ -1,0 +1,15 @@
+# Demonstration: lazy-voter abstention on the top 20% of stake-weighted
+# nodes under the shared-consensus engine.  Layered on top of
+# config.default.yaml via figment (-p parameters/lazy-20pct.yaml).
+leios-variant: shared-consensus
+timestamp-resolution-ms: 0.05
+leios-header-diffusion-time-ms: 3000.0
+linear-tx-max-age-slots: 23
+
+consensus-behaviours:
+  - spec:
+      kind: lazy-voter
+      reason: declined
+    selection:
+      kind: stake-fraction
+      fraction: 0.2
