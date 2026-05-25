@@ -14,7 +14,7 @@ export const ChainWrapper: FC = () => {
     <div className="w-full h-full relative">
       <ChainCanvas />
       {selectedBlock ? (
-        <div className="absolute right-10 top-10">
+        <div className="absolute right-10 top-32">
           <ChainDetailsPanel />
         </div>
       ) : null}

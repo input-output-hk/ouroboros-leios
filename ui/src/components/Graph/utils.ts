@@ -104,15 +104,14 @@ export const findClickTarget = (
     }
   });
 
-  // Pick whichever is closer, as long as it's within threshold
-  if (closestNodeDist <= threshold && closestNodeDist <= closestEdgeDist) {
-    return { kind: "node", id: closestNode! };
+  // Nodes take priority within threshold: in dense graphs an edge often
+  // passes through a node, and its perpendicular distance can be smaller
+  // than the node's centre distance, but the user clicked the node.
+  if (closestNodeDist <= threshold && closestNode) {
+    return { kind: "node", id: closestNode };
   }
   if (closestEdgeDist <= threshold && closestEdge) {
     return { kind: "edge", id: closestEdge };
-  }
-  if (closestNodeDist <= threshold && closestNode) {
-    return { kind: "node", id: closestNode };
   }
   return { kind: "background" };
 };
