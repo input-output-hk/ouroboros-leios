@@ -21,6 +21,7 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
     byType: {},
   },
   lastAggregatedTime: 0,
+  chain: { rbs: new Map(), ebs: new Map() },
 };
 
 export const defaultState: ISimContextState = {

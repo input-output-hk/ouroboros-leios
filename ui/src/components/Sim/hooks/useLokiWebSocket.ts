@@ -201,8 +201,6 @@ const parseEndorserBlockGenerated = (
         slot: log.slot,
         producer: streamLabels.process,
         size_bytes: log.ebSize,
-        pipeline: 0, // XXX: unused
-        endorser_blocks: [], // XXX: not relevant for linear leios
       };
 
       return {

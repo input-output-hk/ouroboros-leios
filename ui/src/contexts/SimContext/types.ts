@@ -33,6 +33,29 @@ export interface ISimulationGlobalData {
   leiosTxOnChain: number;
 }
 
+export interface IChainRB {
+  id: string;
+  slot: number;
+  blockNumber?: number;
+  producer: string;
+  sizeBytes: number;
+  parentId?: string;
+  certifiesEbId?: string;
+  announcesEbId?: string;
+}
+
+export interface IChainEB {
+  id: string;
+  slot: number;
+  producer: string;
+  sizeBytes: number;
+}
+
+export interface IChainState {
+  rbs: Map<string, IChainRB>;
+  ebs: Map<string, IChainEB>;
+}
+
 export interface IMessageAnimation {
   id: string;
   type: EMessageType;
@@ -75,6 +98,7 @@ export interface ISimulationAggregatedDataState {
     byType: Record<string, number>;
   };
   lastAggregatedTime: number; // Timestamp up to which aggregation was last computed
+  chain: IChainState; // Blockchain entities derived from RBGenerated/EBGenerated up to currentTime
 }
 
 export interface IGraphContextState {

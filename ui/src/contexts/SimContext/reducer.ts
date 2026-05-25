@@ -5,6 +5,7 @@ import {
   EConnectionState,
 } from "./types";
 import {
+  buildChainAtTime,
   computeAggregatedDataAtTime,
   clearLatencyCache,
 } from "@/utils/timelineAggregation";
@@ -162,6 +163,10 @@ export const reducer = (
         minTime: newMinTime,
         maxTime: newMaxTime,
         currentTime: clampedCurrentTime,
+        aggregatedData: {
+          ...state.aggregatedData,
+          chain: buildChainAtTime(newEvents, clampedCurrentTime),
+        },
       };
     }
 
@@ -215,6 +220,7 @@ export const reducer = (
         maxTime: 0,
         isPlaying: false,
         speedMultiplier: 1,
+        aggregatedData: defaultAggregatedData,
       };
 
     case "SET_LOKI_CONNECTION_STATE":
