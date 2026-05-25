@@ -341,41 +341,23 @@ export const ChainCanvas: FC = () => {
     return best;
   }, [layout]);
 
-  // Pixels per slot for the projection: matches the displayed block-to-block
-  // spacing so the leading edge advances at the same visual rate as actual
-  // blocks in the chain. We use the average across the visible chain (last
-  // box vs first box) since pair-by-pair rates vary with min-gap clamping.
-  // Falls back to the natural SLOT_WIDTH when there's only one RB.
-  const pxPerSlot = useMemo(() => {
-    let first: IBlockBox | undefined;
-    let last: IBlockBox | undefined;
-    for (const box of layout.rbBoxes) {
-      if (box.ref.kind !== "rb") continue;
-      const slot = box.ref.rb.slot;
-      if (
-        !first ||
-        slot < (first.ref as { kind: "rb"; rb: { slot: number } }).rb.slot
-      )
-        first = box;
-      if (
-        !last ||
-        slot > (last.ref as { kind: "rb"; rb: { slot: number } }).rb.slot
-      )
-        last = box;
-    }
-    if (!first || !last || first === last) return SLOT_WIDTH;
-    const dSlot =
-      (last.ref as { kind: "rb"; rb: { slot: number } }).rb.slot -
-      (first.ref as { kind: "rb"; rb: { slot: number } }).rb.slot;
-    if (dSlot <= 0) return SLOT_WIDTH;
-    return (last.x - first.x) / dSlot;
-  }, [layout]);
-
+  // Project the leading edge to where a new RB at slot=currentTime would
+  // *naturally* land in the layout — i.e. `(currentTime - minSlot) *
+  // SLOT_WIDTH`. This matches the layout's own coordinate system so a new
+  // block lands exactly where the projection was pointing (no jump when
+  // there's no min-gap clamping). For dense clusters that hit MIN_CARD_GAP
+  // the actual RB lands a bit further right than the projection, but the
+  // projection itself advances at a constant SLOT_WIDTH px/slot without
+  // snapping backward when each new RB lands.
+  //
+  // Clamp to at least the right edge of the current tip so the dashed
+  // edge never sits behind the tip when min-gap has pushed the tip past
+  // its natural position (e.g. consecutive-slot RBs).
   const leadingEdgeX = useMemo(() => {
     if (!tipRB || tipRB.ref.kind !== "rb") return undefined;
-    const extraSlots = Math.max(0, currentTime - tipRB.ref.rb.slot);
-    return tipRB.x + tipRB.width + extraSlots * pxPerSlot;
-  }, [tipRB, currentTime, pxPerSlot]);
+    const natural = (currentTime - layout.minSlot) * SLOT_WIDTH;
+    return Math.max(tipRB.x + tipRB.width, natural);
+  }, [tipRB, currentTime, layout.minSlot]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 

@@ -41,6 +41,10 @@ export interface IChainLayout {
   ebBoxes: IBlockBox[];
   edges: IChainEdge[];
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
+  /** Slot of the leftmost block, in trace coordinates. Used by the renderer
+   *  to project the leading edge in the same coordinate system as block
+   *  placement: `worldX = (slot - minSlot) * SLOT_WIDTH`. */
+  minSlot: number;
 }
 
 const EMPTY_LAYOUT: IChainLayout = {
@@ -48,6 +52,7 @@ const EMPTY_LAYOUT: IChainLayout = {
   ebBoxes: [],
   edges: [],
   bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+  minSlot: 0,
 };
 
 // Determine each RB's row index using the "longest chain on row 0, shorter
@@ -221,5 +226,11 @@ export const computeChainLayout = (chain: IChainState): IChainLayout => {
     if (box.y + box.height > maxY) maxY = box.y + box.height;
   }
 
-  return { rbBoxes, ebBoxes, edges, bounds: { minX, minY, maxX, maxY } };
+  return {
+    rbBoxes,
+    ebBoxes,
+    edges,
+    bounds: { minX, minY, maxX, maxY },
+    minSlot,
+  };
 };
