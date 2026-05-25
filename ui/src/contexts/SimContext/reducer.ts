@@ -38,6 +38,7 @@ export const reducer = (
       return {
         ...state,
         aggregatedData: defaultAggregatedData,
+        selectedBlock: undefined,
         activeScenario: scenario.name,
         autoStart: action.autoStart || false,
         tracePath: scenario.trace || "",
@@ -56,7 +57,6 @@ export const reducer = (
         currentTime: 0,
         minTime: 0,
         maxTime: scenario.duration,
-        layoutMode: "original",
       };
     }
 
@@ -221,6 +221,7 @@ export const reducer = (
         isPlaying: false,
         speedMultiplier: 1,
         aggregatedData: defaultAggregatedData,
+        selectedBlock: undefined,
       };
 
     case "SET_LOKI_CONNECTION_STATE":
@@ -259,6 +260,12 @@ export const reducer = (
       return {
         ...state,
         mapGeoJson: action.payload,
+      };
+
+    case "SET_SELECTED_BLOCK":
+      return {
+        ...state,
+        selectedBlock: action.payload,
       };
 
     default:

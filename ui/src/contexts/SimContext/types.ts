@@ -133,12 +133,18 @@ export interface IScenario {
   loki?: string;
 }
 
+export interface ISelectedBlock {
+  kind: "rb" | "eb";
+  id: string;
+}
+
 export interface ISimContextState {
   allScenarios: IScenario[];
   activeScenario: string;
   autoStart: boolean;
   graph: IGraphContextState;
   aggregatedData: ISimulationAggregatedDataState;
+  selectedBlock?: ISelectedBlock;
   tracePath: string;
   lokiHost?: string;
   lokiConnectionState: EConnectionState;
@@ -184,7 +190,8 @@ export type TSimContextActions =
   | { type: "SET_LAYOUT_MODE"; payload: LayoutMode }
   | { type: "SET_NODE_POSITIONS"; payload: Map<string, { fx: number; fy: number }> }
   | { type: "SET_MERCATOR_PARAMS"; payload: MercatorParams | null }
-  | { type: "SET_MAP_GEOJSON"; payload: GeoJSON.FeatureCollection };
+  | { type: "SET_MAP_GEOJSON"; payload: GeoJSON.FeatureCollection }
+  | { type: "SET_SELECTED_BLOCK"; payload: ISelectedBlock | undefined };
 
 export interface ISimContext {
   state: ISimContextState;
