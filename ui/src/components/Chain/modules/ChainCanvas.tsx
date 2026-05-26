@@ -341,23 +341,27 @@ export const ChainCanvas: FC = () => {
     return best;
   }, [layout]);
 
-  // Project the leading edge to where a new RB at slot=currentTime would
-  // *naturally* land in the layout — i.e. `(currentTime - minSlot) *
-  // SLOT_WIDTH`. This matches the layout's own coordinate system so a new
-  // block lands exactly where the projection was pointing (no jump when
-  // there's no min-gap clamping). For dense clusters that hit MIN_CARD_GAP
-  // the actual RB lands a bit further right than the projection, but the
-  // projection itself advances at a constant SLOT_WIDTH px/slot without
-  // snapping backward when each new RB lands.
+  // Project the leading edge to where a new RB at the current slot would
+  // *naturally* land in the layout — i.e. `(currentSlot - minSlot) *
+  // SLOT_WIDTH`. We map `currentTime` (which is wall-clock — epoch seconds
+  // for Loki, trace-relative for the simulator) into slot space via
+  // `chain.slotZeroTime` (derived from the first observed RB as
+  // `time_s - slot`). Without this conversion, Loki traces would push the
+  // leading edge billions of pixels off-screen.
   //
-  // Clamp to at least the right edge of the current tip so the dashed
-  // edge never sits behind the tip when min-gap has pushed the tip past
-  // its natural position (e.g. consecutive-slot RBs).
+  // This matches the layout's own coordinate system, so a new block lands
+  // exactly where the projection was pointing (no jump when there's no
+  // min-gap clamping). Clamped to at least the right edge of the tip so
+  // the dashed edge never sits behind the tip in min-gap clusters.
   const leadingEdgeX = useMemo(() => {
     if (!tipRB || tipRB.ref.kind !== "rb") return undefined;
-    const natural = (currentTime - layout.minSlot) * SLOT_WIDTH;
+    if (chain.slotZeroTime === undefined) {
+      return tipRB.x + tipRB.width;
+    }
+    const currentSlot = currentTime - chain.slotZeroTime;
+    const natural = (currentSlot - layout.minSlot) * SLOT_WIDTH;
     return Math.max(tipRB.x + tipRB.width, natural);
-  }, [tipRB, currentTime, layout.minSlot]);
+  }, [tipRB, currentTime, layout.minSlot, chain.slotZeroTime]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 

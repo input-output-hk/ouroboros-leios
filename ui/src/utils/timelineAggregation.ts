@@ -561,6 +561,9 @@ export const computeAggregatedDataAtTime = (
             certifiesEbId: message.endorsement?.eb.id,
             announcesEbId: message.announces?.id,
           });
+          if (result.chain.slotZeroTime === undefined) {
+            result.chain.slotZeroTime = event.time_s - message.slot;
+          }
         }
 
         // Track last activity for node coloring
@@ -781,6 +784,9 @@ export const buildChainAtTime = (
           certifiesEbId: message.endorsement?.eb.id,
           announcesEbId: message.announces?.id,
         });
+        if (chain.slotZeroTime === undefined) {
+          chain.slotZeroTime = event.time_s - message.slot;
+        }
       }
     } else if (message.type === EServerMessageType.EBGenerated) {
       if (!chain.ebs.has(message.id)) {

@@ -58,6 +58,13 @@ export interface IChainEB {
 export interface IChainState {
   rbs: Map<string, IChainRB>;
   ebs: Map<string, IChainEB>;
+  /** Wall-clock time at which slot 0 happened. Computed once from the
+   *  first observed RBGenerated event as `time_s - slot`, assuming a
+   *  1-second slot duration. Used by the renderer to map `currentTime`
+   *  to a slot number, so the leading-edge projection works whether
+   *  `currentTime` is epoch-seconds (Loki) or trace-relative (simulator).
+   *  Undefined until the first RB is seen. */
+  slotZeroTime?: number;
 }
 
 export interface IMessageAnimation {
