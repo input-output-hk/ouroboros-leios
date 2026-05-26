@@ -17,7 +17,7 @@ use tracing::info;
 use crate::aggregation::{self, hex_prefix, QuorumFormed};
 use crate::config::CommitteeSelection;
 use crate::pipeline::{EbElection, PipelineConfig, PipelinePhase};
-use crate::wfa;
+use crate::committee;
 
 /// What the caller should do as a result of a slot tick.
 ///
@@ -49,23 +49,74 @@ pub enum SlotEffect {
     },
 }
 
+/// Returned by [`ElectionsConfig::validate`] for invariant violations
+/// callers want to surface at startup rather than at quorum-check time.
+#[derive(Debug, PartialEq)]
+pub enum ElectionsConfigError {
+    /// CIP-164 PR #1196 requires the committee to cover strictly more
+    /// stake than quorum demands.  At `top_centile_of_stake ≤
+    /// quorum_weight_fraction`, even unanimous participation by the
+    /// committee cannot satisfy the quorum and certification is
+    /// unreachable.
+    StakeCentileQuorumUnreachable { sigma_c: f64, tau: f64 },
+}
+
+impl std::fmt::Display for ElectionsConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StakeCentileQuorumUnreachable { sigma_c, tau } => write!(
+                f,
+                "stake-centile committee must cover more stake than the quorum fraction \
+                 (σ_c={sigma_c} ≤ τ={tau})"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for ElectionsConfigError {}
+
 /// Configuration for an `Elections` instance.
 pub struct ElectionsConfig {
     pub node_id: String,
     pub pipeline: PipelineConfig,
     pub committee_selection: CommitteeSelection,
     /// Per-pool persistent committee allocation, identical on every node
-    /// (computed via `wfa::build_committee` at startup).
+    /// (computed via `committee::build_committee` at startup).
     pub persistent_committee: BTreeMap<String, u32>,
     /// Network-wide stake registry, used to re-run the NPV lottery for
     /// incoming non-persistent votes.
     pub stake_registry: BTreeMap<String, u64>,
     pub total_stake: u64,
-    /// `Σ persistent_seats + non_persistent_voters`. Quorum threshold base.
-    pub expected_committee_size: u32,
-    /// Fraction of expected committee weight required for quorum
+    /// Quorum denominator in the same units the aggregator sums
+    /// per-voter weights — seats for `WfaLs`, node count for
+    /// `EveryoneVotes`, total active stake for `StakeCentile`.
+    /// Compute via [`committee::expected_total_weight`].
+    pub expected_total_weight: u64,
+    /// Fraction of expected total weight required for quorum
     /// (e.g. 0.75 = 75%).
     pub quorum_weight_fraction: f64,
+}
+
+impl ElectionsConfig {
+    /// Reject configurations that are guaranteed to fail at
+    /// quorum-check time.  Production callers (the sim adapter,
+    /// real-node bootstrap) invoke this before [`Elections::new`];
+    /// test fixtures may construct `Elections` directly when the
+    /// scenario only exercises code below the quorum step.
+    pub fn validate(&self) -> Result<(), ElectionsConfigError> {
+        if let CommitteeSelection::StakeCentile {
+            top_centile_of_stake,
+        } = self.committee_selection
+        {
+            if top_centile_of_stake <= self.quorum_weight_fraction {
+                return Err(ElectionsConfigError::StakeCentileQuorumUnreachable {
+                    sigma_c: top_centile_of_stake,
+                    tau: self.quorum_weight_fraction,
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 pub struct Elections {
@@ -184,7 +235,7 @@ impl Elections {
         eb_hash: &[u8; 32],
         eb_slot: u64,
         voter_key: Vec<u8>,
-        weight: u32,
+        weight: u64,
     ) -> Option<QuorumFormed> {
         aggregation::record_vote(
             &mut self.elections,
@@ -193,34 +244,54 @@ impl Elections {
             voter_key,
             weight,
             self.cfg.quorum_weight_fraction,
-            self.cfg.expected_committee_size,
+            self.cfg.expected_total_weight,
             self.current_slot,
             self.cfg.pipeline,
             &self.cfg.node_id,
         )
     }
 
-    /// Derive the weight to attribute to a decoded vote body.
+    /// Derive the weight to attribute to a decoded vote body, in the
+    /// units `expected_total_weight` is denominated in for this
+    /// committee mode.
     ///
-    /// - `tag == 0` (PV): looks up the voter's persistent-committee seat
-    ///   count (`0` if not seated).
-    /// - `tag == 1` (NPV): re-runs the NPV lottery from the embedded
-    ///   eligibility signature and the voter's stake.  If the voter
-    ///   *also* holds a persistent seat, returns `0` — CIP-0164
-    ///   partitions persistent (indices `[1, n₁]`) and non-persistent
-    ///   candidate (`[i*, |P|]`) pools disjointly, so a verified NPV
-    ///   signature from a persistent-seated voter is spec-violating
-    ///   and must not contribute weight.
-    /// - any other tag, or NPV without a signature: `0`.
-    pub fn weight_for(&self, voter_id: &str, tag: u8, npv_signature: Option<&[u8]>) -> u32 {
-        match (tag, npv_signature) {
-            (0, _) => self
+    /// - `tag == 0` (PV) under `WfaLs`/`EveryoneVotes`: the voter's
+    ///   persistent-committee seat count (`0` if not seated).
+    /// - `tag == 0` (PV) under `StakeCentile` (CIP-164 PR #1196):
+    ///   the voter's stake from the registry, but only if it is on
+    ///   the deterministic committee (otherwise `0`).  The quorum
+    ///   denominator is total active stake, so each member contributes
+    ///   its own stake.
+    /// - `tag == 1` (NPV) under `WfaLs`: re-runs the NPV lottery from
+    ///   the embedded eligibility signature and the voter's stake.  If
+    ///   the voter *also* holds a persistent seat, returns `0` —
+    ///   CIP-0164 partitions persistent (indices `[1, n₁]`) and
+    ///   non-persistent candidate (`[i*, |P|]`) pools disjointly, so a
+    ///   verified NPV signature from a persistent-seated voter is
+    ///   spec-violating and must not contribute weight.
+    /// - NPV tag under non-`WfaLs` modes (no NPV phase), or any other
+    ///   tag, or NPV without a signature: `0`.
+    pub fn weight_for(&self, voter_id: &str, tag: u8, npv_signature: Option<&[u8]>) -> u64 {
+        match (tag, npv_signature, &self.cfg.committee_selection) {
+            (0, _, CommitteeSelection::StakeCentile { .. }) => {
+                if self.cfg.persistent_committee.contains_key(voter_id) {
+                    self.cfg
+                        .stake_registry
+                        .get(voter_id)
+                        .copied()
+                        .unwrap_or(0)
+                } else {
+                    0
+                }
+            }
+            (0, _, _) => self
                 .cfg
                 .persistent_committee
                 .get(voter_id)
                 .copied()
+                .map(u64::from)
                 .unwrap_or(0),
-            (1, Some(sig)) => {
+            (1, Some(sig), CommitteeSelection::WfaLs { .. }) => {
                 if self.cfg.persistent_committee.contains_key(voter_id) {
                     return 0;
                 }
@@ -230,12 +301,12 @@ impl Elections {
                     .get(voter_id)
                     .copied()
                     .unwrap_or(0);
-                wfa::count_npv_wins(
+                committee::count_npv_wins(
                     sig,
                     stake,
                     self.cfg.total_stake,
                     self.cfg.committee_selection.non_persistent_voters(),
-                )
+                ) as u64
             }
             _ => 0,
         }
@@ -334,7 +405,7 @@ mod tests {
             persistent_committee: BTreeMap::new(),
             stake_registry: BTreeMap::new(),
             total_stake: 0,
-            expected_committee_size: 100,
+            expected_total_weight: 100,
             quorum_weight_fraction: 0.75,
         })
     }
@@ -455,7 +526,7 @@ mod tests {
             persistent_committee: BTreeMap::new(),
             stake_registry: BTreeMap::new(),
             total_stake: 0,
-            expected_committee_size: 100,
+            expected_total_weight: 100,
             quorum_weight_fraction: 0.75,
         };
         cfg.persistent_committee.insert("pool-a".to_string(), 5);
@@ -475,12 +546,96 @@ mod tests {
             persistent_committee: BTreeMap::new(),
             stake_registry: BTreeMap::new(),
             total_stake: 1000,
-            expected_committee_size: 100,
+            expected_total_weight: 100,
             quorum_weight_fraction: 0.75,
         };
         cfg.stake_registry.insert("pool-a".to_string(), 500);
         let e = Elections::new(cfg);
-        let sig = wfa::npv_eligibility_signature(b"pool-a", &h(0xAB), 1);
+        let sig = committee::npv_eligibility_signature(b"pool-a", &h(0xAB), 1);
         assert_eq!(e.weight_for("pool-a", 1, Some(&sig)), 0);
+    }
+
+    /// CIP-164 PR #1196 invariant: a stake-centile committee that
+    /// covers less stake than the quorum demands cannot produce a
+    /// certificate even with unanimous participation.  Reject at
+    /// startup rather than at quorum-check time.
+    #[test]
+    fn validate_rejects_stake_centile_when_sigma_c_le_tau() {
+        let cfg = ElectionsConfig {
+            node_id: "test".to_string(),
+            pipeline: test_pipeline(),
+            committee_selection: CommitteeSelection::StakeCentile {
+                top_centile_of_stake: 0.75,
+            },
+            persistent_committee: BTreeMap::new(),
+            stake_registry: BTreeMap::new(),
+            total_stake: 1_000_000,
+            expected_total_weight: 1_000_000,
+            quorum_weight_fraction: 0.80,
+        };
+        assert_eq!(
+            cfg.validate(),
+            Err(ElectionsConfigError::StakeCentileQuorumUnreachable {
+                sigma_c: 0.75,
+                tau: 0.80,
+            })
+        );
+    }
+
+    /// Equality (σ_c == τ) is also rejected — at the boundary the
+    /// committee can only just meet quorum if every member votes, and
+    /// CIP-164 PR #1196 requires strict inequality.
+    #[test]
+    fn validate_rejects_stake_centile_at_boundary() {
+        let cfg = ElectionsConfig {
+            node_id: "test".to_string(),
+            pipeline: test_pipeline(),
+            committee_selection: CommitteeSelection::StakeCentile {
+                top_centile_of_stake: 0.75,
+            },
+            persistent_committee: BTreeMap::new(),
+            stake_registry: BTreeMap::new(),
+            total_stake: 1_000_000,
+            expected_total_weight: 1_000_000,
+            quorum_weight_fraction: 0.75,
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    /// σ_c > τ passes — and the check is StakeCentile-only.
+    #[test]
+    fn validate_accepts_stake_centile_when_sigma_c_gt_tau() {
+        let cfg = ElectionsConfig {
+            node_id: "test".to_string(),
+            pipeline: test_pipeline(),
+            committee_selection: CommitteeSelection::StakeCentile {
+                top_centile_of_stake: 0.95,
+            },
+            persistent_committee: BTreeMap::new(),
+            stake_registry: BTreeMap::new(),
+            total_stake: 1_000_000,
+            expected_total_weight: 1_000_000,
+            quorum_weight_fraction: 0.75,
+        };
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_ignores_wfa_ls_quorum_relationship() {
+        // WfaLs doesn't carry a σ_c notion; the invariant doesn't apply.
+        let cfg = ElectionsConfig {
+            node_id: "test".to_string(),
+            pipeline: test_pipeline(),
+            committee_selection: CommitteeSelection::WfaLs {
+                persistent_voters: 480,
+                non_persistent_voters: 120,
+            },
+            persistent_committee: BTreeMap::new(),
+            stake_registry: BTreeMap::new(),
+            total_stake: 1_000_000,
+            expected_total_weight: 600,
+            quorum_weight_fraction: 0.99,
+        };
+        assert!(cfg.validate().is_ok());
     }
 }

@@ -14,7 +14,7 @@ implementation.
 | `peer`          | `PeerId(u64)` newtype                                            |
 | `config`        | `CommitteeSelection` enum (WfaLs / EveryoneVotes / StakeCentile) |
 | `pipeline`      | EB lifecycle phases (Voting → CertEligible → expiry)             |
-| `wfa`           | Weighted Fait Accompli + Local Sortition committee selection     |
+| `committee`     | Committee selection (WfaLs, EveryoneVotes, StakeCentile), NPV lottery |
 | `lottery`       | Praos f_block stake-weighted threshold formula                   |
 | `aggregation`   | Per-EB vote tally, quorum detection                              |
 | `bitmap`        | Sparse `BTreeMap<u16, u64>` for `MsgLeiosBlockTxsRequest`        |
@@ -53,7 +53,7 @@ graph TD
         Production[production: BodyPath]
         Elections["Elections<br/>per-EB voting state"]
         Pipeline[PipelineConfig]
-        Wfa[wfa]
+        Committee[committee]
         Lottery[lottery]
         Agg[aggregation]
         ChainTree[chain_tree]
@@ -409,7 +409,7 @@ introduce non-determinism. The constraints:
   emits all `EligibleToVote` (sorted by `eb_hash`) before any
   `Expired`.
 - Time enters as `Instant` parameters, never `Instant::now()`.
-- Randomness flows through `wfa.rs` and `lottery.rs` helpers seeded by
+- Randomness flows through `committee.rs` and `lottery.rs` helpers seeded by
   stable bytes (EB hash, voter id, stake) — there is no `thread_rng`
   or `from_entropy` call anywhere in the crate.
 - Behaviours follow the same rules: they take a seed at construction
@@ -420,7 +420,7 @@ introduce non-determinism. The constraints:
 ```mermaid
 graph TD
     leios --> elections
-    leios --> wfa
+    leios --> committee
     leios --> pipeline
     leios --> aggregation
     leios --> fetch
@@ -439,13 +439,13 @@ graph TD
     production --> mempool
     elections --> aggregation
     elections --> pipeline
-    elections --> wfa
+    elections --> committee
     elections --> config
     aggregation --> pipeline
     chain_tree --> types
     peer_chain --> types
     pipeline --> config
-    wfa --> config
+    committee --> config
     fetch --> bitmap
     fetch --> peer
     fetch --> types

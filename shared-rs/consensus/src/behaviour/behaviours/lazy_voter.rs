@@ -78,7 +78,7 @@ mod tests {
             persistent_committee: BTreeMap::new(),
             stake_registry: BTreeMap::new(),
             total_stake: 100,
-            expected_committee_size: 1,
+            expected_total_weight: 1,
             quorum_weight_fraction: 0.75,
         });
         let voting = VotingConfig {
