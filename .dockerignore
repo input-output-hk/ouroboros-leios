@@ -1,23 +1,32 @@
-# Ignore specific files and directories
-.git/
+# Strict allow-list. Everything in the build context is excluded by
+# default; only the paths un-ignored below are sent to the docker
+# daemon. This keeps the context tiny in a fast-growing monorepo.
+#
+# When adding a new Dockerfile that needs additional paths, extend the
+# allow-list below; don't relax the leading `*`.
+
+*
+
+# Top-level Dockerfile (sim-rs + ols)
+!sim-rs
+!simulation
+!conformance-testing
+!leios-trace-hs
+!cabal.project
+!data
+
+# net-rs/docker/Dockerfile (net-node)
+!net-rs
+!shared-rs
+
+# Heavy / generated subdirs under the allow-listed roots
+sim-rs/target
+sim-rs/output
+net-rs/target
+net-rs/net-ui/node_modules
+net-rs/net-ui/dist
+shared-rs/target
+**/dist
+**/dist-newstyle
 **/.DS_Store
 **/*.rs.bk
-
-# Ignore build artifacts
-sim-rs/target/
-sim-rs/output/
-**/dist/
-**/dist-newstyle/
-
-# Allow specific directories and files
-!sim-rs/
-!simulation/
-!conformance-testing/
-!data/simulation/*.yaml
-!leios-trace-hs/
-!cabal.project
-
-# Allow cabal files
-!simulation/*.cabal
-!conformance-testing/*.cabal
-!leios-trace-hs/*.cabal 
