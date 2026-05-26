@@ -328,7 +328,18 @@ pub struct RawParameters {
     pub vote_generation_cpu_time_ms_per_ib: f64,
     pub persistent_vote_validation_cpu_time_ms: f64,
     pub non_persistent_vote_validation_cpu_time_ms: f64,
-    pub vote_threshold: u64,
+    /// Fraction of expected total weight required for quorum
+    /// (CIP-0164 default 0.75).  Replaces the old absolute
+    /// `vote-threshold` knob — the threshold is now derived from the
+    /// committee selection mode:
+    ///
+    /// - `wfa-ls`: threshold = `quorum_weight_fraction × (PV+NPV)`.
+    /// - `everyone`: threshold = `quorum_weight_fraction × N`.
+    /// - `top-stake-fraction` (CIP-164 PR #1196): threshold =
+    ///   `quorum_weight_fraction × total_active_stake`, and per-voter
+    ///   weight is stake (not vote count).
+    #[serde(default = "default_quorum_weight_fraction")]
+    pub quorum_weight_fraction: f64,
     pub vote_bundle_size_bytes_constant: u64,
     pub persistent_vote_bundle_size_bytes_per_eb: u64,
     pub non_persistent_vote_bundle_size_bytes_per_eb: u64,
@@ -438,6 +449,10 @@ pub enum CommitteeSelectionAlgorithm {
 
 fn default_committee_stake_fraction_threshold() -> f64 {
     0.95
+}
+
+fn default_quorum_weight_fraction() -> f64 {
+    0.75
 }
 
 #[derive(Deserialize)]
@@ -1005,7 +1020,13 @@ pub struct SimConfiguration {
     pub max_eb_age: u64,
     pub late_ib_inclusion: bool,
     pub variant: LeiosVariant,
-    pub vote_threshold: u64,
+    /// Quorum fraction (CIP-0164 default 0.75).  Compare votes against
+    /// `quorum_weight_fraction × expected_total_weight`.
+    pub quorum_weight_fraction: f64,
+    /// Quorum denominator in the units the relevant node implementation
+    /// sums per-voter weights.  WfaLs/Everyone: seats or node count.
+    /// TopStakeFraction (CIP-164 PR #1196): `total_stake`.
+    pub expected_total_weight: u64,
     pub(crate) total_stake: u64,
     pub(crate) praos_fallback: bool,
     pub(crate) header_diffusion_time: Duration,
@@ -1068,6 +1089,16 @@ pub struct SimConfiguration {
 }
 
 impl SimConfiguration {
+    /// Absolute quorum threshold in the units the local node
+    /// implementation sums per-voter weights — derived from
+    /// `quorum_weight_fraction × expected_total_weight`.  Replaces the
+    /// old absolute `vote_threshold` config; downstream consumers
+    /// (sim-cli liveness telemetry, per-variant endorsement gates) call
+    /// this where they previously read the field.
+    pub fn vote_threshold(&self) -> u64 {
+        (self.quorum_weight_fraction * self.expected_total_weight as f64) as u64
+    }
+
     pub fn build(params: RawParameters, mut topology: Topology) -> Result<Self> {
         if !params.ib_shards.is_multiple_of(params.ib_shard_group_count) {
             bail!(
@@ -1101,6 +1132,18 @@ impl SimConfiguration {
                 HashSet::new()
             }
             CommitteeSelectionAlgorithm::TopStakeFraction => {
+                // σ_c > τ — CIP-164 PR #1196.  At equality or below
+                // the committee cannot meet the stake quorum even
+                // with unanimous participation.
+                if params.committee_stake_fraction_threshold <= params.quorum_weight_fraction {
+                    bail!(
+                        "top-stake-fraction committee covers σ_c={} of stake which is ≤ \
+                         quorum-weight-fraction τ={}; certification is unreachable \
+                         (CIP-164 PR #1196 requires σ_c > τ)",
+                        params.committee_stake_fraction_threshold,
+                        params.quorum_weight_fraction,
+                    );
+                }
                 let threshold =
                     (total_stake as f64 * params.committee_stake_fraction_threshold) as u64;
                 let mut nodes_by_stake: Vec<_> =
@@ -1119,6 +1162,17 @@ impl SimConfiguration {
                     .map(|(id, _)| id)
                     .collect()
             }
+        };
+        // Quorum denominator matches the per-voter weight unit each
+        // node implementation sums.  WfaLs: persistent + non-persistent
+        // expected vote weight.  Everyone: one seat per topology node.
+        // TopStakeFraction: total active stake (PR #1196).
+        let expected_total_weight: u64 = match params.committee_selection_algorithm {
+            CommitteeSelectionAlgorithm::WfaLs => {
+                (params.persistent_voters + params.non_persistent_voters) as u64
+            }
+            CommitteeSelectionAlgorithm::Everyone => topology.nodes.len() as u64,
+            CommitteeSelectionAlgorithm::TopStakeFraction => total_stake,
         };
         Ok(Self {
             seed: params.seed,
@@ -1161,7 +1215,8 @@ impl SimConfiguration {
             vote_probability: params.persistent_voters + params.non_persistent_voters,
             persistent_voters: params.persistent_voters,
             non_persistent_voters: params.non_persistent_voters,
-            vote_threshold: params.vote_threshold,
+            quorum_weight_fraction: params.quorum_weight_fraction,
+            expected_total_weight,
             vote_slot_length: params.leios_stage_active_voting_slots,
             eb_include_txs_from_previous_stage: params.eb_include_txs_from_previous_stage,
             linear_vote_stage_length: params.linear_vote_stage_length_slots,

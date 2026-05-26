@@ -81,7 +81,7 @@ use shared_consensus::{
     praos::{ParsedHeaderInfo, PraosEffect, PraosState},
     production::BodyPath,
     types::Point,
-    wfa,
+    committee,
 };
 
 use crate::{
@@ -188,15 +188,15 @@ fn derive_committee_selection(sim_config: &SimConfiguration) -> CommitteeSelecti
     }
 }
 
-/// Quorum fraction = `vote_threshold / expected_committee_size`.  Sim
-/// stores quorum as an absolute vote count; shared-consensus wants the same
-/// boundary as a fraction of expected total weight.  Falls back to
-/// 0.75 (CIP-0164 default) when the divisor is zero.
-fn derive_quorum_fraction(sim_config: &SimConfiguration, expected: u32) -> f64 {
-    if expected == 0 {
+/// Quorum fraction passes straight through.  Sim stores it as a
+/// fraction `quorum_weight_fraction` (e.g. 0.75 = CIP-0164 default);
+/// shared-consensus consumes the same shape.  Falls back to 0.75 only
+/// if the sim left it at zero.
+fn derive_quorum_fraction(sim_config: &SimConfiguration) -> f64 {
+    if sim_config.quorum_weight_fraction <= 0.0 {
         return 0.75;
     }
-    sim_config.vote_threshold as f64 / expected as f64
+    sim_config.quorum_weight_fraction
 }
 
 /// Canonical mapping from sim's `TransactionId` to shared-consensus's opaque
@@ -443,14 +443,17 @@ impl NodeImpl for SharedConsensus {
         let stake_registry = build_stake_registry(&sim_config);
         let committee_selection = derive_committee_selection(&sim_config);
         let persistent_committee =
-            wfa::build_committee(&committee_selection, &stake_registry, sim_config.seed);
-        let expected_committee_size =
-            wfa::expected_committee_size(&committee_selection, &persistent_committee);
+            committee::build_committee(&committee_selection, &stake_registry, sim_config.seed);
         let total_stake: u64 = stake_registry.iter().map(|e| e.stake).sum();
+        let expected_total_weight = committee::expected_total_weight(
+            &committee_selection,
+            &persistent_committee,
+            total_stake,
+        );
 
         let pipeline = derive_pipeline(&sim_config);
-        let quorum_weight_fraction = derive_quorum_fraction(&sim_config, expected_committee_size);
-        let elections = Elections::new(ElectionsConfig {
+        let quorum_weight_fraction = derive_quorum_fraction(&sim_config);
+        let elections_config = ElectionsConfig {
             node_id: config.name.clone(),
             pipeline,
             committee_selection: committee_selection.clone(),
@@ -460,9 +463,16 @@ impl NodeImpl for SharedConsensus {
                 .map(|e| (e.node_id.clone(), e.stake))
                 .collect(),
             total_stake,
-            expected_committee_size,
+            expected_total_weight,
             quorum_weight_fraction,
-        });
+        };
+        // σ_c > τ — CIP-164 PR #1196.  Sim configs that violate this
+        // produce no certs; surface the misconfiguration at startup
+        // rather than letting the run silently fail.
+        if let Err(err) = elections_config.validate() {
+            panic!("shared-consensus elections config invalid: {err}");
+        }
+        let elections = Elections::new(elections_config);
 
         let persistent_seats = persistent_committee.get(&config.name).copied().unwrap_or(0);
         // Sim collapses PV / NPV byte budgets into a single
@@ -2111,7 +2121,7 @@ impl SharedConsensus {
                 self.leios.voting_config.persistent_seats,
             ),
             (false, Some(sig)) => {
-                let npv_wins = shared_consensus::wfa::count_npv_wins(
+                let npv_wins = shared_consensus::committee::count_npv_wins(
                     &sig,
                     self.leios.voting_config.stake,
                     self.leios.voting_config.total_stake,

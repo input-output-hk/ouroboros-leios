@@ -843,7 +843,7 @@ impl LeiosNode {
 
     fn choose_endorsed_block_for_rb(&self, slot: u64) -> Option<Endorsement> {
         // an EB is eligible to be included on-chain if it has this many votes
-        let vote_threshold = self.sim_config.vote_threshold;
+        let vote_threshold = self.sim_config.vote_threshold();
         // and it is not older than this
         let max_eb_age = self.sim_config.max_eb_age;
         // and if it is not in a pipeline already represented in the chain
@@ -900,7 +900,7 @@ impl LeiosNode {
 
     fn choose_endorsed_block_from_pipeline(&self, pipeline: u64) -> Option<EndorserBlockId> {
         // an EB is eligible for endorsement if it has this many votes
-        let vote_threshold = self.sim_config.vote_threshold;
+        let vote_threshold = self.sim_config.vote_threshold();
 
         // Choose an EB based on, in order,
         //  - the TXs in the EB (more TXs take priority)
@@ -1475,7 +1475,7 @@ impl LeiosNode {
                 .entry(votes.id.producer)
                 .or_default();
             *eb_votes += count;
-            if *eb_votes as u64 >= self.sim_config.vote_threshold {
+            if *eb_votes as u64 >= self.sim_config.vote_threshold() {
                 self.leios
                     .earliest_eb_cert_times_by_pipeline
                     .entry(eb.pipeline)
@@ -1810,7 +1810,7 @@ impl LeiosNode {
                 return Err(NoVoteReason::UncertifiedEBReference);
             };
             let vote_count = votes.values().copied().sum::<usize>() as u64;
-            if vote_count < self.sim_config.vote_threshold {
+            if vote_count < self.sim_config.vote_threshold() {
                 return Err(NoVoteReason::UncertifiedEBReference);
             }
         }
@@ -1828,7 +1828,7 @@ impl LeiosNode {
                 .entry(votes.id.producer)
                 .or_default();
             *eb_votes += count;
-            if *eb_votes as u64 > self.sim_config.vote_threshold {
+            if *eb_votes as u64 > self.sim_config.vote_threshold() {
                 self.leios
                     .earliest_eb_cert_times_by_pipeline
                     .entry(eb.pipeline)
