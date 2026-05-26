@@ -8,7 +8,7 @@
 //! Server-side protocol handlers read (block lookups, vote lookups,
 //! notification subscriptions).
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::watch;
@@ -58,8 +58,17 @@ struct LeiosStoreInner {
     eb_tx_hashes: HashMap<BlockKey, Vec<[u8; 32]>>,
     /// Votes keyed by (slot, voter_id).
     votes: HashMap<(u64, Vec<u8>), Vec<u8>>,
-    /// Notification queue for the LeiosNotify server.
-    notifications: Vec<LeiosNotification>,
+    /// Notification queue for the LeiosNotify server.  Front-pruned
+    /// alongside the slot-window eviction of the other maps so
+    /// long-running connections don't accumulate notifications for
+    /// data that no longer lives in the store.
+    notifications: VecDeque<LeiosNotification>,
+    /// Total notifications popped off `notifications`' front so far —
+    /// used to translate `notifications_after`'s logical cursor into
+    /// the deque's local index.  Subscribers track a monotonically
+    /// increasing logical position; when their cursor falls behind
+    /// this count, `notifications_after` advances it to the front.
+    notifications_pruned_count: usize,
     /// Max number of blocks to retain.
     capacity: usize,
     /// Monotonically increasing counter for change notifications.
@@ -138,7 +147,8 @@ impl LeiosStore {
                 block_txs: HashMap::new(),
                 eb_tx_hashes: HashMap::new(),
                 votes: HashMap::new(),
-                notifications: Vec::new(),
+                notifications: VecDeque::new(),
+                notifications_pruned_count: 0,
                 capacity,
                 version: 0,
                 max_slot: 0,
@@ -165,7 +175,7 @@ impl LeiosStore {
         inner.blocks.insert(key, block);
         inner
             .notifications
-            .push(LeiosNotification::BlockOffer { point });
+            .push_back(LeiosNotification::BlockOffer { point });
         inner.max_slot = inner.max_slot.max(slot);
         self.bump_version(&mut inner);
     }
@@ -198,7 +208,7 @@ impl LeiosStore {
         if first_injection {
             inner
                 .notifications
-                .push(LeiosNotification::BlockTxsOffer { point });
+                .push_back(LeiosNotification::BlockTxsOffer { point });
         }
         inner.max_slot = inner.max_slot.max(slot);
         self.bump_version(&mut inner);
@@ -228,7 +238,7 @@ impl LeiosStore {
         }
         inner
             .notifications
-            .push(LeiosNotification::VotesOffer { votes: ids });
+            .push_back(LeiosNotification::VotesOffer { votes: ids });
         inner.max_slot = inner.max_slot.max(max_in_batch);
         self.bump_version(&mut inner);
     }
@@ -257,7 +267,7 @@ impl LeiosStore {
             .insert(BlockKey { slot, hash }, tx_hashes);
         inner
             .notifications
-            .push(LeiosNotification::BlockTxsOffer { point });
+            .push_back(LeiosNotification::BlockTxsOffer { point });
         inner.max_slot = inner.max_slot.max(slot);
         self.bump_version(&mut inner);
     }
@@ -332,19 +342,31 @@ impl LeiosStore {
         }
     }
 
-    /// Get notifications after the given index (exclusive).
-    /// Index 0 means "from the beginning".
-    pub fn notifications_after(&self, after: usize) -> Vec<LeiosNotification> {
+    /// Get notifications after the given logical index (exclusive).
+    ///
+    /// The cursor `after` is monotonically increasing across the
+    /// connection's lifetime — never reset, never shifted by pruning.
+    /// If the caller's cursor has fallen behind the prune frontier,
+    /// it's bumped up to the frontier so subsequent `*after += 1`
+    /// increments stay aligned with the logical position of items the
+    /// caller actually consumes.  Index `0` still means "from the
+    /// earliest still-retained notification".
+    pub fn notifications_after(&self, after: &mut usize) -> Vec<LeiosNotification> {
         let inner = self.inner.lock().unwrap();
-        if after >= inner.notifications.len() {
+        if *after < inner.notifications_pruned_count {
+            *after = inner.notifications_pruned_count;
+        }
+        let local = *after - inner.notifications_pruned_count;
+        if local >= inner.notifications.len() {
             return Vec::new();
         }
-        inner.notifications[after..].to_vec()
+        inner.notifications.range(local..).cloned().collect()
     }
 
-    /// Get the total number of notifications so far.
+    /// Total notifications ever pushed (including those since pruned).
     pub fn notification_count(&self) -> usize {
-        self.inner.lock().unwrap().notifications.len()
+        let inner = self.inner.lock().unwrap();
+        inner.notifications_pruned_count + inner.notifications.len()
     }
 
     /// Subscribe to change notifications.
@@ -369,6 +391,22 @@ impl LeiosStore {
             inner.block_txs.retain(|key, _| key.slot >= cutoff);
             inner.eb_tx_hashes.retain(|key, _| key.slot >= cutoff);
             inner.votes.retain(|(slot, _), _| *slot >= cutoff);
+            // Front-prune `notifications` for entries that reference
+            // only data older than the cutoff.  Notifications are
+            // pushed in arrival order, which roughly tracks slot
+            // order under normal operation — a non-evictable item at
+            // the front means later items are at least as recent, so
+            // stopping there is safe.  Worst case (out-of-order
+            // arrivals) leaks a small tail past the cutoff; the next
+            // bump catches it up.
+            while let Some(front) = inner.notifications.front() {
+                if notification_evictable(front, cutoff) {
+                    inner.notifications.pop_front();
+                    inner.notifications_pruned_count += 1;
+                } else {
+                    break;
+                }
+            }
         }
 
         // Capacity backstop on `blocks` (independent of slot window).
@@ -403,6 +441,22 @@ impl LeiosStore {
 
         let version = inner.version;
         let _ = self.notify.send(version);
+    }
+}
+
+/// True iff every slot the notification references is below `cutoff`
+/// — i.e. the notification only points at data that's already been
+/// evicted from the slot-window-pruned maps and can never be served.
+fn notification_evictable(n: &LeiosNotification, cutoff: u64) -> bool {
+    match n {
+        LeiosNotification::BlockOffer { point }
+        | LeiosNotification::BlockTxsOffer { point } => match point {
+            Point::Specific { slot, .. } => *slot < cutoff,
+            Point::Origin => true,
+        },
+        LeiosNotification::VotesOffer { votes } => {
+            !votes.is_empty() && votes.iter().all(|(s, _)| *s < cutoff)
+        }
     }
 }
 
@@ -601,7 +655,7 @@ mod tests {
 
         // One BlockTxsOffer notification, not two.
         let txs_offers = store
-            .notifications_after(0)
+            .notifications_after(&mut 0)
             .into_iter()
             .filter(|n| matches!(n, LeiosNotification::BlockTxsOffer { .. }))
             .count();
@@ -698,7 +752,7 @@ mod tests {
         store.inject_block(point, vec![0x01]);
         store.inject_votes(vec![(10, vec![0x02])], vec![vec![0x03]]);
 
-        let all = store.notifications_after(0);
+        let all = store.notifications_after(&mut 0);
         assert_eq!(all.len(), 2);
         assert!(matches!(
             all[0],
@@ -708,10 +762,10 @@ mod tests {
         ));
         assert!(matches!(all[1], LeiosNotification::VotesOffer { .. }));
 
-        let after_first = store.notifications_after(1);
+        let after_first = store.notifications_after(&mut 1);
         assert_eq!(after_first.len(), 1);
 
-        let after_all = store.notifications_after(2);
+        let after_all = store.notifications_after(&mut 2);
         assert!(after_all.is_empty());
     }
 
@@ -769,6 +823,56 @@ mod tests {
 
         // Recent entry stays.
         assert!(store.get_block(100, &[0x33; 32]).is_some());
+    }
+
+    #[test]
+    fn slot_retention_prunes_notifications() {
+        // Tight retention window so a few slot advances trigger eviction.
+        let (store, _rx) = LeiosStore::new_with_retention(1000, None, 5, 0);
+
+        // Three notifications at slot 1.
+        store.inject_block(
+            Point::Specific {
+                slot: 1,
+                hash: [0x11; 32],
+            },
+            vec![0xB0],
+        );
+        store.inject_block(
+            Point::Specific {
+                slot: 1,
+                hash: [0x12; 32],
+            },
+            vec![0xB1],
+        );
+        store.inject_votes(vec![(1, vec![0xAA])], vec![vec![0x01]]);
+        assert_eq!(store.notification_count(), 3);
+
+        // Inject a recent block to push max_slot past the retention
+        // window — cutoff = 100 - 5 = 95, all slot-1 notifications
+        // are now stale.
+        store.inject_block(
+            Point::Specific {
+                slot: 100,
+                hash: [0x33; 32],
+            },
+            vec![0xD0],
+        );
+
+        // The slot-1 notifications were front-pruned; only the
+        // slot-100 one remains.  The logical count still reflects
+        // every notification ever pushed.
+        assert_eq!(store.notification_count(), 4);
+        let mut cursor = 0;
+        let pending = store.notifications_after(&mut cursor);
+        assert_eq!(pending.len(), 1);
+        assert_eq!(cursor, 3, "cursor advanced past the prune frontier");
+        assert!(matches!(
+            pending[0],
+            LeiosNotification::BlockOffer {
+                point: Point::Specific { slot: 100, .. }
+            }
+        ));
     }
 
     #[tokio::test]
