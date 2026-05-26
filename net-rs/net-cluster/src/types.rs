@@ -81,6 +81,13 @@ impl AggregatedNodeVotes {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AggregatedVotesHistory {
+    pub last_slot: u64,
+    pub node_ids: Vec<String>,
+    pub votes: Vec<String>,
+}
+
 /// An ingested event with extracted metadata for aggregation.
 pub struct IngestedEvent {
     /// Timestamp from the event's `time_s` field.

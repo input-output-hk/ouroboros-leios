@@ -101,3 +101,9 @@ export interface AggregateNodeVotes {
   slot: number;
   node_statuses: Record<string, NodeVoteStatus>;
 }
+
+export interface AggregateVotesHistory {
+  last_slot: number;
+  node_ids: string[];
+  votes: string[];
+}

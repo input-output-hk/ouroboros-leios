@@ -33,7 +33,7 @@ export function VotingPanel() {
   const colCount = matrix.length;
 
   return (
-    <Box sx={{ p: 2, width: 700, maxWidth: "80vw" }}>
+    <Box sx={{ p: 2, width: 675, maxWidth: "80vw" }}>
       <Typography variant="subtitle2" color="primary" gutterBottom>
         Voting Panel
       </Typography>

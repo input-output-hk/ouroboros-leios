@@ -17,7 +17,7 @@ use tokio::sync::{broadcast, mpsc, RwLock};
 use tower_http::cors::CorsLayer;
 use crate::config::ClusterControlConfig;
 use crate::topology::Topology;
-use crate::types::{self, AggregatedNodeVotes, EventWindow, IngestedEvent, NodeVotes, StatsSnapshot};
+use crate::types::{self, AggregatedNodeVotes, AggregatedVotesHistory, EventWindow, IngestedEvent, NodeVotes, StatsSnapshot};
 
 /// Shared state for the HTTP server.
 pub struct ServerState {
@@ -143,6 +143,7 @@ pub async fn start(
         .route("/api/stats/:node_id", get(get_node_stats))
         .route("/api/events", get(get_events))
         .route("/api/events/stream", get(event_stream))
+        .route("/api/votes-history", get(get_votes_history)) // TODO: separate endpoint for aggregated votes?
         .route("/api/votes/:slot", get(get_votes))
         // Cluster control API.
         .route("/api/config", get(get_config))
@@ -364,6 +365,44 @@ async fn get_votes(
             |(node_id, status)| (node_id.clone(), status.clone())
         ).collect(),
     }))
+}
+
+async fn get_votes_history(
+    State(state): State<Arc<ServerState>>,
+) -> Json<AggregatedVotesHistory> {
+    const WINDOW_SIZE: u64 = 30; // TODO: make configurable
+    let votes = state.aggregate_votes.read().await;
+
+    let node_ids: Vec<String> = votes.cache.values().flat_map(|node_statuses| {
+        node_statuses.keys().cloned()
+    }).collect::<std::collections::HashSet<_>>().into_iter().collect();
+
+    let last_slot = votes.cache.keys().max().cloned().unwrap_or(0);
+
+    let mut history = Vec::new();
+    for slot in (last_slot-WINDOW_SIZE..=last_slot).rev() {
+        let Some(node_statuses) = votes.cache.get(&slot) else {
+            history.push("".to_string());
+            continue;
+        };
+        let mut str = String::new();
+        for node_id in &node_ids {
+            str.push(match node_statuses.get(node_id) {
+                Some(NodeVotes {vote_cast: true, ..}) => '1',
+                Some(NodeVotes {eb_received: true, ..}) => 'E',
+                Some(NodeVotes {rb_received: true, ..}) => 'R',
+                Some(NodeVotes {perm_committee_member: true, ..}) => '*',
+                _ => '.'
+            });
+        }
+        history.push(str);
+    };
+
+    Json(AggregatedVotesHistory{
+        last_slot,
+        node_ids,
+        votes: history, // TODO: serialize the full history of votes
+    })
 }
 
 /// Query parameters for the events endpoint.

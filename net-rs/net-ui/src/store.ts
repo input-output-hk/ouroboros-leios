@@ -15,7 +15,7 @@ import {
   fetchConfig,
   restartCluster as apiRestartCluster,
   updateNodeConfig as apiUpdateNodeConfig,
-  fetchAggregateNodeVotes
+  fetchAggregateNodeVotes, fetchAggregateNodeVotesHistory, fetchAggregateVotesHistory
 } from "./api";
 
 const MAX_SERIES = 300; // ~5 min at 1s stats interval
@@ -207,28 +207,33 @@ export const useStore = create<DashboardState>()((set, get) => ({
       const VOTING_SLOTS = 24;
       const topoNodes = get().topology?.nodes ?? [];
       const nodeCount = topoNodes.length;
-      const slotStart = Math.max(0, curSlot - VOTING_SLOTS + 1);
 
-      let aggregated_votes: Array<AggregateNodeVotes> = [];
-
-      for (let slot: number = curSlot - VOTING_SLOTS; slot <= curSlot; slot++) {
-        aggregated_votes.push(await fetchAggregateNodeVotes(slot));
+      const aggregated_votes = await fetchAggregateVotesHistory();
+      const slotStart = aggregated_votes.last_slot;
+      let nodeIds: Record<string, number> = {};
+      for (let i = 0; i < aggregated_votes.node_ids.length; i++) {
+        nodeIds[aggregated_votes.node_ids[i]] = i;
       }
+      //let arrayOffset = aggregated_votes.votes.length - VOTING_SLOTS;
+
+      //for (let slot: number = curSlot - VOTING_SLOTS; slot <= curSlot; slot++) {
+      //  aggregated_votes.push(await fetchAggregateNodeVotes(slot));
+      //}
 
       const nextMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "VoteCast" | "Committee")[][] = Array.from(
         {length: VOTING_SLOTS},
         (_, i) => {
-          const votes = aggregated_votes[i]?.node_statuses;
+          const votes = aggregated_votes.votes[aggregated_votes.votes.length - i] ?? [];
           if (votes) {
             return topoNodes.map((n) => {
-              const v = votes[n.node_id];
-              console.log(n.node_id);
-              console.log(votes[n.node_id]);
-              if (!v) return "NoEvent" as const;
-              if (v.vote_cast) return "VoteCast" as const;
-              if (v.eb_received) return "EBReceived" as const;
-              if (v.rb_received) return "RBReceived" as const;
-              if (v.perm_committee_member) return "Committee" as const;
+              const idx = nodeIds[n.node_id];
+              console.log(idx, n.node_id)
+              const status = votes[idx];
+              if (status === '.') return "NoEvent" as const;
+              if (status === '1') return "VoteCast" as const;
+              if (status === 'E') return "EBReceived" as const;
+              if (status === 'R') return "RBReceived" as const;
+              if (status === '*') return "Committee" as const;
               return "NoEvent" as const;
             });
           }

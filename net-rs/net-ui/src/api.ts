@@ -1,4 +1,11 @@
-import type { Topology, StatsSnapshot, OutputEvent, ClusterControlConfig, AggregateNodeVotes } from "./types";
+import type {
+  Topology,
+  StatsSnapshot,
+  OutputEvent,
+  ClusterControlConfig,
+  AggregateNodeVotes,
+  AggregateVotesHistory
+} from "./types";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -15,6 +22,11 @@ export async function fetchAllStats(): Promise<Record<string, StatsSnapshot>> {
 export async function fetchAggregateNodeVotes(slot: number): Promise<AggregateNodeVotes> {
   const res = await fetch(`${BASE}/api/votes/${slot}`);
   return res.json() as Promise<AggregateNodeVotes>;
+}
+
+export async function fetchAggregateVotesHistory(): Promise<AggregateVotesHistory> {
+  const res = await fetch(`${BASE}/api/votes-history`);
+  return res.json() as Promise<AggregateVotesHistory>;
 }
 
 export async function fetchEvents(after: number): Promise<OutputEvent[]> {
