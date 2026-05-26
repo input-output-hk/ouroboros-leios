@@ -53,17 +53,23 @@ const parseRankingBlockGenerated = (
   try {
     const log = JSON.parse(logLine);
 
-    // {"forgedBlock":{"newBlockHash":"c036...","newBlockSize":{"txCount":293,"txSize":{"txSizeBytes":88842},...},...},"kind":"TraceForgedBlock","slot":1561}
-    if (log.kind === "TraceForgedBlock" && log.forgedBlock) {
-      const block = log.forgedBlock;
-      const txSizeBytes = block.newBlockSize?.txSize?.txSizeBytes ?? 0;
-
+    // cardano-node tracing of newer node versions. The stream label `ns`
+    // carries the tracer namespace; the `data` field is what Loki streams as
+    // the log line, with the legacy `forgedBlock` wrapper flattened away.
+    //
+    // ns=Forge.Loop.ForgedBlock
+    // {"block":"8ee35205...","blockNo":25,"blockPrev":"625d1f62...","kind":"TraceForgedBlock","slot":753}
+    //
+    // TODO: size_bytes is not in this event — the matching
+    // Forge.Loop.AdoptedBlock carries `blockSize`. Correlate by hash to
+    // populate. Until then, fall back to 0.
+    if (streamLabels.ns === "Forge.Loop.ForgedBlock" && log.block) {
       const message: IRankingBlockGenerated = {
         type: EServerMessageType.RBGenerated,
-        id: block.newBlockHash,
+        id: log.block,
         slot: log.slot,
         producer: streamLabels.process,
-        size_bytes: txSizeBytes,
+        size_bytes: 0, // TODO: add size_bytes
         header_bytes: 0, // TODO: used? have we access to the header?
         endorsement: null,
         transactions: [], // TODO: used?
@@ -75,7 +81,11 @@ const parseRankingBlockGenerated = (
       };
     }
   } catch (error) {
-    console.warn("Failed to parse TraceForgedBlock log line:", logLine, error);
+    console.warn(
+      "Failed to parse Forge.Loop.ForgedBlock log line:",
+      logLine,
+      error,
+    );
   }
 
   return null;
