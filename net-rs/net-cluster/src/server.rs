@@ -17,7 +17,7 @@ use tokio::sync::{broadcast, mpsc, RwLock};
 use tower_http::cors::CorsLayer;
 use crate::config::ClusterControlConfig;
 use crate::topology::Topology;
-use crate::types::{self, EventWindow, IngestedEvent, StatsSnapshot};
+use crate::types::{self, AggregatedNodeVotes, EventWindow, IngestedEvent, NodeVotes, StatsSnapshot};
 
 /// Shared state for the HTTP server.
 pub struct ServerState {
@@ -25,6 +25,8 @@ pub struct ServerState {
     pub event_tx: mpsc::Sender<Vec<IngestedEvent>>,
     /// Latest stats per node.
     pub latest_stats: RwLock<HashMap<String, StatsSnapshot>>,
+    /// Voting aggregate statistics, by node.
+    pub aggregate_votes: RwLock<AggregatedNodeStats>,
     /// Cluster topology (updated on restart).
     pub topology: RwLock<Topology>,
     /// Recent events window for the UI API.
@@ -39,6 +41,67 @@ pub struct ServerState {
     pub current_config: RwLock<ClusterControlConfig>,
     /// Guard against concurrent restarts.
     pub restarting: RwLock<bool>,
+}
+
+#[derive(Default)]
+pub struct AggregatedNodeStats {
+    /// Maps event (indexed by slot --- *TODO:* we hope that only one RB exists for a slot)
+    /// to status of the message, follow-up events, indexed by node which produced the
+    /// follow-up event:
+    /// * RBReceived;
+    /// * EBReceived;
+    /// * Vote ('yes' if it was certified by current node);
+    /// * Member of persistent committee (for the slot) at the time of election.
+    pub cache: HashMap<u64, HashMap<String, NodeVotes>>,
+}
+
+impl AggregatedNodeStats {
+    fn update_for_slot_node<F>(&mut self, node_id: String, slot: u64, update: F)
+    where
+        F: FnOnce(&mut NodeVotes),
+    {
+        let slot_entry = self.cache.entry(slot).or_default();
+        let bitmask = slot_entry.entry(node_id).or_default();
+        update(bitmask);
+    }
+
+    pub fn update_aggregated_event(&mut self, event: &IngestedEvent) {
+        let msg = &event.raw.get("message");
+        let event_type = msg.and_then(|m| m.get("type")).and_then(|t| t.as_str());
+        let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
+        let node_id = event.node_id.clone();
+        if let Some(slot) = slot {
+            match event_type {
+                Some("RBReceived") => {
+                    self.update_for_slot_node(node_id, slot, |mask| {
+                        mask.rb_received = true;
+                    });
+                }
+                Some("EBReceived") => {
+                    self.update_for_slot_node(node_id, slot, |mask| {
+                        mask.eb_received = true;
+                    });
+                }
+                Some("VTBundleGenerated") => {
+                    let count = msg.and_then(|m| m.get("count"));
+                    if count.is_some() {
+                        self.update_for_slot_node(node_id, slot, |mask| {
+                            mask.vote_cast = true;
+                        });
+                    }
+                }
+                Some("LeiosElectionInfo") => {
+                    let pers_committee = msg.and_then(
+                        |m| m.get("pers_committee_member")).and_then(|c| c.as_bool()
+                    );
+                    self.update_for_slot_node(node_id, slot, |mask| {
+                        mask.perm_committee_member = pers_committee.is_some_and(|x| x);
+                    });
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 /// Start the telemetry HTTP server.
@@ -67,6 +130,7 @@ pub async fn start(
         update_tx,
         current_config: RwLock::new(initial_config),
         restarting: RwLock::new(false),
+        aggregate_votes: RwLock::new(AggregatedNodeStats::default()),
     });
 
     let app = axum::Router::new()
@@ -79,6 +143,7 @@ pub async fn start(
         .route("/api/stats/:node_id", get(get_node_stats))
         .route("/api/events", get(get_events))
         .route("/api/events/stream", get(event_stream))
+        .route("/api/votes/:slot", get(get_votes))
         // Cluster control API.
         .route("/api/config", get(get_config))
         .route("/api/restart", post(restart_cluster))
@@ -152,6 +217,7 @@ async fn receive_events(
 
     for event in &events {
         log_interesting_event(event);
+        state.aggregate_votes.write().await.update_aggregated_event(event);
     }
 
     // Push to EventWindow immediately so the UI gets real-time events
@@ -283,6 +349,23 @@ async fn get_node_stats(
     }
 }
 
+/// GET /api/stats/:slot -- return rb/eb stats/votes for a given slot (if available).
+async fn get_votes(
+    State(state): State<Arc<ServerState>>,
+    Path(slot): Path<u64>,
+) -> Result<Json<AggregatedNodeVotes>, StatusCode> {
+    let votes = state.aggregate_votes.read().await;
+    let Some(votes_for_slot) = votes.cache.get(&slot) else {
+        return Ok(Json(AggregatedNodeVotes::empty(slot)));
+    };
+    Ok(Json(AggregatedNodeVotes {
+        slot,
+        node_statuses: votes_for_slot.iter().map(
+            |(node_id, status)| (node_id.clone(), status.clone())
+        ).collect(),
+    }))
+}
+
 /// Query parameters for the events endpoint.
 #[derive(serde::Deserialize)]
 struct EventsQuery {
@@ -358,6 +441,7 @@ mod tests {
                 node_config: HashMap::new(),
             }),
             restarting: RwLock::new(false),
+            aggregate_votes: RwLock::new(AggregatedNodeStats::default()),
         });
         (state, rx)
     }

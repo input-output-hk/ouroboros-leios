@@ -30,7 +30,7 @@ tx_rate = 1.0
 
 [behaviour]
 kind = "t22"
-vote_threshold = 70
+vote_threshold = 80
 non_voting_threshold = 0
 hide_eb_tx_received = true
 

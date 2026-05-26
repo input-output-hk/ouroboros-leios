@@ -4,7 +4,7 @@
 //! Events are kept as opaque `serde_json::Value` to avoid coupling to the
 //! full NodeEvent enum.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use serde::{Deserialize, Serialize};
 
@@ -56,6 +56,29 @@ pub struct PeerStatsEntry {
     pub inbound_delay_ms: u64,
     pub bytes_sent: u64,
     pub bytes_received: u64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NodeVotes {
+    pub rb_received: bool,
+    pub eb_received: bool,
+    pub vote_cast: bool,
+    pub perm_committee_member: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AggregatedNodeVotes {
+    pub slot: u64,
+    pub node_statuses: HashMap<String, NodeVotes>, // (node_id, status)
+}
+
+impl AggregatedNodeVotes {
+    pub fn empty(slot: u64) -> Self {
+        Self {
+            slot,
+            node_statuses: HashMap::new(),
+        }
+    }
 }
 
 /// An ingested event with extracted metadata for aggregation.

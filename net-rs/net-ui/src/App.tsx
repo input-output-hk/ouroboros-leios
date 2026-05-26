@@ -12,6 +12,7 @@ import { ChainTreeView } from "@/components/ChainTreeView";
 import { EventLog } from "@/components/EventLog";
 import { IconSidebar } from "@/components/IconSidebar";
 import { ControlPanel } from "@/components/ControlPanel";
+import { VotingPanel } from "@/components/VotingPanel";
 
 export default function App() {
   const loadTopology = useStore((s) => s.loadTopology);
@@ -27,17 +28,19 @@ export default function App() {
   const [chartsOpen, setChartsOpen] = useState(true);
   const [chainTreeOpen, setChainTreeOpen] = useState(true);
   const [controlPanelOpen, setControlPanelOpen] = useState(false);
+  const [votingPanelOpen, setVotingPanelOpen] = useState(false);
 
   useEffect(() => {
     loadTopology();
     loadConfig();
   }, [loadTopology, loadConfig]);
 
-  // Close control panel when restart completes.
+  // Close control/voting panels when restart completes.
   const wasRestarting = useRef(false);
   useEffect(() => {
     if (wasRestarting.current && !restarting) {
       setControlPanelOpen(false);
+      setVotingPanelOpen(false);
     }
     wasRestarting.current = restarting;
   }, [restarting]);
@@ -71,6 +74,8 @@ export default function App() {
             onToggleCharts={() => setChartsOpen((v) => !v)}
             eventLogOpen={eventLogOpen}
             onToggleEventLog={() => setEventLogOpen((v) => !v)}
+            votingPanelOpen={votingPanelOpen}
+            onToggleVotingPanel={() => setVotingPanelOpen((v) => !v)}
           />
         </Box>
 
@@ -89,6 +94,24 @@ export default function App() {
             pointerEvents: "auto",
           }}>
             <ControlPanel />
+          </Box>
+        )}
+
+        {/* Voting panel slide-out — next to sidebar */}
+        {votingPanelOpen && (
+          <Box sx={{
+            position: "absolute",
+            top: 42,
+            left: 48,
+            zIndex: 24,
+            backdropFilter: "blur(8px)",
+            bgcolor: "rgba(13, 27, 42, 0.5)",
+            borderRight: "1px solid rgba(255,255,255,0.08)",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "0 0 8px 0",
+            pointerEvents: "auto",
+          }}>
+            <VotingPanel />
           </Box>
         )}
 

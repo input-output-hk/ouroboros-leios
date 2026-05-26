@@ -89,3 +89,15 @@ export interface ClusterControlConfig {
   seed?: number;
   node_config: Record<string, unknown>;
 }
+
+export type NodeVoteStatus = {
+  rb_received: boolean;
+  eb_received: boolean;
+  vote_cast: boolean;
+  perm_committee_member: boolean;
+}
+
+export interface AggregateNodeVotes {
+  slot: number;
+  node_statuses: Record<string, NodeVoteStatus>;
+}

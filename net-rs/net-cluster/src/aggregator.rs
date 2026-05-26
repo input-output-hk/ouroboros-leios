@@ -4,7 +4,7 @@
 //! them and flushes to JSONL output in timestamp order, using a watermark
 //! derived from the earliest latest-event across all known nodes.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::sync::Arc;
@@ -81,8 +81,6 @@ struct AggregatorState {
     last_seen: HashMap<String, Instant>,
     /// Buffered events, ordered by timestamp.
     buffer: BTreeMap<OrderedF64, Vec<serde_json::Value>>,
-    /// Aggregated general stats for each RB and Node
-    aggregated_stats: AggregatedNodeStats,
     /// Expected number of nodes.
     num_nodes: usize,
     /// How long (wall-clock seconds) before a silent node is considered stale.
@@ -109,77 +107,15 @@ impl Ord for OrderedF64 {
     }
 }
 
-#[derive(Default)]
-struct AggregatedNodeStats {
-    /// Maps event (indexed by slot --- *TODO:* we hope that only one RB exists for a slot)
-    /// to status of the message, follow-up events, indexed by node which produced the
-    /// follow-up event:
-    /// * RBReceived;
-    /// * EBReceived;
-    /// * Vote ('yes' if it was certified by current node);
-    /// * Member of persistent committee (for the slot) at the time of election.
-    pub cache: HashMap<u64, HashMap<String, (bool, bool, bool, bool)>>,
-}
-
-impl AggregatedNodeStats {
-    fn update_for_slot_node<F>(&mut self, node_id: String, slot: u64, update: F)
-    where
-        F: FnOnce(&mut (bool, bool, bool, bool)),
-    {
-        let slot_entry = self.cache.entry(slot).or_default();
-        let bitmask = slot_entry.entry(node_id).or_default();
-        update(bitmask);
-    }
-}
-
 impl AggregatorState {
     fn new(num_nodes: usize, stale_threshold_secs: f64) -> Self {
         Self {
             latest_per_node: HashMap::new(),
             last_seen: HashMap::new(),
             buffer: BTreeMap::new(),
-            aggregated_stats: AggregatedNodeStats::default(),
             num_nodes,
             stale_threshold_secs,
             events_written: 0,
-        }
-    }
-
-    fn update_aggregated_event(&mut self, event: &IngestedEvent) {
-        let msg = &event.raw.get("message");
-        let event_type = msg.and_then(|m| m.get("type")).and_then(|t| t.as_str());
-        let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
-        let node_id = event.node_id.clone();
-        if let Some(slot) = slot {
-            match event_type {
-                Some("RBReceived") => {
-                    self.aggregated_stats.update_for_slot_node(node_id, slot, |mask| {
-                        mask.0 = true;
-                    });
-                }
-                Some("EBReceived") => {
-                    self.aggregated_stats.update_for_slot_node(node_id, slot, |mask| {
-                        mask.1 = true;
-                    });
-                }
-                Some("VTBundleGenerated") => {
-                    let count = msg.and_then(|m| m.get("count"));
-                    if count.is_some() {
-                        self.aggregated_stats.update_for_slot_node(node_id, slot, |mask| {
-                            mask.2 = true;
-                        });
-                    }
-                }
-                Some("LeiosElectionInfo") => {
-                    let pers_committee = msg.and_then(
-                        |m| m.get("pers_committee_member")).and_then(|c| c.as_bool()
-                    );
-                    self.aggregated_stats.update_for_slot_node(node_id, slot, |mask| {
-                        mask.3 = pers_committee.is_some_and(|x| x);
-                    });
-                }
-                _ => {}
-            }
         }
     }
 
@@ -187,8 +123,6 @@ impl AggregatorState {
         let now = Instant::now();
         for event in events {
             // Update aggregated node stats
-            self.update_aggregated_event(&event);
-
             // Update per-node tracking.
             let entry = self
                 .latest_per_node
@@ -253,6 +187,7 @@ impl AggregatorState {
     }
 
     fn print_current_accumulated(&self) {
+        /*
         const MAX_LINES: usize = 10;
 
         let mut all_nodes = HashSet::new();
@@ -329,6 +264,8 @@ impl AggregatorState {
         for ln in lines {
             tracing::info!("{}", ln);
         }
+
+         */
     }
 
     /// Flush all events with timestamp <= watermark.

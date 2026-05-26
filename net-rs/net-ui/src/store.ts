@@ -6,9 +6,17 @@ import type {
   AggregatePoint,
   NodeSeriesPoint,
   ChainTreeEntry,
-  ClusterControlConfig,
+  ClusterControlConfig, AggregateNodeVotes,
 } from "./types";
-import { fetchTopology, fetchAllStats, fetchEvents, fetchConfig, restartCluster as apiRestartCluster, updateNodeConfig as apiUpdateNodeConfig } from "./api";
+import {
+  fetchTopology,
+  fetchAllStats,
+  fetchEvents,
+  fetchConfig,
+  restartCluster as apiRestartCluster,
+  updateNodeConfig as apiUpdateNodeConfig,
+  fetchAggregateNodeVotes
+} from "./api";
 
 const MAX_SERIES = 300; // ~5 min at 1s stats interval
 const MAX_EVENTS = 500;
@@ -80,6 +88,10 @@ export interface DashboardState {
   restarting: boolean;
   loadConfig: () => Promise<void>;
   restartCluster: (config: ClusterControlConfig) => Promise<void>;
+
+  // Voting panel data (column-major: [slot][row])
+  votingMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "VoteCast")[][];
+  votingSlotStart: number;
 }
 
 export const useStore = create<DashboardState>()((set, get) => ({
@@ -114,6 +126,10 @@ export const useStore = create<DashboardState>()((set, get) => ({
   networkChainTree: [],
   networkTipCounts: {},
 
+  // Voting panel
+  votingMatrix: [],
+  votingSlotStart: 0,
+
   pollStats: async () => {
     try {
       const stats = await fetchAllStats();
@@ -124,6 +140,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
       let totalBandwidth = 0;
       let totalMessages = 0;
       let totalBlocks = 0;
+      let curSlot = 0;
       const curNodeCum: Record<string, { bandwidth: number; messages: number; blocks: number }> = {};
 
       for (const snap of Object.values(stats)) {
@@ -142,6 +159,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
             snap.blocks_produced + snap.blocks_received + snap.txs_generated,
           blocks: snap.blocks_produced,
         };
+        curSlot = snap.slot;
       }
 
       // Count distinct chain tips (forks)
@@ -185,6 +203,40 @@ export const useStore = create<DashboardState>()((set, get) => ({
       );
 
       const curSnap = { time: now, bandwidth: totalBandwidth, messages: totalMessages, blocks: totalBlocks, forks: curForks };
+
+      const VOTING_SLOTS = 24;
+      const topoNodes = get().topology?.nodes ?? [];
+      const nodeCount = topoNodes.length;
+      const slotStart = Math.max(0, curSlot - VOTING_SLOTS + 1);
+
+      let aggregated_votes: Array<AggregateNodeVotes> = [];
+
+      for (let slot: number = curSlot - VOTING_SLOTS; slot <= curSlot; slot++) {
+        aggregated_votes.push(await fetchAggregateNodeVotes(slot));
+      }
+
+      const nextMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "VoteCast" | "Committee")[][] = Array.from(
+        {length: VOTING_SLOTS},
+        (_, i) => {
+          const votes = aggregated_votes[i]?.node_statuses;
+          if (votes) {
+            return topoNodes.map((n) => {
+              const v = votes[n.node_id];
+              console.log(n.node_id);
+              console.log(votes[n.node_id]);
+              if (!v) return "NoEvent" as const;
+              if (v.vote_cast) return "VoteCast" as const;
+              if (v.eb_received) return "EBReceived" as const;
+              if (v.rb_received) return "RBReceived" as const;
+              if (v.perm_committee_member) return "Committee" as const;
+              return "NoEvent" as const;
+            });
+          }
+          return Array.from({length: nodeCount}, () => "NoEvent" as const);
+        }
+      )
+
+      const votingSlotStart = slotStart;
 
       if (prevSnapshot) {
         const changed =
@@ -238,10 +290,16 @@ export const useStore = create<DashboardState>()((set, get) => ({
             nodeTimeSeries: newNodeSeries,
             networkChainTree,
             networkTipCounts: tipCounts,
+            votingMatrix: nextMatrix,
+            votingSlotStart,
           }));
         } else {
           // No change — just update latestStats, don't emit a data point
-          set({ latestStats: stats, networkChainTree, networkTipCounts: tipCounts });
+          set({
+            latestStats: stats, networkChainTree, networkTipCounts: tipCounts,
+            votingMatrix: nextMatrix,
+            votingSlotStart,
+          });
         }
       } else {
         // First poll — store baseline
@@ -255,6 +313,8 @@ export const useStore = create<DashboardState>()((set, get) => ({
           prevNodeSnapshot: curNodeSnap,
           networkChainTree,
           networkTipCounts: tipCounts,
+          votingMatrix: nextMatrix,
+          votingSlotStart,
         });
       }
     } catch (e) {
@@ -402,6 +462,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
           newlyAnimating.push(key);
         }
       }
+
       return {
         eventVersion: s.eventVersion + 1,
         lastEventTime: maxTime,
@@ -514,6 +575,8 @@ export const useStore = create<DashboardState>()((set, get) => ({
           nodePositions: {},
           selectedNodeId: null,
           selectedEdge: null,
+          votingMatrix: [],
+          votingSlotStart: 0,
         });
         // Wait for new nodes to start, then reload topology + config.
         await new Promise((resolve) => setTimeout(resolve, 2000));

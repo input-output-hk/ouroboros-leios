@@ -104,6 +104,22 @@ function EventLogIcon({ active }: { active: boolean }) {
   );
 }
 
+/** Ballot icon for Voting panel. */
+function VotingIcon({ active }: { active: boolean }) {
+  const color = active ? "#90caf9" : "#aaa";
+  return (
+    <svg width={28} height={28} viewBox="0 0 24 24">
+      {/* ballot box */}
+      <rect x={4} y={10} width={16} height={10} rx={1.4} fill="none" stroke={color} strokeWidth={1.4} />
+      {/* slot */}
+      <line x1={8} y1={13} x2={16} y2={13} stroke={color} strokeWidth={1.2} />
+      {/* ballot paper */}
+      <path d="M9 4 L16 4 L16 9 L9 9 Z" fill="none" stroke={color} strokeWidth={1.3} />
+      <path d="M10.5 6.5 L12 8 L14.5 5.5" fill="none" stroke={color} strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 interface IconSidebarProps {
   controlPanelOpen: boolean;
   onToggleControlPanel: () => void;
@@ -113,6 +129,8 @@ interface IconSidebarProps {
   onToggleCharts: () => void;
   eventLogOpen: boolean;
   onToggleEventLog: () => void;
+  votingPanelOpen: boolean;
+  onToggleVotingPanel: () => void;
 }
 
 export function IconSidebar({
@@ -124,6 +142,8 @@ export function IconSidebar({
   onToggleCharts,
   eventLogOpen,
   onToggleEventLog,
+  votingPanelOpen,
+  onToggleVotingPanel,
 }: IconSidebarProps) {
   const buttonSx = (active: boolean) => ({
     bgcolor: active ? "rgba(144, 202, 249, 0.15)" : "transparent",
@@ -163,6 +183,11 @@ export function IconSidebar({
       <Tooltip title="Event log" placement="right">
         <IconButton onClick={onToggleEventLog} sx={buttonSx(eventLogOpen)}>
           <EventLogIcon active={eventLogOpen} />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="Voting" placement="right">
+        <IconButton onClick={onToggleVotingPanel} sx={buttonSx(votingPanelOpen)}>
+          <VotingIcon active={votingPanelOpen} />
         </IconButton>
       </Tooltip>
     </Box>
