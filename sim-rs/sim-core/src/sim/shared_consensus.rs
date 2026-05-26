@@ -791,10 +791,10 @@ impl NodeImpl for SharedConsensus {
 impl SharedConsensus {
     /// Lottery win for slot `slot` (winning draw `vrf`): pick the body
     /// path via [`BodyPath::decide`] and schedule
-    /// `CpuTask::RBBlockGenerated`.  The `Eb` path also commits the
-    /// drain via [`MempoolState::produce_eb`] under a hash derived from
-    /// the EB id — a sim convenience that stands in for real Blake2b
-    /// hashing of wire bytes.
+    /// `CpuTask::RBBlockGenerated`.  A non-empty manifest also commits
+    /// the drain via [`MempoolState::produce_eb`] under a hash derived
+    /// from the EB id — a sim convenience that stands in for real
+    /// Blake2b hashing of wire bytes.
     fn try_produce_rb(&mut self, slot: u64, vrf: u64, out: &mut EventResult) {
         let block_id = BlockId {
             slot,
@@ -841,42 +841,45 @@ impl SharedConsensus {
             &self.leios,
             endorsement_present,
         );
-        let (rb_txs, eb_pair) = match body {
-            BodyPath::Empty => (Vec::new(), None),
-            BodyPath::Inline(pending) => (self.collect_arcs(pending), None),
-            BodyPath::Eb { manifest } => {
-                // Commit the drain — `produce_eb` moves the manifest's
-                // txs into `eb_pinned` under the given EbKey.  We
-                // synthesise a deterministic hash from the producer +
-                // slot since sim doesn't model Blake2b on wire bytes.
-                let eb_id = EndorserBlockId {
+        // `inline` becomes the RB body; `manifest` becomes a fresh EB
+        // announcement.  Both may carry txs in the same RB (CIP-0164
+        // overflow: drain RB body, EB ships the residual).
+        let rb_txs = self.collect_arcs(body.inline);
+        let eb_pair = if body.manifest.is_empty() {
+            None
+        } else {
+            // Commit the drain — `produce_eb` moves the manifest's
+            // txs into `eb_pinned` under the given EbKey.  We
+            // synthesise a deterministic hash from the producer +
+            // slot since sim doesn't model Blake2b on wire bytes.
+            let eb_id = EndorserBlockId {
+                slot,
+                pipeline: 0,
+                producer: self.id,
+            };
+            let eb_hash = synthesize_eb_hash(eb_id);
+            let (_committed, mempool_fx) = self.mempool.produce_eb(
+                EbKey {
                     slot,
-                    pipeline: 0,
-                    producer: self.id,
-                };
-                let eb_hash = synthesize_eb_hash(eb_id);
-                let (_committed, mempool_fx) = self.mempool.produce_eb(
-                    EbKey {
-                        slot,
-                        hash: eb_hash,
-                    },
-                    manifest.len(),
-                );
-                self.apply_mempool_effects(out, mempool_fx);
-                // Pull the body Arcs from `tx_arcs` in manifest order.
-                let txs: Vec<Arc<Transaction>> = manifest
-                    .iter()
-                    .filter_map(|id| self.tx_arcs.get(id).cloned())
-                    .collect();
-                let bytes = self.sim_config.sizes.linear_eb(&txs);
-                let eb = LinearEndorserBlock {
-                    slot,
-                    producer: self.id,
-                    bytes,
-                    txs: txs.clone(),
-                };
-                (Vec::new(), Some((eb, txs)))
-            }
+                    hash: eb_hash,
+                },
+                body.manifest.len(),
+            );
+            self.apply_mempool_effects(out, mempool_fx);
+            // Pull the body Arcs from `tx_arcs` in manifest order.
+            let txs: Vec<Arc<Transaction>> = body
+                .manifest
+                .iter()
+                .filter_map(|id| self.tx_arcs.get(id).cloned())
+                .collect();
+            let bytes = self.sim_config.sizes.linear_eb(&txs);
+            let eb = LinearEndorserBlock {
+                slot,
+                producer: self.id,
+                bytes,
+                txs: txs.clone(),
+            };
+            Some((eb, txs))
         };
 
         let rb = LinearRankingBlock {

@@ -53,21 +53,23 @@ fn to_hash_32(id: Vec<u8>) -> [u8; 32] {
 
 /// Which body the next self-produced RB carries — wire-typed sibling of
 /// [`shared_consensus::production::BodyPath`].
-#[derive(Debug, Clone)]
-pub enum BodyPath {
-    /// Producer-side EB-safety gate fired: the local node holds a
-    /// chain-committed cert for an EB whose body it has not validated
-    /// locally.  The RB body must be empty and no fresh EB announced;
-    /// the cert itself is independent and remains the caller's
-    /// responsibility.
-    Empty,
-    /// RB body inlines these txs; mempool has been drained.
-    Inline(Vec<PendingTx>),
-    /// RB body is empty; the listed manifest is announced via an EB.
-    /// Caller hashes the encoded manifest bytes and finishes the
-    /// drain-and-pin via [`Mempool::produce_eb`] with the resulting
-    /// `EbKey`.
-    Eb { manifest_hashes: Vec<[u8; 32]> },
+///
+/// `inline` becomes the RB body; `manifest_hashes` becomes a fresh EB
+/// announcement attached to the same RB header.  Either may be empty
+/// independently:
+///
+/// - both empty: empty body, no EB (safety gate; or cert + small mempool).
+/// - `inline` non-empty, `manifest_hashes` empty: inline-only body, no EB.
+/// - `inline` empty, `manifest_hashes` non-empty: empty body + EB (cert + overflow).
+/// - both non-empty: inline body + EB residual (no cert + overflow).
+///
+/// `inline` is already drained from the mempool.  The manifest txs are
+/// still in the free pool; the caller commits the EB-pin via
+/// [`Mempool::produce_eb`] once it has the EB key.
+#[derive(Debug, Clone, Default)]
+pub struct BodyPath {
+    pub inline: Vec<PendingTx>,
+    pub manifest_hashes: Vec<[u8; 32]>,
 }
 
 /// I/O-side wrapper around `shared_consensus::mempool::MempoolState`.  Public
@@ -183,16 +185,10 @@ impl Mempool {
     }
 
     /// Run the CIP-0164 overflow rule.  Returns the body path the next
-    /// self-produced RB should take:
-    ///
-    /// - `Empty` when `leios`'s producer-side EB-safety gate is set
-    ///   (chain-committed cert for an EB whose body the local node
-    ///   has not validated).  Mempool is untouched.
-    /// - `Inline(txs)` when the mempool fits in the RB body cap
-    ///   (drained on return).
-    /// - `Eb { manifest_hashes }` when the mempool overflows the cap
-    ///   (mempool untouched; caller commits the drain via
-    ///   [`Mempool::produce_eb`] once it has the EB hash).
+    /// self-produced RB should take: `inline` holds drained tx bodies
+    /// (empty when the safety gate fires or a cert ships in a small
+    /// mempool); `manifest_hashes` holds the residual overflow
+    /// (empty when the mempool fit in the RB body cap).
     ///
     /// `endorsement_present` must reflect whether the caller is about
     /// to attach a Leios certificate to this RB; the body-path
@@ -206,26 +202,22 @@ impl Mempool {
         leios: &shared_consensus::leios::LeiosState,
         endorsement_present: bool,
     ) -> BodyPath {
-        match shared_consensus::production::BodyPath::decide(
+        let con = shared_consensus::production::BodyPath::decide(
             &mut self.state,
             rb_body_max_bytes,
             eb_body_max_bytes,
             leios,
             endorsement_present,
-        ) {
-            shared_consensus::production::BodyPath::Empty => BodyPath::Empty,
-            shared_consensus::production::BodyPath::Inline(txs) => {
-                BodyPath::Inline(txs.into_iter().map(from_con_tx).collect())
-            }
-            shared_consensus::production::BodyPath::Eb { manifest } => BodyPath::Eb {
-                manifest_hashes: manifest.into_iter().map(to_hash_32).collect(),
-            },
+        );
+        BodyPath {
+            inline: con.inline.into_iter().map(from_con_tx).collect(),
+            manifest_hashes: con.manifest.into_iter().map(to_hash_32).collect(),
         }
     }
 
     /// Drain the first `count` free txs into an EB pin under `eb_key`.
-    /// `count` must come from the `BodyPath::Eb` manifest's length so
-    /// the drain matches the size-capped selection.  After this the
+    /// `count` must come from `BodyPath::manifest_hashes.len()` so the
+    /// drain matches the size-capped selection.  After this the
     /// drained txs stay locally available via `has_tx` /
     /// `get_body_by_id` but no longer count toward `total_bytes` /
     /// `drain_up_to` — i.e. they won't be double-included in a
