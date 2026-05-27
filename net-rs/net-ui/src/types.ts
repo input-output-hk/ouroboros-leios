@@ -90,12 +90,14 @@ export interface ClusterControlConfig {
   node_config: Record<string, unknown>;
 }
 
-export type NodeVoteStatus = {
-  rb_received: boolean;
-  eb_received: boolean;
-  vote_cast: boolean;
-  perm_committee_member: boolean;
+export const enum NodeVoteBits {
+  RBReceived = 1 << 0,
+  EBReceived = 1 << 1,
+  VoteCast = 1 << 2,
+  PermCommitteeMember = 1 << 3,
 }
+
+export type NodeVoteStatus = number;
 
 export interface AggregateNodeVotes {
   slot: number;

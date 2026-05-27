@@ -380,11 +380,13 @@ async fn get_votes_history(
             //    often, so viewer will guess it from adjacent columns, no need to specify
             //    this info each time.
             str.push(match node_statuses.get(node_id) {
-                Some(NodeVotes {vote_cast: true, ..}) => '1',
-                Some(NodeVotes {eb_received: true, ..}) => 'E',
+                Some(NodeVotes {vote_cast: true, eb_received: true, rb_received: true, ..}) => '1',
+                Some(NodeVotes {eb_received: true, rb_received: true, ..}) => 'E',
                 Some(NodeVotes {rb_received: true, ..}) => 'R',
-                Some(NodeVotes {perm_committee_member: true, ..}) => '*',
-                _ => '.'
+                Some(NodeVotes {perm_committee_member: true, eb_received: false, vote_cast: false, ..}) => '*',
+                Some(NodeVotes {perm_committee_member: false, eb_received: false, vote_cast: false, ..}) => '.',
+                None => '.',
+                _ => '?'
             });
         }
         history.push(str);

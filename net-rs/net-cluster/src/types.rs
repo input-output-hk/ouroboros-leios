@@ -87,6 +87,7 @@ pub struct AggregatedVotesHistory {
     /// '1' - vote cast;
     /// '*' - permanent committee member;
     /// '.' - no events/statuses for the node from the above list.
+    /// '?' - incorrect status (e.g. vote cast without RB received).
     /// In case of multiple statuses for a node, the max is taken: '1' > 'E' > 'R' > ' *' > '.'
     pub votes: Vec<String>,
 }

@@ -41,15 +41,22 @@ T22 for non-committee (non-voting) nodes.
 More information about the mechanism is given in comments to the behaviour implementation:
 `shared-rs/consensus/src/behaviour/behaviours/t22.rs` and in the corresponding config file.
 
-Notes about visualisation.
+#### Notes about visualisation.
+
 * In order to visualise the network activity, use `net-ui` module.
 * Depending on the config file parameters, one should see disruptions to EB propagation:
-the bigger disruption, the smaller amount of eb blocks is certified. Or, in other words,
-the smaller are thresholds, the smaller amount of eb blocks is certified.
+  the bigger disruption, the smaller amount of eb blocks is certified. Or, in other words,
+  the smaller are thresholds, the smaller amount of eb blocks is certified.
 * The disruptions are visualised as smaller amount of blocks with '*' in chain view of UI.
 * In more detail this can be viewed in VotePanel (activated by 5th icon on the left sidebar).
-One can see the actual EB messages in the panel, received by nodes, and the actual votes that
-were (or were not) cast by them.
+  One can see the actual EB messages in the panel, received by nodes, and the actual votes cast.
+* The icons at slot/node intersection can be read as follows:
+  * green tick means that the node received EB message for the slot.
+  * red circle means that the node has 'unusual' status: e.g. it did not receive RB, but
+    received EB.
+  * cyan circle means that the node received RB + EB.
+  * yellow circle means that the node received RB, but did not receive anything else.
+  * grey circle means that the node did not receive any messages for the slot
 
 The more disruptions in the network, the smaller number of EB messages -- and smaller
 amount of votes. If the number of votes for a block is less than 75% of the committee size

@@ -1,7 +1,7 @@
 import { Box, Typography, Divider } from "@mui/material";
 import { useStore } from "@/store";
 
-type VoteCell = "NoEvent" | "RBReceived" | "EBReceived" | "VoteCast" | "Committee";
+type VoteCell = "NoEvent" | "RBReceived" | "EBReceived" | "VoteCast" | "Committee" | "Incorrect";
 
 function CellIcon({ value }: { value: VoteCell }) {
   if (value === "VoteCast") {
@@ -12,15 +12,18 @@ function CellIcon({ value }: { value: VoteCell }) {
     );
   }
   if (value === "RBReceived") {
-    return <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#ef5350" }} />;
+    return <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#fdd835" }} />;
   }
   if (value === "EBReceived") {
-    return <Box sx={{ width: 11, height: 11, borderRadius: "50%", bgcolor: "#fdd835" }} />;
+    return <Box sx={{ width: 11, height: 11, borderRadius: "50%", bgcolor: "#00eeee" }} />;
   }
   if (value === "Committee") {
     return <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "rgba(50,50,240,0.8)" }} />;
   }
-  return <Box sx={{ width: 3, height: 3, borderRadius: "50%", bgcolor: "rgba(180,180,180,0.8)" }} />;
+  if (value === "Incorrect") {
+    return <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#ff1010" }} />;
+  }
+  return <Box sx={{ width: 2, height: 2, borderRadius: "50%", bgcolor: "rgba(180,180,180,0.8)" }} />;
 }
 
 export function VotingPanel() {

@@ -31,7 +31,6 @@ pub async fn run(
 
     let mut flush_interval = tokio::time::interval(std::time::Duration::from_secs(1));
     let mut accumulated_before_flush = 0usize;
-    let mut last_log_time = Instant::now();
 
     loop {
         tokio::select! {
@@ -53,10 +52,6 @@ pub async fn run(
                         state.flush_all(&mut writer, &event_window).await?;
                         break;
                     }
-                }
-                if last_log_time.elapsed() >= std::time::Duration::from_secs(10) {
-                    state.print_current_accumulated();
-                    last_log_time = Instant::now();
                 }
             }
             _ = flush_interval.tick() => {
@@ -186,88 +181,6 @@ impl AggregatorState {
         }
 
         active_latest.iter().copied().reduce(f64::min)
-    }
-
-    fn print_current_accumulated(&self) {
-        /*
-        const MAX_LINES: usize = 10;
-
-        let mut all_nodes = HashSet::new();
-        for slot_stats in self.aggregated_stats
-            .cache
-            .values()
-            .map(|per_node| per_node.keys())
-        {
-            slot_stats.for_each(|node_id| {
-                all_nodes.insert(node_id.clone());
-            });
-        }
-        let mut all_nodes: Vec<String> = all_nodes.into_iter().collect();
-        all_nodes.sort();
-
-        let mut lines = Vec::new();
-
-        let Some(max_slot) = self.aggregated_stats.cache.keys().max() else {
-            return
-        };
-
-        let mut committee = HashSet::new();
-        for slot in (0..=*max_slot).rev() {
-            if let Some(per_node) = &self.aggregated_stats.cache.get(&slot) {
-                let mut line = format!("{slot:10} | ");
-                let mut has_any_event = false;
-                for node_id in &all_nodes {
-                    let (r, e, v, p) = per_node.get(node_id).unwrap_or(&(false, false, false, false));
-                    if *p {
-                        committee.insert(node_id.clone());
-                    }
-                    let mut c = '.';
-                    has_any_event |= *r || *e || *v;
-                    if *v {
-                        c = '1';
-                    } else if *e {
-                        if *r {
-                            c = 'E';
-                        } else {
-                            c = 'e';
-                        }
-                    } else if *r {
-                        c = 'R';
-                    }
-                    if c != '.' {
-                        has_any_event = true;
-                    }
-                    line.push(c);
-                }
-                if has_any_event {
-                    lines.push(line);
-                }
-            }
-            if lines.len() >= MAX_LINES {
-                break;
-            }
-        }
-
-        let mut header = String::from("slot       | ");
-        for (idx,node_id) in all_nodes.iter().enumerate() {
-            if committee.contains(node_id) {
-                header.push_str(&format!("C"));
-            }
-            else if idx % 10 == 0 {
-                header.push_str(&format!("*"));
-            }
-            else {
-                header.push_str(&format!(" "));
-            }
-        }
-        lines.insert(0, header.clone());
-        lines.insert(1, "-".repeat(header.len()));
-
-        for ln in lines {
-            tracing::info!("{}", ln);
-        }
-
-         */
     }
 
     /// Flush all events with timestamp <= watermark.
