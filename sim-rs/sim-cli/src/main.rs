@@ -86,9 +86,11 @@ fn read_config(args: &Args) -> Result<SimConfiguration> {
     };
     topology.validate()?;
 
-    let mut raw_params = Figment::new().merge(Yaml::string(include_str!(
-        "../../parameters/config.default.yaml"
-    )));
+    let mut raw_params = Figment::new()
+        .merge(Yaml::string(include_str!(
+            "../../parameters/config.default.yaml"
+        )))
+        .merge(Yaml::string("tcp-congestion-control: false"));
 
     for params_file in &args.parameters {
         raw_params = raw_params.merge(Yaml::file_exact(params_file));

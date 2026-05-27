@@ -3,7 +3,9 @@ use std::{
     time::Duration,
 };
 
-use crate::clock::Timestamp;
+use crate::{clock::Timestamp, tcp::TcpConnProps};
+
+use super::tcp_connection::{DEFAULT_TCP_BANDWIDTH, TcpConnection};
 
 struct MiniProtocolQueue<T> {
     queue: VecDeque<(T, u64)>,
@@ -543,5 +545,73 @@ mod tests {
             ],
         );
         assert_eq!(conn.next_arrival_time(), None);
+    }
+}
+
+// ── Connection kind ───────────────────────────────────────────────────────────
+
+/// Either a bandwidth-sharing connection or a TCP congestion-window connection.
+///
+/// Both present the same interface so the rest of the network layer can treat
+/// them uniformly.
+pub enum ConnectionKind<TProtocol, TMessage> {
+    /// Fair-bandwidth-sharing model (the existing `Connection`).
+    Simple(Connection<TProtocol, TMessage>),
+    /// TCP congestion-window model (`TcpConnection`).  The `TProtocol` tag is
+    /// accepted for API compatibility but ignored — all protocols share the
+    /// single TCP stream, matching real TCP mux behaviour.
+    Tcp(TcpConnection<TMessage>),
+}
+
+impl<TProtocol: Clone + Ord, TMessage> ConnectionKind<TProtocol, TMessage> {
+    pub fn simple(latency: Duration, bandwidth_bps: Option<u64>) -> Self {
+        Self::Simple(Connection::new(latency, bandwidth_bps))
+    }
+
+    pub fn tcp(latency: Duration, bandwidth_bps: Option<u64>) -> Self {
+        let bandwidth = bandwidth_bps.unwrap_or(DEFAULT_TCP_BANDWIDTH);
+        Self::Tcp(TcpConnection::new(TcpConnProps::new(latency, bandwidth)))
+    }
+
+    pub fn from_config(latency: Duration, bandwidth_bps: Option<u64>, use_tcp: bool) -> Self {
+        if use_tcp {
+            Self::tcp(latency, bandwidth_bps)
+        } else {
+            Self::simple(latency, bandwidth_bps)
+        }
+    }
+
+    pub fn send(
+        &mut self,
+        message: TMessage,
+        bytes: u64,
+        protocol: TProtocol,
+        now: Timestamp,
+    ) {
+        match self {
+            Self::Simple(c) => c.send(message, bytes, protocol, now),
+            Self::Tcp(c) => c.send(message, bytes, now),
+        }
+    }
+
+    pub fn next_arrival_time(&self) -> Option<Timestamp> {
+        match self {
+            Self::Simple(c) => c.next_arrival_time(),
+            Self::Tcp(c) => c.next_arrival_time(),
+        }
+    }
+
+    pub fn recv_many(&mut self, now: Timestamp) -> Vec<(TMessage, Timestamp)> {
+        match self {
+            Self::Simple(c) => c.recv_many(now),
+            Self::Tcp(c) => c.recv_many(now),
+        }
+    }
+
+    pub fn queue_stats(&self) -> (usize, u64) {
+        match self {
+            Self::Simple(c) => c.queue_stats(),
+            Self::Tcp(c) => c.queue_stats(),
+        }
     }
 }

@@ -607,8 +607,9 @@
       "type": "boolean"
     },
     "tcp-congestion-control": {
-      "description": "Only supported by Haskell simulation.",
-      "type": "boolean"
+      "description": "Use the TCP congestion-window model for all links (slow-start, bandwidth-delay product, ACK pipelining). Supported by both Haskell and Rust simulations.",
+      "type": "boolean",
+      "default": true
     },
     "shard-count": {
       "description": "Number of clock shards for parallel simulation. Each shard advances time independently.\nOnly supported by Rust simulation.",
