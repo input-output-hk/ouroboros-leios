@@ -1,6 +1,14 @@
 name: "net-node-docker"
 
 on:
+  pull_request:
+    paths:
+      - "net-rs/docker/**"
+      - "net-rs/net-core/**"
+      - "net-rs/net-node/**"
+      - "net-rs/Cargo.lock"
+      - "shared-rs/**"
+      - ".github/workflows/net-node-docker.yaml"
   push:
     branches:
       - main
@@ -36,10 +44,12 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       # QEMU emulates linux/arm64 on the linux/amd64 runner so a single
-      # job can produce a multi-arch manifest. Adds ~10–15 min to the
+      # job can produce a multi-arch manifest. Adds ~10-15 min to the
       # build; if that becomes painful, split into a matrix job per
-      # platform and merge manifests at the end.
+      # platform and merge manifests at the end. Skipped on PRs, which
+      # build amd64-only for fast Dockerfile + workflow validation.
       - name: Set up QEMU
+        if: github.event_name != 'pull_request'
         uses: docker/setup-qemu-action@v3 # TODO: SHA-pin once a release SHA is verified.
 
       - name: Set up Docker Buildx
@@ -61,6 +71,7 @@ jobs:
           tags: |
             type=sha
             type=ref,event=branch
+            type=ref,event=pr
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
@@ -68,7 +79,7 @@ jobs:
         with:
           context: .
           file: ./net-rs/docker/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           push: ${{ github.event_name == 'push' || github.event.inputs.push_image == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
