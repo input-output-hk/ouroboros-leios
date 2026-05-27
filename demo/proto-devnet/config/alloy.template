@@ -173,13 +173,14 @@ loki.process "extract_ptrace_logs" {
 
 		stage.json {
 			expressions = {
-				event    = "event",
-				call     = "call",
-				parent   = "parent",
-				function = "function",
-				thread   = "thread",
-				argument = "argument",
-				host     = "host",
+				event         = "event",
+				call_id       = "call_id",
+				function      = "function",
+				thread        = "thread",
+				argument      = "argument",
+				call_stack    = "call_stack",
+				call_id_stack = "call_id_stack",
+				host          = "host",
 			}
 			drop_malformed = true
 		}
@@ -193,9 +194,10 @@ loki.process "extract_ptrace_logs" {
 
 		stage.labels {
 			values = {
-				ptrace_function = "function",
-				ptrace_thread   = "thread",
-				ptrace_event    = "event",
+				ptrace_function   = "function",
+				ptrace_thread     = "thread",
+				ptrace_event      = "event",
+				ptrace_call_stack = "call_stack",
 			}
 		}
 
@@ -204,16 +206,22 @@ loki.process "extract_ptrace_logs" {
 
 			stage.metrics {
 				metric.counter {
-					name        = "started_total"
-					description = "Total number of started processes"
-					prefix      = "ptrace_"
-					action      = "inc"
+					name              = "started_total"
+					description       = "Total number of started processes"
+					prefix            = "ptrace_"
+					action            = "inc"
+          source            = "event"
+          value             = "Start"
+					max_idle_duration = "24h"
+				}
 
-					// Look at the "event" field extracted in stage.json
-					source = "event"
-					// Only increment if the source value matches this
-					value = "Start"
-					// Use extracted values as Prometheus labels
+				metric.gauge {
+					name              = "active_total"
+					description       = "Total number of active processes"
+					prefix            = "ptrace_"
+					action            = "inc"
+          source            = "event"
+          value             = "Start"
 					max_idle_duration = "24h"
 				}
 			}
@@ -231,13 +239,12 @@ loki.process "extract_ptrace_logs" {
 
 			stage.metrics {
 				metric.counter {
-					name        = "ended_total"
-					description = "Total number of ended processes"
-					prefix      = "ptrace_"
-					action      = "inc"
-
-					source            = "event"
-					value             = "End"
+					name              = "ended_total"
+					description       = "Total number of ended processes"
+					prefix            = "ptrace_"
+					action            = "inc"
+          source            = "event"
+          value             = "End"
 					max_idle_duration = "24h"
 				}
 
@@ -247,6 +254,16 @@ loki.process "extract_ptrace_logs" {
 					prefix      = "ptrace_"
 					action      = "set"
 					source      = "duration"
+				}
+
+				metric.gauge {
+					name              = "active_total"
+					description       = "Total number of active processes"
+					prefix            = "ptrace_"
+					action            = "dec"
+          source            = "event"
+          value             = "End"
+					max_idle_duration = "24h"
 				}
 			}
 		}
