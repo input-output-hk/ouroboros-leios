@@ -229,6 +229,10 @@ impl ChainTree {
     /// RB was pruned, or this node never adopted the chain that
     /// announced it).
     pub fn record_announced_eb_tx_count(&mut self, eb_hash: &[u8; 32], count: u32) {
+        // No early-out: two RBs on different forks can legitimately
+        // announce the same (content-derived) EB hash, and both nodes
+        // need their cache populated — otherwise the fork-side entry
+        // loses its tx-count once the live manifest cache ages out.
         for node in self.nodes.values_mut() {
             if node.announced_eb_hash.as_ref() == Some(eb_hash) {
                 node.cached_eb_tx_count = Some(count);
