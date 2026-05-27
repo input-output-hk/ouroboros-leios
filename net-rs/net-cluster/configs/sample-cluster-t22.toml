@@ -11,6 +11,8 @@
 # `mainnet.toml`: every pool in the top 99% of stake casts one
 # weight-1 vote, so the committee size is 9 and the quorum threshold
 # is `floor(0.75 × 9) = 6` voters.
+#
+# Behaviour invokes T22 threat model
 
 num_nodes = 25
 degree = 3
@@ -30,8 +32,16 @@ tx_rate = 1.0
 
 [behaviour]
 kind = "t22"
+# Threshold (average percentage, 0-100) of the committee nodes, which
+# take offered eb messages. EB messages for the remaining nodes will be dropped.
 vote_threshold = 80
+
+# Threshold (average percentage, 0-100) of the non-committee nodes
+# (non-voting nodes in Leios), which take offered eb messages.
 non_voting_threshold = 0
+
+# `True` means that disruptions touch not only eb-offered/eb-txs-offered,
+# but also eb-received/eb-txs-received (in other words, true means more disruptions).
 hide_eb_tx_received = true
 
 [behaviour_selection]

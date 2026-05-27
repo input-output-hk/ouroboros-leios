@@ -1,3 +1,47 @@
+/*!
+
+T21 and T22 Threats: selectively withhold data from voting committee (T21) and honest nodes (T22).
+
+General description:
+--------------------
+This behaviour emulates network disruption, implied by T21 and T22 threat models. Irrespective of
+the method of disruption, the outcome is always the same: EB-related messages don't come to
+the committee nodes (T21) or honest nodes (T22).
+
+This threat implementation emulates the final effect: it drops incoming EB-related messages for
+some nodes (according to provided parameters).
+
+EB-messages filtering details:
+------------------------------
+For each point and node, a deterministic checksum is calculated using the point hash and node id.
+If the checksum is above the provided threshold, EB-related messages are dropped. Thus, the set of
+nodes that are affected by the threat is deterministic, but unpredictable. Also, the set is
+different for each point.
+
+The thresholds are specified separately for voting and non-voting nodes, so the behaviour can be
+configured to emulate T21 (drop EB messages for voting nodes) or T22 (drop EB messages for
+non-voting nodes).
+
+This implementation is more stressful for the network than the original T21/T22 definition, since
+here we assume that any partial disruption is achievable (some of possible disruptions
+could be unimplementable in practice, e.g. in case of direct links between honest nodes).
+
+Parameters:
+-----------
+- `vote_threshold`: Percentage of EB-related messages (0-100), that are to be delivered to
+   voting (committee) nodes.
+- `non_voting_threshold`: Percentage of EB-related messages (0-100), that are to be delivered
+   to non-voting (non-committee) nodes.
+- `hide_eb_tx_received`: In case of `false`, only eb-offered, eb-txs-offered events are
+   ignored (so block offers are dropped). In case of `true`, also eb-received and tx-received
+   events are ignored.
+
+The threshold parameters are probabilistic: they specify average cutoff. So, if some threshold
+is set to 70, it means that for some points 75% of nodes will have hash%100 > 70 (and pass the
+threshold); but also for some other points only 65% of nodes will make it.
+
+*/
+
 use crate::behaviour::{Behaviour, BehaviourOutcome};
 use crate::leios::{LeiosEffect, LeiosState};
 use crate::peer::PeerId;
