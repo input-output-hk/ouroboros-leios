@@ -1295,7 +1295,7 @@ fn duration_ms(ms: f64) -> Duration {
 }
 
 fn default_tcp_congestion_control() -> bool {
-    true
+    false
 }
 
 fn default_shard_count() -> usize {
