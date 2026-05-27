@@ -73,7 +73,7 @@ impl LinkEnvelopeCfg {
     /// uniform random `u ∈ [0, 1)` and pass `u < msg_loss_prob(bytes)` as
     /// the `loss_drawn` argument to [`crate::LinkState::on_send`].
     pub fn msg_loss_prob(&self, bytes: u64) -> f64 {
-        if self.loss_prob_per_segment <= 0.0 || bytes == 0 {
+        if self.loss_prob_per_segment <= 0.0 || bytes == 0 || self.mss_bytes == 0 {
             return 0.0;
         }
         let segments = bytes.div_ceil(self.mss_bytes) as f64;

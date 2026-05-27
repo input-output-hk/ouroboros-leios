@@ -572,12 +572,20 @@ pub struct RawTcpEnvelope {
 
 impl RawTcpEnvelope {
     /// Apply this YAML block over a baseline [`tcp_model::LinkEnvelopeCfg`].
-    /// Fields left as `None` keep the baseline value.
-    pub fn apply(&self, cfg: &mut tcp_model::LinkEnvelopeCfg) {
+    /// Fields left as `None` keep the baseline value. Rejects values that
+    /// would crash or NaN-poison downstream computations
+    /// (`mss-bytes: 0`, `loss-prob-per-segment` outside `[0, 1]`).
+    pub fn apply(&self, cfg: &mut tcp_model::LinkEnvelopeCfg) -> Result<()> {
         if let Some(v) = self.loss_prob_per_segment {
+            if !(0.0..=1.0).contains(&v) {
+                bail!("tcp-envelope.loss-prob-per-segment must be in [0, 1], got {v}");
+            }
             cfg.loss_prob_per_segment = v;
         }
         if let Some(v) = self.mss_bytes {
+            if v == 0 {
+                bail!("tcp-envelope.mss-bytes must be > 0");
+            }
             cfg.mss_bytes = v;
         }
         if let Some(v) = self.initial_cwnd_segments {
@@ -607,6 +615,7 @@ impl RawTcpEnvelope {
         if let Some(v) = self.loss_release_shape {
             cfg.loss_release_shape = v;
         }
+        Ok(())
     }
 }
 
@@ -744,10 +753,12 @@ impl Topology {
                         }
                         let mut cfg = tcp_model::LinkEnvelopeCfg::defaults_for(latency, bps);
                         if let Some(g) = global {
-                            g.apply(&mut cfg);
+                            g.apply(&mut cfg)
+                                .expect("invalid global tcp-envelope override");
                         }
                         if let Some(l) = per_link {
-                            l.apply(&mut cfg);
+                            l.apply(&mut cfg)
+                                .expect("invalid per-link tcp-envelope override");
                         }
                         Some(cfg)
                     }),
@@ -1740,12 +1751,36 @@ mod tcp_envelope_tests {
             1_000_000,
         );
         let baseline_cold_release = cfg.cold_release;
-        raw.apply(&mut cfg);
+        raw.apply(&mut cfg).unwrap();
         assert_eq!(cfg.loss_prob_per_segment, 0.002);
         assert_eq!(cfg.rto, Duration::from_millis(500));
         assert_eq!(cfg.cold_release_shape, Curve::Linear);
         // Unmentioned fields keep their derived defaults.
         assert_eq!(cfg.cold_release, baseline_cold_release);
         assert_eq!(cfg.mss_bytes, 1460);
+    }
+
+    #[test]
+    fn apply_rejects_invalid_mss_bytes() {
+        let raw: RawTcpEnvelope = serde_yaml::from_str("mss-bytes: 0").unwrap();
+        let mut cfg = tcp_model::LinkEnvelopeCfg::defaults_for(
+            Duration::from_millis(150),
+            1_000_000,
+        );
+        assert!(raw.apply(&mut cfg).is_err());
+    }
+
+    #[test]
+    fn apply_rejects_loss_prob_outside_unit_interval() {
+        let mut cfg = tcp_model::LinkEnvelopeCfg::defaults_for(
+            Duration::from_millis(150),
+            1_000_000,
+        );
+        let bad_low: RawTcpEnvelope =
+            serde_yaml::from_str("loss-prob-per-segment: -0.1").unwrap();
+        assert!(bad_low.apply(&mut cfg).is_err());
+        let bad_high: RawTcpEnvelope =
+            serde_yaml::from_str("loss-prob-per-segment: 1.5").unwrap();
+        assert!(bad_high.apply(&mut cfg).is_err());
     }
 }
