@@ -18,10 +18,15 @@ pub struct QuorumFormed {
 }
 
 /// Record a vote for an EB. Deduplicates by `(voter_id, tag)`. The
-/// `weight` argument is what the aggregator derived for this body —
-/// for PV votes it's the cached persistent-committee seat count; for
-/// NPV votes it's the result of re-running the lottery from the
-/// embedded eligibility signature and the voter's stake.
+/// `weight` argument is what the aggregator derived for this body, in
+/// units matching `expected_total_weight`:
+///
+/// - `WfaLs`: persistent-committee seat count (PV) or the result of
+///   re-running the NPV lottery from the embedded eligibility
+///   signature and the voter's stake.
+/// - `EveryoneVotes`: `1` per voter.
+/// - `StakeCentile`: the voter's stake (`expected_total_weight` is
+///   then `total_active_stake`, matching CIP-164 PR #1196).
 ///
 /// If no election exists for `eb_hash`, a vote-placeholder is created
 /// at `(eb_slot, current_slot)` with `body_validated_locally = false`.
@@ -31,7 +36,7 @@ pub struct QuorumFormed {
 /// EB-safety gate then ensures any cert built from such an aggregate
 /// rides on an empty RB body until the closure validates.
 ///
-/// Quorum: `Σ weight ≥ quorum_fraction × expected_committee_size`.
+/// Quorum: `Σ weight ≥ quorum_weight_fraction × expected_total_weight`.
 /// Returns `Some(QuorumFormed)` exactly once per election.
 #[allow(clippy::too_many_arguments)]
 pub fn record_vote(
@@ -39,9 +44,9 @@ pub fn record_vote(
     eb_hash: &[u8; 32],
     eb_slot: u64,
     voter_id: Vec<u8>,
-    weight: u32,
+    weight: u64,
     quorum_weight_fraction: f64,
-    expected_committee_size: u32,
+    expected_total_weight: u64,
     current_slot: u64,
     pipeline: PipelineConfig,
     node_id: &str,
@@ -76,8 +81,11 @@ pub fn record_vote(
         return None;
     }
 
-    let voted_weight: u64 = election.voter_weights.values().map(|w| *w as u64).sum();
-    let threshold = (quorum_weight_fraction * expected_committee_size as f64) as u64;
+    let voted_weight: u64 = election.voter_weights.values().sum();
+    // Ceiling so the integer threshold really enforces the doc's
+    // `Σ weight ≥ τ × total`: truncating a 2.25 product to 2 would
+    // accept 2/3 = 66% under a τ = 75% quorum.
+    let threshold = (quorum_weight_fraction * expected_total_weight as f64).ceil() as u64;
     if voted_weight < threshold {
         return None;
     }
@@ -117,7 +125,7 @@ mod tests {
 
     /// Default quorum: 75% of 1000 = 750 weight.
     const QUORUM_FRACTION: f64 = 0.75;
-    const EXPECTED_COMMITTEE_SIZE: u32 = 1000;
+    const EXPECTED_TOTAL_WEIGHT: u64 = 1000;
     const EB_SLOT: u64 = 10;
     /// `current_slot = 11`, `eb_slot = 10`, delta_hdr=1 → elapsed=1 lands
     /// at the start of the Voting phase, matching `make_election`'s
@@ -153,7 +161,7 @@ mod tests {
         elections: &mut BTreeMap<[u8; 32], EbElection>,
         hash: &[u8; 32],
         voter_id: Vec<u8>,
-        weight: u32,
+        weight: u64,
     ) {
         record_vote(
             elections,
@@ -162,7 +170,7 @@ mod tests {
             voter_id,
             weight,
             QUORUM_FRACTION,
-            EXPECTED_COMMITTEE_SIZE,
+            EXPECTED_TOTAL_WEIGHT,
             CURRENT_SLOT,
             test_pipeline(),
             "test",
@@ -217,11 +225,11 @@ mod tests {
         elections.insert(hash, election);
 
         // 750 distinct voters × weight 1 each crosses 750 threshold.
-        for i in 0u32..749 {
+        for i in 0u64..749 {
             vote(&mut elections, &hash, i.to_le_bytes().to_vec(), 1);
             assert!(!elections[&hash].quorum_reached);
         }
-        vote(&mut elections, &hash, 749u32.to_le_bytes().to_vec(), 1);
+        vote(&mut elections, &hash, 749u64.to_le_bytes().to_vec(), 1);
         assert!(elections[&hash].quorum_reached);
     }
 
@@ -266,5 +274,44 @@ mod tests {
         vote(&mut elections, &hash, vec![3], 200);
         assert!(elections[&hash].quorum_reached);
         assert_eq!(elections[&hash].voter_weights.len(), 3);
+    }
+
+    /// CIP-164 PR #1196: under stake-weighted quorum the denominator is
+    /// total active stake and per-voter "weight" is the voter's own
+    /// stake.  A small set of large-stake voters can therefore reach
+    /// quorum without majority head-count participation.
+    #[test]
+    fn quorum_reached_when_high_stake_minority_votes() {
+        let mut elections = BTreeMap::new();
+        let (hash, election) = make_election(10);
+        elections.insert(hash, election);
+
+        // Stake distribution [600, 200, 100, 100] = total 1000.
+        // τ = 0.75 → threshold 750 stake-units.
+        vote(&mut elections, &hash, vec![1], 600);
+        assert!(!elections[&hash].quorum_reached);
+        vote(&mut elections, &hash, vec![2], 200);
+        // 800 ≥ 750 — quorum reached with only 2 of 4 voters.
+        assert!(elections[&hash].quorum_reached);
+    }
+
+    /// Mirror of the above: a head-count majority of small-stake voters
+    /// must NOT reach the stake-weighted quorum if their combined stake
+    /// falls short.  This is the security property PR #1196 protects.
+    #[test]
+    fn quorum_blocked_when_low_stake_majority_votes() {
+        let mut elections = BTreeMap::new();
+        let (hash, election) = make_election(10);
+        elections.insert(hash, election);
+
+        // Stake distribution [600, 50 × 8] = total 1000.  All eight
+        // 50-stake voters vote; the 600-stake voter abstains.  Vote
+        // count 8 > 1, but vote stake 400 < threshold 750 — quorum
+        // must NOT fire.
+        for i in 0u64..8 {
+            vote(&mut elections, &hash, i.to_le_bytes().to_vec(), 50);
+        }
+        assert!(!elections[&hash].quorum_reached);
+        assert_eq!(elections[&hash].voter_weights.len(), 8);
     }
 }

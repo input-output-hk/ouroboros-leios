@@ -755,9 +755,8 @@
     "non-persistent-vote-generation-probability": {
       "type": "number"
     },
-    "vote-threshold": {
-      "additionalProperties": false,
-      "properties": {},
+    "quorum-weight-fraction": {
+      "description": "Fraction of expected total weight required for quorum. Replaces the old `vote-threshold` knob. CIP-0164 default 0.75; legacy sim runs used 0.6. For `top-stake-fraction` selection the denominator is total active stake (CIP-164 PR #1196).",
       "type": "number"
     },
     "vote-validation-cpu-time-ms": {

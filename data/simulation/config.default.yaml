@@ -221,8 +221,14 @@ eb-body-avg-size-bytes: 2500000
 persistent-vote-generation-probability: 400.0
 non-persistent-vote-generation-probability: 100.0
 # vote-spec#"Committee and quorum size"
-# 60% of total vote-generation-probability
-vote-threshold: 300
+# Fraction of expected total weight required for quorum (CIP-0164
+# default is 0.75; legacy sim runs used 0.6 = old absolute 300 / 500).
+# The absolute threshold is derived per committee mode:
+#   wfa-ls             → quorum-weight-fraction × (PV + NPV)
+#   everyone           → quorum-weight-fraction × N nodes
+#   top-stake-fraction → quorum-weight-fraction × total active stake
+# Replaces the old `vote-threshold` knob; see CIP-164 PR #1196.
+quorum-weight-fraction: 0.6
 # vote-spec#"Generate vote"
 persistent-vote-generation-cpu-time-ms: 135e-3
 non-persistent-vote-generation-cpu-time-ms: 280e-3
@@ -251,7 +257,9 @@ vote-validation-cpu-time-ms: 816e-3
 vote-bundle-size-bytes-per-eb: 105
 
 # Committee selection algorithm: "wfa-ls" (default), "everyone", or "top-stake-fraction"
-# For "everyone" or "top-stake-fraction", adjust vote-threshold manually.
+# The same `quorum-weight-fraction` knob applies to all modes; the
+# absolute threshold is derived from it via the mode-specific
+# denominator (see above).
 committee-selection-algorithm: "wfa-ls"
 # Fraction of total stake eligible to vote when using "top-stake-fraction".
 committee-stake-fraction-threshold: 0.95

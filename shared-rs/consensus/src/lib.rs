@@ -22,7 +22,7 @@ pub mod pipeline;
 pub mod praos;
 pub mod production;
 pub mod types;
-pub mod wfa;
+pub mod committee;
 
 pub use config::{CommitteeSelection, StakeEntry};
 pub use peer::PeerId;
