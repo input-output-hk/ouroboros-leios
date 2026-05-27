@@ -223,7 +223,7 @@ export const useGraphLayout = () => {
       dispatch({ type: "SET_NODE_POSITIONS", payload: positions });
 
     switch (layoutMode) {
-      case "original":
+      case "none":
         applyPositions(originalLayout(topography));
         break;
       case "circular":

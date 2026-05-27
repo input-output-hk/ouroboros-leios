@@ -9,7 +9,7 @@ import {
 } from "@/contexts/SimContext/types";
 
 const LAYOUT_MODES: readonly LayoutMode[] = [
-  "original",
+  "none",
   "auto",
   "circular",
   "mercator",

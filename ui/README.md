@@ -124,8 +124,21 @@ from the topology's `location` field). A different layout can be picked via the
 Supported modes:
 
 - `auto` (default) - force-directed simulation
-- `original` - uses each node's `location` as raw canvas coordinates
 - `circular` - evenly spaces nodes on a circle
 - `mercator` - projects `location` as `[lat, lon]` onto a Mercator world map
+- `none` - uses each node's `location` as raw canvas coordinates
 
 The parameter combines with `scenario`, e.g. `?scenario=2&layout=mercator`.
+
+### Selecting the view
+
+The visualizer opens on the network view by default. Add `?view=chain` to
+jump straight into the blockchain visualisation:
+
+```
+?view=<network|chain>
+```
+
+Combines with the other parameters, e.g.
+`?scenario=4&view=chain` opens the proto-devnet scenario directly in the
+chain view.

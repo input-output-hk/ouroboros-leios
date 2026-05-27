@@ -52,7 +52,14 @@ export const SimWrapper: FC = () => {
     dispatch,
   } = useSimContext();
 
-  const [view, setView] = useState<View>("network");
+  // Honour `?view=chain` (or `?view=network`) on initial load so links can
+  // jump straight into the chain visualisation. See README for the param
+  // list. Validated against the literal union so a bad value falls back
+  // to the default.
+  const [view, setView] = useState<View>(() => {
+    const v = new URLSearchParams(window.location.search).get("view");
+    return v === "chain" || v === "network" ? v : "network";
+  });
 
   useGraphLayout();
 
