@@ -281,3 +281,17 @@ cert-generation-cpu-time-ms-per-node: 0
 # vote-spec#"Verify certificate"
 cert-validation-cpu-time-ms-constant: 130.0
 cert-validation-cpu-time-ms-per-node: 0
+
+################################################################################
+# Consensus Behaviours (shared-consensus adapter only)
+################################################################################
+
+# Per-node adversarial / experimental behaviours wired into the
+# shared-consensus engine.  Each entry pairs a `BehaviourSpec` (kind
+# = honest | composite | rb-header-equivocator | lazy-voter) with a
+# `BehaviourSelection` (kind = all | nodes | stake-random |
+# stake-ordered | stake-fraction) picking which nodes run it.
+# Overlapping selections compose; resolution is deterministic for a
+# given `seed`.  Empty (default) means every node runs `honest`.
+# Ignored by engines other than `shared-consensus`.
+consensus-behaviours: []

@@ -348,6 +348,29 @@ pub struct RawParameters {
     // attacks,
     pub late_eb_attack: Option<RawLateEBAttackConfig>,
     pub late_tx_attack: Option<RawLateTXAttackConfig>,
+
+    /// Per-node consensus behaviours wired into the shared-consensus
+    /// engine.  Each entry pairs a [`BehaviourSpec`] with a
+    /// [`BehaviourSelection`] picking which nodes run it; overlapping
+    /// selections compose via [`BehaviourSpec::Composite`].  Resolution
+    /// is deterministic for a given `seed`.  Empty (default) means
+    /// every node runs [`BehaviourSpec::Honest`].  Only consumed by the
+    /// shared-consensus adapter; ignored by other engines.
+    ///
+    /// [`BehaviourSpec`]: shared_consensus::behaviour::BehaviourSpec
+    /// [`BehaviourSelection`]: shared_consensus::behaviour::BehaviourSelection
+    /// [`BehaviourSpec::Composite`]: shared_consensus::behaviour::BehaviourSpec::Composite
+    /// [`BehaviourSpec::Honest`]: shared_consensus::behaviour::BehaviourSpec::Honest
+    #[serde(default)]
+    pub consensus_behaviours: Vec<ConsensusBehaviourEntry>,
+}
+
+/// One row of [`RawParameters::consensus_behaviours`].
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ConsensusBehaviourEntry {
+    pub spec: shared_consensus::behaviour::BehaviourSpec,
+    pub selection: shared_consensus::behaviour::BehaviourSelection,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -998,6 +1021,7 @@ pub struct SimConfiguration {
     pub(crate) ib_generation_probability: f64,
     pub(crate) eb_generation_probability: f64,
     pub(crate) committee_selection: CommitteeSelectionAlgorithm,
+    pub(crate) committee_stake_fraction_threshold: f64,
     pub(crate) vote_eligible_nodes: HashSet<NodeId>,
     /// Sum of `persistent_voters + non_persistent_voters`.  Linear
     /// uses this as a single VRF-lottery probability per (voter, EB).
@@ -1031,6 +1055,16 @@ pub struct SimConfiguration {
     pub(crate) tx_batch_window: Option<Duration>,
     /// Shared network stats collector (set by sequential engine, read by nodes).
     pub network_stats: Option<Arc<crate::network::stats::NetworkStatsCollector>>,
+
+    /// Per-node consensus behaviour assignment.  Resolved once at
+    /// build time from [`RawParameters::consensus_behaviours`].  Nodes
+    /// absent from the map run [`BehaviourSpec::Honest`] (the default
+    /// installed by `LeiosState::new`).  Only consumed by the
+    /// shared-consensus adapter.
+    ///
+    /// [`BehaviourSpec::Honest`]: shared_consensus::behaviour::BehaviourSpec::Honest
+    pub(crate) consensus_behaviour_specs:
+        BTreeMap<NodeId, shared_consensus::behaviour::BehaviourSpec>,
 }
 
 impl SimConfiguration {
@@ -1056,6 +1090,11 @@ impl SimConfiguration {
             );
         }
         let total_stake: u64 = topology.nodes.iter().map(|n| n.stake).sum();
+        let consensus_behaviour_specs = resolve_consensus_behaviours(
+            &params.consensus_behaviours,
+            &topology.nodes,
+            params.seed,
+        );
         let attacks = AttackConfig::build(&params, &mut topology);
         let vote_eligible_nodes = match params.committee_selection_algorithm {
             CommitteeSelectionAlgorithm::WfaLs | CommitteeSelectionAlgorithm::Everyone => {
@@ -1117,6 +1156,7 @@ impl SimConfiguration {
             ib_generation_probability: params.ib_generation_probability,
             eb_generation_probability: params.eb_generation_probability,
             committee_selection: params.committee_selection_algorithm,
+            committee_stake_fraction_threshold: params.committee_stake_fraction_threshold,
             vote_eligible_nodes,
             vote_probability: params.persistent_voters + params.non_persistent_voters,
             persistent_voters: params.persistent_voters,
@@ -1142,8 +1182,42 @@ impl SimConfiguration {
             attacks,
             tx_batch_window: params.tx_batch_window_ms.map(duration_ms),
             network_stats: None,
+            consensus_behaviour_specs,
         })
     }
+}
+
+/// Resolve `[(spec, selection)]` against the node list in `NodeId`
+/// order.  Stakes are read in the same order, so the
+/// `BTreeMap<usize, BehaviourSpec>` returned by
+/// [`shared_consensus::behaviour::resolve_specs`] maps directly onto
+/// `NodeId`s.
+fn resolve_consensus_behaviours(
+    items: &[ConsensusBehaviourEntry],
+    nodes: &[NodeConfiguration],
+    seed: u64,
+) -> BTreeMap<NodeId, shared_consensus::behaviour::BehaviourSpec> {
+    if items.is_empty() {
+        return BTreeMap::new();
+    }
+    // NodeIds are assigned by topology enumeration order; assert that
+    // for the slice we receive so the index translation below is sound.
+    debug_assert!(
+        nodes.iter().enumerate().all(|(i, n)| n.id.to_inner() == i),
+        "expected NodeConfiguration ordering by NodeId"
+    );
+    let stakes: Vec<u64> = nodes.iter().map(|n| n.stake).collect();
+    let pairs: Vec<(
+        shared_consensus::behaviour::BehaviourSpec,
+        shared_consensus::behaviour::BehaviourSelection,
+    )> = items
+        .iter()
+        .map(|e| (e.spec.clone(), e.selection.clone()))
+        .collect();
+    shared_consensus::behaviour::resolve_specs(&pairs, &stakes, Some(seed))
+        .into_iter()
+        .map(|(idx, spec)| (nodes[idx].id, spec))
+        .collect()
 }
 
 fn duration_ms(ms: f64) -> Duration {
@@ -1220,5 +1294,111 @@ impl NodeBehaviours {
             }
         }
         result
+    }
+}
+
+#[cfg(test)]
+mod consensus_behaviour_tests {
+    use super::*;
+    use shared_consensus::behaviour::{BehaviourSelection, BehaviourSpec};
+
+    fn node(id: usize, name: &str, stake: u64) -> NodeConfiguration {
+        NodeConfiguration {
+            id: NodeId::new(id),
+            name: name.to_string(),
+            stake,
+            location: None,
+            cpu_multiplier: 1.0,
+            cores: None,
+            tx_conflict_fraction: None,
+            tx_generation_weight: None,
+            consumers: Vec::new(),
+            behaviours: NodeBehaviours::default(),
+        }
+    }
+
+    #[test]
+    fn empty_items_returns_empty_map() {
+        let nodes = vec![node(0, "a", 1), node(1, "b", 1)];
+        let out = resolve_consensus_behaviours(&[], &nodes, 0);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn stake_fraction_maps_to_correct_node_ids() {
+        let nodes = vec![
+            node(0, "a", 100),
+            node(1, "b", 100),
+            node(2, "c", 100),
+            node(3, "d", 0), // relay
+        ];
+        let items = vec![ConsensusBehaviourEntry {
+            spec: BehaviourSpec::LazyVoter {
+                reason: shared_consensus::leios::NoVoteReason::Declined,
+            },
+            selection: BehaviourSelection::StakeFraction { fraction: 0.4 },
+        }];
+        let out = resolve_consensus_behaviours(&items, &nodes, 0);
+        // total 300, target 120 → cover with 2 nodes (100 + 100).
+        let picked: Vec<NodeId> = out.keys().copied().collect();
+        assert_eq!(picked, vec![NodeId::new(0), NodeId::new(1)]);
+        for (_, spec) in &out {
+            assert!(matches!(spec, BehaviourSpec::LazyVoter { .. }));
+        }
+    }
+
+    #[test]
+    fn overlapping_selections_compose_per_node() {
+        let nodes = vec![node(0, "a", 100), node(1, "b", 100)];
+        let items = vec![
+            ConsensusBehaviourEntry {
+                spec: BehaviourSpec::LazyVoter {
+                    reason: shared_consensus::leios::NoVoteReason::Declined,
+                },
+                selection: BehaviourSelection::All,
+            },
+            ConsensusBehaviourEntry {
+                spec: BehaviourSpec::RbHeaderEquivocator { ways: 2 },
+                selection: BehaviourSelection::Nodes { indices: vec![0] },
+            },
+        ];
+        let out = resolve_consensus_behaviours(&items, &nodes, 0);
+        match out.get(&NodeId::new(0)) {
+            Some(BehaviourSpec::Composite { children }) => {
+                assert_eq!(children.len(), 2);
+                assert!(matches!(children[0], BehaviourSpec::LazyVoter { .. }));
+                assert!(matches!(
+                    children[1],
+                    BehaviourSpec::RbHeaderEquivocator { ways: 2 }
+                ));
+            }
+            other => panic!("expected Composite at node 0, got {:?}", other),
+        }
+        assert!(matches!(
+            out.get(&NodeId::new(1)),
+            Some(BehaviourSpec::LazyVoter { .. })
+        ));
+    }
+
+    #[test]
+    fn stake_random_is_deterministic_across_calls() {
+        let nodes: Vec<_> = (0..10)
+            .map(|i| node(i, &format!("n{i}"), if i % 2 == 0 { 100 } else { 0 }))
+            .collect();
+        let items = vec![ConsensusBehaviourEntry {
+            spec: BehaviourSpec::LazyVoter {
+                reason: shared_consensus::leios::NoVoteReason::Declined,
+            },
+            selection: BehaviourSelection::StakeRandom { count: 2 },
+        }];
+        let a = resolve_consensus_behaviours(&items, &nodes, 42);
+        let b = resolve_consensus_behaviours(&items, &nodes, 42);
+        let c = resolve_consensus_behaviours(&items, &nodes, 43);
+        assert_eq!(a.keys().collect::<Vec<_>>(), b.keys().collect::<Vec<_>>());
+        assert_ne!(a.keys().collect::<Vec<_>>(), c.keys().collect::<Vec<_>>());
+        // never picks zero-stake nodes
+        for id in a.keys() {
+            assert!(id.to_inner() % 2 == 0);
+        }
     }
 }

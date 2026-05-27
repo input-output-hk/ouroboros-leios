@@ -1,6 +1,95 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "BehaviourSpec": {
+      "description": "Per-node consensus behaviour.  Tagged enum (kind = honest|composite|rb-header-equivocator|lazy-voter).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "required": ["kind"],
+          "type": "object",
+          "properties": { "kind": { "const": "honest", "type": "string" } }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["kind", "children"],
+          "type": "object",
+          "properties": {
+            "kind": { "const": "composite", "type": "string" },
+            "children": { "type": "array", "items": { "$ref": "#/definitions/BehaviourSpec" } }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["kind"],
+          "type": "object",
+          "properties": {
+            "kind": { "const": "rb-header-equivocator", "type": "string" },
+            "ways": { "type": "integer", "minimum": 2, "default": 2 }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["kind"],
+          "type": "object",
+          "properties": {
+            "kind": { "const": "lazy-voter", "type": "string" },
+            "reason": {
+              "default": "declined",
+              "description": "NoVote reason recorded for telemetry on each abstention.",
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "BehaviourSelection": {
+      "description": "Which nodes a behaviour applies to.  Tagged enum (kind = all|nodes|stake-random|stake-ordered|stake-fraction).  Stake-aware variants ignore zero-stake nodes; selection is deterministic for a given seed.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "required": ["kind"],
+          "type": "object",
+          "properties": { "kind": { "const": "all", "type": "string" } }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["kind"],
+          "type": "object",
+          "properties": {
+            "kind": { "const": "nodes", "type": "string" },
+            "indices": { "type": "array", "items": { "type": "integer", "minimum": 0 } }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["kind", "count"],
+          "type": "object",
+          "properties": {
+            "kind": { "const": "stake-random", "type": "string" },
+            "count": { "type": "integer", "minimum": 0 }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["kind", "count"],
+          "type": "object",
+          "properties": {
+            "kind": { "const": "stake-ordered", "type": "string" },
+            "count": { "type": "integer", "minimum": 0 }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["kind", "fraction"],
+          "type": "object",
+          "properties": {
+            "kind": { "const": "stake-fraction", "type": "string" },
+            "fraction": { "type": "number" }
+          }
+        }
+      ]
+    },
     "CleanupPolicies": {
       "anyOf": [
         {
@@ -374,6 +463,20 @@
     "ib-shards": {
       "description": "The total number of shards available for IBs.\nMust be divisible by ib_shard_group_count.\n\nOnly supported by Rust simulation.",
       "type": "number"
+    },
+    "consensus-behaviours": {
+      "default": [],
+      "description": "Per-node adversarial / experimental behaviours wired into the shared-consensus engine.\nEach entry pairs a BehaviourSpec (kind = honest|composite|rb-header-equivocator|lazy-voter)\nwith a BehaviourSelection (kind = all|nodes|stake-random|stake-ordered|stake-fraction)\npicking which nodes run it.  Overlapping selections compose.\nDeterministic for a given seed.  Ignored by engines other than `shared-consensus`.",
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "required": ["spec", "selection"],
+        "type": "object",
+        "properties": {
+          "spec": { "$ref": "#/definitions/BehaviourSpec" },
+          "selection": { "$ref": "#/definitions/BehaviourSelection" }
+        }
+      }
     },
     "late-eb-attack": {
       "$ref": "#/definitions/LateEBAttackConfig",
