@@ -40,6 +40,11 @@ pub struct Consensus {
     /// coordinator holds its own clone for the per-peer outbound
     /// transform path.
     behaviour_handle: shared_consensus::behaviour::BehaviourHandle,
+    /// Spec the node materialised at startup.  Kept so a runtime
+    /// "reset" can walk the handle back to the original behaviour
+    /// (Honest for most nodes, but a node configured as a startup
+    /// attacker remains one).
+    startup_spec: shared_consensus::behaviour::BehaviourSpec,
 }
 
 impl Consensus {
@@ -63,6 +68,7 @@ impl Consensus {
         rtt: PeerRttCache,
         fetch_policy: FetchPolicyConfig,
         behaviour_handle: shared_consensus::behaviour::BehaviourHandle,
+        startup_spec: shared_consensus::behaviour::BehaviourSpec,
     ) -> Self {
         let mut praos = PraosConsensus::new(
             node_id.clone(),
@@ -112,6 +118,7 @@ impl Consensus {
             leios,
             behaviour_seed,
             behaviour_handle,
+            startup_spec,
         }
     }
 
@@ -127,6 +134,22 @@ impl Consensus {
     ) {
         tracing::info!(?spec, behaviour_seed = self.behaviour_seed, "swapping per-node behaviour");
         shared_consensus::behaviour::swap_handle(&self.behaviour_handle, spec, self.behaviour_seed);
+    }
+
+    /// Walk the per-node behaviour back to the spec materialised at
+    /// startup.  Used when net-cluster stops a runtime attack so each
+    /// node returns to its original configuration.
+    pub fn reset_behaviour(&mut self, _mempool: &crate::mempool::SharedMempool) {
+        tracing::info!(
+            startup_spec = ?self.startup_spec,
+            behaviour_seed = self.behaviour_seed,
+            "resetting per-node behaviour to startup spec"
+        );
+        shared_consensus::behaviour::swap_handle(
+            &self.behaviour_handle,
+            &self.startup_spec,
+            self.behaviour_seed,
+        );
     }
 
     /// Ask the per-node behaviour what to do for this slot's
@@ -183,14 +206,23 @@ impl Consensus {
 
     /// Register a self-produced endorser block with Leios consensus —
     /// records the manifest, fires the offer notifications, and marks
-    /// the EB validated.
+    /// the EB validated.  Also stashes the manifest size on the
+    /// announcing RB's chain-tree node so the UI snapshot can surface
+    /// the count regardless of LeiosState's manifest-cache TTL.
     pub async fn register_self_produced_eb(&mut self, point: Point, eb_data: &[u8]) {
+        self.record_announced_eb_tx_count_from_blob(&point, eb_data);
         self.leios.register_self_produced_eb(point, eb_data).await;
     }
 
     /// Route a network event to Praos or Leios. Returns true if the event
     /// was consumed (caller should not log it separately).
     pub async fn handle_event(&mut self, event: &NetworkEvent) -> bool {
+        // Mirror manifest sizes onto the chain-tree node on receive so
+        // they survive the LeiosState cache TTL — see
+        // `register_self_produced_eb` for the same on the produce path.
+        if let NetworkEvent::LeiosBlockReceived { point, block } = event {
+            self.record_announced_eb_tx_count_from_blob(point, block);
+        }
         match event {
             NetworkEvent::LeiosBlockOffered { .. }
             | NetworkEvent::LeiosBlockTxsOffered { .. }
@@ -199,6 +231,22 @@ impl Consensus {
             | NetworkEvent::LeiosVotesReceived { .. }
             | NetworkEvent::LeiosBlockTxsReceived { .. } => self.leios.handle_event(event).await,
             _ => self.praos.handle_event(event).await,
+        }
+    }
+
+    /// Decode an EB blob to extract its manifest size and stash it on
+    /// the chain-tree node that announced this EB hash.  Idempotent;
+    /// no-op when the blob doesn't decode (malformed) or no chain-tree
+    /// node announces the EB (the announcing RB was pruned or never
+    /// adopted).
+    fn record_announced_eb_tx_count_from_blob(&mut self, point: &Point, blob: &[u8]) {
+        let hash = match point {
+            Point::Specific { hash, .. } => *hash,
+            Point::Origin => return,
+        };
+        if let Some((_, tx_hashes)) = crate::production::decode_overflow_eb(blob) {
+            self.praos
+                .record_announced_eb_tx_count(&hash, tx_hashes.len() as u32);
         }
     }
 

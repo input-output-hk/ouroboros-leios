@@ -1,0 +1,25 @@
+# Relay defaults for the piranha-relay Docker image.
+#
+# Passive Leios participant: no block production, no tx generation,
+# Leios protocols enabled so the node can diffuse EBs, votes and
+# EB-tx bodies for its peers.
+#
+# Layered between mainnet.toml and the env-driven runtime overlay.
+# Intentionally omits `node_id`, `listen_address`, and `[[peers]]` so
+# the runtime overlay (and optional NET_NODE_CONFIG) can supply them
+# without conflicting with bundled values.
+
+seed = 1
+leios_enabled = true
+
+[production]
+stake = 0
+
+[transactions]
+tx_rate = 0.0
+
+[telemetry]
+stats_interval_secs = 10
+
+[[telemetry.stats_sinks]]
+type = "log"

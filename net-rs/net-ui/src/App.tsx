@@ -13,13 +13,17 @@ import { EventLog } from "@/components/EventLog";
 import { IconSidebar } from "@/components/IconSidebar";
 import { ControlPanel } from "@/components/ControlPanel";
 import { VotingPanel } from "@/components/VotingPanel";
+import { AttackPanel } from "@/components/AttackPanel";
+import piranhaLogo from "@/assets/piranha.svg";
 
 export default function App() {
   const loadTopology = useStore((s) => s.loadTopology);
   const loadConfig = useStore((s) => s.loadConfig);
+  const loadActiveAttack = useStore((s) => s.loadActiveAttack);
   const pollStats = useStore((s) => s.pollStats);
   const topology = useStore((s) => s.topology);
   const restarting = useStore((s) => s.restarting);
+  const activeAttack = useStore((s) => s.activeAttack);
   const networkChainTree = useStore((s) => s.networkChainTree);
   const networkTipCounts = useStore((s) => s.networkTipCounts);
   const selectedNodeId = useStore((s) => s.selectedNodeId);
@@ -29,11 +33,13 @@ export default function App() {
   const [chainTreeOpen, setChainTreeOpen] = useState(true);
   const [controlPanelOpen, setControlPanelOpen] = useState(false);
   const [votingPanelOpen, setVotingPanelOpen] = useState(false);
+  const [attackPanelOpen, setAttackPanelOpen] = useState(false);
 
   useEffect(() => {
     loadTopology();
     loadConfig();
-  }, [loadTopology, loadConfig]);
+    loadActiveAttack();
+  }, [loadTopology, loadConfig, loadActiveAttack]);
 
   // Close control/voting panels when restart completes.
   const wasRestarting = useRef(false);
@@ -47,6 +53,7 @@ export default function App() {
 
   useForceLayout();
   usePolling(pollStats, 1000);
+  usePolling(loadActiveAttack, 2000);
   useEventStream();
 
   return (
@@ -67,7 +74,16 @@ export default function App() {
         <Box sx={{ position: "absolute", top: 42, left: 0, bottom: 0, zIndex: 25, pointerEvents: "auto" }}>
           <IconSidebar
             controlPanelOpen={controlPanelOpen}
-            onToggleControlPanel={() => setControlPanelOpen((v) => !v)}
+            onToggleControlPanel={() => {
+              setControlPanelOpen((v) => !v);
+              setAttackPanelOpen(false);
+            }}
+            attackPanelOpen={attackPanelOpen}
+            attackActive={activeAttack !== null}
+            onToggleAttackPanel={() => {
+              setAttackPanelOpen((v) => !v);
+              setControlPanelOpen(false);
+            }}
             chainTreeOpen={chainTreeOpen}
             onToggleChainTree={() => setChainTreeOpen((v) => !v)}
             chartsOpen={chartsOpen}
@@ -114,6 +130,25 @@ export default function App() {
             <VotingPanel />
           </Box>
         )}
+        
+        {/* Attack panel slide-out — same anchor as control panel; only one
+            shows at a time because they share the same left strip. */}
+        {attackPanelOpen && (
+          <Box sx={{
+            position: "absolute",
+            top: 42,
+            left: 48,
+            zIndex: 24,
+            backdropFilter: "blur(8px)",
+            bgcolor: "rgba(13, 27, 42, 0.5)",
+            borderRight: "1px solid rgba(255,255,255,0.08)",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "0 0 8px 0",
+            pointerEvents: "auto",
+          }}>
+            <AttackPanel />
+          </Box>
+        )}
 
         {/* Restarting overlay */}
         {restarting && (
@@ -132,10 +167,13 @@ export default function App() {
         )}
 
         {/* Header — overlay */}
-        <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, px: 2, py: 0.75, bgcolor: "rgba(13, 27, 42, 0.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "baseline", justifyContent: "space-between", pointerEvents: "auto" }}>
-          <Typography variant="h5" sx={{ color: "#ffffff", fontWeight: 700 }}>
-            Leios Node Cluster
-          </Typography>
+        <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, px: 2, py: 0.75, bgcolor: "rgba(13, 27, 42, 0.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "space-between", pointerEvents: "auto" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+            <img src={piranhaLogo} alt="" style={{ height: 40, width: "auto", display: "block" }} />
+            <Typography variant="h5" sx={{ color: "#ffffff", fontWeight: 700 }}>
+              Leios Piranha Cluster
+            </Typography>
+          </Box>
           {topology && (
             <Typography variant="body2" sx={{ color: "#ffffff" }}>
               {topology.nodes.length} nodes, {topology.edges.length} edges

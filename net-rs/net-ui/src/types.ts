@@ -107,3 +107,40 @@ export interface AggregateVotesHistory {
   node_ids: string[];
   votes: string[];
 }
+// Mirrors shared_consensus::leios::NoVoteReason (kebab-case serde).
+export type NoVoteReason =
+  | "late-eb"
+  | "late-rb-header"
+  | "wrong-eb"
+  | "missing-tx"
+  | "eb-validating"
+  | "equivocating-rb"
+  | "declined";
+
+// Per-node behaviour spec — mirrors shared_consensus::behaviour::BehaviourSpec.
+// The Rust enum uses #[serde(tag = "kind", rename_all = "kebab-case")].
+export type BehaviourSpec =
+  | { kind: "honest" }
+  | { kind: "lazy-voter"; reason?: NoVoteReason }
+  | { kind: "rb-header-equivocator"; ways: number }
+  | { kind: "composite"; children: BehaviourSpec[] };
+
+// Mirrors net-cluster's BehaviourSelection enum (same serde tag layout).
+export type BehaviourSelection =
+  | { kind: "all" }
+  | { kind: "nodes"; indices: number[] }
+  | { kind: "stake-random"; count: number }
+  | { kind: "stake-ordered"; count: number }
+  | { kind: "stake-fraction"; fraction: number };
+
+export interface AttackRequest {
+  behaviour: BehaviourSpec;
+  selection: BehaviourSelection;
+}
+
+export interface ActiveAttack {
+  behaviour: BehaviourSpec;
+  selection: BehaviourSelection;
+  indices: number[];
+  started_at_s: number;
+}

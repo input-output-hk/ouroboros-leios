@@ -162,6 +162,8 @@ cargo clippy           # lint
 cargo fmt --check      # format check
 ```
 
+A Docker image is also available — see [`docker/README.md`](docker/README.md) for the build and run contract (`piranha-relay`, single passive relay, env-driven peers and listen port).
+
 ## CLI Usage
 
 The `net-cli` binary provides subcommands for testing against live nodes and local simulation.

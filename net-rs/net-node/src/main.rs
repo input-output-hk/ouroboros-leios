@@ -153,6 +153,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         rtt_cache,
         config.fetch_policy,
         behaviour_handle.clone(),
+        behaviour_spec.clone(),
     );
 
     // Transaction validator (validates received txs before mempool entry).
@@ -521,6 +522,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 // mutates the live state machines.
                                 if let Some(spec) = &update.behaviour {
                                     consensus.set_behaviour(spec, &mempool);
+                                } else if matches!(update.behaviour_reset, Some(true)) {
+                                    consensus.reset_behaviour(&mempool);
                                 }
                                 info!(node_id = %node_id, "dynamic config updated");
                             }

@@ -197,7 +197,10 @@ pub struct ProducedRb {
     pub body: BlockBody,
     /// If the mempool overflowed, the EB manifest to inject into the network.
     pub announced_eb: Option<ProducedEb>,
-    /// Number of transactions included in the RB body (RB path only).
+    /// Number of transactions included inline in the RB body.  Non-zero
+    /// for the pure-RB case and the RB+EB overflow split alike;
+    /// the EB-announcement residual (if any) is counted by
+    /// `announced_eb`, not here.
     pub included_tx_count: usize,
 }
 
@@ -246,12 +249,21 @@ impl BlockProducer {
         self.stake > 0 && self.total_stake > 0
     }
 
-    /// Run the VRF lottery for a Praos ranking block. On win, drains the
-    /// mempool: if pending txs fit in `rb_body_max_bytes`, they go in the
-    /// RB body (RB path). Otherwise the EB-overflow path fires: an EB
-    /// announcement carries a FIFO-ordered manifest capped at
-    /// `eb_body_max_bytes` worth of tx bodies, the RB body is empty,
-    /// and the remainder stays in the mempool for the next RB.
+    /// Run the VRF lottery for a Praos ranking block. On win, asks
+    /// shared-consensus's `production::BodyPath::decide` how to split
+    /// the pending mempool between the RB body and a fresh EB
+    /// announcement:
+    ///
+    /// - All-fits case: every pending tx goes inline into the RB body
+    ///   up to `rb_body_max_bytes`; no EB is announced.
+    /// - Overflow split: txs fill the RB body up to `rb_body_max_bytes`
+    ///   and the residual is announced via a fresh EB whose
+    ///   FIFO-ordered manifest is capped at `eb_body_max_bytes` worth
+    ///   of tx bodies.  Inline RB body and EB announcement coexist;
+    ///   anything past both caps stays in the mempool for the next RB.
+    /// - Empty-for-safety: the producer-side EB-safety gate may force
+    ///   both inline and announcement to be empty (no EB is announced
+    ///   when the chain context can't certify one safely).
     pub fn try_produce_block(
         &mut self,
         slot: u64,
@@ -277,42 +289,42 @@ impl BlockProducer {
         self.block_count += 1;
 
         // CIP-0164 overflow rule plus producer-side EB-safety gate
-        // both live in shared-consensus (`production::BodyPath`).
+        // both live in shared-consensus (`production::BodyPath`).  The
+        // returned struct's `inline` becomes the RB body and
+        // `manifest_hashes` becomes a fresh EB announcement; either
+        // (or both) may be empty.
         let mut pool = mempool.lock().unwrap();
-        let (txs, announced_eb) = match pool.decide_body_path(
+        let body_path = pool.decide_body_path(
             self.rb_body_max_bytes,
             self.eb_body_max_bytes,
             leios,
             certified_eb,
-        ) {
-            crate::mempool::BodyPath::Empty => (Vec::new(), None),
-            crate::mempool::BodyPath::Inline(txs) => (txs, None),
-            crate::mempool::BodyPath::Eb { manifest_hashes } => {
-                // Encode wire bytes, hash them, then commit the
-                // drain-and-pin under the resulting EB key.  Bodies stay
-                // pinned in the mempool under `eb_pinned` so the producer
-                // can vote for its own EB (MissingTX predicate sees them)
-                // and serve `LeiosFetch BlockTxs` (resolver finds them by
-                // tx_id).
-                let manifest_len = manifest_hashes.len();
-                let eb_data = encode_overflow_eb(slot, &manifest_hashes);
-                let eb_hash = blake2b_256(&eb_data);
-                let eb_key = EbKey {
+        );
+        let txs = body_path.inline;
+        let announced_eb = if body_path.manifest_hashes.is_empty() {
+            None
+        } else {
+            // Encode wire bytes, hash them, then commit the
+            // drain-and-pin under the resulting EB key.  Bodies stay
+            // pinned in the mempool under `eb_pinned` so the producer
+            // can vote for its own EB (MissingTX predicate sees them)
+            // and serve `LeiosFetch BlockTxs` (resolver finds them by
+            // tx_id).
+            let manifest_len = body_path.manifest_hashes.len();
+            let eb_data = encode_overflow_eb(slot, &body_path.manifest_hashes);
+            let eb_hash = blake2b_256(&eb_data);
+            let eb_key = EbKey {
+                slot,
+                hash: eb_hash,
+            };
+            pool.produce_eb(eb_key, manifest_len);
+            Some(ProducedEb {
+                point: Point::Specific {
                     slot,
                     hash: eb_hash,
-                };
-                pool.produce_eb(eb_key, manifest_len);
-                (
-                    Vec::new(),
-                    Some(ProducedEb {
-                        point: Point::Specific {
-                            slot,
-                            hash: eb_hash,
-                        },
-                        data: eb_data,
-                    }),
-                )
-            }
+                },
+                data: eb_data,
+            })
         };
         drop(pool);
 
@@ -789,8 +801,10 @@ mod tests {
             .try_produce_block(100, None, 1, false, &mempool, &empty_leios())
             .unwrap();
 
-        // EB path: RB body is empty, EB is announced.
-        assert_eq!(produced.included_tx_count, 0);
+        // CIP-0164 overflow: drain RB body up to the cap (2 × 500 =
+        // 1000 fits exactly), residual (the third 500-byte tx) is
+        // announced via the EB.
+        assert_eq!(produced.included_tx_count, 2);
         assert!(produced.announced_eb.is_some());
         assert!(produced.body.point().is_some());
 
@@ -805,7 +819,7 @@ mod tests {
         }
         assert_eq!(eb.data.len() as u32, eb_size);
 
-        // Mempool should be drained.
+        // Mempool drained: 2 inline + 1 pinned in the EB closure.
         assert_eq!(mempool.lock().unwrap().len(), 0);
     }
 

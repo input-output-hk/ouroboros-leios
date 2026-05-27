@@ -476,9 +476,8 @@ impl MempoolState {
     /// next RB.  The pinned bodies stay serveable via LeiosFetch and
     /// visible to the `MissingTX` voting predicate.
     ///
-    /// `count` must come from `BodyPath::Eb { manifest }`'s
-    /// `manifest.len()` — pairing the size-capped manifest selection
-    /// with a matching prefix drain.
+    /// `count` must come from `BodyPath::manifest.len()` — pairing the
+    /// size-capped manifest selection with a matching prefix drain.
     ///
     /// Returns the manifest and any `TxRejected{EbClosurePruned}`
     /// effects emitted when older EB closures aged out of the

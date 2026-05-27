@@ -13,9 +13,18 @@
 //! and the byte-equivalent event-stream determinism check in W2.5 line
 //! up directly.
 //!
-//! Adversary hooks are intentionally absent — they re-enter as a
-//! follow-on wrapper layer once the protocol-level equivalence in W2.6
-//! is verified.
+//! ## Behaviours
+//!
+//! Each node installs a [`shared_consensus::behaviour::BehaviourHandle`]
+//! on its `LeiosState`, `PraosState`, and `MempoolState` — the same
+//! handle on all three so stateful behaviours (e.g.
+//! `RbHeaderEquivocator`'s peer-partition map) observe events from
+//! every layer.  Specs come from the `consensus-behaviours` YAML
+//! parameter, resolved once at [`SimConfiguration::build`] via
+//! [`shared_consensus::behaviour::resolve_specs`], and looked up
+//! per-node here.  Nodes not in the map run [`HonestBehaviour`].  The
+//! assignment is static for the lifetime of the sim — there is no
+//! analog of net-node's runtime `swap_handle` path.
 //!
 //! # YAML config knobs the adapter reads
 //!
@@ -47,7 +56,6 @@
 //! | shared-consensus field                  | Value | Rationale                                         |
 //! |-------------------------------|-------|---------------------------------------------------|
 //! | `WfaLs.non_persistent_voters` | `0`   | sim collapses PV/NPV into one probability         |
-//! | `StakeCentile.top_centile_of_stake` | `0.95` | sim's `committee-stake-fraction-threshold` isn't propagated to `SimConfiguration` |
 //! | `PraosState` `k`              | `2160` | sim doesn't model security parameter           |
 //! | Fetch policies (RB/EB/EB-txs/votes) | YAML `fetch-policy.{block,eb,eb-txs,votes}` (default `lowest-rtt` everywhere, matching `LeiosState::new`).  RTT oracle is `UniformRtt(0)` — sim drives fetches via its own `Message` enum |
 
@@ -174,11 +182,8 @@ fn derive_committee_selection(sim_config: &SimConfiguration) -> CommitteeSelecti
             }
         }
         A::Everyone => CommitteeSelection::EveryoneVotes,
-        // Sim's `committee_stake_fraction_threshold` isn't propagated
-        // through to `SimConfiguration` — use the spec default 0.95
-        // until/unless that wire-up lands.
         A::TopStakeFraction => CommitteeSelection::StakeCentile {
-            top_centile_of_stake: 0.95,
+            top_centile_of_stake: sim_config.committee_stake_fraction_threshold,
         },
     }
 }
@@ -342,6 +347,15 @@ pub struct SharedConsensus {
     /// set of EBs blocked on it.  An admitted tx is looked up here so
     /// every blocked EB can re-check coverage and release if complete.
     missing_tx_index: BTreeMap<TransactionId, std::collections::BTreeSet<EndorserBlockId>>,
+
+    /// Shared per-node behaviour handle.  The same `Arc<Mutex<…>>` is
+    /// installed on `leios`, `praos`, and `mempool` above so stateful
+    /// behaviours observe events from every layer through one instance.
+    /// Stored here for clarity and to anchor the Arc beyond the three
+    /// state-machine holders.  The sim never swaps the inner trait
+    /// object after construction (see module docs).
+    #[allow(dead_code)]
+    behaviour_handle: shared_consensus::behaviour::BehaviourHandle,
 }
 
 enum VoteState {
@@ -478,8 +492,26 @@ impl NodeImpl for SharedConsensus {
         // pruning depth comfortably beyond any sim run length.
         let mut praos = PraosState::new(config.name.clone(), 2160);
         praos.set_fetch_policy(fp.block.into_block_policy());
-        let mempool = MempoolState::new(sim_config.mempool_size_bytes as usize);
+        let mut mempool = MempoolState::new(sim_config.mempool_size_bytes as usize);
         let node_names = sim_config_nodes_to_names(&sim_config);
+
+        // Per-node behaviour install.  Look up the resolved spec
+        // (resolve_specs ran once at SimConfiguration::build) and
+        // share a single handle across leios/praos/mempool — stateful
+        // behaviours like RbHeaderEquivocator carry per-peer state
+        // that has to be visible from every layer.
+        let behaviour_spec = sim_config
+            .consensus_behaviour_specs
+            .get(&config.id)
+            .cloned()
+            .unwrap_or_default();
+        let behaviour_seed =
+            shared_consensus::behaviour::seed_from_node_id(&config.name);
+        let behaviour_handle =
+            shared_consensus::behaviour::build_handle(&behaviour_spec, behaviour_seed);
+        leios.behaviour = behaviour_handle.clone();
+        praos.behaviour = behaviour_handle.clone();
+        mempool.behaviour = behaviour_handle.clone();
 
         Self {
             id: config.id,
@@ -509,6 +541,7 @@ impl NodeImpl for SharedConsensus {
             noted_no_vote: std::collections::BTreeSet::new(),
             eb_pending_txs: BTreeMap::new(),
             missing_tx_index: BTreeMap::new(),
+            behaviour_handle,
         }
     }
 
@@ -758,10 +791,10 @@ impl NodeImpl for SharedConsensus {
 impl SharedConsensus {
     /// Lottery win for slot `slot` (winning draw `vrf`): pick the body
     /// path via [`BodyPath::decide`] and schedule
-    /// `CpuTask::RBBlockGenerated`.  The `Eb` path also commits the
-    /// drain via [`MempoolState::produce_eb`] under a hash derived from
-    /// the EB id — a sim convenience that stands in for real Blake2b
-    /// hashing of wire bytes.
+    /// `CpuTask::RBBlockGenerated`.  A non-empty manifest also commits
+    /// the drain via [`MempoolState::produce_eb`] under a hash derived
+    /// from the EB id — a sim convenience that stands in for real
+    /// Blake2b hashing of wire bytes.
     fn try_produce_rb(&mut self, slot: u64, vrf: u64, out: &mut EventResult) {
         let block_id = BlockId {
             slot,
@@ -808,42 +841,45 @@ impl SharedConsensus {
             &self.leios,
             endorsement_present,
         );
-        let (rb_txs, eb_pair) = match body {
-            BodyPath::Empty => (Vec::new(), None),
-            BodyPath::Inline(pending) => (self.collect_arcs(pending), None),
-            BodyPath::Eb { manifest } => {
-                // Commit the drain — `produce_eb` moves the manifest's
-                // txs into `eb_pinned` under the given EbKey.  We
-                // synthesise a deterministic hash from the producer +
-                // slot since sim doesn't model Blake2b on wire bytes.
-                let eb_id = EndorserBlockId {
+        // `inline` becomes the RB body; `manifest` becomes a fresh EB
+        // announcement.  Both may carry txs in the same RB (CIP-0164
+        // overflow: drain RB body, EB ships the residual).
+        let rb_txs = self.collect_arcs(body.inline);
+        let eb_pair = if body.manifest.is_empty() {
+            None
+        } else {
+            // Commit the drain — `produce_eb` moves the manifest's
+            // txs into `eb_pinned` under the given EbKey.  We
+            // synthesise a deterministic hash from the producer +
+            // slot since sim doesn't model Blake2b on wire bytes.
+            let eb_id = EndorserBlockId {
+                slot,
+                pipeline: 0,
+                producer: self.id,
+            };
+            let eb_hash = synthesize_eb_hash(eb_id);
+            let (_committed, mempool_fx) = self.mempool.produce_eb(
+                EbKey {
                     slot,
-                    pipeline: 0,
-                    producer: self.id,
-                };
-                let eb_hash = synthesize_eb_hash(eb_id);
-                let (_committed, mempool_fx) = self.mempool.produce_eb(
-                    EbKey {
-                        slot,
-                        hash: eb_hash,
-                    },
-                    manifest.len(),
-                );
-                self.apply_mempool_effects(out, mempool_fx);
-                // Pull the body Arcs from `tx_arcs` in manifest order.
-                let txs: Vec<Arc<Transaction>> = manifest
-                    .iter()
-                    .filter_map(|id| self.tx_arcs.get(id).cloned())
-                    .collect();
-                let bytes = self.sim_config.sizes.linear_eb(&txs);
-                let eb = LinearEndorserBlock {
-                    slot,
-                    producer: self.id,
-                    bytes,
-                    txs: txs.clone(),
-                };
-                (Vec::new(), Some((eb, txs)))
-            }
+                    hash: eb_hash,
+                },
+                body.manifest.len(),
+            );
+            self.apply_mempool_effects(out, mempool_fx);
+            // Pull the body Arcs from `tx_arcs` in manifest order.
+            let txs: Vec<Arc<Transaction>> = body
+                .manifest
+                .iter()
+                .filter_map(|id| self.tx_arcs.get(id).cloned())
+                .collect();
+            let bytes = self.sim_config.sizes.linear_eb(&txs);
+            let eb = LinearEndorserBlock {
+                slot,
+                producer: self.id,
+                bytes,
+                txs: txs.clone(),
+            };
+            Some((eb, txs))
         };
 
         let rb = LinearRankingBlock {

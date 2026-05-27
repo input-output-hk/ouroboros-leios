@@ -1026,7 +1026,8 @@ impl LeiosState {
     /// [`crate::production::BodyPath::decide`].  True iff the local
     /// node holds a chain-committed cert for at least one EB whose
     /// body it has not validated locally; in that state the next
-    /// self-produced RB must emit an empty body.
+    /// self-produced RB must emit an empty body and no fresh EB
+    /// announcement.
     pub fn has_endorsed_unvalidated_eb(&self) -> bool {
         !self.endorsed_unvalidated_ebs.is_empty()
     }

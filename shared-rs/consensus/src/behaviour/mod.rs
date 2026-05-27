@@ -80,6 +80,7 @@ pub struct RbVariantInput {
 pub mod delay;
 pub mod outbound;
 pub mod registry;
+pub mod selection;
 
 pub mod behaviours {
     //! Concrete [`super::Behaviour`] implementations.  Each lives in its
@@ -96,6 +97,7 @@ pub mod behaviours {
 pub use delay::DelayQueue;
 pub use outbound::{Outbound, OutboundDecision, OwnedOutbound};
 pub use registry::{build, build_handle, seed_from_node_id, swap_handle, BehaviourSpec};
+pub use selection::{resolve_selection, resolve_specs, BehaviourSelection};
 
 // `BehaviourHandle` is defined at the top of this module.
 

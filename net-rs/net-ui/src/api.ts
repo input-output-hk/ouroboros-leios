@@ -5,6 +5,8 @@ import type {
   ClusterControlConfig,
   AggregateNodeVotes,
   AggregateVotesHistory
+  ActiveAttack,
+  AttackRequest,
 } from "./types";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -49,5 +51,25 @@ export async function updateNodeConfig(nodeConfig: Record<string, unknown>): Pro
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ node_config: nodeConfig }),
   });
+  return res.ok;
+}
+
+export async function fetchActiveAttack(): Promise<ActiveAttack | null> {
+  const res = await fetch(`${BASE}/api/attack`);
+  if (!res.ok) return null;
+  return res.json() as Promise<ActiveAttack | null>;
+}
+
+export async function startAttack(request: AttackRequest): Promise<boolean> {
+  const res = await fetch(`${BASE}/api/attack`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  return res.ok;
+}
+
+export async function stopAttack(): Promise<boolean> {
+  const res = await fetch(`${BASE}/api/attack/stop`, { method: "POST" });
   return res.ok;
 }

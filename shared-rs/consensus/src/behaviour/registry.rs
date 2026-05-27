@@ -121,7 +121,7 @@ pub fn build(spec: &BehaviourSpec, seed: u64) -> Box<dyn Behaviour> {
 /// Mix `seed` with `child_index` to give each composite child a
 /// distinct deterministic stream.  Uses Blake2b to avoid linear
 /// correlations between sibling seeds.
-fn child_seed(seed: u64, idx: usize) -> u64 {
+pub(crate) fn child_seed(seed: u64, idx: usize) -> u64 {
     let mut h = blake2b_simd::Params::new().hash_length(8).to_state();
     h.update(&seed.to_le_bytes());
     h.update(&(idx as u64).to_le_bytes());
