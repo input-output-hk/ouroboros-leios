@@ -249,9 +249,8 @@ mod tests {
         // A node with a behaviour spec should emit a `[behaviour]` table
         // that round-trips through the toml parser.
         let mut node = sample_node();
-        node.behaviour = Some(
-            shared_consensus::behaviour::BehaviourSpec::RbHeaderEquivocator { ways: 2 },
-        );
+        node.behaviour =
+            Some(shared_consensus::behaviour::BehaviourSpec::RbHeaderEquivocator { ways: 2 });
         let toml_str = render_overlay(&node, 9100, 5, 1, &[]);
         let parsed: toml::Value = toml::from_str(&toml_str).expect("generated TOML should parse");
         assert_eq!(
