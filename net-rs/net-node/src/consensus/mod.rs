@@ -183,14 +183,23 @@ impl Consensus {
 
     /// Register a self-produced endorser block with Leios consensus —
     /// records the manifest, fires the offer notifications, and marks
-    /// the EB validated.
+    /// the EB validated.  Also stashes the manifest size on the
+    /// announcing RB's chain-tree node so the UI snapshot can surface
+    /// the count regardless of LeiosState's manifest-cache TTL.
     pub async fn register_self_produced_eb(&mut self, point: Point, eb_data: &[u8]) {
+        self.record_announced_eb_tx_count_from_blob(&point, eb_data);
         self.leios.register_self_produced_eb(point, eb_data).await;
     }
 
     /// Route a network event to Praos or Leios. Returns true if the event
     /// was consumed (caller should not log it separately).
     pub async fn handle_event(&mut self, event: &NetworkEvent) -> bool {
+        // Mirror manifest sizes onto the chain-tree node on receive so
+        // they survive the LeiosState cache TTL — see
+        // `register_self_produced_eb` for the same on the produce path.
+        if let NetworkEvent::LeiosBlockReceived { point, block } = event {
+            self.record_announced_eb_tx_count_from_blob(point, block);
+        }
         match event {
             NetworkEvent::LeiosBlockOffered { .. }
             | NetworkEvent::LeiosBlockTxsOffered { .. }
@@ -199,6 +208,22 @@ impl Consensus {
             | NetworkEvent::LeiosVotesReceived { .. }
             | NetworkEvent::LeiosBlockTxsReceived { .. } => self.leios.handle_event(event).await,
             _ => self.praos.handle_event(event).await,
+        }
+    }
+
+    /// Decode an EB blob to extract its manifest size and stash it on
+    /// the chain-tree node that announced this EB hash.  Idempotent;
+    /// no-op when the blob doesn't decode (malformed) or no chain-tree
+    /// node announces the EB (the announcing RB was pruned or never
+    /// adopted).
+    fn record_announced_eb_tx_count_from_blob(&mut self, point: &Point, blob: &[u8]) {
+        let hash = match point {
+            Point::Specific { hash, .. } => *hash,
+            Point::Origin => return,
+        };
+        if let Some((_, tx_hashes)) = crate::production::decode_overflow_eb(blob) {
+            self.praos
+                .record_announced_eb_tx_count(&hash, tx_hashes.len() as u32);
         }
     }
 
