@@ -82,7 +82,10 @@ pub fn record_vote(
     }
 
     let voted_weight: u64 = election.voter_weights.values().sum();
-    let threshold = (quorum_weight_fraction * expected_total_weight as f64) as u64;
+    // Ceiling so the integer threshold really enforces the doc's
+    // `Σ weight ≥ τ × total`: truncating a 2.25 product to 2 would
+    // accept 2/3 = 66% under a τ = 75% quorum.
+    let threshold = (quorum_weight_fraction * expected_total_weight as f64).ceil() as u64;
     if voted_weight < threshold {
         return None;
     }
