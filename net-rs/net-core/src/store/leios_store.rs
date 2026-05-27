@@ -35,6 +35,23 @@ pub enum LeiosNotification {
     VotesOffer { votes: Vec<(u64, Vec<u8>)> },
 }
 
+/// Per-entry byte estimate for a single notification.  Fixed-size for
+/// `BlockOffer` / `BlockTxsOffer`; sums the variable `Vec<(u64,
+/// Vec<u8>)>` payload for `VotesOffer`.
+fn notification_bytes_estimate(n: &LeiosNotification) -> usize {
+    let base = std::mem::size_of::<LeiosNotification>();
+    match n {
+        LeiosNotification::BlockOffer { .. } | LeiosNotification::BlockTxsOffer { .. } => base,
+        LeiosNotification::VotesOffer { votes } => {
+            let payload: usize = votes
+                .iter()
+                .map(|(_, id)| std::mem::size_of::<(u64, Vec<u8>)>() + id.len())
+                .sum();
+            base + payload
+        }
+    }
+}
+
 /// Key for block lookups.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct BlockKey {
@@ -76,13 +93,20 @@ struct LeiosStoreInner {
 }
 
 /// Snapshot of internal map sizes — for memory diagnostics.
-#[derive(Debug, Clone)]
+///
+/// `notifications_bytes_estimate` is a precise byte sum over the
+/// notifications log (the never-evicted suspect #1 from the audit):
+/// each `BlockOffer` / `BlockTxsOffer` is fixed-size, but `VotesOffer`
+/// carries a variable-length `Vec<(u64, Vec<u8>)>` so its payload bytes
+/// are summed directly.
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct LeiosStoreStats {
     pub blocks: usize,
     pub block_txs: usize,
     pub eb_tx_hashes: usize,
     pub votes: usize,
     pub notifications: usize,
+    pub notifications_bytes_estimate: usize,
     pub max_slot: u64,
 }
 
@@ -322,12 +346,19 @@ impl LeiosStore {
     /// Snapshot of internal map sizes — for memory diagnostics.
     pub fn stats(&self) -> LeiosStoreStats {
         let inner = self.inner.lock().unwrap();
+        let notifications_bytes_estimate = inner
+            .notifications
+            .iter()
+            .map(notification_bytes_estimate)
+            .sum::<usize>()
+            + std::mem::size_of::<Vec<LeiosNotification>>();
         LeiosStoreStats {
             blocks: inner.blocks.len(),
             block_txs: inner.block_txs.len(),
             eb_tx_hashes: inner.eb_tx_hashes.len(),
             votes: inner.votes.len(),
             notifications: inner.notifications.len(),
+            notifications_bytes_estimate,
             max_slot: inner.max_slot,
         }
     }
