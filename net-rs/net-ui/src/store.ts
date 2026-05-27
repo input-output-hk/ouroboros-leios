@@ -15,7 +15,7 @@ import {
   fetchConfig,
   restartCluster as apiRestartCluster,
   updateNodeConfig as apiUpdateNodeConfig,
-  fetchAggregateNodeVotes, fetchAggregateNodeVotesHistory, fetchAggregateVotesHistory
+  fetchAggregatedVotesHistory
 } from "./api";
 
 const MAX_SERIES = 300; // ~5 min at 1s stats interval
@@ -90,7 +90,7 @@ export interface DashboardState {
   restartCluster: (config: ClusterControlConfig) => Promise<void>;
 
   // Voting panel data (column-major: [slot][row])
-  votingMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "VoteCast")[][];
+  votingMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "VoteCast" | "Committee")[][];
   votingSlotStart: number;
 }
 
@@ -208,26 +208,24 @@ export const useStore = create<DashboardState>()((set, get) => ({
       const topoNodes = get().topology?.nodes ?? [];
       const nodeCount = topoNodes.length;
 
-      const aggregated_votes = await fetchAggregateVotesHistory();
-      const slotStart = aggregated_votes.last_slot;
+      const aggregated_votes = await fetchAggregatedVotesHistory();
+      const votes_history = aggregated_votes.votes;
+      const votingSlotStart = aggregated_votes.last_slot;
       let nodeIds: Record<string, number> = {};
       for (let i = 0; i < aggregated_votes.node_ids.length; i++) {
         nodeIds[aggregated_votes.node_ids[i]] = i;
       }
-      //let arrayOffset = aggregated_votes.votes.length - VOTING_SLOTS;
-
-      //for (let slot: number = curSlot - VOTING_SLOTS; slot <= curSlot; slot++) {
-      //  aggregated_votes.push(await fetchAggregateNodeVotes(slot));
-      //}
 
       const nextMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "VoteCast" | "Committee")[][] = Array.from(
         {length: VOTING_SLOTS},
         (_, i) => {
-          const votes = aggregated_votes.votes[aggregated_votes.votes.length - i] ?? [];
+          // Vote events in the string are written from older slots to most recent slot.
+          // Columns are displayed in increasing order (time goes left to right).
+          // So, the order of columns should be reversed.
+          const votes = votes_history[votes_history.length - i - 1] ?? [];
           if (votes) {
             return topoNodes.map((n) => {
               const idx = nodeIds[n.node_id];
-              console.log(idx, n.node_id)
               const status = votes[idx];
               if (status === '.') return "NoEvent" as const;
               if (status === '1') return "VoteCast" as const;
@@ -240,8 +238,6 @@ export const useStore = create<DashboardState>()((set, get) => ({
           return Array.from({length: nodeCount}, () => "NoEvent" as const);
         }
       )
-
-      const votingSlotStart = slotStart;
 
       if (prevSnapshot) {
         const changed =

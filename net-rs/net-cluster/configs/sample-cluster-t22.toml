@@ -7,12 +7,7 @@
 # (stake = 0, no votes) and ~29% are pools sharing the total stake
 # uniformly.  With `num_nodes = 30` that yields ~9 pool nodes.
 #
-# Committee selection is top-stake-fraction (TSF) inherited from
-# `mainnet.toml`: every pool in the top 99% of stake casts one
-# weight-1 vote, so the committee size is 9 and the quorum threshold
-# is `floor(0.75 × 9) = 6` voters.
-#
-# Behaviour invokes T22 threat model
+# Behaviour invokes T21/T22 threat model, parameter description is given below.
 
 num_nodes = 25
 degree = 3

@@ -17,7 +17,9 @@ use tokio::sync::{broadcast, mpsc, RwLock};
 use tower_http::cors::CorsLayer;
 use crate::config::ClusterControlConfig;
 use crate::topology::Topology;
-use crate::types::{self, AggregatedNodeVotes, AggregatedVotesHistory, EventWindow, IngestedEvent, NodeVotes, StatsSnapshot};
+use crate::types::{
+    self, AggregatedVotesHistory, EventWindow, IngestedEvent, NodeVotes, StatsSnapshot, WINDOW_SIZE
+};
 
 /// Shared state for the HTTP server.
 pub struct ServerState {
@@ -144,7 +146,6 @@ pub async fn start(
         .route("/api/events", get(get_events))
         .route("/api/events/stream", get(event_stream))
         .route("/api/votes-history", get(get_votes_history)) // TODO: separate endpoint for aggregated votes?
-        .route("/api/votes/:slot", get(get_votes))
         // Cluster control API.
         .route("/api/config", get(get_config))
         .route("/api/restart", post(restart_cluster))
@@ -350,43 +351,34 @@ async fn get_node_stats(
     }
 }
 
-/// GET /api/stats/:slot -- return rb/eb stats/votes for a given slot (if available).
-async fn get_votes(
-    State(state): State<Arc<ServerState>>,
-    Path(slot): Path<u64>,
-) -> Result<Json<AggregatedNodeVotes>, StatusCode> {
-    let votes = state.aggregate_votes.read().await;
-    let Some(votes_for_slot) = votes.cache.get(&slot) else {
-        return Ok(Json(AggregatedNodeVotes::empty(slot)));
-    };
-    Ok(Json(AggregatedNodeVotes {
-        slot,
-        node_statuses: votes_for_slot.iter().map(
-            |(node_id, status)| (node_id.clone(), status.clone())
-        ).collect(),
-    }))
-}
-
 async fn get_votes_history(
     State(state): State<Arc<ServerState>>,
 ) -> Json<AggregatedVotesHistory> {
-    const WINDOW_SIZE: u64 = 30; // TODO: make configurable
-    let votes = state.aggregate_votes.read().await;
+    let node_ids: Vec<String> = state.topology.read().await
+        .nodes.iter().map(|t| t.node_id.clone()).collect();
 
-    let node_ids: Vec<String> = votes.cache.values().flat_map(|node_statuses| {
-        node_statuses.keys().cloned()
-    }).collect::<std::collections::HashSet<_>>().into_iter().collect();
+    let votes = state.aggregate_votes.read().await;
 
     let last_slot = votes.cache.keys().max().cloned().unwrap_or(0);
 
+    // History: from newest [idx=0, slot=last_slot] to oldest [idx=WINDOW_SIZE-1,
+    //          slot=last_slot-WINDOW_SIZE+1].
     let mut history = Vec::new();
-    for slot in (last_slot-WINDOW_SIZE..=last_slot).rev() {
+    for slot in ((last_slot+1).saturating_sub(WINDOW_SIZE)..=last_slot).rev() {
         let Some(node_statuses) = votes.cache.get(&slot) else {
             history.push("".to_string());
             continue;
         };
         let mut str = String::new();
         for node_id in &node_ids {
+            // Priority: Vote > EB > RB > Committee membership.
+            // Rationale:
+            // 1. Vote cast only if all other events happened; correctness of node
+            //    behaviour is not intended to be tested here (yet).
+            // 2. This is needed for Leios debugging: so EB reception is more important than RB.
+            // 3. Committee info will be shown in empty slots, and committee does not change
+            //    often, so viewer will guess it from adjacent columns, no need to specify
+            //    this info each time.
             str.push(match node_statuses.get(node_id) {
                 Some(NodeVotes {vote_cast: true, ..}) => '1',
                 Some(NodeVotes {eb_received: true, ..}) => 'E',

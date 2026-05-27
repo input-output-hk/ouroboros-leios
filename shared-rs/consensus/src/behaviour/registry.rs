@@ -112,9 +112,9 @@ pub fn build(spec: &BehaviourSpec, seed: u64) -> Box<dyn Behaviour> {
         BehaviourSpec::LazyVoter { reason } => Box::new(LazyVoter { reason: *reason }),
         BehaviourSpec::T22 {
             vote_threshold,
-            non_voting_threshold: non_voting_thrshold,
+            non_voting_threshold,
             hide_eb_tx_received,
-        } => Box::new(T22ThreatBehaviour::new(*vote_threshold, *hide_eb_tx_received, *non_voting_thrshold)),
+        } => Box::new(T22ThreatBehaviour::new(*vote_threshold, *non_voting_threshold, *hide_eb_tx_received)),
     }
 }
 
@@ -162,6 +162,7 @@ mod tests {
                 BehaviourSpec::RbHeaderEquivocator { ways: 2 },
                 BehaviourSpec::T22 {
                     vote_threshold: 42,
+                    non_voting_threshold: 99,
                     hide_eb_tx_received: false,
                 },
             ],
@@ -177,6 +178,7 @@ mod tests {
                     children[2],
                     BehaviourSpec::T22 {
                         vote_threshold: 42,
+                        non_voting_threshold: 99,
                         hide_eb_tx_received: false
                     }
                 ));

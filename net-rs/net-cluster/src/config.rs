@@ -214,12 +214,6 @@ pub enum BehaviourSelection {
     /// of the *voting weight* run the behaviour, regardless of how
     /// many nodes that turns out to be.
     StakeFraction { fraction: f64 },
-    /// Shortcut variant: configure T22 behaviour directly in
-    /// `[behaviour_selection]` and apply it to all nodes.
-    T22 {
-        vote_threshold: u8,
-        hide_eb_tx_received: bool,
-    },
 }
 
 impl ClusterConfig {

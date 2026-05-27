@@ -58,11 +58,11 @@ pub struct T22ThreatBehaviour {
 }
 
 impl T22ThreatBehaviour {
-    pub fn new(vote_threshold: u8, hide_eb_tx_received: bool, non_voting_threshold: u8) -> Self {
+    pub fn new(vote_threshold: u8, non_voting_threshold: u8, hide_eb_tx_received: bool) -> Self {
         Self {
             vote_threshold,
+            non_voting_threshold,
             hide_eb_tx_received,
-            non_voting_threshold
         }
     }
 

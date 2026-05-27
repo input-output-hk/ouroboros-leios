@@ -24,7 +24,7 @@ export async function fetchAggregateNodeVotes(slot: number): Promise<AggregateNo
   return res.json() as Promise<AggregateNodeVotes>;
 }
 
-export async function fetchAggregateVotesHistory(): Promise<AggregateVotesHistory> {
+export async function fetchAggregatedVotesHistory(): Promise<AggregateVotesHistory> {
   const res = await fetch(`${BASE}/api/votes-history`);
   return res.json() as Promise<AggregateVotesHistory>;
 }

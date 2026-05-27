@@ -211,9 +211,7 @@ impl LeiosConsensus {
             eb_slot: slot,
             perm_committee: self.state.voting_config.persistent_seats > 0,
         }));
-        info!("Pushing leios telemetry, telemetry count = {}", self.pending_telemetry.len());
         self.dispatch(fx).await;
-        info!("Pushed leios telemetry, telemetry count = {}", self.pending_telemetry.len());
     }
 
     /// Handle a Leios-shaped network event.

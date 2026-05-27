@@ -42,6 +42,7 @@ pub async fn run(
                         state.ingest(events);
                         if event_rx.len() <= event_rx.capacity() / 2 {
                             state.flush_to_watermark(&mut writer, &event_window).await?;
+                            accumulated_before_flush = 0;
                         }
                         else {
                             accumulated_before_flush += len.clone();
@@ -65,6 +66,7 @@ pub async fn run(
                         "aggregator: accumulated before flush {accumulated_before_flush}"
                     );
                 }
+                accumulated_before_flush = 0;
             }
         }
     }
