@@ -376,6 +376,12 @@ pub struct RawParameters {
     /// [`BehaviourSpec::Honest`]: shared_consensus::behaviour::BehaviourSpec::Honest
     #[serde(default)]
     pub consensus_behaviours: Vec<ConsensusBehaviourEntry>,
+
+    /// Global tcp-envelope defaults applied to every directed link in the
+    /// topology that has a bandwidth_bps set. Per-link overrides in the
+    /// topology YAML's `tcp-envelope` block layer on top of this.
+    #[serde(default)]
+    pub tcp_envelope: Option<RawTcpEnvelope>,
 }
 
 /// One row of [`RawParameters::consensus_behaviours`].
@@ -525,6 +531,92 @@ pub struct RawLinkInfo {
     pub latency_ms: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bandwidth_bytes_per_second: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub tcp_envelope: Option<RawTcpEnvelope>,
+}
+
+/// User-facing topology knobs for the analytic TCP envelope model. Every
+/// field is an optional override on top of the
+/// [`tcp_model::LinkEnvelopeCfg::defaults_for`] derivation. Durations use
+/// the same `_ms` suffix convention as the surrounding topology schema.
+///
+/// Note: `mss_bytes` and `initial_cwnd_segments` do *not* re-derive
+/// dependent fields like `cold_bw_depth` or `cold_release_ms` on their own.
+/// Override those too if you change MSS or IW away from the defaults.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct RawTcpEnvelope {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss_prob_per_segment: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mss_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub initial_cwnd_segments: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idle_reset_threshold_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rto_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss_bw_depth: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cold_bw_depth: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cold_release_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cold_release_shape: Option<tcp_model::Curve>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss_release_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss_release_shape: Option<tcp_model::Curve>,
+}
+
+impl RawTcpEnvelope {
+    /// Apply this YAML block over a baseline [`tcp_model::LinkEnvelopeCfg`].
+    /// Fields left as `None` keep the baseline value. Rejects values that
+    /// would crash or NaN-poison downstream computations
+    /// (`mss-bytes: 0`, `loss-prob-per-segment` outside `[0, 1]`).
+    pub fn apply(&self, cfg: &mut tcp_model::LinkEnvelopeCfg) -> Result<()> {
+        if let Some(v) = self.loss_prob_per_segment {
+            if !(0.0..=1.0).contains(&v) {
+                bail!("tcp-envelope.loss-prob-per-segment must be in [0, 1], got {v}");
+            }
+            cfg.loss_prob_per_segment = v;
+        }
+        if let Some(v) = self.mss_bytes {
+            if v == 0 {
+                bail!("tcp-envelope.mss-bytes must be > 0");
+            }
+            cfg.mss_bytes = v;
+        }
+        if let Some(v) = self.initial_cwnd_segments {
+            cfg.initial_cwnd_segments = v;
+        }
+        if let Some(v) = self.idle_reset_threshold_ms {
+            cfg.idle_reset_threshold = Duration::from_millis(v);
+        }
+        if let Some(v) = self.rto_ms {
+            cfg.rto = Duration::from_millis(v);
+        }
+        if let Some(v) = self.loss_bw_depth {
+            cfg.loss_bw_depth = v;
+        }
+        if let Some(v) = self.cold_bw_depth {
+            cfg.cold_bw_depth = v;
+        }
+        if let Some(v) = self.cold_release_ms {
+            cfg.cold_release = Duration::from_millis(v);
+        }
+        if let Some(v) = self.cold_release_shape {
+            cfg.cold_release_shape = v;
+        }
+        if let Some(v) = self.loss_release_ms {
+            cfg.loss_release = Duration::from_millis(v);
+        }
+        if let Some(v) = self.loss_release_shape {
+            cfg.loss_release_shape = v;
+        }
+        Ok(())
+    }
 }
 
 pub struct Topology {
@@ -601,6 +693,17 @@ impl Topology {
 
 impl From<RawTopology> for Topology {
     fn from(value: RawTopology) -> Self {
+        Self::from_raw(value, None)
+    }
+}
+
+impl Topology {
+    /// Convert a raw topology, layering an optional global tcp-envelope under
+    /// any per-link overrides. The final per-link envelope is computed as
+    /// `defaults_for(latency, bps)` → apply `global` → apply per-link. Links
+    /// without a bandwidth_bps or with zero latency get no envelope, even if
+    /// a global cfg is supplied.
+    pub fn from_raw(value: RawTopology, global: Option<&RawTcpEnvelope>) -> Self {
         let mut node_ids = BTreeMap::new();
         let mut nodes = BTreeMap::new();
         for (index, (name, node)) in value.nodes.iter().enumerate() {
@@ -640,13 +743,34 @@ impl From<RawTopology> for Topology {
                     .push(consumer_id);
                 let mut ids = [consumer_id, producer_id];
                 ids.sort();
+                let latency = duration_ms(producer_info.latency_ms);
+                let per_link = producer_info.tcp_envelope.as_ref();
+                let tcp_envelope = match (global, per_link) {
+                    (None, None) => None,
+                    _ => producer_info.bandwidth_bytes_per_second.and_then(|bps| {
+                        if bps == 0 || latency.is_zero() {
+                            return None;
+                        }
+                        let mut cfg = tcp_model::LinkEnvelopeCfg::defaults_for(latency, bps);
+                        if let Some(g) = global {
+                            g.apply(&mut cfg)
+                                .expect("invalid global tcp-envelope override");
+                        }
+                        if let Some(l) = per_link {
+                            l.apply(&mut cfg)
+                                .expect("invalid per-link tcp-envelope override");
+                        }
+                        Some(cfg)
+                    }),
+                };
                 links.insert(
                     ids,
                     LinkConfiguration {
                         nodes: (ids[0], ids[1]),
-                        latency: duration_ms(producer_info.latency_ms),
+                        latency,
                         bandwidth_bps: producer_info.bandwidth_bytes_per_second,
                         use_tcp: false,
+                        tcp_envelope,
                     },
                 );
             }
@@ -1351,6 +1475,7 @@ pub struct LinkConfiguration {
     /// Use the TCP congestion-window model for this link instead of the
     /// simple bandwidth-sharing model.
     pub use_tcp: bool,
+    pub tcp_envelope: Option<tcp_model::LinkEnvelopeCfg>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -1477,5 +1602,185 @@ mod consensus_behaviour_tests {
         for id in a.keys() {
             assert!(id.to_inner() % 2 == 0);
         }
+    }
+}
+
+#[cfg(test)]
+mod tcp_envelope_tests {
+    use super::*;
+    use tcp_model::Curve;
+
+    fn parsed(yaml: &str) -> RawTcpEnvelope {
+        serde_yaml::from_str(yaml).expect("parse failure")
+    }
+
+    #[test]
+    fn empty_block_is_all_none() {
+        let env = parsed("{}");
+        assert!(env.loss_prob_per_segment.is_none());
+        assert!(env.cold_release_shape.is_none());
+    }
+
+    #[test]
+    fn kebab_case_fields_parse() {
+        let env = parsed(
+            "
+            loss-prob-per-segment: 0.001
+            mss-bytes: 1500
+            initial-cwnd-segments: 16
+            idle-reset-threshold-ms: 250
+            rto-ms: 200
+            loss-bw-depth: 0.75
+            cold-bw-depth: 0.1
+            cold-release-ms: 500
+            cold-release-shape: linear
+            loss-release-ms: 2000
+            loss-release-shape: geometric
+            ",
+        );
+        assert_eq!(env.loss_prob_per_segment, Some(0.001));
+        assert_eq!(env.mss_bytes, Some(1500));
+        assert_eq!(env.initial_cwnd_segments, Some(16));
+        assert_eq!(env.idle_reset_threshold_ms, Some(250));
+        assert_eq!(env.rto_ms, Some(200));
+        assert_eq!(env.loss_bw_depth, Some(0.75));
+        assert_eq!(env.cold_bw_depth, Some(0.1));
+        assert_eq!(env.cold_release_ms, Some(500));
+        assert_eq!(env.cold_release_shape, Some(Curve::Linear));
+        assert_eq!(env.loss_release_ms, Some(2000));
+        assert_eq!(env.loss_release_shape, Some(Curve::Geometric));
+    }
+
+    #[test]
+    fn unknown_field_is_rejected() {
+        let res: Result<RawTcpEnvelope, _> = serde_yaml::from_str("not-a-field: 1");
+        assert!(res.is_err());
+    }
+
+    fn raw_topology_2node_with_bandwidth() -> RawTopology {
+        let mut nodes = std::collections::BTreeMap::new();
+        nodes.insert(
+            "a".to_string(),
+            RawNode {
+                location: RawNodeLocation::Coords((0.0, 0.0)),
+                cpu_core_count: None,
+                tx_conflict_fraction: None,
+                tx_generation_weight: None,
+                stake: None,
+                producers: std::collections::BTreeMap::new(),
+                adversarial: None,
+                behaviours: vec![],
+            },
+        );
+        let mut b_producers = std::collections::BTreeMap::new();
+        b_producers.insert(
+            "a".to_string(),
+            RawLinkInfo {
+                latency_ms: 50.0,
+                bandwidth_bytes_per_second: Some(1_000_000),
+                tcp_envelope: None,
+            },
+        );
+        nodes.insert(
+            "b".to_string(),
+            RawNode {
+                location: RawNodeLocation::Coords((1.0, 1.0)),
+                cpu_core_count: None,
+                tx_conflict_fraction: None,
+                tx_generation_weight: None,
+                stake: None,
+                producers: b_producers,
+                adversarial: None,
+                behaviours: vec![],
+            },
+        );
+        RawTopology { nodes }
+    }
+
+    #[test]
+    fn global_envelope_applies_to_every_link_without_per_link_override() {
+        let global = RawTcpEnvelope {
+            loss_prob_per_segment: Some(0.005),
+            ..Default::default()
+        };
+        let topo = Topology::from_raw(raw_topology_2node_with_bandwidth(), Some(&global));
+        assert_eq!(topo.links.len(), 1);
+        let cfg = topo.links[0].tcp_envelope.as_ref().expect("envelope was attached");
+        assert_eq!(cfg.loss_prob_per_segment, 0.005);
+        // Untouched fields keep their physics-derived defaults.
+        assert_eq!(cfg.mss_bytes, 1460);
+    }
+
+    #[test]
+    fn no_global_and_no_per_link_means_no_envelope() {
+        let topo = Topology::from_raw(raw_topology_2node_with_bandwidth(), None);
+        assert_eq!(topo.links.len(), 1);
+        assert!(topo.links[0].tcp_envelope.is_none());
+    }
+
+    #[test]
+    fn per_link_override_layers_on_top_of_global() {
+        let global = RawTcpEnvelope {
+            loss_prob_per_segment: Some(0.005),
+            rto_ms: Some(800),
+            ..Default::default()
+        };
+        let mut raw = raw_topology_2node_with_bandwidth();
+        raw.nodes.get_mut("b").unwrap().producers.get_mut("a").unwrap().tcp_envelope = Some(
+            RawTcpEnvelope {
+                rto_ms: Some(200), // per-link overrides global's 800
+                ..Default::default()
+            },
+        );
+        let topo = Topology::from_raw(raw, Some(&global));
+        let cfg = topo.links[0].tcp_envelope.as_ref().unwrap();
+        assert_eq!(cfg.loss_prob_per_segment, 0.005); // from global
+        assert_eq!(cfg.rto, Duration::from_millis(200)); // per-link wins
+    }
+
+    #[test]
+    fn apply_layers_overrides_on_top_of_defaults() {
+        let yaml = "
+            loss-prob-per-segment: 0.002
+            rto-ms: 500
+            cold-release-shape: linear
+        ";
+        let raw: RawTcpEnvelope = serde_yaml::from_str(yaml).unwrap();
+        let mut cfg = tcp_model::LinkEnvelopeCfg::defaults_for(
+            Duration::from_millis(150),
+            1_000_000,
+        );
+        let baseline_cold_release = cfg.cold_release;
+        raw.apply(&mut cfg).unwrap();
+        assert_eq!(cfg.loss_prob_per_segment, 0.002);
+        assert_eq!(cfg.rto, Duration::from_millis(500));
+        assert_eq!(cfg.cold_release_shape, Curve::Linear);
+        // Unmentioned fields keep their derived defaults.
+        assert_eq!(cfg.cold_release, baseline_cold_release);
+        assert_eq!(cfg.mss_bytes, 1460);
+    }
+
+    #[test]
+    fn apply_rejects_invalid_mss_bytes() {
+        let raw: RawTcpEnvelope = serde_yaml::from_str("mss-bytes: 0").unwrap();
+        let mut cfg = tcp_model::LinkEnvelopeCfg::defaults_for(
+            Duration::from_millis(150),
+            1_000_000,
+        );
+        assert!(raw.apply(&mut cfg).is_err());
+    }
+
+    #[test]
+    fn apply_rejects_loss_prob_outside_unit_interval() {
+        let mut cfg = tcp_model::LinkEnvelopeCfg::defaults_for(
+            Duration::from_millis(150),
+            1_000_000,
+        );
+        let bad_low: RawTcpEnvelope =
+            serde_yaml::from_str("loss-prob-per-segment: -0.1").unwrap();
+        assert!(bad_low.apply(&mut cfg).is_err());
+        let bad_high: RawTcpEnvelope =
+            serde_yaml::from_str("loss-prob-per-segment: 1.5").unwrap();
+        assert!(bad_high.apply(&mut cfg).is_err());
     }
 }

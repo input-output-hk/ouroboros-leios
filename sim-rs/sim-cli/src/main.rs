@@ -80,11 +80,7 @@ fn read_config(args: &Args) -> Result<SimConfiguration> {
         Some(path) => fs::read_to_string(path)?,
         None => get_default_topology()?,
     };
-    let topology: Topology = {
-        let raw_topology: RawTopology = serde_yaml::from_str(&topology_str)?;
-        raw_topology.into()
-    };
-    topology.validate()?;
+    let raw_topology: RawTopology = serde_yaml::from_str(&topology_str)?;
 
     let mut raw_params = Figment::new()
         .merge(Yaml::string(include_str!(
@@ -97,6 +93,8 @@ fn read_config(args: &Args) -> Result<SimConfiguration> {
     }
 
     let params: RawParameters = raw_params.extract()?;
+    let topology = Topology::from_raw(raw_topology, params.tcp_envelope.as_ref());
+    topology.validate()?;
     let mut config = SimConfiguration::build(params, topology)?;
     if let Some(slots) = args.slots {
         config.slots = Some(slots);

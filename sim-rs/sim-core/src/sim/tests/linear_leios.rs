@@ -110,6 +110,7 @@ fn new_node(stake: Option<u64>, producers: Vec<&'static str>) -> RawNode {
                     RawLinkInfo {
                         latency_ms: 0.0,
                         bandwidth_bytes_per_second: None,
+                        tcp_envelope: None,
                     },
                 )
             })
