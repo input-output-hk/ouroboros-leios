@@ -1096,7 +1096,11 @@ impl SimConfiguration {
     /// (sim-cli liveness telemetry, per-variant endorsement gates) call
     /// this where they previously read the field.
     pub fn vote_threshold(&self) -> u64 {
-        (self.quorum_weight_fraction * self.expected_total_weight as f64) as u64
+        // Ceiling so an integer threshold compared against integer
+        // voted weights enforces `Σ weight ≥ τ × total` exactly —
+        // truncating a 2.25 product to 2 would accept 2/3 = 67% under
+        // a τ = 75% quorum.  Mirrors shared-consensus aggregation.
+        (self.quorum_weight_fraction * self.expected_total_weight as f64).ceil() as u64
     }
 
     pub fn build(params: RawParameters, mut topology: Topology) -> Result<Self> {
@@ -1169,7 +1173,12 @@ impl SimConfiguration {
         // TopStakeFraction: total active stake (PR #1196).
         let expected_total_weight: u64 = match params.committee_selection_algorithm {
             CommitteeSelectionAlgorithm::WfaLs => {
-                (params.persistent_voters + params.non_persistent_voters) as u64
+                // PV / NPV are f64 in the config; round to the nearest
+                // integer rather than truncating so a configured 600.7
+                // doesn't quietly become 600 and so a fractional sub-1
+                // pair doesn't zero the denominator and trivialise the
+                // threshold.
+                (params.persistent_voters + params.non_persistent_voters).round() as u64
             }
             CommitteeSelectionAlgorithm::Everyone => topology.nodes.len() as u64,
             CommitteeSelectionAlgorithm::TopStakeFraction => total_stake,
