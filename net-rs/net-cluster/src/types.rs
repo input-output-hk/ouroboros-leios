@@ -4,7 +4,7 @@
 //! Events are kept as opaque `serde_json::Value` to avoid coupling to the
 //! full NodeEvent enum.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 use serde::{Deserialize, Serialize};
 
@@ -64,6 +64,7 @@ pub struct NodeVotes {
     pub eb_received: bool,
     pub vote_cast: bool,
     pub perm_committee_member: bool,
+    pub eb_generated: bool,
 }
 
 /// Number of recent slots to keep in the aggregated votes history for the UI.
@@ -85,10 +86,11 @@ pub struct AggregatedVotesHistory {
     /// 'R' - RB received;
     /// 'E' - EB received;
     /// '1' - vote cast;
+    /// 'G' - EB generated + vote cast;
     /// '*' - permanent committee member;
     /// '.' - no events/statuses for the node from the above list.
     /// '?' - incorrect status (e.g. vote cast without RB received).
-    /// In case of multiple statuses for a node, the max is taken: '1' > 'E' > 'R' > ' *' > '.'
+    /// In case of multiple statuses for a node, the max is taken: '1','G' > 'E' > 'R' > ' *' > '.'
     pub votes: Vec<String>,
 }
 

@@ -90,7 +90,7 @@ export interface DashboardState {
   restartCluster: (config: ClusterControlConfig) => Promise<void>;
 
   // Voting panel data (column-major: [slot][row])
-  votingMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "VoteCast" | "Committee" | "Incorrect")[][];
+  votingMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "EBGenerated" | "VoteCast" | "Committee" | "Incorrect")[][];
   votingSlotStart: number;
 }
 
@@ -217,7 +217,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
         nodeIds[aggregated_votes.node_ids[i]] = i;
       }
 
-      const nextMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "VoteCast" | "Committee" | "Incorrect")[][] = Array.from(
+      const nextMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "EBGenerated" | "VoteCast" | "Committee" | "Incorrect")[][] = Array.from(
         {length: VOTING_SLOTS},
         (_, i) => {
           // Vote events in the string are written from older slots to most recent slot.
@@ -230,6 +230,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
               const status = votes[idx];
               if (status === '.') return "NoEvent" as const;
               if (status === '1') return "VoteCast" as const;
+              if (status === 'G') return "EBGenerated" as const;
               if (status === 'E') return "EBReceived" as const;
               if (status === 'R') return "RBReceived" as const;
               if (status === '*') return "Committee" as const;

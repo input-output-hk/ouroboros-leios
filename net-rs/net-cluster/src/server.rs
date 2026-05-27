@@ -84,6 +84,11 @@ impl AggregatedNodeStats {
                         mask.eb_received = true;
                     });
                 }
+                Some("EBGenerated") => {
+                    self.update_for_slot_node(node_id, slot, |mask| {
+                        mask.eb_generated = true;
+                    });
+                }
                 Some("VTBundleGenerated") => {
                     let count = msg.and_then(|m| m.get("count"));
                     if count.and_then(|c| c.as_u64()).unwrap_or(0) > 0 {
@@ -381,6 +386,7 @@ async fn get_votes_history(
             //    this info each time.
             str.push(match node_statuses.get(node_id) {
                 Some(NodeVotes {vote_cast: true, eb_received: true, rb_received: true, ..}) => '1',
+                Some(NodeVotes {vote_cast: true, eb_generated: true, ..}) => 'G',
                 Some(NodeVotes {eb_received: true, rb_received: true, ..}) => 'E',
                 Some(NodeVotes {rb_received: true, ..}) => 'R',
                 Some(NodeVotes {perm_committee_member: true, eb_received: false, vote_cast: false, ..}) => '*',

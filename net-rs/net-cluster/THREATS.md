@@ -52,11 +52,14 @@ More information about the mechanism is given in comments to the behaviour imple
   One can see the actual EB messages in the panel, received by nodes, and the actual votes cast.
 * The icons at slot/node intersection can be read as follows:
   * green tick means that the node received EB message for the slot.
-  * red circle means that the node has 'unusual' status: e.g. it did not receive RB, but
-    received EB.
+  * green circle with tick means that the node generated this EB message for the slot 
+    and voted for it.
   * cyan circle means that the node received RB + EB.
   * yellow circle means that the node received RB, but did not receive anything else.
   * grey circle means that the node did not receive any messages for the slot
+  * red circle means that the node has 'impossible' status: e.g. it did not receive RB, but
+    received EB. This may happen due to delays (net-cluster received events info with delay,
+    then this status will disappear quite soon), but also can happen due to a bug.
 
 The more disruptions in the network, the smaller number of EB messages -- and smaller
 amount of votes. If the number of votes for a block is less than 75% of the committee size

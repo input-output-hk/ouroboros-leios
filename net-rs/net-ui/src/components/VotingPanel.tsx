@@ -1,13 +1,20 @@
 import { Box, Typography, Divider } from "@mui/material";
 import { useStore } from "@/store";
 
-type VoteCell = "NoEvent" | "RBReceived" | "EBReceived" | "VoteCast" | "Committee" | "Incorrect";
+type VoteCell = "NoEvent" | "RBReceived" | "EBReceived" | "EBGenerated" | "VoteCast" | "Committee" | "Incorrect";
 
 function CellIcon({ value }: { value: VoteCell }) {
   if (value === "VoteCast") {
     return (
       <Box sx={{ width: 12, height: 12, color: "#66bb6a", fontSize: 16, lineHeight: "16px", textAlign: "center", fontWeight: 700 }}>
         ✓
+      </Box>
+    );
+  }
+  if (value === "EBGenerated") {
+    return (
+      <Box sx={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid #66bb6a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Box sx={{ color: "#66bb6a", fontSize: 11, lineHeight: "11px", fontWeight: 700 }}>✓</Box>
       </Box>
     );
   }
