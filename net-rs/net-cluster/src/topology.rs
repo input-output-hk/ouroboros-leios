@@ -250,9 +250,27 @@ fn resolve_behaviour_nodes(
     let Some(selection) = &config.behaviour_selection else {
         return BTreeSet::new();
     };
+    resolve_selection(selection, stakes, config.seed)
+}
+
+/// Resolve a [`BehaviourSelection`] to the concrete set of node
+/// indices it picks.  Pure helper reused at startup (via
+/// [`resolve_behaviour_nodes`]) and at runtime (when the cluster
+/// orchestrator translates a `POST /api/attack` request to per-node
+/// stdin writes).
+pub fn resolve_selection(
+    selection: &BehaviourSelection,
+    stakes: &[u64],
+    seed: Option<u64>,
+) -> std::collections::BTreeSet<usize> {
+    use std::collections::BTreeSet;
     match selection {
         BehaviourSelection::All => (0..stakes.len()).collect(),
-        BehaviourSelection::Nodes { indices } => indices.iter().copied().collect(),
+        BehaviourSelection::Nodes { indices } => indices
+            .iter()
+            .copied()
+            .filter(|&i| i < stakes.len())
+            .collect(),
         BehaviourSelection::StakeOrdered { count } => {
             stake_ranked(stakes).into_iter().take(*count).collect()
         }
@@ -263,8 +281,7 @@ fn resolve_behaviour_nodes(
                 .filter(|(_, &s)| s > 0)
                 .map(|(i, _)| i)
                 .collect();
-            let seed = config.seed.unwrap_or(0);
-            let mut rng = StdRng::seed_from_u64(seed);
+            let mut rng = StdRng::seed_from_u64(seed.unwrap_or(0));
             bearers.shuffle(&mut rng);
             bearers.into_iter().take(*count).collect()
         }

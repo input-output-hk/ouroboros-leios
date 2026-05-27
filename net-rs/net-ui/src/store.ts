@@ -7,8 +7,20 @@ import type {
   NodeSeriesPoint,
   ChainTreeEntry,
   ClusterControlConfig,
+  ActiveAttack,
+  AttackRequest,
 } from "./types";
-import { fetchTopology, fetchAllStats, fetchEvents, fetchConfig, restartCluster as apiRestartCluster, updateNodeConfig as apiUpdateNodeConfig } from "./api";
+import {
+  fetchTopology,
+  fetchAllStats,
+  fetchEvents,
+  fetchConfig,
+  restartCluster as apiRestartCluster,
+  updateNodeConfig as apiUpdateNodeConfig,
+  fetchActiveAttack,
+  startAttack as apiStartAttack,
+  stopAttack as apiStopAttack,
+} from "./api";
 
 const MAX_SERIES = 300; // ~5 min at 1s stats interval
 const MAX_EVENTS = 500;
@@ -80,6 +92,13 @@ export interface DashboardState {
   restarting: boolean;
   loadConfig: () => Promise<void>;
   restartCluster: (config: ClusterControlConfig) => Promise<void>;
+
+  // Runtime attack trigger
+  activeAttack: ActiveAttack | null;
+  attackingIndices: Set<number>;
+  loadActiveAttack: () => Promise<void>;
+  triggerAttack: (request: AttackRequest) => Promise<void>;
+  stopAttack: () => Promise<void>;
 }
 
 export const useStore = create<DashboardState>()((set, get) => ({
@@ -532,11 +551,14 @@ export const useStore = create<DashboardState>()((set, get) => ({
           nodePositions: {},
           selectedNodeId: null,
           selectedEdge: null,
+          activeAttack: null,
+          attackingIndices: new Set<number>(),
         });
         // Wait for new nodes to start, then reload topology + config.
         await new Promise((resolve) => setTimeout(resolve, 2000));
         await get().loadTopology();
         await get().loadConfig();
+        await get().loadActiveAttack();
       }
     } finally {
       set({ restarting: false });
@@ -550,6 +572,39 @@ export const useStore = create<DashboardState>()((set, get) => ({
       await get().loadConfig();
     } finally {
       set({ updating: false });
+    }
+  },
+
+  // --- Runtime attack trigger ---
+  activeAttack: null,
+  attackingIndices: new Set<number>(),
+
+  loadActiveAttack: async () => {
+    try {
+      const attack = await fetchActiveAttack();
+      set({
+        activeAttack: attack,
+        attackingIndices: new Set(attack?.indices ?? []),
+      });
+    } catch (e) {
+      console.error("Failed to load active attack:", e);
+    }
+  },
+
+  triggerAttack: async (request) => {
+    const ok = await apiStartAttack(request);
+    if (ok) {
+      // Server returns 202; poll once for the resolved indices.
+      await new Promise((r) => setTimeout(r, 100));
+      await get().loadActiveAttack();
+    }
+  },
+
+  stopAttack: async () => {
+    const ok = await apiStopAttack();
+    if (ok) {
+      await new Promise((r) => setTimeout(r, 100));
+      await get().loadActiveAttack();
     }
   },
 }));

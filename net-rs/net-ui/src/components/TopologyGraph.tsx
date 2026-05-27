@@ -35,6 +35,7 @@ export function TopologyGraph() {
       type: "topologyNode",
       data: {
         label: n.node_id,
+        index: n.index,
         stake: n.stake,
         selected: selectedNodeId === n.node_id,
       },

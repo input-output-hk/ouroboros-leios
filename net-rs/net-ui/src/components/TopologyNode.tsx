@@ -5,6 +5,7 @@ import { useStore } from "@/store";
 
 interface TopologyNodeData {
   label: string;
+  index: number;
   stake: number;
   selected: boolean;
 }
@@ -34,7 +35,7 @@ function borderColor(selected: boolean, flash: FlashType): string {
   return "#616161";
 }
 
-function bgColor(_selected: boolean, flash: FlashType): string {
+function bgColor(_selected: boolean, flash: FlashType, attacking: boolean): string {
   if (flash === "rolledback") return "#4a148c";
   if (flash === "rb-certified") return "#5d4037";
   if (flash === "rb-produced") return "#1b5e20";
@@ -43,13 +44,18 @@ function bgColor(_selected: boolean, flash: FlashType): string {
   if (flash === "eb-received") return "#1a237e";
   if (flash === "vote-produced") return "#4a148c";
   if (flash === "vote-received") return "#311b92";
+  // No flash — dark red when this node is currently running an attack
+  // behaviour, otherwise the default slate background.
+  if (attacking) return "#7f1d1d";
   return "#263238";
 }
 
 function TopologyNodeInner({ data }: Props) {
-  const { label, selected } = data;
+  const { label, index, selected } = data;
   const stats = useStore((s) => s.latestStats[label]);
   const flash = useStore((s) => s.nodeFlash[label] ?? null);
+  const attackingIndices = useStore((s) => s.attackingIndices);
+  const attacking = attackingIndices.has(index);
   const tip = stats?.tip_block_no;
   const tipHash = stats?.tip_hash;
 
@@ -63,7 +69,7 @@ function TopologyNodeInner({ data }: Props) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        bgcolor: bgColor(selected, flash),
+        bgcolor: bgColor(selected, flash, attacking),
         border: flash === "rb-certified" ? 4 : selected ? 4 : 2,
         borderColor: borderColor(selected, flash),
         cursor: "pointer",
