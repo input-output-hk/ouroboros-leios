@@ -90,11 +90,21 @@ export interface ClusterControlConfig {
   node_config: Record<string, unknown>;
 }
 
+// Mirrors shared_consensus::leios::NoVoteReason (kebab-case serde).
+export type NoVoteReason =
+  | "late-eb"
+  | "late-rb-header"
+  | "wrong-eb"
+  | "missing-tx"
+  | "eb-validating"
+  | "equivocating-rb"
+  | "declined";
+
 // Per-node behaviour spec — mirrors shared_consensus::behaviour::BehaviourSpec.
 // The Rust enum uses #[serde(tag = "kind", rename_all = "kebab-case")].
 export type BehaviourSpec =
   | { kind: "honest" }
-  | { kind: "lazy-voter"; reason?: string }
+  | { kind: "lazy-voter"; reason?: NoVoteReason }
   | { kind: "rb-header-equivocator"; ways: number }
   | { kind: "composite"; children: BehaviourSpec[] };
 

@@ -270,11 +270,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 /// Drive a runtime attack-trigger command from the HTTP server.
 ///
-/// For `Start`: any prior active attack is first reset on its nodes
-/// (so they return to their startup spec) before the new behaviour is
-/// installed on the freshly-resolved set.  For `Stop`: every node in
-/// the active set is reset and the server state is cleared.  All
-/// writes go through `send_config_update_to`, which talks to each
+/// For `Start`: installs the requested behaviour on the freshly-resolved
+/// node set.  The HTTP handler rejects with 409 when an attack is
+/// already active, but a narrow race window exists between that read
+/// and the main loop's apply — so we re-check here and drop the
+/// command if the slot has filled in the meantime.  For `Stop`: every
+/// node in the active set is reset and the server state is cleared.
+/// All writes go through `send_config_update_to`, which talks to each
 /// child via the same stdin pipe used by `update-config`.
 async fn handle_attack_command(
     cmd: server::AttackCommand,
@@ -284,15 +286,13 @@ async fn handle_attack_command(
 ) {
     match cmd {
         server::AttackCommand::Start(request) => {
-            // Reset any prior set first so its nodes don't keep their
-            // previous attack spec when they aren't in the new set.
-            let prior = server_state.active_attack.read().await.clone();
-            if let Some(prior) = prior {
-                let reset_json = serde_json::json!({ "behaviour_reset": true });
-                cluster
-                    .pm
-                    .send_config_update_to(&prior.indices, &reset_json)
-                    .await;
+            if server_state.active_attack.read().await.is_some() {
+                tracing::warn!(
+                    selection = ?request.selection,
+                    "attack start raced past the 409 check; dropping (an attack \
+                     is already active — POST /api/attack/stop first)"
+                );
+                return;
             }
 
             let stakes = server_state.stakes.read().await.clone();

@@ -5,6 +5,7 @@ import { useStore } from "@/store";
 
 interface TopologyNodeData {
   label: string;
+  index: number;
   stake: number;
   selected: boolean;
 }
@@ -50,13 +51,11 @@ function bgColor(_selected: boolean, flash: FlashType, attacking: boolean): stri
 }
 
 function TopologyNodeInner({ data }: Props) {
-  const { label, selected } = data;
+  const { label, index, selected } = data;
   const stats = useStore((s) => s.latestStats[label]);
   const flash = useStore((s) => s.nodeFlash[label] ?? null);
-  const topology = useStore((s) => s.topology);
   const attackingIndices = useStore((s) => s.attackingIndices);
-  const nodeIndex = topology?.nodes.find((n) => n.node_id === label)?.index;
-  const attacking = nodeIndex != null && attackingIndices.has(nodeIndex);
+  const attacking = attackingIndices.has(index);
   const tip = stats?.tip_block_no;
   const tipHash = stats?.tip_hash;
 

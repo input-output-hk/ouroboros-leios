@@ -293,13 +293,19 @@ async fn get_attack(State(state): State<Arc<ServerState>>) -> Json<Option<Active
 }
 
 /// POST /api/attack — install `request.behaviour` on the nodes picked
-/// by `request.selection`.  Replaces any prior active attack; the
-/// main loop resets the prior nodes to their startup spec before
-/// applying the new one.  Returns 202 once the command is queued.
+/// by `request.selection`.  Returns 202 once the command is queued, or
+/// 409 Conflict if an attack is already active (call
+/// `POST /api/attack/stop` first to replace).
 async fn start_attack(
     State(state): State<Arc<ServerState>>,
     Json(request): Json<AttackRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    if state.active_attack.read().await.is_some() {
+        return Err((
+            StatusCode::CONFLICT,
+            "An attack is already active; POST /api/attack/stop first".into(),
+        ));
+    }
     match state.attack_tx.try_send(AttackCommand::Start(request)) {
         Ok(()) => Ok(StatusCode::ACCEPTED),
         Err(mpsc::error::TrySendError::Full(_)) => Err((

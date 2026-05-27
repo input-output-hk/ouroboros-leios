@@ -69,7 +69,7 @@ export function AttackPanel() {
   const buildSpec = (): BehaviourSpec | null => {
     if (behaviourKind === "lazy-voter") return { kind: "lazy-voter" };
     if (behaviourKind === "rb-header-equivocator") {
-      const w = Math.max(2, Math.floor(Number(ways) || 2));
+      const w = Math.min(8, Math.max(2, Math.floor(Number(ways) || 2)));
       return { kind: "rb-header-equivocator", ways: w };
     }
     return null;
@@ -243,7 +243,7 @@ export function AttackPanel() {
         <Stack direction="row" spacing={2} alignItems="center">
           <Slider
             value={fractionPct}
-            min={0}
+            min={1}
             max={100}
             step={1}
             onChange={(_, v) => setFractionPct(v as number)}

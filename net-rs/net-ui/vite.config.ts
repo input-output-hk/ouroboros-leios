@@ -10,7 +10,6 @@ const apiPort = Number(process.env.API_PORT) || 9100;
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: "0.0.0.0",
     port: uiPort,
     proxy: {
       "/api": `http://127.0.0.1:${apiPort}`,

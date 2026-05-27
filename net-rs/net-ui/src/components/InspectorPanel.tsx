@@ -23,13 +23,11 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
   const stats = useStore((s) => s.latestStats[nodeId]);
   const topology = useStore((s) => s.topology);
   const activeAttack = useStore((s) => s.activeAttack);
+  const attackingIndices = useStore((s) => s.attackingIndices);
   const series = useStore((s) => s.nodeTimeSeries[nodeId]) ?? EMPTY_SERIES;
 
   const nodeIndex = topology?.nodes.find((n) => n.node_id === nodeId)?.index;
-  const isAttacking =
-    activeAttack != null &&
-    nodeIndex != null &&
-    activeAttack.indices.includes(nodeIndex);
+  const isAttacking = nodeIndex != null && attackingIndices.has(nodeIndex);
 
   const addrToNode = useMemo(() => {
     const map: Record<string, string> = {};
