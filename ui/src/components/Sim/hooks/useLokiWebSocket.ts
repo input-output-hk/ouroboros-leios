@@ -448,8 +448,14 @@ const parseVotesGenerated = (
   try {
     const log = JSON.parse(logLine);
 
-    // {"kind":"LeiosVoted","vote":{"slot":76,"ebHash":"...","voterId":228,"voteSignature":true}}
+    // {"kind":"LeiosVoted","vote":{"slot":76,"ebHash":"...","voterId":228,"voteSignature":true},
+    //  "weight":0.333}
+    //
+    // `weight` is a stake fraction in [0,1]. The network-side
+    // `MsgLeiosVotes` still doesn't carry weight; only the producer's
+    // `LeiosVoted` does. See aggregator for how it's summed per EB.
     if (log.kind === "LeiosVoted") {
+      const weight = typeof log.weight === "number" ? log.weight : undefined;
       const message: IVotesGenerated = {
         type: EServerMessageType.VotesGenerated,
         id: `vote-${log.vote.slot}-${log.vote.voterId}-${log.vote.ebHash}`,
@@ -461,6 +467,7 @@ const parseVotesGenerated = (
             voterId: log.vote.voterId,
             ebHash: log.vote.ebHash,
             slot: log.vote.slot,
+            weight,
           },
         ],
       };

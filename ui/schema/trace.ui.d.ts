@@ -27,6 +27,10 @@ export interface Vote {
   /** Legacy field name for `slot`, kept for older prototype traces. */
   electionId?: number;
   voteSignature?: boolean;
+  /** Stake-weighted vote weight, as a fraction of total stake in [0,1].
+   *  Currently only carried by the producer's `LeiosVoted` trace; the
+   *  network-side `MsgLeiosVotes` doesn't surface weights yet. */
+  weight?: number;
 }
 
 /** Reference to a block by its identifier. */

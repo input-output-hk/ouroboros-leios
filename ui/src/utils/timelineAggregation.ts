@@ -669,15 +669,16 @@ export const computeAggregatedDataAtTime = (
         // fractions, sum those instead (`totalVotes` would then be 1.0
         // and is the default when the scenario omits it).
         //
-        // FIXME: switch the prototype branch to sum `v.weight` once
-        // emitted; until then the bar will read 1 per Vote (which works
-        // sensibly only when totalVotes is set to the voter count for
-        // that scenario, or the trace happens to emit one Vote per
-        // voter).
+        // Prototype `Vote[]` may carry `weight` (stake-weighted fraction in
+        // [0,1], flattened from a `{numerator,denominator}` rational by the
+        // Loki parser — TODO: stabilise the encoding upstream). When
+        // present, accumulate the weight; otherwise fall back to 1 per vote
+        // (the pre-weights behaviour, which makes sense only if
+        // `scenario.totalVotes` is set to the voter count).
         if (Array.isArray(message.votes)) {
           for (const v of message.votes) {
             const eb = result.chain.ebs.get(v.ebHash);
-            if (eb) eb.voteCount = (eb.voteCount ?? 0) + 1;
+            if (eb) eb.voteCount = (eb.voteCount ?? 0) + (v.weight ?? 1);
           }
         } else {
           for (const [ebId, count] of Object.entries(message.votes)) {
@@ -798,14 +799,13 @@ export const buildChainAtTime = (
         });
       }
     } else if (message.type === EServerMessageType.VotesGenerated) {
-      // See computeAggregatedDataAtTime — accumulate "weight" per EB:
-      // lottery hit counts (sim) or 1 per Vote (prototype, until weights
-      // land). Normalisation by `scenario.totalVotes` happens in the
-      // renderer.
+      // See computeAggregatedDataAtTime. Prototype `Vote.weight` (stake
+      // fraction, flattened from {numerator,denominator}) is summed when
+      // present; otherwise fall back to 1 per vote.
       if (Array.isArray(message.votes)) {
         for (const v of message.votes) {
           const eb = chain.ebs.get(v.ebHash);
-          if (eb) eb.voteCount = (eb.voteCount ?? 0) + 1;
+          if (eb) eb.voteCount = (eb.voteCount ?? 0) + (v.weight ?? 1);
         }
       } else {
         for (const [ebId, count] of Object.entries(message.votes)) {
