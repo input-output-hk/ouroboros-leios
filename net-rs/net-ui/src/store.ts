@@ -6,7 +6,7 @@ import type {
   AggregatePoint,
   NodeSeriesPoint,
   ChainTreeEntry,
-  ClusterControlConfig, AggregateNodeVotes,
+  ClusterControlConfig,
 } from "./types";
 import {
   fetchTopology,
