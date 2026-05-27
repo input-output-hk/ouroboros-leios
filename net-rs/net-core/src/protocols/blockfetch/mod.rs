@@ -101,24 +101,8 @@ impl Protocol for BlockFetch {
 
     fn size_limit(state: &State) -> usize {
         match state {
-            // `StIdle` is client-agency: the server never sends here,
-            // so the small cap is enough.
-            State::StIdle => SIZE_LIMIT_SMALL,
-            // In `StBusy` and `StStreaming` the client receives from
-            // the server.  The demuxer enforces this value as a
-            // *buffer* cap, not a per-message cap — and the server
-            // can pipeline a `MsgStartBatch` plus one or more
-            // `MsgBlock`s in a single TCP read.  `SIZE_LIMIT_STREAMING`
-            // (2.5 MB) is the per-message spec cap but it's too tight
-            // for the buffer: a single legitimate Praos block body
-            // (post-EB-overflow fallback) can land right around 2.5
-            // MB and trip the demuxer.  Use the per-spec ingress
-            // buffer cap (`INGRESS_LIMIT`, 230 MB) instead.
-            //
-            // Per-spec per-message rejection at `SIZE_LIMIT_*` values
-            // belongs in the codec at decode time (not yet wired);
-            // this constant is buffer sizing, not message validation.
-            State::StBusy | State::StStreaming => INGRESS_LIMIT,
+            State::StIdle | State::StBusy => SIZE_LIMIT_SMALL,
+            State::StStreaming => SIZE_LIMIT_STREAMING,
             State::StDone => 0,
         }
     }
@@ -253,13 +237,12 @@ mod tests {
 
     #[test]
     fn size_limits() {
-        assert_eq!(BlockFetch::size_limit(&State::StIdle), 65_535);
-        // StBusy and StStreaming use the per-protocol ingress buffer
-        // cap so the demuxer can hold pipelined `MsgStartBatch` +
-        // `MsgBlock` plus block-body messages that exceed the
-        // per-message spec cap of 2.5 MB.
-        assert_eq!(BlockFetch::size_limit(&State::StBusy), INGRESS_LIMIT);
-        assert_eq!(BlockFetch::size_limit(&State::StStreaming), INGRESS_LIMIT);
+        assert_eq!(BlockFetch::size_limit(&State::StIdle), SIZE_LIMIT_SMALL);
+        assert_eq!(BlockFetch::size_limit(&State::StBusy), SIZE_LIMIT_SMALL);
+        assert_eq!(
+            BlockFetch::size_limit(&State::StStreaming),
+            SIZE_LIMIT_STREAMING
+        );
     }
 
     #[test]
