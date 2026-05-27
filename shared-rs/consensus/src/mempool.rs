@@ -698,7 +698,7 @@ impl MempoolState {
                 self.total_bytes -= old.size as usize;
                 let evicted_id = old.tx_id.clone();
                 self.prune_from_peer_sets(&evicted_id);
-                info!(
+                tracing::debug!(
                     evicted = ?hex_short(&evicted_id),
                     capacity = self.capacity,
                     "mempool: evicting oldest tx to make room"
