@@ -20,6 +20,15 @@ TMP="${OVERLAY}.tmp"
 printf 'listen_address = "0.0.0.0:%s"\n' "$LISTEN_PORT" >> "$TMP"
 
 if [ -n "${NET_NODE_ID:-}" ]; then
+    # Reject characters that would need TOML escaping; the overlay is
+    # written by printf into a "%s" template and net-node would surface
+    # any breakage as an opaque TOML parse error at startup.
+    case "$NET_NODE_ID" in
+        *[!A-Za-z0-9._-]*)
+            echo "entrypoint: NET_NODE_ID=\"$NET_NODE_ID\" must match [A-Za-z0-9._-]+" >&2
+            exit 64
+            ;;
+    esac
     printf 'node_id = "%s"\n' "$NET_NODE_ID" >> "$TMP"
 fi
 
@@ -28,8 +37,10 @@ fi
 if [ -n "${NET_NODE_PEERS:-}" ]; then
     OLD_IFS=$IFS
     IFS=','
+    set -f                # block pathname expansion on the unquoted split
     # shellcheck disable=SC2086
     set -- $NET_NODE_PEERS
+    set +f
     IFS=$OLD_IFS
     for entry in "$@"; do
         addr=$(printf '%s' "$entry" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
