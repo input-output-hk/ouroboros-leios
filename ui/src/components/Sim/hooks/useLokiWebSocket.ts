@@ -48,6 +48,31 @@ const getNodesFromConnection = (connectionId: string): [string, string] => {
   return ["UNKNOWN", "UNKNOWN"];
 };
 
+// Per-RB info accumulated across three correlated tracer events on the
+// producer, consumed when the producer adopts the block. Sized to a small
+// cap as a memory bound; in practice an entry lives only ~ms before being
+// consumed and deleted. Order on a producer for the same RB:
+//
+//   1. Consensus.LeiosKernel.TraceLeiosKernel { kind: TraceLeiosBlockCertified,
+//                                               atSlot, ebHash }
+//   2. Forge.Loop.ForgedBlock                 { block, blockNo, blockPrev, slot }
+//   3. Forge.Loop.AdoptedBlock                { blockHash, blockSize, slot }
+//
+// Step 1 is slot-keyed because the RB hash isn't known yet; step 2
+// promotes it to a hash-keyed entry; step 3 consumes.
+const PENDING_CAP = 256;
+const pendingCerts = new Map<string, string>(); // `${producer}:${slot}` → ebHash
+const pendingForges = new Map<
+  string,
+  { blockNo: number; blockPrev?: string; certifiesEbId?: string }
+>();
+
+const evictOldest = <K, V>(m: Map<K, V>, cap: number) => {
+  if (m.size < cap) return;
+  const k = m.keys().next().value;
+  if (k !== undefined) m.delete(k);
+};
+
 const parseRankingBlockGenerated = (
   streamLabels: any,
   timestamp: number,
@@ -60,22 +85,63 @@ const parseRankingBlockGenerated = (
     // carries the tracer namespace; the `data` field is what Loki streams as
     // the log line, with the legacy `forgedBlock` wrapper flattened away.
     //
-    // ns=Forge.Loop.ForgedBlock
-    // {"block":"8ee35205...","blockNo":25,"blockPrev":"625d1f62...","kind":"TraceForgedBlock","slot":753}
+    // Two events together produce one RBGenerated, correlated by hash:
     //
-    // TODO: size_bytes is not in this event — the matching
-    // Forge.Loop.AdoptedBlock carries `blockSize`. Correlate by hash to
-    // populate. Until then, fall back to 0.
+    //   ns=Forge.Loop.ForgedBlock   (first)
+    //   {"block":"8ee35205...","blockNo":25,"blockPrev":"625d1f62...",
+    //    "kind":"TraceForgedBlock","slot":753}
+    //
+    //   ns=Forge.Loop.AdoptedBlock  (second, ~ms later, only on adoption)
+    //   {"blockHash":"8ee35205...","blockSize":87239,
+    //    "kind":"TraceAdoptedBlock","slot":753}
+    //
+    // ForgedBlock has parent/block_number, AdoptedBlock has size. We stash
+    // the former and emit the RBGenerated message on the latter — so a
+    // forged-but-not-adopted block (loser in a fork) doesn't appear in the
+    // chain view, which matches "what made it into the chain".
+
+    // Step 1: cert. The RB hash isn't known yet — stash by producer:slot.
+    if (
+      streamLabels.ns === "Consensus.LeiosKernel.TraceLeiosKernel" &&
+      log.kind === "TraceLeiosBlockCertified" &&
+      log.ebHash !== undefined &&
+      log.atSlot !== undefined
+    ) {
+      evictOldest(pendingCerts, PENDING_CAP);
+      pendingCerts.set(`${streamLabels.process}:${log.atSlot}`, log.ebHash);
+      return null;
+    }
+
+    // Step 2: forge. Promote the cert (if any) from slot-keyed to hash-keyed.
     if (streamLabels.ns === "Forge.Loop.ForgedBlock" && log.block) {
+      const certKey = `${streamLabels.process}:${log.slot}`;
+      const certifiesEbId = pendingCerts.get(certKey);
+      pendingCerts.delete(certKey);
+      evictOldest(pendingForges, PENDING_CAP);
+      pendingForges.set(log.block, {
+        blockNo: log.blockNo,
+        blockPrev: log.blockPrev,
+        certifiesEbId,
+      });
+      return null;
+    }
+
+    // Step 3: adopt. Emit a complete RBGenerated.
+    if (streamLabels.ns === "Forge.Loop.AdoptedBlock" && log.blockHash) {
+      const forged = pendingForges.get(log.blockHash);
+      pendingForges.delete(log.blockHash);
       const message: IRankingBlockGenerated = {
         type: EServerMessageType.RBGenerated,
-        id: log.block,
+        id: log.blockHash,
         slot: log.slot,
         producer: streamLabels.process,
-        size_bytes: 0, // TODO: add size_bytes
-        endorsement: null,
+        size_bytes: log.blockSize ?? 0,
+        endorsement: forged?.certifiesEbId
+          ? { eb: { id: forged.certifiesEbId } }
+          : null,
+        block_number: forged?.blockNo,
+        parent: forged?.blockPrev ? { id: forged.blockPrev } : null,
       };
-
       return {
         time_s: timestamp,
         message,
@@ -83,7 +149,7 @@ const parseRankingBlockGenerated = (
     }
   } catch (error) {
     console.warn(
-      "Failed to parse Forge.Loop.ForgedBlock log line:",
+      "Failed to parse Forge.Loop.{Forged,Adopted}Block log line:",
       logLine,
       error,
     );
@@ -508,7 +574,7 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
   // 3. Loki naturally returns results in chronological order within a single stream
   // 4. Sorting large event arrays in the reducer is too expensive for dense simulation data
   const query =
-    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|MsgLeiosVotes|LeiosVoted"';
+    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|TraceAdoptedBlock|TraceLeiosBlockCertified|MsgLeiosVotes|LeiosVoted"';
   const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${encodeURIComponent(query)}&limit=5000`;
 
   let hasAutoStartedPlayback = false;
