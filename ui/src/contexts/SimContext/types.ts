@@ -121,7 +121,7 @@ export interface IGraphContextState {
   currentEdge?: string; // Edge key "source|target" (sorted)
 }
 
-export type LayoutMode = "original" | "auto" | "circular" | "mercator";
+export type LayoutMode = "none" | "auto" | "circular" | "mercator";
 
 export interface MercatorParams {
   xOffset: number;
