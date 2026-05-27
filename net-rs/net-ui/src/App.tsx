@@ -13,6 +13,7 @@ import { EventLog } from "@/components/EventLog";
 import { IconSidebar } from "@/components/IconSidebar";
 import { ControlPanel } from "@/components/ControlPanel";
 import { AttackPanel } from "@/components/AttackPanel";
+import piranhaLogo from "@/assets/piranha.svg";
 
 export default function App() {
   const loadTopology = useStore((s) => s.loadTopology);
@@ -143,10 +144,13 @@ export default function App() {
         )}
 
         {/* Header — overlay */}
-        <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, px: 2, py: 0.75, bgcolor: "rgba(13, 27, 42, 0.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "baseline", justifyContent: "space-between", pointerEvents: "auto" }}>
-          <Typography variant="h5" sx={{ color: "#ffffff", fontWeight: 700 }}>
-            Leios Node Cluster
-          </Typography>
+        <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, px: 2, py: 0.75, bgcolor: "rgba(13, 27, 42, 0.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "space-between", pointerEvents: "auto" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+            <img src={piranhaLogo} alt="" style={{ height: 40, width: "auto", display: "block" }} />
+            <Typography variant="h5" sx={{ color: "#ffffff", fontWeight: 700 }}>
+              Leios Piranha Cluster
+            </Typography>
+          </Box>
           {topology && (
             <Typography variant="body2" sx={{ color: "#ffffff" }}>
               {topology.nodes.length} nodes, {topology.edges.length} edges

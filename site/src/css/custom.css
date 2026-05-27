@@ -523,6 +523,9 @@ blockquote {
   .col {
     padding: var(--ifm-global-spacing);
   }
+  .col--3 {
+    display: none;
+  }
   .footer__links .col {
     padding: 0 !important;
   }
@@ -537,10 +540,6 @@ blockquote {
     min-width: 0px;
     max-width: 81px;
   }
-}
-
-.col--3 {
-  display: none;
 }
 
 @media (min-width: 997px) {

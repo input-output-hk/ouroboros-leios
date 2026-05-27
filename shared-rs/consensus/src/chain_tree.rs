@@ -90,9 +90,16 @@ struct ChainNode {
     /// hasn't been parsed (opaque-header path) or when the count is
     /// genuinely zero.
     tx_count: u32,
-    /// Hash of the EB this block announces, if any. Used at snapshot
-    /// time to resolve the manifest tx count via the caller's closure.
+    /// Hash of the EB this block announces, if any.  Used at snapshot
+    /// time to resolve the manifest tx count from the caller's closure
+    /// (fallback) or the cached value below (primary).
     announced_eb_hash: Option<[u8; 32]>,
+    /// Tx count of the announced EB once its manifest has been observed
+    /// locally.  `None` until [`ChainTree::record_announced_eb_tx_count`]
+    /// fires (self-produce or LeiosFetch).  Cached on the node so the
+    /// snapshot can still surface the count after the I/O wrapper's
+    /// short-lived manifest cache has aged out.
+    cached_eb_tx_count: Option<u32>,
     /// True if the block's header has `certified_eb == Some(true)`.
     certified_eb: bool,
 }
@@ -158,6 +165,7 @@ impl ChainTree {
                 prev_hash,
                 tx_count,
                 announced_eb_hash,
+                cached_eb_tx_count: None,
                 certified_eb,
             },
         );
@@ -210,6 +218,26 @@ impl ChainTree {
     /// certify the EB this RB announced.
     pub fn announced_eb_hash_by(&self, hash: &[u8; 32]) -> Option<[u8; 32]> {
         self.nodes.get(hash).and_then(|n| n.announced_eb_hash)
+    }
+
+    /// Stash the tx-count of an EB once its manifest is known.  The
+    /// I/O wrapper calls this from its self-produce path (count known
+    /// immediately) and its receive path (count known once the
+    /// manifest has been fetched and parsed).  Looks up the RB that
+    /// announced `eb_hash` and records the count there.  Idempotent;
+    /// no-op if `eb_hash` isn't announced by any tree node (e.g., the
+    /// RB was pruned, or this node never adopted the chain that
+    /// announced it).
+    pub fn record_announced_eb_tx_count(&mut self, eb_hash: &[u8; 32], count: u32) {
+        // No early-out: two RBs on different forks can legitimately
+        // announce the same (content-derived) EB hash, and both nodes
+        // need their cache populated — otherwise the fork-side entry
+        // loses its tx-count once the live manifest cache ages out.
+        for node in self.nodes.values_mut() {
+            if node.announced_eb_hash.as_ref() == Some(eb_hash) {
+                node.cached_eb_tx_count = Some(count);
+            }
+        }
     }
 
     /// Number of blocks in the tree.
@@ -390,7 +418,14 @@ impl ChainTree {
             .iter()
             .filter_map(|h| {
                 let node = self.nodes.get(h)?;
-                let eb_tx_count = node.announced_eb_hash.as_ref().and_then(&eb_manifest_count);
+                // Prefer the cached count (stashed by the I/O wrapper
+                // on manifest arrival).  Fall back to the closure
+                // (queries the wrapper's live manifest cache) so the
+                // count appears as soon as a manifest arrives, before
+                // it's been stashed.
+                let eb_tx_count = node.cached_eb_tx_count.or_else(|| {
+                    node.announced_eb_hash.as_ref().and_then(&eb_manifest_count)
+                });
                 Some(ChainTreeEntry {
                     block_number: node.block_number,
                     hash: short_hash(h),
@@ -739,6 +774,75 @@ mod tests {
         let fork = entries.iter().find(|e| e.hash == "f4f4").unwrap();
         assert_eq!(fork.block_number, 4);
         assert_eq!(fork.prev_hash.as_deref(), Some("0303"));
+    }
+
+    #[test]
+    fn record_announced_eb_tx_count_survives_closure_miss() {
+        let mut tree = ChainTree::new();
+        // Block 1 announces EB [0xEB; 32].
+        tree.insert(
+            [1; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [1; 32],
+            },
+            1,
+            1,
+            None,
+            0,
+            Some([0xEB; 32]),
+            false,
+        );
+        // Block 2 announces nothing.
+        tree.insert_simple(
+            [2; 32],
+            Point::Specific {
+                slot: 2,
+                hash: [2; 32],
+            },
+            2,
+            2,
+            Some([1; 32]),
+        );
+
+        // Before the stash, a closure returning None leaves the count
+        // unresolved on block 1.
+        let entries = tree.snapshot([2; 32], 10, None, |_| None);
+        let block1 = entries.iter().find(|e| e.block_number == 1).unwrap();
+        assert_eq!(block1.eb_tx_count, None);
+
+        // Stash the count; the snapshot now surfaces it without help
+        // from the closure (simulates the manifest cache having aged
+        // out by the next poll).
+        tree.record_announced_eb_tx_count(&[0xEB; 32], 42);
+        let entries = tree.snapshot([2; 32], 10, None, |_| None);
+        let block1 = entries.iter().find(|e| e.block_number == 1).unwrap();
+        assert_eq!(block1.eb_tx_count, Some(42));
+        // Block 2 announces nothing — stash must not bleed across.
+        let block2 = entries.iter().find(|e| e.block_number == 2).unwrap();
+        assert_eq!(block2.eb_tx_count, None);
+    }
+
+    #[test]
+    fn record_announced_eb_tx_count_unknown_eb_is_noop() {
+        let mut tree = ChainTree::new();
+        tree.insert(
+            [1; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [1; 32],
+            },
+            1,
+            1,
+            None,
+            0,
+            Some([0xEB; 32]),
+            false,
+        );
+        // Stashing a count for an EB no node announces is a no-op.
+        tree.record_announced_eb_tx_count(&[0xFF; 32], 99);
+        let entries = tree.snapshot([1; 32], 10, None, |_| None);
+        assert_eq!(entries[0].eb_tx_count, None);
     }
 
     #[test]

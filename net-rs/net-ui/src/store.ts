@@ -173,17 +173,35 @@ export const useStore = create<DashboardState>()((set, get) => ({
       // Aggregate network-wide chain tree, accumulating across polls so
       // gaps don't appear when nodes are at different chain heights.
       // Skip carry-forward while restarting so stale entries don't persist.
+      //
+      // The backend snapshot identifies blocks by a 2-byte short hash
+      // (4 hex chars), which has a non-trivial collision rate inside a
+      // single 30-block window.  Key the merge by `block_number:hash`
+      // so an `eb_tx_count` carried forward can't bleed into an
+      // unrelated block that just happens to share the last two bytes.
+      const entryKey = (e: ChainTreeEntry) => `${e.block_number}:${e.hash}`;
       const mergedEntries = new Map<string, ChainTreeEntry>();
       if (!get().restarting) {
         for (const e of get().networkChainTree) {
-          mergedEntries.set(e.hash, e);
+          mergedEntries.set(entryKey(e), e);
         }
       }
       const tipCounts: Record<string, string[]> = {};
       for (const snap of Object.values(stats)) {
         if (snap.chain_tree) {
           for (const e of snap.chain_tree) {
-            mergedEntries.set(e.hash, e);
+            // Preserve `eb_tx_count` if a prior poll observed it.
+            // The backend drops the count once the EB manifest ages out
+            // of its short-lived cache; the chain-tree node's other
+            // fields (announced_eb, certified_eb, …) are permanent on
+            // ChainNode and never lose information across polls.
+            const key = entryKey(e);
+            const prev = mergedEntries.get(key);
+            const merged: ChainTreeEntry =
+              prev && prev.eb_tx_count != null && e.eb_tx_count == null
+                ? { ...e, eb_tx_count: prev.eb_tx_count }
+                : e;
+            mergedEntries.set(key, merged);
           }
         }
         if (snap.tip_hash) {
@@ -196,8 +214,8 @@ export const useStore = create<DashboardState>()((set, get) => ({
         if (e.block_number > maxBn) maxBn = e.block_number;
       }
       const pruneBelow = maxBn - 30;
-      for (const [hash, e] of mergedEntries) {
-        if (e.block_number < pruneBelow) mergedEntries.delete(hash);
+      for (const [key, e] of mergedEntries) {
+        if (e.block_number < pruneBelow) mergedEntries.delete(key);
       }
       const networkChainTree = [...mergedEntries.values()].sort(
         (a, b) => a.block_number - b.block_number,
