@@ -17,7 +17,7 @@ import {
   fetchConfig,
   restartCluster as apiRestartCluster,
   updateNodeConfig as apiUpdateNodeConfig,
-  fetchAggregatedVotesHistory
+  fetchAggregatedVotesHistory,
   fetchActiveAttack,
   startAttack as apiStartAttack,
   stopAttack as apiStopAttack,

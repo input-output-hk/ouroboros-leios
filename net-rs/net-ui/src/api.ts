@@ -4,7 +4,7 @@ import type {
   OutputEvent,
   ClusterControlConfig,
   AggregateNodeVotes,
-  AggregateVotesHistory
+  AggregateVotesHistory,
   ActiveAttack,
   AttackRequest,
 } from "./types";
