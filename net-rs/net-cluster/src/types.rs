@@ -66,21 +66,6 @@ pub struct NodeVotes {
     pub perm_committee_member: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AggregatedNodeVotes {
-    pub slot: u64,
-    pub node_statuses: HashMap<String, NodeVotes>, // (node_id, status)
-}
-
-impl AggregatedNodeVotes {
-    pub fn empty(slot: u64) -> Self {
-        Self {
-            slot,
-            node_statuses: HashMap::new(),
-        }
-    }
-}
-
 /// Number of recent slots to keep in the aggregated votes history for the UI.
 pub const WINDOW_SIZE: u64 = 25;
 

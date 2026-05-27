@@ -86,7 +86,7 @@ impl AggregatedNodeStats {
                 }
                 Some("VTBundleGenerated") => {
                     let count = msg.and_then(|m| m.get("count"));
-                    if count.is_some() {
+                    if count.and_then(|c| c.as_u64()).unwrap_or(0) > 0 {
                         self.update_for_slot_node(node_id, slot, |mask| {
                             mask.vote_cast = true;
                         });

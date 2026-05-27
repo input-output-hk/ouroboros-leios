@@ -83,7 +83,7 @@ impl T22ThreatBehaviour {
         };
         // `checksum % 100` yields values in 0..=99, so use `< threshold` to make
         // threshold semantics match percentages exactly: 0 => 0%, 100 => 100%.
-        let decision = (checksum % 100) as u8 < threshold;
+        let decision = ((checksum % 100) as u8) < threshold;
         info!(
             "[T22] {nm}: decision={decision}, sum={checksum}, threshold={threshold}, persistent_seats={persistent_seats}",
         );

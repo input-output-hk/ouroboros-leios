@@ -205,6 +205,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
       const curSnap = { time: now, bandwidth: totalBandwidth, messages: totalMessages, blocks: totalBlocks, forks: curForks };
 
       const VOTING_SLOTS = 24;
+      const MAX_NODES_VOTING_PANEL = 30;
       const topoNodes = get().topology?.nodes ?? [];
       const nodeCount = topoNodes.length;
 
@@ -224,7 +225,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
           // So, the order of columns should be reversed.
           const votes = votes_history[votes_history.length - i - 1] ?? [];
           if (votes) {
-            return topoNodes.map((n) => {
+            return topoNodes.slice(0, MAX_NODES_VOTING_PANEL).map((n) => {
               const idx = nodeIds[n.node_id];
               const status = votes[idx];
               if (status === '.') return "NoEvent" as const;
