@@ -41,26 +41,20 @@ const EB_CERTIFIED_FILL = "#f3e8ff";
 // -----------------------------------------------------------------------------
 // Progress = min(1, voteWeight / totalVotes)
 //
-//   * `voteWeight` is summed in the aggregator (timelineAggregation.ts).
-//     For the simulator it sums lottery hit counts (the values of the
-//     `{ebId: count}` map). For the prototype it sums 1 per `Vote` until
-//     per-vote stake weights are added.
+//   * `voteWeight` is summed in the aggregator (timelineAggregation.ts):
+//     - simulator: sum of lottery hit counts (values in the `{ebId: count}`
+//       weight map);
+//     - prototype: sum of `Vote.weight` (stake fraction in [0,1]) when
+//       present, otherwise 1 per vote.
 //   * `totalVotes` comes from the active scenario (`scenarios.json`). For
 //     sim-rs wfa-ls the natural value is 500 (persistent 400 +
-//     non-persistent 100). When unset we default to 1.0, which is the
-//     shape we expect from the prototype once it emits per-vote stake
-//     fractions that sum to ≤1.
+//     non-persistent 100). When unset (prototype case) we default to 1.0
+//     since prototype weights are already stake fractions summing to ≤1.
 //
-// Not yet protocol-correct, but a much better model than counting voters:
-//   * Treating lottery hit counts as stake-equivalents lets a single
-//     well-staked voter contribute proportionally more — matching how
-//     wfa-ls actually certifies an EB.
+// Not yet protocol-correct:
 //   * The 75% threshold (CERT_THRESHOLD above) is still a placeholder;
 //     sim-rs uses 300/500 = 60% by default. Surface via the trace/config
 //     once it stabilises.
-//   * The prototype's `Vote[]` has no weight field yet; the aggregator
-//     contributes 1 per vote in the meantime. Switch to summing `weight`
-//     once the field lands.
 // =============================================================================
 const computeVotingProgress = (
   voteWeight: number | undefined,
