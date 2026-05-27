@@ -16,22 +16,36 @@ function rgb([r, g, b]: [number, number, number], alpha = 1) {
 // Marker radius (px) by node kind / stake.
 function markerRadius(n: NodeFeature): number {
   if (n.stake <= 0) return 4;                      // relays
-  // BPs scale logarithmically with stake
+  // BPs scale logarithmically with stake.  With x = log10(stake) the formula
+  // is flat below 1e3 and then linear in log-stake: 5 at 1k, 14 at 1M,
+  // 20 at 100M ADA.
   const x = Math.log10(Math.max(1, n.stake));
-  return 5 + 3 * Math.max(0, x - 3);               // 5 at 1M, 11 at 100M ADA
+  return 5 + 3 * Math.max(0, x - 3);
+}
+
+// Escape `<`, `>`, `&`, `"`, `'` so tooltip values that came from external
+// data (ticker, provider, …) can't inject markup into the Leaflet tooltip.
+function esc(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  return String(v)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function buildTooltip(n: NodeFeature): string {
   const stake =
     n.stake > 0 ? `${(n.stake / 1e6).toFixed(2)} M ADA` : "(relay)";
   return `<div style="font-family:ui-monospace,monospace;font-size:11px;line-height:1.4">
-    <b>${n.id}</b> &middot; <span style="opacity:.7">${n.kind}</span><br/>
-    ${n.ticker ? `<b>${n.ticker}</b><br/>` : ""}
+    <b>${esc(n.id)}</b> &middot; <span style="opacity:.7">${esc(n.kind)}</span><br/>
+    ${n.ticker ? `<b>${esc(n.ticker)}</b><br/>` : ""}
     stake: ${stake}<br/>
-    provider: ${n.provider || "—"}<br/>
-    tier: ${n.tier || "—"}<br/>
-    ASN: ${n.asn ?? "—"} &middot; ${n.cc || "—"}<br/>
-    region: ${n.region || "—"}<br/>
+    provider: ${esc(n.provider) || "—"}<br/>
+    tier: ${esc(n.tier) || "—"}<br/>
+    ASN: ${n.asn ?? "—"} &middot; ${esc(n.cc) || "—"}<br/>
+    region: ${esc(n.region) || "—"}<br/>
     peers: ${n.peer_count} &middot; spread: ${n.spread_km.toFixed(0)} km
   </div>`;
 }
@@ -142,11 +156,17 @@ export default function MapView() {
     // Skip self-corridors + provider-excluded corridors.  No render cap:
     // line width and opacity are already log-scaled by edge count, so weak
     // corridors fade to hairlines automatically, while heavy ones dominate.
+    //
+    // Provider corridor keys are `<provider>/<continent>` (see
+    // `provider_region_key` in build-viewer-data.py), so we split on `/`
+    // before checking the excluded-provider set, which stores raw names.
+    const providerOf = (key: string) => key.split("/")[0];
     const visible = corridors
       .filter((c) => c.from !== c.to)
       .filter((c) =>
         aggregateBy === "provider"
-          ? !excludedProviders.has(c.from) && !excludedProviders.has(c.to)
+          ? !excludedProviders.has(providerOf(c.from)) &&
+            !excludedProviders.has(providerOf(c.to))
           : true
       );
     if (!visible.length) return;

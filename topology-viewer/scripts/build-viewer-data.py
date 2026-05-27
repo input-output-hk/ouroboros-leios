@@ -233,8 +233,6 @@ def aggregate_corridors(nodes, key_fn):
             key_t = key_fn(tgt)
             if key_t is None or key_t == key_s:
                 # skip self-pair corridors (counted as "intra-bucket"; reported separately)
-                pass
-            if key_t is None:
                 continue
             bucket_edges[(key_s, key_t)].append(link["latency-ms"])
 

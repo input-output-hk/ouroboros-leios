@@ -40,7 +40,11 @@ export function providerColor(p?: string | null): [number, number, number] {
   return PROVIDER_COLORS[p] || FALLBACK_COLOR;
 }
 
-// Latency colormap: 0ms = green, 700ms = red, log-ish progression.
+// Latency colormap: 0ms = green, ≥400ms = red.  Saturating at 400ms
+// (rather than the 700ms tail-max) is a deliberate visualisation choice:
+// inter-continent corridor *means* never exceed ~383ms and country/provider
+// means top out around 395ms (p99), so 400ms uses the full gradient on the
+// data that actually exists.  The handful of >400ms edges clamp to red.
 export function latencyColor(ms: number): [number, number, number] {
   const x = Math.min(1, Math.max(0, ms / 400));
   // green (low) -> yellow (mid) -> red (high)

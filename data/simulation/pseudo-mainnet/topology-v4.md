@@ -23,9 +23,9 @@ ASN-pair peering propensity.  Latencies are sampled from RIPE Atlas.
 | Network diameter | 4 hops |
 | Average connections per node | 35.65 |
 | Clustering coefficient | 0.038 |
-| Average latency | 95.1ms ms |
-| Maximum latency | 700.0ms ms |
-| Stake-weighted latency | 0.0ms ms |
+| Average latency | 95.1ms |
+| Maximum latency | 700.0ms |
+| Stake-weighted latency | 0.0ms |
 | Bidirectional connections | 6722 |
 | Asymmetry ratio | 85.95% |
 
@@ -40,9 +40,9 @@ ASN-pair peering propensity.  Latencies are sampled from RIPE Atlas.
 | Network diameter | 3 hops |
 | Average connections per node | 34.29 |
 | Clustering coefficient | 0.319 |
-| Average latency | 91.6ms ms |
-| Maximum latency | 700.0ms ms |
-| Stake-weighted latency | 0.0ms ms |
+| Average latency | 91.6ms |
+| Maximum latency | 700.0ms |
+| Stake-weighted latency | 0.0ms |
 | Bidirectional connections | 674 |
 | Asymmetry ratio | 84.27% |
 

@@ -117,7 +117,11 @@ Use the topology dropdown to swap between:
 ## Failure-scenario simulation
 
 Click any provider in the right-hand legend to **drop** it from rendering.
-Node markers disappear and corridor lines recompute.  Try:
+Node markers and spread halos for that provider disappear immediately.
+Corridor lines are filtered too, but only when **Aggregate by → provider**
+is selected (the country/continent corridor layers are pre-aggregated, so
+provider-level exclusions don't affect them — switch the aggregation
+dropdown to see the effect).  Try:
 
 - Drop **AWS** → 22.7% of stake offline; cross-Atlantic corridors shrink
 - Drop **OVH** + **Hetzner** → severe European fragmentation

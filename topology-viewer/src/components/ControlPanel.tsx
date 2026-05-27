@@ -162,7 +162,7 @@ export default function ControlPanel() {
             setShowCorridors,
             "Aggregated peer links between groups (group choice set by the buttons above: country, provider, or continent), drawn as straight lines between group centroids. " +
               "Line width = log of the number of underlying edges in that group-pair. " +
-              "Color = mean RTT latency (green ≈ low, red ≈ ≥ 700 ms). " +
+              "Color = mean RTT latency (green ≈ low, red ≈ ≥ 400 ms). " +
               "All corridors render — heavy ones dominate visually, the long tail appears as faint hairlines.",
           )}
           {checkbox(
