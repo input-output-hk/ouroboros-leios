@@ -132,6 +132,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tokio::sync::mpsc::channel::<config::ClusterControlConfig>(1);
     let (update_tx, mut update_rx) =
         tokio::sync::mpsc::channel::<std::collections::HashMap<String, serde_json::Value>>(16);
+    let (attack_tx, mut attack_rx) =
+        tokio::sync::mpsc::channel::<server::AttackCommand>(4);
+    let initial_stakes: Vec<u64> = topo.nodes.iter().map(|n| n.stake).collect();
     let (server_state, _server_handle) = server::start(
         current_config.aggregator_port,
         event_tx,
@@ -139,7 +142,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         event_window.clone(),
         restart_tx,
         update_tx,
+        attack_tx,
         current_config.control_fields(),
+        initial_stakes,
     )
     .await?;
 
@@ -231,8 +236,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let mut control = current_config.control_fields();
                 control.node_config = node_config.clone();
 
+                let new_stakes: Vec<u64> = new_topo.nodes.iter().map(|n| n.stake).collect();
                 *server_state.topology.write().await = new_topo.clone();
                 *server_state.current_config.write().await = control;
+                *server_state.stakes.write().await = new_stakes;
+                // Fresh processes re-read startup specs, so any runtime
+                // attack from before the restart is gone.
+                *server_state.active_attack.write().await = None;
                 server_state.latest_stats.write().await.clear();
                 server_state.event_window.write().await.clear();
                 *server_state.restarting.write().await = false;
@@ -244,6 +254,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     current_config.aggregator_port,
                 );
             }
+            Some(cmd) = attack_rx.recv() => {
+                handle_attack_command(cmd, &mut cluster, &server_state, current_config.seed).await;
+            }
         }
     }
 
@@ -253,6 +266,82 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _ = tokio::time::timeout(std::time::Duration::from_secs(5), aggregator_handle).await;
     tracing::info!("cluster shut down");
     Ok(())
+}
+
+/// Drive a runtime attack-trigger command from the HTTP server.
+///
+/// For `Start`: installs the requested behaviour on the freshly-resolved
+/// node set.  The HTTP handler rejects with 409 when an attack is
+/// already active, but a narrow race window exists between that read
+/// and the main loop's apply — so we re-check here and drop the
+/// command if the slot has filled in the meantime.  For `Stop`: every
+/// node in the active set is reset and the server state is cleared.
+/// All writes go through `send_config_update_to`, which talks to each
+/// child via the same stdin pipe used by `update-config`.
+async fn handle_attack_command(
+    cmd: server::AttackCommand,
+    cluster: &mut RunningCluster,
+    server_state: &Arc<server::ServerState>,
+    seed: Option<u64>,
+) {
+    match cmd {
+        server::AttackCommand::Start(request) => {
+            if server_state.active_attack.read().await.is_some() {
+                tracing::warn!(
+                    selection = ?request.selection,
+                    "attack start raced past the 409 check; dropping (an attack \
+                     is already active — POST /api/attack/stop first)"
+                );
+                return;
+            }
+
+            let stakes = server_state.stakes.read().await.clone();
+            let indices: Vec<usize> =
+                topology::resolve_selection(&request.selection, &stakes, seed)
+                    .into_iter()
+                    .collect();
+            if indices.is_empty() {
+                tracing::warn!(
+                    selection = ?request.selection,
+                    "attack start resolved to zero nodes; clearing active-attack state"
+                );
+                *server_state.active_attack.write().await = None;
+                return;
+            }
+            let update_json = serde_json::json!({ "behaviour": request.behaviour });
+            cluster.pm.send_config_update_to(&indices, &update_json).await;
+
+            let started_at_s = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs_f64())
+                .unwrap_or(0.0);
+            let active = config::ActiveAttack {
+                behaviour: request.behaviour,
+                selection: request.selection,
+                indices: indices.clone(),
+                started_at_s,
+            };
+            tracing::info!(
+                indices = ?indices,
+                behaviour = ?active.behaviour,
+                "runtime attack installed"
+            );
+            *server_state.active_attack.write().await = Some(active);
+        }
+        server::AttackCommand::Stop => {
+            let prior = server_state.active_attack.write().await.take();
+            if let Some(prior) = prior {
+                let reset_json = serde_json::json!({ "behaviour_reset": true });
+                cluster
+                    .pm
+                    .send_config_update_to(&prior.indices, &reset_json)
+                    .await;
+                tracing::info!(indices = ?prior.indices, "runtime attack cleared");
+            } else {
+                tracing::debug!("attack stop requested but no active attack");
+            }
+        }
+    }
 }
 
 /// Convert a dotted-key node_config map (e.g. `{"production.rb_generation_probability": 0.1}`)

@@ -216,6 +216,27 @@ pub enum BehaviourSelection {
     StakeFraction { fraction: f64 },
 }
 
+/// Request payload for `POST /api/attack`: which behaviour to install
+/// and which nodes to install it on.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AttackRequest {
+    pub behaviour: shared_consensus::behaviour::BehaviourSpec,
+    pub selection: BehaviourSelection,
+}
+
+/// State of the cluster's currently-active runtime attack, surfaced to
+/// the UI via `GET /api/attack`.  `indices` is the resolved set of
+/// node indices the attack applies to so the UI can highlight them
+/// without re-running selection logic.  `started_at_s` is seconds
+/// since UNIX epoch — same convention as event timestamps.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ActiveAttack {
+    pub behaviour: shared_consensus::behaviour::BehaviourSpec,
+    pub selection: BehaviourSelection,
+    pub indices: Vec<usize>,
+    pub started_at_s: f64,
+}
+
 impl ClusterConfig {
     /// Apply optional overrides from a control config, returning a new config.
     pub fn with_overrides(

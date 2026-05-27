@@ -20,9 +20,9 @@ pub(crate) struct ProtocolIngress {
     pub tx: mpsc::Sender<Bytes>,
     /// Shared byte counter — incremented here, decremented by ChannelRecv.
     pub counter: IngressCounter,
-    /// Shared limit — updated by protocol runner as state changes, read by
-    /// demuxer on each segment dispatch. Enforces per-state size limits at
-    /// the nearest point to the TCP socket.
+    /// Per-channel buffer cap. Fixed at registration; the demuxer
+    /// reads it on each segment dispatch to bound runaway accumulation
+    /// when the protocol consumer falls behind.
     pub limit: IngressLimit,
 }
 

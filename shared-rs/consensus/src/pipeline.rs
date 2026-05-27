@@ -40,7 +40,15 @@ pub struct EbElection {
     /// True after this node has cast its vote for this EB.
     pub voted: bool,
     /// Per-voter weight: voter_id+tag → derived weight.
-    pub voter_weights: BTreeMap<Vec<u8>, u32>,
+    ///
+    /// The unit is mode-dependent.  Under `WfaLs` the value is the
+    /// voter's seat count; under `EveryoneVotes` it is `1`; under
+    /// `StakeCentile` it is the voter's stake.  The aggregator sums
+    /// these values and compares against
+    /// `quorum_weight_fraction × expected_total_weight`, where
+    /// `expected_total_weight` is computed in the same units (see
+    /// [`crate::committee::expected_total_weight`]).
+    pub voter_weights: BTreeMap<Vec<u8>, u64>,
     /// True once quorum has been reached.
     pub quorum_reached: bool,
     /// True once `on_validated_eb` has fired for this hash on the local

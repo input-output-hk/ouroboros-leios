@@ -69,6 +69,7 @@ where
 {
     let shard_count = clocks.len();
     let mut rng = ChaChaRng::seed_from_u64(config.seed.wrapping_add(1));
+    let net_oracle = crate::rng::Rng::new(config.seed);
 
     // Set up direct NC-to-NC cross-shard routing
     if shard_count > 1 {
@@ -83,6 +84,10 @@ where
         }
     }
 
+    for network in &mut networks {
+        network.set_rng_oracle(net_oracle);
+    }
+
     // Add edges to per-shard networks
     for link_config in config.links.iter() {
         let from = link_config.nodes.0;
@@ -93,15 +98,32 @@ where
         if from_shard == to_shard {
             // Intra-shard: both directions
             networks[from_shard]
-                .set_edge_policy(from, to, link_config.latency, link_config.bandwidth_bps)
+                .set_edge_policy(
+                    from,
+                    to,
+                    link_config.latency,
+                    link_config.bandwidth_bps,
+                    link_config.use_tcp,
+                    link_config.tcp_envelope.clone(),
+                )
                 .expect("failed to set edge policy");
         } else {
             // Cross-shard: incoming connections on each target shard's NC
             networks[to_shard].add_incoming_edge(
-                from, to, link_config.latency, link_config.bandwidth_bps,
+                from,
+                to,
+                link_config.latency,
+                link_config.bandwidth_bps,
+                link_config.use_tcp,
+                link_config.tcp_envelope.clone(),
             );
             networks[from_shard].add_incoming_edge(
-                to, from, link_config.latency, link_config.bandwidth_bps,
+                to,
+                from,
+                link_config.latency,
+                link_config.bandwidth_bps,
+                link_config.use_tcp,
+                link_config.tcp_envelope.clone(),
             );
         }
     }

@@ -153,6 +153,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         rtt_cache,
         config.fetch_policy,
         behaviour_handle.clone(),
+        behaviour_spec.clone(),
     );
 
     // Transaction validator (validates received txs before mempool entry).
@@ -521,6 +522,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 // mutates the live state machines.
                                 if let Some(spec) = &update.behaviour {
                                     consensus.set_behaviour(spec, &mempool);
+                                } else if matches!(update.behaviour_reset, Some(true)) {
+                                    consensus.reset_behaviour(&mempool);
                                 }
                                 info!(node_id = %node_id, "dynamic config updated");
                             }
@@ -661,14 +664,14 @@ fn log_event(node_id: &str, event: &NetworkEvent) {
         NetworkEvent::TransactionReceived { peer_id, body } => {
             // Accumulate received tx into local mempool for block inclusion.
             // (The tx was already received via TxSubmission from a peer.)
-            info!(node_id, %peer_id, bytes = body.len(), "transaction received");
+            tracing::debug!(node_id, %peer_id, bytes = body.len(), "transaction received");
         }
         NetworkEvent::PeersDiscovered { peers, .. } => {
             info!(node_id, count = peers.len(), "peers discovered");
         }
         NetworkEvent::PeerSnapshot { .. } => {} // handled by telemetry
         _ => {
-            info!(node_id, event = ?event, "network event");
+            tracing::debug!(node_id, event = ?event, "network event");
         }
     }
 }

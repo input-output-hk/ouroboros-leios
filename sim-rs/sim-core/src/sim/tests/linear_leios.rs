@@ -42,8 +42,12 @@ fn new_sim_config_with(
         value: tx_size as f64,
     };
     params.tx_max_size_bytes = tx_size;
-    // it takes two votes to certify an EB
-    params.vote_threshold = 2;
+    // it takes two votes to certify an EB.  Pin the committee to two
+    // virtual voters and demand 100% to reach a threshold of exactly 2,
+    // independent of the default-config probabilities.
+    params.persistent_voters = 2.0;
+    params.non_persistent_voters = 0.0;
+    params.quorum_weight_fraction = 1.0;
     customize(&mut params);
     let topology = topology.into();
     Arc::new(SimConfiguration::build(params, topology).unwrap())
@@ -106,6 +110,7 @@ fn new_node(stake: Option<u64>, producers: Vec<&'static str>) -> RawNode {
                     RawLinkInfo {
                         latency_ms: 0.0,
                         bandwidth_bytes_per_second: None,
+                        tcp_envelope: None,
                     },
                 )
             })
@@ -648,6 +653,11 @@ fn top_stake_fraction_should_select_voters() {
     let config = new_sim_config_with(topology, |params| {
         params.committee_selection_algorithm = CommitteeSelectionAlgorithm::TopStakeFraction;
         params.committee_stake_fraction_threshold = 0.75;
+        // σ_c > τ is the CIP-164 PR #1196 invariant; relax τ here
+        // since this test exercises membership selection, not quorum
+        // reachability (the make_sim_config default of 1.0 would
+        // trigger the startup check).
+        params.quorum_weight_fraction = 0.5;
     });
 
     // big (500) + medium (300) = 800 >= 750 (75% of 1000), so small is excluded
@@ -691,4 +701,94 @@ fn top_stake_fraction_should_select_voters() {
         .map(|q| q.tasks.iter().any(|t| matches!(t, CpuTask::VTBundleGenerated(..))))
         .unwrap_or(false);
     assert!(!has_vote_task, "small node should not have generated a vote");
+}
+
+/// CIP-164 PR #1196: under TopStakeFraction the per-voter contribution
+/// to a VoteBundle is the voter's own stake, and the absolute quorum
+/// threshold is `quorum_weight_fraction × total_active_stake`.
+///
+/// Topology: stakes 600/300/100, σ_c = 0.95 → all three eligible.
+/// τ = 0.75 → threshold 750 stake-units.
+/// - "big" alone (600) < 750 — no quorum.
+/// - "big" + "medium" (900) ≥ 750 — quorum.  Reached with 2/3 voters
+///   even though no single voter is a majority.
+#[test]
+fn top_stake_fraction_uses_stake_weighted_quorum() {
+    let topology = new_topology(vec![
+        ("big", new_node(Some(600), vec!["medium", "small"])),
+        ("medium", new_node(Some(300), vec!["big", "small"])),
+        ("small", new_node(Some(100), vec!["big", "medium"])),
+    ]);
+    let config = new_sim_config_with(topology, |params| {
+        params.committee_selection_algorithm = CommitteeSelectionAlgorithm::TopStakeFraction;
+        params.committee_stake_fraction_threshold = 0.95;
+        params.quorum_weight_fraction = 0.75;
+    });
+
+    // Quorum denominator is total active stake; threshold = τ × total.
+    assert_eq!(config.expected_total_weight, 1000);
+    assert_eq!(config.vote_threshold(), 750);
+
+    let mut sim = TestDriver::new_with_config(config);
+    let big = sim.id_for("big");
+    let medium = sim.id_for("medium");
+    let small = sim.id_for("small");
+
+    // big produces an RB and EB.
+    let txs: [_; 3] = sim.produce_txs(big, false);
+    for tx in &txs {
+        sim.expect_tx_sent(big, medium, tx.clone());
+        sim.expect_tx_sent(big, small, tx.clone());
+    }
+    sim.win_next_rb_lottery(big, 0);
+    sim.next_slot();
+    let (rb, eb) = sim.expect_cpu_task_matching(big, is_new_rb_task);
+    let eb = eb.expect("node did not produce EB");
+
+    sim.expect_rb_and_eb_sent(big, medium, rb.clone(), Some(eb.clone()));
+    sim.expect_rb_and_eb_sent(big, small, rb.clone(), Some(eb.clone()));
+    sim.expect_eb_validated(medium, eb.clone());
+    sim.expect_eb_validated(small, eb.clone());
+
+    sim.advance_time_to(sim.now() + (sim.config.header_diffusion_time * 3));
+
+    // Per-voter weight in the VoteBundle is the voter's stake.
+    let votes_big = sim.expect_cpu_task_matching(big, is_new_vote_task);
+    assert_eq!(*votes_big.ebs.first_key_value().unwrap().1, 600);
+    let votes_medium = sim.expect_cpu_task_matching(medium, is_new_vote_task);
+    assert_eq!(*votes_medium.ebs.first_key_value().unwrap().1, 300);
+    let votes_small = sim.expect_cpu_task_matching(small, is_new_vote_task);
+    assert_eq!(*votes_small.ebs.first_key_value().unwrap().1, 100);
+
+    // Sanity: head-count majority of small voters ({medium, small} =
+    // 2/3 of nodes) carries only 400 stake, below the 750 threshold.
+    // The PR #1196 security property is that such a coalition does
+    // NOT certify.
+    let low_stake_majority = (votes_medium.ebs.first_key_value().unwrap().1
+        + votes_small.ebs.first_key_value().unwrap().1) as u64;
+    assert!(low_stake_majority < sim.config.vote_threshold());
+}
+
+/// PR #1196 invariant σ_c > τ must be enforced at config load.
+#[test]
+fn sim_config_rejects_top_stake_fraction_when_sigma_c_le_tau() {
+    let topology = new_topology(vec![
+        ("big", new_node(Some(600), vec!["medium"])),
+        ("medium", new_node(Some(400), vec!["big"])),
+    ]);
+    let mut params: crate::config::RawParameters =
+        serde_yaml::from_slice(include_bytes!("../../../../parameters/config.default.yaml"))
+            .unwrap();
+    params.leios_variant = crate::config::LeiosVariant::LinearWithTxReferences;
+    params.committee_selection_algorithm = CommitteeSelectionAlgorithm::TopStakeFraction;
+    params.committee_stake_fraction_threshold = 0.75;
+    params.quorum_weight_fraction = 0.80; // σ_c=0.75 ≤ τ=0.80
+
+    let topology: crate::config::Topology = topology.into();
+    let err = SimConfiguration::build(params, topology).unwrap_err();
+    let msg = err.to_string();
+    assert!(
+        msg.contains("σ_c") && msg.contains("τ"),
+        "expected σ_c/τ violation, got: {msg}"
+    );
 }

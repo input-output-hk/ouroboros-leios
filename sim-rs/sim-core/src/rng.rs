@@ -117,6 +117,22 @@ impl Rng {
         self.draw_f64_01(node, slot, site) < p
     }
 
+    /// Uniform in `[0.0, 1.0)` keyed by an arbitrary hashable context. Mirror
+    /// of [`Self::draw_f64_01`] for draws that don't fit the
+    /// `(NodeId, slot, DrawSite)` shape — e.g. per-link transport events.
+    pub fn draw_f64_01_with_context<K: Hash>(&self, ctx: &K) -> f64 {
+        let bits = self.draw_u64_with_context(ctx) >> 11;
+        (bits as f64) / (1u64 << 53) as f64
+    }
+
+    /// Bernoulli trial keyed by an arbitrary hashable context. Mirror of
+    /// [`Self::draw_bool`] for contexts that don't fit the
+    /// `(NodeId, slot, DrawSite)` shape.
+    pub fn draw_bool_with_context<K: Hash>(&self, ctx: &K, p: f64) -> bool {
+        let p = p.clamp(0.0, 1.0);
+        self.draw_f64_01_with_context(ctx) < p
+    }
+
     /// Seed a one-shot `ChaChaRng` from the given context. Useful when
     /// driving code that requires a `rand::Rng` interface (e.g., a
     /// `rand_distr::Distribution::sample` call, or any function taking

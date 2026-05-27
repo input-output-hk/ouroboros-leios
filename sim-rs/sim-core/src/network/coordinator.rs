@@ -9,14 +9,16 @@ use std::{
 
 use anyhow::Result;
 use priority_queue::PriorityQueue;
+use tcp_model::LinkEnvelopeCfg;
 use tokio::{select, sync::mpsc};
 
 use crate::{
     clock::{ClockBarrier, Timestamp},
     config::NodeId,
+    rng::Rng,
 };
 
-use super::connection::Connection;
+use super::connection::{ConnectionKind, EnvelopeWiring};
 
 /// Tuple sent directly from source NC to target NC for cross-shard messages.
 pub type CrossShardDelivery<TProtocol, TMessage> = (NodeId, NodeId, TProtocol, TMessage, u64, Timestamp);
@@ -24,7 +26,7 @@ pub type CrossShardDelivery<TProtocol, TMessage> = (NodeId, NodeId, TProtocol, T
 pub struct NetworkCoordinator<TProtocol, TMessage> {
     source: mpsc::UnboundedReceiver<Message<TProtocol, TMessage>>,
     sinks: HashMap<NodeId, mpsc::UnboundedSender<(NodeId, TMessage)>>,
-    connections: HashMap<Link, Connection<TProtocol, TMessage>>,
+    connections: HashMap<Link, ConnectionKind<TProtocol, TMessage>>,
     events: PriorityQueue<Link, Reverse<Timestamp>>,
     local_nodes: HashSet<NodeId>,
     /// Per-shard delivery sinks for sending cross-shard messages directly to target NCs.
@@ -32,6 +34,9 @@ pub struct NetworkCoordinator<TProtocol, TMessage> {
     shard_lookup: Option<Arc<HashMap<NodeId, usize>>>,
     /// Receives cross-shard messages from other NCs for local timing/delivery.
     cross_shard_delivery: Option<mpsc::UnboundedReceiver<CrossShardDelivery<TProtocol, TMessage>>>,
+    /// Deterministic oracle used to seed per-message loss draws when an edge
+    /// has a tcp-envelope configured.
+    rng_oracle: Option<Rng>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -45,6 +50,8 @@ pub struct EdgeConfig {
     pub to: NodeId,
     pub latency: Duration,
     pub bandwidth_bps: Option<u64>,
+    pub use_tcp: bool,
+    pub tcp_envelope: Option<LinkEnvelopeCfg>,
 }
 
 impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> NetworkCoordinator<TProtocol, TMessage> {
@@ -58,7 +65,12 @@ impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> NetworkCoordinator<TPr
             cross_shard_targets: Vec::new(),
             shard_lookup: None,
             cross_shard_delivery: None,
+            rng_oracle: None,
         }
+    }
+
+    pub fn set_rng_oracle(&mut self, oracle: Rng) {
+        self.rng_oracle = Some(oracle);
     }
 
     /// Set up direct cross-shard routing: this NC sends directly to target NCs.
@@ -90,7 +102,26 @@ impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> NetworkCoordinator<TPr
             from: config.from,
             to: config.to,
         };
-        let connection = Connection::new(config.latency, config.bandwidth_bps);
+        let envelope = match (config.tcp_envelope, self.rng_oracle) {
+            (Some(cfg), Some(rng)) => {
+                Some(EnvelopeWiring::new(cfg, rng, config.from, config.to))
+            }
+            (Some(_), None) => {
+                debug_assert!(
+                    false,
+                    "tcp_envelope configured for link {}→{} but rng_oracle is unset; call Network::set_rng_oracle before adding edges",
+                    config.from, config.to,
+                );
+                None
+            }
+            (None, _) => None,
+        };
+        let connection = ConnectionKind::from_config(
+            config.latency,
+            config.bandwidth_bps,
+            config.use_tcp,
+            envelope,
+        );
         self.connections.insert(link, connection);
     }
 

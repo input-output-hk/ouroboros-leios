@@ -529,7 +529,7 @@ pub async fn serve_leios_notify(ln_send: CodecSend, ln_recv: CodecRecv, store: A
 
         match msg {
             LnMsg::MsgLeiosNotificationRequestNext => {
-                let pending = store.notifications_after(read_index);
+                let pending = store.notifications_after(&mut read_index);
                 if let Some(notification) = pending.first() {
                     read_index += 1;
                     let response = match notification {
@@ -554,7 +554,7 @@ pub async fn serve_leios_notify(ln_send: CodecSend, ln_recv: CodecRecv, store: A
                         if subscription.changed().await.is_err() {
                             return;
                         }
-                        let pending = store.notifications_after(read_index);
+                        let pending = store.notifications_after(&mut read_index);
                         if let Some(notification) = pending.first() {
                             read_index += 1;
                             let response = match notification {

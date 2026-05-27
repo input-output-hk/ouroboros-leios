@@ -22,7 +22,12 @@ const EMPTY_SERIES: never[] = [];
 function NodeInspector({ nodeId }: { nodeId: string }) {
   const stats = useStore((s) => s.latestStats[nodeId]);
   const topology = useStore((s) => s.topology);
+  const activeAttack = useStore((s) => s.activeAttack);
+  const attackingIndices = useStore((s) => s.attackingIndices);
   const series = useStore((s) => s.nodeTimeSeries[nodeId]) ?? EMPTY_SERIES;
+
+  const nodeIndex = topology?.nodes.find((n) => n.node_id === nodeId)?.index;
+  const isAttacking = nodeIndex != null && attackingIndices.has(nodeIndex);
 
   const addrToNode = useMemo(() => {
     const map: Record<string, string> = {};
@@ -59,6 +64,29 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
       <Typography variant="subtitle2" color="primary" gutterBottom>
         {nodeId}
       </Typography>
+
+      {isAttacking && activeAttack && (
+        <Box
+          sx={{
+            mb: 1,
+            p: 1,
+            borderRadius: 1,
+            border: "1px solid rgba(255,112,67,0.6)",
+            bgcolor: "rgba(255,112,67,0.08)",
+          }}
+        >
+          <Typography variant="caption" sx={{ color: "#ffab91", display: "block", fontWeight: 700 }}>
+            Attacking
+          </Typography>
+          <Typography variant="caption" sx={{ color: "#ffab91" }}>
+            {activeAttack.behaviour.kind}
+            {activeAttack.behaviour.kind === "rb-header-equivocator" &&
+              ` (ways=${activeAttack.behaviour.ways})`}
+            <br />
+            Since {new Date(activeAttack.started_at_s * 1000).toLocaleTimeString()}
+          </Typography>
+        </Box>
+      )}
 
       {stats ? (
         <Box sx={{ mb: 1 }}>

@@ -4,12 +4,15 @@ import { fileURLToPath } from "url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
+const uiPort = Number(process.env.UI_PORT) || 3001;
+const apiPort = Number(process.env.API_PORT) || 9100;
+
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 3001,
+    port: uiPort,
     proxy: {
-      "/api": "http://127.0.0.1:9100",
+      "/api": `http://127.0.0.1:${apiPort}`,
     },
   },
   resolve: {

@@ -82,6 +82,39 @@ function ChartIcon({ active }: { active: boolean }) {
   );
 }
 
+/** Orange-explosion burst (runtime attack trigger). */
+function AttackIcon({ active }: { active: boolean }) {
+  const color = active ? "#ff7043" : "#888";
+  const core = active ? "#ffab40" : "#aaa";
+  const cx = 12;
+  const cy = 12;
+  // Twelve alternating long/short spikes radiating from the centre.
+  const spikes = Array.from({ length: 12 }, (_, i) => {
+    const angle = (Math.PI * 2 * i) / 12;
+    const len = i % 2 === 0 ? 10 : 6;
+    const x = cx + len * Math.cos(angle);
+    const y = cy + len * Math.sin(angle);
+    return { x, y };
+  });
+  return (
+    <svg width={28} height={28} viewBox="0 0 24 24">
+      {spikes.map((p, i) => (
+        <line
+          key={i}
+          x1={cx}
+          y1={cy}
+          x2={p.x}
+          y2={p.y}
+          stroke={color}
+          strokeWidth={1.4}
+          strokeLinecap="round"
+        />
+      ))}
+      <circle cx={cx} cy={cy} r={3} fill={core} />
+    </svg>
+  );
+}
+
 /** Document icon with lines (event log). */
 function EventLogIcon({ active }: { active: boolean }) {
   const color = active ? "#90caf9" : "#aaa";
@@ -123,6 +156,9 @@ function VotingIcon({ active }: { active: boolean }) {
 interface IconSidebarProps {
   controlPanelOpen: boolean;
   onToggleControlPanel: () => void;
+  attackPanelOpen: boolean;
+  attackActive: boolean;
+  onToggleAttackPanel: () => void;
   chainTreeOpen: boolean;
   onToggleChainTree: () => void;
   chartsOpen: boolean;
@@ -136,6 +172,9 @@ interface IconSidebarProps {
 export function IconSidebar({
   controlPanelOpen,
   onToggleControlPanel,
+  attackPanelOpen,
+  attackActive,
+  onToggleAttackPanel,
   chainTreeOpen,
   onToggleChainTree,
   chartsOpen,
@@ -168,6 +207,11 @@ export function IconSidebar({
       <Tooltip title="Cluster config" placement="right">
         <IconButton onClick={onToggleControlPanel} sx={buttonSx(controlPanelOpen)}>
           <ClusterIcon active={controlPanelOpen} />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title={attackActive ? "Attack in progress" : "Attack trigger"} placement="right">
+        <IconButton onClick={onToggleAttackPanel} sx={buttonSx(attackPanelOpen)}>
+          <AttackIcon active={attackActive} />
         </IconButton>
       </Tooltip>
       <Tooltip title="Chain tree" placement="right">

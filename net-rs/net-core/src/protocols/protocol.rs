@@ -56,9 +56,13 @@ pub trait Protocol: Send + 'static {
     /// message is invalid for the current state.
     fn transition(state: &Self::State, msg: &Self::Message) -> Result<Self::State, ProtocolError>;
 
-    /// Maximum message size (bytes) allowed in the given state.
-    /// Must be nonzero — Runner will panic if this returns 0, and
-    /// the demuxer will reject all data for a protocol with limit 0.
+    /// Per-spec maximum size (bytes) of a single message in the given
+    /// state.  Enforced at codec decode time by `Runner::recv`: a
+    /// decoded message whose wire size exceeds this is a spec-violating
+    /// peer and the connection is torn down with `MuxError::Message
+    /// TooLarge`.  The demuxer's buffer cap is a separate, static value
+    /// declared at registration in `ProtocolConfig::ingress_limit`.
+    /// Must be nonzero — Runner will panic if this returns 0.
     fn size_limit(state: &Self::State) -> usize;
 
     /// Timeout for receiving a message in the given state.
@@ -108,18 +112,25 @@ pub struct Runner<P: Protocol> {
 impl<P: Protocol> Runner<P> {
     /// Create a new runner starting in the protocol's initial state.
     ///
+    /// The per-state `P::size_limit()` declares the spec's per-message
+    /// cap and is enforced at codec decode time in `recv()`.  The
+    /// demuxer's *buffer* cap is a separate, static value sized once
+    /// at protocol registration (`ProtocolConfig::ingress_limit`) to
+    /// bound runaway accumulation when a protocol consumer falls
+    /// behind; conflating it with the per-message cap races against
+    /// pipelined responses that legitimately arrive ahead of the
+    /// local state transition.
+    ///
     /// # Panics
     ///
     /// Panics if `P::size_limit()` returns 0 for the initial state. Every
     /// protocol must define a nonzero size limit for all states.
     pub fn new(role: Role, codec_send: CodecSend, codec_recv: CodecRecv) -> Self {
         let initial_state = P::initial_state();
-        let limit = P::size_limit(&initial_state);
         assert!(
-            limit > 0,
+            P::size_limit(&initial_state) > 0,
             "protocol size_limit must be nonzero for all states"
         );
-        codec_recv.set_ingress_limit(limit);
 
         Self {
             role,
@@ -170,16 +181,8 @@ impl<P: Protocol> Runner<P> {
         // Validate the transition.
         let next_state = P::transition(&self.state, msg)?;
 
-        // Send.
         self.codec_send.send(msg).await?;
-
         self.state = next_state;
-
-        // Update the demuxer's ingress limit for the new state. After
-        // sending, the remote side typically has agency and will respond,
-        // so set the limit before data arrives.
-        self.codec_recv
-            .set_ingress_limit(P::size_limit(&self.state));
 
         Ok(())
     }
@@ -205,18 +208,18 @@ impl<P: Protocol> Runner<P> {
             });
         }
 
-        // Set the demuxer's ingress limit for the current state, so
-        // oversized data is rejected at the segment level (closest to TCP).
-        self.codec_recv
-            .set_ingress_limit(P::size_limit(&self.state));
-
-        // Receive with optional timeout.
+        // Receive with optional timeout.  Codec checks the decoded
+        // message's wire size against `P::size_limit(state)` and returns
+        // `MuxError::MessageTooLarge` for spec-violating peers.
+        let max_msg_size = P::size_limit(&self.state);
         let msg: P::Message = match P::timeout(&self.state) {
-            Some(duration) => match tokio::time::timeout(duration, self.codec_recv.recv()).await {
-                Ok(result) => result?,
-                Err(_) => return Err(ProtocolError::Timeout(duration)),
-            },
-            None => self.codec_recv.recv().await?,
+            Some(duration) => {
+                match tokio::time::timeout(duration, self.codec_recv.recv(max_msg_size)).await {
+                    Ok(result) => result?,
+                    Err(_) => return Err(ProtocolError::Timeout(duration)),
+                }
+            }
+            None => self.codec_recv.recv(max_msg_size).await?,
         };
 
         // Validate the transition.

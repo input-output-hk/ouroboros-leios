@@ -3,7 +3,11 @@ use std::{
     time::Duration,
 };
 
-use crate::clock::Timestamp;
+use tcp_model::{LinkEnvelopeCfg, LinkState};
+
+use crate::{clock::Timestamp, config::NodeId, rng::Rng, tcp::TcpConnProps};
+
+use super::tcp_connection::{DEFAULT_TCP_BANDWIDTH, TcpConnection};
 
 struct MiniProtocolQueue<T> {
     queue: VecDeque<(T, u64)>,
@@ -61,6 +65,27 @@ pub struct Connection<TProtocol, TMessage> {
     latency_queue: VecDeque<(TMessage, Timestamp)>,
     last_event: Timestamp,
     next_id: u64,
+    envelope: Option<EnvelopeWiring>,
+}
+
+/// Per-link state for the analytic TCP envelope model plus the deterministic
+/// oracle and link identity used to seed loss draws.
+pub struct EnvelopeWiring {
+    pub state: LinkState,
+    pub rng: Rng,
+    pub from: NodeId,
+    pub to: NodeId,
+}
+
+impl EnvelopeWiring {
+    pub fn new(cfg: LinkEnvelopeCfg, rng: Rng, from: NodeId, to: NodeId) -> Self {
+        Self {
+            state: LinkState::new(cfg),
+            rng,
+            from,
+            to,
+        }
+    }
 }
 
 impl<TProtocol, TMessage> Connection<TProtocol, TMessage>
@@ -68,6 +93,25 @@ where
     TProtocol: Clone + Ord,
 {
     pub fn new(latency: Duration, bandwidth_bps: Option<u64>) -> Self {
+        Self::new_inner(latency, bandwidth_bps, None)
+    }
+
+    /// Constructor that attaches a [`tcp_model::LinkState`] driving slow-start,
+    /// idle-reset, and per-message loss for this directed link. Behaviour
+    /// matches [`Self::new`] exactly when the cfg is [`LinkEnvelopeCfg::disabled`].
+    pub fn with_envelope(
+        latency: Duration,
+        bandwidth_bps: Option<u64>,
+        envelope: EnvelopeWiring,
+    ) -> Self {
+        Self::new_inner(latency, bandwidth_bps, Some(envelope))
+    }
+
+    fn new_inner(
+        latency: Duration,
+        bandwidth_bps: Option<u64>,
+        envelope: Option<EnvelopeWiring>,
+    ) -> Self {
         Self {
             bandwidth_bps,
             latency,
@@ -75,7 +119,34 @@ where
             latency_queue: VecDeque::new(),
             last_event: Timestamp::zero(),
             next_id: 0,
+            envelope,
         }
+    }
+
+    /// Absolute time below which arrivals are not delivered, given the current
+    /// envelope state. `t` is returned unchanged when no stall is active or no
+    /// envelope is attached.
+    fn delivery_floor(&self, t: Timestamp) -> Timestamp {
+        let Some(env) = &self.envelope else { return t };
+        let floor_dur = env.state.delivery_floor(t - Timestamp::zero());
+        Timestamp::zero() + floor_dur
+    }
+
+    /// Fires the cold/idle envelope and the per-message loss draw for the
+    /// pending message. The loss outcome is deterministic in
+    /// `(global_seed, from, to, send_time_nanos, message_id)`.
+    fn run_on_send(&mut self, bytes: u64, now: Timestamp) {
+        let Some(env) = self.envelope.as_mut() else {
+            return;
+        };
+        let send_dur = now - Timestamp::zero();
+        let p = env.state.cfg().msg_loss_prob(bytes);
+        let loss = p > 0.0
+            && env.rng.draw_bool_with_context(
+                &("tcp_loss", env.from, env.to, send_dur, self.next_id),
+                p,
+            );
+        env.state.on_send(send_dur, bytes, loss);
     }
 
     /// Returns (message_count, total_bytes) across all bandwidth and latency queues.
@@ -93,9 +164,12 @@ where
 
     pub fn send(&mut self, message: TMessage, bytes: u64, miniprotocol: TProtocol, now: Timestamp) {
         if self.bandwidth_bps.is_none() {
-            self.latency_queue.push_back((message, now + self.latency));
+            self.run_on_send(bytes, now);
+            let arrival = self.delivery_floor(now + self.latency);
+            self.latency_queue.push_back((message, arrival));
         } else {
             self.update_bandwidth_queues(now);
+            self.run_on_send(bytes, now);
             self.bandwidth_queues
                 .entry(miniprotocol)
                 .or_default()
@@ -113,15 +187,14 @@ where
             .values()
             .filter_map(|q| q.bytes_in_next_message())
             .min()?;
-        Some(
-            self.last_event
-                + compute_bandwidth_delay(
-                    self.bandwidth_bps?,
-                    self.bandwidth_queues.len() as u64,
-                    bytes_left,
-                )
-                + self.latency,
-        )
+        let raw = self.last_event
+            + compute_bandwidth_delay(
+                self.bandwidth_bps?,
+                self.bandwidth_queues.len() as u64,
+                bytes_left,
+            )
+            + self.latency;
+        Some(self.delivery_floor(raw))
     }
 
     pub fn recv_many(&mut self, now: Timestamp) -> Vec<(TMessage, Timestamp)> {
@@ -142,14 +215,42 @@ where
             return;
         }
 
-        let mut bytes_to_consume =
-            (now - self.last_event).as_micros() as u64 * total_bps / 1_000_000;
+        // Total bytes the link could push over [last_event, now]. With no
+        // envelope this is `bps * elapsed`; with an envelope it integrates
+        // `bps * bw_mult(s)` so that slow-start, idle reset and loss-stall
+        // bandwidth dips are honoured.
+        let mut bytes_to_consume = match &self.envelope {
+            Some(env) => env.state.bytes_deliverable(
+                total_bps,
+                self.last_event - Timestamp::zero(),
+                now - Timestamp::zero(),
+            ),
+            None => (now - self.last_event).as_micros() as u64 * total_bps / 1_000_000,
+        };
 
         let mut messages_received = vec![];
         while bytes_to_consume > 0 && !self.bandwidth_queues.is_empty() {
             let queues = self.bandwidth_queues.len() as u64;
             let bytes_per_queue = self.split_bytes_amongst_queues(bytes_to_consume);
-            let total_bytes_consumed = bytes_per_queue.values().copied().sum();
+            let total_bytes_consumed: u64 = bytes_per_queue.values().copied().sum();
+
+            let envelope = self.envelope.as_ref();
+            let latency = self.latency;
+            let round_t0 = self.last_event;
+            let envelope_active = envelope.is_some_and(|e| e.state.has_active_envelopes());
+            let arrival_after = |link_bytes: u64| -> Timestamp {
+                if !envelope_active {
+                    return round_t0 + compute_bandwidth_delay(total_bps, 1, link_bytes) + latency;
+                }
+                let env = envelope.unwrap();
+                let t = env.state.invert_bytes_deliverable(
+                    total_bps,
+                    link_bytes,
+                    round_t0 - Timestamp::zero(),
+                    now - Timestamp::zero(),
+                );
+                Timestamp::zero() + t + latency
+            };
 
             self.bandwidth_queues.retain(|key, queue| {
                 let mut bytes_consumed = 0;
@@ -158,25 +259,24 @@ where
                 };
                 for (message, size) in queue.consume(bytes_to_consume_next) {
                     bytes_consumed += size;
-                    messages_received.push((
-                        message,
-                        self.last_event
-                            + compute_bandwidth_delay(total_bps, queues, bytes_consumed)
-                            + self.latency,
-                    ));
+                    messages_received.push((message, arrival_after(bytes_consumed * queues)));
                 }
                 bytes_to_consume -= bytes_to_consume_next;
                 !queue.is_empty()
             });
-            self.last_event += compute_bandwidth_delay(total_bps, 1, total_bytes_consumed);
+            // Advance last_event by the time taken to consume the whole pool
+            // (so the next iteration of this loop sees the correct t0).
+            self.last_event = arrival_after(total_bytes_consumed) - self.latency;
         }
         messages_received.sort_by_key(|((id, _), ts)| (*ts, *id));
         for ((_, message), arrival) in messages_received {
-            self.latency_queue.push_back((message, arrival));
+            let clamped = self.delivery_floor(arrival);
+            self.latency_queue.push_back((message, clamped));
         }
 
         self.last_event = now;
     }
+
 
     fn split_bytes_amongst_queues(&self, bytes: u64) -> BTreeMap<TProtocol, u64> {
         let mut queue_bytes: Vec<(&TProtocol, u64)> = self
@@ -543,5 +643,163 @@ mod tests {
             ],
         );
         assert_eq!(conn.next_arrival_time(), None);
+    }
+
+    fn envelope_for(latency: Duration, bps: u64, loss_p: f64) -> super::EnvelopeWiring {
+        use crate::config::NodeId;
+        use tcp_model::LinkEnvelopeCfg;
+        let mut cfg = LinkEnvelopeCfg::defaults_for(latency, bps);
+        cfg.loss_prob_per_segment = loss_p;
+        super::EnvelopeWiring::new(cfg, crate::rng::Rng::new(0xC0FFEE), NodeId::new(1), NodeId::new(2))
+    }
+
+    #[test]
+    fn envelope_slow_start_delays_cold_message_vs_no_envelope() {
+        let latency = Duration::from_millis(150);
+        let bps = 1_000_000u64;
+        let far_future = Timestamp::zero() + Duration::from_secs(20);
+
+        let mut warm = Connection::<MiniProtocol, &'static str>::new(latency, Some(bps));
+        warm.send("m", 1_000_000, MiniProtocol::One, Timestamp::zero());
+        let warm_arrival = warm.recv_many(far_future)[0].1;
+
+        let mut cold = Connection::with_envelope(latency, Some(bps), envelope_for(latency, bps, 0.0));
+        cold.send("m", 1_000_000, MiniProtocol::One, Timestamp::zero());
+        let cold_arrival = cold.recv_many(far_future)[0].1;
+
+        // Warm pipe: 1MB / 1MB/s + 150ms ≈ 1.15s. Cold pipe: slow-start ramp
+        // pushes it noticeably later.
+        assert!(
+            cold_arrival > warm_arrival + Duration::from_millis(500),
+            "cold {cold_arrival:?} vs warm {warm_arrival:?} delta too small"
+        );
+    }
+
+    #[test]
+    fn envelope_loss_pushes_arrival_to_delivery_floor() {
+        let latency = Duration::from_millis(150);
+        let bps = 1_000_000u64;
+        let mut conn = Connection::with_envelope(latency, Some(bps), envelope_for(latency, bps, 1.0));
+        let send_at = Timestamp::zero() + Duration::from_millis(100);
+        conn.send("m", 1500, MiniProtocol::One, send_at);
+        let arrival = conn.recv_many(send_at + Duration::from_secs(5))[0].1;
+        // Loss certain → stall window = RTO = max(1s, 2*latency) = 1s.
+        let floor = send_at + Duration::from_secs(1);
+        assert!(arrival >= floor, "arrival {arrival:?} below floor {floor:?}");
+    }
+
+    #[test]
+    fn envelope_disabled_matches_no_envelope_byte_for_byte() {
+        use tcp_model::LinkEnvelopeCfg;
+        let latency = Duration::from_millis(10);
+        let bps = 1_000u64;
+
+        let mut plain = Connection::<MiniProtocol, &'static str>::new(latency, Some(bps));
+        let wiring = super::EnvelopeWiring::new(
+            LinkEnvelopeCfg::disabled(),
+            crate::rng::Rng::new(0),
+            crate::config::NodeId::new(1),
+            crate::config::NodeId::new(2),
+        );
+        let mut env = Connection::with_envelope(latency, Some(bps), wiring);
+
+        let start = Timestamp::zero() + Duration::from_secs(1);
+        for (i, p) in [MiniProtocol::One, MiniProtocol::Two, MiniProtocol::Three].into_iter().enumerate() {
+            let when = start + Duration::from_millis(50 * i as u64);
+            plain.send("m", 100, p.clone(), when);
+            env.send("m", 100, p, when);
+        }
+        let later = start + Duration::from_secs(5);
+        let plain_msgs = plain.recv_many(later);
+        let env_msgs = env.recv_many(later);
+        assert_eq!(plain_msgs.len(), env_msgs.len());
+        for ((pm, pt), (em, et)) in plain_msgs.iter().zip(env_msgs.iter()) {
+            assert_eq!(pm, em);
+            assert_eq!(pt, et, "envelope-disabled arrival diverged from baseline");
+        }
+    }
+}
+
+// ── Connection kind ───────────────────────────────────────────────────────────
+
+/// Either a bandwidth-sharing connection or a TCP congestion-window connection.
+///
+/// Both present the same interface so the rest of the network layer can treat
+/// them uniformly.
+pub enum ConnectionKind<TProtocol, TMessage> {
+    /// Fair-bandwidth-sharing model (the existing `Connection`).
+    Simple(Connection<TProtocol, TMessage>),
+    /// TCP congestion-window model (`TcpConnection`).  The `TProtocol` tag is
+    /// accepted for API compatibility but ignored — all protocols share the
+    /// single TCP stream, matching real TCP mux behaviour.
+    Tcp(TcpConnection<TMessage>),
+}
+
+impl<TProtocol: Clone + Ord, TMessage> ConnectionKind<TProtocol, TMessage> {
+    pub fn simple(latency: Duration, bandwidth_bps: Option<u64>) -> Self {
+        Self::Simple(Connection::new(latency, bandwidth_bps))
+    }
+
+    pub fn tcp(latency: Duration, bandwidth_bps: Option<u64>) -> Self {
+        let bandwidth = bandwidth_bps.unwrap_or(DEFAULT_TCP_BANDWIDTH);
+        Self::Tcp(TcpConnection::new(TcpConnProps::new(latency, bandwidth)))
+    }
+
+    pub fn from_config(
+        latency: Duration,
+        bandwidth_bps: Option<u64>,
+        use_tcp: bool,
+        envelope: Option<EnvelopeWiring>,
+    ) -> Self {
+        if use_tcp {
+            debug_assert!(
+                envelope.is_none(),
+                "use-tcp and tcp-envelope are mutually exclusive; tcp-envelope ignored",
+            );
+            Self::tcp(latency, bandwidth_bps)
+        } else {
+            match envelope {
+                Some(wiring) => Self::Simple(Connection::with_envelope(
+                    latency,
+                    bandwidth_bps,
+                    wiring,
+                )),
+                None => Self::simple(latency, bandwidth_bps),
+            }
+        }
+    }
+
+    pub fn send(
+        &mut self,
+        message: TMessage,
+        bytes: u64,
+        protocol: TProtocol,
+        now: Timestamp,
+    ) {
+        match self {
+            Self::Simple(c) => c.send(message, bytes, protocol, now),
+            Self::Tcp(c) => c.send(message, bytes, now),
+        }
+    }
+
+    pub fn next_arrival_time(&self) -> Option<Timestamp> {
+        match self {
+            Self::Simple(c) => c.next_arrival_time(),
+            Self::Tcp(c) => c.next_arrival_time(),
+        }
+    }
+
+    pub fn recv_many(&mut self, now: Timestamp) -> Vec<(TMessage, Timestamp)> {
+        match self {
+            Self::Simple(c) => c.recv_many(now),
+            Self::Tcp(c) => c.recv_many(now),
+        }
+    }
+
+    pub fn queue_stats(&self) -> (usize, u64) {
+        match self {
+            Self::Simple(c) => c.queue_stats(),
+            Self::Tcp(c) => c.queue_stats(),
+        }
     }
 }

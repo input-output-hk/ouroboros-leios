@@ -1,0 +1,25 @@
+# Per-Dockerfile ignore file for net-rs/docker/Dockerfile.
+#
+# BuildKit (signalled by the `# syntax=` directive at the top of the
+# Dockerfile) picks this file up automatically and skips the repo-root
+# .dockerignore for this build. Required: the build context is the
+# whole monorepo (net-node depends on shared-rs/consensus as a sibling
+# path crate), and the legacy builder would otherwise send 108 GB.
+#
+# Strict allow-list. Everything in the build context is excluded by
+# default; only the paths un-ignored below are sent to the docker
+# daemon. When adding a path the build needs, extend the allow-list
+# below; don't relax the leading `*`.
+
+*
+
+# net-rs/docker/Dockerfile (net-node)
+!net-rs
+!shared-rs
+
+# Heavy / generated subdirs under the allow-listed roots
+net-rs/target
+net-rs/net-ui/node_modules
+net-rs/net-ui/dist
+shared-rs/target
+**/dist

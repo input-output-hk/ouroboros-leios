@@ -362,6 +362,12 @@ impl PraosConsensus {
         self.state.chain_tree_snapshot(eb_manifest_count)
     }
 
+    /// Stash the tx-count of an EB on the chain-tree node that
+    /// announced it.  See [`shared_consensus::praos::PraosState::record_announced_eb_tx_count`].
+    pub fn record_announced_eb_tx_count(&mut self, eb_hash: &[u8; 32], count: u32) {
+        self.state.record_announced_eb_tx_count(eb_hash, count);
+    }
+
     pub fn tip_hash(&self) -> Option<[u8; 32]> {
         self.state.tip_hash()
     }

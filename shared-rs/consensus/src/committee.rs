@@ -1,15 +1,23 @@
-//! Weighted Fait Accompli (wFA) persistent committee allocation.
+//! Committee selection and the per-vote weight denominator.
 //!
-//! Each node, at the same epoch boundary, runs the same deterministic
-//! stake-weighted lottery to allocate `persistent_voters` seats among the
-//! pools in the stake registry. Identical inputs → identical outputs, so
-//! every node arrives at the same persistent committee without
-//! communication.
+//! Each node, at the same epoch boundary, derives the same committee
+//! from the stake registry under the configured
+//! [`crate::config::CommitteeSelection`].  Three schemes are
+//! supported:
 //!
-//! Algorithm: independent multinomial draws from the cumulative stake
-//! distribution. A pool with stake `s` out of `T` total receives each seat
-//! with probability `s/T`; expected total seats per pool ≈ `N_pv × s/T`.
-//! High-stake pools may win multiple seats; zero-stake pools win none.
+//! - `WfaLs`: weighted Fait Accompli + Local Sortition.  Stake-weighted
+//!   lottery for persistent seats; per-EB NPV draws fill the rest.
+//!   Multi-seat per pool.
+//! - `EveryoneVotes`: every registered node gets one seat regardless
+//!   of stake.  Extreme-test mode that drives the maximum voter set.
+//! - `StakeCentile` (CIP-164 PR #1196): pools sorted by stake
+//!   descending, given one seat each until cumulative stake covers the
+//!   configured top centile.
+//!
+//! `expected_total_weight` returns the quorum denominator in the units
+//! the aggregator sums: seats (WfaLs PV+NPV), node count (Everyone),
+//! or total active stake (StakeCentile).  Per-voter weight is supplied
+//! by `Elections::weight_for`.
 
 use std::collections::BTreeMap;
 
@@ -112,21 +120,34 @@ fn top_centile_committee(
     committee
 }
 
-/// Total expected vote weight per EB across the network. Used as the
-/// denominator for the quorum threshold: `Σ weight ≥ q × this`.
-pub fn expected_committee_size(
+/// Total expected vote weight per EB across the network — the quorum
+/// denominator `Σ weight ≥ quorum_weight_fraction × this`.
+///
+/// Units are mode-dependent and must match the per-voter weights the
+/// aggregator records via `Elections::weight_for`:
+///
+/// - `WfaLs`: persistent seat count + non-persistent voter pool size.
+/// - `EveryoneVotes`: number of committee members (each weighted `1`).
+/// - `StakeCentile` (CIP-164 PR #1196): `total_active_stake` — the
+///   security property the certificate proves is "votes from pools
+///   holding ≥ τ of total active stake have signed", so the
+///   denominator is the network total, not the committee subtotal.
+pub fn expected_total_weight(
     selection: &CommitteeSelection,
     committee: &BTreeMap<String, u32>,
-) -> u32 {
-    let pv: u32 = committee.values().sum();
-    let npv = match selection {
+    total_active_stake: u64,
+) -> u64 {
+    match selection {
         CommitteeSelection::WfaLs {
             non_persistent_voters,
             ..
-        } => *non_persistent_voters,
-        _ => 0,
-    };
-    pv + npv
+        } => {
+            let pv: u64 = committee.values().map(|w| *w as u64).sum();
+            pv + *non_persistent_voters as u64
+        }
+        CommitteeSelection::EveryoneVotes => committee.values().map(|w| *w as u64).sum(),
+        CommitteeSelection::StakeCentile { .. } => total_active_stake,
+    }
 }
 
 /// Construct the deterministic NPV eligibility signature for a given
@@ -345,28 +366,38 @@ mod tests {
         assert!(!committee.contains_key("relay"));
     }
 
-    // -- expected_committee_size --------------------------------------------
+    // -- expected_total_weight ----------------------------------------------
 
     #[test]
-    fn expected_size_wfa_ls_is_pv_plus_npv() {
+    fn expected_weight_wfa_ls_is_pv_plus_npv() {
         let selection = CommitteeSelection::WfaLs {
             persistent_voters: 480,
             non_persistent_voters: 120,
         };
         let mut committee = BTreeMap::new();
         committee.insert("a".to_string(), 480u32);
-        assert_eq!(expected_committee_size(&selection, &committee), 600);
+        assert_eq!(expected_total_weight(&selection, &committee, 0), 600);
     }
 
     #[test]
-    fn expected_size_everyone_no_npv() {
+    fn expected_weight_everyone_no_npv() {
         let mut committee = BTreeMap::new();
         committee.insert("a".to_string(), 1);
         committee.insert("b".to_string(), 1);
         assert_eq!(
-            expected_committee_size(&CommitteeSelection::EveryoneVotes, &committee),
+            expected_total_weight(&CommitteeSelection::EveryoneVotes, &committee, 0),
             2
         );
+    }
+
+    #[test]
+    fn expected_weight_stake_centile_is_total_active_stake() {
+        let selection = CommitteeSelection::StakeCentile {
+            top_centile_of_stake: 0.95,
+        };
+        // Committee contents irrelevant — denominator is the network total.
+        let committee = BTreeMap::new();
+        assert_eq!(expected_total_weight(&selection, &committee, 1_000_000), 1_000_000);
     }
 
     // -- NPV eligibility ----------------------------------------------------
