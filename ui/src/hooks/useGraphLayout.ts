@@ -157,14 +157,22 @@ function forceLayout(
   const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
   const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
 
+  // Scale link distance and repulsion inversely with node count, clamped so
+  // larger topologies keep the previous (10 / -30) values that work well at
+  // ~50–100 nodes, while small ones (e.g. the 3-node proto-devnet) get
+  // enough spread to be readable.
+  const n = Math.max(1, nodeArray.length);
+  const linkDistance = Math.min(100, Math.max(10, 300 / n));
+  const chargeStrength = Math.max(-300, Math.min(-30, -1000 / n));
+
   const sim = forceSimulation<ForceNode>(nodeArray)
     .force(
       "link",
       forceLink<ForceNode, SimulationLinkDatum<ForceNode>>(linkArray)
-        .distance(10)
+        .distance(linkDistance)
         .strength(0.3),
     )
-    .force("charge", forceManyBody().strength(-30))
+    .force("charge", forceManyBody().strength(chargeStrength))
     .force("center", forceCenter(cx, cy))
     .alpha(1)
     .alphaDecay(0.05);
