@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 #
 # Build: from the repo root,
-#   docker build -f net-rs/docker/Dockerfile -t leios-net-node .
+#   docker build -f net-rs/docker/Dockerfile -t piranha-relay .
 #
 # Build context must be the repo root because net-node depends on a
 # sibling path crate at shared-rs/consensus.

@@ -21,11 +21,11 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE: ${{ github.repository }}/leios-net-node
+  IMAGE: ${{ github.repository }}/piranha-relay
 
 jobs:
   build:
-    name: "Build and publish leios-net-node"
+    name: "Build and publish piranha-relay"
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -72,5 +72,5 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event.inputs.push_image == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=leios-net-node
-          cache-to: type=gha,mode=max,scope=leios-net-node
+          cache-from: type=gha,scope=piranha-relay
+          cache-to: type=gha,mode=max,scope=piranha-relay

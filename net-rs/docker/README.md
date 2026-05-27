@@ -1,4 +1,4 @@
-# leios-net-node Docker image
+# piranha-relay Docker image
 
 Single-relay Docker image for `net-node`. Runs as a passive Leios participant: `stake = 0` and `tx_rate = 0.0`, so the node diffuses EBs, votes and EB-tx bodies for its peers without producing any blocks or transactions itself.
 
@@ -7,7 +7,7 @@ Single-relay Docker image for `net-node`. Runs as a passive Leios participant: `
 From the **repository root** (not from `net-rs/`):
 
 ```sh
-docker build -f net-rs/docker/Dockerfile -t leios-net-node .
+docker build -f net-rs/docker/Dockerfile -t piranha-relay .
 ```
 
 The build context must be the repo root because `net-node` depends on the sibling path crate at `shared-rs/consensus`. A per-Dockerfile `Dockerfile.dockerignore` next to the Dockerfile keeps the context to ~1.6 MB by allow-listing only `net-rs/` and `shared-rs/`. Requires BuildKit (signalled by `# syntax=docker/dockerfile:1.7` at the top of the Dockerfile); on Ubuntu, `sudo apt install docker-buildx` if `docker buildx version` reports the plugin missing.
@@ -39,11 +39,11 @@ Standalone relay, two outbound peers:
 
 ```sh
 docker run --rm \
-  --name leios-relay \
+  --name piranha-relay \
   -p 3001:3001 \
   -e NET_NODE_ID=relay-eu-1 \
   -e NET_NODE_PEERS="relay-a.example:3001,relay-b.example:3001" \
-  leios-net-node
+  piranha-relay
 ```
 
 With a user TOML overlay (e.g. to override telemetry sinks or enable production):
@@ -55,7 +55,7 @@ docker run --rm \
   -e NET_NODE_CONFIG=/etc/leios/user.toml \
   -e NET_NODE_ID=relay-eu-1 \
   -e NET_NODE_PEERS="relay-a.example:3001" \
-  leios-net-node
+  piranha-relay
 ```
 
 Non-default port:
@@ -65,7 +65,7 @@ docker run --rm \
   -p 4001:4001 \
   -e NET_NODE_LISTEN_PORT=4001 \
   -e NET_NODE_PEERS="relay-a.example:3001" \
-  leios-net-node
+  piranha-relay
 ```
 
 ### Container details
