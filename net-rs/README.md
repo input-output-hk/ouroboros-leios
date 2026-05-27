@@ -162,7 +162,7 @@ cargo clippy           # lint
 cargo fmt --check      # format check
 ```
 
-A Docker image is also available — see [`docker/README.md`](docker/README.md) for the build and run contract (`leios-net-node`, single passive relay, env-driven peers and listen port).
+A Docker image is also available — see [`docker/README.md`](docker/README.md) for the build and run contract (`piranha-relay`, single passive relay, env-driven peers and listen port).
 
 ## CLI Usage
 

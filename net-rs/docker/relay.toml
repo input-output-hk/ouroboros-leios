@@ -1,4 +1,4 @@
-# Relay defaults for the leios-net-node Docker image.
+# Relay defaults for the piranha-relay Docker image.
 #
 # Passive Leios participant: no block production, no tx generation,
 # Leios protocols enabled so the node can diffuse EBs, votes and
