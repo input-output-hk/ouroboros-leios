@@ -472,7 +472,10 @@ export const useStore = create<DashboardState>()((set, get) => ({
     }
 
     // Mutate ring buffer in place — no immutable copy in store state.
+    // LeiosElectionInfo is internal (drives server-side vote aggregation
+    // surfaced via the votes API); don't surface it in the event log.
     for (const e of newEvents) {
+      if (e.message.type === "LeiosElectionInfo") continue;
       if (eventRing.length >= MAX_EVENTS) eventRing.shift();
       eventRing.push(e);
     }

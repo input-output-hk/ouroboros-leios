@@ -16,7 +16,6 @@ use futures_util::stream::Stream;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tower_http::cors::CorsLayer;
 use crate::config::{ActiveAttack, AttackRequest, ClusterControlConfig};
-
 use crate::topology::Topology;
 use crate::types::{
     self, AggregatedVotesHistory, EventWindow, IngestedEvent, NodeVotes, StatsSnapshot, WINDOW_SIZE
