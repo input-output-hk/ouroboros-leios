@@ -231,6 +231,9 @@ impl LeiosStore {
     /// `ids` are `(slot, voter_id)` pairs; `data` are the corresponding
     /// opaque vote blobs (same length).
     pub fn inject_votes(&self, ids: Vec<(u64, Vec<u8>)>, data: Vec<Vec<u8>>) {
+        if ids.is_empty() {
+            return;
+        }
         let mut inner = self.inner.lock().unwrap();
         let max_in_batch = ids.iter().map(|(s, _)| *s).max().unwrap_or(0);
         for (id, blob) in ids.iter().zip(data.iter()) {
@@ -454,9 +457,7 @@ fn notification_evictable(n: &LeiosNotification, cutoff: u64) -> bool {
             Point::Specific { slot, .. } => *slot < cutoff,
             Point::Origin => true,
         },
-        LeiosNotification::VotesOffer { votes } => {
-            !votes.is_empty() && votes.iter().all(|(s, _)| *s < cutoff)
-        }
+        LeiosNotification::VotesOffer { votes } => votes.iter().all(|(s, _)| *s < cutoff),
     }
 }
 
