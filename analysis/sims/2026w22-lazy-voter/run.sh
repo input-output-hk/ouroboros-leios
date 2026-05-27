@@ -6,8 +6,10 @@
 
 set -eo pipefail
 
-BASE_DIR="/home/prc/leios/analysis/sims/2026w22-lazy-voter/NA,0.200/top-stake-fraction/topology-v2/seed-0"
-SIM_CLI="/home/prc/leios/sim-rs/target/release/sim-cli"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_DIR="$SCRIPT_DIR/NA,0.200/top-stake-fraction/topology-v2/seed-0"
+# Override with SIM_CLI=/path/to/sim-cli if your build lives elsewhere.
+SIM_CLI="${SIM_CLI:-$SCRIPT_DIR/../../../sim-rs/target/release/sim-cli}"
 NETWORK="$BASE_DIR/network.yaml"
 SLOTS=1500
 

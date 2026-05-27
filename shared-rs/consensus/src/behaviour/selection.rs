@@ -125,6 +125,10 @@ pub fn resolve_selection(
 /// from this resolver behaves the same as a hand-written
 /// [`BehaviourSpec::Composite`].
 ///
+/// `seed` is salted per item via [`child_seed`](super::registry::child_seed),
+/// so two `StakeRandom` items pick independent subsets rather than the
+/// same shuffle (or nested prefixes when their `count` differs).
+///
 /// Nodes not picked by any item are absent from the returned map; the
 /// caller treats those as honest.
 pub fn resolve_specs(
@@ -133,8 +137,9 @@ pub fn resolve_specs(
     seed: Option<u64>,
 ) -> BTreeMap<usize, BehaviourSpec> {
     let mut out: BTreeMap<usize, BehaviourSpec> = BTreeMap::new();
-    for (spec, selection) in items {
-        let picked = resolve_selection(selection, stakes, seed);
+    for (item_idx, (spec, selection)) in items.iter().enumerate() {
+        let item_seed = seed.map(|s| super::registry::child_seed(s, item_idx));
+        let picked = resolve_selection(selection, stakes, item_seed);
         for idx in picked {
             match out.remove(&idx) {
                 None => {
@@ -382,6 +387,45 @@ mod tests {
         }
         assert!(matches!(out.get(&1), Some(BehaviourSpec::LazyVoter { .. })));
         assert!(matches!(out.get(&2), Some(BehaviourSpec::LazyVoter { .. })));
+    }
+
+    #[test]
+    fn resolve_specs_salts_seed_per_item_so_stake_random_items_are_independent() {
+        // Two StakeRandom items with the same count would otherwise see
+        // the same shuffle and pick the same nodes.  Per-item salting
+        // via child_seed should give independent subsets.
+        let stakes = vec![10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+        let items = vec![
+            (
+                BehaviourSpec::LazyVoter {
+                    reason: crate::leios::NoVoteReason::Declined,
+                },
+                BehaviourSelection::StakeRandom { count: 3 },
+            ),
+            (
+                BehaviourSpec::RbHeaderEquivocator { ways: 2 },
+                BehaviourSelection::StakeRandom { count: 3 },
+            ),
+        ];
+        let out = resolve_specs(&items, &stakes, Some(7));
+        let lazy: BTreeSet<usize> = out
+            .iter()
+            .filter_map(|(idx, spec)| match spec {
+                BehaviourSpec::LazyVoter { .. } => Some(*idx),
+                _ => None,
+            })
+            .collect();
+        let equiv: BTreeSet<usize> = out
+            .iter()
+            .filter_map(|(idx, spec)| match spec {
+                BehaviourSpec::RbHeaderEquivocator { .. } => Some(*idx),
+                _ => None,
+            })
+            .collect();
+        assert_ne!(
+            lazy, equiv,
+            "two StakeRandom items with same count should select different subsets"
+        );
     }
 
     #[test]
