@@ -146,11 +146,6 @@ impl Behaviour for T22ThreatBehaviour {
         _tx_id: &crate::mempool::TxId,
         _body: &[u8],
     ) -> BehaviourOutcome<crate::mempool::MempoolEffect> {
-        let skip_process = self.hide_eb_tx_received;
-        if skip_process {
-            BehaviourOutcome::Replace(vec![])
-        } else {
-            BehaviourOutcome::Continue
-        }
+        BehaviourOutcome::Continue
     }
 }
