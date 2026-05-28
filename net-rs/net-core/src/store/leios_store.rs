@@ -8,7 +8,7 @@
 //! Server-side protocol handlers read (block lookups, vote lookups,
 //! notification subscriptions).
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::watch;
@@ -37,7 +37,8 @@ pub enum LeiosNotification {
 
 /// Per-entry byte estimate for a single notification.  Fixed-size for
 /// `BlockOffer` / `BlockTxsOffer`; sums the variable `Vec<(u64,
-/// Vec<u8>)>` payload for `VotesOffer`.
+/// Vec<u8>)>` payload for `VotesOffer`.  The leading `u64` slot tag
+/// stored in the deque is accounted for separately by the caller.
 fn notification_bytes_estimate(n: &LeiosNotification) -> usize {
     let base = std::mem::size_of::<LeiosNotification>();
     match n {
@@ -75,8 +76,18 @@ struct LeiosStoreInner {
     eb_tx_hashes: HashMap<BlockKey, Vec<[u8; 32]>>,
     /// Votes keyed by (slot, voter_id).
     votes: HashMap<(u64, Vec<u8>), Vec<u8>>,
-    /// Notification queue for the LeiosNotify server.
-    notifications: Vec<LeiosNotification>,
+    /// Notification queue for the LeiosNotify server.  Each entry is
+    /// tagged with the slot it belongs to so the slot-window retention
+    /// in `bump_version` can evict from the front efficiently.
+    notifications: VecDeque<(u64, LeiosNotification)>,
+    /// Absolute count of notifications already evicted from the front
+    /// of `notifications`.  The absolute index of `notifications[0]`
+    /// is exactly this value; `notifications_evicted +
+    /// notifications.len()` is the lifetime total ever pushed.  Used
+    /// by `notifications_after` to keep callers' `read_index` valid
+    /// across eviction (a server that falls behind the base receives
+    /// the new starting index back and fast-forwards).
+    notifications_evicted: usize,
     /// Max number of blocks to retain.
     capacity: usize,
     /// Monotonically increasing counter for change notifications.
@@ -162,7 +173,8 @@ impl LeiosStore {
                 block_txs: HashMap::new(),
                 eb_tx_hashes: HashMap::new(),
                 votes: HashMap::new(),
-                notifications: Vec::new(),
+                notifications: VecDeque::new(),
+                notifications_evicted: 0,
                 capacity,
                 version: 0,
                 max_slot: 0,
@@ -189,7 +201,7 @@ impl LeiosStore {
         inner.blocks.insert(key, block);
         inner
             .notifications
-            .push(LeiosNotification::BlockOffer { point });
+            .push_back((slot, LeiosNotification::BlockOffer { point }));
         inner.max_slot = inner.max_slot.max(slot);
         self.bump_version(&mut inner);
     }
@@ -222,7 +234,7 @@ impl LeiosStore {
         if first_injection {
             inner
                 .notifications
-                .push(LeiosNotification::BlockTxsOffer { point });
+                .push_back((slot, LeiosNotification::BlockTxsOffer { point }));
         }
         inner.max_slot = inner.max_slot.max(slot);
         self.bump_version(&mut inner);
@@ -252,7 +264,7 @@ impl LeiosStore {
         }
         inner
             .notifications
-            .push(LeiosNotification::VotesOffer { votes: ids });
+            .push_back((max_in_batch, LeiosNotification::VotesOffer { votes: ids }));
         inner.max_slot = inner.max_slot.max(max_in_batch);
         self.bump_version(&mut inner);
     }
@@ -281,7 +293,7 @@ impl LeiosStore {
             .insert(BlockKey { slot, hash }, tx_hashes);
         inner
             .notifications
-            .push(LeiosNotification::BlockTxsOffer { point });
+            .push_back((slot, LeiosNotification::BlockTxsOffer { point }));
         inner.max_slot = inner.max_slot.max(slot);
         self.bump_version(&mut inner);
     }
@@ -346,12 +358,16 @@ impl LeiosStore {
     /// Snapshot of internal map sizes — for memory diagnostics.
     pub fn stats(&self) -> LeiosStoreStats {
         let inner = self.inner.lock().unwrap();
+        // VecDeque<(u64, LeiosNotification)>: each slot of the ring buffer
+        // is sizeof((u64, LeiosNotification)) and we still need the
+        // variable VotesOffer payload from the helper.
+        let per_entry_overhead = std::mem::size_of::<(u64, LeiosNotification)>();
         let notifications_bytes_estimate = inner
             .notifications
             .iter()
-            .map(notification_bytes_estimate)
+            .map(|(_, n)| notification_bytes_estimate(n) + per_entry_overhead)
             .sum::<usize>()
-            + std::mem::size_of::<Vec<LeiosNotification>>();
+            + std::mem::size_of::<VecDeque<(u64, LeiosNotification)>>();
         LeiosStoreStats {
             blocks: inner.blocks.len(),
             block_txs: inner.block_txs.len(),
@@ -363,19 +379,53 @@ impl LeiosStore {
         }
     }
 
-    /// Get notifications after the given index (exclusive).
-    /// Index 0 means "from the beginning".
-    pub fn notifications_after(&self, after: usize) -> Vec<LeiosNotification> {
+    /// Get notifications at absolute indices ≥ `after`.  Index 0 means
+    /// "from the beginning" but only entries still retained are
+    /// returned — old slots are evicted under the same slot window as
+    /// the other store maps.  Returns `(entries, start)` where `start`
+    /// is the absolute index of `entries[0]`.  A server whose
+    /// `read_index` has fallen behind the evicted base sees
+    /// `start > read_index` and must update `read_index = start + i + 1`
+    /// after consuming entry `i`, fast-forwarding past the eviction gap.
+    pub fn notifications_after(&self, after: usize) -> (Vec<LeiosNotification>, usize) {
         let inner = self.inner.lock().unwrap();
-        if after >= inner.notifications.len() {
-            return Vec::new();
+        let base = inner.notifications_evicted;
+        let effective = after.max(base);
+        let local = effective - base;
+        if local >= inner.notifications.len() {
+            return (Vec::new(), effective);
         }
-        inner.notifications[after..].to_vec()
+        let entries: Vec<LeiosNotification> = inner
+            .notifications
+            .iter()
+            .skip(local)
+            .map(|(_, n)| n.clone())
+            .collect();
+        (entries, effective)
     }
 
-    /// Get the total number of notifications so far.
+    /// Lifetime total of notifications ever pushed, including those
+    /// since evicted by the slot window.  This is the right value for
+    /// "skip everything up to now" — a server starting fresh can set
+    /// `read_index = notification_count()` and only see future events.
     pub fn notification_count(&self) -> usize {
-        self.inner.lock().unwrap().notifications.len()
+        let inner = self.inner.lock().unwrap();
+        inner.notifications_evicted + inner.notifications.len()
+    }
+
+    /// Advance the retention clock to `current_slot`.  Triggers slot-window
+    /// eviction even when no injects are happening, so a node that stops
+    /// receiving Leios data (peer disconnects, partition) doesn't freeze
+    /// its retention window at the last seen `max_slot`.  Cluster runs
+    /// showed nodes with `slot − max_slot` of 100+ — retention stalled and
+    /// stale notifications stayed retained.  Host should call once per
+    /// wall-clock slot from its slot ticker.
+    pub fn tick_slot(&self, current_slot: u64) {
+        let mut inner = self.inner.lock().unwrap();
+        if current_slot > inner.max_slot {
+            inner.max_slot = current_slot;
+            self.bump_version(&mut inner);
+        }
     }
 
     /// Subscribe to change notifications.
@@ -400,6 +450,19 @@ impl LeiosStore {
             inner.block_txs.retain(|key, _| key.slot >= cutoff);
             inner.eb_tx_hashes.retain(|key, _| key.slot >= cutoff);
             inner.votes.retain(|(slot, _), _| *slot >= cutoff);
+            // Notifications are ordered by push time, which is not strictly
+            // ordered by slot (`max_slot` can stay the same across pushes,
+            // and `VotesOffer` carries the batch max).  But entries below
+            // the cutoff cluster at the front, so a `pop_front` loop is
+            // both safe and O(evicted) without scanning the whole deque.
+            while let Some((slot, _)) = inner.notifications.front() {
+                if *slot < cutoff {
+                    inner.notifications.pop_front();
+                    inner.notifications_evicted += 1;
+                } else {
+                    break;
+                }
+            }
         }
 
         // Capacity backstop on `blocks` (independent of slot window).
@@ -631,8 +694,8 @@ mod tests {
         store.inject_block_txs(point, b);
 
         // One BlockTxsOffer notification, not two.
-        let txs_offers = store
-            .notifications_after(0)
+        let (entries, _start) = store.notifications_after(0);
+        let txs_offers = entries
             .into_iter()
             .filter(|n| matches!(n, LeiosNotification::BlockTxsOffer { .. }))
             .count();
@@ -666,10 +729,8 @@ mod tests {
         let h0 = [0x10u8; 32];
         let h1 = [0x20u8; 32];
         let h2 = [0x30u8; 32];
-        let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(HashMap::from([(
-            h1.to_vec(),
-            vec![0xD1],
-        )])));
+        let resolver: Arc<dyn TxBodyResolver> =
+            Arc::new(StubResolver(HashMap::from([(h1.to_vec(), vec![0xD1])])));
         let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
 
         let eb_hash = [0xDDu8; 32];
@@ -729,7 +790,8 @@ mod tests {
         store.inject_block(point, vec![0x01]);
         store.inject_votes(vec![(10, vec![0x02])], vec![vec![0x03]]);
 
-        let all = store.notifications_after(0);
+        let (all, start) = store.notifications_after(0);
+        assert_eq!(start, 0);
         assert_eq!(all.len(), 2);
         assert!(matches!(
             all[0],
@@ -739,11 +801,63 @@ mod tests {
         ));
         assert!(matches!(all[1], LeiosNotification::VotesOffer { .. }));
 
-        let after_first = store.notifications_after(1);
+        let (after_first, start) = store.notifications_after(1);
+        assert_eq!(start, 1);
         assert_eq!(after_first.len(), 1);
 
-        let after_all = store.notifications_after(2);
+        let (after_all, start) = store.notifications_after(2);
+        assert_eq!(start, 2);
         assert!(after_all.is_empty());
+    }
+
+    #[test]
+    fn notifications_evict_on_slot_window() {
+        // Tight retention window — anything older than 5 slots behind
+        // max_slot gets evicted on each bump.
+        let (store, _rx) = LeiosStore::new_with_retention(1000, None, 5, 0);
+
+        // Push three notifications at slot 1.
+        store.inject_block(
+            Point::Specific {
+                slot: 1,
+                hash: [0x11; 32],
+            },
+            vec![0xB0],
+        );
+        store.inject_votes(vec![(1, vec![0xAA])], vec![vec![0x01]]);
+        store.record_eb_manifest(
+            Point::Specific {
+                slot: 1,
+                hash: [0x22; 32],
+            },
+            vec![[0xCC; 32]],
+        );
+        assert_eq!(store.notification_count(), 3);
+
+        // Advance the clock past the retention window.
+        // max_slot becomes 100; cutoff = 95; slot=1 entries evicted.
+        store.inject_block(
+            Point::Specific {
+                slot: 100,
+                hash: [0x33; 32],
+            },
+            vec![0xD0],
+        );
+
+        // The three slot-1 entries have been popped from the front;
+        // only the slot-100 notification remains in the deque.
+        let (entries, start) = store.notifications_after(0);
+        assert_eq!(start, 3, "evicted base should be exposed to the caller");
+        assert_eq!(entries.len(), 1);
+        assert!(matches!(entries[0], LeiosNotification::BlockOffer { .. }));
+
+        // notification_count() still reports the lifetime total of 4.
+        assert_eq!(store.notification_count(), 4);
+
+        // A consumer at read_index=0 must fast-forward to the new base.
+        let (entries, start) = store.notifications_after(2);
+        assert_eq!(start, 3);
+        assert_eq!(entries.len(), 1);
     }
 
     #[test]

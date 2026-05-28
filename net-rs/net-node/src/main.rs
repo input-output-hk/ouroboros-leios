@@ -232,6 +232,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 telem.current_slot = slot;
                 retry_counter += 1;
 
+                // Drive LeiosStore retention by wall-clock instead of by
+                // inject activity.  Cluster runs showed nodes whose
+                // `max_slot` froze 100+ slots behind wall-clock when they
+                // stopped receiving Leios data, stalling eviction and
+                // leaving stale notifications retained.
+                if let Some(store) = handle.leios_store.as_ref() {
+                    store.tick_slot(slot);
+                }
+
                 // Leios: advance pipeline phases and trigger voting.
                 if leios {
                     consensus.on_slot(slot).await;
