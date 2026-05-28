@@ -43,6 +43,7 @@ pub enum NodeEvent {
     RBReceived {
         node: String,
         slot: u64,
+        len: usize,
     },
     TXGenerated {
         node: String,
@@ -85,6 +86,7 @@ pub enum NodeEvent {
     EBReceived {
         node: String,
         slot: u64,
+        len: usize,
     },
     VotesReceived {
         node: String,
@@ -101,6 +103,11 @@ pub enum NodeEvent {
         rb_slot: u64,
         eb_slot: u64,
     },
+    LeiosElectionInfo {
+        node: String,
+        slot: u64,
+        pers_committee_member: bool,
+    },
     LeiosElectionExpired {
         node: String,
         eb_slot: u64,
@@ -113,6 +120,11 @@ pub enum NodeEvent {
         eb_slot: u64,
         reason: String,
     },
+    EBTxsReceived {
+        node: String,
+        slot: u64,
+        len: usize,
+    }
 }
 
 // ---------------------------------------------------------------------------

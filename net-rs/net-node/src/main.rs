@@ -595,12 +595,13 @@ async fn record_network_event(
                 })
                 .await;
         }
-        NetworkEvent::BlockReceived { .. } => {
+        NetworkEvent::BlockReceived { body, .. } => {
             telem.blocks_received += 1;
             telem
                 .record(NodeEvent::RBReceived {
                     node: node_id.into(),
                     slot: telem.current_slot,
+                    len: body.raw.len(),
                 })
                 .await;
         }
@@ -613,13 +614,21 @@ async fn record_network_event(
                 .emit_stats(peers, chain_tree, tip_block_no, tip_hash)
                 .await;
         }
-        NetworkEvent::LeiosBlockReceived { .. } => {
+        NetworkEvent::LeiosBlockReceived { block, .. } => {
             telem
                 .record(NodeEvent::EBReceived {
                     node: node_id.into(),
                     slot: telem.current_slot,
+                    len: block.len(),
                 })
                 .await;
+        }
+        NetworkEvent::LeiosBlockTxsReceived { transactions, .. } => {
+            telem.record(NodeEvent::EBTxsReceived {
+                node: node_id.into(),
+                slot: telem.current_slot,
+                len: transactions.len()
+            }).await
         }
         NetworkEvent::LeiosVotesReceived { ref vote_data, .. } => {
             telem

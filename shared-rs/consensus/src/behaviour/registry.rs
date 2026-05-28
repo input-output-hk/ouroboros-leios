@@ -17,7 +17,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::behaviours::{LazyVoter, RbHeaderEquivocator};
+use super::behaviours::{LazyVoter, RbHeaderEquivocator, T22ThreatBehaviour};
 use super::{Behaviour, CompositeBehaviour, HonestBehaviour};
 use crate::leios::NoVoteReason;
 
@@ -52,6 +52,14 @@ pub enum BehaviourSpec {
     LazyVoter {
         #[serde(default = "default_lazy_reason")]
         reason: NoVoteReason,
+    },
+    /// T22 threat prototype. Filters EB/TX processing using deterministic
+    /// checksum threshold policy.
+    #[serde(rename = "t22")]
+    T22 {
+        vote_threshold: u8,
+        non_voting_threshold: u8,
+        hide_eb_tx_received: bool,
     },
 }
 
@@ -102,6 +110,11 @@ pub fn build(spec: &BehaviourSpec, seed: u64) -> Box<dyn Behaviour> {
             Box::new(RbHeaderEquivocator::new(*ways, seed))
         }
         BehaviourSpec::LazyVoter { reason } => Box::new(LazyVoter { reason: *reason }),
+        BehaviourSpec::T22 {
+            vote_threshold,
+            non_voting_threshold,
+            hide_eb_tx_received,
+        } => Box::new(T22ThreatBehaviour::new(*vote_threshold, *non_voting_threshold, *hide_eb_tx_received)),
     }
 }
 
@@ -144,15 +157,31 @@ mod tests {
     #[test]
     fn composite_round_trips() {
         let spec = BehaviourSpec::Composite {
-            children: vec![BehaviourSpec::Honest, BehaviourSpec::RbHeaderEquivocator { ways: 2 }],
+            children: vec![
+                BehaviourSpec::Honest,
+                BehaviourSpec::RbHeaderEquivocator { ways: 2 },
+                BehaviourSpec::T22 {
+                    vote_threshold: 42,
+                    non_voting_threshold: 99,
+                    hide_eb_tx_received: false,
+                },
+            ],
         };
         let json = serde_json::to_string(&spec).unwrap();
         let back: BehaviourSpec = serde_json::from_str(&json).unwrap();
         match back {
             BehaviourSpec::Composite { children } => {
-                assert_eq!(children.len(), 2);
+                assert_eq!(children.len(), 3);
                 assert!(matches!(children[0], BehaviourSpec::Honest));
                 assert!(matches!(children[1], BehaviourSpec::RbHeaderEquivocator { ways: 2 }));
+                assert!(matches!(
+                    children[2],
+                    BehaviourSpec::T22 {
+                        vote_threshold: 42,
+                        non_voting_threshold: 99,
+                        hide_eb_tx_received: false
+                    }
+                ));
             }
             _ => panic!("expected Composite"),
         }

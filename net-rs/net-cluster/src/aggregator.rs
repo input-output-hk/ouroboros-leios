@@ -11,7 +11,6 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use tokio::sync::{mpsc, RwLock};
-
 use crate::types::{EventWindow, IngestedEvent};
 
 /// Run the aggregator as a tokio task.
@@ -31,14 +30,22 @@ pub async fn run(
     let mut state = AggregatorState::new(num_nodes, ordering_window_secs);
 
     let mut flush_interval = tokio::time::interval(std::time::Duration::from_secs(1));
+    let mut accumulated_before_flush = 0usize;
 
     loop {
         tokio::select! {
             batch = event_rx.recv() => {
                 match batch {
                     Some(events) => {
+                        let len = events.len();
                         state.ingest(events);
-                        state.flush_to_watermark(&mut writer, &event_window).await?;
+                        if event_rx.len() <= event_rx.capacity() / 2 {
+                            state.flush_to_watermark(&mut writer, &event_window).await?;
+                            accumulated_before_flush = 0;
+                        }
+                        else {
+                            accumulated_before_flush += len.clone();
+                        }
                     }
                     None => {
                         // Channel closed — final flush of all remaining events.
@@ -49,6 +56,12 @@ pub async fn run(
             }
             _ = flush_interval.tick() => {
                 state.flush_to_watermark(&mut writer, &event_window).await?;
+                if accumulated_before_flush > 0 {
+                    tracing::warn!(
+                        "aggregator: accumulated before flush {accumulated_before_flush}"
+                    );
+                }
+                accumulated_before_flush = 0;
             }
         }
     }
@@ -106,6 +119,7 @@ impl AggregatorState {
     fn ingest(&mut self, events: Vec<IngestedEvent>) {
         let now = Instant::now();
         for event in events {
+            // Update aggregated node stats
             // Update per-node tracking.
             let entry = self
                 .latest_per_node

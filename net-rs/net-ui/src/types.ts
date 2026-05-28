@@ -90,6 +90,12 @@ export interface ClusterControlConfig {
   node_config: Record<string, unknown>;
 }
 
+export interface AggregateVotesHistory {
+  last_slot: number;
+  node_ids: string[];
+  votes: string[];
+}
+
 // Mirrors shared_consensus::leios::NoVoteReason (kebab-case serde).
 export type NoVoteReason =
   | "late-eb"

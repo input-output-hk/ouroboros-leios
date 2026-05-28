@@ -58,6 +58,42 @@ pub struct PeerStatsEntry {
     pub bytes_received: u64,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NodeVotes {
+    pub rb_received: bool,
+    pub eb_received: bool,
+    pub vote_cast: bool,
+    pub perm_committee_member: bool,
+    pub eb_generated: bool,
+}
+
+/// Number of recent slots to keep in the aggregated votes history for the UI.
+pub const WINDOW_SIZE: u64 = 25;
+
+/// Compact structure for recent votes and eb messages history.
+/// Contains info about WINDOW_SIZE most recent slots.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AggregatedVotesHistory {
+    /// The most recent slot number for which we have aggregated votes.
+    pub last_slot: u64,
+
+    /// Indexes for nodes: sets order of nodes for `votes` strings: contains nodes-ids of
+    /// nodes, implied in `votes`
+    pub node_ids: Vec<String>,
+
+    /// Vector is indexed by slots (from most recent to the oldest). Each string contains
+    /// status for nodes (in the order of `node_ids`), encoded as a single character:
+    /// 'R' - RB received;
+    /// 'E' - EB received;
+    /// '1' - vote cast;
+    /// 'G' - EB generated + vote cast;
+    /// '*' - permanent committee member;
+    /// '.' - no events/statuses for the node from the above list.
+    /// '?' - incorrect status (e.g. vote cast without RB received).
+    /// In case of multiple statuses for a node, the max is taken: '1','G' > 'E' > 'R' > ' *' > '.'
+    pub votes: Vec<String>,
+}
+
 /// An ingested event with extracted metadata for aggregation.
 pub struct IngestedEvent {
     /// Timestamp from the event's `time_s` field.

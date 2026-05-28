@@ -1,0 +1,43 @@
+# Cluster with lazy-voter abstention pressed against the quorum threshold.
+#
+# Run with:
+#   cargo run -p net-cluster -- --config net-cluster/configs/sample-cluster-t22.toml
+#
+# Stake distribution is `mainnet-shaped`: ~71% of nodes are relays
+# (stake = 0, no votes) and ~29% are pools sharing the total stake
+# uniformly.  With `num_nodes = 30` that yields ~9 pool nodes.
+#
+# Behaviour invokes T21/T22 threat model, parameter description is given below.
+
+num_nodes = 25
+degree = 3
+min_latency_ms = 5
+max_latency_ms = 100
+
+base_config = "net-node/configs/mainnet.toml"
+base_port = 30300
+seed = 42
+output_events = "cluster-events-t22.jsonl"
+ordering_window_secs = 1.0
+aggregator_port = 9100
+stats_interval_secs = 1
+stake_distribution = "mainnet-shaped"
+rb_generation_probability = 0.05
+tx_rate = 1.0
+
+[behaviour]
+kind = "t22"
+# Threshold (average percentage, 0-100) of the committee nodes, which
+# take offered eb messages. EB messages for the remaining nodes will be dropped.
+vote_threshold = 90
+
+# Threshold (average percentage, 0-100) of the non-committee nodes
+# (non-voting nodes in Leios), which take offered eb messages.
+non_voting_threshold = 30
+
+# `True` means that disruptions touch not only eb-offered/eb-txs-offered,
+# but also eb-received/eb-txs-received (in other words, true means more disruptions).
+hide_eb_tx_received = false
+
+[behaviour_selection]
+kind = "all"

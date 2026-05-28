@@ -3,7 +3,7 @@
 //! Axum server with POST endpoints for receiving telemetry from net-node
 //! instances, and GET endpoints for the UI to query topology, stats, and events.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -15,10 +15,11 @@ use axum::Json;
 use futures_util::stream::Stream;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tower_http::cors::CorsLayer;
-
 use crate::config::{ActiveAttack, AttackRequest, ClusterControlConfig};
 use crate::topology::Topology;
-use crate::types::{self, EventWindow, IngestedEvent, StatsSnapshot};
+use crate::types::{
+    self, AggregatedVotesHistory, EventWindow, IngestedEvent, NodeVotes, StatsSnapshot, WINDOW_SIZE
+};
 
 /// Control message sent from the HTTP handlers to the main loop for
 /// the runtime attack-trigger feature.
@@ -40,6 +41,8 @@ pub struct ServerState {
     pub event_tx: mpsc::Sender<Vec<IngestedEvent>>,
     /// Latest stats per node.
     pub latest_stats: RwLock<HashMap<String, StatsSnapshot>>,
+    /// Voting aggregate statistics, by node.
+    pub aggregate_votes: RwLock<AggregatedVotes>,
     /// Cluster topology (updated on restart).
     pub topology: RwLock<Topology>,
     /// Recent events window for the UI API.
@@ -66,6 +69,102 @@ pub struct ServerState {
     pub active_attack: RwLock<Option<ActiveAttack>>,
     /// Guard against concurrent restarts.
     pub restarting: RwLock<bool>,
+}
+
+#[derive(Default)]
+pub struct AggregatedVotes {
+    /// Maps event (indexed by slot --- *TODO:* we hope that only one RB exists for a slot)
+    /// to status of the message, follow-up events, indexed by node which produced the
+    /// follow-up event:
+    /// * RBReceived;
+    /// * EBGenerated;
+    /// * EBReceived;
+    /// * Vote ('yes' if it was certified by current node);
+    /// * Member of persistent committee (for the slot) at the time of election.
+    pub events: HashMap<u64, HashMap<String, NodeVotes>>,
+    pub slots: BTreeSet<u64>,
+}
+
+impl AggregatedVotes {
+    fn update_for_slot_node<F>(&mut self, node_id: String, slot: u64, update: F)
+    where
+        F: FnOnce(&mut NodeVotes),
+    {
+        let slot_entry = self.events.entry(slot).or_default();
+        let bitmask = slot_entry.entry(node_id).or_default();
+        update(bitmask);
+    }
+
+    pub fn update_aggregated_event(&mut self, event: &IngestedEvent) {
+        let msg = &event.raw.get("message");
+        let event_type = msg.and_then(|m| m.get("type")).and_then(|t| t.as_str());
+        let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
+        let node_id = event.node_id.clone();
+        if let Some(slot) = slot {
+            match event_type {
+                Some("RBReceived") => {
+                    self.slots.insert(slot);
+                    self.update_for_slot_node(node_id, slot, |mask| {
+                        mask.rb_received = true;
+                    });
+                }
+                Some("EBReceived") => {
+                    self.slots.insert(slot);
+                    self.update_for_slot_node(node_id, slot, |mask| {
+                        mask.eb_received = true;
+                    });
+                }
+                Some("EBGenerated") => {
+                    self.slots.insert(slot);
+                    self.update_for_slot_node(node_id, slot, |mask| {
+                        mask.eb_generated = true;
+                    });
+                }
+                Some("VTBundleGenerated") => {
+                    self.slots.insert(slot);
+                    let count = msg.and_then(|m| m.get("count"));
+                    if count.and_then(|c| c.as_u64()).unwrap_or(0) > 0 {
+                        self.update_for_slot_node(node_id, slot, |mask| {
+                            mask.vote_cast = true;
+                        });
+                    }
+                }
+                Some("LeiosElectionInfo") => {
+                    let pers_committee = msg.and_then(
+                        |m| m.get("pers_committee_member")).and_then(|c| c.as_bool()
+                    );
+                    // No event happens, so no slot update needed.
+                    self.update_for_slot_node(node_id, slot, |mask| {
+                        mask.perm_committee_member = pers_committee.is_some_and(|x| x);
+                    });
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Removing old events to prevent unbounded memory growth.
+    pub fn garbage_collect(&mut self) {
+        let mut deleted_slots = 0;
+        while let Some(oldest) = self.slots.first().cloned() {
+            if self.slots.len() <= WINDOW_SIZE as usize {
+                break;
+            }
+
+            self.events.remove(&oldest);
+            self.slots.remove(&oldest);
+            deleted_slots += 1;
+        }
+
+        if deleted_slots > 0 {
+            tracing::info!(
+                "Aggregated voting GC: {deleted_slots} slots deleted, current interval: {:?}..={:?}, {} slots",
+                self.slots.first(),
+                self.slots.last(),
+                self.slots.len()
+            );
+        }
+    }
 }
 
 /// Start the telemetry HTTP server.
@@ -99,6 +198,7 @@ pub async fn start(
         stakes: RwLock::new(initial_stakes),
         active_attack: RwLock::new(None),
         restarting: RwLock::new(false),
+        aggregate_votes: RwLock::new(AggregatedVotes::default()),
     });
 
     let app = axum::Router::new()
@@ -111,6 +211,7 @@ pub async fn start(
         .route("/api/stats/:node_id", get(get_node_stats))
         .route("/api/events", get(get_events))
         .route("/api/events/stream", get(event_stream))
+        .route("/api/votes-history", get(get_votes_history)) // TODO: separate endpoint for aggregated votes?
         // Cluster control API.
         .route("/api/config", get(get_config))
         .route("/api/restart", post(restart_cluster))
@@ -156,7 +257,18 @@ fn log_interesting_event(event: &IngestedEvent) {
         }
         Some("RBReceived") => {
             let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
-            tracing::info!("{}: received block (slot {:?})", event.node_id, slot);
+            let len = msg.and_then(|m| m.get("len")).and_then(|l| l.as_u64());
+            tracing::info!("{}: received block (slot {:?}, len {:?})", event.node_id, slot, len);
+        }
+        Some("EBReceived") => {
+            let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
+            let len = msg.and_then(|m| m.get("len")).and_then(|l| l.as_u64());
+            tracing::info!("{}: received EB (slot {:?}, len {:?})", event.node_id, slot, len);
+        }
+        Some("EBTxsReceived") => {
+            let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
+            let len = msg.and_then(|m| m.get("len")).and_then(|c| c.as_u64());
+            tracing::info!("{}: received EB txs (slot {:?}, count {:?})", event.node_id, slot, len);
         }
         _ => {}
     }
@@ -175,6 +287,11 @@ async fn receive_events(
 
     for event in &events {
         log_interesting_event(event);
+        state.aggregate_votes.write().await.update_aggregated_event(event);
+    }
+
+    {
+        state.aggregate_votes.write().await.garbage_collect();
     }
 
     // Push to EventWindow immediately so the UI gets real-time events
@@ -358,6 +475,55 @@ async fn get_node_stats(
     }
 }
 
+async fn get_votes_history(
+    State(state): State<Arc<ServerState>>,
+) -> Json<AggregatedVotesHistory> {
+    let node_ids: Vec<String> = state.topology.read().await
+        .nodes.iter().map(|t| t.node_id.clone()).collect();
+
+    let votes = state.aggregate_votes.read().await;
+
+    let last_slot = votes.events.keys().max().cloned().unwrap_or(0);
+
+    // History: from newest [idx=0, slot=last_slot] to oldest [idx=WINDOW_SIZE-1,
+    //          slot=last_slot-WINDOW_SIZE+1].
+    let mut history = Vec::new();
+    for slot in ((last_slot+1).saturating_sub(WINDOW_SIZE)..=last_slot).rev() {
+        let Some(node_statuses) = votes.events.get(&slot) else {
+            history.push("".to_string());
+            continue;
+        };
+        let mut str = String::new();
+        for node_id in &node_ids {
+            // Priority: Vote > EB > RB > Committee membership.
+            // Rationale:
+            // 1. Vote cast only if all other events happened; correctness of node
+            //    behaviour is not intended to be tested here (yet).
+            // 2. This is needed for Leios debugging: so EB reception is more important than RB.
+            // 3. Committee info will be shown in empty slots, and committee does not change
+            //    often, so viewer will guess it from adjacent columns, no need to specify
+            //    this info each time.
+            str.push(match node_statuses.get(node_id) {
+                Some(NodeVotes {vote_cast: true, eb_received: true, rb_received: true, ..}) => '1',
+                Some(NodeVotes {vote_cast: true, eb_generated: true, ..}) => 'G',
+                Some(NodeVotes {eb_received: true, rb_received: true, ..}) => 'E',
+                Some(NodeVotes {rb_received: true, ..}) => 'R',
+                Some(NodeVotes {perm_committee_member: true, eb_received: false, vote_cast: false, ..}) => '*',
+                Some(NodeVotes {perm_committee_member: false, eb_received: false, vote_cast: false, ..}) => '.',
+                None => '.',
+                _ => '?'
+            });
+        }
+        history.push(str);
+    };
+
+    Json(AggregatedVotesHistory{
+        last_slot,
+        node_ids,
+        votes: history, // TODO: serialize the full history of votes
+    })
+}
+
 /// Query parameters for the events endpoint.
 #[derive(serde::Deserialize)]
 struct EventsQuery {
@@ -437,6 +603,7 @@ mod tests {
             stakes: RwLock::new(Vec::new()),
             active_attack: RwLock::new(None),
             restarting: RwLock::new(false),
+            aggregate_votes: RwLock::new(AggregatedVotes::default()),
         });
         (state, rx)
     }
@@ -699,5 +866,63 @@ mod tests {
             .unwrap();
         let events: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
         assert_eq!(events.len(), 2);
+    }
+
+    #[test]
+    fn test_garbage_collect() {
+        let mut votes = AggregatedVotes::default();
+
+        // Insert 50 slots with mixed content:
+        // - Even slots: only perm_committee_member (no real events)
+        // - Odd slots: have actual events (rb_received, and optionally eb/vote)
+        for slot in 0..50u64 {
+            votes.slots.insert(slot);
+            let mut node_map = HashMap::new();
+            if slot % 2 == 0 {
+                // Committee-only slot (no real events)
+                node_map.insert("node-0".to_string(), NodeVotes {
+                    perm_committee_member: true,
+                    rb_received: false,
+                    eb_received: false,
+                    eb_generated: false,
+                    vote_cast: false,
+                });
+            } else {
+                // Slot with real events
+                node_map.insert("node-0".to_string(), NodeVotes {
+                    perm_committee_member: true,
+                    rb_received: true,
+                    eb_received: slot >= 21,
+                    eb_generated: false,
+                    vote_cast: slot >= 31,
+                });
+            }
+            votes.events.insert(slot, node_map);
+        }
+
+        assert_eq!(votes.slots.len(), 50);
+
+        votes.garbage_collect();
+
+        // 1) Exactly WINDOW_SIZE (25) slots remain.
+        assert_eq!(votes.slots.len(), WINDOW_SIZE as usize);
+
+        // 2) Removed slots are the oldest ones, so only the newest 25 remain.
+        for slot in 0..50u64 {
+            // All elder odd slots should have been removed
+            if !votes.slots.contains(&slot) {
+                assert!(slot < *votes.slots.first().unwrap());
+                assert!(votes.events.iter().all(|(k,_v)| slot < *k));
+            }
+        }
+
+        // 3) Slots and events are in sync
+        for slot in votes.slots.iter() {
+            assert!(votes.events.contains_key(slot));
+        }
+
+        for slot in votes.events.keys() {
+            assert!(votes.slots.contains(slot));
+        }
     }
 }

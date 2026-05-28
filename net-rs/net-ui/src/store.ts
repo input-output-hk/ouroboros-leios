@@ -17,6 +17,7 @@ import {
   fetchConfig,
   restartCluster as apiRestartCluster,
   updateNodeConfig as apiUpdateNodeConfig,
+  fetchAggregatedVotesHistory,
   fetchActiveAttack,
   startAttack as apiStartAttack,
   stopAttack as apiStopAttack,
@@ -93,6 +94,10 @@ export interface DashboardState {
   loadConfig: () => Promise<void>;
   restartCluster: (config: ClusterControlConfig) => Promise<void>;
 
+  // Voting panel data (column-major: [slot][row])
+  votingMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "EBGenerated" | "VoteCast" | "Committee" | "Incorrect")[][];
+  votingSlotStart: number;
+
   // Runtime attack trigger
   activeAttack: ActiveAttack | null;
   attackingIndices: Set<number>;
@@ -133,6 +138,10 @@ export const useStore = create<DashboardState>()((set, get) => ({
   networkChainTree: [],
   networkTipCounts: {},
 
+  // Voting panel
+  votingMatrix: [],
+  votingSlotStart: 0,
+
   pollStats: async () => {
     try {
       const stats = await fetchAllStats();
@@ -143,6 +152,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
       let totalBandwidth = 0;
       let totalMessages = 0;
       let totalBlocks = 0;
+      let curSlot = 0;
       const curNodeCum: Record<string, { bandwidth: number; messages: number; blocks: number }> = {};
 
       for (const snap of Object.values(stats)) {
@@ -161,6 +171,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
             snap.blocks_produced + snap.blocks_received + snap.txs_generated,
           blocks: snap.blocks_produced,
         };
+        curSlot = snap.slot;
       }
 
       // Count distinct chain tips (forks)
@@ -223,6 +234,44 @@ export const useStore = create<DashboardState>()((set, get) => ({
 
       const curSnap = { time: now, bandwidth: totalBandwidth, messages: totalMessages, blocks: totalBlocks, forks: curForks };
 
+      const VOTING_SLOTS = 24;
+      const MAX_NODES_VOTING_PANEL = 30;
+      const topoNodes = get().topology?.nodes ?? [];
+      const nodeCount = topoNodes.length;
+
+      const aggregated_votes = await fetchAggregatedVotesHistory();
+      const votes_history = aggregated_votes.votes;
+      const votingSlotStart = aggregated_votes.last_slot;
+      let nodeIds: Record<string, number> = {};
+      for (let i = 0; i < aggregated_votes.node_ids.length; i++) {
+        nodeIds[aggregated_votes.node_ids[i]] = i;
+      }
+
+      const nextMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "EBGenerated" | "VoteCast" | "Committee" | "Incorrect")[][] = Array.from(
+        {length: VOTING_SLOTS},
+        (_, i) => {
+          // Vote events in the string are written from older slots to most recent slot.
+          // Columns are displayed in increasing order (time goes left to right).
+          // So, the order of columns should be reversed.
+          const votes = votes_history[votes_history.length - i - 1] ?? [];
+          if (votes) {
+            return topoNodes.slice(0, MAX_NODES_VOTING_PANEL).map((n) => {
+              const idx = nodeIds[n.node_id];
+              const status = votes[idx];
+              if (status === '.') return "NoEvent" as const;
+              if (status === '1') return "VoteCast" as const;
+              if (status === 'G') return "EBGenerated" as const;
+              if (status === 'E') return "EBReceived" as const;
+              if (status === 'R') return "RBReceived" as const;
+              if (status === '*') return "Committee" as const;
+              if (status === '?') return "Incorrect" as const;
+              return "NoEvent" as const;
+            });
+          }
+          return Array.from({length: nodeCount}, () => "NoEvent" as const);
+        }
+      )
+
       if (prevSnapshot) {
         const changed =
           curSnap.bandwidth !== prevSnapshot.bandwidth ||
@@ -275,10 +324,16 @@ export const useStore = create<DashboardState>()((set, get) => ({
             nodeTimeSeries: newNodeSeries,
             networkChainTree,
             networkTipCounts: tipCounts,
+            votingMatrix: nextMatrix,
+            votingSlotStart,
           }));
         } else {
           // No change — just update latestStats, don't emit a data point
-          set({ latestStats: stats, networkChainTree, networkTipCounts: tipCounts });
+          set({
+            latestStats: stats, networkChainTree, networkTipCounts: tipCounts,
+            votingMatrix: nextMatrix,
+            votingSlotStart,
+          });
         }
       } else {
         // First poll — store baseline
@@ -292,6 +347,8 @@ export const useStore = create<DashboardState>()((set, get) => ({
           prevNodeSnapshot: curNodeSnap,
           networkChainTree,
           networkTipCounts: tipCounts,
+          votingMatrix: nextMatrix,
+          votingSlotStart,
         });
       }
     } catch (e) {
@@ -415,7 +472,10 @@ export const useStore = create<DashboardState>()((set, get) => ({
     }
 
     // Mutate ring buffer in place — no immutable copy in store state.
+    // LeiosElectionInfo is internal (drives server-side vote aggregation
+    // surfaced via the votes API); don't surface it in the event log.
     for (const e of newEvents) {
+      if (e.message.type === "LeiosElectionInfo") continue;
       if (eventRing.length >= MAX_EVENTS) eventRing.shift();
       eventRing.push(e);
     }
@@ -439,6 +499,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
           newlyAnimating.push(key);
         }
       }
+
       return {
         eventVersion: s.eventVersion + 1,
         lastEventTime: maxTime,
@@ -551,6 +612,8 @@ export const useStore = create<DashboardState>()((set, get) => ({
           nodePositions: {},
           selectedNodeId: null,
           selectedEdge: null,
+          votingMatrix: [],
+          votingSlotStart: 0,
           activeAttack: null,
           attackingIndices: new Set<number>(),
         });

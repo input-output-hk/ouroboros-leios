@@ -3,6 +3,7 @@ import type {
   StatsSnapshot,
   OutputEvent,
   ClusterControlConfig,
+  AggregateVotesHistory,
   ActiveAttack,
   AttackRequest,
 } from "./types";
@@ -17,6 +18,11 @@ export async function fetchTopology(): Promise<Topology> {
 export async function fetchAllStats(): Promise<Record<string, StatsSnapshot>> {
   const res = await fetch(`${BASE}/api/stats`);
   return res.json() as Promise<Record<string, StatsSnapshot>>;
+}
+
+export async function fetchAggregatedVotesHistory(): Promise<AggregateVotesHistory> {
+  const res = await fetch(`${BASE}/api/votes-history`);
+  return res.json() as Promise<AggregateVotesHistory>;
 }
 
 export async function fetchEvents(after: number): Promise<OutputEvent[]> {
