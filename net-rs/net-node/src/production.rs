@@ -383,12 +383,14 @@ impl BlockProducer {
     }
 
     /// Run the Praos f_block lottery.  Returns true on win.  Threshold
-    /// math lives in [`shared_consensus::lottery::rb_win_threshold`]; this site
-    /// just supplies the `f64` draw.
+    /// math lives in [`shared_consensus::lottery::LotteryParams`]; this site
+    /// supplies the `u64` draw.  When a real VRF replaces the PRNG, only
+    /// the draw source changes — the integer comparison stays.
     fn run_lottery(&mut self, probability: f64) -> bool {
-        let threshold = shared_consensus::lottery::rb_win_threshold(probability, self.stake);
-        let roll: f64 = self.rng.gen();
-        roll < threshold as f64 / self.total_stake as f64
+        let params = shared_consensus::lottery::LotteryParams::new(probability);
+        let threshold = params.rb_win_threshold(self.stake, self.total_stake);
+        let draw: u64 = self.rng.gen();
+        draw < threshold
     }
 
     /// Build a fake block with valid Shelley+ CBOR structure.
@@ -714,6 +716,11 @@ mod tests {
 
     #[test]
     fn approximate_production_rate() {
+        // Expected win rate per slot is the spec-faithful Praos
+        // φ(σ) = 1 − (1 − f)^σ.  For stake=100, total_stake=1000, f=0.5:
+        // φ = 1 − 0.5^0.1 ≈ 0.0670, so ~670 wins out of 10 000 slots.
+        // Bounds span 4σ (≈100 wins) of binomial variance to keep the
+        // test stable across PRNG seeds.
         let config = ProductionConfig {
             stake: 100,
             rb_generation_probability: 0.5,
@@ -729,8 +736,8 @@ mod tests {
             })
             .count();
         assert!(
-            (400..=600).contains(&wins),
-            "wins={wins}, expected ~500 (5%)"
+            (570..=770).contains(&wins),
+            "wins={wins}, expected ~670 (6.7%)"
         );
     }
 
