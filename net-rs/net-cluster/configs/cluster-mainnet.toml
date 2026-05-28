@@ -1,0 +1,45 @@
+# 100-node degree-10 cluster, sim-matched throughput (NA, 0.200 TxMB/sec).
+#
+# Mirrors the baseline used for the documented 100/d10 NA,0.200 collapse
+# run.  Each node generates ~1.33 tx/sec at 1500 B/tx, giving
+# ~200 KB/sec aggregate cluster throughput (200_000 / 1500 / 100 ≈ 1.33).
+#
+# Run with:
+#   cargo run --release -p net-cluster -- \
+#     --config net-cluster/configs/cluster-100n-d10-NA0.200.toml \
+#     --net-node-bin target/release/net-node \
+#     --node-set transactions.tx_rate=1.33 \
+#     --node-set transactions.tx_size_min=1500 \
+#     --node-set transactions.tx_size_max=1500
+#
+# Add per-class fetch-policy overrides as additional --node-set args, e.g.:
+#     --node-set fetch_policy.eb_txs.kind=broadcast \
+#     --node-set fetch_policy.eb_txs.n=3
+
+num_nodes = 240
+degree = 7
+min_latency_ms = 5
+max_latency_ms = 250
+
+
+
+base_config = "net-node/configs/mainnet.toml"
+
+# Avoid colliding with any other cluster on the same machine.
+base_port = 30000
+
+# Reproducible topology — matches the collapse baseline.
+seed = 42
+
+output_events = "cluster-events.jsonl"
+ordering_window_secs = 1.0
+aggregator_port = 9100
+stats_interval_secs = 1
+stake_distribution = "equal"
+
+# Match the baseline RB lottery cadence.
+rb_generation_probability = 0.05
+
+[topology_source]
+kind = "yaml"
+path = "../data/simulation/pseudo-mainnet/topology-v4-mini.yaml"

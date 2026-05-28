@@ -89,7 +89,7 @@ pub struct ClusterConfig {
     pub max_latency_ms: u64,
 
     /// Where the topology comes from.  See [`TopologySource`].
-    #[serde(default)]
+    //#[serde(default)]
     pub topology_source: TopologySource,
 
     /// Path to the base net-node config (e.g. "net-node/configs/mainnet.toml").
