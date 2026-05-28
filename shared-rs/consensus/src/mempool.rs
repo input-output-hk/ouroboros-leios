@@ -131,6 +131,14 @@ pub struct MempoolState {
     /// TxSubmission server never re-announces the same tx to the same
     /// peer.
     pub peer_advertised: BTreeMap<PeerId, BTreeSet<TxId>>,
+    /// Per-peer "still owed to this peer" set — the inverse partition of
+    /// `peer_advertised` over the current mempool.  Lazily seeded on
+    /// the first peer-facing call (peek or mark), then maintained by
+    /// admit fan-out and pruned alongside `peer_advertised`.  Lets the
+    /// TxSubmission server return in `O(log P)` when the peer is
+    /// caught up, instead of scanning the entire mempool to find that
+    /// out.
+    pub peer_unannounced: BTreeMap<PeerId, BTreeSet<TxId>>,
     /// Bodies currently with the validator.  Cleared on
     /// `on_tx_validated` (body moves to `txs`) or
     /// `on_tx_validation_failed` (body dropped).
@@ -170,6 +178,7 @@ impl MempoolState {
             total_bytes: 0,
             capacity,
             peer_advertised: BTreeMap::new(),
+            peer_unannounced: BTreeMap::new(),
             pending_validation: BTreeMap::new(),
             eb_manifests: BTreeMap::new(),
             eb_pinned: BTreeMap::new(),
@@ -316,6 +325,7 @@ impl MempoolState {
     /// Drop per-peer advertised state on disconnect.
     pub fn forget_peer(&mut self, peer_id: PeerId) {
         self.peer_advertised.remove(&peer_id);
+        self.peer_unannounced.remove(&peer_id);
     }
 
     // -- Pure queries ------------------------------------------------------
@@ -350,24 +360,53 @@ impl MempoolState {
     }
 
     /// Return up to `max_count` txs not yet advertised to `peer_id`,
-    /// recording them so subsequent calls skip them.  The per-peer
-    /// advertised set is pruned automatically when txs leave the
-    /// mempool.  Hot path under TxSubmission pull traffic; the
-    /// `contains` check before the clone-and-insert avoids the heap
-    /// allocation for tx ids the peer already has.
+    /// moving each one from the per-peer "owed" set into the per-peer
+    /// "advertised" set so subsequent calls skip them.  Hot path under
+    /// TxSubmission pull traffic — when the peer is caught up the
+    /// per-peer owed set is empty and the call returns in `O(log P)`
+    /// (the BTreeMap lookup) without touching `self.txs`.
     pub fn peek_unannounced_for_peer(
         &mut self,
         peer_id: PeerId,
         max_count: usize,
     ) -> Vec<PendingTx> {
-        let mut result = Vec::with_capacity(max_count);
+        self.ensure_peer_registered(peer_id);
+        let unann = self
+            .peer_unannounced
+            .get_mut(&peer_id)
+            .expect("ensure_peer_registered");
+        if unann.is_empty() || max_count == 0 {
+            return Vec::new();
+        }
+        let to_send: Vec<TxId> = unann.iter().take(max_count).cloned().collect();
+        for id in &to_send {
+            unann.remove(id);
+        }
         let advertised = self.peer_advertised.entry(peer_id).or_default();
+        for id in &to_send {
+            advertised.insert(id.clone());
+        }
+        // Resolve bodies.  One scan over the free pool collects every
+        // id present there; eb-pinned bodies fill in for ids that have
+        // already drained out of `txs` into an EB closure.  The scan
+        // only runs when the owed set was non-empty — under steady
+        // TxSubmission traffic with a caught-up peer this branch
+        // doesn't execute at all.
+        let wanted: BTreeSet<&TxId> = to_send.iter().collect();
+        let mut result = Vec::with_capacity(to_send.len());
         for tx in &self.txs {
-            if result.len() >= max_count {
-                break;
+            if wanted.contains(&tx.tx_id) {
+                result.push(tx.clone());
+                if result.len() == to_send.len() {
+                    return result;
+                }
             }
-            if !advertised.contains(&tx.tx_id) {
-                advertised.insert(tx.tx_id.clone());
+        }
+        for id in &to_send {
+            if result.iter().any(|tx| &tx.tx_id == id) {
+                continue;
+            }
+            if let Some(tx) = self.eb_pinned.get(id) {
                 result.push(tx.clone());
             }
         }
@@ -375,15 +414,24 @@ impl MempoolState {
     }
 
     /// Mark `tx_id` as advertised to `peer_id`.  Returns `true` iff the
-    /// entry was newly inserted (the caller still needs to send the tx
-    /// body to that peer).  Used by the admit-fanout path to announce
-    /// a single just-admitted tx to every connected peer in O(log N)
-    /// per peer.
+    /// peer hadn't previously been told about `tx_id` (the caller still
+    /// needs to send the tx body to that peer).  Used by the
+    /// admit-fan-out path to announce a single just-admitted tx to
+    /// every connected peer in `O(log N)` per peer.
     pub fn mark_announced_to_peer(&mut self, peer_id: PeerId, tx_id: &TxId) -> bool {
-        self.peer_advertised
-            .entry(peer_id)
-            .or_default()
-            .insert(tx_id.clone())
+        self.ensure_peer_registered(peer_id);
+        let was_owed = self
+            .peer_unannounced
+            .get_mut(&peer_id)
+            .expect("ensure_peer_registered")
+            .remove(tx_id);
+        if was_owed {
+            self.peer_advertised
+                .entry(peer_id)
+                .or_default()
+                .insert(tx_id.clone());
+        }
+        was_owed
     }
 
     /// Drain txs from the front of the queue up to `max_bytes`.  At
@@ -449,6 +497,14 @@ impl MempoolState {
             .map(|s| s.len())
             .max()
             .unwrap_or(0);
+        let peer_unannounced_total: usize =
+            self.peer_unannounced.values().map(|s| s.len()).sum();
+        let peer_unannounced_max: usize = self
+            .peer_unannounced
+            .values()
+            .map(|s| s.len())
+            .max()
+            .unwrap_or(0);
         let eb_manifest_entries_total: usize =
             self.eb_manifests.values().map(|v| v.len()).sum();
         info!(
@@ -459,6 +515,9 @@ impl MempoolState {
             peer_advertised = self.peer_advertised.len(),
             peer_advertised_total,
             peer_advertised_max,
+            peer_unannounced = self.peer_unannounced.len(),
+            peer_unannounced_total,
+            peer_unannounced_max,
             pending_validation = self.pending_validation.len(),
             eb_manifests = self.eb_manifests.len(),
             eb_manifest_entries_total,
@@ -639,7 +698,7 @@ impl MempoolState {
                 self.total_bytes -= old.size as usize;
                 let evicted_id = old.tx_id.clone();
                 self.prune_from_peer_sets(&evicted_id);
-                info!(
+                tracing::debug!(
                     evicted = ?hex_short(&evicted_id),
                     capacity = self.capacity,
                     "mempool: evicting oldest tx to make room"
@@ -652,6 +711,11 @@ impl MempoolState {
         }
         self.total_bytes += size as usize;
         self.tx_index.insert(tx_id.clone());
+        // Fan the new id out into every known peer's "owed" set so the
+        // next TxSubmission peek returns it without rescanning `txs`.
+        for set in self.peer_unannounced.values_mut() {
+            set.insert(tx_id.clone());
+        }
         self.txs.push_back(PendingTx {
             tx_id,
             body,
@@ -663,6 +727,20 @@ impl MempoolState {
     fn prune_from_peer_sets(&mut self, tx_id: &TxId) {
         for set in self.peer_advertised.values_mut() {
             set.remove(tx_id);
+        }
+        for set in self.peer_unannounced.values_mut() {
+            set.remove(tx_id);
+        }
+    }
+
+    /// Seed the "owed" set for `peer_id` from the current mempool the
+    /// first time the peer surfaces — the catch-up backlog any new
+    /// connection inherits.  Cheap re-call: skips the clone once an
+    /// entry exists.
+    fn ensure_peer_registered(&mut self, peer_id: PeerId) {
+        if !self.peer_unannounced.contains_key(&peer_id) {
+            self.peer_unannounced
+                .insert(peer_id, self.tx_index.clone());
         }
     }
 }

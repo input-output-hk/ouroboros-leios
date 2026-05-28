@@ -675,7 +675,7 @@ impl LinearLeiosNode {
             let eb_id = *self.leios.ebs_by_rb.get(&rb_id)?;
             let votes = self.leios.votes_by_eb.get(&eb_id)?;
             let total_votes = votes.values().copied().sum::<usize>();
-            if (total_votes as u64) < self.sim_config.vote_threshold {
+            if (total_votes as u64) < self.sim_config.vote_threshold() {
                 // Not enough votes. No endorsement.
                 return None;
             }
@@ -1427,9 +1427,12 @@ impl LinearLeiosNode {
                     .count()
             }
             CommitteeSelectionAlgorithm::Everyone => 1,
+            // CIP-164 PR #1196: certificate weight is the voter's own
+            // stake; the receiver sums these and compares against
+            // `quorum_weight_fraction × total_active_stake`.
             CommitteeSelectionAlgorithm::TopStakeFraction => {
                 if self.sim_config.vote_eligible_nodes.contains(&self.id) {
-                    1
+                    self.sim_config.nodes[self.id.to_inner()].stake as usize
                 } else {
                     0
                 }

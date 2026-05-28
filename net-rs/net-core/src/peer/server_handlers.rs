@@ -8,7 +8,9 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
-use shared_consensus::behaviour::{BehaviourHandle, Outbound, OutboundDecision, OwnedOutbound};
+use shared_consensus::behaviour::{
+    BehaviourHandle, Outbound, OutboundDecision, OwnedOutbound,
+};
 
 use crate::types::{BlockBody, Point, Tip, WrappedHeader};
 
@@ -527,13 +529,9 @@ pub async fn serve_leios_notify(ln_send: CodecSend, ln_recv: CodecRecv, store: A
 
         match msg {
             LnMsg::MsgLeiosNotificationRequestNext => {
-                // `start` is the absolute index of the first returned
-                // entry. It may be > `read_index` if the store has
-                // evicted entries we hadn't yet sent; in that case we
-                // silently fast-forward past the gap.
-                let (pending, start) = store.notifications_after(read_index);
+                let pending = store.notifications_after(&mut read_index);
                 if let Some(notification) = pending.first() {
-                    read_index = start + 1;
+                    read_index += 1;
                     let response = match notification {
                         LeiosNotification::BlockOffer { point } => LnMsg::MsgLeiosBlockOffer {
                             point: point.clone(),
@@ -551,20 +549,14 @@ pub async fn serve_leios_notify(ln_send: CodecSend, ln_recv: CodecRecv, store: A
                         break;
                     }
                 } else {
-                    // No pending notifications — `notifications_after`
-                    // returned the next-write index as `start`, so set
-                    // `read_index` to it.  Without this, a long-idle
-                    // consumer would re-scan the evicted region every
-                    // wake-up (correct, just wasteful).
-                    read_index = start;
-                    // Wait for new items.
+                    // No pending notifications — wait for new items.
                     loop {
                         if subscription.changed().await.is_err() {
                             return;
                         }
-                        let (pending, start) = store.notifications_after(read_index);
+                        let pending = store.notifications_after(&mut read_index);
                         if let Some(notification) = pending.first() {
-                            read_index = start + 1;
+                            read_index += 1;
                             let response = match notification {
                                 LeiosNotification::BlockOffer { point } => {
                                     LnMsg::MsgLeiosBlockOffer {
@@ -586,8 +578,6 @@ pub async fn serve_leios_notify(ln_send: CodecSend, ln_recv: CodecRecv, store: A
                                 return;
                             }
                             break;
-                        } else {
-                            read_index = start;
                         }
                     }
                 }

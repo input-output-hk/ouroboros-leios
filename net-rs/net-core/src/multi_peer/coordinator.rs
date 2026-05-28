@@ -199,11 +199,6 @@ struct Coordinator {
     chain_store: Arc<ChainStore>,
     /// Shared Leios data store for responder peers (when leios_enabled).
     leios_store: Option<Arc<LeiosStore>>,
-    /// Per-peer chain-fragment size snapshot. Updated alongside every
-    /// `peer.fragment` mutation so the application can read fragment
-    /// memory usage for per-slot telemetry without going through the
-    /// command channel.
-    fragment_sizes: Arc<Mutex<HashMap<PeerId, usize>>>,
     /// Completed inbound duplex connections from the accept loop. The third
     /// tuple element is the RAII guard holding the per-IP slot reservation;
     /// it is stored in the new `PeerState` once the connection is added.
@@ -250,22 +245,12 @@ impl Coordinator {
             reconnect_queue: Vec::new(),
             chain_store,
             leios_store,
-            fragment_sizes: Arc::new(Mutex::new(HashMap::new())),
             inbound_connections: None,
             accept_task: None,
             ip_counts: Arc::new(Mutex::new(HashMap::new())),
             peer_provider: Arc::new(|_| Vec::new()),
             pending_removals: Vec::new(),
             leios_offer_dedup: OfferDedup::new(dedup_window),
-        }
-    }
-
-    /// Update the shared fragment-size snapshot for a peer to match its
-    /// current `ChainFragment::len()`.  Called after every mutation of
-    /// `peer.fragment` so per-slot telemetry sees a consistent view.
-    fn sync_fragment_size(&self, peer_id: PeerId, len: usize) {
-        if let Ok(mut map) = self.fragment_sizes.lock() {
-            map.insert(peer_id, len);
         }
     }
 
@@ -390,7 +375,6 @@ impl Coordinator {
                 last_rolled_back_to: None,
             },
         );
-        self.sync_fragment_size(peer_id, 0);
 
         peer_id
     }
@@ -420,14 +404,8 @@ impl Coordinator {
             }
 
             PeerEvent::IntersectionFound { point } => {
-                let new_len = if let Some(peer) = self.peers.get_mut(&peer_id) {
+                if let Some(peer) = self.peers.get_mut(&peer_id) {
                     peer.fragment.set_intersection(point.clone());
-                    Some(peer.fragment.len())
-                } else {
-                    None
-                };
-                if let Some(len) = new_len {
-                    self.sync_fragment_size(peer_id, len);
                 }
                 // Forward to consensus so it can store the intersection as
                 // the peer chain's anchor (guaranteed common ancestor).
@@ -439,17 +417,11 @@ impl Coordinator {
                 let header_point = header.point().unwrap_or(tip.point.clone());
 
                 // Update this peer's known tip and chain fragment.
-                let new_len = if let Some(peer) = self.peers.get_mut(&peer_id) {
+                if let Some(peer) = self.peers.get_mut(&peer_id) {
                     peer.tip = Some(tip.clone());
                     peer.fragment.append(header_point.clone());
                     // A fresh forward progression clears the rollback dedup.
                     peer.last_rolled_back_to = None;
-                    Some(peer.fragment.len())
-                } else {
-                    None
-                };
-                if let Some(len) = new_len {
-                    self.sync_fragment_size(peer_id, len);
                 }
 
                 // Update best tip tracker.
@@ -475,20 +447,17 @@ impl Coordinator {
                 // Per-peer dedup: if we already forwarded a rollback to
                 // this same point for this peer, don't refire — a chatty
                 // peer could otherwise flood the consensus channel.
-                let (duplicate, new_len) = if let Some(peer) = self.peers.get_mut(&peer_id) {
+                let duplicate = if let Some(peer) = self.peers.get_mut(&peer_id) {
                     peer.tip = Some(tip.clone());
                     peer.fragment.rollback_to(&point);
                     let dup = peer.last_rolled_back_to.as_ref() == Some(&point);
                     if !dup {
                         peer.last_rolled_back_to = Some(point.clone());
                     }
-                    (dup, Some(peer.fragment.len()))
+                    dup
                 } else {
-                    (false, None)
+                    false
                 };
-                if let Some(len) = new_len {
-                    self.sync_fragment_size(peer_id, len);
-                }
 
                 // If this peer's rollback lowers our best tip, update the
                 // best tip and the local chain store. This mirrors the
@@ -886,9 +855,6 @@ impl Coordinator {
 
         if let Some(peer) = self.peers.remove(&peer_id) {
             peer.task_handle.abort();
-            if let Ok(mut map) = self.fragment_sizes.lock() {
-                map.remove(&peer_id);
-            }
 
             // The per-IP slot (if any) is released automatically when
             // `peer.ip_guard` drops as the PeerState is moved out here.
@@ -1027,7 +993,6 @@ impl Coordinator {
                 last_rolled_back_to: None,
             },
         );
-        self.sync_fragment_size(peer_id, 0);
 
         peer_id
     }
@@ -1388,17 +1353,14 @@ pub fn spawn_coordinator(config: CoordinatorConfig) -> CoordinatorHandle {
         net_event_sender,
         net_cmd_receiver,
         chain_store,
-        leios_store.clone(),
+        leios_store,
     );
-    let fragment_sizes = coordinator.fragment_sizes.clone();
 
     tokio::spawn(coordinator.run());
 
     CoordinatorHandle {
         events: net_event_receiver,
         commands: net_cmd_sender,
-        leios_store,
-        fragment_sizes,
     }
 }
 

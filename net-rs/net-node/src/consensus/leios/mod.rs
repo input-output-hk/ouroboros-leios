@@ -17,7 +17,7 @@ use shared_consensus::leios::{
 };
 pub use shared_consensus::leios::EbTxMatchOutcome;
 pub use shared_consensus::pipeline::PipelineConfig;
-use shared_consensus::wfa;
+use shared_consensus::committee;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::Point;
 use rand::rngs::StdRng;
@@ -68,9 +68,12 @@ impl LeiosConsensus {
     ) -> Self {
         let total_stake: u64 = stake_registry_entries.iter().map(|e| e.stake).sum();
         let persistent_committee =
-            wfa::build_committee(&committee_selection, stake_registry_entries, committee_seed);
-        let expected_committee_size =
-            wfa::expected_committee_size(&committee_selection, &persistent_committee);
+            committee::build_committee(&committee_selection, stake_registry_entries, committee_seed);
+        let expected_total_weight = committee::expected_total_weight(
+            &committee_selection,
+            &persistent_committee,
+            total_stake,
+        );
         let persistent_seats = persistent_committee.get(&node_id).copied().unwrap_or(0);
         let stake_registry: BTreeMap<String, u64> = stake_registry_entries
             .iter()
@@ -91,20 +94,27 @@ impl LeiosConsensus {
         info!(
             node_id = %node_id,
             persistent_seats,
-            expected_committee_size,
+            expected_total_weight,
             committee_pools = persistent_committee.len(),
             "leios committee initialized"
         );
-        let elections = Elections::new(ElectionsConfig {
+        let elections_config = ElectionsConfig {
             node_id: node_id.clone(),
             pipeline,
             committee_selection,
             persistent_committee,
             stake_registry,
             total_stake,
-            expected_committee_size,
+            expected_total_weight,
             quorum_weight_fraction,
-        });
+        };
+        // σ_c > τ — CIP-164 PR #1196.  Unreachable-quorum configs
+        // produce no certificates; surface the misconfiguration at
+        // boot rather than running silently.
+        if let Err(err) = elections_config.validate() {
+            panic!("leios elections config invalid: {err}");
+        }
+        let elections = Elections::new(elections_config);
         let state = LeiosState::new(node_id, elections, voting_config, pipeline);
         Self {
             state,
@@ -814,7 +824,7 @@ mod tests {
     //
     // Under EveryoneVotes (test_leios mode) every registered pool has 1
     // PV seat, so each PV vote contributes weight 1. The 10-pool test
-    // registry yields expected_committee_size=10; quorum at 0.75 needs
+    // registry yields expected_total_weight=10; quorum at 0.75 needs
     // ≥7 distinct voters. Voter ids in tests must match registry node_ids
     // ("test", "peer-0".."peer-8") for the PV-lookup weight to be 1.
 

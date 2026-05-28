@@ -1,3 +1,2 @@
 target/
 *-events.jsonl
-cluster-events-*.jsonl

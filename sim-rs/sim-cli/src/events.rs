@@ -74,7 +74,7 @@ impl EventMonitor {
             pool_ids,
             maximum_ib_age,
             maximum_eb_age: config.max_eb_age,
-            vote_threshold: config.vote_threshold,
+            vote_threshold: config.vote_threshold(),
             events_source: LivenessMonitor::new(config, events_source),
             output_path,
             aggregate: config.aggregate_events,

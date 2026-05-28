@@ -115,22 +115,22 @@ export default function App() {
 
         {/* Voting panel slide-out — next to sidebar */}
         {votingPanelOpen && (
-          <Box sx={{
-            position: "absolute",
-            top: 42,
-            left: 48,
-            zIndex: 24,
-            backdropFilter: "blur(8px)",
-            bgcolor: "rgba(13, 27, 42, 0.5)",
-            borderRight: "1px solid rgba(255,255,255,0.08)",
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: "0 0 8px 0",
-            pointerEvents: "auto",
-          }}>
-            <VotingPanel />
-          </Box>
+            <Box sx={{
+              position: "absolute",
+              top: 42,
+              left: 48,
+              zIndex: 24,
+              backdropFilter: "blur(8px)",
+              bgcolor: "rgba(13, 27, 42, 0.5)",
+              borderRight: "1px solid rgba(255,255,255,0.08)",
+              borderBottom: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: "0 0 8px 0",
+              pointerEvents: "auto",
+            }}>
+              <VotingPanel />
+            </Box>
         )}
-        
+
         {/* Attack panel slide-out — same anchor as control panel; only one
             shows at a time because they share the same left strip. */}
         {attackPanelOpen && (

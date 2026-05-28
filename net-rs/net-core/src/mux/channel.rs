@@ -65,9 +65,10 @@ impl IngressCounter {
     }
 }
 
-/// Shared ingress limit that the protocol runner can update and the demuxer
-/// reads on each segment dispatch. Allows per-state size limits to be
-/// enforced at the demuxer level (closest to the TCP socket).
+/// Shared per-channel buffer cap that the demuxer reads on each
+/// segment dispatch.  Fixed at protocol registration in production;
+/// the atomic exists so tests can dial it down to exercise overflow
+/// handling.
 #[derive(Debug, Clone)]
 pub struct IngressLimit(pub Arc<AtomicUsize>);
 
@@ -107,9 +108,9 @@ impl ChannelRecv {
         }
     }
 
-    /// Update the demuxer's ingress limit for this protocol. Called by the
-    /// protocol runner when the state changes, so the demuxer enforces
-    /// per-state size limits at the segment level (before data is buffered).
+    /// Update the demuxer's per-channel buffer cap.  In production the
+    /// buffer cap is fixed at protocol registration; this hook exists
+    /// for tests that exercise the demuxer's overflow handling.
     pub fn set_ingress_limit(&self, limit: usize) {
         self.ingress_limit.store(limit);
     }

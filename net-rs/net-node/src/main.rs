@@ -232,15 +232,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 telem.current_slot = slot;
                 retry_counter += 1;
 
-                // Drive LeiosStore retention by wall-clock instead of by
-                // inject activity.  Cluster runs showed nodes whose
-                // `max_slot` froze 100+ slots behind wall-clock when they
-                // stopped receiving Leios data, stalling eviction and
-                // leaving stale notifications retained.
-                if let Some(store) = handle.leios_store.as_ref() {
-                    store.tick_slot(slot);
-                }
-
                 // Leios: advance pipeline phases and trigger voting.
                 if leios {
                     consensus.on_slot(slot).await;
@@ -248,33 +239,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         telem.record(ev).await;
                     }
                 }
-
-                // Per-slot memory telemetry. Counts every slot so leak rate
-                // can be computed as (max - min) / slots from JSONL without
-                // depending on run length. Cheap: nested structs, no
-                // allocations beyond the event itself.
-                let frag_sizes = {
-                    let map = handle.fragment_sizes.lock().expect("fragment_sizes poisoned");
-                    let total: usize = map.values().copied().sum();
-                    let max: usize = map.values().copied().max().unwrap_or(0);
-                    telemetry::FragmentSizes {
-                        peer_count: map.len(),
-                        fragment_total: total,
-                        fragment_max: max,
-                        // Each retained Point::Specific lives in both the
-                        // Vec and the HashSet inside the fragment.
-                        bytes_estimate: total.saturating_mul(96),
-                    }
-                };
-                let mem_event = NodeEvent::MemorySizes(Box::new(telemetry::MemorySizesPayload {
-                    node: node_id.clone(),
-                    slot,
-                    praos: consensus.praos_state_sizes(),
-                    leios: if leios { Some(consensus.leios_state_sizes()) } else { None },
-                    leios_store: handle.leios_store.as_ref().map(|s| s.stats()),
-                    fragments: frag_sizes,
-                }));
-                telem.record(mem_event).await;
 
                 // Praos: try to produce a ranking block. If the mempool
                 // overflows rb_body_max_bytes, an EB manifest is produced
@@ -700,14 +664,14 @@ fn log_event(node_id: &str, event: &NetworkEvent) {
         NetworkEvent::TransactionReceived { peer_id, body } => {
             // Accumulate received tx into local mempool for block inclusion.
             // (The tx was already received via TxSubmission from a peer.)
-            info!(node_id, %peer_id, bytes = body.len(), "transaction received");
+            tracing::debug!(node_id, %peer_id, bytes = body.len(), "transaction received");
         }
         NetworkEvent::PeersDiscovered { peers, .. } => {
             info!(node_id, count = peers.len(), "peers discovered");
         }
         NetworkEvent::PeerSnapshot { .. } => {} // handled by telemetry
         _ => {
-            info!(node_id, event = ?event, "network event");
+            tracing::debug!(node_id, event = ?event, "network event");
         }
     }
 }

@@ -1,0 +1,9 @@
+[package]
+name = "tcp-model"
+version = "0.1.0"
+edition = "2021"
+description = "Analytic envelope model of TCP transport effects (slow-start, idle reset, packet loss) for Cardano Leios network simulators."
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+smallvec = { version = "1", features = ["serde"] }

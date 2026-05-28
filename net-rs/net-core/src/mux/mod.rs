@@ -117,6 +117,9 @@ pub enum MuxError {
         capacity: usize,
     },
 
+    #[error("message too large: {size} bytes exceeds per-state spec limit {limit}")]
+    MessageTooLarge { size: usize, limit: usize },
+
     #[error("unknown protocol {0}")]
     UnknownProtocol(ProtocolId),
 

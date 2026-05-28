@@ -36,7 +36,7 @@ use crate::fetch::{
 use crate::peer::PeerId;
 use crate::pipeline::PipelineConfig;
 use crate::types::Point;
-use crate::wfa;
+use crate::committee;
 
 /// How long an in-flight fetch entry remains "active" before being
 /// considered stale and eligible for retry.
@@ -771,12 +771,12 @@ impl LeiosState {
         let npv_signature = if emit_pv || n_npv == 0 {
             None
         } else {
-            let sig = wfa::npv_eligibility_signature(
+            let sig = committee::npv_eligibility_signature(
                 self.node_id.as_bytes(),
                 eb_hash,
                 eb_slot,
             );
-            let wins = wfa::count_npv_wins(
+            let wins = committee::count_npv_wins(
                 &sig,
                 self.voting_config.stake,
                 self.voting_config.total_stake,
@@ -1373,7 +1373,7 @@ mod tests {
             persistent_committee: BTreeMap::new(),
             stake_registry: BTreeMap::new(),
             total_stake: 0,
-            expected_committee_size: 100,
+            expected_total_weight: 100,
             quorum_weight_fraction: 0.75,
         })
     }
@@ -1474,7 +1474,7 @@ mod tests {
             persistent_committee: BTreeMap::new(),
             stake_registry: BTreeMap::new(),
             total_stake: 1000,
-            expected_committee_size: 600,
+            expected_total_weight: 600,
             quorum_weight_fraction: 0.75,
         });
         let mut state = LeiosState::new("n0".into(), elections, voting, pipeline());
@@ -1517,7 +1517,7 @@ mod tests {
             persistent_committee: BTreeMap::new(),
             stake_registry: BTreeMap::new(),
             total_stake: 1000,
-            expected_committee_size: 600,
+            expected_total_weight: 600,
             quorum_weight_fraction: 0.75,
         });
         let mut state = LeiosState::new("n0".into(), elections, voting, pipeline());
@@ -1858,7 +1858,7 @@ mod tests {
             persistent_committee: persistent,
             stake_registry: BTreeMap::new(),
             total_stake: 0,
-            expected_committee_size: 100,
+            expected_total_weight: 100,
             quorum_weight_fraction: 0.75,
         });
         let mut state = LeiosState::new("n0".into(), elections, cfg(0), pipeline());

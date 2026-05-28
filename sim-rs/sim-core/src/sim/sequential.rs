@@ -16,7 +16,7 @@ use crate::{
     config::{LeiosVariant, NodeId, SimConfiguration},
     events::EventTracker,
     model::Transaction,
-    network::{connection::Connection, stats::NetworkStatsCollector},
+    network::{connection::ConnectionKind, stats::NetworkStatsCollector},
     sim::{
         MiniProtocol, NodeImpl, SimMessage as _,
         common::{CpuTaskWrapper, NodeEvent, self},
@@ -209,7 +209,7 @@ struct CrossShardState<M> {
 pub(super) struct SequentialSimulation<N: NodeImpl> {
     nodes: Vec<NodeState<N>>,
     node_indices: HashMap<NodeId, usize>,
-    connections: HashMap<Link, Connection<MiniProtocol, N::Message>>,
+    connections: HashMap<Link, ConnectionKind<MiniProtocol, N::Message>>,
     event_queue: BinaryHeap<FutureEvent<GlobalEvent<N>>>,
     pending_deliveries: HashSet<Link>,
     tx_generator: TxGeneratorCore,
@@ -550,7 +550,7 @@ impl<N: NodeImpl> SequentialSimulation<N> {
     /// shards no longer leaks into the simulation state trajectory.
     fn drain_cross_shard_safe(
         cs: &mut CrossShardState<N::Message>,
-        connections: &mut HashMap<Link, Connection<MiniProtocol, N::Message>>,
+        connections: &mut HashMap<Link, ConnectionKind<MiniProtocol, N::Message>>,
         pending_deliveries: &mut HashSet<Link>,
         event_queue: &mut BinaryHeap<FutureEvent<GlobalEvent<N>>>,
         timestamp_resolution: Duration,
@@ -589,7 +589,7 @@ impl<N: NodeImpl> SequentialSimulation<N> {
     /// `drain_cross_shard_safe`.
     fn wait_for_cross_shard_and_deliver_safe(
         cs: &mut CrossShardState<N::Message>,
-        connections: &mut HashMap<Link, Connection<MiniProtocol, N::Message>>,
+        connections: &mut HashMap<Link, ConnectionKind<MiniProtocol, N::Message>>,
         pending_deliveries: &mut HashSet<Link>,
         event_queue: &mut BinaryHeap<FutureEvent<GlobalEvent<N>>>,
         timestamp_resolution: Duration,
@@ -614,7 +614,7 @@ impl<N: NodeImpl> SequentialSimulation<N> {
 
     /// Deliver a single cross-shard message into the local connection.
     fn deliver_cross_shard_msg(
-        connections: &mut HashMap<Link, Connection<MiniProtocol, N::Message>>,
+        connections: &mut HashMap<Link, ConnectionKind<MiniProtocol, N::Message>>,
         pending_deliveries: &mut HashSet<Link>,
         event_queue: &mut BinaryHeap<FutureEvent<GlobalEvent<N>>>,
         msg: CrossShardMsg<N::Message>,
@@ -973,31 +973,30 @@ where
         }
 
         // Build connections
-        let mut connections: HashMap<Link, Connection<MiniProtocol, N::Message>> = HashMap::new();
+        let mut connections: HashMap<Link, ConnectionKind<MiniProtocol, N::Message>> = HashMap::new();
+        let net_oracle = crate::rng::Rng::new(config.seed);
+        let make_conn = |from, to, lc: &crate::config::LinkConfiguration| {
+            let envelope = lc.tcp_envelope.as_ref().map(|cfg| {
+                crate::network::connection::EnvelopeWiring::new(
+                    cfg.clone(),
+                    net_oracle,
+                    from,
+                    to,
+                )
+            });
+            ConnectionKind::from_config(lc.latency, lc.bandwidth_bps, lc.use_tcp, envelope)
+        };
         for lc in &config.links {
             let (from, to) = lc.nodes;
             let fs = shard_lookup[&from];
             let ts = shard_lookup[&to];
             if shard_count == 1 || (fs == shard_idx && ts == shard_idx) {
-                // Intra-shard (or single-shard): both directions
-                connections.insert(
-                    Link { from, to },
-                    Connection::new(lc.latency, lc.bandwidth_bps),
-                );
-                connections.insert(
-                    Link { from: to, to: from },
-                    Connection::new(lc.latency, lc.bandwidth_bps),
-                );
+                connections.insert(Link { from, to }, make_conn(from, to, lc));
+                connections.insert(Link { from: to, to: from }, make_conn(to, from, lc));
             } else if ts == shard_idx {
-                connections.insert(
-                    Link { from, to },
-                    Connection::new(lc.latency, lc.bandwidth_bps),
-                );
+                connections.insert(Link { from, to }, make_conn(from, to, lc));
             } else if fs == shard_idx {
-                connections.insert(
-                    Link { from: to, to: from },
-                    Connection::new(lc.latency, lc.bandwidth_bps),
-                );
+                connections.insert(Link { from: to, to: from }, make_conn(to, from, lc));
             }
         }
 

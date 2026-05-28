@@ -237,9 +237,12 @@ mod tests {
 
     #[test]
     fn size_limits() {
-        assert_eq!(BlockFetch::size_limit(&State::StIdle), 65_535);
-        assert_eq!(BlockFetch::size_limit(&State::StBusy), 65_535);
-        assert_eq!(BlockFetch::size_limit(&State::StStreaming), 2_500_000);
+        assert_eq!(BlockFetch::size_limit(&State::StIdle), SIZE_LIMIT_SMALL);
+        assert_eq!(BlockFetch::size_limit(&State::StBusy), SIZE_LIMIT_SMALL);
+        assert_eq!(
+            BlockFetch::size_limit(&State::StStreaming),
+            SIZE_LIMIT_STREAMING
+        );
     }
 
     #[test]

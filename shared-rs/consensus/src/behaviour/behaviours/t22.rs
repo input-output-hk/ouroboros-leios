@@ -48,7 +48,6 @@ use crate::peer::PeerId;
 use crate::types::Point;
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
-use tracing::info;
 
 #[derive(Debug, Default)]
 pub struct T22ThreatBehaviour {
@@ -67,7 +66,7 @@ impl T22ThreatBehaviour {
     }
 
     /// Returns true, if eb_data should be processed.
-    fn should_process_eb_data(&self, nm: &str, state: &LeiosState, point: &Point) -> bool {
+    fn should_process_eb_data(&self, _nm: &str, state: &LeiosState, point: &Point) -> bool {
         let persistent_seats = state.voting_config.persistent_seats;
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         if let Point::Specific { hash, .. } = point {
@@ -84,9 +83,6 @@ impl T22ThreatBehaviour {
         // `checksum % 100` yields values in 0..=99, so use `< threshold` to make
         // threshold semantics match percentages exactly: 0 => 0%, 100 => 100%.
         let decision = ((checksum % 100) as u8) < threshold;
-        info!(
-            "[T22] {nm}: decision={decision}, sum={checksum}, threshold={threshold}, persistent_seats={persistent_seats}",
-        );
         decision
     }
 }

@@ -33,7 +33,7 @@ impl LivenessMonitor {
             ibs: BTreeMap::new(),
             ebs: BTreeMap::new(),
             stage_length: config.stage_length,
-            vote_threshold: config.vote_threshold,
+            vote_threshold: config.vote_threshold(),
         }
     }
 

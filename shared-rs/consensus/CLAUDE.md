@@ -26,7 +26,7 @@ No `tokio`, no networking, no clock reads, no file I/O.
   (`on_block_received`, `retry_select_chain`, …). The state machine
   never calls `Instant::now()` or `SystemTime::now()` itself.
 - Randomness is **deterministic and stake-keyed** — all uses go through
-  `wfa.rs` helpers seeded by `(eb_hash, voter_id)` style inputs. No
+  `committee.rs` helpers seeded by `(eb_hash, voter_id)` style inputs. No
   `from_entropy` / `thread_rng`.
 - Tracing (`info!`, `warn!`) is allowed; it's a side-effect-free sink
   from the state machine's perspective.
@@ -86,7 +86,7 @@ types.rs            Point, Tip with minicbor codec
 peer.rs             PeerId(u64) wrapper
 config.rs           CommitteeSelection enum, StakeEntry
 pipeline.rs         PipelineConfig — phase math (Voting/CertEligible/Expired)
-wfa.rs              wFA + LS committee selection, NPV lottery
+committee.rs        Committee selection (WfaLs, EveryoneVotes, StakeCentile), NPV lottery
 lottery.rs          Praos f_block stake-weighted threshold formula
 aggregation.rs      record_vote, QuorumFormed
 bitmap.rs           sparse BTreeMap<u16, u64> for MsgLeiosBlockTxsRequest

@@ -34,7 +34,9 @@ set -euo pipefail
 #   ./scripts/cip-voting-options.sh -S 0,1,2,3,4 -T 0.200 -m wfa-ls     # 5-seed sweep
 #   ./scripts/cip-voting-options.sh --slots 500 -m top-stake-fraction
 #
-# Vote thresholds are auto-computed at QUORUM_FRACTION of expected committee size.
+# Quorum threshold is configured as a fraction (QUORUM_FRACTION, default
+# 0.75 per CIP-0164).  The sim derives the absolute threshold from this
+# and the mode-specific committee denominator at config build time.
 
 usage() {
     sed -n '3,/^$/p' "$0" | sed 's/^# \?//'
@@ -156,15 +158,13 @@ for s in staking:
 print(total_nodes, len(staking), top_n)
 ")
 
-# committee-selection-algorithm values and corresponding vote thresholds.
-# wfa-ls: VRF lottery with 600 total trials (480 persistent + 120 non-persistent), 75% quorum
+# committee-selection-algorithm values.
+# wfa-ls: VRF lottery with 600 total trials (480 persistent + 120 non-persistent)
 # everyone: all nodes vote (1 each)
-# top-stake-fraction: top ${STAKE_FRACTION} of cumulative stake
-declare -A VOTE_THRESHOLDS=(
-    ["wfa-ls"]=450
-    ["everyone"]=$(python3 -c "import math; print(math.ceil($TOTAL_NODES * $QUORUM_FRACTION))")
-    ["top-stake-fraction"]=$(python3 -c "import math; print(math.ceil($TOP_STAKE_NODES * $QUORUM_FRACTION))")
-)
+# top-stake-fraction: top ${STAKE_FRACTION} of cumulative stake (CIP-164 PR #1196)
+# Quorum threshold is the same fraction for all modes; the sim derives
+# the absolute threshold from the mode-specific denominator at config
+# build time.
 
 # Build the engine-specific parameter file.
 WORK=$(mktemp -d)
@@ -191,7 +191,7 @@ esac
 echo "Topology: $TOPOLOGY" >&2
 echo "  Total nodes: $TOTAL_NODES, Staking: $STAKING_NODES" >&2
 echo "  Top ${STAKE_FRACTION} stake: $TOP_STAKE_NODES nodes" >&2
-echo "  Vote thresholds: wfa-ls=${VOTE_THRESHOLDS[wfa-ls]}, everyone=${VOTE_THRESHOLDS[everyone]}, top-stake-fraction=${VOTE_THRESHOLDS[top-stake-fraction]}" >&2
+echo "  Quorum fraction: $QUORUM_FRACTION (CIP-0164 default 0.75)" >&2
 echo "Engine: $ENGINE" >&2
 echo "Slots: $SLOTS" >&2
 echo "Seeds: ${SEEDS[*]}" >&2
@@ -232,7 +232,7 @@ for throughput in "${THROUGHPUTS[@]}"; do
         override="$WORK/override-$mode.yaml"
         {
             echo "committee-selection-algorithm: \"$mode\""
-            echo "vote-threshold: ${VOTE_THRESHOLDS[$mode]}"
+            echo "quorum-weight-fraction: $QUORUM_FRACTION"
             if [[ "$mode" == "wfa-ls" ]]; then
                 # 600 total VRF trials, 80:20 persistent/non-persistent split
                 echo "persistent-vote-generation-probability: 480"

@@ -185,6 +185,7 @@ impl GraphBuilder {
                 RawLinkInfo {
                     latency_ms: link.latency_ms as f64,
                     bandwidth_bytes_per_second: None,
+                    tcp_envelope: None,
                 },
             );
         }

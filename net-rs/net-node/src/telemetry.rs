@@ -8,14 +8,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use net_core::multi_peer::types::PeerInfo;
-use net_core::store::leios_store::LeiosStoreStats;
 use serde::Serialize;
 use tracing::info;
 
-use crate::config::{EventSinkConfig, StatsSinkConfig, TelemetryConfig};
 use shared_consensus::chain_tree::ChainTreeEntry;
-use shared_consensus::leios::LeiosStateSizes;
-use shared_consensus::praos::PraosStateSizes;
+use crate::config::{EventSinkConfig, StatsSinkConfig, TelemetryConfig};
 
 // ---------------------------------------------------------------------------
 // Event types (sim-rs compatible JSONL format)
@@ -127,41 +124,7 @@ pub enum NodeEvent {
         node: String,
         slot: u64,
         len: usize,
-    },
-    /// Per-slot memory diagnostics covering the three suspect areas
-    /// from the leak audit: Praos equivocation maps, Leios state, and
-    /// the `LeiosStore` notifications log + multi-peer chain fragments.
-    /// Counts are exact; `*_bytes_estimate` fields multiply counts by
-    /// per-entry constants and are intentionally rough.
-    ///
-    /// Boxed so the rest of `NodeEvent` (mostly tiny events fired at
-    /// high frequency) doesn't inherit the size of this struct.
-    MemorySizes(Box<MemorySizesPayload>),
-}
-
-/// Payload of [`NodeEvent::MemorySizes`].  Defined as a separate struct
-/// so a `Box` indirection keeps `NodeEvent` small.  Serializes as if it
-/// were inlined into the parent variant — serde transparently flattens
-/// newtype variants when the enum is internally tagged.
-#[derive(Serialize, Clone, Debug)]
-pub struct MemorySizesPayload {
-    pub node: String,
-    pub slot: u64,
-    pub praos: PraosStateSizes,
-    pub leios: Option<LeiosStateSizes>,
-    pub leios_store: Option<LeiosStoreStats>,
-    pub fragments: FragmentSizes,
-}
-
-/// Snapshot of multi-peer `ChainFragment` sizes summed across peers.
-/// Bytes estimate is `~96 bytes/point` × points (Point::Specific stored
-/// in both Vec and HashSet inside each fragment).
-#[derive(Serialize, Clone, Debug)]
-pub struct FragmentSizes {
-    pub peer_count: usize,
-    pub fragment_total: usize,
-    pub fragment_max: usize,
-    pub bytes_estimate: usize,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -511,57 +474,6 @@ mod tests {
         assert!(json.contains("\"time_s\":1.23"));
         assert!(json.contains("\"type\":\"Slot\""));
         assert!(json.contains("\"slot\":42"));
-    }
-
-    /// Memory-sizes event is boxed; verify serde still flattens the
-    /// payload into the parent variant so `jq '.message.slot'` works
-    /// and the aggregator's `parse_event` lookup of `message.node`
-    /// keeps finding the field.
-    #[test]
-    fn memory_sizes_event_serialization() {
-        let event = OutputEvent {
-            time_s: 12.5,
-            message: NodeEvent::MemorySizes(Box::new(MemorySizesPayload {
-                node: "node-0".into(),
-                slot: 42,
-                praos: PraosStateSizes {
-                    chain_tree: 1,
-                    block_cache: 2,
-                    validated: 3,
-                    in_flight: 4,
-                    in_flight_validation: 5,
-                    self_produced: 6,
-                    peer_chains: 7,
-                    peer_chain_total: 8,
-                    peer_chain_max: 9,
-                    header_first_seen: 10,
-                    header_hashes_by_slot_issuer: 11,
-                    issuer_hashes_total: 12,
-                    equivocating_rb_slots: 13,
-                    orphan_cooldown: 14,
-                    block_fetch_cooldown: 15,
-                    equivocation_bytes_estimate: 16,
-                },
-                leios: None,
-                leios_store: None,
-                fragments: FragmentSizes {
-                    peer_count: 17,
-                    fragment_total: 18,
-                    fragment_max: 19,
-                    bytes_estimate: 20,
-                },
-            })),
-        };
-        let v: serde_json::Value = serde_json::to_value(&event).unwrap();
-        assert_eq!(v["time_s"], 12.5);
-        assert_eq!(v["message"]["type"], "MemorySizes");
-        assert_eq!(v["message"]["node"], "node-0");
-        assert_eq!(v["message"]["slot"], 42);
-        assert_eq!(v["message"]["praos"]["header_hashes_by_slot_issuer"], 11);
-        assert_eq!(v["message"]["praos"]["equivocation_bytes_estimate"], 16);
-        assert_eq!(v["message"]["fragments"]["peer_count"], 17);
-        assert!(v["message"]["leios"].is_null());
-        assert!(v["message"]["leios_store"].is_null());
     }
 
     #[test]

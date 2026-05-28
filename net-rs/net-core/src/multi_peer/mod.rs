@@ -24,7 +24,7 @@ pub mod types;
 pub use coordinator::spawn_coordinator;
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::mpsc;
@@ -33,7 +33,7 @@ pub use types::{NetworkCommand, NetworkEvent};
 use crate::mux::scheduler::{SchedulerType, TrafficClass};
 use crate::mux::ProtocolId;
 use crate::peer::PeerId;
-use crate::store::leios_store::{LeiosStore, TxBodyResolver};
+use crate::store::leios_store::TxBodyResolver;
 
 /// Per-peer RTT measurement observer.  Invoked from the coordinator
 /// when a `LatencyMeasured` event arrives (with `Some(rtt)`) and on
@@ -133,13 +133,4 @@ pub struct CoordinatorHandle {
     pub events: mpsc::Receiver<NetworkEvent>,
     /// Send commands to the coordinator.
     pub commands: mpsc::Sender<NetworkCommand>,
-    /// Shared handle to the Leios data store (None if `leios_enabled=false`).
-    /// Exposed so the application can read `LeiosStore::stats()` directly for
-    /// per-slot memory telemetry rather than going through a command round-trip.
-    pub leios_store: Option<Arc<LeiosStore>>,
-    /// Per-peer chain-fragment sizes (point counts), maintained by the
-    /// coordinator. Read this for per-slot memory telemetry on the
-    /// multi-peer `ChainFragment` suspect — sum across peers gives total
-    /// retained announcements; max gives the worst-case single peer.
-    pub fragment_sizes: Arc<Mutex<HashMap<PeerId, usize>>>,
 }

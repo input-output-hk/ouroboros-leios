@@ -354,18 +354,6 @@ impl Consensus {
         self.leios.state.log_state_sizes();
     }
 
-    /// Snapshot Praos state collection sizes (plus byte estimates for the
-    /// equivocation maps).  Used by the per-slot memory telemetry path.
-    pub fn praos_state_sizes(&self) -> shared_consensus::praos::PraosStateSizes {
-        self.praos.state().state_sizes()
-    }
-
-    /// Snapshot Leios state collection sizes.  Used by the per-slot
-    /// memory telemetry path.
-    pub fn leios_state_sizes(&self) -> shared_consensus::leios::LeiosStateSizes {
-        self.leios.state.state_sizes()
-    }
-
     /// Drain Leios-side telemetry events buffered since the last call.
     pub fn drain_leios_telemetry(&mut self) -> Vec<NodeEvent> {
         self.leios.drain_telemetry()

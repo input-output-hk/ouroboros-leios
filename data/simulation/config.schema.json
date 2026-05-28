@@ -607,8 +607,9 @@
       "type": "boolean"
     },
     "tcp-congestion-control": {
-      "description": "Only supported by Haskell simulation.",
-      "type": "boolean"
+      "description": "Use the TCP congestion-window model for all links (slow-start, bandwidth-delay product, ACK pipelining). Supported by both Haskell and Rust simulations.",
+      "type": "boolean",
+      "default": true
     },
     "shard-count": {
       "description": "Number of clock shards for parallel simulation. Each shard advances time independently.\nOnly supported by Rust simulation.",
@@ -755,9 +756,8 @@
     "non-persistent-vote-generation-probability": {
       "type": "number"
     },
-    "vote-threshold": {
-      "additionalProperties": false,
-      "properties": {},
+    "quorum-weight-fraction": {
+      "description": "Fraction of expected total weight required for quorum. Replaces the old `vote-threshold` knob. CIP-0164 default 0.75; legacy sim runs used 0.6. For `top-stake-fraction` selection the denominator is total active stake (CIP-164 PR #1196).",
       "type": "number"
     },
     "vote-validation-cpu-time-ms": {

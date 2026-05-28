@@ -90,23 +90,12 @@ export interface ClusterControlConfig {
   node_config: Record<string, unknown>;
 }
 
-export type NodeVoteStatus = {
-  rb_received: boolean;
-  eb_received: boolean;
-  vote_cast: boolean;
-  perm_committee_member: boolean;
-}
-
-export interface AggregateNodeVotes {
-  slot: number;
-  node_statuses: Record<string, NodeVoteStatus>;
-}
-
 export interface AggregateVotesHistory {
   last_slot: number;
   node_ids: string[];
   votes: string[];
 }
+
 // Mirrors shared_consensus::leios::NoVoteReason (kebab-case serde).
 export type NoVoteReason =
   | "late-eb"

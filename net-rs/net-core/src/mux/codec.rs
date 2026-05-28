@@ -36,9 +36,19 @@ impl CodecSend {
 /// messages. Handles the case where a message spans multiple segments or
 /// multiple messages arrive in a single segment.
 ///
-/// Size limits are enforced at the demuxer level (via shared `IngressLimit`),
-/// not here. The demuxer rejects oversized data at the segment level before
-/// it reaches this buffer, allowing TCP backpressure to constrain the sender.
+/// Two distinct size guards apply on the receive path:
+///
+/// 1. **Per-channel buffer cap** (DoS protection): enforced at the demuxer
+///    via `ChannelRecv`'s shared `IngressLimit`.  Sized once at protocol
+///    registration to a value much larger than any single legal message,
+///    so a slow consumer can briefly queue multiple messages without
+///    tripping it.
+///
+/// 2. **Per-message spec cap** (protocol conformance): enforced here in
+///    `recv()` by the caller passing `max_msg_size = P::size_limit(state)`.
+///    After a CBOR value decodes successfully, the consumed-bytes count
+///    is checked against the per-state spec limit; an oversized message
+///    returns `MuxError::MessageTooLarge` and the connection is torn down.
 pub struct CodecRecv {
     channel: ChannelRecv,
     buffer: BytesMut,
@@ -52,26 +62,39 @@ impl CodecRecv {
         }
     }
 
-    /// Update the demuxer's ingress limit for this protocol channel.
-    /// Called by the protocol runner when state changes, so the demuxer
-    /// enforces per-state size limits at the segment level.
+    /// Update the demuxer's per-channel buffer cap. In production the
+    /// cap is fixed at protocol registration; this hook exists for
+    /// tests that exercise the demuxer's overflow handling.
     pub fn set_ingress_limit(&self, limit: usize) {
         self.channel.set_ingress_limit(limit);
     }
 
-    /// Receive and decode one CBOR message. Blocks until a complete message
-    /// is available. Returns an error if the channel closes before a complete
-    /// message is received.
+    /// Receive and decode one CBOR message. Blocks until a complete
+    /// message is available. Returns an error if the channel closes
+    /// before a complete message is received, or if the decoded
+    /// message's wire size exceeds `max_msg_size`.
+    ///
+    /// `max_msg_size` is the per-state per-message spec limit (callers
+    /// pass `P::size_limit(state)`). A decoded message larger than this
+    /// is a protocol-conformance violation by the peer.
     ///
     /// The decoded type must be owned (no borrows from the input buffer).
     /// This is necessary because the buffer is mutated between decode attempts.
-    pub async fn recv<T: for<'a> minicbor::Decode<'a, ()>>(&mut self) -> Result<T, MuxError> {
+    pub async fn recv<T: for<'a> minicbor::Decode<'a, ()>>(
+        &mut self,
+        max_msg_size: usize,
+    ) -> Result<T, MuxError> {
         loop {
             // Try to decode a message from the buffer.
             if !self.buffer.is_empty() {
                 match try_decode::<T>(&self.buffer) {
                     DecodeResult::Ok(value, consumed) => {
-                        // Advance past the consumed bytes.
+                        if consumed > max_msg_size {
+                            return Err(MuxError::MessageTooLarge {
+                                size: consumed,
+                                limit: max_msg_size,
+                            });
+                        }
                         let _ = self.buffer.split_to(consumed);
                         return Ok(value);
                     }
@@ -211,7 +234,7 @@ mod tests {
         };
         codec_send.send(&msg).await.unwrap();
 
-        let received: TestMsg = codec_recv.recv().await.unwrap();
+        let received: TestMsg = codec_recv.recv(65535).await.unwrap();
         assert_eq!(received, msg);
 
         ra.abort();
@@ -237,7 +260,7 @@ mod tests {
         }
 
         for i in 0..3u32 {
-            let received: TestMsg = codec_recv.recv().await.unwrap();
+            let received: TestMsg = codec_recv.recv(65535).await.unwrap();
             assert_eq!(received.tag, i);
             assert_eq!(received.payload, vec![i as u8; 10]);
         }
@@ -264,7 +287,7 @@ mod tests {
         };
         codec_send.send(&msg).await.unwrap();
 
-        let received: TestMsg = codec_recv.recv().await.unwrap();
+        let received: TestMsg = codec_recv.recv(100_000).await.unwrap();
         assert_eq!(received.tag, 1);
         assert_eq!(received.payload.len(), 30_000);
         assert!(received.payload.iter().all(|&b| b == 0xAB));
@@ -304,11 +327,43 @@ mod tests {
         codec_send.send(&msg).await.unwrap();
 
         // The recv should fail because the demuxer rejects the oversized data.
-        let result: Result<TestMsg, _> = codec_recv.recv().await;
+        let result: Result<TestMsg, _> = codec_recv.recv(usize::MAX).await;
         assert!(
             result.is_err(),
             "should reject message exceeding ingress limit"
         );
+
+        ra.abort();
+        rb.abort();
+    }
+
+    #[tokio::test]
+    async fn codec_recv_rejects_message_exceeding_per_message_cap() {
+        // Demuxer buffer cap is generous, but the codec's per-message
+        // cap (passed by Runner from P::size_limit(state)) must reject
+        // a message whose decoded wire size exceeds it.
+        let proto = ProtocolConfig {
+            id: 0,
+            traffic_class: TrafficClass::Priority,
+            ingress_limit: 100_000,
+            egress_queue_size: 10,
+        };
+        let (codec_send, mut codec_recv, ra, rb) = make_mux_pair(&proto);
+
+        let msg = TestMsg {
+            tag: 1,
+            payload: vec![0xAB; 10_000],
+        };
+        codec_send.send(&msg).await.unwrap();
+
+        let result: Result<TestMsg, _> = codec_recv.recv(1_000).await;
+        match result {
+            Err(MuxError::MessageTooLarge { size, limit }) => {
+                assert!(size > 10_000);
+                assert_eq!(limit, 1_000);
+            }
+            other => panic!("expected MessageTooLarge, got {other:?}"),
+        }
 
         ra.abort();
         rb.abort();
@@ -332,7 +387,7 @@ mod tests {
         // Give tasks a moment to shut down.
         tokio::task::yield_now().await;
 
-        let result: Result<TestMsg, _> = codec_recv.recv().await;
+        let result: Result<TestMsg, _> = codec_recv.recv(65535).await;
         assert!(result.is_err());
     }
 }

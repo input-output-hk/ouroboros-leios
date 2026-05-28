@@ -3,7 +3,6 @@ import type {
   StatsSnapshot,
   OutputEvent,
   ClusterControlConfig,
-  AggregateNodeVotes,
   AggregateVotesHistory,
   ActiveAttack,
   AttackRequest,
