@@ -1,7 +1,11 @@
 # Why does n=2 give only a 12 % P99 improvement, not 2×?
 
-Companion to [parallel-chunking.md](./parallel-chunking.md) (math) and
-[parallel-chunking-results.md](./parallel-chunking-results.md) (empirical sweep).
+Companion to [parallel-chunking.md](./parallel-chunking.md) (math),
+[parallel-chunking-results.md](./parallel-chunking-results.md) (empirical sweep),
+[parallel-chunking-mc-confidence.md](./parallel-chunking-mc-confidence.md)
+(MC stability of these estimates), and
+[parallel-chunking-low-p.md](./parallel-chunking-low-p.md) (where the
+"fast-path invariant" point of section 3 becomes the dominant story).
 
 ## Observation
 

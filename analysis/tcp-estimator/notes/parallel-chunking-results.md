@@ -1,47 +1,52 @@
 # Parallel chunked downloads: empirical comparison
 
 Follow-up to [parallel-chunking.md](./parallel-chunking.md). Ran
-`tools/chunk_compare.py` over `inputs.yaml` (size=12500 kB, link=1000 Mbps,
-RTT=50 ms, p=1e-4, lognormal jitter σ=0.15), with 50 000 MC trials per scenario
-for tail stability at `0.99^(1/n)`.
+`tools/chunk_compare.py --runs 500000` over `inputs.yaml`
+(size=12500 kB, link=1000 Mbps, RTT=50 ms, p=1e-4, lognormal jitter σ=0.15).
+M=500 000 was chosen for tail stability after the validation in
+[parallel-chunking-mc-confidence.md](./parallel-chunking-mc-confidence.md)
+showed M=50 000 single-run values for n=8 and n=16 can be seed-fragile
+(the original draft of this table had n=8 at 3.465 s — 10 % above the
+M=500 000 truth of 3.157 s).
 
 ## Results
 
 ```
 Baseline (n=1, no chunking, full link):
-  P50 = 0.526s   P95 = 1.997s   P99 = 6.632s
+  P50 = 0.526s   P95 = 1.976s   P99 = 6.717s
 
 Optimistic: each chunk gets the FULL link (distinct peers, no shared bottleneck)
   n     chunk    link/ch   P99_chunk    file_P99    vs base
 -----------------------------------------------------------
-  2    6250kB  1000.0 M      3.281s      5.843s    -11.9%
-  4    3125kB  1000.0 M      1.800s      5.420s    -18.3%
-  8    1562kB  1000.0 M      1.005s      3.465s    -47.8%
- 16     781kB  1000.0 M      0.562s      3.009s    -54.6%
- 32     391kB  1000.0 M      0.359s      1.656s    -75.0%
+  2    6250kB  1000.0 M      3.228s      5.777s    -14.0%
+  4    3125kB  1000.0 M      1.790s      5.413s    -19.4%
+  8    1562kB  1000.0 M      1.007s      3.157s    -53.0%
+ 16     781kB  1000.0 M      0.565s      3.017s    -55.1%
+ 32     391kB  1000.0 M      0.358s      1.645s    -75.5%
 
 Realistic: client downlink SHARED — each parallel chunk sees link/n Mbps
   n     chunk    link/ch   P99_chunk    file_P99    vs base
 -----------------------------------------------------------
-  2    6250kB   500.0 M      3.281s      5.843s    -11.9%
-  4    3125kB   250.0 M      1.800s      5.420s    -18.3%
-  8    1562kB   125.0 M      1.005s      3.465s    -47.8%
- 16     781kB    62.5 M      0.562s      3.009s    -54.6%
- 32     391kB    31.2 M      0.359s      1.656s    -75.0%
+  2    6250kB   500.0 M      3.228s      5.777s    -14.0%
+  4    3125kB   250.0 M      1.790s      5.413s    -19.4%
+  8    1562kB   125.0 M      1.007s      3.157s    -53.0%
+ 16     781kB    62.5 M      0.565s      3.017s    -55.1%
+ 32     391kB    31.2 M      0.358s      1.645s    -75.5%
 ```
 
 ## Takeaways
 
-1. **Chunking helps substantially.** File P99 drops from 6.63 s (no chunking)
-   to 1.66 s with n = 32 — a 75 % reduction. The benefit comes from *tail
+1. **Chunking helps substantially.** File P99 drops from 6.72 s (no chunking)
+   to 1.65 s with n = 32 — a 75 % reduction. The benefit comes from *tail
    shrinkage*, not from bandwidth: with smaller chunks each carries less loss
    exposure ( P[no loss in chunk] ≈ (1-p)^(packets/n) ), so each chunk's CDF
    has a much shorter right tail. Taking the max of n shorter tails still
    beats one long one — even though you're sampling at quantile `0.99^(1/n)`
-   instead of 0.99.
+   instead of 0.99. (See [parallel-chunking-n2-puzzle.md](./parallel-chunking-n2-puzzle.md)
+   for why this benefit is small at n=2 and grows non-linearly with n.)
 
 2. **"Chunk's P99" is *not* the file's P99.** Read across rows: at n = 8 the
-   chunk's P99 is 1.005 s but the file's P99 is 3.465 s — confirming the math
+   chunk's P99 is 1.007 s but the file's P99 is 3.157 s — confirming the math
    from the companion note: file P99 sits at the chunk's P99.87
    ( = 0.99^(1/8) ), which is much deeper into the chunk's right tail.
 
@@ -79,7 +84,12 @@ Realistic: client downlink SHARED — each parallel chunk sees link/n Mbps
    chunking can attack shrinks.
 
 5. **Quick way to map your own workloads:** drop in your `inputs.yaml` and
-   rerun `tools/chunk_compare.py`. Configs where the slow-start floor
-   dominates P99 (high RTT, small file, low loss) gain less from chunking
-   relative to baseline; configs where the loss-induced tail dominates
-   (heavier load, longer files, higher loss) gain more.
+   rerun `tools/chunk_compare.py --runs 500000`. Configs where the slow-start
+   floor dominates P99 (high RTT, small file, low loss) gain less from
+   chunking relative to baseline; configs where the loss-induced tail
+   dominates (heavier load, longer files, higher loss) gain more. For low p
+   ( ≲ 1e-5 ) the marginal P99 reported here becomes uninformative — see
+   [parallel-chunking-low-p.md](./parallel-chunking-low-p.md) for the
+   conditional metric that captures chunking's benefit in that regime.
+   For MC-precision considerations and seed-to-seed stability, see
+   [parallel-chunking-mc-confidence.md](./parallel-chunking-mc-confidence.md).

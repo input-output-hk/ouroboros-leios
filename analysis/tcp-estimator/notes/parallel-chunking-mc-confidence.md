@@ -2,10 +2,14 @@
 
 Companion to [parallel-chunking.md](./parallel-chunking.md) (math),
 [parallel-chunking-results.md](./parallel-chunking-results.md) (empirical
-sweep), and [parallel-chunking-n2-puzzle.md](./parallel-chunking-n2-puzzle.md)
-(why n=2 underperforms). This note investigates how trustworthy the
-chunking plot's curves are, especially for n ≥ 8 where we're reading
-quantiles deep in the chunk distribution's tail.
+sweep), [parallel-chunking-n2-puzzle.md](./parallel-chunking-n2-puzzle.md)
+(why n=2 underperforms), and
+[parallel-chunking-low-p.md](./parallel-chunking-low-p.md)
+(where the "precise but uninformative" trap discussed in lesson 3 below
+gets a dedicated treatment plus the conditional-metric fix).
+This note investigates how trustworthy the chunking plot's curves
+are, especially for n ≥ 8 where we're reading quantiles deep in the
+chunk distribution's tail.
 
 ## The arithmetic problem
 
@@ -149,14 +153,18 @@ Two findings:
   stability tool agrees.
 
 - **p ≈ 1e-6 (realistic for well-provisioned short connections).**
-  Cranking `--runs` doesn't help much: you'd need ≥ ~100/p ≈ 10⁸ trials
-  to sample the conditional loss tail reliably. The right tool is
-  **analytical conditioning**: split the simulation into "no loss
-  anywhere" (deterministic slow-start time + RTT jitter, closed-form)
-  and "≥ 1 loss" (Monte Carlo over a smaller, more concentrated
-  distribution), then combine via the law of total probability. Or
-  reframe the metric: report `P99 | at least one loss` instead of
-  marginal P99, which doesn't degenerate at low p.
+  Cranking `--runs` doesn't help much for the *marginal* P99: you'd
+  need ≥ ~100/p ≈ 10⁸ trials to sample the conditional loss tail
+  reliably. The realistic fix is to **reframe the metric**: report
+  `P99 | at least one loss` instead of marginal P99 — implemented as
+  `tools/chunk_compare.py --conditional` and elaborated in
+  [parallel-chunking-low-p.md](./parallel-chunking-low-p.md). For
+  values still requiring extra precision after that (e.g. n=32
+  conditional at very low p), bump `--runs` further so the
+  conditional-set sample count grows; for the truly extreme regime
+  (p ≤ 1e-7) move to analytical conditioning (closed-form the
+  no-loss path, MC the smaller loss-affected sub-distribution,
+  combine via the law of total probability).
 
 ### Diagnostic tooling
 

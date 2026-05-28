@@ -4,7 +4,8 @@ Companion to the parallel-chunking series:
 [math](./parallel-chunking.md),
 [empirical sweep](./parallel-chunking-results.md),
 [n=2 puzzle](./parallel-chunking-n2-puzzle.md),
-[MC confidence](./parallel-chunking-mc-confidence.md).
+[MC confidence](./parallel-chunking-mc-confidence.md),
+[low-p regime](./parallel-chunking-low-p.md).
 
 ## Observation
 

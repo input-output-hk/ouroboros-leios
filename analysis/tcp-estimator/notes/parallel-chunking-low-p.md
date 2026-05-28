@@ -96,11 +96,14 @@ revised upward by ~0.8 s when re-run at M=500k.)
 
 Reading: chunking **does** meaningfully attack the conditional tail
 at low p — the bad-outcome magnitude drops from 8.9 s at n=1 to 0.92 s
-at n=32, a ~10× reduction. The probability of a bad outcome stays in
-the same ~0.005–0.009 band (the OR-over-chunks effect roughly
-cancels the smaller per-chunk loss probability), so chunking's
-contribution here is **shrinking the bad-outcome magnitude** rather
-than reducing its frequency.
+at n=32, a ~10× reduction at M=50k. (The M=500k validation below
+revises n=32 upward to 1.69 s, making the true reduction ~5×; the M=50k
+~10× figure was based on only ~10 conditional samples and was
+optimistic.) The probability of a bad outcome stays in the same
+~0.005–0.009 band (the OR-over-chunks effect roughly cancels the
+smaller per-chunk loss probability), so chunking's contribution here
+is **shrinking the bad-outcome magnitude** rather than reducing its
+frequency.
 
 ### Compare to p=1e-4 (current default)
 

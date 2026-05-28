@@ -56,5 +56,5 @@ previous.
    `tools/chunk_compare.py --conditional` — and shows that at p=1e-6 the
    conditional baseline is ~9 s vs marginal ~0.6 s, and that chunking
    still meaningfully shrinks the conditional bad-outcome magnitude
-   (≈10× at n=32). Includes a sample-size caveat: the conditional metric
-   needs M ≥ 500k for stable n=32 numbers.
+   (~5× at n=32, validated at M=500k). Includes a sample-size caveat: the
+   conditional metric needs M ≥ 500k for stable n=32 numbers.

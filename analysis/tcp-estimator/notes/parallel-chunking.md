@@ -34,29 +34,49 @@ the answer climbs (slowly) with n.
 
 ### Using these plots correctly for parallel chunking
 
-1. Re-run with `file_size_kb` set to your **chunk size** (S/n), not the
-   whole-file size — slow start applies per transfer, so the chunk's CDF,
-   not the whole-file CDF, is what you need.
-2. Read off the **q^(1/n)** quantile of that chunk CDF; that's the file's
-   `P_q` under parallel chunking. The current plot only marks the requested
-   percentile and P99 — for chunked analysis you'd want to read a different
-   percentile off the curve (or pass `-p` set to `0.99^(1/n)` to drop the
-   marker exactly where you need it).
+You no longer need to compute `q^(1/n)` by hand — three tools in `tools/`
+do the chunking analysis end-to-end:
 
-### Two caveats glossed over by the question
+- **`tools/chunk_compare.py [--runs 500000]`** — tabular sweep of file P99
+  vs n at the configured workload, in both "optimistic" (each chunk gets
+  the full link) and "realistic" (chunks share a single link/n) bandwidth
+  models. Add `--conditional` to also report `P99 | ≥1 loss`, the
+  meaningful metric at low p.
+- **`tools/plot_chunking.py [--runs 500000] [--ci]`** — overlay SVG plot
+  of the implied whole-file CDF for each n on one axes; the leftward shift
+  and tail collapse make chunking's benefit visible at a glance. `--ci`
+  additionally writes a per-n companion plot with a bootstrap 95 % CI band.
+- **`tools/chunking_stability.py`** — reseed sanity check. Reruns the
+  chunk-distribution sim K times with different RNG seeds and reports
+  CoV per n; flags rows that are seed-fragile so you don't mistake a
+  lucky M=50 k sample for a stable answer.
+
+### Three caveats glossed over by the question
 
 - **"Independent" assumes losses on different paths are uncorrelated.**
   Chunks pulled to the same client share your access link and receive queue;
   if that's the bottleneck, they're not independent (and effective per-chunk
   bandwidth becomes link/n).
-- **MC tail stability.** 1000 MC runs gives ~10 samples in the top 1 %. For
-  stable readings at `0.99^(1/n)` when n is moderate, bump
-  `monte_carlo_runs` to 10 000+.
+- **MC tail stability.** The marginal P99 at chunking-relevant quantiles
+  lives on only `M·(1-q)` samples, so M=1 000 gives ~10 tail samples and
+  is unreliable. See [parallel-chunking-mc-confidence.md](./parallel-chunking-mc-confidence.md);
+  the empirical recommendation is **M=500 000** at p ~ 1e-4 for reportable
+  numbers, and `tools/chunking_stability.py` catches the residual
+  seed-fragile rows.
+- **Marginal P99 degenerates at low p.** When p ≲ 1e-5 most runs are
+  loss-free and the marginal P99 just reads the upper tail of jittered
+  slow-start completion. The conditional metric `P99 | ≥1 loss` is the
+  right thing to look at; see
+  [parallel-chunking-low-p.md](./parallel-chunking-low-p.md).
 
 ### Does chunking actually help?
 
 Whether parallel chunking *lowers* the file's P99 vs. a single one-shot
 download depends on the parameters: smaller chunks each carry less loss
 exposure (so each chunk's CDF is tighter), but you're sampling deeper into
-the n-fold worst case. The simulator can answer this empirically by
-running both configurations and comparing.
+the n-fold worst case. The empirical answer for the default config and
+its RTT sensitivity is in
+[parallel-chunking-results.md](./parallel-chunking-results.md); the
+mechanism explanation (chunking attacks the loss tail, not the slow-start
+floor) is in
+[parallel-chunking-n2-puzzle.md](./parallel-chunking-n2-puzzle.md).
