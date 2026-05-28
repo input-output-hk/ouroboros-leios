@@ -33,23 +33,64 @@ pub struct ClusterControlConfig {
     pub node_config: std::collections::HashMap<String, serde_json::Value>,
 }
 
+/// Where the cluster topology comes from.
+///
+/// Defaults to [`TopologySource::Random`] (the historical behaviour) so
+/// existing TOML configs that don't mention `topology_source` continue to
+/// generate a random graph from `num_nodes`/`degree`/`min_latency_ms`/
+/// `max_latency_ms`.
+///
+/// Selecting [`TopologySource::Yaml`] loads `data/simulation/pseudo-mainnet/
+/// topology-v*.yaml`-style files (same schema as sim-rs and topology-checker).
+/// In YAML mode the `num_nodes`/`degree`/`min_latency_ms`/`max_latency_ms`
+/// fields are **ignored** — node count comes from the YAML (optionally
+/// capped by `node_limit`), edges come from the YAML's `producers` arrays,
+/// and per-link latencies come from `latency-ms`.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum TopologySource {
+    /// Generate a random connected graph (`num_nodes`, `degree`,
+    /// `min/max_latency_ms`).
+    #[default]
+    Random,
+    /// Load a YAML topology (v3/v4 schema).  `path` is interpreted
+    /// relative to the process's current directory at startup.
+    Yaml {
+        path: String,
+        /// Optional cap: load only the first `node_limit` nodes from the
+        /// YAML (in YAML insertion order; the v4 generator orders by
+        /// stake-rank descending, so this is effectively top-N by stake).
+        /// `None` loads every node — beware, v4-mainnet has 2,685 nodes
+        /// and average degree ~70, which is impractical for a local
+        /// process-per-node cluster.
+        #[serde(default)]
+        node_limit: Option<usize>,
+    },
+}
+
 /// Top-level cluster configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ClusterConfig {
-    /// Number of net-node instances to spawn.
+    /// Number of net-node instances to spawn (random topology only;
+    /// overwritten by the loaded node count when `topology_source` is
+    /// `yaml`).
     pub num_nodes: usize,
 
-    /// Target number of peers per node.
+    /// Target number of peers per node (random topology only).
     #[serde(default = "default_degree")]
     pub degree: usize,
 
-    /// Minimum simulated link latency (ms).
+    /// Minimum simulated link latency (ms) (random topology only).
     #[serde(default = "default_min_latency")]
     pub min_latency_ms: u64,
 
-    /// Maximum simulated link latency (ms).
+    /// Maximum simulated link latency (ms) (random topology only).
     #[serde(default = "default_max_latency")]
     pub max_latency_ms: u64,
+
+    /// Where the topology comes from.  See [`TopologySource`].
+    #[serde(default)]
+    pub topology_source: TopologySource,
 
     /// Path to the base net-node config (e.g. "net-node/configs/mainnet.toml").
     pub base_config: String,
@@ -169,6 +210,7 @@ impl Default for ClusterConfig {
             behaviour: None,
             behaviour_selection: None,
             external_peers: Vec::new(),
+            topology_source: TopologySource::default(),
         }
     }
 }
