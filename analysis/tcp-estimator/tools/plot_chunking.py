@@ -15,6 +15,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import bisect
 import dataclasses
 import math
 import random
@@ -97,7 +98,7 @@ def render(
     width = 960
     height = 600
     margin_left = 80
-    margin_right = 30
+    margin_right = 60  # room for "▶" off-frame truncation markers + mass labels
     margin_top = 70
     margin_bottom = 60
     plot_w = width - margin_left - margin_right
@@ -234,14 +235,19 @@ def render(
         if i_min >= N:
             continue  # curve never reaches y_min within sampled data
 
+        # Sampling strategy: uniform step across the visible range *plus* dense
+        # coverage of the top ~1 % of chunk indices. Without the dense-tail
+        # addition, at low p the uniform step skips over the loss-affected
+        # chunks (which are <1 % of mass) and the curve appears flat through
+        # the loss tail.
         n_visible = N - i_min
         step = max(1, n_visible // max_pts)
         indices = list(range(i_min, N, step))
-        if indices[-1] != N - 1:
-            indices.append(N - 1)
+        tail_start = max(i_min, N - max(1, N // 100))
+        tail_step = max(1, (N - tail_start) // (max_pts // 2))
+        indices = sorted(set(indices) | set(range(tail_start, N, tail_step)) | {N - 1})
 
         pts: list[tuple[float, float]] = []
-        last_y_in_range = y_min
         truncated = False
         for i in indices:
             x_data = finite[i]
@@ -258,15 +264,33 @@ def render(
                 anchor_x = x_min if y_min == 0.0 else x_data
                 pts.append((x_to_px(anchor_x), y_to_px(y_min)))
             pts.append((x_to_px(x_data), y_to_px(y)))
-            last_y_in_range = y
 
+        # True F at xmax (independent of polyline sampling): F_chunk^n where
+        # F_chunk = (count of samples <= xmax) / N. Use this for the truncation
+        # marker so the mass-off-frame label is exact.
+        n_chunks_below = bisect.bisect_right(finite, x_max)
+        f_chunk_at_xmax = n_chunks_below / N
+        f_file_at_xmax = f_chunk_at_xmax**n
         if pts:
-            pts.append((x_to_px(x_max), y_to_px(last_y_in_range if truncated else 1.0)))
+            right_y = f_file_at_xmax if truncated else 1.0
+            pts.append((x_to_px(x_max), y_to_px(min(1.0, max(y_min, right_y)))))
             polyline = " ".join(f"{x:.2f},{y:.2f}" for x, y in pts)
             parts.append(
                 f'<polyline points="{polyline}" fill="none" stroke="{color}" '
                 f'stroke-width="1.8"/>'
             )
+            # If the curve didn't reach y=1 within the visible range, mark the
+            # right edge with a chevron so the reader knows it continues
+            # off-frame. The mass label is omitted here to keep the multi-curve
+            # plot uncluttered; per-n CI plots include it.
+            if truncated and f_file_at_xmax < 1.0 - 1e-6:
+                end_x = x_to_px(x_max)
+                end_y = y_to_px(max(y_min, f_file_at_xmax))
+                parts.append(
+                    f'<text x="{end_x + 3:.2f}" y="{end_y + 4:.2f}" '
+                    f'fill="{color}" font-size="13" '
+                    f'font-weight="bold">▶</text>'
+                )
 
     # Legend in the lower-right of the plot. Header wrapped to two lines at a
     # slightly smaller font so it fits the box without being truncated.
@@ -328,7 +352,7 @@ def render_ci(
     width = 960
     height = 600
     margin_left = 80
-    margin_right = 30
+    margin_right = 60  # room for "▶" off-frame truncation markers + mass labels
     margin_top = 70
     margin_bottom = 60
     plot_w = width - margin_left - margin_right
@@ -449,12 +473,16 @@ def render_ci(
         out_path.write_text("\n".join(parts))
         return
 
+    # Sampling: uniform step + dense top-1 % so the loss-tail isn't skipped
+    # at low p. (Same rationale as in render(); without dense-tail addition,
+    # the per-n curve flat-lines through the visible loss tail.)
     max_pts = 1000
     n_visible = N - i_min
     step = max(1, n_visible // max_pts)
-    indices = list(range(i_min, N, step))
-    if indices[-1] != N - 1:
-        indices.append(N - 1)
+    indices_uniform = set(range(i_min, N, step))
+    tail_start = max(i_min, N - max(1, N // 100))
+    tail_step = max(1, (N - tail_start) // (max_pts // 2))
+    indices = sorted(indices_uniform | set(range(tail_start, N, tail_step)) | {N - 1})
 
     # Bootstrap-sample F_chunk(x_i) ~ Binomial(N, (i+1)/N) / N for each x_i,
     # then transform to F_file = F_chunk^n. The B-sample envelope at quantile
@@ -485,11 +513,23 @@ def render_ci(
         out_path.write_text("\n".join(parts))
         return
 
+    # True F at xmax (independent of polyline sampling) — used for the
+    # truncation marker and the curve's right-edge endpoint.
+    n_chunks_below = bisect.bisect_right(finite, x_max)
+    f_chunk_at_xmax = n_chunks_below / N
+    f_file_at_xmax_pt = f_chunk_at_xmax**n
+    # Pointwise bootstrap on the true F_chunk gives band edges at xmax too.
+    boots_at_xmax = sorted(
+        (rng.binomialvariate(N, f_chunk_at_xmax) / N) ** n for _ in range(B)
+    )
+    f_file_at_xmax_lo = max(y_min, boots_at_xmax[lo_q_idx])
+    f_file_at_xmax_hi = min(1.0, boots_at_xmax[hi_q_idx])
+
     # Anchor the band/curve at the visible bottom-left.
     anchor_x = x_min if y_min == 0.0 else band[0][0]
-    right_y_lo = band[-1][1] if truncated else 1.0
-    right_y_hi = band[-1][2] if truncated else 1.0
-    right_y_pt = band[-1][3] if truncated else 1.0
+    right_y_lo = f_file_at_xmax_lo if truncated else 1.0
+    right_y_hi = f_file_at_xmax_hi if truncated else 1.0
+    right_y_pt = f_file_at_xmax_pt if truncated else 1.0
 
     # CI band: a polygon fill + explicit thin polylines on the upper and lower
     # edges. The edge lines stay visible even when the band is sub-pixel-wide
@@ -529,6 +569,22 @@ def render_ci(
         f'<polyline points="{polyline}" fill="none" stroke="{color}" '
         f'stroke-width="2.0"/>'
     )
+
+    # Off-frame truncation marker: chevron + mass percentage. This makes it
+    # obvious that the curve continues to the right and quantifies how much
+    # probability mass is beyond the visible range.
+    if truncated and right_y_pt < 1.0 - 1e-6:
+        mass_off = 1.0 - right_y_pt
+        end_x = x_to_px(x_max)
+        end_y = y_to_px(right_y_pt)
+        parts.append(
+            f'<text x="{end_x + 3:.2f}" y="{end_y + 4:.2f}" '
+            f'fill="{color}" font-size="13" font-weight="bold">▶</text>'
+        )
+        parts.append(
+            f'<text x="{end_x + 17:.2f}" y="{end_y + 4:.2f}" '
+            f'fill="{color}" font-size="10">{mass_off*100:.2g}%</text>'
+        )
 
     # n = X label box (lower-left, matches main-plot's legend style).
     label_x = margin_left + 12
