@@ -29,15 +29,15 @@ tx_rate = 1.0
 kind = "t22"
 # Threshold (average percentage, 0-100) of the committee nodes, which
 # take offered eb messages. EB messages for the remaining nodes will be dropped.
-vote_threshold = 80
+vote_threshold = 90
 
 # Threshold (average percentage, 0-100) of the non-committee nodes
 # (non-voting nodes in Leios), which take offered eb messages.
-non_voting_threshold = 0
+non_voting_threshold = 30
 
 # `True` means that disruptions touch not only eb-offered/eb-txs-offered,
 # but also eb-received/eb-txs-received (in other words, true means more disruptions).
-hide_eb_tx_received = true
+hide_eb_tx_received = false
 
 [behaviour_selection]
 kind = "all"

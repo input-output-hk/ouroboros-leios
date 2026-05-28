@@ -156,7 +156,7 @@ impl AggregatedVotes {
             deleted_slots += 1;
         }
 
-        if deleted_slots >= 0 {
+        if deleted_slots > 0 {
             tracing::info!(
                 "Aggregated voting GC: {deleted_slots} slots deleted, current interval: {:?}..={:?}, {} slots",
                 self.slots.first(),
