@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 0,
+  "id": 4,
   "links": [],
   "panels": [
     {
@@ -84,7 +84,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 23,
+        "w": 6,
         "x": 0,
         "y": 0
       },
@@ -98,7 +98,7 @@
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
@@ -110,7 +110,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "builder",
-          "expr": "sum(ptrace_started_total)",
+          "expr": "sum(ptrace_started_total{process=~\"$host\"})",
           "legendFormat": "Started",
           "range": true,
           "refId": "Started"
@@ -121,7 +121,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "builder",
-          "expr": "sum(ptrace_ended_total)",
+          "expr": "sum(ptrace_ended_total{process=~\"$host\"})",
           "hide": false,
           "instant": false,
           "legendFormat": "Ended",
@@ -130,120 +130,17 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "name": "Expression",
+            "type": "__expr__",
+            "uid": "__expr__"
           },
-          "editorMode": "builder",
-          "expr": "sum(ptrace_active_total)",
+          "expression": "$Started - $Ended\n",
           "hide": false,
-          "instant": false,
-          "legendFormat": "Active",
-          "range": true,
-          "refId": "Active"
+          "refId": "Active",
+          "type": "math"
         }
       ],
       "title": "Started/Ended/Active",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 21,
-        "w": 13,
-        "x": 0,
-        "y": 8
-      },
-      "id": 3,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "builder",
-          "expr": "sum by(ptrace_call_stack, ptrace_thread) (ptrace_active_total)",
-          "fromExploreMetrics": true,
-          "instant": false,
-          "interval": "",
-          "legendFormat": "[{{ptrace_thread}}] $ {{ptrace_call_stack}}",
-          "range": true,
-          "refId": "ptrace_started_total-sum(rate)"
-        }
-      ],
-      "title": "Active by Thread & Call Stack",
       "type": "timeseries"
     },
     {
@@ -340,9 +237,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 29
+        "w": 6,
+        "x": 6,
+        "y": 0
       },
       "id": 2,
       "maxDataPoints": 500,
@@ -358,42 +255,524 @@
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
       "pluginVersion": "12.3.1",
       "targets": [
         {
-          "expr": "min(ptrace_duration_s{ })",
+          "editorMode": "builder",
+          "expr": "sum(ptrace_duration_total_s{process=~\"$host\"})",
           "fromExploreMetrics": false,
-          "legendFormat": "min",
+          "legendFormat": "sum",
+          "range": true,
           "refId": "ptrace_duration_s-min"
-        },
-        {
-          "expr": "max(ptrace_duration_s{ })",
-          "fromExploreMetrics": false,
-          "legendFormat": "max",
-          "refId": "ptrace_duration_s-max"
         }
       ],
-      "title": "Min & Max duration",
+      "title": "Sum Duration",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "wrapText": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 24,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 5,
+      "options": {
+        "cellHeight": "sm",
+        "enablePagination": true,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Time"
+          }
+        ]
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "{type=\"ptrace\", process=~\"$host\"} | json\n\n\n\n",
+          "legendFormat": "{{process}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Events",
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "delimiter": ",",
+            "format": "json",
+            "source": "labels"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Line": true,
+              "argument": false,
+              "argument_ebHash": true,
+              "argument_ebSlot": true,
+              "detected_level": true,
+              "filename": true,
+              "function": true,
+              "host": true,
+              "id": true,
+              "kind": true,
+              "kind_extracted": true,
+              "labelTypes": true,
+              "labels": true,
+              "level": true,
+              "ns": true,
+              "ptrace_call_stack": true,
+              "ptrace_event": true,
+              "ptrace_function": true,
+              "ptrace_thread": true,
+              "replica": true,
+              "service": true,
+              "service_name": true,
+              "sev": true,
+              "tsNs": true,
+              "type": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Line": 11,
+              "Time": 1,
+              "argument": 5,
+              "argument_ebHash": 32,
+              "argument_ebSlot": 33,
+              "call_id": 9,
+              "call_id_stack": 10,
+              "call_stack": 4,
+              "detected_level": 15,
+              "duration": 8,
+              "event": 6,
+              "filename": 16,
+              "function": 17,
+              "host": 18,
+              "id": 14,
+              "kind": 19,
+              "kind_extracted": 20,
+              "labelTypes": 13,
+              "labels": 0,
+              "level": 21,
+              "ns": 22,
+              "process": 2,
+              "ptrace_call_stack": 23,
+              "ptrace_event": 24,
+              "ptrace_function": 25,
+              "ptrace_thread": 26,
+              "replica": 27,
+              "result": 7,
+              "service": 28,
+              "service_name": 29,
+              "sev": 30,
+              "thread": 3,
+              "tsNs": 12,
+              "type": 31
+            },
+            "renameByName": {
+              "process": "host"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "builder",
+          "expr": "sum by(ptrace_thread, ptrace_call_stack) (ptrace_duration_total_s{process=~\"$host\", ptrace_event=\"End\"})",
+          "instant": false,
+          "key": "Q-1a8a5906-1205-448b-bb62-6321c732c4b1-1",
+          "legendFormat": "[{{ptrace_thread}}] $ {{ptrace_call_stack}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Duration by Thread & Call Stack",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "sum by (ptrace_call_stack, ptrace_thread) (ptrace_started_total{process=~\"$host\"}) \n- \nsum by (ptrace_call_stack, ptrace_thread) (ptrace_ended_total{process=~\"$host\"})",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "[{{ptrace_thread}}] $ {{ptrace_call_stack}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Active by Thread & Call Stack",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 6,
+      "options": {
+        "spanFilters": {
+          "criticalPathOnly": false,
+          "matchesOnly": true,
+          "serviceNameOperator": "=",
+          "spanNameOperator": "=",
+          "tags": [
+            {
+              "id": "8dfce78f-50c",
+              "operator": "="
+            }
+          ]
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "{kind=\"Process\", ptrace_event=\"End\", process=~\"$host\"}\n  | json spanID=\"call_id\", operationName=\"function\", duration_sec=\"duration\", serviceName=\"thread\", stack=\"call_id_stack\", argument=\"argument\", host=\"process\"\n  | label_format traceID=`{{ regexReplaceAll \"^([0-9]+).*\" .stack \"${1}\" }}`\n  | label_format parentSpanID=`{{ regexReplaceAll \".*(?:^|[^0-9])([0-9]+)[^0-9]+[0-9]+$\" .stack \"${1}\" }}`\n  | label_format parentSpanID=`{{ if eq .parentSpanID .spanID }}{{ \"\" }}{{ else }}{{ .parentSpanID }}{{ end }}`\n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName, argument, host\n",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Traces",
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "delimiter": ",",
+            "format": "json",
+            "source": "labels"
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "duration",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "duration_sec"
+                }
+              },
+              "operator": "*",
+              "right": {
+                "fixed": "1000"
+              }
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "startTime",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Time"
+                }
+              },
+              "operator": "-",
+              "right": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "duration"
+                }
+              }
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        }
+      ],
+      "type": "traces"
     }
   ],
   "preload": false,
+  "refresh": "",
   "schemaVersion": 42,
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "text": "Node3",
+          "value": "Node3"
+        },
+        "definition": "label_values({type=\"ptrace\"},process)",
+        "description": "",
+        "includeAll": true,
+        "label": "host",
+        "multi": true,
+        "name": "host",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values({type=\"ptrace\"},process)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      }
+    ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Proto Devnet - PTrace",
-  "uid": "g7gtqh",
-  "version": 6
+  "uid": "asd",
+  "version": 1
 }

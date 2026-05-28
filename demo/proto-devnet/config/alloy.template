@@ -214,16 +214,6 @@ loki.process "extract_ptrace_logs" {
           value             = "Start"
 					max_idle_duration = "24h"
 				}
-
-				metric.gauge {
-					name              = "active_total"
-					description       = "Total number of active processes"
-					prefix            = "ptrace_"
-					action            = "inc"
-          source            = "event"
-          value             = "Start"
-					max_idle_duration = "24h"
-				}
 			}
 		}
 
@@ -248,23 +238,22 @@ loki.process "extract_ptrace_logs" {
 					max_idle_duration = "24h"
 				}
 
+				metric.counter {
+					name        = "duration_total_s"
+					description = "Total process duration in seconds"
+					prefix      = "ptrace_"
+					action      = "add"
+					source      = "duration"
+				}
+
 				metric.gauge {
-					name        = "duration_s"
-					description = "Process duration in seconds"
+					name        = "duration_last_s"
+					description = "Last process duration in seconds"
 					prefix      = "ptrace_"
 					action      = "set"
 					source      = "duration"
 				}
 
-				metric.gauge {
-					name              = "active_total"
-					description       = "Total number of active processes"
-					prefix            = "ptrace_"
-					action            = "dec"
-          source            = "event"
-          value             = "End"
-					max_idle_duration = "24h"
-				}
 			}
 		}
 	}
