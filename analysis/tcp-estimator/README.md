@@ -10,16 +10,17 @@ where OPTIONAL_INPUT is an input file in yaml format, or otherwise the script de
 
 # Supplementary tools
 
-The `tools` directory contains two more python utilities:
+The `tools` directory contains three more python utilities:
 1. plot_chunking.py
 2. chunk_compare.py
+3. chunking_stability.py
 With further description in the `README.md` file.
 
 # Additional documentation
 
 The `notes` subdirectory contains some additional research into the benefit of chunking
 downloads, and how it can reduce download time of the aggregate datum. Essentially, it is a means
-of avoiding packet loss-induced drawn out tails on the CDF.
+of avoiding packet loss-induced drawn out tails on the CDF. The notes cover this issue comprehensively.
 
 # References
 
