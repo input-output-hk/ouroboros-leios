@@ -13,7 +13,7 @@ function CellIcon({ value }: { value: VoteCell }) {
   }
   if (value === "EBGenerated") {
     return (
-      <Box sx={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid #66bb6a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Box sx={{ width: 14, height: 14, borderRadius: "50%", border: "1px solid #66bb6a", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Box sx={{ color: "#66bb6a", fontSize: 11, lineHeight: "11px", fontWeight: 700 }}>✓</Box>
       </Box>
     );
