@@ -53,9 +53,33 @@ Realistic: client downlink SHARED — each parallel chunk sees link/n Mbps
    higher p, smaller RTT, or small files where slow start drives cwnd into
    the BDP cap before encountering a loss.
 
-4. **The companion note's claim "chunking helps, depends on parameters" is
-   empirically confirmed.** For this config it's a big win; for a
-   high-RTT / low-loss workload where the file already completes in slow
-   start, the gain would be smaller (no loss exposure to shrink). Quick way
-   to map your own workloads: drop in your `inputs.yaml` and rerun
-   `tools/chunk_compare.py`.
+4. **Chunking attacks the loss-induced tail; it can't shrink the slow-start
+   ramp.** Each chunk still ramps from W₀ via doublings, so per-chunk
+   wall-clock floor is roughly
+
+   ```
+   T_floor ≈ ⌈log₂(N/n / W₀)⌉ · RTT
+   ```
+
+   This is what a perfectly lossless run takes, and it scales linearly with
+   RTT regardless of n. The achievable chunking gain is bounded by how much
+   of P99 sits *above* T_floor — i.e., how much is killable tail. RTT sweep
+   at the default config (file=12500 kB, link=1 Gbps, p=1e-4, ssthresh auto):
+
+   | RTT     | baseline P99 | n=32 P99 | relative gain | absolute gain |
+   | ------- | ------------ | -------- | ------------- | ------------- |
+   | 50 ms   | 6.6 s        | 1.7 s    | **−75 %**     | 5 s           |
+   | 250 ms  | 15.9 s       | 6.0 s    | **−62 %**     | 10 s          |
+   | 1000 ms | 31.4 s       | 11.4 s   | **−63 %**     | 20 s          |
+
+   At low RTT the floor is negligible (~0.5 s) and almost all of P99 is
+   killable, so chunking eliminates 75 %. At high RTT the floor grows to
+   ~10 s, so even perfect tail elimination caps the relative gain at
+   ~65 %. The absolute saving still grows, but the *fraction* of P99 that
+   chunking can attack shrinks.
+
+5. **Quick way to map your own workloads:** drop in your `inputs.yaml` and
+   rerun `tools/chunk_compare.py`. Configs where the slow-start floor
+   dominates P99 (high RTT, small file, low loss) gain less from chunking
+   relative to baseline; configs where the loss-induced tail dominates
+   (heavier load, longer files, higher loss) gain more.

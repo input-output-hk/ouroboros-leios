@@ -261,11 +261,19 @@ def _sample_round_loss_ge(
     return lost, state
 
 
-def simulate_one_run(cfg: Config, rng: random.Random) -> float:
-    """One Monte Carlo trial. Returns total download time in seconds."""
+def simulate_one_run(cfg: Config, rng: random.Random) -> tuple[float, int]:
+    """One Monte Carlo trial. Returns (download_time_seconds, n_effective_losses).
+
+    n_effective_losses counts only loss events that actually reshaped cwnd —
+    a loss sampled during the final round (where the file completes) doesn't
+    extend the time and is not counted. So a run with n_effective_losses == 0
+    is one whose timing was determined purely by the slow-start ramp / no-loss
+    CA trajectory; n_effective_losses >= 1 marks a run whose tail was shaped
+    by at least one CUBIC recovery.
+    """
     file_bytes = cfg.file_bytes
     if file_bytes <= 0:
-        return 0.0
+        return 0.0, 0
 
     mss = cfg.mss_bytes
     bdp_cap = cfg.bdp_cap_segs
@@ -288,6 +296,7 @@ def simulate_one_run(cfg: Config, rng: random.Random) -> float:
     ca_elapsed_s = 0.0
 
     ge_state = cfg.ge_start_state
+    n_effective_losses = 0
 
     # Safety cap to prevent infinite loops on pathological inputs.
     max_rounds = 10_000_000
@@ -296,7 +305,7 @@ def simulate_one_run(cfg: Config, rng: random.Random) -> float:
     while bytes_sent < file_bytes:
         rounds += 1
         if rounds > max_rounds:
-            return float("inf")
+            return float("inf"), n_effective_losses
 
         eff_cwnd = max(1, min(int(cwnd), bdp_cap))
         remaining_bytes = file_bytes - bytes_sent
@@ -323,6 +332,7 @@ def simulate_one_run(cfg: Config, rng: random.Random) -> float:
             break
 
         if lost:
+            n_effective_losses += 1
             cwnd_at_loss = float(eff_cwnd)
             # Fast convergence (Ha 2008 §3.7): if this loss happened below the previous
             # W_max, reduce W_max further before applying the cwnd cut, releasing
@@ -354,10 +364,26 @@ def simulate_one_run(cfg: Config, rng: random.Random) -> float:
             else:
                 cwnd = max(1.0, C * (ca_elapsed_s - K) ** 3 + cubic_origin)
 
-    return t_seconds
+    return t_seconds, n_effective_losses
 
 
 def monte_carlo(cfg: Config) -> list[float]:
+    """Run cfg.monte_carlo_runs trials, return list of completion times only.
+
+    Backward-compatible wrapper around simulate_one_run; for analyses that
+    need the per-trial loss count too, use monte_carlo_with_losses.
+    """
+    rng = random.Random(cfg.random_seed)
+    return [simulate_one_run(cfg, rng)[0] for _ in range(cfg.monte_carlo_runs)]
+
+
+def monte_carlo_with_losses(cfg: Config) -> list[tuple[float, int]]:
+    """Same as monte_carlo() but returns (time, n_effective_losses) tuples.
+
+    Use the loss counts for conditional analyses like P99 | at least one loss,
+    which is the meaningful metric when p is so low that marginal P99 just
+    reads the upper tail of the no-loss slow-start completion distribution.
+    """
     rng = random.Random(cfg.random_seed)
     return [simulate_one_run(cfg, rng) for _ in range(cfg.monte_carlo_runs)]
 
