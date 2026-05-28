@@ -86,6 +86,14 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("config", nargs="?", default=str(REPO_ROOT / "inputs.yaml"))
     ap.add_argument(
+        "--runs",
+        type=int,
+        default=50_000,
+        help="Monte Carlo trials per (n, scenario) (default: 50000). "
+        "For --conditional at low p, bump to 500k+ so the loss-affected "
+        "subset has enough samples to estimate the conditional P99.",
+    )
+    ap.add_argument(
         "--conditional",
         action="store_true",
         help="Also report P99|≥1 loss (chunk and file) — the meaningful "
@@ -100,7 +108,7 @@ def main() -> int:
     args = ap.parse_args()
 
     base = estimator.load_config(Path(args.config), None)
-    base.monte_carlo_runs = 50_000  # tail stability at q^(1/n) up to ~0.9999
+    base.monte_carlo_runs = args.runs
 
     whole_kb = base.file_size_kb
     whole_mbps = base.link_speed_mbps

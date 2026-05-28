@@ -79,7 +79,11 @@ So at p=1e-6 the rare "bad" transfer is ~15× slower than the typical
 one, but only ~1 in 200 transfers hits it. Marginal P99 hides this
 entirely.
 
-### Conditional sweep across n (p=1e-6, optimistic)
+### Conditional sweep across n (p=1e-6, optimistic, M=50k initial)
+
+(See the "Validation at M=500 000" section further below; the n=32
+row in this M=50k table is based on ~10 conditional samples and is
+revised upward by ~0.8 s when re-run at M=500k.)
 
 | n | P[chunkLoss] | P99\|chunkLoss | P[fileLoss] | **file_P99\|fileLoss** |
 | --- | --- | --- | --- | --- |
@@ -130,6 +134,43 @@ samples — directionally suggestive, not a precise number. For
 reportable conditional values at low p, bump `--runs` to 500k–1M
 (the absolute number of loss-affected chunk samples is what determines
 precision, and that scales linearly with M).
+
+### Validation at M=500 000
+
+Rerunning `chunk_compare.py /tmp/p1e-6.yaml --runs 500000 --conditional`
+(1m 30s runtime — each MC trial is fast at low p since most runs are
+loss-free slow-start completions):
+
+```
+Baseline (n=1):
+  P[≥1 loss] = 0.0052  (2617 of 500000 runs)
+  P99 | ≥1 loss = 8.904 s
+```
+
+| n | M=50k file_P99\|loss | M=500k file_P99\|loss | mean shift | conditional-set size |
+| --- | --- | --- | --- | --- |
+| 1 (baseline) | 8.923 s | 8.904 s | −0.019 s | 253 → 2 617 |
+| 2 | 7.797 s | 7.755 s | −0.042 s | ~135 → ~1 300 |
+| 4 | 6.784 s | 6.699 s | −0.085 s | ~60 → ~600 |
+| 8 | 5.086 s | 5.058 s | −0.028 s | ~40 → ~400 |
+| 16 | 3.044 s | 3.082 s | +0.038 s | ~30 → ~300 |
+| **32** | **0.921 s** | **1.689 s** | **+0.768 s** | **~10 → ~100** |
+
+Findings:
+
+- **n=32 corrected substantially** — the M=50k point estimate (0.92 s)
+  was based on ~10 conditional samples and was off by ~80 %; the M=500k
+  value (1.69 s) is based on ~100 and is much more credible. For
+  publication-grade n=32 numbers, bump further to M=2 M+ (~1 000
+  conditional samples).
+- **n=1–16 were already within ~1 % at M=50k** — the conditional set
+  was big enough for those rows.
+- **The qualitative story holds:** chunking still substantially shrinks
+  the conditional bad-outcome magnitude (8.9 s → 1.7 s at n=32, ~80 %
+  reduction), it's just slightly less dramatic than M=50k suggested.
+- **Conditional file-loss probability is stable around 0.005** across
+  all n: chunking doesn't change *how often* the bad outcome happens,
+  only *how bad* it is when it does.
 
 ## Recommendation
 

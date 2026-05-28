@@ -71,6 +71,7 @@ whole-file P99. Reports both optimistic and realistic bandwidth models.
 tools/chunk_compare.py                          # defaults
 tools/chunk_compare.py custom.yaml              # use a different config
 tools/chunk_compare.py --conditional            # also report P99 | ≥1 loss
+tools/chunk_compare.py --runs 500000            # bump MC for tail/conditional stability
 ```
 
 The `--conditional` flag adds a companion table reporting
