@@ -855,8 +855,11 @@ mod tests {
         let _ = leios.drain_telemetry();
 
         let eb_hash = point_hash(0);
+        // 8 voters out of 10 pools clears the τ = 0.75 quorum: in
+        // `EveryoneVotes` each pool has weight 1, so the threshold
+        // `ceil(0.75 × 10) = 8`.
         let voters = [
-            "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5",
+            "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5", "peer-6",
         ];
         let bodies: Vec<Vec<u8>> = voters
             .iter()
@@ -880,13 +883,13 @@ mod tests {
         } = cert
         {
             assert_eq!(*eb_slot, 0);
-            assert_eq!(*voted_weight, 7);
-            assert_eq!(*voters, 7);
+            assert_eq!(*voted_weight, 8);
+            assert_eq!(*voters, 8);
         }
 
         // Subsequent votes don't re-fire.
-        let body8 = crate::production::VoteBody::stub_persistent(0, b"peer-6", 100, &eb_hash);
-        leios.on_validated_votes(&[body8.encode(130)]);
+        let body_extra = crate::production::VoteBody::stub_persistent(0, b"peer-7", 100, &eb_hash);
+        leios.on_validated_votes(&[body_extra.encode(130)]);
         let drained2 = leios.drain_telemetry();
         assert!(!drained2
             .iter()
@@ -906,8 +909,9 @@ mod tests {
 
         let hash0 = point_hash(0);
         let hash5 = point_hash(5);
+        // 8 voters per EB clears the τ = 0.75 quorum (ceil(0.75 × 10) = 8).
         let voters = [
-            "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5",
+            "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5", "peer-6",
         ];
         let mut all_bodies = Vec::new();
         for slot in [0u64, 5u64] {
