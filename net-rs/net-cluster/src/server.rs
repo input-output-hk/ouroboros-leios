@@ -420,6 +420,7 @@ mod tests {
             topology: RwLock::new(Topology {
                 nodes: Vec::new(),
                 edges: Vec::new(),
+                total_stake: 0,
             }),
             event_window,
             event_broadcast,
