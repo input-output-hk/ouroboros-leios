@@ -7,8 +7,10 @@
 //!   `stake_distribution`.
 //! - [`load_from_yaml`] — read a v3/v4-style topology YAML
 //!   (`data/simulation/pseudo-mainnet/topology-v4-*.yaml`); honours each
-//!   node's `stake` and each link's `latency-ms` verbatim.  Geographic
-//!   placement and per-link bandwidth in the YAML are accepted-and-ignored.
+//!   node's `stake` directly and each link's `latency-ms` after clamping
+//!   negatives to zero and rounding to whole milliseconds (the inbound
+//!   delay model is integer-millisecond).  Geographic placement and
+//!   per-link bandwidth in the YAML are accepted-and-ignored.
 //!
 //! Both paths return the same [`Topology`] shape, which downstream code
 //! (overlay generation, port allocation, behaviour assignment) consumes
@@ -154,10 +156,12 @@ pub fn generate(config: &ClusterConfig, total_stake: u64) -> Topology {
 ///
 /// Per-link fields:
 ///
-/// - `producers` arrays in the YAML become directed `Edge` entries with
-///   `latency_ms = round(link.latency_ms as f64)`.  We log a one-time
-///   warning if any link has a noticeable fractional component, since
-///   `inbound_delay_ms: u64` truncates.
+/// - `producers` arrays in the YAML become directed `Edge` entries.
+///   `link.latency_ms` (f64) is clamped to `>= 0.0` and rounded to the
+///   nearest whole millisecond before storing as `u64` — net-core's
+///   inbound-delay model is integer-millisecond.  A one-time warning
+///   fires if any link has a noticeable fractional component (>0.05 ms)
+///   so operators know sub-ms precision is being dropped.
 /// - `bandwidth-bytes-per-second` is **accepted-and-ignored** — net-core
 ///   has no per-peer bandwidth shaping yet.  A one-time warning fires if
 ///   any link carries a value, so the dropped data isn't silent.
@@ -182,13 +186,26 @@ fn build_from_raw(
     raw: RawTopology,
     node_limit: Option<usize>,
 ) -> Result<Topology, Box<dyn std::error::Error + Send + Sync>> {
-    if raw.nodes.is_empty() {
-        return Err("topology YAML contains no nodes".into());
-    }
-
     let limit = node_limit.unwrap_or(usize::MAX);
     let kept_ids: Vec<&String> = raw.nodes.keys().take(limit).collect();
     let kept_count = kept_ids.len();
+
+    // Reject the empty cases up-front.  Two ways to arrive here:
+    // 1. YAML has no nodes at all.
+    // 2. YAML has nodes but `node_limit = Some(0)` discarded all of them.
+    // Either way, downstream (port allocation, overlay generation,
+    // num_nodes override in main.rs) would silently produce a 0-node
+    // cluster that boots and does nothing — surface it as an error
+    // instead.
+    if kept_count == 0 {
+        return Err(format!(
+            "topology YAML produced zero nodes (yaml_nodes={}, node_limit={:?})",
+            raw.nodes.len(),
+            node_limit,
+        )
+        .into());
+    }
+
     let id_to_index: std::collections::HashMap<&str, usize> = kept_ids
         .iter()
         .enumerate()
@@ -224,8 +241,11 @@ fn build_from_raw(
         .collect();
 
     // ---- Pass 2: build edges + peer links from the YAML producers ---------
-    // Edges are directed (one direction per `producers` entry) and we keep
-    // them ordered by (src_index, dst_index) for determinism.  Skipped:
+    // Edges are directed (one direction per `producers` entry) and emitted
+    // in **YAML insertion order** — outer loop over `raw.nodes`, inner
+    // loop over each node's `producers`.  Both are `IndexMap`s which
+    // preserve YAML order, so the resulting `edges` / per-node `peers`
+    // vectors are deterministic given the YAML file.  Skipped:
     // - destinations beyond `node_limit`
     // - self-loops (shouldn't appear in well-formed topologies)
     let mut edges: Vec<Edge> = Vec::new();
@@ -1007,10 +1027,31 @@ nodes:
 
     #[test]
     fn yaml_empty_topology_is_rejected() {
+        // Empty `nodes:` map → no nodes to load → error.
         let config = yaml_test_config();
         let raw: crate::raw_topology::RawTopology = serde_yaml::from_str("nodes: {}\n").unwrap();
         let err = build_from_raw(&config, raw, None).unwrap_err();
-        assert!(err.to_string().contains("no nodes"));
+        assert!(
+            err.to_string().contains("zero nodes"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn yaml_node_limit_zero_is_rejected() {
+        // Non-empty YAML but `node_limit = Some(0)` discards everything.
+        // Previously this silently produced an empty `Topology`, which
+        // then propagated as `num_nodes = 0` through main.rs and the
+        // cluster booted with no children.  Must be a hard error.
+        let config = yaml_test_config();
+        let raw = parse_yaml_fixture();
+        let err = build_from_raw(&config, raw, Some(0)).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("zero nodes"), "unexpected error: {msg}");
+        assert!(
+            msg.contains("node_limit=Some(0)") || msg.contains("Some(0)"),
+            "error should mention the node_limit value, got: {msg}"
+        );
     }
 
     #[test]
