@@ -77,6 +77,7 @@ pub struct AggregatedNodeStats {
     /// to status of the message, follow-up events, indexed by node which produced the
     /// follow-up event:
     /// * RBReceived;
+    /// * EBGenerated;
     /// * EBReceived;
     /// * Vote ('yes' if it was certified by current node);
     /// * Member of persistent committee (for the slot) at the time of election.

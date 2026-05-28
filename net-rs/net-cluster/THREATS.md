@@ -26,7 +26,9 @@ To invoke a threat model, use the following command:
 Here, instead of `THREAT-CONFIG`, insert the name of the corresponding threat config.
 
 In order to visualize the network activity in the corresponding configuration,
-invoke `net-ui` interface in a separate console.
+invoke `net-ui` interface in a separate console, then press 'o' and 'ENTER',
+when `net-ui` console will start. This operation will open a web-browser with the
+net cluster UI.
 
 Specific threat models
 -----------------------
