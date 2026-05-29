@@ -22,6 +22,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use serde::Serialize;
 use tracing::info;
 
 use crate::aggregation::QuorumFormed;
@@ -277,6 +278,30 @@ pub struct EbTxMatchOutcome {
     pub requested: usize,
     /// Indices we requested but didn't receive a matching body for.
     pub remaining_bitmap: BTreeMap<u16, u64>,
+}
+
+/// Snapshot of [`LeiosState`]'s internal collection sizes plus
+/// `CandidateTracker` sub-counts.  Emitted per slot via telemetry so
+/// any unbounded growth shows up as a non-flat trend line in JSONL.
+#[derive(Debug, Clone, Serialize)]
+pub struct LeiosStateSizes {
+    pub elections: usize,
+    pub eb_tx_hashes: usize,
+    pub eb_tx_hash_entries_total: usize,
+    pub pending_eb_tx_fetches: usize,
+    pub pending_eb_tx_bitmaps_total: usize,
+    pub endorsed_unvalidated_ebs: usize,
+    pub in_flight: usize,
+    pub equivocating_slots: usize,
+    pub cand_block_offers: usize,
+    pub cand_eb_offers: usize,
+    pub cand_eb_txs_offers: usize,
+    pub cand_vote_offers: usize,
+    pub cand_pending_block: usize,
+    pub cand_pending_eb: usize,
+    pub cand_pending_eb_txs: usize,
+    pub cand_pending_vote: usize,
+    pub cand_eb_txs_attempts: usize,
 }
 
 // ---------------------------------------------------------------------------
@@ -1207,11 +1232,9 @@ impl LeiosState {
         self.elections.eb_certifiable_slot(eb_hash)
     }
 
-    /// Emit an `info!` line summarising the sizes of every internal
-    /// collection.  Used by adapters to monitor memory growth — if any
-    /// collection grows without bound across consecutive lines, that's
-    /// the leak.
-    pub fn log_state_sizes(&self) {
+    /// Snapshot every internal collection's size.  Used both by
+    /// [`Self::log_state_sizes`] and by per-slot telemetry adapters.
+    pub fn state_sizes(&self) -> LeiosStateSizes {
         let eb_tx_hash_entries_total: usize =
             self.eb_tx_hashes.values().map(|(_, hs)| hs.len()).sum();
         let pending_eb_tx_bitmaps_total: usize = self
@@ -1230,16 +1253,15 @@ impl LeiosState {
             cand_pending_vote,
             cand_eb_txs_attempts,
         ) = self.candidates.state_sizes();
-        info!(
-            node_id = %self.node_id,
-            elections = self.elections.count(),
-            eb_tx_hashes = self.eb_tx_hashes.len(),
+        LeiosStateSizes {
+            elections: self.elections.count(),
+            eb_tx_hashes: self.eb_tx_hashes.len(),
             eb_tx_hash_entries_total,
-            pending_eb_tx_fetches = self.pending_eb_tx_fetches.len(),
+            pending_eb_tx_fetches: self.pending_eb_tx_fetches.len(),
             pending_eb_tx_bitmaps_total,
-            endorsed_unvalidated_ebs = self.endorsed_unvalidated_ebs.len(),
-            in_flight = self.in_flight.len(),
-            equivocating_slots = self.chain_tip_ctx.equivocating_slots.len(),
+            endorsed_unvalidated_ebs: self.endorsed_unvalidated_ebs.len(),
+            in_flight: self.in_flight.len(),
+            equivocating_slots: self.chain_tip_ctx.equivocating_slots.len(),
             cand_block_offers,
             cand_eb_offers,
             cand_eb_txs_offers,
@@ -1249,6 +1271,34 @@ impl LeiosState {
             cand_pending_eb_txs,
             cand_pending_vote,
             cand_eb_txs_attempts,
+        }
+    }
+
+    /// Emit an `info!` line summarising the sizes of every internal
+    /// collection.  Used by adapters to monitor memory growth — if any
+    /// collection grows without bound across consecutive lines, that's
+    /// the leak.
+    pub fn log_state_sizes(&self) {
+        let s = self.state_sizes();
+        info!(
+            node_id = %self.node_id,
+            elections = s.elections,
+            eb_tx_hashes = s.eb_tx_hashes,
+            eb_tx_hash_entries_total = s.eb_tx_hash_entries_total,
+            pending_eb_tx_fetches = s.pending_eb_tx_fetches,
+            pending_eb_tx_bitmaps_total = s.pending_eb_tx_bitmaps_total,
+            endorsed_unvalidated_ebs = s.endorsed_unvalidated_ebs,
+            in_flight = s.in_flight,
+            equivocating_slots = s.equivocating_slots,
+            cand_block_offers = s.cand_block_offers,
+            cand_eb_offers = s.cand_eb_offers,
+            cand_eb_txs_offers = s.cand_eb_txs_offers,
+            cand_vote_offers = s.cand_vote_offers,
+            cand_pending_block = s.cand_pending_block,
+            cand_pending_eb = s.cand_pending_eb,
+            cand_pending_eb_txs = s.cand_pending_eb_txs,
+            cand_pending_vote = s.cand_pending_vote,
+            cand_eb_txs_attempts = s.cand_eb_txs_attempts,
             "leios state sizes"
         );
     }

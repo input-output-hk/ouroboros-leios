@@ -17,6 +17,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use serde::Serialize;
 use tracing::{debug, info, warn};
 
 use crate::chain_tree::{is_better_tip, ChainTree, ChainTreeEntry};
@@ -48,6 +49,32 @@ pub const ORPHAN_COOLDOWN: Duration = Duration::from_secs(1);
 /// job; this cooldown just keeps a known-bad peer out of the running
 /// long enough for a different one to be picked.
 pub const BLOCK_FETCH_COOLDOWN: Duration = Duration::from_secs(2);
+
+/// Snapshot of [`PraosState`]'s internal collection sizes plus byte
+/// estimates for the equivocation tracking maps.  Emitted per slot via
+/// telemetry so leak rate can be plotted independently of run length.
+#[derive(Debug, Clone, Serialize)]
+pub struct PraosStateSizes {
+    pub chain_tree: usize,
+    pub block_cache: usize,
+    pub validated: usize,
+    pub in_flight: usize,
+    pub in_flight_validation: usize,
+    pub self_produced: usize,
+    pub peer_chains: usize,
+    pub peer_chain_total: usize,
+    pub peer_chain_max: usize,
+    pub header_first_seen: usize,
+    pub header_hashes_by_slot_issuer: usize,
+    pub issuer_hashes_total: usize,
+    pub equivocating_rb_slots: usize,
+    pub orphan_cooldown: usize,
+    pub block_fetch_cooldown: usize,
+    /// Rough byte estimate covering `header_hashes_by_slot_issuer` (outer
+    /// + inner) and `equivocating_rb_slots`.  Multiplies counts by
+    /// per-entry constants — not exact heap usage.
+    pub equivocation_bytes_estimate: usize,
+}
 
 // ---------------------------------------------------------------------------
 // Effect type
@@ -342,37 +369,69 @@ impl PraosState {
         (self.security_param_k as usize).saturating_mul(2).max(64)
     }
 
-    /// Emit an `info!` line summarising the sizes of every internal
-    /// collection.  Used by adapters to monitor memory growth — if any
-    /// collection grows without bound across consecutive lines, that's
-    /// the leak.
-    pub fn log_state_sizes(&self) {
-        let peer_chain_total: usize =
-            self.peer_chains.values().map(|c| c.len()).sum();
+    /// Snapshot the sizes of every internal collection plus rough byte
+    /// estimates for the equivocation maps (suspect #2 in the per-node
+    /// memory-leak audit).  Used by adapters to emit per-slot telemetry
+    /// and by `log_state_sizes` for the periodic info line.
+    pub fn state_sizes(&self) -> PraosStateSizes {
+        let peer_chain_total: usize = self.peer_chains.values().map(|c| c.len()).sum();
         let peer_chain_max: usize =
             self.peer_chains.values().map(|c| c.len()).max().unwrap_or(0);
+        let issuer_key_count = self.header_hashes_by_slot_issuer.len();
         let issuer_hashes_total: usize = self
             .header_hashes_by_slot_issuer
             .values()
             .map(|s| s.len())
             .sum();
-        info!(
-            node_id = %self.node_id,
-            chain_tree = self.chain_tree.len(),
-            block_cache = self.block_cache.len(),
-            validated = self.validated.len(),
-            in_flight = self.in_flight.len(),
-            in_flight_validation = self.in_flight_validation.len(),
-            self_produced = self.self_produced.len(),
-            peer_chains = self.peer_chains.len(),
+        // Rough byte estimate: outer BTreeMap entry ~ 100 bytes (key tuple
+        // + tree overhead, amortized); each inner BTreeSet<[u8;32]> entry
+        // ~ 80 bytes (32-byte hash + tree overhead).
+        let equivocation_bytes_estimate =
+            issuer_key_count * 100 + issuer_hashes_total * 80 + self.equivocating_rb_slots.len() * 56;
+        PraosStateSizes {
+            chain_tree: self.chain_tree.len(),
+            block_cache: self.block_cache.len(),
+            validated: self.validated.len(),
+            in_flight: self.in_flight.len(),
+            in_flight_validation: self.in_flight_validation.len(),
+            self_produced: self.self_produced.len(),
+            peer_chains: self.peer_chains.len(),
             peer_chain_total,
             peer_chain_max,
-            header_first_seen = self.header_first_seen.len(),
-            header_hashes_by_slot_issuer = self.header_hashes_by_slot_issuer.len(),
+            header_first_seen: self.header_first_seen.len(),
+            header_hashes_by_slot_issuer: issuer_key_count,
             issuer_hashes_total,
-            equivocating_rb_slots = self.equivocating_rb_slots.len(),
-            orphan_cooldown = self.orphan_cooldown.len(),
-            block_fetch_cooldown = self.block_fetch_cooldown.len(),
+            equivocating_rb_slots: self.equivocating_rb_slots.len(),
+            orphan_cooldown: self.orphan_cooldown.len(),
+            block_fetch_cooldown: self.block_fetch_cooldown.len(),
+            equivocation_bytes_estimate,
+        }
+    }
+
+    /// Emit an `info!` line summarising the sizes of every internal
+    /// collection.  Used by adapters to monitor memory growth — if any
+    /// collection grows without bound across consecutive lines, that's
+    /// the leak.
+    pub fn log_state_sizes(&self) {
+        let s = self.state_sizes();
+        info!(
+            node_id = %self.node_id,
+            chain_tree = s.chain_tree,
+            block_cache = s.block_cache,
+            validated = s.validated,
+            in_flight = s.in_flight,
+            in_flight_validation = s.in_flight_validation,
+            self_produced = s.self_produced,
+            peer_chains = s.peer_chains,
+            peer_chain_total = s.peer_chain_total,
+            peer_chain_max = s.peer_chain_max,
+            header_first_seen = s.header_first_seen,
+            header_hashes_by_slot_issuer = s.header_hashes_by_slot_issuer,
+            issuer_hashes_total = s.issuer_hashes_total,
+            equivocating_rb_slots = s.equivocating_rb_slots,
+            orphan_cooldown = s.orphan_cooldown,
+            block_fetch_cooldown = s.block_fetch_cooldown,
+            equivocation_bytes_estimate = s.equivocation_bytes_estimate,
             "praos state sizes"
         );
     }
