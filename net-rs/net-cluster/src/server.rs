@@ -500,7 +500,7 @@ async fn get_votes_history(
             if let Some(statuses) = statuses {
                 let eb_known = statuses.eb_received || statuses.eb_generated;
                 count.votes_cast += statuses.vote_cast as u64;
-                count.rb_received += statuses.eb_received as u64;
+                count.rb_received += statuses.rb_received as u64;
                 count.eb_known += eb_known as u64;
                 if statuses.perm_committee_member {
                     count.perm_committee_members += 1;
