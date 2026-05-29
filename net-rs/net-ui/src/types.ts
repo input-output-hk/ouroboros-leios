@@ -90,10 +90,19 @@ export interface ClusterControlConfig {
   node_config: Record<string, unknown>;
 }
 
+export interface AggregatedVotesCount {
+  rb_received: number,
+  eb_known: number,
+  committee_members_know_eb: number,
+  votes_cast: number,
+  perm_committee_members: number,
+}
+
 export interface AggregateVotesHistory {
   last_slot: number;
   node_ids: string[];
   votes: string[];
+  votes_count: AggregatedVotesCount[];
 }
 
 // Mirrors shared_consensus::leios::NoVoteReason (kebab-case serde).

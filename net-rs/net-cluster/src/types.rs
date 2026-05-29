@@ -67,6 +67,15 @@ pub struct NodeVotes {
     pub eb_generated: bool,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AggregatedVotesCount {
+    pub rb_received: u64,
+    pub eb_known: u64,
+    pub committee_members_know_eb: u64,
+    pub votes_cast: u64,
+    pub perm_committee_members: u64,
+}
+
 /// Number of recent slots to keep in the aggregated votes history for the UI.
 pub const WINDOW_SIZE: u64 = 25;
 
@@ -92,6 +101,8 @@ pub struct AggregatedVotesHistory {
     /// '?' - incorrect status (e.g. vote cast without RB received).
     /// In case of multiple statuses for a node, the max is taken: '1','G' > 'E' > 'R' > ' *' > '.'
     pub votes: Vec<String>,
+
+    pub votes_count: Vec<AggregatedVotesCount>
 }
 
 /// An ingested event with extracted metadata for aggregation.
