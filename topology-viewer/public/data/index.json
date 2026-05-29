@@ -1,0 +1,18 @@
+{
+  "topologies": [
+    {
+      "id": "topology-v4-mini",
+      "label": "v4-mini",
+      "file": "data/topology-v4-mini.json",
+      "n_nodes": 250,
+      "n_edges": 8572
+    },
+    {
+      "id": "topology-v4-mainnet",
+      "label": "v4-mainnet",
+      "file": "data/topology-v4-mainnet.json",
+      "n_nodes": 2685,
+      "n_edges": 95713
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  margin: 0;
+  height: 100%;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Leaflet's panes use z-index up to 700 (.leaflet-popup-pane); cap the
+   whole map container so our overlay panels (z-10..z-50) stay on top. */
+.leaflet-container {
+  z-index: 0;
+}
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: auto !important;
+}
+.leaflet-control-container .leaflet-top.leaflet-left,
+.leaflet-control-container .leaflet-top.leaflet-right,
+.leaflet-control-container .leaflet-bottom.leaflet-left,
+.leaflet-control-container .leaflet-bottom.leaflet-right {
+  z-index: 5 !important;
+}
+
+/* Leaflet attribution: dark pill overlay so it doesn't fight the basemap */
+.leaflet-control-attribution {
+  background: rgba(15, 23, 42, 0.7) !important;
+  color: #cbd5e1 !important;
+  font-size: 10px !important;
+}
+.leaflet-control-attribution a {
+  color: #93c5fd !important;
+}
+
+/* Tooltip styling for nodes */
+.leaflet-tooltip-dark {
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #334155 !important;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  padding: 6px 8px !important;
+}
+.leaflet-tooltip-dark::before {
+  border-top-color: #1e293b !important;
+}
+
+/* Zoom buttons fit the dark UI */
+.leaflet-bar a, .leaflet-bar a:hover {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-bottom-color: #334155 !important;
+}

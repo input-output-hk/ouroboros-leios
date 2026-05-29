@@ -56,16 +56,18 @@ pub fn generate_report(
         "| Clustering coefficient | {:.3} |\n",
         network_stats.clustering_coefficient
     ));
+    // `Latency` Display already appends "ms" (see models/latency.rs), so
+    // do not add another ` ms` here — that produced "95.1ms ms" output.
     report.push_str(&format!(
-        "| Average latency | {:.2} ms |\n",
+        "| Average latency | {} |\n",
         network_stats.avg_latency_ms
     ));
     report.push_str(&format!(
-        "| Maximum latency | {:.2} ms |\n",
+        "| Maximum latency | {} |\n",
         network_stats.max_latency_ms
     ));
     report.push_str(&format!(
-        "| Stake-weighted latency | {:.2} ms |\n",
+        "| Stake-weighted latency | {} |\n",
         network_stats.stake_weighted_latency_ms
     ));
     report.push_str(&format!(

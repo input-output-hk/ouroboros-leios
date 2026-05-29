@@ -46,7 +46,8 @@ pub fn check_triangle_inequality(topology: &Topology) -> Vec<Issue> {
                             severity: Severity::Error,
                             node: node_id.clone(),
                             message: format!(
-                                "Path through {} (latency: {:.1}ms) shorter than direct {}->{} (latency: {:.1}ms)",
+                                // `Latency` Display already appends "ms"; don't add another.
+                                "Path through {} (latency: {}) shorter than direct {}->{} (latency: {})",
                                 intermediate_id, shortest_indirect, node_id, producer_id, direct_dist
                             ),
                             suggestion: format!(
