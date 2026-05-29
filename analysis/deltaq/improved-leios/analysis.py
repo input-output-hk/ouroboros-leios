@@ -519,19 +519,26 @@ def cdf_validate_eb_for_voter(s_eb_tx_kb: float) -> np.ndarray:
 
 def cdf_process_cert_rb(s_eb_tx_kb: float) -> np.ndarray:
     """
-    Process an RB that contains an EB certificate (EB was certified):
+    Process an RB that contains an EB certificate (EB was certified),
+    modelling the **eager** non-voter pipeline.
+
+    Under the eager model, non-voters pre-fetch the EB body and closure
+    during the diffusion window (in parallel with voter activity), so
+    by the time the certRB arrives the only on-arrival work is the
+    certRB body fetch + cert verify (negligible).  The non-voter
+    completion time is therefore dominated by whichever finishes last:
+    the pre-fetch pipeline (body + closure + reapply — equivalent to
+    the voter pipeline) or the certRB body fetch itself.  In practice
+    the pre-fetch pipeline dominates because the certRB body is ~8 kB.
 
       Parallel:
-        A) Fetch certRB body   (~8kB)
-        B) Fetch EB body  →  Fetch missing closure txs   (sequential)
-      Then: Reapply all EB-closure txs  (CPU bound)
+        A) Fetch certRB body                  (~8 kB blended)
+        B) cdf_validate_eb_for_voter pipeline (EB body + missing
+           closure + reapply, started at EB header diffusion)
     """
-    cert_rb = cdf_fetch_cert_rb_body()
-    eb_valid = cdf_sequential(
-        cdf_fetch_eb_body(), cdf_fetch_missing_eb_closure(s_eb_tx_kb)
-    )
-    parallel = cdf_last_to_finish(cert_rb, eb_valid)
-    return cdf_sequential(parallel, reapply_txs_cdf(s_eb_tx_kb))
+    pre_fetch = cdf_validate_eb_for_voter(s_eb_tx_kb)
+    cert_arrival = cdf_fetch_cert_rb_body()
+    return cdf_last_to_finish(pre_fetch, cert_arrival)
 
 
 def cdf_process_tx_rb() -> np.ndarray:
@@ -1153,34 +1160,27 @@ def plot_outcome_diagram(fname="outcome_diagram.svg"):
 
 
 def run_sensitivity_1hop_vs_blended():
-    """Compare 1-hop vs blended-delay for missing EB closure fetching."""
+    """Compare 1-hop vs blended-delay for missing EB closure fetching,
+    under the eager non-voter model."""
     s_kb = 12288  # 12 MB
 
-    # 1-hop (as recommended by README)
+    # 1-hop (default) — non-voter pre-fetch pipeline in parallel with
+    # certRB body fetch, then verify cert.
     cert_1hop = cdf_process_cert_rb(s_kb)
 
-    # Blended-delay (conservative: missing txs must diffuse multi-hop)
-    # Temporarily patch the fetch function
-
-    class _Patched:
-        def __init__(self, use_1hop):
-            self.use_1hop = use_1hop
-
-        def __call__(self, s_eb_tx_kb):
-            missing_kb = TX_CACHE_MISS_RATE * s_eb_tx_kb
-            if self.use_1hop:
-                fetch_cdf = cdf_hop(missing_kb)
-            else:
-                fetch_cdf = cdf_blended_delay(missing_kb)
-            return cdf_choice(TX_CACHE_HIT_RATE, cdf_wait(0.001), fetch_cdf)
-
+    # Blended-missing variant: missing-closure fetch uses blended
+    # multi-hop instead of 1-hop.  Rebuild the pre-fetch pipeline with
+    # the blended fetch step in place of the 1-hop step.
     eb_body = cdf_fetch_eb_body()
+    missing_kb = TX_CACHE_MISS_RATE * s_kb
+    blended_miss_fetch = cdf_choice(
+        TX_CACHE_HIT_RATE, cdf_wait(0.001), cdf_blended_delay(missing_kb)
+    )
+    pre_fetch_blended = cdf_sequential(
+        cdf_sequential(eb_body, blended_miss_fetch), reapply_txs_cdf(s_kb)
+    )
     cert_rb = cdf_fetch_cert_rb_body()
-
-    # Blended version
-    eb_blended = cdf_sequential(eb_body, _Patched(False)(s_kb))
-    parallel_b = cdf_last_to_finish(cert_rb, eb_blended)
-    cert_blended = cdf_sequential(parallel_b, reapply_txs_cdf(s_kb))
+    cert_blended = cdf_last_to_finish(pre_fetch_blended, cert_rb)
 
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(TIMES, cert_1hop, lw=2, label="1-hop fetch (recommended)")
@@ -1431,15 +1431,30 @@ def plot_network_model_comparison(fname: str = "network_model_comparison.svg"):
         lw=1,
         label=f"p = {_TCP_LOSS:g} (analysis default)",
     )
-    # Highlight where each model crosses the 7s deadline
-    for arr, name, ls in [(t_m, "Mathis", "-"), (t_c, "CUBIC", "--")]:
-        idx = int(np.searchsorted(arr, 7.0))
-        if 0 < idx < len(p_grid):
-            ax2.plot(p_grid[idx], 7.0, "o", color="tab:red", ms=6)
+    # Highlight where each model crosses the 7s deadline.  Compute the
+    # crossing on a separate fine grid (so it matches §5.4's table to
+    # displayed precision and isn't biased by the visible curve's
+    # coarser sampling, which is intentionally undersampled to look
+    # smooth despite the step structure of _tcp_transfer_time).
+    p_fine = np.logspace(-5, -2, 6000)
+    for fn_name, name in [("mathis", "Mathis"), ("cubic", "CUBIC")]:
+        t_fine = np.array(
+            [_tcp_transfer_time(2048, _OWD_LONG_S, fn_name, p) for p in p_fine]
+        )
+        idx = int(np.searchsorted(t_fine, 7.0))
+        if 0 < idx < len(p_fine):
+            t0, t1 = t_fine[idx - 1], t_fine[idx]
+            p0, p1 = p_fine[idx - 1], p_fine[idx]
+            if t1 > t0:
+                frac = (7.0 - t0) / (t1 - t0)
+                p_cross = p0 * (p1 / p0) ** frac  # log-linear interp
+            else:
+                p_cross = p_fine[idx]
+            ax2.plot(p_cross, 7.0, "o", color="tab:red", ms=6)
             ax2.annotate(
-                f"{name}: p≈{p_grid[idx]:.1e}",
-                xy=(p_grid[idx], 7.0),
-                xytext=(p_grid[idx] * 2.5, 9 if name == "Mathis" else 11),
+                f"{name}: p≈{p_cross:.1e}",
+                xy=(p_cross, 7.0),
+                xytext=(p_cross * 2.5, 9 if name == "Mathis" else 11),
                 fontsize=8,
                 color="dimgray",
                 arrowprops=dict(arrowstyle="->", color="dimgray", lw=0.5),

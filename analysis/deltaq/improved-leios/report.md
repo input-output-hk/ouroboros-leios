@@ -157,8 +157,7 @@ relevant timing pipeline (one round) is:
   total: 3×L_hdr + L_vote + L_diff = 3+4+7 = 14 slots
 ```
 
-(Linear Leios has no Input Blocks; those belong to Full Leios.)  The
-$3 \times L_{\text{hdr}}$ period at the start of the round covers diffusion
+The $3 \times L_{\text{hdr}}$ period at the start of the round covers diffusion
 of the three relevant headers (current RB header, EB header, and
 certifying RB header).  The voter deadline is at the end of the voting
 window — i.e. $3 L_{\text{hdr}} + L_{\text{vote}} = 7$ slots from the start
@@ -191,31 +190,51 @@ Fixed: use a probabilistic choice weighted by $P_{certified}$:
 cdf_validate_rb(p_cert) = p_cert × certRB_path + (1-p_cert) × txRB_path
 ```
 
-**Why $P_{\text{cert}}$, not $P(\text{EB exists})$.**
-`cdf_validate_rb` models the *receiver-side* processing of an RB.  By
-protocol an RB is either a **certRB** (carries the cert; receiver does the
-full EB-body + missing-closure + reapply pipeline) or a **txRB** (carries
-transactions directly; receiver just applies them) — never both, never
-neither.  A certRB only exists if certification succeeded, so the choice
-probability is exactly $P_{\text{cert}}$.  In a round where an EB was
-produced but failed to certify, the next slot leader cannot include a
-cert and produces a txRB instead; the receiver in that case sees a txRB
-and does no EB processing.
+**Where does $p_{\text{cert}}$ come from, and why is it the right
+weight?**
+
+1. Where does $p_{\text{cert}}$ come from?  It is not a free
+   parameter we choose — it is a derived quantity from the model.
+   `compute_p_certified` (defined in [§4.5](#certification-probability))
+   runs the voter pipeline, computes $P_{\text{validating}}$ against
+   the 7 s voter deadline, derives $P_{\text{quorum}}$ via the
+   stake-weighted Poisson sortition, multiplies by
+   $(1 - P_{\text{interrupted}})$ from the Praos slot schedule, and
+   returns the result.  `cdf_validate_rb` then consumes that derived
+   $p_{\text{cert}}$ as the mixture weight.  The dataflow is one-way:
+   voter side → $p_{\text{cert}}$ → receiver side.  No circularity,
+   no a-priori assumed value, and the value changes across the
+   $S_{EB-tx}$ sweep as larger closures depress
+   $P_{\text{validating}}$ (and through it $P_{\text{quorum}}$ and
+   $p_{\text{cert}}$).
+
+2. Why is $p_{\text{cert}}$ the correct weight (rather than, say,
+   $P(\text{EB exists})$)?  `cdf_validate_rb` models the
+   *receiver-side* processing of an RB.  By protocol an RB is either
+   a **certRB** (carries the cert; receiver does the full EB-body +
+   missing-closure + reapply pipeline) or a **txRB** (carries
+   transactions directly; receiver just applies them) — never both,
+   never neither.  A certRB only exists if certification succeeded,
+   so the choice probability is exactly $P_{\text{cert}}$.  In a
+   round where an EB was produced but failed to certify, the next
+   slot leader cannot include a cert and produces a txRB instead;
+   the receiver in that case sees a txRB and does no EB processing.
 
 The separate work that voters do during the voting window (validating
-the EB regardless of whether the eventual cert succeeds) is modelled in
-`cdf_validate_eb_for_voter` and rolled up into $P_{\text{validating}} \to
-P_{\text{quorum}} \to P_{\text{cert}}$.  There is no double-counting: voter
-EB-validation and receiver RB-processing live in different parts of the
-model and trade on different probabilities — $P(\text{EB exists})$
-(implicit, $\approx 1$) for the former, $P_{\text{cert}}$ for the latter.
+the EB regardless of whether the eventual cert succeeds) is modelled
+in `cdf_validate_eb_for_voter` and rolled up into
+$P_{\text{validating}} \to P_{\text{quorum}} \to P_{\text{cert}}$.
+There is no double-counting: voter EB-validation and receiver
+RB-processing live in different parts of the model and trade on
+different probabilities — $P(\text{EB exists}) \approx 1$ for the
+former, $P_{\text{cert}}$ for the latter.
 
 Concretely, per round there are *three* distinct work streams:
 
 1. **Voter EB validation** of this round's EB.  Triggered by
    $P(\text{EB exists}) \approx 1$.  Captured in
-   `cdf_validate_eb_for_voter` and rolled up into $P_{\text{validating}}
-   \to P_{\text{quorum}} \to P_{\text{cert}}$.
+   `cdf_validate_eb_for_voter` and rolled up into
+   $P_{\text{validating}} \to P_{\text{quorum}} \to P_{\text{cert}}$.
 2. **Receiver RB processing** of this round's RB.  By protocol the RB
    is mutually exclusively either a certRB (probability $P_{\text{cert}}$)
    or a txRB (probability $1 - P_{\text{cert}}$) — never both, never
@@ -223,41 +242,19 @@ Concretely, per round there are *three* distinct work streams:
    here would put every RB on the certRB path, which the protocol
    forbids: in failed-cert rounds the slot leader literally cannot
    include a cert (it does not exist) and emits a txRB instead.
-3. **Non-voter EB body diffusion** within the round. The
-   current model is *lazy* and excludes this factor: non-voters incur the EB-body fetch cost
-   only when a certRB later arrives (folded into `cdf_process_cert_rb`).
-   A more eager model — closer to how real Cardano nodes operate, where
-   the EB body diffuses via gossip during $L_{\text{diff}}$ to every node
-   regardless of voting outcome — would treat this as a constant
-   per-round cost (probability $P(\text{EB exists}) \approx 1$),
-   independent of $P_{\text{cert}}$.
+3. **Non-voter EB body diffusion** within the round.  Modelled
+   explicitly under the *eager* assumption: non-voters pre-fetch the
+   EB body (and missing closure) during the diffusion window in
+   parallel with voter activity, mirroring how real Cardano nodes
+   operate under tx-submission gossip.  Triggered by
+   $P(\text{EB exists}) \approx 1$, independent of $P_{\text{cert}}$.  Captured in
+   `cdf_process_cert_rb`, which models the non-voter completion time
+   as the parallel of the pre-fetch pipeline
+   (`cdf_validate_eb_for_voter`) and the certRB body fetch.
 
-The lazy assumption in (3) is **conservative for the feasibility
-verdict**: it concentrates all non-voter EB-body work into a single
-bursty pipeline at certRB-arrival time rather than amortising it across
-the diffusion window.  An eager refinement would *lighten*
-`cdf_process_cert_rb` (most nodes would already have the EB body) and
-*raise* $P(\text{certRB} \leq 14s)$.  No change is required to keep the
-$P_{\text{cert}}$-weighted choice in `cdf_validate_rb` correct.
-
-**Where the lazy/eager choice actually matters numerically.** Under the
-1-hop missing-closure fetch (the §5.1 headline pipeline) the cert
-pipeline finishes well within both 7 s and 14 s at every CIP-target
-size, so the lazy/eager choice is invisible — both interpretations
-saturate at $P \approx 1.000$ by 14 s.  Under the **blended-missing**
-fall-back of [§5.3](#sensitivity-1-hop-vs-multi-hop-eb-closure-fetch-voter-path)
-(the upstream peer doesn't have the missing closure and the voter
-pipeline must traverse the full multi-hop network), the distinction
-becomes meaningful: at 12 MB Mathis, the same non-voter pipeline
-gives $P(\leq 7\,\text{s}) = 0.854$ (the lazy interpretation, where
-non-voters' effective budget is the round remaining after voting) but
-$P(\leq 14\,\text{s}) = 0.973$ (the eager interpretation, with the
-full round-start budget) — a ~12 percentage-point swing.  Under CUBIC
-the corresponding numbers are 0.942 vs ≈ 1.000.  The lazy model is
-therefore conservatively biased in exactly the one scenario where
-that conservatism shows up in the bottom line — and an eager refinement
-would expand the blended-missing feasibility margins without affecting
-any 1-hop headline result.
+Because the certRB body is ~8 kB the pre-fetch dominates in practice
+— by the time the certRB arrives only a small cert-verify step
+(~1 ms) remains.
 
 <a id="eb-closure-size"></a>
 
@@ -300,8 +297,8 @@ This is significantly more pessimistic for large $N$:
 | 4 MB        | 4 096     | 293 ms         | 587 ms                 |
 | 12 MB       | 12 288    | 879 ms         | 1.76 s                 |
 
-The scale mixture underestimates the mean by exactly 2×: under $k \sim
-\mathcal{U}(1, N)$ the expected work is $E[k]\mu = (N/2)\mu$ versus $N\mu$
+The scale mixture underestimates the mean by exactly 2×: under
+$k \sim \mathcal{U}(1, N)$ the expected work is $E[k]\mu = (N/2)\mu$ versus $N\mu$
 for the fixed-N case.  With the corrected per-tx constants
 ($\mu_{\text{eff}} = 0.143$ ms/tx), the Fixed-N times are well under the
 7-second voter deadline for all sizes shown, so the 2× factor no longer
@@ -322,14 +319,14 @@ The answer is no, for two reasons:
    implementation cannot skip transactions it happens to have cached.
 
 2. *The scale mixture models the wrong quantity as random.*
-   `scaleMixtureDQ N` treats the *count* of transactions as $k \sim
-   \mathcal{U}(1, N)$, implying the validator randomly skips a fraction of
+   `scaleMixtureDQ N` treats the *count* of transactions as
+   $k \sim \mathcal{U}(1, N)$, implying the validator randomly skips a fraction of
    the closure.  The actual source of variability across validators is the
    *cost per transaction*, not the number of transactions: a cache hit pays
    $\mu_{\text{reapply}}$ while a cache miss pays $\mu_{\text{apply}}$.  This
    per-transaction randomness is captured correctly by the effective mean
    $\mu_{\text{eff}} = \pi_1 \mu_{\text{apply}} + \pi_2 \mu_{\text{reapply}}$
-   (Section 4.4), with N fixed.
+   ([§4.4](#voter-validation-outcome-certrb-path)), with N fixed.
 
 The number of transactions *fetched* over the network does vary across
 validators (approximately $\pi_1 N$ on average), but this affects only the
@@ -531,12 +528,12 @@ of `Apply[ms]/n` taken from `block-edf.csv` bin means (which record per-bin
 *between-bin* spread of per-tx mean costs; *within-bin* per-tx variance
 (most notably Plutus-heavy outlier transactions) is unmeasured and not
 reflected here.  As a sensitivity check, the table below shows what the
-$T_\text{CPU}$ 99th percentile becomes under three increasingly
+$T_{\text{CPU}}$ 99th percentile becomes under three increasingly
 conservative $\sigma$ estimates derived in
 [`timing_derivation.md`](timing_derivation.md) (all §X.Y references in
 this table refer to that document, not the present report):
 
-| Source ([`timing_derivation.md`](timing_derivation.md))   | σ_apply | σ_reapply | σ_eff | $T_\text{CPU}$ q99 |
+| Source ([`timing_derivation.md`](timing_derivation.md))   | σ_apply | σ_reapply | σ_eff | $T_{\text{CPU}}$ q99 |
 |-----------------------------------------------------------|---------|-----------|-------|--------------------|
 | §3.3 tx-weighted bin-mean (adopted, headline)             | 0.527   | 0.265     | 0.363 | **1.85 s**         |
 | §3.2 frequency-weighted block-level                       | 0.93    | 0.72      | 0.77  | 1.96 s             |
@@ -647,8 +644,8 @@ falls below the quorum fraction $\tau = 0.75$, the expected vote count
 $\mu_V = P_{\text{validating}} \times 600$ drops below the threshold $\tau m = 450$.
 Because $\sigma_V \approx 10$–12 votes, being even $\approx 20$–50 votes short
 is a multi-$\sigma$ event and $P_{\text{quorum}}$ collapses rapidly.  In the
-present results $P_{\text{validating}}$ stays at or above 0.948, so $\mu_V \geq
-569$ and the margin to the 450 threshold is ≈ 120 votes (≈ 11 σ) — the
+present results $P_{\text{validating}}$ stays at or above 0.948, so
+$\mu_V \geq 569$ and the margin to the 450 threshold is ≈ 120 votes (≈ 11 σ) — the
 cliff exists in the model but is nowhere near triggered at any CIP-target
 size under either throughput model.
 
@@ -658,9 +655,9 @@ $\mu_V = 0.948 \times 600 = 569$ expected votes — well above the 450
 threshold — so $P_{\text{quorum}} \approx 1.000$ across the entire sweep.
 
 Under **CUBIC**, the same fetches complete faster: $P_{\text{validating}}$
-is ≈ 1.000 at small sizes and 0.992 at 12 MB.  $\mu_V = 0.992 \times 600
-= 595$ — essentially at the upper limit — so $P_{\text{quorum}} \approx
-1.000$.
+is ≈ 1.000 at small sizes and 0.992 at 12 MB.
+$\mu_V = 0.992 \times 600 = 595$ — essentially at the upper limit — so
+$P_{\text{quorum}} \approx 1.000$.
 
 In both models $P_{\text{cert}}$ stays at the Praos cap of $\approx 0.497$
 for every CIP-target closure size; see [§5.1](#sweep) for the full per-model tables.
@@ -793,11 +790,12 @@ worst-case scenario at 12 MB is still poor (network delivers within 14 s only
 factor (99% deliver within 14 s).  Either way, the 1-hop approximation is
 **load-bearing** for the main results: it is only justified if the raw
 transactions referenced by the EB body have already diffused via
-tx-submission *before* the EB is produced.  In Linear Leios (which has no
-Input Blocks — transactions diffuse solely via the tx-submission
-miniprotocol) this typically holds under normal operation, but is not
-guaranteed under adversarial conditions or heavy mempool load.  The full P_cert under the full-blended worst case is derived in [§5.3 "Full-blended worst case"](#full-blended-worst-case-catastrophic-pre-diffusion-failure)
-("Full-blended worst case") and is ≈ 0 under both models (the bottleneck
+tx-submission *before* the EB is produced.  In Linear Leios (where
+transactions diffuse solely via the tx-submission miniprotocol) this
+typically holds under normal operation, but is not guaranteed under
+adversarial conditions or heavy mempool load.  The full P_cert under the full-blended worst case is derived in
+[§5.3 "Full-blended worst case"](#full-blended-worst-case-catastrophic-pre-diffusion-failure)
+and is ≈ 0 under both models (the bottleneck
 shifts from network delivery to the tighter 7 s voter deadline and the 75%
 quorum threshold).
 
@@ -930,19 +928,6 @@ $X = 8.1$ MB CUBIC.  The CPU step uses the swept $\pi_1$ in
 $\mu_{\text{eff}} = \pi_1 \mu_{\text{apply}} + (1{-}\pi_1) \mu_{\text{reapply}}$,
 so per-tx cost rises with $\pi_1$.)
 
-*Note: the lazy-vs-eager modelling choice ([§3.1](#rb-path-structure))
-does not move this table.*  The figures above are derived from the
-**voter** pipeline, where the 7 s deadline is protocol-fixed (voters
-must cast their vote within the voting window) and the voter must
-fetch the EB body and missing closure themselves to validate before
-voting.  The lazy/eager distinction only affects *non-voter* EB-body
-diffusion timing; it does not change voter behaviour, the voter
-deadline, or the blended-multi-hop fetch cost of the missing closure
-under the "1-hop fails" topology assumption.  Switching to the eager
-model would improve the non-voter side — specifically
-$P(\text{certRB} \leq 14s)$ under blended-missing rises from 0.854 to
-0.973 at 12 MB Mathis (§3.1) — but $S_{\text{max}}$ itself is unchanged.
-
 **The naive formula $S = X / \pi_1$ overstates feasibility by ~1.5–2×
 under Mathis and ~4–7× under CUBIC** across the swept range.  It counts
 only the missing-fraction fetch step; the actual voter pipeline also
@@ -1050,9 +1035,9 @@ throughput equation and may matter more than the Mathis-vs-CUBIC distinction:
    | 8     | 146 000     | 803 000         | steady state  | **1 538 590** (capped) | 3 392 790 | **capped** |
 
    Mathis caps at the end of round 4 (cwnd $\to W_{\text{ss}}^M = 146$ kB);
-   CUBIC caps at the end of round 7 (cwnd $\to W_{\text{ss}}^C \approx 1.54$
-   MB).  The asymptotic per-RTT throughput ratio is $W_{\text{ss}}^C /
-   W_{\text{ss}}^M \approx 10.5$.
+   CUBIC caps at the end of round 7 (cwnd $\to W_{\text{ss}}^C \approx 1.54$ MB).
+   The asymptotic per-RTT throughput ratio is
+   $W_{\text{ss}}^C / W_{\text{ss}}^M \approx 10.5$.
 
    Concrete consequences for our analysis (transfer-size thresholds in
    bytes, with approximate kiB/MiB labels):
@@ -1194,8 +1179,8 @@ empirical mean $\pi_1$ but not under Mathis).
    The missing-fetch overhead has grown but not enough to fail the 7 s
    voter deadline at any tested CIP-target size.
 
-3. **Only at $\pi_1 = 0.50$ does Mathis fail at 12 MB** ($P_{\text{cert}} \to
-   0$).  CUBIC is robust to $\pi_1$ all the way up to 0.50 at 12 MB.
+3. **Only at $\pi_1 = 0.50$ does Mathis fail at 12 MB**
+   ($P_{\text{cert}} \to 0$).  CUBIC is robust to $\pi_1$ all the way up to 0.50 at 12 MB.
 
 **Implication.** **Neither the throughput model nor $\pi_1$ (within the
 empirical and prior-model range) is a sensitive input to the 12 MB
@@ -1286,11 +1271,11 @@ P99, and observed maximum (all times in seconds):
    The "≈ 2.0 s" missing-closure-fetch figure is the *typical*
    outcome; 1 in 100 transfers takes 5.6 s, and the worst observed
    was 13.9 s.  All percentiles up to P99 still complete within the
-   7 s voter deadline, so [§5.1](#sweep)'s $P_{\text{validating}} =
-   0.992$ for 12 MB CUBIC is consistent with the tail behaviour the
+   7 s voter deadline, so [§5.1](#sweep)'s
+   $P_{\text{validating}} = 0.992$ for 12 MB CUBIC is consistent with the tail behaviour the
    analytical model omits.  At the §5.3 full-blended worst case
-   (12 MB full-closure), MC confirms $P(\text{full diffusion} \leq
-   14\,\text{s}) \approx 0.98$, close to the 99.1% figure cited
+   (12 MB full-closure), MC confirms
+   $P(\text{full diffusion} \leq 14\,\text{s}) \approx 0.98$, close to the 99.1% figure cited
    in [§5.2](#network-diffusion-of-the-eb-closure) (within MC noise).
 
 **Caveats.**
@@ -1440,8 +1425,8 @@ stays at the Praos cap of $\approx 0.497$.
      $W_{\text{ss}}$ and dominates transfer time for large sizes.
    - *1 Gbit/s interface cap.*  Applies only if the interface is the
      bottleneck; SPO nodes with lower-bandwidth connections would see worse
-     numbers.  The bandwidth-delay product $\text{BDP} = 125\,\text{MB/s}
-     \times \text{RTT}$ is well above either model's $W_{\text{ss}}$ at
+     numbers.  The bandwidth-delay product
+     $\text{BDP} = 125\,\text{MB/s} \times \text{RTT}$ is well above either model's $W_{\text{ss}}$ at
      $p = 10^{-4}$ on every distance category, so the BDP cap is inactive.
    - *Persistent TCP, no handshake.*  Each fetch is assumed to use an existing
      long-lived TLS connection; cold-start RTTs (TCP 3-way + TLS handshake)
@@ -1469,7 +1454,7 @@ stays at the Praos cap of $\approx 0.497$.
 9. **Normality (CLT) assumption on per-tx and vote-count distributions.**
    The model uses Normal-CDF approximations in two places: the total per-EB
    CPU validation time is treated as
-   $T_\text{CPU} \sim \mathcal{N}(N \mu_{\text{eff}}, N \sigma^2_{\text{eff}})$
+   $T_{\text{CPU}} \sim \mathcal{N}(N \mu_{\text{eff}}, N \sigma^2_{\text{eff}})$
    (Fixed-N CLT, [§4.4](#voter-validation-outcome-certrb-path)), and the
    committee vote count is treated as
    $V \sim \mathcal{N}(\mu_V, \sigma_V^2)$ (CLT over independent voters,
@@ -1512,8 +1497,8 @@ stays at the Praos cap of $\approx 0.497$.
 
 1. **The CIP-0164 target of 12 MB is robustly feasible under realistic
    mainnet conditions.**  At the empirical $\pi_1 \approx 0.06$ ([§5.5](#pi1-sensitivity),
-   [`pi1_derivation.md`](pi1_derivation.md)) and the Praos paper's RTT values, $P_{\text{cert}}
-   \approx 0.497$ at 12 MB under *both* Mathis and CUBIC.  The 2 MB
+   [`pi1_derivation.md`](pi1_derivation.md)) and the Praos paper's RTT values,
+   $P_{\text{cert}} \approx 0.497$ at 12 MB under *both* Mathis and CUBIC.  The 2 MB
    missing-closure fetch over long-haul (268 ms RTT) takes ≈ 4.4 s under
    Mathis and ≈ 2.0 s under CUBIC — both well within the 7 s voter deadline.
    The throughput-model uncertainty is immaterial in this regime; both
@@ -1534,8 +1519,8 @@ stays at the Praos cap of $\approx 0.497$.
    ≈ 0 under either throughput model at 12 MB (the 7 s voter deadline and
    75% quorum threshold both fail, regardless of whether the network
    delivers within 14 s; see [§5.3 "Full-blended worst case"](#full-blended-worst-case-catastrophic-pre-diffusion-failure) and the
-   $\alpha$-mixture formula $P_{\text{cert,effective}} \approx \alpha \cdot
-   P_{\text{cert,1-hop}}$).  Protocol parameters and node implementation
+   $\alpha$-mixture formula $P_{\text{cert,effective}} \approx \alpha \cdot P_{\text{cert,1-hop}}$).
+   Protocol parameters and node implementation
    must ensure pre-diffusion holds under normal operation.
 
 4. **The Praos interruption probability (≈ 50%) is a hard ceiling.**
@@ -1578,7 +1563,7 @@ stays at the Praos cap of $\approx 0.497$.
 
 9. **Fit a heavy-tailed per-tx cost distribution from regression
    residuals.**  Limitation 9 ([§7](#limitations-and-assumptions)) notes
-   that the Normal CLT used for $T_\text{CPU}$ likely understates the
+   that the Normal CLT used for $T_{\text{CPU}}$ likely understates the
    q99 / q99.9 of CPU validation time because the per-tx cost
    distribution has heavier tails than Gaussian.  Without per-transaction
    telemetry we cannot fit a tail distribution directly, but we *can*
@@ -1597,10 +1582,10 @@ stays at the Praos cap of $\approx 0.497$.
      candidate heavy-tailed family — lognormal and Pareto are the
      natural first attempts — using maximum likelihood or method of
      moments.  (c) Use the fitted distribution to compute the
-     $T_\text{CPU}$ tail (sum of $N$ iid samples) via simulation or
+     $T_{\text{CPU}}$ tail (sum of $N$ iid samples) via simulation or
      a saddle-point approximation rather than the CLT.
 
-   - **Deliverable.**  An updated q99 / q99.9 estimate for $T_\text{CPU}$
+   - **Deliverable.**  An updated q99 / q99.9 estimate for $T_{\text{CPU}}$
      at $S_{EB-tx} = 12$ MB with explicit tail parameters, replacing
      the current $\sigma$-bound interval (1.85 s – 3.44 s) with a tighter
      empirically-fitted figure.
@@ -1700,24 +1685,6 @@ cap, no cliff.  The chart illustrates that the model corrections change
 the interpretation fundamentally: what previously appeared to be a
 feasibility limit at 0.974 is now revealed as the Praos 50% cap.
 
-**Counterintuitive appearance — blue below orange.** The $S_{EB-tx}=0$ curve
-(blue) sits *below* the $S_{EB-tx}=12\,\text{MB}$ curve (orange) at early
-times, which looks backwards at first glance.  Both curves show the
-*combined* round outcome:
-
-$$F_{\text{comb}}(t) = p_{\text{cert}} \times F_{\text{certRB}}(t) + (1-p_{\text{cert}}) \times F_{\text{txRB}}(t)$$
-
-At $S_{EB-tx}=0$, $p_{\text{cert}} \approx 0.50$, so half of all rounds take the
-certRB path, which requires fetching the EB body (up to 512 kB, blended
-multi-hop) even when the closure is empty.  That diffusion overhead pulls the
-$S_{EB-tx}=0$ curve below the $S_{EB-tx}=12\,\text{MB}$ curve at early times.
-
-This is not an error.  It correctly reflects a real protocol cost: running
-Linear Leios with active EB certification makes the average round *slower* than
-pure Praos (txRB only), because cert rounds carry more network overhead.  The
-green dotted *txRB path only* curve closely tracks the 12 MB curve, confirming
-that the 12 MB result is dominated by the fast txRB path (50% of rounds).
-
 ---
 
 ### `eb_closure_sweep.svg`
@@ -1736,8 +1703,8 @@ the combined outcome CDF.  Curves are colour-coded by size; the vertical line
 marks the 14-second deadline.
 
 **Why it matters.** With the corrected per-tx constants and the corrected
-Praos RTTs, every curve from 0 to 12 MB plateaus at $P_{\text{cert}} \approx
-0.497$ before the 14-second deadline under both throughput models —
+Praos RTTs, every curve from 0 to 12 MB plateaus at
+$P_{\text{cert}} \approx 0.497$ before the 14-second deadline under both throughput models —
 $P_{\text{validating}}$ is high enough at every CIP-target size that the
 quorum is comfortably met.  No cliff appears in the plotted range under
 either model.
@@ -1758,8 +1725,8 @@ either model.
 - *Left* — three probability curves: $P_{\text{cert}}$ (liveness), $P(\text{certRB} \leq 14s)$ (safety), and their product $P_{\text{cert}} \times P(\leq 14s)$ (the combined outcome, the only quantity that matters for protocol correctness).
 - *Right* — $P(\text{certRB validated} \leq 14s \mid \text{cert path})$ alone, zoomed to show whether the certRB diffusion time is a bottleneck.
 
-**Why it matters.** Both panels stay essentially flat at $P_{\text{cert}}
-\approx 0.497$ across the entire 0–12 MB range under either model.  The
+**Why it matters.** Both panels stay essentially flat at
+$P_{\text{cert}} \approx 0.497$ across the entire 0–12 MB range under either model.  The
 "cert × safe" composite likewise stays at ≈ 0.497 throughout.  Confirms
 the Praos cap is the only binding limit in the CIP target range — no
 network-driven cliff appears under either model.
@@ -1786,8 +1753,8 @@ network-driven cliff appears under either model.
 
 **Why it matters.**
 - *Mathis*: $P_{\text{validating}}$ declines from ≈ 1.000 at 0 MB to 0.948 at
-  12 MB — always well above the 0.75 quorum threshold.  $P_{\text{quorum}}
-  \approx 1.0$ throughout; $P_{\text{cert}}$ stays at the Praos cap.
+  12 MB — always well above the 0.75 quorum threshold.
+  $P_{\text{quorum}} \approx 1.0$ throughout; $P_{\text{cert}}$ stays at the Praos cap.
 - *CUBIC*: $P_{\text{validating}}$ declines from ≈ 1.000 at 0 MB to 0.992 at
   12 MB.  Same conclusion: $P_{\text{cert}}$ at the Praos cap.
 
@@ -1808,7 +1775,7 @@ probability $1 - p_{\text{cert}}$ the RB is a *txRB*: the node downloads the
 header and a ≤ 90 kB transaction payload and applies those transactions
 directly.
 
-**Why it matters.** This diagram is the visual summary of Bug Fix 1 (Section 3).
+**Why it matters.** This diagram is the visual summary of [§3.1](#rb-path-structure)'s bug fix.
 The prior model forced *both* paths to run in parallel on every RB; this
 diagram illustrates why that was wrong and what the correct probabilistic
 choice model looks like.
@@ -1858,18 +1825,24 @@ without it changing the certification outcome.
 ![network_diffusion — CUBIC](plots/cubic/network_diffusion.svg)
 
 **What it shows.** A network-only (CPU excluded) analysis across $S_{EB-tx}$
-values from 0.5 MB to 12 MB.  Three $P(\leq t)$ curves are shown for each
-size: 1-hop fetch of missing fraction (EB body + 1-hop), blended fetch of
-missing fraction (EB body + blended multi-hop), and full blended diffusion of
-the entire closure.  The 7-second voter deadline and 14-second total deadline
-are annotated.
+values from 0.5 MB to 12 MB, split into two panels.
 
-**Why it matters.** This plot answers the question "even if the CPU were
-infinitely fast, could the network deliver the closure in time?"  All
-three curves assume *every* voter must fetch (i.e. treat all voters as
+- *Left panel (per-size CDFs):* for each highlighted closure size,
+  two $P(\le t)$ curves are plotted — **1-hop fetch of missing
+  fraction** (EB body + 1-hop, solid) and **full blended diffusion
+  of the entire closure** (dashed).  The 7 s voter deadline and
+  14 s total deadline are annotated.
+- *Right panel (sweep over $S_{EB-tx}$):* four aggregate trace
+  lines vs closure size — $P(\le 7s)$ for 1-hop missing, $P(\le 7s)$
+  for blended missing, $P(\le 14s)$ for full blended, and $P(\le 7s)$
+  for full blended.  A 97% target line is overlaid.
+
+**Why it matters.** This plot answers the question "even if the CPU
+were infinitely fast, could the network deliver the closure in time?"
+The curves assume *every* voter must fetch (i.e. treat all voters as
 cache-miss); this is therefore strictly more conservative than the
-[§5.1](#sweep) voter pipeline, where 5/6 of voters are cache-hits with a near-zero
-lookup.
+[§5.1](#sweep) voter pipeline, where 5/6 of voters are cache-hits
+with a near-zero lookup.
 - *Mathis*: full-blended at 12 MB gives $P(\leq 14\,\text{s}) = 0.139$ —
   the network delivers only 14% of the time under the worst-case
   no-pre-diffusion assumption.  The 1-hop scenario at 12 MB gives
