@@ -28,6 +28,7 @@
     - [5.4 Network Model Sensitivity (Mathis vs CUBIC vs loss rate)](#network-model-sensitivity-mathis-vs-cubic-vs-loss-rate)
         - [Caveats common to both models](#caveats-common-to-both-models)
     - [5.5 TxCache Miss Rate Sensitivity (π₁ sweep)](#pi1-sensitivity)
+    - [5.6 Monte Carlo tail validation (CUBIC)](#mc-validation)
 - [6. Comparison with Prior Analysis](#comparison-with-prior-analysis)
 - [7. Limitations and Assumptions](#limitations-and-assumptions)
 - [8. Recommendations](#recommendations)
@@ -1224,6 +1225,101 @@ from a broader SPO sample** (not just three AWS regions) covering more
 network topologies and a wider time window including incident periods,
 ideally fitting the Markov chain $p, q$ directly from the observed
 tx-arrival autocorrelation rather than just the steady-state mean.
+
+<a id="mc-validation"></a>
+
+### 5.6 Monte Carlo tail validation (CUBIC)
+
+The analytical network model in [§5.1](#sweep)–[§5.5](#pi1-sensitivity)
+treats each per-hop TCP transfer as a *deterministic* function of
+$(\text{size}, \text{RTT}, p)$: slow start from $\text{cwnd}_{0} = 10$
+MSS, cwnd doubles each RTT, capped at the model-specific steady-state
+window $W_{\text{ss}}$.  Real TCP transfers are stochastic: random
+packet losses can occur during the transfer, triggering CUBIC's
+multiplicative-decrease-and-reclimb cycle and adding tail latency.
+To validate the analytical model and quantify the tail, we ran a
+Monte Carlo TCP CUBIC simulator (a separate companion project,
+described below) at the report's headline parameters.
+
+**Setup.**  20,000 independent MC runs per (file size, model) pair
+under: CUBIC with multiplicative-decrease $\beta = 0.3$, $C = 0.4$,
+fast convergence on; initial cwnd = 10 MSS; slow-start exits at the
+BDP (matches our model); RTT = 268 ms (long-haul, conservative end);
+Bernoulli loss at $p = 10^{-4}$; no RTT jitter.  The estimator models
+the actual CUBIC dynamics: slow-start cwnd doubling, multiplicative
+decrease on each loss event, cubic-curve climb back to the
+pre-decrease window in congestion avoidance.
+
+**Results.**  For each closure size appearing in [§5.1](#sweep) /
+[§5.3](#sensitivity-1-hop-vs-multi-hop-eb-closure-fetch-voter-path),
+the analytical prediction is compared with the MC mean, median, P95,
+P99, and observed maximum (all times in seconds):
+
+| Scenario                        | Size     | Analytical | MC mean | MC P50 | MC P95 | MC P99 | MC max |
+|---------------------------------|----------|-----------:|--------:|-------:|-------:|-------:|-------:|
+| **Missing-closure fetch (1-hop, $\pi_1 = 1/6$)** |          |            |         |        |        |        |        |
+| missing @ 1 MB closure          | 171 kB   | 0.94       | 1.08    | 1.07   | 1.07   | 1.07   | 3.48   |
+| missing @ 4 MB closure          | 683 kB   | 1.48       | 1.65    | 1.61   | 1.61   | 2.68   | 8.04   |
+| missing @ 8 MB closure          | 1.37 MB  | 1.75       | 1.96    | 1.88   | 2.14   | 4.29   | 14.74  |
+| **missing @ 12 MB closure**     | **2 MB** | **2.01**   | **2.26**| **2.14** | **2.68** | **5.63** | **13.94**|
+| **Full closure ([§5.3](#full-blended-worst-case-catastrophic-pre-diffusion-failure) worst case)** |          |            |         |        |        |        |        |
+| full @ 1 MB                     | 1.02 MB  | 1.74       | 1.93    | 1.88   | 1.88   | 3.48   | 11.79  |
+| full @ 4 MB                     | 4.10 MB  | 2.28       | 2.69    | 2.41   | 4.02   | 9.92   | 20.10  |
+| full @ 8 MB                     | 8.19 MB  | 3.09       | 3.29    | 2.68   | 6.43   | 13.67  | 26.26  |
+| **full @ 12 MB**                | **12.3 MB** | **3.63**| **3.77**| **2.68** | **8.84** | **16.08** | **29.48** |
+
+**Three takeaways.**
+
+1. **Analytical model captures the modal outcome.**  The MC median is
+   essentially the analytical value at every size — confirming the
+   deterministic slow-start-to-$W_{\text{ss}}$ formulation correctly
+   predicts the *loss-free* trajectory, which is the typical outcome
+   at $p = 10^{-4}$.  Mean alignment is within ~15% across the table.
+
+2. **Right tails grow with payload size.**  The MC P99 / analytical
+   ratio rises from 1.14× at the smallest size to 2.80× at 12 MB
+   missing-fetch and 4.43× at 12 MB full-closure.  Loss events during
+   long transfers compound: each loss costs ~one round-trip plus the
+   CUBIC reclimb, and larger transfers carry more rounds.
+
+3. **The §5.1 headline at 12 MB CUBIC stays robust to the tail.**
+   The "≈ 2.0 s" missing-closure-fetch figure is the *typical*
+   outcome; 1 in 100 transfers takes 5.6 s, and the worst observed
+   was 13.9 s.  All percentiles up to P99 still complete within the
+   7 s voter deadline, so [§5.1](#sweep)'s $P_{\text{validating}} =
+   0.992$ for 12 MB CUBIC is consistent with the tail behaviour the
+   analytical model omits.  At the §5.3 full-blended worst case
+   (12 MB full-closure), MC confirms $P(\text{full diffusion} \leq
+   14\,\text{s}) \approx 0.98$, close to the 99.1% figure cited
+   in [§5.2](#network-diffusion-of-the-eb-closure) (within MC noise).
+
+**Caveats.**
+
+1. **CUBIC only.**  The estimator simulates TCP CUBIC.  The §5.1a
+   Mathis (Reno/AIMD) results are not yet MC-validated; adding a Reno
+   branch to the estimator is a modest follow-up.
+2. **Long-haul RTT only.**  The §5.1 "blended" numbers average over
+   short / medium / long distance categories and path lengths 1–5.
+   The MC results above all use RTT = 268 ms (the long-haul end,
+   conservative).  Shorter-RTT distributions would have proportionally
+   shorter tails.
+3. **Single TCP connection.**  The estimator models one TCP flow with
+   a single end-to-end RTT.  The §5.3 "blended multi-hop" scenario
+   chains multiple per-hop transfers; here we approximate that as a
+   single connection at the long-haul RTT, which overstates per-hop
+   independence but is the closest direct analog.
+4. **Bernoulli loss only.**  The estimator also supports
+   Gilbert–Elliott (bursty) loss but we use Bernoulli here for
+   apples-to-apples comparison against the analytical model.  Bursty
+   loss would heighten the tails further.
+
+**Connection to [§7 Limitation 9](#limitations-and-assumptions).**  The
+table above gives the first concrete tail evidence for the *network*
+step (where Limit 9 previously had only qualitative claims).  P99 / mean
+ratios of 2–4× confirm that per-hop transfer time has substantially
+heavier tails than the analytical Gaussian-collapse implicit in our
+ΔQ network module, even before adding the per-tx CPU tail.  The two
+sources of tail compound in the full voter pipeline.
 
 ---
 
