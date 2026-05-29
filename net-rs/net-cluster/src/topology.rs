@@ -21,7 +21,7 @@ use std::path::Path;
 use rand::prelude::*;
 use serde::Serialize;
 
-use crate::config::{BehaviourSelection, ClusterConfig};
+use crate::config::{BehaviourSelection, ClusterConfig, TopologySource};
 use crate::raw_topology::{self, RawTopology};
 
 /// A peer link from one node to another.
@@ -89,19 +89,31 @@ pub struct Topology {
 /// Generate a random cluster topology from the given config.
 ///
 /// The `total_stake` parameter comes from the base config and is divided
-/// among nodes according to the stake distribution strategy.
+/// among nodes according to the stake distribution strategy.  The caller
+/// is responsible for ensuring `config.topology_source` is the `Random`
+/// variant.
 pub fn generate(config: &ClusterConfig, total_stake: u64) -> Topology {
-    let n = config.num_nodes;
+    let TopologySource::Random {
+        num_nodes,
+        degree,
+        min_latency_ms,
+        max_latency_ms,
+        stake_distribution,
+    } = &config.topology_source
+    else {
+        panic!("topology::generate called with non-Random topology_source");
+    };
+    let n = *num_nodes;
     let mut rng = match config.seed {
         Some(s) => StdRng::seed_from_u64(s),
         None => StdRng::from_entropy(),
     };
 
     // Step 1: Build random graph edges.
-    let edges = build_random_graph(n, config.degree, config, &mut rng);
+    let edges = build_random_graph(n, *degree, *min_latency_ms, *max_latency_ms, &mut rng);
 
     // Step 2: Distribute stake.
-    let stakes = distribute_stake(n, total_stake, &config.stake_distribution);
+    let stakes = distribute_stake(n, total_stake, stake_distribution);
 
     // Step 3: Build node topologies.
     let behaviour_set = resolve_behaviour_nodes(config, &stakes);
@@ -379,7 +391,8 @@ fn build_from_raw(
 fn build_random_graph(
     n: usize,
     degree: usize,
-    config: &ClusterConfig,
+    min_latency_ms: u64,
+    max_latency_ms: u64,
     rng: &mut StdRng,
 ) -> Vec<Edge> {
     if n <= 1 {
@@ -398,7 +411,7 @@ fn build_random_graph(
 
         let needed = degree.saturating_sub(adj[i].len());
         for &j in candidates.iter().take(needed) {
-            let latency = rng.gen_range(config.min_latency_ms..=config.max_latency_ms);
+            let latency = rng.gen_range(min_latency_ms..=max_latency_ms);
             adj[i].insert(j);
             adj[j].insert(i);
             edges.push(Edge {
@@ -416,7 +429,7 @@ fn build_random_graph(
             let a = pair[0][0];
             let b = pair[1][0];
             if !adj[a].contains(&b) {
-                let latency = rng.gen_range(config.min_latency_ms..=config.max_latency_ms);
+                let latency = rng.gen_range(min_latency_ms..=max_latency_ms);
                 adj[a].insert(b);
                 adj[b].insert(a);
                 edges.push(Edge {
@@ -630,10 +643,13 @@ mod tests {
 
     fn test_config(num_nodes: usize, degree: usize) -> ClusterConfig {
         ClusterConfig {
-            num_nodes,
-            degree,
-            min_latency_ms: 10,
-            max_latency_ms: 100,
+            topology_source: TopologySource::Random {
+                num_nodes,
+                degree,
+                min_latency_ms: 10,
+                max_latency_ms: 100,
+                stake_distribution: "equal".to_string(),
+            },
             base_config: "test.toml".to_string(),
             base_port: 30000,
             seed: Some(42),
@@ -969,8 +985,11 @@ nodes:
 "#;
 
     fn yaml_test_config() -> ClusterConfig {
+        // Note: when YAML mode is exercised through `build_from_raw` we
+        // don't actually need to set `topology_source = Yaml { .. }` —
+        // the loader doesn't read it — but we keep the default Random
+        // here so the rest of the ClusterConfig stays valid.
         ClusterConfig {
-            num_nodes: 4,
             base_config: "test.toml".to_string(),
             base_port: 31000,
             seed: Some(7),
@@ -1163,7 +1182,6 @@ nodes:
         let raw: crate::raw_topology::RawTopology = serde_yaml::from_str(&yaml).unwrap();
 
         let config = ClusterConfig {
-            num_nodes: 3,
             base_config: "test.toml".to_string(),
             base_port: 32000,
             seed: Some(7),

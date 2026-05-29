@@ -16,11 +16,6 @@
 #     --node-set fetch_policy.eb_txs.kind=broadcast \
 #     --node-set fetch_policy.eb_txs.n=3
 
-num_nodes = 100
-degree = 10
-min_latency_ms = 5
-max_latency_ms = 250
-
 base_config = "net-node/configs/mainnet.toml"
 
 # Avoid colliding with any other cluster on the same machine.
@@ -33,7 +28,14 @@ output_events = "cluster-events.jsonl"
 ordering_window_secs = 1.0
 aggregator_port = 9100
 stats_interval_secs = 1
-stake_distribution = "equal"
 
 # Match the baseline RB lottery cadence.
 rb_generation_probability = 0.05
+
+[topology_source]
+type = "random"
+num_nodes = 100
+degree = 10
+min_latency_ms = 5
+max_latency_ms = 250
+stake_distribution = "equal"

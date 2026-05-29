@@ -1,6 +1,6 @@
 //! TOML-based cluster configuration with figment loading.
 
-use figment::providers::{Format, Serialized, Toml};
+use figment::providers::{Format, Toml};
 use figment::Figment;
 use serde::{Deserialize, Serialize};
 
@@ -20,12 +20,20 @@ fn default_inject_count() -> usize {
 }
 
 /// Subset of ClusterConfig controllable via the REST API.
+///
+/// `topology_source` overrides the whole topology mode wholesale — sending
+/// `type = "random"` switches the cluster to a random graph (with whichever
+/// random-mode fields you supply), and `type = "yaml"` switches it to a
+/// YAML-driven topology.  There's intentionally no way to override just one
+/// random-mode field through this struct: that would silently mix modes.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ClusterControlConfig {
-    pub num_nodes: Option<usize>,
-    pub degree: Option<usize>,
-    pub min_latency_ms: Option<u64>,
-    pub max_latency_ms: Option<u64>,
+    /// Topology mode + its mode-specific params (e.g. `num_nodes`, `degree`
+    /// for Random; `path`, `node_limit` for Yaml).  When `None`, the
+    /// current cluster topology source is left untouched.
+    #[serde(default)]
+    pub topology_source: Option<TopologySource>,
+    #[serde(default)]
     pub seed: Option<u64>,
     /// Node-level config overrides written into each node's overlay TOML.
     /// Keys are dotted TOML paths (e.g. "production.rb_generation_probability").
@@ -37,22 +45,36 @@ pub struct ClusterControlConfig {
 ///
 /// Defaults to [`TopologySource::Random`] (the historical behaviour) so
 /// existing TOML configs that don't mention `topology_source` continue to
-/// generate a random graph from `num_nodes`/`degree`/`min_latency_ms`/
-/// `max_latency_ms`.
+/// generate a random graph from the default `num_nodes`/`degree`/
+/// `min_latency_ms`/`max_latency_ms`/`stake_distribution`.
 ///
 /// Selecting [`TopologySource::Yaml`] loads `data/simulation/pseudo-mainnet/
 /// topology-v*.yaml`-style files (same schema as sim-rs and topology-checker).
-/// In YAML mode the `num_nodes`/`degree`/`min_latency_ms`/`max_latency_ms`
-/// fields are **ignored** — node count comes from the YAML (optionally
-/// capped by `node_limit`), edges come from the YAML's `producers` arrays,
-/// and per-link latencies come from `latency-ms`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+/// All mode-specific parameters live **inside** the variant: writing
+/// `degree = 7` under `type = "yaml"` is a parse-time error, not a silent
+/// ignore.  This is enforced by `#[serde(deny_unknown_fields)]` on the
+/// enum, which forwards to each variant struct.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum TopologySource {
-    /// Generate a random connected graph (`num_nodes`, `degree`,
-    /// `min/max_latency_ms`).
-    #[default]
-    Random,
+    /// Generate a random connected graph.
+    Random {
+        /// Number of net-node instances to spawn.
+        #[serde(default = "default_num_nodes")]
+        num_nodes: usize,
+        /// Target number of peers per node.
+        #[serde(default = "default_degree")]
+        degree: usize,
+        /// Minimum simulated link latency (ms).
+        #[serde(default = "default_min_latency")]
+        min_latency_ms: u64,
+        /// Maximum simulated link latency (ms).
+        #[serde(default = "default_max_latency")]
+        max_latency_ms: u64,
+        /// Stake distribution strategy ("equal", "mainnet-shaped").
+        #[serde(default = "default_stake_distribution")]
+        stake_distribution: String,
+    },
     /// Load a YAML topology (v3/v4 schema).  `path` is interpreted
     /// relative to the process's current directory at startup.
     Yaml {
@@ -68,27 +90,23 @@ pub enum TopologySource {
     },
 }
 
+impl Default for TopologySource {
+    fn default() -> Self {
+        Self::Random {
+            num_nodes: default_num_nodes(),
+            degree: default_degree(),
+            min_latency_ms: default_min_latency(),
+            max_latency_ms: default_max_latency(),
+            stake_distribution: default_stake_distribution(),
+        }
+    }
+}
+
 /// Top-level cluster configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ClusterConfig {
-    /// Number of net-node instances to spawn (random topology only;
-    /// overwritten by the loaded node count when `topology_source` is
-    /// `yaml`).
-    pub num_nodes: usize,
-
-    /// Target number of peers per node (random topology only).
-    #[serde(default = "default_degree")]
-    pub degree: usize,
-
-    /// Minimum simulated link latency (ms) (random topology only).
-    #[serde(default = "default_min_latency")]
-    pub min_latency_ms: u64,
-
-    /// Maximum simulated link latency (ms) (random topology only).
-    #[serde(default = "default_max_latency")]
-    pub max_latency_ms: u64,
-
-    /// Where the topology comes from.  See [`TopologySource`].
+    /// Where the topology comes from + its mode-specific parameters.
+    /// See [`TopologySource`].
     #[serde(default)]
     pub topology_source: TopologySource,
 
@@ -100,6 +118,7 @@ pub struct ClusterConfig {
     pub base_port: u16,
 
     /// PRNG seed for reproducible topology. Optional.
+    #[serde(default)]
     pub seed: Option<u64>,
 
     /// Path for merged event JSONL output.
@@ -114,10 +133,6 @@ pub struct ClusterConfig {
     #[serde(default = "default_aggregator_port")]
     pub aggregator_port: u16,
 
-    /// Stake distribution strategy ("equal").
-    #[serde(default = "default_stake_distribution")]
-    pub stake_distribution: String,
-
     /// How often nodes should report stats (seconds).
     #[serde(default = "default_stats_interval")]
     pub stats_interval_secs: u64,
@@ -127,6 +142,7 @@ pub struct ClusterConfig {
     pub event_window_size: usize,
 
     /// Override rb_generation_probability for all nodes.
+    #[serde(default)]
     pub rb_generation_probability: Option<f64>,
 
     /// Override the per-node Poisson transaction generation rate
@@ -136,6 +152,7 @@ pub struct ClusterConfig {
     /// must keep the mempool busy enough to overflow into EBs.  When
     /// `None`, the base config's value is used (`mainnet.toml` defaults
     /// to `0.0` = no generation).
+    #[serde(default)]
     pub tx_rate: Option<f64>,
 
     /// Per-node adversarial / experimental behaviour.  See
@@ -158,6 +175,9 @@ pub struct ClusterConfig {
     pub external_peers: Vec<ExternalPeerConfig>,
 }
 
+fn default_num_nodes() -> usize {
+    5
+}
 fn default_degree() -> usize {
     3
 }
@@ -192,17 +212,12 @@ fn default_stats_interval() -> u64 {
 impl Default for ClusterConfig {
     fn default() -> Self {
         Self {
-            num_nodes: 5,
-            degree: default_degree(),
-            min_latency_ms: default_min_latency(),
-            max_latency_ms: default_max_latency(),
             base_config: "net-node/configs/mainnet.toml".to_string(),
             base_port: default_base_port(),
             seed: None,
             output_events: default_output_events(),
             ordering_window_secs: default_ordering_window(),
             aggregator_port: default_aggregator_port(),
-            stake_distribution: default_stake_distribution(),
             stats_interval_secs: default_stats_interval(),
             event_window_size: default_event_window_size(),
             rb_generation_probability: None,
@@ -279,33 +294,74 @@ pub struct ActiveAttack {
     pub started_at_s: f64,
 }
 
+impl TopologySource {
+    /// Borrow the Random variant's parameters, or `None` for Yaml.
+    /// Sugar for callers that only need to read the random-mode knobs
+    /// (currently the tests; the production code pattern-matches the
+    /// enum directly to keep all fields visible at the call site).
+    #[cfg(test)]
+    pub fn as_random(&self) -> Option<RandomParams<'_>> {
+        match self {
+            TopologySource::Random {
+                num_nodes,
+                degree,
+                min_latency_ms,
+                max_latency_ms,
+                stake_distribution,
+            } => Some(RandomParams {
+                num_nodes: *num_nodes,
+                degree: *degree,
+                min_latency_ms: *min_latency_ms,
+                max_latency_ms: *max_latency_ms,
+                stake_distribution,
+            }),
+            TopologySource::Yaml { .. } => None,
+        }
+    }
+}
+
+/// Borrowed view of [`TopologySource::Random`] parameters.  Test-only
+/// today — production code matches the enum directly.
+#[cfg(test)]
+#[derive(Debug, Clone, Copy)]
+pub struct RandomParams<'a> {
+    pub num_nodes: usize,
+    pub degree: usize,
+    pub min_latency_ms: u64,
+    pub max_latency_ms: u64,
+    pub stake_distribution: &'a str,
+}
+
 impl ClusterConfig {
     /// Apply optional overrides from a control config, returning a new config.
+    ///
+    /// `topology_source` (when present) replaces the entire topology source
+    /// wholesale — there's no per-field merge.  This intentionally prevents
+    /// mixing modes (e.g. overriding just `degree` on a YAML-backed cluster).
     pub fn with_overrides(
         &self,
         overrides: &ClusterControlConfig,
     ) -> Result<ClusterConfig, String> {
         let mut config = self.clone();
-        if let Some(n) = overrides.num_nodes {
-            config.num_nodes = n;
-        }
-        if let Some(d) = overrides.degree {
-            config.degree = d;
-        }
-        if let Some(min) = overrides.min_latency_ms {
-            config.min_latency_ms = min;
-        }
-        if let Some(max) = overrides.max_latency_ms {
-            config.max_latency_ms = max;
+        if let Some(ts) = &overrides.topology_source {
+            config.topology_source = ts.clone();
         }
         if let Some(s) = overrides.seed {
             config.seed = Some(s);
         }
-        if config.num_nodes == 0 {
-            return Err("num_nodes must be at least 1".into());
-        }
-        if config.min_latency_ms > config.max_latency_ms {
-            return Err("min_latency_ms must be <= max_latency_ms".into());
+        if let TopologySource::Random {
+            num_nodes,
+            min_latency_ms,
+            max_latency_ms,
+            ..
+        } = &config.topology_source
+        {
+            if *num_nodes == 0 {
+                return Err("num_nodes must be at least 1".into());
+            }
+            if min_latency_ms > max_latency_ms {
+                return Err("min_latency_ms must be <= max_latency_ms".into());
+            }
         }
         Ok(config)
     }
@@ -329,10 +385,7 @@ impl ClusterConfig {
             node_config.insert("transactions.tx_rate".into(), serde_json::json!(r));
         }
         ClusterControlConfig {
-            num_nodes: Some(self.num_nodes),
-            degree: Some(self.degree),
-            min_latency_ms: Some(self.min_latency_ms),
-            max_latency_ms: Some(self.max_latency_ms),
+            topology_source: Some(self.topology_source.clone()),
             seed: self.seed,
             node_config,
         }
@@ -340,12 +393,21 @@ impl ClusterConfig {
 }
 
 /// Load cluster configuration from a TOML file with optional --set overrides.
+///
+/// Defaults strategy: we *don't* serialise the entire
+/// `ClusterConfig::default()` into figment as defaults — that would
+/// leak `topology_source = Random { num_nodes, degree, … }` into every
+/// load, and then any TOML that selects `type = "yaml"` would merge
+/// the stale Random fields under it and trip `deny_unknown_fields` at
+/// extraction time.  Instead, every top-level field that has a default
+/// declares it via `#[serde(default = "...")]` on `ClusterConfig` and
+/// each variant declares its per-field defaults internally.  Figment
+/// only carries the user-supplied TOML and any `--set` overrides.
 pub fn load(
     config_file: &str,
     set_overrides: &[String],
 ) -> Result<ClusterConfig, Box<dyn std::error::Error + Send + Sync>> {
-    let mut figment = Figment::from(Serialized::defaults(ClusterConfig::default()))
-        .merge(Toml::file(config_file));
+    let mut figment = Figment::from(Toml::file(config_file));
 
     for override_str in set_overrides {
         let toml_fragment = set_override_to_toml(override_str)?;
@@ -354,11 +416,21 @@ pub fn load(
 
     let config: ClusterConfig = figment.extract()?;
 
-    if config.num_nodes == 0 {
-        return Err("num_nodes must be at least 1".into());
-    }
-    if config.min_latency_ms > config.max_latency_ms {
-        return Err("min_latency_ms must be <= max_latency_ms".into());
+    // Random-mode-only validation.  Yaml mode rejects the empty case
+    // inside `topology::build_from_raw` instead.
+    if let TopologySource::Random {
+        num_nodes,
+        min_latency_ms,
+        max_latency_ms,
+        ..
+    } = &config.topology_source
+    {
+        if *num_nodes == 0 {
+            return Err("num_nodes must be at least 1".into());
+        }
+        if min_latency_ms > max_latency_ms {
+            return Err("min_latency_ms must be <= max_latency_ms".into());
+        }
     }
 
     Ok(config)
@@ -432,10 +504,54 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = ClusterConfig::default();
-        assert_eq!(config.num_nodes, 5);
-        assert_eq!(config.degree, 3);
-        assert_eq!(config.min_latency_ms, 5);
-        assert_eq!(config.max_latency_ms, 300);
+        let random = config
+            .topology_source
+            .as_random()
+            .expect("default is random");
+        assert_eq!(random.num_nodes, 5);
+        assert_eq!(random.degree, 3);
+        assert_eq!(random.min_latency_ms, 5);
+        assert_eq!(random.max_latency_ms, 300);
+        assert_eq!(random.stake_distribution, "equal");
+    }
+
+    /// Smallest valid config: just `base_config`.  Every other top-level
+    /// field has to have a serde default, otherwise the user will hit a
+    /// "missing field `X`" error the moment they trim their config.  This
+    /// test pins that contract explicitly so it can't regress silently
+    /// (e.g. by someone adding a new required field without realising).
+    #[test]
+    fn test_load_minimal_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("minimal.toml");
+        let mut f = std::fs::File::create(&path).unwrap();
+        writeln!(f, r#"base_config = "mainnet.toml""#).unwrap();
+
+        let config = load(path.to_str().unwrap(), &[]).expect("minimal config must load");
+
+        // base_config is the only field the user wrote — everything else
+        // must come from defaults.
+        assert_eq!(config.base_config, "mainnet.toml");
+        assert_eq!(config.base_port, 30000);
+        assert_eq!(config.aggregator_port, 9100);
+        assert!(config.seed.is_none());
+        assert!(config.rb_generation_probability.is_none());
+        assert!(config.tx_rate.is_none());
+        assert!(config.behaviour.is_none());
+        assert!(config.behaviour_selection.is_none());
+        assert!(config.external_peers.is_empty());
+
+        // topology_source defaults to Random with all variant fields at
+        // their per-field defaults.
+        let random = config
+            .topology_source
+            .as_random()
+            .expect("default topology_source is random");
+        assert_eq!(random.num_nodes, 5);
+        assert_eq!(random.degree, 3);
+        assert_eq!(random.min_latency_ms, 5);
+        assert_eq!(random.max_latency_ms, 300);
+        assert_eq!(random.stake_distribution, "equal");
     }
 
     #[test]
@@ -446,17 +562,21 @@ mod tests {
         writeln!(
             f,
             r#"
-num_nodes = 8
-degree = 4
 base_config = "mainnet.toml"
 seed = 123
+
+[topology_source]
+type = "random"
+num_nodes = 8
+degree = 4
 "#
         )
         .unwrap();
 
         let config = load(path.to_str().unwrap(), &[]).unwrap();
-        assert_eq!(config.num_nodes, 8);
-        assert_eq!(config.degree, 4);
+        let random = config.topology_source.as_random().expect("random mode");
+        assert_eq!(random.num_nodes, 8);
+        assert_eq!(random.degree, 4);
         assert_eq!(config.seed, Some(123));
         // Defaults should fill in the rest.
         assert_eq!(config.aggregator_port, 9100);
@@ -470,14 +590,22 @@ seed = 123
         writeln!(
             f,
             r#"
-num_nodes = 3
 base_config = "mainnet.toml"
+
+[topology_source]
+type = "random"
+num_nodes = 3
 "#
         )
         .unwrap();
 
-        let config = load(path.to_str().unwrap(), &["num_nodes=10".to_string()]).unwrap();
-        assert_eq!(config.num_nodes, 10);
+        // --set drills into the topology_source table by dotted key.
+        let config = load(
+            path.to_str().unwrap(),
+            &["topology_source.num_nodes=10".to_string()],
+        )
+        .unwrap();
+        assert_eq!(config.topology_source.as_random().unwrap().num_nodes, 10);
     }
 
     #[test]
@@ -488,13 +616,72 @@ base_config = "mainnet.toml"
         writeln!(
             f,
             r#"
-num_nodes = 0
 base_config = "mainnet.toml"
+
+[topology_source]
+type = "random"
+num_nodes = 0
 "#
         )
         .unwrap();
 
         let result = load(path.to_str().unwrap(), &[]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_yaml_rejects_random_fields() {
+        // Schema-level rejection: `degree` is meaningless under
+        // `type = "yaml"`, so the parse must fail rather than silently
+        // ignore it.  This is the core invariant of the refactor.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bad.toml");
+        let mut f = std::fs::File::create(&path).unwrap();
+        writeln!(
+            f,
+            r#"
+base_config = "mainnet.toml"
+
+[topology_source]
+type = "yaml"
+path = "topology.yaml"
+degree = 7
+"#
+        )
+        .unwrap();
+
+        let err = load(path.to_str().unwrap(), &[]).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("degree") || msg.contains("unknown field"),
+            "expected unknown-field error mentioning 'degree', got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_random_rejects_yaml_fields() {
+        // Symmetric: `path` is meaningless under `type = "random"`.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bad.toml");
+        let mut f = std::fs::File::create(&path).unwrap();
+        writeln!(
+            f,
+            r#"
+base_config = "mainnet.toml"
+
+[topology_source]
+type = "random"
+num_nodes = 5
+path = "topology.yaml"
+"#
+        )
+        .unwrap();
+
+        let err = load(path.to_str().unwrap(), &[]).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("path") || msg.contains("unknown field"),
+            "expected unknown-field error mentioning 'path', got: {msg}"
+        );
     }
 }

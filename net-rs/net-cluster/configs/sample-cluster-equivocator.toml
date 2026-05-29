@@ -14,11 +14,6 @@
 # gossiped through the topology — flags the slot in
 # `equivocating_rb_slots` via `note_header_for_equivocation`.
 
-num_nodes = 10
-degree = 3
-min_latency_ms = 5
-max_latency_ms = 100
-
 base_config = "net-node/configs/mainnet.toml"
 base_port = 30200
 seed = 42
@@ -26,8 +21,15 @@ output_events = "cluster-events-equivocator.jsonl"
 ordering_window_secs = 1.0
 aggregator_port = 9200
 stats_interval_secs = 1
-stake_distribution = "equal"
 rb_generation_probability = 0.05
+
+[topology_source]
+type = "random"
+num_nodes = 10
+degree = 3
+min_latency_ms = 5
+max_latency_ms = 100
+stake_distribution = "equal"
 
 # Per-node adversarial behaviour: install RbHeaderEquivocator on node 3.
 # Swap the selection variant for a different placement strategy —

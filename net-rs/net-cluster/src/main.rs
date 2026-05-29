@@ -114,10 +114,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let total_stake = read_total_stake(&current_config.base_config)?;
 
     // Step 3: Build initial topology (random graph or YAML, depending on
-    // `topology_source`).  YAML mode overwrites `num_nodes` with the
-    // actual node count loaded so downstream code (port allocation,
-    // control_fields, the REST API) sees a consistent value.
-    let topo = build_topology(&mut current_config, total_stake)?;
+    // `topology_source`).  The Topology is now the single source of
+    // truth for node count; main.rs reads `topo.nodes.len()` rather
+    // than carrying a redundant `num_nodes` on the config.
+    let topo = build_topology(&current_config, total_stake)?;
     log_topology(&topo);
 
     // Step 4: Create shared event window, restart channel, and start HTTP server.
@@ -147,7 +147,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Step 5: Spawn the aggregator task (persists across restarts).
     let output_path = PathBuf::from(&current_config.output_events);
-    let num_nodes = current_config.num_nodes;
+    let num_nodes = topo.nodes.len();
     let ordering_window = current_config.ordering_window_secs;
     let agg_window = event_window.clone();
     let aggregator_handle = tokio::spawn(async move {
@@ -226,7 +226,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
                 // Generate new topology and update server state.
                 let new_total_stake = read_total_stake(&current_config.base_config)?;
-                let new_topo = build_topology(&mut current_config, new_total_stake)?;
+                let new_topo = build_topology(&current_config, new_total_stake)?;
                 log_topology(&new_topo);
 
                 // Build control config with current node_config for the UI.
@@ -306,7 +306,10 @@ async fn handle_attack_command(
                 return;
             }
             let update_json = serde_json::json!({ "behaviour": request.behaviour });
-            cluster.pm.send_config_update_to(&indices, &update_json).await;
+            cluster
+                .pm
+                .send_config_update_to(&indices, &update_json)
+                .await;
 
             let started_at_s = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -362,52 +365,45 @@ fn dotted_keys_to_dynamic_config(
 
 /// Dispatch on `current_config.topology_source` and build the cluster topology.
 ///
-/// In YAML mode the loaded node count overwrites `current_config.num_nodes`
-/// so port allocation (`base_port + num_nodes`), the REST API, and overlay
-/// generation all see the same value downstream.
+/// Random mode reads the random-variant params straight off the enum;
+/// YAML mode reads `path` / `node_limit`.  Either way the resulting
+/// `Topology` is the single source of truth for downstream node count
+/// (port allocation, overlay generation, the REST API) — no separate
+/// `num_nodes` field exists on `ClusterConfig` any more.
 fn build_topology(
-    current_config: &mut config::ClusterConfig,
+    current_config: &config::ClusterConfig,
     total_stake: u64,
 ) -> Result<topology::Topology, Box<dyn std::error::Error + Send + Sync>> {
-    match current_config.topology_source.clone() {
-        config::TopologySource::Random => Ok(topology::generate(current_config, total_stake)),
+    match &current_config.topology_source {
+        config::TopologySource::Random { .. } => {
+            Ok(topology::generate(current_config, total_stake))
+        }
         config::TopologySource::Yaml { path, node_limit } => {
-            let topo =
-                topology::load_from_yaml(current_config, std::path::Path::new(&path), node_limit)?;
-            // Reconcile num_nodes with the YAML-loaded count.  The user's
-            // num_nodes (if any) is now meaningless in YAML mode and is
-            // overridden silently — we log so it's obvious which value
-            // is actually in effect.
-            let loaded = topo.nodes.len();
-            if current_config.num_nodes != loaded {
-                tracing::info!(
-                    yaml_path = %path,
-                    config_num_nodes = current_config.num_nodes,
-                    loaded_num_nodes = loaded,
-                    node_limit = ?node_limit,
-                    "YAML topology: overriding num_nodes with loaded node count"
-                );
-                current_config.num_nodes = loaded;
-            }
-            Ok(topo)
+            topology::load_from_yaml(current_config, std::path::Path::new(path), *node_limit)
         }
     }
 }
 
 /// Log a one-line summary of the cluster config at startup.  Splits on
 /// topology source: in random mode we surface the graph-gen knobs; in YAML
-/// mode we surface the path / limit instead (those knobs are ignored).
+/// mode we surface the path / limit instead.
 fn log_cluster_config_summary(config: &config::ClusterConfig) {
     match &config.topology_source {
-        config::TopologySource::Random => {
+        config::TopologySource::Random {
+            num_nodes,
+            degree,
+            min_latency_ms,
+            max_latency_ms,
+            ..
+        } => {
             tracing::info!(
                 "loaded cluster config: random topology, {} nodes, degree={}, latency={}–{}ms, ports {}–{}",
-                config.num_nodes,
-                config.degree,
-                config.min_latency_ms,
-                config.max_latency_ms,
+                num_nodes,
+                degree,
+                min_latency_ms,
+                max_latency_ms,
                 config.base_port,
-                config.base_port + config.num_nodes.saturating_sub(1) as u16,
+                config.base_port + num_nodes.saturating_sub(1) as u16,
             );
         }
         config::TopologySource::Yaml { path, node_limit } => {

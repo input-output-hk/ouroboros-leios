@@ -81,11 +81,38 @@ export interface NodeSeriesPoint {
   blocks: number;
 }
 
+/**
+ * Mirrors net-cluster's `TopologySource` enum (internally tagged on `type`,
+ * snake_case).  See net-cluster/src/config.rs.
+ *
+ * `random` mode: cluster generates a random connected graph from these
+ * params.  `yaml` mode: cluster loads a pre-built topology from disk;
+ * `num_nodes`/`degree`/etc. don't exist in this variant because they're
+ * either derived from the YAML or don't apply.
+ */
+export type TopologySource =
+  | {
+      type: "random";
+      num_nodes: number;
+      degree: number;
+      min_latency_ms: number;
+      max_latency_ms: number;
+      stake_distribution: string;
+    }
+  | {
+      type: "yaml";
+      path: string;
+      node_limit?: number | null;
+    };
+
 export interface ClusterControlConfig {
-  num_nodes?: number;
-  degree?: number;
-  min_latency_ms?: number;
-  max_latency_ms?: number;
+  /**
+   * When present in a POST body, replaces the cluster's current
+   * topology source wholesale.  When `null`/omitted, leaves the
+   * topology unchanged.  When read from GET /api/config, always
+   * reflects the cluster's current source.
+   */
+  topology_source?: TopologySource | null;
   seed?: number;
   node_config: Record<string, unknown>;
 }
