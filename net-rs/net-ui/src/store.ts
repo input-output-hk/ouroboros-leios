@@ -256,8 +256,8 @@ export const useStore = create<DashboardState>()((set, get) => ({
       const votingSlotStart = aggregated_votes?.last_slot ?? 0;
       const votes_count = aggregated_votes?.votes_count ?? [];
       let nodeIds: Record<string, number> = {};
-      for (let i = 0; i < (aggregated_votes?.node_ids ?? []).length; i++) {
-        nodeIds[aggregated_votes?.node_ids[i]] = i;
+      for (const [i, nodeId] of (aggregated_votes?.node_ids ?? []).entries()) {
+        nodeIds[nodeId] = i;
       }
 
       const nextMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "EBGenerated" | "VoteCast" | "Committee" | "Incorrect" | "Empty")[][] = Array.from(
