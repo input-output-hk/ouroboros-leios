@@ -69,6 +69,21 @@ pub struct Edge {
 pub struct Topology {
     pub nodes: Vec<NodeTopology>,
     pub edges: Vec<Edge>,
+    /// Sum of `nodes[*].stake` — written into each per-node overlay TOML
+    /// as `production.total_stake` so the Praos lottery threshold
+    /// (`stake_i / total_stake`) is computed against the cluster's
+    /// actual stake total rather than whatever value the base config
+    /// happens to carry.
+    ///
+    /// In random mode this equals the `total_stake` passed to
+    /// [`generate`] (the random `distribute_stake` is sum-preserving),
+    /// so behaviour is unchanged.  In YAML mode this is the sum of the
+    /// YAML's per-node `stake` fields, which is critical: a v4 YAML
+    /// carries real mainnet ADA values (~1e8 per pool), and if
+    /// `total_stake` stays at the base config's synthetic `1000` the
+    /// per-node win probability saturates and every node produces a
+    /// block every slot.
+    pub total_stake: u64,
 }
 
 /// Generate a random cluster topology from the given config.
@@ -138,7 +153,14 @@ pub fn generate(config: &ClusterConfig, total_stake: u64) -> Topology {
         }
     }
 
-    Topology { nodes, edges }
+    // `distribute_stake` is sum-preserving so this equals the input
+    // `total_stake`; recomputing keeps the invariant local.
+    let cluster_total_stake = nodes.iter().map(|n| n.stake).sum();
+    Topology {
+        nodes,
+        edges,
+        total_stake: cluster_total_stake,
+    }
 }
 
 /// Load a cluster topology from a v3/v4-style YAML file.
@@ -341,7 +363,16 @@ fn build_from_raw(
         }
     }
 
-    Ok(Topology { nodes, edges })
+    // Sum of the loaded per-node stakes — overwrites the base config's
+    // `total_stake`.  Critical for YAML mode where the YAML carries real
+    // mainnet ADA values; without this each node's `stake / total_stake`
+    // ratio explodes and the Praos lottery saturates.
+    let total_stake = nodes.iter().map(|n| n.stake).sum();
+    Ok(Topology {
+        nodes,
+        edges,
+        total_stake,
+    })
 }
 
 /// Build a random undirected graph with target degree, ensuring connectivity.
@@ -1146,6 +1177,40 @@ nodes:
         assert_eq!(topo.nodes.len(), 3);
         let stakes: Vec<u64> = topo.nodes.iter().map(|n| n.stake).collect();
         assert_eq!(stakes, vec![12_000, 11_000, 10_000]);
+    }
+
+    #[test]
+    fn yaml_total_stake_is_sum_of_loaded_stakes() {
+        // YAML mode must compute `total_stake` from the actual loaded
+        // nodes — not inherit the base config's value — so the Praos
+        // lottery ratio is sane.  The fixture has stakes 1000+500+0+250
+        // = 1750.
+        let config = yaml_test_config();
+        let raw = parse_yaml_fixture();
+        let topo = build_from_raw(&config, raw, None).unwrap();
+        assert_eq!(topo.total_stake, 1750);
+    }
+
+    #[test]
+    fn yaml_total_stake_respects_node_limit() {
+        // With node_limit = 2, only the first two YAML nodes count
+        // toward total_stake.  Fixture: node-A (1000) + node-B (700).
+        // Wait — yaml_test_config uses the fixture with stakes
+        // 1000/500/0/250.  node_limit = 2 → 1000 + 500 = 1500.
+        let config = yaml_test_config();
+        let raw = parse_yaml_fixture();
+        let topo = build_from_raw(&config, raw, Some(2)).unwrap();
+        assert_eq!(topo.total_stake, 1500);
+    }
+
+    #[test]
+    fn random_topology_total_stake_equals_input() {
+        // Sanity check for the random path: distribute_stake is
+        // sum-preserving, so Topology.total_stake should equal the
+        // input total_stake.
+        let config = test_config(5, 2);
+        let topo = generate(&config, 12_345);
+        assert_eq!(topo.total_stake, 12_345);
     }
 
     #[test]
