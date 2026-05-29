@@ -100,7 +100,7 @@ export interface DashboardState {
 
   // Voting panel data (column-major: [slot][row])
   votingMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "EBGenerated" | "VoteCast" | "Committee" | "Incorrect" | "Empty")[][];
-  voiingMatrixOverflowRow: number;
+  votingMatrixOverflowRow: number;
   votingSlotStart: number;
   votingCounts: { ebReceivedPct: number; ebKnownToCommitteePct: number; votedPct: number }[];
 
@@ -148,7 +148,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
   votingPanelVisible: false,
   setVotingPanelVisible: (v) => set({ votingPanelVisible: v }),
   votingMatrix: [],
-  voiingMatrixOverflowRow: -1,
+  votingMatrixOverflowRow: -1,
   votingSlotStart: 0,
   votingCounts: [],
 
@@ -244,8 +244,9 @@ export const useStore = create<DashboardState>()((set, get) => ({
 
       const curSnap = { time: now, bandwidth: totalBandwidth, messages: totalMessages, blocks: totalBlocks, forks: curForks };
 
-      const showVotingPanel = get().votingPanelVisible;
+      /// Voting panel data preparation: step 1. fetch general info.
 
+      const showVotingPanel = get().votingPanelVisible;
       const VOTING_SLOTS = 24;
       const MAX_NODES_VOTING_PANEL = 20;
       const topoNodes = showVotingPanel ? (get().topology?.nodes ?? []) : [];
@@ -259,6 +260,8 @@ export const useStore = create<DashboardState>()((set, get) => ({
       for (const [i, nodeId] of (aggregated_votes?.node_ids ?? []).entries()) {
         nodeIds[nodeId] = i;
       }
+
+      /// Voting panel matrix preparation: step 2, build voting matrix.
 
       const nextMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "EBGenerated" | "VoteCast" | "Committee" | "Incorrect" | "Empty")[][] = Array.from(
         {length: VOTING_SLOTS},
@@ -285,8 +288,9 @@ export const useStore = create<DashboardState>()((set, get) => ({
           return Array.from({length: Math.min(MAX_NODES_VOTING_PANEL, nodeCount)}, () => "NoEvent" as const);
         }
       )
-
       const nextMatrixOverflowRow = nodeCount > MAX_NODES_VOTING_PANEL ? MAX_NODES_VOTING_PANEL : -1;
+
+      /// Voting panel matrix preparation: step 3, counts.
 
       const nextCounts = Array.from({length: VOTING_SLOTS}, (_, i) => {
         const votes = votes_count[votes_history.length - i - 1] ?? null;
@@ -298,6 +302,8 @@ export const useStore = create<DashboardState>()((set, get) => ({
           votedPct: comm > 0 ? Math.floor((votes.votes_cast / comm) * 100) : 0,
         };
       });
+
+      /// Stats
 
       if (prevSnapshot) {
         const changed =
@@ -361,7 +367,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
           set({
             latestStats: stats, networkChainTree, networkTipCounts: tipCounts,
             votingMatrix: nextMatrix,
-            voiingMatrixOverflowRow: nextMatrixOverflowRow,
+            votingMatrixOverflowRow: nextMatrixOverflowRow,
             votingSlotStart,
             votingCounts: nextCounts,
           });
@@ -379,7 +385,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
           networkChainTree,
           networkTipCounts: tipCounts,
           votingMatrix: nextMatrix,
-          voiingMatrixOverflowRow: nextMatrixOverflowRow,
+          votingMatrixOverflowRow: nextMatrixOverflowRow,
           votingSlotStart,
           votingCounts: nextCounts,
         });
@@ -646,7 +652,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
           selectedNodeId: null,
           selectedEdge: null,
           votingMatrix: [],
-          voiingMatrixOverflowRow: -1,
+          votingMatrixOverflowRow: -1,
           votingSlotStart: 0,
           activeAttack: null,
           attackingIndices: new Set<number>(),

@@ -41,7 +41,7 @@ export function VotingPanel() {
   const matrix = useStore((s) => s.votingMatrix);
   const slotStart = useStore((s) => s.votingSlotStart);
   const votingCounts = useStore((s) => s.votingCounts);
-  const overflowRow = useStore((s) => s.voiingMatrixOverflowRow);
+  const overflowRow = useStore((s) => s.votingMatrixOverflowRow);
 
   const nodes = topology?.nodes ?? [];
   const totalNodes = nodes.length;

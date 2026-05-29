@@ -490,6 +490,7 @@ async fn get_votes_history(
     for slot in ((last_slot+1).saturating_sub(WINDOW_SIZE)..=last_slot).rev() {
         let Some(node_statuses) = votes.events.get(&slot) else {
             history.push("".to_string());
+            votes_count.push(AggregatedVotesCount::default());
             continue;
         };
 
