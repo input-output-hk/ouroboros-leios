@@ -1,0 +1,199 @@
+---
+title: Protocol status
+---
+
+import ProtocolStatus from '@site/src/components/ProtocolStatus';
+
+export const stages = [
+  'Requirements',
+  'Prototype',
+  'Design',
+  'Implementation',
+  'Confidence',
+];
+
+{/* Marks: 'done' (✓) · 'ongoing' (~) · 'open' (?) · 'empty' (blank).
+    Optional `note` overrides the default label in the tooltip.
+    `anchor` pins the badge to a position in the SVG viewBox (1120.77 × 471.62);
+    rows without an anchor render as cross-cutting cards under the diagram. */}
+
+export const rows = [
+  {
+    id: 'multiplexing',
+    name: 'Pros > Leios / Multiplexing',
+    anchor: { x: 140, y: 25 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'ongoing' },
+      Design: { mark: 'ongoing' },
+      Implementation: { mark: 'open' },
+    },
+  },
+  {
+    id: 'ht-tx-submission',
+    name: 'High-Throughput Tx Submission',
+    anchor: { x: 460, y: 25 },
+    cells: {
+      Implementation: { mark: 'ongoing', note: 'V2-undecision' },
+    },
+  },
+  {
+    id: 'ht-mempool',
+    name: 'High-Throughput Mempool',
+    anchor: { x: 760, y: 25 },
+    cells: {
+      'Requirements': { mark: 'ongoing' },
+      Prototype: { mark: 'ongoing' },
+      Design: { mark: 'ongoing' },
+    },
+  },
+  {
+    id: 'eb-production',
+    name: 'EB Production',
+    anchor: { x: 430, y: 150 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'done' },
+      Design: { mark: 'open', note: 'Pre-application' },
+    },
+  },
+  {
+    id: 'eb-announcement',
+    name: 'EB Announcement',
+    anchor: { x: 470, y: 190 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Design: { mark: 'open', note: 'Block structure' },
+    },
+  },
+  {
+    id: 'eb-diffusion',
+    name: 'EB Diffusion',
+    anchor: { x: 470, y: 230 },
+    cells: {
+      'Requirements': { mark: 'open' },
+      Prototype: { mark: 'done' },
+      Design: { mark: 'ongoing' },
+    },
+  },
+  {
+    id: 'vote-production',
+    name: 'Vote Production',
+    anchor: { x: 370, y: 410 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'done' },
+    },
+  },
+  {
+    id: 'vote-diffusion',
+    name: 'Vote Diffusion',
+    anchor: { x: 550, y: 410 },
+    cells: {
+      'Requirements': { mark: 'open' },
+      Prototype: { mark: 'done' },
+    },
+  },
+  {
+    id: 'certification',
+    name: 'Certification',
+    anchor: { x: 850, y: 320 },
+    cells: {
+      'Requirements': { mark: 'done' },
+    },
+  },
+  {
+    id: 'rb-validation',
+    name: 'RB Validation',
+    anchor: { x: 985, y: 70 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'done' },
+      Design: { mark: 'ongoing' },
+    },
+  },
+  {
+    id: 'rb-staging-area',
+    name: 'RB Staging area',
+    anchor: { x: 760, y: 170 },
+    cells: {
+      Prototype: { mark: 'ongoing' },
+      Design: { mark: 'ongoing' },
+    },
+  },
+  {
+    id: 'catching-up',
+    name: 'Catching up',
+    anchor: { x: 980, y: 400 },
+    cells: {
+      'Requirements': { mark: 'done' },
+    },
+  },
+  {
+    id: 'key-registration',
+    name: 'Key Registration',
+    anchor: { x: 90, y: 200 },
+    cells: {
+      'Requirements': { mark: 'ongoing' },
+      Prototype: { mark: 'ongoing' },
+      Design: { mark: 'ongoing' },
+    },
+  },
+  {
+    id: 'committee-selection',
+    name: 'Committee Selection',
+    anchor: { x: 230, y: 320 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'done' },
+      Design: { mark: 'open', note: 'Simplified' },
+    },
+  },
+  {
+    id: 'crypto',
+    name: 'Crypto primitives',
+    anchor: { x: 140, y: 445 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'done' },
+      Design: { mark: 'done' },
+      Implementation: { mark: 'done' },
+      Confidence: { mark: 'done', note: 'Audited' },
+    },
+  },
+];
+
+# Protocol status
+
+The diagram below sketches the Leios protocol flow. Each badge marks a
+component of the protocol and summarises its progress across the stages.
+Click or hover a badge for the full breakdown.
+
+<ProtocolStatus stages={stages} rows={rows} />
+
+## Full matrix
+
+| Component                     | Requirements CIP | Prototype | Design            | Implementation  | High Confidence |
+|-------------------------------|------------------|-----------|-------------------|-----------------|-----------------|
+| Pros > Leios / Multiplexing   | ✓                | ~         | ~                 | ?               |                 |
+| High-Throughput Tx Submission |                  |           |                   | ~ V2-undecision |                 |
+| High-Throughput Mempool       | ~                | ~         | ~                 |                 |                 |
+| EB Production                 | ✓                | ✓         | ? Pre-application |                 |                 |
+| EB Announcement               | ✓                |           | ? Block structure |                 |                 |
+| EB Diffusion                  | ?                | ✓         | ~                 |                 |                 |
+| Vote Production               | ✓                | ✓         |                   |                 |                 |
+| Vote Diffusion                | ?                | ✓         |                   |                 |                 |
+| Certification                 | ✓                |           |                   |                 |                 |
+| RB Validation                 | ✓                | ✓         | ~                 |                 |                 |
+| RB Staging area               |                  | ~         | ~                 |                 |                 |
+| Catching up                   | ✓                |           |                   |                 |                 |
+| Key Registration              | ~                | ~         | ~                 |                 |                 |
+| Committee Selection           | ✓                | ✓         | ? Simplified      |                 |                 |
+| Crypto primitives             | ✓                | ✓         | ✓                 | ✓               | ✓ Audited       |
+
+| Symbol | Meaning         |
+|--------|-----------------|
+| ✓      | Done / OK       |
+| ~      | Vague / Ongoing |
+| ?      | Open questions  |
+|        | Not started     |
