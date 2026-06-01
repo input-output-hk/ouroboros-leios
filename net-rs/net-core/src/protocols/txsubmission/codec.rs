@@ -12,6 +12,7 @@
 //! Inner lists (txIdsAndSizes, txIdList, txList) use indefinite-length
 //! encoding per the Haskell codec.
 
+use std::sync::Arc;
 use minicbor::decode::Error as DecodeError;
 use minicbor::encode::Error as EncodeError;
 use minicbor::{Decoder, Encoder};
@@ -44,7 +45,7 @@ impl<'a> minicbor::Decode<'a, ()> for TxId {
                 raw.len()
             )));
         }
-        Ok(TxId(raw.to_vec()))
+        Ok(TxId(Arc::new(raw.to_vec())))
     }
 }
 
@@ -73,7 +74,7 @@ impl<'a> minicbor::Decode<'a, ()> for TxBody {
                 raw.len()
             )));
         }
-        Ok(TxBody(raw.to_vec()))
+        Ok(TxBody(Arc::new(raw.to_vec())))
     }
 }
 

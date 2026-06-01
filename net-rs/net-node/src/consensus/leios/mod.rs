@@ -9,6 +9,7 @@
 //! eligibility signature) and this layer encodes the wire-format body.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::time::Instant;
 
 use shared_consensus::elections::{Elections, ElectionsConfig};
@@ -215,7 +216,7 @@ impl LeiosConsensus {
         // a receiver has merged via `LeiosFetch BlockTxs`.  Snapshot
         // upfront so we don't hold the mempool lock across the call.
         let known = self.mempool.lock().unwrap().all_known_tx_ids();
-        let tx_known = |h: &[u8; 32]| known.contains(h.as_slice());
+        let tx_known = |h: &[u8; 32]| known.contains(&Arc::new(h.to_vec()));
         let mut fx = self.state.on_slot(slot, &tx_known);
         fx.push(LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::LeiosElectionInfo {
             eb_slot: slot,
@@ -330,9 +331,9 @@ impl LeiosConsensus {
     pub fn match_eb_tx_response(
         &mut self,
         point: &Point,
-        bodies: &[Vec<u8>],
+        bodies: &[Arc<Vec<u8>>],
     ) -> EbTxMatchOutcome {
-        let bodies_with_hashes: Vec<(Vec<u8>, [u8; 32])> = bodies
+        let bodies_with_hashes: Vec<(Arc<Vec<u8>>, [u8; 32])> = bodies
             .iter()
             .map(|body| {
                 let h = blake2b_simd::Params::new().hash_length(32).hash(body);

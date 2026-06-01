@@ -54,13 +54,13 @@ pub struct EbKey {
 /// Opaque transaction identifier.  Conventionally Blake2b-256 of the
 /// body, but this crate doesn't enforce that — the wrapper picks the hash
 /// scheme and supplies it on every entry path.
-pub type TxId = Vec<u8>;
+pub type TxId = Arc<Vec<u8>>;
 
 /// A transaction body the mempool is holding.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingTx {
     pub tx_id: TxId,
-    pub body: Vec<u8>,
+    pub body: Arc<Vec<u8>>,
     pub size: u32,
 }
 
@@ -75,7 +75,7 @@ pub enum MempoolEffect {
     /// validator returns, the wrapper calls
     /// [`MempoolState::on_tx_validated`] or
     /// [`MempoolState::on_tx_validation_failed`].
-    ValidateTx { tx_id: TxId, body: Vec<u8> },
+    ValidateTx { tx_id: TxId, body: Arc<Vec<u8>> },
     /// A tx was dropped before reaching the mempool (overflow,
     /// validation failure) or evicted from it.  Telemetry only — the
     /// wrapper forwards this to its events sink.
@@ -142,7 +142,7 @@ pub struct MempoolState {
     /// Bodies currently with the validator.  Cleared on
     /// `on_tx_validated` (body moves to `txs`) or
     /// `on_tx_validation_failed` (body dropped).
-    pub pending_validation: BTreeMap<TxId, Vec<u8>>,
+    pub pending_validation: BTreeMap<TxId, Arc<Vec<u8>>>,
     /// Per-EB ordered tx-hash list — the "EB Body" in CIP-0164 terms.
     /// Producers populate this from `produce_eb`; receivers from
     /// `record_eb_manifest` after decoding a fetched EB body.
@@ -211,7 +211,7 @@ impl MempoolState {
     /// `AlreadyKnown` and discards.  Otherwise records the body and
     /// emits `ValidateTx`; the wrapper validates and reports back via
     /// [`Self::on_tx_validated`] or [`Self::on_tx_validation_failed`].
-    pub fn on_tx_received(&mut self, tx_id: TxId, body: Vec<u8>) -> Vec<MempoolEffect> {
+    pub fn on_tx_received(&mut self, tx_id: TxId, body: Arc<Vec<u8>>) -> Vec<MempoolEffect> {
         let appended: Vec<MempoolEffect> =
             match self.invoke_hook(|b, s| b.on_tx_received(s, &tx_id, &body)) {
                 BehaviourOutcome::Continue => Vec::new(),
@@ -274,7 +274,7 @@ impl MempoolState {
     pub fn admit_validated(
         &mut self,
         tx_id: TxId,
-        body: Vec<u8>,
+        body: Arc<Vec<u8>>,
         size: u32,
     ) -> Vec<MempoolEffect> {
         if self.contains(&tx_id) {
@@ -347,7 +347,7 @@ impl MempoolState {
     /// mempool sizes this prototype targets keep it acceptable.  Used
     /// by the LeiosFetch BlockTxs server (via the `TxBodyResolver`
     /// trait in the consumer's wrapper) to resolve manifest entries.
-    pub fn get_body_by_id(&self, id: &[u8]) -> Option<Vec<u8>> {
+    pub fn get_body_by_id(&self, id: Arc<Vec<u8>>) -> Option<Arc<Vec<u8>>> {
         if let Some(body) = self
             .txs
             .iter()
@@ -356,7 +356,7 @@ impl MempoolState {
         {
             return Some(body);
         }
-        self.eb_pinned.get(id).map(|tx| tx.body.clone())
+        self.eb_pinned.get(&id).map(|tx| tx.body.clone())
     }
 
     /// Return up to `max_count` txs not yet advertised to `peer_id`,
@@ -587,7 +587,7 @@ impl MempoolState {
     /// wrapper hashes incoming bodies and matches against the manifest
     /// before calling here.  No-op if the tx is already known via
     /// `txs` or `eb_pinned`.
-    pub fn merge_eb_body(&mut self, tx_id: TxId, body: Vec<u8>, size: u32) {
+    pub fn merge_eb_body(&mut self, tx_id: TxId, body: Arc<Vec<u8>>, size: u32) {
         if self.contains(&tx_id) || self.eb_pinned.contains_key(&tx_id) {
             return;
         }
@@ -618,16 +618,16 @@ impl MempoolState {
     /// returns bodies for every requested index whose body is locally
     /// resolvable.  Out-of-range indices and indices whose body is
     /// missing are silently dropped (partial response).
-    pub fn get_eb_bodies<I>(&self, eb_key: &EbKey, indices: I) -> Option<Vec<Vec<u8>>>
+    pub fn get_eb_bodies<I>(&self, eb_key: &EbKey, indices: I) -> Option<Vec<Arc<Vec<u8>>>>
     where
         I: IntoIterator<Item = u32>,
     {
         let manifest = self.eb_manifests.get(eb_key)?;
-        let bodies: Vec<Vec<u8>> = indices
+        let bodies: Vec<Arc<Vec<u8>>> = indices
             .into_iter()
             .filter_map(|i| {
                 let tx_id = manifest.get(i as usize)?;
-                self.get_body_by_id(tx_id)
+                self.get_body_by_id(tx_id.clone())
             })
             .collect();
         Some(bodies)
@@ -688,7 +688,7 @@ impl MempoolState {
     fn admit_internal(
         &mut self,
         tx_id: TxId,
-        body: Vec<u8>,
+        body: Arc<Vec<u8>>,
         size: u32,
     ) -> Vec<MempoolEffect> {
         let mut fx = Vec::new();
@@ -760,8 +760,8 @@ mod tests {
         PeerId(n)
     }
 
-    fn tx(id: u8, size: u32) -> (TxId, Vec<u8>, u32) {
-        (vec![id; 32], vec![0u8; size as usize], size)
+    fn tx(id: u8, size: u32) -> (TxId, Arc<Vec<u8>>, u32) {
+        (Arc::new(vec![id; 32]), Arc::new(vec![0u8; size as usize]), size)
     }
 
     fn admit(state: &mut MempoolState, id: u8, size: u32) -> Vec<MempoolEffect> {
@@ -877,7 +877,7 @@ mod tests {
                 tx_id,
                 reason: TxRejectReason::QueueFull,
             } => {
-                assert_eq!(*tx_id, vec![1u8; 32]);
+                assert_eq!(*tx_id, Arc::new(vec![1u8; 32]));
             }
             other => panic!("expected TxRejected QueueFull, got {other:?}"),
         }
@@ -893,10 +893,10 @@ mod tests {
         admit(&mut s, 1, 100);
         admit(&mut s, 2, 200);
         admit(&mut s, 3, 300);
-        let included = vec![vec![1u8; 32], vec![3u8; 32]];
+        let included = vec![Arc::new(vec![1u8; 32]), Arc::new(vec![3u8; 32])];
         s.on_block_applied(&included);
         assert_eq!(s.len(), 1);
-        assert_eq!(s.txs.front().unwrap().tx_id, vec![2u8; 32]);
+        assert_eq!(s.txs.front().unwrap().tx_id, Arc::new(vec![2u8; 32]));
         assert_eq!(s.total_bytes(), 200);
     }
 

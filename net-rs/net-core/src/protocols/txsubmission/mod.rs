@@ -7,6 +7,7 @@
 pub mod codec;
 
 use std::collections::VecDeque;
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::mpsc;
@@ -44,11 +45,11 @@ pub const MAX_TX_SIZE: usize = 2_500_000;
 
 /// Opaque transaction ID stored as raw CBOR bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TxId(pub Vec<u8>);
+pub struct TxId(pub Arc<Vec<u8>>);
 
 /// Opaque transaction body stored as raw CBOR bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TxBody(pub Vec<u8>);
+pub struct TxBody(pub Arc<Vec<u8>>);
 
 /// A transaction ID paired with its serialized size (for flow control).
 #[derive(Debug, Clone)]

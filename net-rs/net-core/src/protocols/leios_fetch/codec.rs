@@ -50,7 +50,8 @@ impl minicbor::Encode<()> for Message {
             Message::MsgLeiosBlockTxs { transactions } => {
                 e.array(2)?;
                 e.u32(3)?;
-                encode_blob_list(e, transactions)?;
+                let transactions = transactions.iter().map(|tx| tx.to_vec()).collect::<Vec<_>>();
+                encode_blob_list(e, transactions.as_slice())?;
             }
             Message::MsgLeiosVotesRequest { votes } => {
                 e.array(2)?;
@@ -87,7 +88,8 @@ impl minicbor::Encode<()> for Message {
                 e.array(3)?;
                 e.u32(7)?;
                 e.bytes(block)?;
-                encode_blob_list(e, transactions)?;
+                let transactions = transactions.iter().map(|tx| tx.to_vec()).collect::<Vec<_>>();
+                encode_blob_list(e, transactions.as_slice())?;
             }
             Message::MsgLeiosLastBlockAndTxsInRange {
                 block,
@@ -96,7 +98,8 @@ impl minicbor::Encode<()> for Message {
                 e.array(3)?;
                 e.u32(8)?;
                 e.bytes(block)?;
-                encode_blob_list(e, transactions)?;
+                let transactions = transactions.iter().map(|tx| tx.to_vec()).collect::<Vec<_>>();
+                encode_blob_list(e, transactions.as_slice())?;
             }
             Message::MsgDone => {
                 e.array(1)?;
@@ -129,6 +132,7 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
             3 => {
                 let transactions =
                     decode_blob_list(d, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE, "transaction")?;
+                let transactions = transactions.into_iter().map(|tx| tx.into()).collect();
                 Ok(Message::MsgLeiosBlockTxs { transactions })
             }
             4 => {
@@ -155,6 +159,7 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
                 let block = decode_block(d)?;
                 let transactions =
                     decode_blob_list(d, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE, "transaction")?;
+                let transactions = transactions.into_iter().map(|tx| tx.into()).collect();
                 Ok(Message::MsgLeiosNextBlockAndTxsInRange {
                     block,
                     transactions,
@@ -164,6 +169,7 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
                 let block = decode_block(d)?;
                 let transactions =
                     decode_blob_list(d, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE, "transaction")?;
+                let transactions = transactions.into_iter().map(|tx| tx.into()).collect();
                 Ok(Message::MsgLeiosLastBlockAndTxsInRange {
                     block,
                     transactions,

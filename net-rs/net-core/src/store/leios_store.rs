@@ -21,7 +21,7 @@ use crate::types::Point;
 /// locally — typically the host application's mempool answers.
 pub trait TxBodyResolver: Send + Sync {
     /// Return the body for `tx_id`, or `None` if unknown.
-    fn resolve_body(&self, tx_id: &[u8]) -> Option<Vec<u8>>;
+    fn resolve_body(&self, tx_id: &[u8]) -> Option<Arc<Vec<u8>>>;
 }
 
 /// A notification about available Leios data, served by LeiosNotify.
@@ -51,7 +51,7 @@ struct LeiosStoreInner {
     /// shot. `get_block_txs` falls through to manifest+resolver for any
     /// index missing here, so partial holdings still serve subsets to
     /// downstream peers.
-    block_txs: HashMap<BlockKey, BTreeMap<u32, Vec<u8>>>,
+    block_txs: HashMap<BlockKey, BTreeMap<u32, Arc<Vec<u8>>>>,
     /// Per-EB ordered tx hash list. Populated by receivers after decoding
     /// a fetched EB manifest. Pairs with `tx_body_resolver` to serve the
     /// bodies indirectly without keeping a duplicate copy.
@@ -193,7 +193,7 @@ impl LeiosStore {
     ///
     /// The `point` must be `Point::Specific { slot, hash }`. If
     /// `Point::Origin` is passed, the transactions are silently dropped.
-    pub fn inject_block_txs(&self, point: Point, indexed: BTreeMap<u32, Vec<u8>>) {
+    pub fn inject_block_txs(&self, point: Point, indexed: BTreeMap<u32, Arc<Vec<u8>>>) {
         let (slot, hash) = match &point {
             Point::Specific { slot, hash } => (*slot, *hash),
             Point::Origin => return,
@@ -217,8 +217,8 @@ impl LeiosStore {
     /// Convenience for the producer path: inject a complete ordered body
     /// list, indices `0..bodies.len()`. Equivalent to constructing a
     /// `BTreeMap` and calling `inject_block_txs`.
-    pub fn inject_block_txs_full(&self, point: Point, bodies: Vec<Vec<u8>>) {
-        let indexed: BTreeMap<u32, Vec<u8>> = bodies
+    pub fn inject_block_txs_full(&self, point: Point, bodies: Vec<Arc<Vec<u8>>>) {
+        let indexed: BTreeMap<u32, Arc<Vec<u8>>> = bodies
             .into_iter()
             .enumerate()
             .map(|(i, b)| (i as u32, b))
@@ -289,7 +289,7 @@ impl LeiosStore {
         slot: u64,
         hash: &[u8; 32],
         bitmap: &BTreeMap<u16, u64>,
-    ) -> Option<Vec<Vec<u8>>> {
+    ) -> Option<Vec<Arc<Vec<u8>>>> {
         let key = BlockKey { slot, hash: *hash };
         let (block_txs, manifest) = {
             let inner = self.inner.lock().unwrap();
@@ -302,7 +302,7 @@ impl LeiosStore {
             return None;
         }
         let resolver = self.tx_body_resolver.as_ref();
-        let selected: Vec<Vec<u8>> = bitmap::iter_indices(bitmap)
+        let selected: Vec<Arc<Vec<u8>>> = bitmap::iter_indices(bitmap)
             .filter_map(|i| {
                 if let Some(body) = block_txs.as_ref().and_then(|m| m.get(&i).cloned()) {
                     return Some(body);

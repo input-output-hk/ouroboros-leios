@@ -271,7 +271,7 @@ pub enum LeiosTelemetryEvent {
 pub struct EbTxMatchOutcome {
     /// Bodies whose blake2b-256 hash maps to a requested manifest
     /// index, in ascending manifest-index order.
-    pub matched_bodies: Vec<Vec<u8>>,
+    pub matched_bodies: Vec<Arc<Vec<u8>>>,
     /// Number of indices that the original request bitmap selected.
     /// Zero means "manifest not cached at request time" (fallback path).
     pub requested: usize,
@@ -490,7 +490,7 @@ impl LeiosState {
             .iter()
             .enumerate()
             .filter_map(|(i, h)| {
-                let tx_id: crate::mempool::TxId = h.to_vec();
+                let tx_id: crate::mempool::TxId = Arc::new(h.to_vec());
                 if mempool.has_tx(&tx_id) {
                     None
                 } else {
@@ -1091,7 +1091,7 @@ impl LeiosState {
     pub fn match_eb_tx_response(
         &mut self,
         point: &Point,
-        bodies_with_hashes: &[(Vec<u8>, [u8; 32])],
+        bodies_with_hashes: &[(Arc<Vec<u8>>, [u8; 32])],
     ) -> EbTxMatchOutcome {
         // A response means the in-flight fetch for this point is done;
         // clear the candidate tracker's pending guard so a retry (which
@@ -1124,13 +1124,13 @@ impl LeiosState {
             .map(|(i, h)| (h, i))
             .collect();
         // Match each body, sorting by manifest index.
-        let mut matched: BTreeMap<usize, Vec<u8>> = BTreeMap::new();
+        let mut matched: BTreeMap<usize, Arc<Vec<u8>>> = BTreeMap::new();
         for (body, body_hash) in bodies_with_hashes {
             if let Some(&idx) = manifest_index.get(body_hash) {
                 matched.entry(idx).or_insert_with(|| body.clone());
             }
         }
-        let matched_bodies: Vec<Vec<u8>> = matched.values().cloned().collect();
+        let matched_bodies: Vec<Arc<Vec<u8>>> = matched.values().cloned().collect();
 
         // Compute `requested` and `remaining_bitmap`.
         let (requested, remaining_bitmap) =

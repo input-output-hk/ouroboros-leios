@@ -14,6 +14,7 @@ mod validation;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+use std::sync::Arc;
 use clap::Parser;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use tokio::io::AsyncBufReadExt;
@@ -157,7 +158,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     );
 
     // Transaction validator (validates received txs before mempool entry).
-    let (tx_valid_tx, tx_valid_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(1024);
+    let (tx_valid_tx, tx_valid_rx) = tokio::sync::mpsc::channel::<Arc<Vec<u8>>>(1024);
     let _tx_valid_handle = mempool::spawn_tx_validator(
         config.validation.tx_validation_ms,
         config.validation.tx_validation_ms_per_byte,

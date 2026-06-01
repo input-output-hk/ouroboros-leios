@@ -8,6 +8,7 @@ pub mod bitmap;
 pub mod codec;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::protocols::{Agency, Protocol, ProtocolError, Runner};
@@ -90,7 +91,7 @@ pub enum Message {
         bitmap: BTreeMap<u16, u64>,
     },
     /// Server delivers transactions. [3, [tx, ...]]
-    MsgLeiosBlockTxs { transactions: Vec<Vec<u8>> },
+    MsgLeiosBlockTxs { transactions: Vec<Arc<Vec<u8>>> },
     /// Client requests votes. [4, [(slot, voter_id), ...]]
     MsgLeiosVotesRequest { votes: Vec<(u64, Vec<u8>)> },
     /// Server delivers votes. [5, [vote, ...]]
@@ -105,12 +106,12 @@ pub enum Message {
     /// Server delivers next block+txs in range (more to follow). [7, block, [tx, ...]]
     MsgLeiosNextBlockAndTxsInRange {
         block: Vec<u8>,
-        transactions: Vec<Vec<u8>>,
+        transactions: Vec<Arc<Vec<u8>>>,
     },
     /// Server delivers last block+txs in range (end of sequence). [8, block, [tx, ...]]
     MsgLeiosLastBlockAndTxsInRange {
         block: Vec<u8>,
-        transactions: Vec<Vec<u8>>,
+        transactions: Vec<Arc<Vec<u8>>>,
     },
     /// Client terminates. [9]
     MsgDone,
@@ -207,7 +208,7 @@ pub async fn fetch_block_txs(
     runner: &mut Runner<LeiosFetch>,
     point: Point,
     bitmap: BTreeMap<u16, u64>,
-) -> Result<Vec<Vec<u8>>, ProtocolError> {
+) -> Result<Vec<Arc<Vec<u8>>>, ProtocolError> {
     runner
         .send(&Message::MsgLeiosBlockTxsRequest { point, bitmap })
         .await?;
@@ -244,7 +245,7 @@ pub async fn fetch_block_range(
     end_slot: u64,
     start_hash: [u8; 32],
     end_hash: [u8; 32],
-) -> Result<Vec<(Vec<u8>, Vec<Vec<u8>>)>, ProtocolError> {
+) -> Result<Vec<(Vec<u8>, Vec<Arc<Vec<u8>>>)>, ProtocolError> {
     runner
         .send(&Message::MsgLeiosBlockRangeRequest {
             start_slot,

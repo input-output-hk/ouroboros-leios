@@ -624,7 +624,9 @@ pub async fn serve_leios_fetch(lf_send: CodecSend, lf_recv: CodecRecv, store: Ar
                     break;
                 };
                 if runner
-                    .send(&LfMsg::MsgLeiosBlockTxs { transactions })
+                    .send(&LfMsg::MsgLeiosBlockTxs {
+                        transactions: transactions.iter().map(|x| x.clone()).collect()
+                    })
                     .await
                     .is_err()
                 {

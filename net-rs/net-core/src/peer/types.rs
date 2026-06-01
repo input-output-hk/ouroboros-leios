@@ -47,7 +47,7 @@ pub enum PeerEvent {
     PeersDiscovered { peers: Vec<PeerAddress> },
 
     /// TxSubmission server: received a transaction from a client.
-    TransactionReceived { body: Vec<u8> },
+    TransactionReceived { body: Arc<Vec<u8>> },
 
     /// TxSubmission client: peer requested `count` tx ids (blocking mode).
     TxsRequested { count: u16 },
@@ -77,7 +77,7 @@ pub enum PeerEvent {
     /// LeiosFetch: requested transactions for an EB arrived.
     LeiosBlockTxsFetched {
         point: Point,
-        transactions: Vec<Vec<u8>>,
+        transactions: Vec<Arc<Vec<u8>>>,
     },
 
     /// BlockFetch: peer responded with NoBlocks for a requested range.

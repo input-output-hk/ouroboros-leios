@@ -592,7 +592,7 @@ impl Coordinator {
                             .enumerate()
                             .map(|(i, h)| (*h, i as u32))
                             .collect();
-                        let indexed: BTreeMap<u32, Vec<u8>> = transactions
+                        let indexed: BTreeMap<u32, Arc<Vec<u8>>> = transactions
                             .iter()
                             .filter_map(|body| {
                                 let id = blake2b_256(body);
