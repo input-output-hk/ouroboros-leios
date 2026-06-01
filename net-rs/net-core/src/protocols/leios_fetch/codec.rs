@@ -387,6 +387,7 @@ fn decode_vote_id_pair(d: &mut Decoder<'_>) -> Result<(u64, Vec<u8>), DecodeErro
 mod tests {
     use super::*;
     use crate::types::Point;
+    use std::sync::Arc;
 
     fn round_trip(msg: &Message) -> Message {
         let encoded = minicbor::to_vec(msg).unwrap();
@@ -489,14 +490,14 @@ mod tests {
     #[test]
     fn block_txs_round_trip() {
         let msg = Message::MsgLeiosBlockTxs {
-            transactions: vec![vec![0x01, 0x02], vec![0x03]],
+            transactions: vec![Arc::new(vec![0x01, 0x02]), Arc::new(vec![0x03])],
         };
         let decoded = round_trip(&msg);
         match decoded {
             Message::MsgLeiosBlockTxs { transactions } => {
                 assert_eq!(transactions.len(), 2);
-                assert_eq!(transactions[0], vec![0x01, 0x02]);
-                assert_eq!(transactions[1], vec![0x03]);
+                assert_eq!(*transactions[0], vec![0x01, 0x02]);
+                assert_eq!(*transactions[1], vec![0x03]);
             }
             other => panic!("expected MsgLeiosBlockTxs, got {other:?}"),
         }
@@ -574,7 +575,7 @@ mod tests {
     fn next_block_in_range_round_trip() {
         let msg = Message::MsgLeiosNextBlockAndTxsInRange {
             block: vec![0xE1],
-            transactions: vec![vec![0x01]],
+            transactions: vec![Arc::new(vec![0x01])],
         };
         let decoded = round_trip(&msg);
         match decoded {
@@ -583,7 +584,7 @@ mod tests {
                 transactions,
             } => {
                 assert_eq!(block, vec![0xE1]);
-                assert_eq!(transactions, vec![vec![0x01]]);
+                assert_eq!(*transactions[0], vec![0x01]);
             }
             other => panic!("expected MsgLeiosNextBlockAndTxsInRange, got {other:?}"),
         }
@@ -593,7 +594,7 @@ mod tests {
     fn last_block_in_range_round_trip() {
         let msg = Message::MsgLeiosLastBlockAndTxsInRange {
             block: vec![0xE2],
-            transactions: vec![vec![0x02], vec![0x03]],
+            transactions: vec![Arc::new(vec![0x02]), Arc::new(vec![0x03])],
         };
         let decoded = round_trip(&msg);
         match decoded {

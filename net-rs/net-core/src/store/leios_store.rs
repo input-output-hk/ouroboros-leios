@@ -482,7 +482,7 @@ mod tests {
     fn get_block_txs_with_select_all_returns_all() {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0xCDu8; 32];
-        let txs = vec![vec![10, 20], vec![30, 40]];
+        let txs = vec![Arc::new(vec![10, 20]), Arc::new(vec![30, 40])];
         let point = Point::Specific { slot: 42, hash };
 
         store.inject_block_txs_full(point, txs.clone());
@@ -496,7 +496,7 @@ mod tests {
     fn get_block_txs_empty_bitmap_returns_empty() {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0xCDu8; 32];
-        let txs = vec![vec![10, 20], vec![30, 40]];
+        let txs = vec![Arc::new(vec![10, 20]), Arc::new(vec![30, 40])];
         let point = Point::Specific { slot: 42, hash };
 
         store.inject_block_txs_full(point, txs);
@@ -509,7 +509,7 @@ mod tests {
     fn get_block_txs_filters_by_bitmap_and_orders_ascending() {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0xEFu8; 32];
-        let txs: Vec<Vec<u8>> = (0..70u8).map(|i| vec![i]).collect();
+        let txs: Vec<Arc<Vec<u8>>> = (0..70u8).map(|i| Arc::new(vec![i])).collect();
         let point = Point::Specific { slot: 1, hash };
 
         store.inject_block_txs_full(point, txs);
@@ -517,12 +517,12 @@ mod tests {
         // Pick out-of-order indices spanning two segments to check ordering.
         let bitmap = bitmap::from_indices(&[65, 0, 63]);
         let got = store.get_block_txs(1, &hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![0u8], vec![63u8], vec![65u8]]);
+        assert_eq!(got, vec![Arc::new(vec![0u8]), Arc::new(vec![63u8]), Arc::new(vec![65u8])]);
     }
 
-    struct StubResolver(HashMap<Vec<u8>, Vec<u8>>);
+    struct StubResolver(HashMap<Vec<u8>, Arc<Vec<u8>>>);
     impl TxBodyResolver for StubResolver {
-        fn resolve_body(&self, tx_id: &[u8]) -> Option<Vec<u8>> {
+        fn resolve_body(&self, tx_id: &[u8]) -> Option<Arc<Vec<u8>>> {
             self.0.get(tx_id).cloned()
         }
     }
@@ -533,9 +533,9 @@ mod tests {
         let h1 = [0x20u8; 32];
         let h2 = [0x30u8; 32];
         let bodies = HashMap::from([
-            (h0.to_vec(), vec![1u8]),
-            (h1.to_vec(), vec![2u8]),
-            (h2.to_vec(), vec![3u8]),
+            (h0.to_vec(), Arc::new(vec![1u8])),
+            (h1.to_vec(), Arc::new(vec![2u8])),
+            (h2.to_vec(), Arc::new(vec![3u8])),
         ]);
         let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(bodies));
         let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
@@ -550,7 +550,7 @@ mod tests {
         // Bitmap selects indices 0 and 2.
         let bitmap = bitmap::from_indices(&[0, 2]);
         let got = store.get_block_txs(5, &eb_hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![1u8], vec![3u8]]);
+        assert_eq!(got, vec![Arc::new(vec![1u8]), Arc::new(vec![3u8])]);
     }
 
     #[test]
@@ -559,7 +559,7 @@ mod tests {
         let h1 = [0x50u8; 32];
         // Only h0 is resolvable.
         let resolver: Arc<dyn TxBodyResolver> =
-            Arc::new(StubResolver(HashMap::from([(h0.to_vec(), vec![0xAA])])));
+            Arc::new(StubResolver(HashMap::from([(h0.to_vec(), Arc::new(vec![0xAA]))])));
         let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
 
         let eb_hash = [0xCCu8; 32];
@@ -571,7 +571,7 @@ mod tests {
 
         let bitmap = bitmap::from_indices(&[0, 1]);
         let got = store.get_block_txs(7, &eb_hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![0xAA]]);
+        assert_eq!(got, vec![Arc::new(vec![0xAA])]);
     }
 
     #[test]
@@ -585,14 +585,14 @@ mod tests {
             slot: 1,
             hash: eb_hash,
         };
-        store.inject_block_txs_full(point.clone(), vec![vec![100u8], vec![200u8]]);
+        store.inject_block_txs_full(point.clone(), vec![Arc::new(vec![100u8]), Arc::new(vec![200u8])]);
         // Pretend we also have manifest hashes (would normally be set
         // separately; here we make sure the block_txs path wins).
         store.record_eb_manifest(point, vec![[0; 32], [0; 32]]);
 
         let bitmap = bitmap::from_indices(&[0, 1]);
         let got = store.get_block_txs(1, &eb_hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![100u8], vec![200u8]]);
+        assert_eq!(got, vec![Arc::new(vec![100u8]), Arc::new(vec![200u8])]);
     }
 
     #[test]
@@ -607,14 +607,14 @@ mod tests {
     fn get_block_txs_ignores_out_of_range_bits() {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0xAA; 32];
-        let txs = vec![vec![1u8], vec![2u8]];
+        let txs = vec![Arc::new(vec![1u8]), Arc::new(vec![2u8])];
         let point = Point::Specific { slot: 5, hash };
         store.inject_block_txs_full(point, txs);
 
         // Bit 99 is past the available 2 txs; should be silently dropped.
         let bitmap = bitmap::from_indices(&[0, 99]);
         let got = store.get_block_txs(5, &hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![1u8]]);
+        assert_eq!(got, vec![Arc::new(vec![1u8])]);
     }
 
     #[test]
@@ -625,19 +625,19 @@ mod tests {
 
         // First batch: indices 0 and 2.
         let mut first = BTreeMap::new();
-        first.insert(0u32, vec![0xA0]);
-        first.insert(2u32, vec![0xA2]);
+        first.insert(0u32, Arc::new(vec![0xA0]));
+        first.insert(2u32, Arc::new(vec![0xA2]));
         store.inject_block_txs(point.clone(), first);
 
         // Second batch: indices 1 and 3.
         let mut second = BTreeMap::new();
-        second.insert(1u32, vec![0xA1]);
-        second.insert(3u32, vec![0xA3]);
+        second.insert(1u32, Arc::new(vec![0xA1]));
+        second.insert(3u32, Arc::new(vec![0xA3]));
         store.inject_block_txs(point, second);
 
         let bitmap = bitmap::from_indices(&[0, 1, 2, 3]);
         let got = store.get_block_txs(7, &hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![0xA0], vec![0xA1], vec![0xA2], vec![0xA3]]);
+        assert_eq!(got, vec![Arc::new(vec![0xA0]), Arc::new(vec![0xA1]), Arc::new(vec![0xA2]), Arc::new(vec![0xA3])]);
     }
 
     #[test]
@@ -647,11 +647,11 @@ mod tests {
         let point = Point::Specific { slot: 8, hash };
 
         let mut a = BTreeMap::new();
-        a.insert(0u32, vec![0xB0]);
+        a.insert(0u32, Arc::new(vec![0xB0]));
         store.inject_block_txs(point.clone(), a);
 
         let mut b = BTreeMap::new();
-        b.insert(1u32, vec![0xB1]);
+        b.insert(1u32, Arc::new(vec![0xB1]));
         store.inject_block_txs(point, b);
 
         // One BlockTxsOffer notification, not two.
@@ -670,17 +670,17 @@ mod tests {
         let point = Point::Specific { slot: 9, hash };
 
         let mut a = BTreeMap::new();
-        a.insert(0u32, vec![0xC0]);
+        a.insert(0u32, Arc::new(vec![0xC0]));
         store.inject_block_txs(point.clone(), a);
 
         // Conflicting body for index 0 — first writer wins.
         let mut b = BTreeMap::new();
-        b.insert(0u32, vec![0xFF]);
+        b.insert(0u32, Arc::new(vec![0xFF]));
         store.inject_block_txs(point, b);
 
         let bitmap = bitmap::from_indices(&[0]);
         let got = store.get_block_txs(9, &hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![0xC0]]);
+        assert_eq!(got, vec![Arc::new(vec![0xC0])]);
     }
 
     #[test]
@@ -692,7 +692,7 @@ mod tests {
         let h2 = [0x30u8; 32];
         let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(HashMap::from([(
             h1.to_vec(),
-            vec![0xD1],
+            Arc::new(vec![0xD1]),
         )])));
         let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
 
@@ -704,13 +704,13 @@ mod tests {
         store.record_eb_manifest(point.clone(), vec![h0, h1, h2]);
 
         let mut partial = BTreeMap::new();
-        partial.insert(0u32, vec![0xD0]);
-        partial.insert(2u32, vec![0xD2]);
+        partial.insert(0u32, Arc::new(vec![0xD0]));
+        partial.insert(2u32, Arc::new(vec![0xD2]));
         store.inject_block_txs(point, partial);
 
         let bitmap = bitmap::from_indices(&[0, 1, 2]);
         let got = store.get_block_txs(11, &eb_hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![0xD0], vec![0xD1], vec![0xD2]]);
+        assert_eq!(got, vec![Arc::new(vec![0xD0]), Arc::new(vec![0xD1]), Arc::new(vec![0xD2])]);
     }
 
     #[test]

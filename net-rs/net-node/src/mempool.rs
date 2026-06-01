@@ -450,6 +450,29 @@ mod tests {
         assert_ne!(tx1.tx_id.0, tx2.tx_id.0);
     }
 
+    #[test]
+    fn exp_sample_positive() {
+        let mut rng = StdRng::seed_from_u64(42);
+        for _ in 0..100 {
+            let d = exp_sample(&mut rng, 1.0);
+            assert!(d.as_secs_f64() > 0.0);
+        }
+    }
+
+    #[test]
+    fn exp_sample_mean_roughly_correct() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let rate = 2.0;
+        let n = 10_000;
+        let total: f64 = (0..n)
+            .map(|_| exp_sample(&mut rng, rate).as_secs_f64())
+            .sum();
+        let mean = total / n as f64;
+        assert!((0.4..=0.6).contains(&mean), "mean={mean}, expected ~0.5");
+    }
+
+    // -- Wrapper translation tests (algorithmic behaviour lives in shared-consensus) --
+
     #[tokio::test]
     async fn mempool_resolver_serves_body_through_trait() {
         use net_core::store::leios_store::TxBodyResolver;
@@ -488,7 +511,10 @@ mod tests {
         let pool_locked = pool.lock().unwrap();
         assert_eq!(pool_locked.len(), 1);
         let expected = tx_from_received_bytes(body);
-        assert_eq!(pool_locked.get_body_by_id(&expected.tx_id.0), Some(expected.body.0));
+        assert_eq!(
+            pool_locked.get_body_by_id(&expected.tx_id.0),
+            Some(expected.body.0)
+        );
     }
 
     #[test]

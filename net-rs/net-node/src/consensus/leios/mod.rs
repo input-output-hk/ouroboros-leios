@@ -1010,8 +1010,8 @@ mod tests {
 
     fn push_tx_with_id(mempool: &crate::mempool::SharedMempool, id: [u8; 32]) {
         let tx = PendingTx {
-            tx_id: TxId(id.to_vec()),
-            body: TxBody(vec![]),
+            tx_id: TxId(Arc::new(id.to_vec())),
+            body: TxBody(Arc::new(vec![])),
             size: 0,
         };
         mempool.lock().unwrap().push(tx);
@@ -1146,9 +1146,9 @@ mod tests {
         let mut leios = test_leios_with_mempool(tx, validator, mempool);
 
         // Three bodies, request all three, server returns only the middle one.
-        let body0 = b"alpha".to_vec();
-        let body1 = b"bravo".to_vec();
-        let body2 = b"charlie".to_vec();
+        let body0 = Arc::new(b"alpha".to_vec());
+        let body1 = Arc::new(b"bravo".to_vec());
+        let body2 = Arc::new(b"charlie".to_vec());
         let h0 = body_hash(&body0);
         let h1 = body_hash(&body1);
         let h2 = body_hash(&body2);

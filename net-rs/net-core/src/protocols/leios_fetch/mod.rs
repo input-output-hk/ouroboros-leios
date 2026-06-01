@@ -601,7 +601,7 @@ mod tests {
 
             runner
                 .send(&Message::MsgLeiosBlockTxs {
-                    transactions: vec![vec![0x01], vec![0x02], vec![0x03]],
+                    transactions: vec![Arc::new(vec![0x01]), Arc::new(vec![0x02]), Arc::new(vec![0x03])],
                 })
                 .await
                 .unwrap();
@@ -701,7 +701,7 @@ mod tests {
             runner
                 .send(&Message::MsgLeiosNextBlockAndTxsInRange {
                     block: vec![0xE1],
-                    transactions: vec![vec![0x01]],
+                    transactions: vec![Arc::new(vec![0x01])],
                 })
                 .await
                 .unwrap();
@@ -709,7 +709,7 @@ mod tests {
             runner
                 .send(&Message::MsgLeiosLastBlockAndTxsInRange {
                     block: vec![0xE2],
-                    transactions: vec![vec![0x02], vec![0x03]],
+                    transactions: vec![Arc::new(vec![0x02]), Arc::new(vec![0x03])],
                 })
                 .await
                 .unwrap();
@@ -727,9 +727,9 @@ mod tests {
 
             assert_eq!(results.len(), 2);
             assert_eq!(results[0].0, vec![0xE1]);
-            assert_eq!(results[0].1, vec![vec![0x01]]);
+            assert_eq!(results[0].1, vec![Arc::new(vec![0x01])]);
             assert_eq!(results[1].0, vec![0xE2]);
-            assert_eq!(results[1].1, vec![vec![0x02], vec![0x03]]);
+            assert_eq!(results[1].1, vec![Arc::new(vec![0x02]), Arc::new(vec![0x03])]);
 
             done(&mut runner).await.unwrap();
         });

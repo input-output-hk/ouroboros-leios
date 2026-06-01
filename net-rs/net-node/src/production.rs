@@ -567,6 +567,7 @@ pub fn blake2b_256(bytes: &[u8]) -> [u8; 32] {
 mod tests {
     use super::*;
     use net_core::protocols::txsubmission::{PendingTx, TxBody, TxId};
+    use std::sync::Arc;
 
     fn base_config() -> ProductionConfig {
         ProductionConfig {
@@ -635,8 +636,8 @@ mod tests {
 
     fn make_test_tx(id: u8, size: usize) -> PendingTx {
         PendingTx {
-            tx_id: TxId(vec![id; 32]),
-            body: TxBody(vec![id; size]),
+            tx_id: TxId(Arc::new(vec![id; 32])),
+            body: TxBody(Arc::new(vec![id; size])),
             size: size as u32,
         }
     }

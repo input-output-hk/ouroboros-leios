@@ -376,7 +376,7 @@ mod tests {
             TxSubmission::transition(
                 &State::StIdle,
                 &Message::MsgRequestTxs {
-                    tx_ids: vec![TxId(vec![0x42])]
+                    tx_ids: vec![TxId(Arc::new(vec![0x42]))]
                 }
             )
             .unwrap(),
@@ -430,7 +430,7 @@ mod tests {
         assert!(TxSubmission::transition(
             &State::StTxIdsBlocking,
             &Message::MsgRequestTxs {
-                tx_ids: vec![TxId(vec![])]
+                tx_ids: vec![TxId(Arc::new(vec![]))]
             }
         )
         .is_err());
@@ -504,8 +504,8 @@ mod tests {
 
     fn make_test_tx(id_byte: u8, size: usize) -> PendingTx {
         PendingTx {
-            tx_id: TxId(vec![id_byte; 32]),
-            body: TxBody(vec![id_byte; size]),
+            tx_id: TxId(Arc::new(vec![id_byte; 32])),
+            body: TxBody(Arc::new(vec![id_byte; size])),
             size: size as u32,
         }
     }

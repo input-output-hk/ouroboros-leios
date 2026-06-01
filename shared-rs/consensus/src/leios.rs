@@ -1304,6 +1304,7 @@ fn indices_to_bitmap(indices: &[u32]) -> BTreeMap<u16, u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     fn pipeline() -> PipelineConfig {
         PipelineConfig {
@@ -1575,14 +1576,18 @@ mod tests {
         state.eb_tx_hashes.insert(h(1), (10, vec![ha, hb, hc]));
         // Body order arrives as [b, a, c] but should come out [a, b, c].
         let bodies = vec![
-            (b"body-b".to_vec(), hb),
-            (b"body-a".to_vec(), ha),
-            (b"body-c".to_vec(), hc),
+            (Arc::new(b"body-b".to_vec()), hb),
+            (Arc::new(b"body-a".to_vec()), ha),
+            (Arc::new(b"body-c".to_vec()), hc),
         ];
         let outcome = state.match_eb_tx_response(&point(10, 1), &bodies);
         assert_eq!(
             outcome.matched_bodies,
-            vec![b"body-a".to_vec(), b"body-b".to_vec(), b"body-c".to_vec()]
+            vec![
+                Arc::new(b"body-a".to_vec()),
+                Arc::new(b"body-b".to_vec()),
+                Arc::new(b"body-c".to_vec())
+            ]
         );
     }
 
@@ -1592,9 +1597,12 @@ mod tests {
         let ha = h(0xA0);
         state.eb_tx_hashes.insert(h(1), (10, vec![ha]));
         let bogus = h(0xFF);
-        let bodies = vec![(b"body-a".to_vec(), ha), (b"bogus".to_vec(), bogus)];
+        let bodies = vec![
+            (Arc::new(b"body-a".to_vec()), ha),
+            (Arc::new(b"bogus".to_vec()), bogus),
+        ];
         let outcome = state.match_eb_tx_response(&point(10, 1), &bodies);
-        assert_eq!(outcome.matched_bodies, vec![b"body-a".to_vec()]);
+        assert_eq!(outcome.matched_bodies, vec![Arc::new(b"body-a".to_vec())]);
     }
 
     #[test]
@@ -1745,9 +1753,11 @@ mod tests {
         requested.insert(0u16, 0b11u64);
         state.pending_eb_tx_fetches.insert(h(1), (10, requested));
         // Only body for index 0 (ha) arrives.
-        let outcome =
-            state.match_eb_tx_response(&point(10, 1), &[(b"body-a".to_vec(), ha)]);
-        assert_eq!(outcome.matched_bodies, vec![b"body-a".to_vec()]);
+        let outcome = state.match_eb_tx_response(
+            &point(10, 1),
+            &[(Arc::new(b"body-a".to_vec()), ha)],
+        );
+        assert_eq!(outcome.matched_bodies, vec![Arc::new(b"body-a".to_vec())]);
         assert_eq!(outcome.requested, 2);
         // Index 1 still missing.
         let mut expected_remaining = BTreeMap::new();
@@ -1768,8 +1778,10 @@ mod tests {
         let mut requested = BTreeMap::new();
         requested.insert(0u16, 0b1u64);
         state.pending_eb_tx_fetches.insert(h(1), (10, requested));
-        let outcome =
-            state.match_eb_tx_response(&point(10, 1), &[(b"body-a".to_vec(), ha)]);
+        let outcome = state.match_eb_tx_response(
+            &point(10, 1),
+            &[(Arc::new(b"body-a".to_vec()), ha)],
+        );
         assert!(outcome.remaining_bitmap.is_empty());
         assert!(!state.pending_eb_tx_fetches.contains_key(&h(1)));
     }
@@ -1779,9 +1791,9 @@ mod tests {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
         let outcome = state.match_eb_tx_response(
             &point(10, 1),
-            &[(b"some-body".to_vec(), h(0xAA))],
+            &[(Arc::new(b"some-body".to_vec()), h(0xAA))],
         );
-        assert_eq!(outcome.matched_bodies, vec![b"some-body".to_vec()]);
+        assert_eq!(outcome.matched_bodies, vec![Arc::new(b"some-body".to_vec())]);
         assert_eq!(outcome.requested, 0);
         assert!(outcome.remaining_bitmap.is_empty());
     }
@@ -2065,8 +2077,8 @@ mod tests {
 
         let mut mempool = crate::mempool::MempoolState::new(4096);
         // Local mempool has txs 0 (h(1)) and 2 (h(3)); 1 (h(2)) and 3 (h(4)) are missing.
-        mempool.admit_validated(h(1).to_vec(), vec![0u8; 16], 16);
-        mempool.admit_validated(h(3).to_vec(), vec![0u8; 16], 16);
+        mempool.admit_validated(Arc::new(h(1).to_vec()), Arc::new(vec![0u8; 16]), 16);
+        mempool.admit_validated(Arc::new(h(3).to_vec()), Arc::new(vec![0u8; 16]), 16);
 
         let bitmap = state.missing_eb_tx_bitmap(&h(0xAB), &mempool);
         let indices: Vec<u32> = crate::bitmap::iter_indices(&bitmap).collect();
@@ -2080,8 +2092,8 @@ mod tests {
         state.eb_tx_hashes.insert(h(0xCD), (50, manifest));
 
         let mut mempool = crate::mempool::MempoolState::new(4096);
-        mempool.admit_validated(h(5).to_vec(), vec![0u8; 8], 8);
-        mempool.admit_validated(h(6).to_vec(), vec![0u8; 8], 8);
+        mempool.admit_validated(Arc::new(h(5).to_vec()), Arc::new(vec![0u8; 8]), 8);
+        mempool.admit_validated(Arc::new(h(6).to_vec()), Arc::new(vec![0u8; 8]), 8);
 
         let bitmap = state.missing_eb_tx_bitmap(&h(0xCD), &mempool);
         assert!(bitmap.is_empty());
