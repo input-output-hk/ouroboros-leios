@@ -240,6 +240,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                 }
 
+                // Per-slot memory telemetry. Counts every slot so leak rate
+                // can be computed as (max - min) / slots from JSONL without
+                // depending on run length. Cheap: nested structs, no
+                // allocations beyond the event itself.
+                let frag_sizes = {
+                    let map = handle.fragment_sizes.lock().expect("fragment_sizes poisoned");
+                    let total: usize = map.values().copied().sum();
+                    let max: usize = map.values().copied().max().unwrap_or(0);
+                    telemetry::FragmentSizes {
+                        peer_count: map.len(),
+                        fragment_total: total,
+                        fragment_max: max,
+                        // Each retained Point::Specific lives in both the
+                        // Vec and the HashSet inside the fragment.
+                        bytes_estimate: total.saturating_mul(96),
+                    }
+                };
+                let mem_event = NodeEvent::MemorySizes(Box::new(telemetry::MemorySizesPayload {
+                    node: node_id.clone(),
+                    slot,
+                    praos: consensus.praos_state_sizes(),
+                    leios: if leios { Some(consensus.leios_state_sizes()) } else { None },
+                    leios_store: handle.leios_store.as_ref().map(|s| s.stats()),
+                    fragments: frag_sizes,
+                }));
+                telem.record(mem_event).await;
+
                 // Praos: try to produce a ranking block. If the mempool
                 // overflows rb_body_max_bytes, an EB manifest is produced
                 // instead of embedding txs in the RB body.

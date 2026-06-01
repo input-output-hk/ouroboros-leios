@@ -857,6 +857,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "minicbor",
+ "serde",
  "shared-consensus",
  "socket2 0.5.10",
  "thiserror",
