@@ -111,8 +111,8 @@ RUST_LOG=info cargo run -p net-cluster --release -- \
 ```
 
 **Sizing:** `node_limit` controls memory + CPU footprint linearly.
-v4-mainnet has 2,685 nodes and average degree ~35 — running the full
-graph as a process-per-node cluster will saturate any workstation.
+v4-mainnet has 2,685 nodes with a dense peer graph — running it in
+full as a process-per-node cluster will saturate any workstation.
 Rule of thumb on a stock laptop: ~50 nodes on 16 GB RAM, ~250 on 48 GB.
 
 `node_limit = 0` is rejected at startup (an empty cluster would boot
@@ -125,7 +125,7 @@ Key fields in the cluster TOML config:
 
 | Field | Description |
 |-------|-------------|
-| `[topology_source]` | Required topology selector.  `type = "random"` takes `num_nodes`, `degree`, `min_latency_ms`, `max_latency_ms`, `stake_distribution` (`"equal"` or `"mainnet-shaped"`). `type = "yaml"` takes `path` and optional `node_limit` (cap to top-N by stake). The schema rejects fields from the wrong variant at parse time. |
+| `[topology_source]` | Optional topology selector.  `type = "random"` takes `num_nodes`, `degree`, `min_latency_ms`, `max_latency_ms`, `stake_distribution` (`"equal"` or `"mainnet-shaped"`). `type = "yaml"` takes `path` and optional `node_limit` (cap to top-N by stake). The schema rejects fields from the wrong variant at parse time. |
 | `base_config` | Path to shared net-node base config |
 | `base_port` | Starting port for node allocation |
 | `seed` | RNG seed for reproducible topologies |

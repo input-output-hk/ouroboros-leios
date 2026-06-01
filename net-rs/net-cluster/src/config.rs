@@ -83,7 +83,7 @@ pub enum TopologySource {
         /// YAML (in YAML insertion order; the v4 generator orders by
         /// stake-rank descending, so this is effectively top-N by stake).
         /// `None` loads every node — beware, v4-mainnet has 2,685 nodes
-        /// and average degree ~70, which is impractical for a local
+        /// with a dense peer graph, which is impractical for a local
         /// process-per-node cluster.
         #[serde(default)]
         node_limit: Option<usize>,
