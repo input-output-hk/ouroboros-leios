@@ -127,7 +127,7 @@
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
@@ -143,21 +143,6 @@
           "legendFormat": "{{process}} mempool",
           "range": true,
           "refId": "Mempool bytes"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
-          },
-          "direction": "backward",
-          "editorMode": "code",
-          "expr": "rate({service=\"tx-centrifuge\", ns=\"TxCentrifuge.Builder.NewTx\"}[30s]) * 204 / 1000",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "Load (assumed 204B per tx)",
-          "queryType": "range",
-          "range": true,
-          "refId": "Load"
         }
       ],
       "title": "Mempool",
@@ -237,7 +222,7 @@
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
@@ -250,8 +235,8 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "rate({service=\"tx-centrifuge\", ns=\"TxCentrifuge.Builder.NewTx\"}[30s])",
-          "legendFormat": "tx/s",
+          "expr": "rate({type=\"cardano-node\", ns=~\"Mempool.AddedTx\"}[30s])",
+          "legendFormat": "{{process}}",
           "queryType": "range",
           "refId": "A"
         }
