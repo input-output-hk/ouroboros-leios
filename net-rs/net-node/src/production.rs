@@ -145,7 +145,7 @@ impl BlockProducer {
             // and serve `LeiosFetch BlockTxs` (resolver finds them by
             // tx_id).
             let manifest_len = body_path.manifest_hashes.len();
-            let eb_data = encode_overflow_eb(slot, &body_path.manifest_hashes);
+            let eb_data = encode_overflow_eb(&body_path.manifest_hashes);
             let eb_hash = blake2b_256(&eb_data);
             let eb_key = EbKey {
                 slot,
@@ -351,41 +351,55 @@ impl BlockProducer {
     }
 }
 
-/// Decode an overflow EB manifest produced by `make_overflow_eb`.
-/// Returns `(slot, tx_hashes)` on success, where each `tx_hash` is 32 bytes.
-pub fn decode_overflow_eb(blob: &[u8]) -> Option<(u64, Vec<[u8; 32]>)> {
-    let mut dec = minicbor::Decoder::new(blob);
-    let outer = dec.array().ok()??;
-    if outer != 2 {
-        return None;
-    }
-    let slot = dec.u64().ok()?;
-    let inner = dec.array().ok()??;
-    let mut hashes = Vec::with_capacity(inner as usize);
-    for _ in 0..inner {
+/// Decode an endorser-block manifest — the CIP-0164 prototype
+/// `endorser_block = { tx_hash => tx_size }` (CBOR map) — returning the
+/// referenced tx hashes in wire order.  Returns `None` if the blob isn't
+/// a well-formed manifest map (32-byte keys, integer values).  Sizes are
+/// ignored (the consumer only needs the hash set + order).
+pub fn decode_overflow_eb(blob: &[u8]) -> Option<Vec<[u8; 32]>> {
+    fn read_hash(dec: &mut minicbor::Decoder) -> Option<[u8; 32]> {
         let bytes = dec.bytes().ok()?;
         if bytes.len() != 32 {
             return None;
         }
         let mut h = [0u8; 32];
         h.copy_from_slice(bytes);
-        hashes.push(h);
+        let _size = dec.u32().ok()?; // tx size — unused
+        Some(h)
     }
-    Some((slot, hashes))
+    let mut dec = minicbor::Decoder::new(blob);
+    let entries = dec.map().ok()?;
+    let mut hashes = Vec::new();
+    match entries {
+        Some(n) => {
+            hashes.reserve(n as usize);
+            for _ in 0..n {
+                hashes.push(read_hash(&mut dec)?);
+            }
+        }
+        None => loop {
+            // Indefinite-length map: read until the break marker.
+            if dec.datatype().ok()? == minicbor::data::Type::Break {
+                dec.skip().ok()?;
+                break;
+            }
+            hashes.push(read_hash(&mut dec)?);
+        },
+    }
+    Some(hashes)
 }
 
-/// Encode an EB body as CBOR `[slot, [tx_hash, ...]]` — pure function
-/// over the manifest hashes; lets the caller hash the bytes to derive
-/// the EB key before committing the drain in the mempool.
-pub fn encode_overflow_eb(slot: u64, manifest: &[[u8; 32]]) -> Vec<u8> {
+/// Encode an endorser-block manifest as the prototype
+/// `endorser_block = { tx_hash => tx_size }` map.  Sizes are `0` (the
+/// produce path doesn't track per-tx sizes); the hash order is preserved
+/// for bitmap indexing.  Pure over the manifest so the caller can hash
+/// the bytes to derive the EB key before committing the mempool drain.
+pub fn encode_overflow_eb(manifest: &[[u8; 32]]) -> Vec<u8> {
     let mut data = Vec::new();
     let mut enc = minicbor::Encoder::new(&mut data);
-    let _ = enc
-        .array(2)
-        .and_then(|e| e.u64(slot))
-        .and_then(|e| e.array(manifest.len() as u64));
+    let _ = enc.map(manifest.len() as u64);
     for h in manifest {
-        let _ = minicbor::Encoder::new(&mut data).bytes(h);
+        let _ = enc.bytes(h).and_then(|e| e.u32(0));
     }
     data
 }
@@ -667,8 +681,8 @@ mod tests {
     #[test]
     fn encode_overflow_eb_is_deterministic() {
         let manifest = vec![[0x10u8; 32], [0x20u8; 32]];
-        let a = encode_overflow_eb(50, &manifest);
-        let b = encode_overflow_eb(50, &manifest);
+        let a = encode_overflow_eb(&manifest);
+        let b = encode_overflow_eb(&manifest);
         assert_eq!(a, b);
         assert_eq!(blake2b_256(&a), blake2b_256(&b));
     }
@@ -676,9 +690,8 @@ mod tests {
     #[test]
     fn decode_overflow_eb_round_trip() {
         let manifest = vec![[0x10u8; 32], [0x20u8; 32]];
-        let data = encode_overflow_eb(99, &manifest);
-        let (slot, hashes) = decode_overflow_eb(&data).expect("decode");
-        assert_eq!(slot, 99);
+        let data = encode_overflow_eb(&manifest);
+        let hashes = decode_overflow_eb(&data).expect("decode");
         assert_eq!(hashes, manifest);
     }
 
@@ -691,17 +704,15 @@ mod tests {
     #[test]
     fn encode_overflow_eb_layout() {
         let manifest = vec![[0xAAu8; 32], [0xBBu8; 32]];
-        let data = encode_overflow_eb(42, &manifest);
-        // Decode the manifest: [slot, [hash, ...]]
+        let data = encode_overflow_eb(&manifest);
+        // Decode the manifest map: { hash => size }, hashes in order.
         let mut dec = minicbor::Decoder::new(&data);
-        let outer_len = dec.array().unwrap().unwrap();
-        assert_eq!(outer_len, 2);
-        let slot = dec.u64().unwrap();
-        assert_eq!(slot, 42);
-        let inner_len = dec.array().unwrap().unwrap();
-        assert_eq!(inner_len, 2);
+        let n = dec.map().unwrap().unwrap();
+        assert_eq!(n, 2);
         assert_eq!(dec.bytes().unwrap(), &[0xAA; 32]);
+        assert_eq!(dec.u32().unwrap(), 0);
         assert_eq!(dec.bytes().unwrap(), &[0xBB; 32]);
+        assert_eq!(dec.u32().unwrap(), 0);
     }
 
     // -- Header roundtrip tests --

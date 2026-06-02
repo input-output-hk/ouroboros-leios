@@ -613,8 +613,13 @@ pub async fn serve_leios_fetch(lf_send: CodecSend, lf_recv: CodecRecv, store: Ar
                     // CIP-0164: server should disconnect if it doesn't have the requested EB txs.
                     break;
                 };
+                // Echo the request's point + bitmap alongside the txs.
                 if runner
-                    .send(&LfMsg::MsgLeiosBlockTxs { transactions })
+                    .send(&LfMsg::MsgLeiosBlockTxs {
+                        point,
+                        bitmap,
+                        transactions,
+                    })
                     .await
                     .is_err()
                 {
@@ -879,14 +884,15 @@ mod tests {
         let ((client_send, client_recv), (server_send, server_recv), mux_a, mux_b) =
             mux_pair_for_protocol(&lf_proto);
 
-        // Create and populate LeiosStore.
+        // Create and populate LeiosStore.  The EB blob is a CBOR
+        // endorser_block map { hash => size } (empty here).
         let (store, _rx) = LeiosStore::new(100);
         store.inject_block(
             Point::Specific {
                 slot: 42,
                 hash: [0xAB; 32],
             },
-            vec![1, 2, 3, 4],
+            vec![0xA0],
         );
 
         // Start server.
@@ -903,7 +909,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(block, vec![1, 2, 3, 4]);
+        assert_eq!(block, vec![0xA0]);
 
         // Clean up.
         let _ = leios_fetch::done(&mut client).await;
@@ -967,7 +973,9 @@ mod tests {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0x77u8; 32];
         let point = Point::Specific { slot: 50, hash };
-        let txs: Vec<Vec<u8>> = (0..100u8).map(|i| vec![i, i, i]).collect();
+        // Each tx body is a single valid CBOR value (a 3-byte bytestring,
+        // 0x43 = bytes(3)) — the codec passes txs through as raw CBOR.
+        let txs: Vec<Vec<u8>> = (0..100u8).map(|i| vec![0x43, i, i, i]).collect();
         store.inject_block_txs_full(point.clone(), txs);
 
         let server_handle =
@@ -982,10 +990,10 @@ mod tests {
 
         // Server returns those four in ascending order.
         assert_eq!(got.len(), 4);
-        assert_eq!(got[0], vec![0, 0, 0]);
-        assert_eq!(got[1], vec![5, 5, 5]);
-        assert_eq!(got[2], vec![64, 64, 64]);
-        assert_eq!(got[3], vec![99, 99, 99]);
+        assert_eq!(got[0], vec![0x43, 0, 0, 0]);
+        assert_eq!(got[1], vec![0x43, 5, 5, 5]);
+        assert_eq!(got[2], vec![0x43, 64, 64, 64]);
+        assert_eq!(got[3], vec![0x43, 99, 99, 99]);
 
         let _ = leios_fetch::done(&mut client).await;
         server_handle.await.ok();
@@ -1018,11 +1026,13 @@ mod tests {
         let h0 = [0xA0u8; 32];
         let h1 = [0xA1u8; 32];
         let h2 = [0xA2u8; 32];
+        // Bodies are single valid CBOR values (1-byte bytestrings,
+        // 0x41 = bytes(1)) — txs pass through the codec as raw CBOR.
         let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(
             [
-                (h0.to_vec(), vec![0xB0]),
-                (h1.to_vec(), vec![0xB1]),
-                (h2.to_vec(), vec![0xB2]),
+                (h0.to_vec(), vec![0x41, 0xB0]),
+                (h1.to_vec(), vec![0x41, 0xB1]),
+                (h2.to_vec(), vec![0x41, 0xB2]),
             ]
             .into_iter()
             .collect(),
@@ -1042,7 +1052,7 @@ mod tests {
         let got = leios_fetch::fetch_block_txs(&mut client, point, bitmap)
             .await
             .expect("server should respond");
-        assert_eq!(got, vec![vec![0xB0u8], vec![0xB2u8]]);
+        assert_eq!(got, vec![vec![0x41u8, 0xB0], vec![0x41u8, 0xB2]]);
 
         let _ = leios_fetch::done(&mut client).await;
         server_handle.await.ok();

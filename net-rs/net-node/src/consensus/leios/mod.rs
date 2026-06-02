@@ -232,7 +232,7 @@ impl LeiosConsensus {
                 )
             }
             NetworkEvent::LeiosBlockReceived { point, block } => {
-                let manifest = decode_overflow_eb(block).map(|(_, hashes)| hashes);
+                let manifest = decode_overflow_eb(block);
                 (true, self.state.on_eb_received(point.clone(), manifest))
             }
             NetworkEvent::LeiosVotesReceived { votes, .. } => {
@@ -264,7 +264,7 @@ impl LeiosConsensus {
     /// peer offers fire), and marks the EB validated immediately —
     /// the producer trusts its own work.
     pub async fn register_self_produced_eb(&mut self, point: Point, eb_data: &[u8]) {
-        let manifest = decode_overflow_eb(eb_data).map(|(_, hashes)| hashes);
+        let manifest = decode_overflow_eb(eb_data);
         let fx = self.state.on_eb_received(point.clone(), manifest);
         self.dispatch(fx).await;
         self.state.on_validated_eb(point);
@@ -882,16 +882,11 @@ mod tests {
     /// Build the manifest bytes that the producer would emit for a given
     /// list of 32-byte tx hashes at `slot`. Returns the same CBOR shape as
     /// `make_overflow_eb` (`[slot, [hash, ...]]`) plus the EB hash.
-    fn make_manifest(slot: u64, hashes: &[[u8; 32]]) -> (Vec<u8>, [u8; 32]) {
-        let mut data = Vec::new();
-        let mut enc = minicbor::Encoder::new(&mut data);
-        let _ = enc
-            .array(2)
-            .and_then(|e| e.u64(slot))
-            .and_then(|e| e.array(hashes.len() as u64));
-        for h in hashes {
-            let _ = minicbor::Encoder::new(&mut data).bytes(h);
-        }
+    fn make_manifest(_slot: u64, hashes: &[[u8; 32]]) -> (Vec<u8>, [u8; 32]) {
+        // The endorser_block is the CIP-0164 `{ tx_hash => tx_size }`
+        // manifest map — use the production encoder so the test blob
+        // matches what `decode_overflow_eb` expects.
+        let data = crate::production::encode_overflow_eb(hashes);
         let hash_result = blake2b_simd::Params::new().hash_length(32).hash(&data);
         let mut eb_hash = [0u8; 32];
         eb_hash.copy_from_slice(hash_result.as_bytes());

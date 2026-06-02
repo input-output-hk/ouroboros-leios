@@ -1180,10 +1180,9 @@ mod tests {
                 }
                 other => panic!("expected MsgLeiosBlockRequest, got {other:?}"),
             }
+            // A valid CBOR endorser_block map { hash => size } (empty here).
             runner
-                .send(&LfMsg::MsgLeiosBlock {
-                    block: vec![1, 2, 3, 4],
-                })
+                .send(&LfMsg::MsgLeiosBlock { block: vec![0xA0] })
                 .await
                 .unwrap();
 
@@ -1226,7 +1225,7 @@ mod tests {
                             hash: [0xAB; 32]
                         }
                     );
-                    assert_eq!(block, vec![1, 2, 3, 4]);
+                    assert_eq!(block, vec![0xA0]);
                 }
                 other => panic!("expected LeiosBlockFetched, got {other:?}"),
             }
