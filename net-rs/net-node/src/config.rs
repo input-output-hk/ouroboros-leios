@@ -157,17 +157,6 @@ impl FetchPolicyKind {
         }
     }
 
-    /// Build a [`VoteFetchPolicy`] handle from this config.
-    pub fn into_vote_policy(self) -> Box<dyn shared_consensus::fetch::VoteFetchPolicy + Send + Sync> {
-        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
-        match self {
-            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
-            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
-                n: n.unwrap_or(usize::MAX),
-            }),
-            FetchPolicyKind::NoFetch => Box::new(NoFetch),
-        }
-    }
 }
 
 /// Per-traffic-class fetch-policy selection.  Each class is set
@@ -184,9 +173,6 @@ pub struct FetchPolicyConfig {
     /// Policy for fetching EB transaction bodies (`FetchLeiosBlockTxs`).
     #[serde(default)]
     pub eb_txs: FetchPolicyKind,
-    /// Policy for fetching missing votes (`FetchLeiosVotes`).
-    #[serde(default)]
-    pub votes: FetchPolicyKind,
 }
 
 /// Top-level node configuration.
@@ -937,7 +923,6 @@ stake = 0
         assert!(matches!(cfg.block, FetchPolicyKind::LowestRtt));
         assert!(matches!(cfg.eb, FetchPolicyKind::LowestRtt));
         assert!(matches!(cfg.eb_txs, FetchPolicyKind::LowestRtt));
-        assert!(matches!(cfg.votes, FetchPolicyKind::LowestRtt));
     }
 
     #[test]
@@ -946,9 +931,6 @@ stake = 0
 [fetch_policy.eb_txs]
 kind = "broadcast"
 n = 2
-
-[fetch_policy.votes]
-kind = "broadcast"
 "#;
         let figment = Figment::from(Serialized::defaults(NodeConfig::default()))
             .merge(Toml::string(toml_text));
@@ -961,11 +943,6 @@ kind = "broadcast"
         assert!(matches!(
             config.fetch_policy.eb_txs,
             FetchPolicyKind::Broadcast { n: Some(2) }
-        ));
-        // Omitting `n` means "broadcast to all candidates".
-        assert!(matches!(
-            config.fetch_policy.votes,
-            FetchPolicyKind::Broadcast { n: None }
         ));
     }
 
@@ -994,9 +971,6 @@ kind = "lowest_rtt"
             FetchPolicyKind::Broadcast { n: Some(3) }.into_eb_policy();
         let _: Box<dyn shared_consensus::fetch::EbTxsFetchPolicy + Send + Sync> =
             FetchPolicyKind::Broadcast { n: Some(1) }.into_eb_txs_policy();
-        // `n = None` => broadcast to all candidates.
-        let _: Box<dyn shared_consensus::fetch::VoteFetchPolicy + Send + Sync> =
-            FetchPolicyKind::Broadcast { n: None }.into_vote_policy();
     }
 
     #[test]

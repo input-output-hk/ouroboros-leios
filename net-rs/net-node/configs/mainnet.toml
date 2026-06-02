@@ -47,9 +47,6 @@ tx_size_max = 16384
 # [fetch_policy.eb_txs]
 # kind = "broadcast"
 # n = 2
-#
-# [fetch_policy.votes]
-# kind = "broadcast"   # broadcast to all candidates
 
 [validation]
 # Mirror sim-rs `parameters/config.default.yaml` legacy-Praos
