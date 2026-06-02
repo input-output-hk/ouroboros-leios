@@ -1073,33 +1073,38 @@ impl PraosState {
         // Bridge a chain_tree gap between best_tip and adopted, if any.
         if let Some(best) = self.chain_tree.best_tip_hash() {
             if let Err(Some(gap_point)) = self.try_switch_to(best) {
+                // Only bridge when we have a real lower-bound block: a
+                // range anchored at Origin is rejected (and reset) by a
+                // standard Cardano server, so we cannot bridge a gap
+                // with no adopted tip to anchor against.
                 let from = self
                     .adopted_tip_hash
-                    .and_then(|h| self.chain_tree.point(&h).cloned())
-                    .unwrap_or(Point::Origin);
-                let from_slot = match &from {
-                    Point::Specific { slot, .. } => *slot,
+                    .and_then(|h| self.chain_tree.point(&h).cloned());
+                let from_slot = match from.as_ref() {
+                    Some(Point::Specific { slot, .. }) => *slot,
                     _ => 0,
                 };
                 let to_slot = match &gap_point {
                     Point::Specific { slot, .. } => *slot,
                     _ => 0,
                 };
-                if to_slot > from_slot && !self.in_flight.contains_key(&gap_point) {
-                    let peers = self.choose_block_fetch_peers(&gap_point, None);
-                    info!(
-                        node_id = %self.node_id,
-                        %from,
-                        to = %gap_point,
-                        peer_count = peers.len(),
-                        "retry: fetching gap to bridge chain_tree"
-                    );
-                    self.in_flight.insert(gap_point.clone(), now);
-                    fx.push(PraosEffect::FetchBlockRange {
-                        from,
-                        to: gap_point,
-                        peers,
-                    });
+                if let Some(from) = from {
+                    if to_slot > from_slot && !self.in_flight.contains_key(&gap_point) {
+                        let peers = self.choose_block_fetch_peers(&gap_point, None);
+                        info!(
+                            node_id = %self.node_id,
+                            %from,
+                            to = %gap_point,
+                            peer_count = peers.len(),
+                            "retry: fetching gap to bridge chain_tree"
+                        );
+                        self.in_flight.insert(gap_point.clone(), now);
+                        fx.push(PraosEffect::FetchBlockRange {
+                            from,
+                            to: gap_point,
+                            peers,
+                        });
+                    }
                 }
             }
         }
@@ -1628,7 +1633,15 @@ impl PraosState {
             return;
         }
         self.evict_stale_in_flight(now);
-        let from = anchor_point.unwrap_or_else(|| missing.first().unwrap().clone());
+        // The BlockFetch range lower bound must be a real block point.
+        // A standard Cardano server rejects — and resets the bearer on —
+        // a range anchored at Origin, since genesis carries no block.
+        // When the only anchor we have is the genesis intersection, fall
+        // back to the oldest block we actually need.
+        let from = match anchor_point {
+            Some(p) if !matches!(p, Point::Origin) => p,
+            _ => missing.first().unwrap().clone(),
+        };
         let to = missing.last().unwrap().clone();
         if self.in_flight.contains_key(&to) {
             return;
