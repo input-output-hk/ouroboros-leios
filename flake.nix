@@ -32,8 +32,8 @@
     deltaq-src.flake = false;
 
     # Used by demo/
-    ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype-remake";
-    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype-remake";
+    ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype";
+    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
     # TODO: Use latest tx-centrifuge on bench/leios again once it has no cooldown anymore
     cardano-node.url = "github:intersectmbo/cardano-node?rev=0ab6523057298eae80cb1aa1b23f4472480084be";
   };
