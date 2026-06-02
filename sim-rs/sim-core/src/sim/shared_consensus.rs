@@ -2079,17 +2079,17 @@ impl SharedConsensus {
                     // derives equivalent signals from `votes_by_eb`
                     // counts on the receive path.
                 }
-                // Fetch effects stay no-op: sim drives RB/EB/vote
+                // Fetch effects stay no-op: sim drives RB/EB
                 // fetches directly through its `Message` enum, so
                 // shared-consensus's fetch-policy abstraction isn't on the
                 // path.  Validation effects similarly: sim's
-                // `CpuTask` already models the validation hop.
+                // `CpuTask` already models the validation hop.  (Votes are
+                // delivered inline now, so there is no vote fetch/validate
+                // effect to handle.)
                 LeiosEffect::FetchLeiosBlock { .. }
                 | LeiosEffect::FetchLeiosBlockTxs { .. }
-                | LeiosEffect::FetchLeiosVotes { .. }
                 | LeiosEffect::RecordLeiosEbManifest { .. }
-                | LeiosEffect::ValidateEb { .. }
-                | LeiosEffect::ValidateVotes { .. } => {}
+                | LeiosEffect::ValidateEb { .. } => {}
             }
         }
     }

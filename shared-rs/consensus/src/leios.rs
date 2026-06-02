@@ -31,10 +31,11 @@ use crate::config::CommitteeSelection;
 use crate::elections::{Elections, SlotEffect};
 use crate::fetch::{
     CandidateTracker, EbFetchPolicy, EbTxsFetchPolicy, LowestRttFirst, PeerRtt, UniformRtt,
-    VoteFetchPolicy, VoteId,
+    VoteFetchPolicy,
 };
 use crate::peer::PeerId;
 use crate::pipeline::PipelineConfig;
+use crate::types::Vote;
 use crate::types::Point;
 use crate::committee;
 
@@ -188,12 +189,6 @@ pub enum LeiosEffect {
         bitmap: BTreeMap<u16, u64>,
         peers: Vec<PeerId>,
     },
-    /// Request the listed votes — already grouped by the
-    /// [`VoteFetchPolicy`] into one batch per peer.  The wrapper
-    /// dispatches each (`peer`, `votes`) tuple as a separate fetch.
-    FetchLeiosVotes {
-        per_peer: BTreeMap<PeerId, Vec<(u64, Vec<u8>)>>,
-    },
     /// Record the EB-tx manifest in the network-side store so this
     /// node can serve EB-tx requests back to peers.
     RecordLeiosEbManifest {
@@ -229,11 +224,6 @@ pub enum LeiosEffect {
 
     /// Submit a fetched EB body for ledger validation.
     ValidateEb { point: Point },
-    /// Submit fetched vote bodies for ledger validation.
-    ValidateVotes {
-        vote_ids: Vec<(u64, Vec<u8>)>,
-        vote_data: Vec<Vec<u8>>,
-    },
 
     /// Telemetry event the I/O layer should forward to its sink.
     EmitTelemetry(LeiosTelemetryEvent),
@@ -902,46 +892,6 @@ impl LeiosState {
         fx
     }
 
-    /// A peer offered votes.  Records each (slot, voter_id) offer in
-    /// the candidate tracker, then runs the [`VoteFetchPolicy`] across
-    /// the batch — the policy decides which peer to ask for each vote
-    /// (potentially fanning out across peers).  Empty if no votes are
-    /// offered or none have a candidate.
-    pub fn on_votes_offered(
-        &mut self,
-        peer: PeerId,
-        votes: Vec<VoteId>,
-    ) -> Vec<LeiosEffect> {
-        let appended: Vec<LeiosEffect> =
-            match self.invoke_hook(|b, s| b.on_votes_offered(s, peer, &votes)) {
-                BehaviourOutcome::Continue => Vec::new(),
-                BehaviourOutcome::Replace(effects) => return effects,
-                BehaviourOutcome::Append(extra) => extra,
-            };
-        if votes.is_empty() {
-            return appended;
-        }
-        for v in &votes {
-            self.candidates.note_vote_offered(v.clone(), peer);
-        }
-        let lookup = |v: &VoteId| self.candidates.vote_candidates(v);
-        let per_peer =
-            self.vote_policy
-                .pick(&votes, &lookup, self.rtt.as_ref());
-        if per_peer.is_empty() {
-            return appended;
-        }
-        info!(
-            node_id = %self.node_id,
-            count = votes.len(),
-            peer_count = per_peer.len(),
-            "fetching leios votes"
-        );
-        let mut fx = vec![LeiosEffect::FetchLeiosVotes { per_peer }];
-        fx.extend(appended);
-        fx
-    }
-
     /// An EB body arrived.  `manifest_hashes` is the decoded tx-hash
     /// list (or `None` if the body didn't decode as an overflow EB —
     /// e.g., a header-only block).  Always emits a `ValidateEb`.
@@ -972,23 +922,46 @@ impl LeiosState {
         fx
     }
 
-    /// Received vote bodies; submit to the validator.
-    pub fn on_votes_received(
-        &mut self,
-        vote_ids: Vec<(u64, Vec<u8>)>,
-        vote_data: Vec<Vec<u8>>,
-    ) -> Vec<LeiosEffect> {
-        let appended: Vec<LeiosEffect> = match self
-            .invoke_hook(|b, s| b.on_votes_received(s, &vote_ids, &vote_data))
-        {
-            BehaviourOutcome::Continue => Vec::new(),
-            BehaviourOutcome::Replace(effects) => return effects,
-            BehaviourOutcome::Append(extra) => extra,
-        };
-        let mut fx = vec![LeiosEffect::ValidateVotes {
-            vote_ids,
-            vote_data,
-        }];
+    /// Votes arrived inline (CIP-0164 prototype: full vote bodies are
+    /// delivered directly via `LeiosNotify`, no offer/fetch round-trip).
+    /// Each vote's compact `voter_id` index is resolved to its node id
+    /// via the deterministic voter registry, then fed straight into
+    /// aggregation — the mocked `bool` signature needs no ledger
+    /// validation step.  Returns telemetry effects for any quorums newly
+    /// formed.  Votes whose `voter_id` is outside the local registry
+    /// (e.g. a foreign voter from an external relay) carry no resolvable
+    /// weight and are skipped; gossip re-serving is the I/O layer's job.
+    pub fn on_votes_received(&mut self, votes: Vec<Vote>) -> Vec<LeiosEffect> {
+        let appended: Vec<LeiosEffect> =
+            match self.invoke_hook(|b, s| b.on_votes_received(s, &votes)) {
+                BehaviourOutcome::Continue => Vec::new(),
+                BehaviourOutcome::Replace(effects) => return effects,
+                BehaviourOutcome::Append(extra) => extra,
+            };
+        // Resolve each compact voter index to its node id (owned, so the
+        // borrowed `ValidatedVote` views below can lend the bytes).
+        let resolved: Vec<(String, Vote)> = votes
+            .into_iter()
+            .filter_map(|v| {
+                self.elections
+                    .voter_id_at(v.voter_id)
+                    .map(|id| (id.to_string(), v))
+            })
+            .collect();
+        let bodies: Vec<ValidatedVote> = resolved
+            .iter()
+            .map(|(node_id, v)| ValidatedVote {
+                voter_id: node_id.as_bytes(),
+                // Prototype votes carry no PV/NPV tag or eligibility
+                // signature; treat every inline vote as a committee (PV)
+                // vote weighted by the registry.
+                tag: 0,
+                eligibility_signature: None,
+                endorser_block_hash: &v.eb_hash,
+                endorser_block_slot: v.slot,
+            })
+            .collect();
+        let mut fx = self.on_validated_votes(bodies);
         fx.extend(appended);
         fx
     }
@@ -1695,47 +1668,59 @@ mod tests {
     }
 
     #[test]
-    fn on_votes_offered_emits_fetch() {
-        let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        let votes = vec![(10u64, vec![0u8; 8])];
-        let peer = PeerId(1);
-        let fx = state.on_votes_offered(peer, votes.clone());
-        assert_eq!(fx.len(), 1);
-        match &fx[0] {
-            LeiosEffect::FetchLeiosVotes { per_peer } => {
-                assert_eq!(
-                    per_peer.get(&peer).cloned().unwrap_or_default(),
-                    votes
-                );
-            }
-            other => panic!("expected FetchLeiosVotes, got {other:?}"),
-        }
+    fn on_votes_received_resolves_index_and_forms_quorum() {
+        // A committee where index-0 voter "voter-a" alone meets quorum.
+        use crate::elections::ElectionsConfig;
+        let mut persistent = BTreeMap::new();
+        persistent.insert("voter-a".to_string(), 100u32);
+        let mut registry = BTreeMap::new();
+        registry.insert("voter-a".to_string(), 100u64);
+        let elections = Elections::new(ElectionsConfig {
+            node_id: "n0".to_string(),
+            pipeline: pipeline(),
+            committee_selection: CommitteeSelection::EveryoneVotes,
+            persistent_committee: persistent,
+            stake_registry: registry,
+            total_stake: 100,
+            expected_total_weight: 100,
+            quorum_weight_fraction: 0.75,
+        });
+        let mut state = LeiosState::new("n0".into(), elections, cfg(0), pipeline());
+        state.on_slot(10, &tx_all);
+        state.elections.announce(10, h(1));
+        // "voter-a" is index 0 in the sorted registry.
+        let vote = Vote {
+            slot: 10,
+            eb_hash: h(1),
+            voter_id: 0,
+            vote_signature: true,
+        };
+        let fx = state.on_votes_received(vec![vote]);
+        assert!(fx.iter().any(|e| matches!(
+            e,
+            LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::QuorumReached { .. })
+        )));
     }
 
     #[test]
-    fn on_votes_offered_empty_is_noop() {
+    fn on_votes_received_skips_unknown_voter() {
+        // Empty registry → no index resolves; the vote is dropped.
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        let fx = state.on_votes_offered(PeerId(1), Vec::new());
+        let vote = Vote {
+            slot: 10,
+            eb_hash: h(1),
+            voter_id: 7,
+            vote_signature: true,
+        };
+        let fx = state.on_votes_received(vec![vote]);
         assert!(fx.is_empty());
     }
 
     #[test]
-    fn on_votes_received_emits_validate_votes() {
+    fn on_votes_received_empty_is_noop() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        let ids = vec![(10u64, vec![0u8; 8])];
-        let bodies = vec![vec![0xAB]];
-        let fx = state.on_votes_received(ids.clone(), bodies.clone());
-        assert_eq!(fx.len(), 1);
-        match &fx[0] {
-            LeiosEffect::ValidateVotes {
-                vote_ids,
-                vote_data,
-            } => {
-                assert_eq!(vote_ids, &ids);
-                assert_eq!(vote_data, &bodies);
-            }
-            other => panic!("expected ValidateVotes, got {other:?}"),
-        }
+        let fx = state.on_votes_received(Vec::new());
+        assert!(fx.is_empty());
     }
 
     #[test]

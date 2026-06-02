@@ -26,4 +26,4 @@ pub mod committee;
 
 pub use config::{CommitteeSelection, StakeEntry};
 pub use peer::PeerId;
-pub use types::{Point, Tip};
+pub use types::{Point, Tip, Vote};

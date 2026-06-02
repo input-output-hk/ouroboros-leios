@@ -14,7 +14,7 @@ use minicbor::decode::Error as DecodeError;
 use minicbor::encode::Error as EncodeError;
 use minicbor::{Decode, Decoder, Encode, Encoder};
 
-pub use shared_consensus::{Point, Tip};
+pub use shared_consensus::{Point, Tip, Vote};
 
 /// Maximum number of points in a FindIntersect message.
 pub const MAX_POINTS: usize = 2048;

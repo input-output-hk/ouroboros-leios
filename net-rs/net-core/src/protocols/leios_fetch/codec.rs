@@ -5,8 +5,6 @@
 //!   msgLeiosBlock                  = [1, block]
 //!   msgLeiosBlockTxsRequest        = [2, point, { u16 => u64, ... }]
 //!   msgLeiosBlockTxs               = [3, [tx, ...]]
-//!   msgLeiosVotesRequest           = [4, [(slot, voterId), ...]]
-//!   msgLeiosVoteDelivery           = [5, [vote, ...]]
 //!   msgLeiosBlockRangeRequest      = [6, startSlot, endSlot, startHash, endHash]
 //!   msgLeiosNextBlockAndTxsInRange = [7, block, [tx, ...]]
 //!   msgLeiosLastBlockAndTxsInRange = [8, block, [tx, ...]]
@@ -20,7 +18,6 @@ use minicbor::{Decoder, Encoder};
 
 use super::{
     Message, MAX_BITMAP_ENTRIES, MAX_BLOCK_SIZE, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE,
-    MAX_VOTER_ID_SIZE, MAX_VOTES, MAX_VOTE_SIZE,
 };
 use crate::types::Point;
 
@@ -51,21 +48,6 @@ impl minicbor::Encode<()> for Message {
                 e.array(2)?;
                 e.u32(3)?;
                 encode_blob_list(e, transactions)?;
-            }
-            Message::MsgLeiosVotesRequest { votes } => {
-                e.array(2)?;
-                e.u32(4)?;
-                e.array(votes.len() as u64)?;
-                for (slot, voter_id) in votes {
-                    e.array(2)?;
-                    e.u64(*slot)?;
-                    e.bytes(voter_id)?;
-                }
-            }
-            Message::MsgLeiosVoteDelivery { votes } => {
-                e.array(2)?;
-                e.u32(5)?;
-                encode_blob_list(e, votes)?;
             }
             Message::MsgLeiosBlockRangeRequest {
                 start_slot,
@@ -130,14 +112,6 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
                 let transactions =
                     decode_blob_list(d, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE, "transaction")?;
                 Ok(Message::MsgLeiosBlockTxs { transactions })
-            }
-            4 => {
-                let votes = decode_vote_id_list(d)?;
-                Ok(Message::MsgLeiosVotesRequest { votes })
-            }
-            5 => {
-                let votes = decode_blob_list(d, MAX_VOTES, MAX_VOTE_SIZE, "vote")?;
-                Ok(Message::MsgLeiosVoteDelivery { votes })
             }
             6 => {
                 let start_slot = d.u64()?;
@@ -327,56 +301,6 @@ fn decode_bounded_bytes(
     Ok(bytes.to_vec())
 }
 
-/// Decode a list of (slot, voter_id) pairs with bounds checking.
-fn decode_vote_id_list(d: &mut Decoder<'_>) -> Result<Vec<(u64, Vec<u8>)>, DecodeError> {
-    let len = d.array()?;
-    match len {
-        Some(n) => {
-            let n = n as usize;
-            if n > MAX_VOTES {
-                return Err(DecodeError::message(format!(
-                    "vote ID list has {n} entries, maximum is {MAX_VOTES}"
-                )));
-            }
-            let mut votes = Vec::with_capacity(n);
-            for _ in 0..n {
-                votes.push(decode_vote_id_pair(d)?);
-            }
-            Ok(votes)
-        }
-        None => {
-            let mut votes = Vec::new();
-            loop {
-                if d.datatype()? == minicbor::data::Type::Break {
-                    d.skip()?;
-                    break;
-                }
-                if votes.len() >= MAX_VOTES {
-                    return Err(DecodeError::message(format!(
-                        "vote ID list exceeds maximum of {MAX_VOTES}"
-                    )));
-                }
-                votes.push(decode_vote_id_pair(d)?);
-            }
-            Ok(votes)
-        }
-    }
-}
-
-/// Decode a single (slot, voter_id) pair.
-fn decode_vote_id_pair(d: &mut Decoder<'_>) -> Result<(u64, Vec<u8>), DecodeError> {
-    let _pair_len = d.array()?;
-    let slot = d.u64()?;
-    let voter_id = d.bytes()?;
-    if voter_id.len() > MAX_VOTER_ID_SIZE {
-        return Err(DecodeError::message(format!(
-            "voter ID is {} bytes, maximum is {MAX_VOTER_ID_SIZE}",
-            voter_id.len()
-        )));
-    }
-    Ok((slot, voter_id.to_vec()))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -505,37 +429,6 @@ mod tests {
         match decoded {
             Message::MsgLeiosBlockTxs { transactions } => assert!(transactions.is_empty()),
             other => panic!("expected MsgLeiosBlockTxs, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn votes_request_round_trip() {
-        let msg = Message::MsgLeiosVotesRequest {
-            votes: vec![(10, vec![0xAA]), (20, vec![0xBB, 0xCC])],
-        };
-        let decoded = round_trip(&msg);
-        match decoded {
-            Message::MsgLeiosVotesRequest { votes } => {
-                assert_eq!(votes.len(), 2);
-                assert_eq!(votes[0], (10, vec![0xAA]));
-                assert_eq!(votes[1], (20, vec![0xBB, 0xCC]));
-            }
-            other => panic!("expected MsgLeiosVotesRequest, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn vote_delivery_round_trip() {
-        let msg = Message::MsgLeiosVoteDelivery {
-            votes: vec![vec![0x01, 0x02], vec![0x03, 0x04]],
-        };
-        let decoded = round_trip(&msg);
-        match decoded {
-            Message::MsgLeiosVoteDelivery { votes } => {
-                assert_eq!(votes.len(), 2);
-                assert_eq!(votes[0], vec![0x01, 0x02]);
-            }
-            other => panic!("expected MsgLeiosVoteDelivery, got {other:?}"),
         }
     }
 
@@ -670,40 +563,6 @@ mod tests {
         let n = MAX_TRANSACTIONS + 1;
         e.array(n as u64).unwrap();
         for _ in 0..n {
-            e.bytes(&[0x01]).unwrap();
-        }
-
-        let result: Result<Message, _> = minicbor::decode(&buf);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn vote_delivery_exceeds_max_fails() {
-        let mut buf = Vec::new();
-        let mut e = minicbor::Encoder::new(&mut buf);
-        e.array(2).unwrap();
-        e.u32(5).unwrap();
-        let n = MAX_VOTES + 1;
-        e.array(n as u64).unwrap();
-        for _ in 0..n {
-            e.bytes(&[0x01]).unwrap();
-        }
-
-        let result: Result<Message, _> = minicbor::decode(&buf);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn vote_request_exceeds_max_fails() {
-        let mut buf = Vec::new();
-        let mut e = minicbor::Encoder::new(&mut buf);
-        e.array(2).unwrap();
-        e.u32(4).unwrap();
-        let n = MAX_VOTES + 1;
-        e.array(n as u64).unwrap();
-        for i in 0..n {
-            e.array(2).unwrap();
-            e.u64(i as u64).unwrap();
             e.bytes(&[0x01]).unwrap();
         }
 

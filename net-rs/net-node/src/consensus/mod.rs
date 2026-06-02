@@ -226,7 +226,6 @@ impl Consensus {
         match event {
             NetworkEvent::LeiosBlockOffered { .. }
             | NetworkEvent::LeiosBlockTxsOffered { .. }
-            | NetworkEvent::LeiosVotesOffered { .. }
             | NetworkEvent::LeiosBlockReceived { .. }
             | NetworkEvent::LeiosVotesReceived { .. }
             | NetworkEvent::LeiosBlockTxsReceived { .. } => self.leios.handle_event(event).await,
@@ -280,10 +279,6 @@ impl Consensus {
         match outcome {
             LedgerOutcome::EbValidated { point } => {
                 self.leios.on_validated_eb(point);
-                false
-            }
-            LedgerOutcome::VotesValidated { vote_data, .. } => {
-                self.leios.on_validated_votes(&vote_data);
                 false
             }
             LedgerOutcome::Applied { ref point } => {

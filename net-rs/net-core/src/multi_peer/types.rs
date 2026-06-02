@@ -7,7 +7,7 @@ use std::time::Duration;
 use crate::peer::{ConnectionMode, PeerId};
 use crate::protocols::peersharing::PeerAddress;
 use crate::protocols::txsubmission::PendingTx;
-use crate::types::{BlockBody, Point, Tip, WrappedHeader};
+use crate::types::{BlockBody, Point, Tip, Vote, WrappedHeader};
 
 // ---------------------------------------------------------------------------
 // Coordinator ↔ Application
@@ -82,20 +82,13 @@ pub enum NetworkEvent {
     /// Leios: an EB's transactions are available for download from a peer.
     LeiosBlockTxsOffered { peer_id: PeerId, point: Point },
 
-    /// Leios: votes are available for download from a peer.
-    LeiosVotesOffered {
-        peer_id: PeerId,
-        votes: Vec<(u64, Vec<u8>)>,
-    },
-
     /// Leios: a fetched endorser block arrived.
     LeiosBlockReceived { point: Point, block: Vec<u8> },
 
-    /// Leios: fetched votes arrived.
-    /// `vote_ids` are (slot, issuer_id) keys; `vote_data` are the CBOR bodies.
+    /// Leios: votes delivered inline by a peer (no fetch round-trip).
     LeiosVotesReceived {
-        vote_ids: Vec<(u64, Vec<u8>)>,
-        vote_data: Vec<Vec<u8>>,
+        peer_id: PeerId,
+        votes: Vec<Vote>,
     },
 
     /// Leios: fetched transactions for an EB arrived.
@@ -172,14 +165,6 @@ pub enum NetworkCommand {
         bitmap: BTreeMap<u16, u64>,
     },
 
-    /// Fetch specific votes from a specific peer (chosen by shared-consensus's
-    /// VoteFetchPolicy — the consensus dispatcher emits one of these
-    /// per peer in the policy's per-peer grouping).
-    FetchLeiosVotes {
-        peer_id: PeerId,
-        votes: Vec<(u64, Vec<u8>)>,
-    },
-
     /// Inject a Leios block into the Leios store (for responder peers to serve).
     InjectLeiosBlock { point: Point, block: Vec<u8> },
 
@@ -199,11 +184,9 @@ pub enum NetworkCommand {
         tx_hashes: Vec<[u8; 32]>,
     },
 
-    /// Inject votes into the Leios store (for responder peers to serve).
-    InjectLeiosVotes {
-        votes: Vec<(u64, Vec<u8>)>,
-        data: Vec<Vec<u8>>,
-    },
+    /// Inject votes into the Leios store (for responder peers to re-serve
+    /// inline via `MsgLeiosVotes`).
+    InjectLeiosVotes { votes: Vec<Vote> },
 
     /// Provide transactions to a specific peer via TxSubmission.
     ProvideTxs {

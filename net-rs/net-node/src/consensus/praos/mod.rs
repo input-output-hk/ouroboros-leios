@@ -336,7 +336,7 @@ impl PraosConsensus {
                 );
                 (false, Vec::new())
             }
-            LedgerOutcome::EbValidated { .. } | LedgerOutcome::VotesValidated { .. } => {
+            LedgerOutcome::EbValidated { .. } => {
                 // Leios outcomes are handled by the facade before reaching Praos.
                 (false, Vec::new())
             }

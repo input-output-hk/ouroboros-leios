@@ -31,10 +31,10 @@ struct OfferDedup {
     seen_eb: BTreeSet<(PeerId, u64, [u8; 32])>,
     /// `(peer, slot, eb_hash)` already forwarded as `LeiosBlockTxsOffered`.
     seen_eb_txs: BTreeSet<(PeerId, u64, [u8; 32])>,
-    /// `(peer, slot, voter_id)` already forwarded as part of
-    /// `LeiosVotesOffered`.  Per-vote because a single offer event
-    /// carries a batch.
-    seen_votes: BTreeSet<(PeerId, u64, Vec<u8>)>,
+    /// `(peer, slot, eb_hash, voter_id)` already forwarded as part of an
+    /// inline `LeiosVotesReceived`.  Per-vote because a single notify
+    /// carries a batch; dedup keeps gossiped duplicates from re-firing.
+    seen_votes: BTreeSet<(PeerId, u64, [u8; 32], u16)>,
     max_slot: u64,
     window: u64,
 }
@@ -53,7 +53,7 @@ impl OfferDedup {
             let cutoff = slot.saturating_sub(self.window);
             self.seen_eb.retain(|(_, s, _)| *s >= cutoff);
             self.seen_eb_txs.retain(|(_, s, _)| *s >= cutoff);
-            self.seen_votes.retain(|(_, s, _)| *s >= cutoff);
+            self.seen_votes.retain(|(_, s, _, _)| *s >= cutoff);
         }
     }
 
@@ -69,18 +69,17 @@ impl OfferDedup {
         self.seen_eb_txs.insert((peer, slot, hash))
     }
 
-    /// Filter a vote batch to fresh-for-this-peer entries.  Updates
-    /// internal state to record forwarding.
-    fn fresh_votes(
-        &mut self,
-        peer: PeerId,
-        votes: Vec<(u64, Vec<u8>)>,
-    ) -> Vec<(u64, Vec<u8>)> {
+    /// Filter an inline vote batch to fresh-for-this-peer entries.
+    /// Updates internal state to record forwarding.
+    fn fresh_votes(&mut self, peer: PeerId, votes: Vec<Vote>) -> Vec<Vote> {
         let mut out = Vec::with_capacity(votes.len());
-        for (slot, voter_id) in votes {
-            self.update_slot(slot);
-            if self.seen_votes.insert((peer, slot, voter_id.clone())) {
-                out.push((slot, voter_id));
+        for vote in votes {
+            self.update_slot(vote.slot);
+            if self
+                .seen_votes
+                .insert((peer, vote.slot, vote.eb_hash, vote.voter_id))
+            {
+                out.push(vote);
             }
         }
         out
@@ -95,7 +94,7 @@ use super::chain_fragment::ChainFragment;
 use crate::bearer::tcp::TcpBearer;
 use crate::mux::MuxConfig;
 use crate::protocols::peersharing::PeerAddress;
-use crate::types::{Point, Tip};
+use crate::types::{Point, Tip, Vote};
 
 use super::types::{NetworkCommand, NetworkEvent};
 use super::{CoordinatorConfig, CoordinatorHandle};
@@ -584,10 +583,16 @@ impl Coordinator {
                 }
             }
 
-            PeerEvent::LeiosVotesOffered { votes } => {
+            PeerEvent::LeiosVotesReceived { votes } => {
+                // Votes arrive inline (no fetch). Dedup per peer, re-inject
+                // into the local store so this node re-serves them to
+                // downstream peers (epidemic gossip), then surface to the app.
                 let fresh = self.leios_offer_dedup.fresh_votes(peer_id, votes);
                 if !fresh.is_empty() {
-                    self.emit_event(NetworkEvent::LeiosVotesOffered {
+                    if let Some(ref store) = self.leios_store {
+                        store.inject_votes(fresh.clone());
+                    }
+                    self.emit_event(NetworkEvent::LeiosVotesReceived {
                         peer_id,
                         votes: fresh,
                     });
@@ -638,21 +643,6 @@ impl Coordinator {
                 self.emit_event(NetworkEvent::LeiosBlockTxsReceived {
                     point,
                     transactions,
-                });
-            }
-
-            PeerEvent::LeiosVotesFetched {
-                vote_ids,
-                vote_data,
-            } => {
-                // Re-inject fetched votes so this node can re-serve them
-                // (epidemic flooding rather than star topology).
-                if let Some(ref store) = self.leios_store {
-                    store.inject_votes(vote_ids.clone(), vote_data.clone());
-                }
-                self.emit_event(NetworkEvent::LeiosVotesReceived {
-                    vote_ids,
-                    vote_data,
                 });
             }
 
@@ -807,10 +797,6 @@ impl Coordinator {
                 );
             }
 
-            NetworkCommand::FetchLeiosVotes { peer_id, votes } => {
-                self.send_peer_command(peer_id, PeerCommand::FetchLeiosVotes { votes });
-            }
-
             NetworkCommand::InjectLeiosBlock { point, block } => {
                 if let Some(ref store) = self.leios_store {
                     store.inject_block(point, block);
@@ -836,9 +822,9 @@ impl Coordinator {
                 }
             }
 
-            NetworkCommand::InjectLeiosVotes { votes, data } => {
+            NetworkCommand::InjectLeiosVotes { votes } => {
                 if let Some(ref store) = self.leios_store {
-                    store.inject_votes(votes, data);
+                    store.inject_votes(votes);
                 }
             }
 

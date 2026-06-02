@@ -12,7 +12,7 @@ use std::sync::Arc;
 use crate::mux::MuxStats;
 use crate::protocols::peersharing::PeerAddress;
 use crate::protocols::txsubmission::PendingTx;
-use crate::types::{BlockBody, Point, Tip, WrappedHeader};
+use crate::types::{BlockBody, Point, Tip, Vote, WrappedHeader};
 
 // ---------------------------------------------------------------------------
 // Peer ↔ Coordinator
@@ -61,18 +61,11 @@ pub enum PeerEvent {
     /// LeiosNotify: an EB's transactions are available.
     LeiosBlockTxsOffered { point: Point },
 
-    /// LeiosNotify: votes are available for download.
-    LeiosVotesOffered { votes: Vec<(u64, Vec<u8>)> },
+    /// LeiosNotify: votes delivered inline (no fetch round-trip).
+    LeiosVotesReceived { votes: Vec<Vote> },
 
     /// LeiosFetch: a requested endorser block arrived.
     LeiosBlockFetched { point: Point, block: Vec<u8> },
-
-    /// LeiosFetch: requested votes arrived.
-    /// `vote_ids` are (slot, issuer_id) keys; `vote_data` are the CBOR bodies.
-    LeiosVotesFetched {
-        vote_ids: Vec<(u64, Vec<u8>)>,
-        vote_data: Vec<Vec<u8>>,
-    },
 
     /// LeiosFetch: requested transactions for an EB arrived.
     LeiosBlockTxsFetched {
@@ -104,9 +97,6 @@ pub enum PeerCommand {
         point: Point,
         bitmap: BTreeMap<u16, u64>,
     },
-
-    /// Fetch votes via LeiosFetch.
-    FetchLeiosVotes { votes: Vec<(u64, Vec<u8>)> },
 
     /// Provide transactions to this peer via TxSubmission.
     ProvideTxs { txs: Vec<PendingTx> },

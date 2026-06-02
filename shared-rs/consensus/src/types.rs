@@ -138,6 +138,30 @@ impl<'a> minicbor::Decode<'a, ()> for Tip {
     }
 }
 
+/// A Leios vote, delivered inline (no offer/fetch round-trip).
+///
+/// Mirrors the CIP-0164 prototype wire shape
+/// (`vote = [slot, eb_hash, voter_id: word16, vote_signature: bool]`):
+///
+/// - `slot` — the slot at which the endorser block was announced (its
+///   election id); votes can arrive before the local node has seen the
+///   EB body, so the slot is needed to place the vote in its pipeline.
+/// - `eb_hash` — the endorser block being voted on.
+/// - `voter_id` — compact voter index; resolves to a registered pool
+///   via the deterministic voter registry (see `committee.rs`).
+/// - `vote_signature` — mocked in the prototype (a `bool`); a real
+///   deployment carries a BLS signature here.
+///
+/// The CBOR codec lives in the network I/O layer (this crate stays
+/// format-agnostic); this is the logical value every consumer agrees on.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Vote {
+    pub slot: u64,
+    pub eb_hash: [u8; 32],
+    pub voter_id: u16,
+    pub vote_signature: bool,
+}
+
 /// Hex-encode the first 8 bytes of a hash for display.
 pub(crate) fn hex_prefix(hash: &[u8; 32]) -> String {
     hash.iter()

@@ -13,20 +13,20 @@ use std::time::Instant;
 
 use shared_consensus::elections::{Elections, ElectionsConfig};
 use shared_consensus::leios::{
-    ChainTipContext, LeiosEffect, LeiosState, LeiosTelemetryEvent, ValidatedVote, VotingConfig,
+    ChainTipContext, LeiosEffect, LeiosState, LeiosTelemetryEvent, VotingConfig,
 };
 pub use shared_consensus::leios::EbTxMatchOutcome;
 pub use shared_consensus::pipeline::PipelineConfig;
 use shared_consensus::committee;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
-use net_core::types::Point;
+use net_core::types::{Point, Vote};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use tokio::sync::{mpsc, watch};
 use tracing::info;
 
 use crate::config::{CommitteeSelection, DynamicConfig, StakeEntry};
-use crate::production::{decode_overflow_eb, VoteBody};
+use crate::production::decode_overflow_eb;
 use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerCommand, Validator};
 
@@ -240,21 +240,15 @@ impl LeiosConsensus {
                         .on_eb_txs_offered(point.clone(), *peer_id, bitmap, now),
                 )
             }
-            NetworkEvent::LeiosVotesOffered { peer_id, votes } => (
-                true,
-                self.state.on_votes_offered(*peer_id, votes.clone()),
-            ),
             NetworkEvent::LeiosBlockReceived { point, block } => {
                 let manifest = decode_overflow_eb(block).map(|(_, hashes)| hashes);
                 (true, self.state.on_eb_received(point.clone(), manifest))
             }
-            NetworkEvent::LeiosVotesReceived {
-                vote_ids,
-                vote_data,
-            } => (
-                true,
-                self.state.on_votes_received(vote_ids.clone(), vote_data.clone()),
-            ),
+            NetworkEvent::LeiosVotesReceived { votes, .. } => {
+                // Inline votes: feed straight into aggregation (the mocked
+                // signature needs no ledger validation step).
+                (true, self.state.on_votes_received(votes.clone()))
+            }
             NetworkEvent::LeiosBlockTxsReceived {
                 point,
                 transactions,
@@ -283,45 +277,6 @@ impl LeiosConsensus {
         let fx = self.state.on_eb_received(point.clone(), manifest);
         self.dispatch(fx).await;
         self.state.on_validated_eb(point);
-    }
-
-    /// Vote validation completed; record each vote, fire quorum
-    /// telemetry if quorum forms.
-    pub fn on_validated_votes(&mut self, vote_data: &[Vec<u8>]) {
-        // Decode wire-format vote bodies up front so we can lend them
-        // to the state machine as borrowed `ValidatedVote` views.
-        let decoded: Vec<VoteBody> = vote_data
-            .iter()
-            .filter_map(|b| VoteBody::decode(b))
-            .collect();
-        let bodies: Vec<ValidatedVote> = decoded
-            .iter()
-            .map(|body| ValidatedVote {
-                voter_id: &body.voter_id,
-                tag: body.tag,
-                eligibility_signature: body.eligibility_signature.as_deref(),
-                endorser_block_hash: &body.endorser_block_hash,
-                endorser_block_slot: body.election_id,
-            })
-            .collect();
-        let fx = self.state.on_validated_votes(bodies);
-        // Only telemetry effects come out of this path; fold them into
-        // the pending buffer inline so the caller can stay sync.
-        for eff in fx {
-            if let LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::QuorumReached {
-                eb_slot,
-                voted_weight,
-                voters,
-            }) = eff
-            {
-                self.pending_telemetry.push(NodeEvent::LeiosQuorumReached {
-                    node: self.state.node_id.clone(),
-                    eb_slot,
-                    voted_weight,
-                    voters,
-                });
-            }
-        }
     }
 
     /// Verify a `LeiosBlockTxsReceived` response against the cached
@@ -396,14 +351,6 @@ impl LeiosConsensus {
                             .await;
                     }
                 }
-                LeiosEffect::FetchLeiosVotes { per_peer } => {
-                    for (peer_id, votes) in per_peer {
-                        let _ = self
-                            .commands
-                            .send(NetworkCommand::FetchLeiosVotes { peer_id, votes })
-                            .await;
-                    }
-                }
                 LeiosEffect::RecordLeiosEbManifest { point, tx_hashes } => {
                     let _ = self
                         .commands
@@ -431,17 +378,6 @@ impl LeiosConsensus {
                 LeiosEffect::ValidateEb { point } => {
                     self.validator
                         .submit(LedgerCommand::ValidateEb { point })
-                        .await;
-                }
-                LeiosEffect::ValidateVotes {
-                    vote_ids,
-                    vote_data,
-                } => {
-                    self.validator
-                        .submit(LedgerCommand::ValidateVotes {
-                            vote_ids,
-                            vote_data,
-                        })
                         .await;
                 }
                 LeiosEffect::EmitTelemetry(event) => {
@@ -484,8 +420,10 @@ impl LeiosConsensus {
         }
     }
 
-    /// Build and inject the vote bodies for an EB.  Encodes the
-    /// wire-format vote body — shared-consensus handed us the logical args.
+    /// Build and inject the inline vote for an EB.  The CIP-0164
+    /// prototype vote carries no PV/NPV tag, so an eligible node (PV
+    /// seat and/or NPV win) emits a single structured vote keyed by its
+    /// compact voter index from the shared registry.
     async fn emit_vote(
         &mut self,
         eb_slot: u64,
@@ -493,51 +431,35 @@ impl LeiosConsensus {
         emit_pv: bool,
         npv_signature: Option<Vec<u8>>,
     ) {
-        let voter_id = self.state.node_id.as_bytes().to_vec();
-        let stake = self.state.voting_config.stake;
-        let pv_size = self.state.voting_config.persistent_vote_bytes;
-        let npv_size = self.state.voting_config.non_persistent_vote_bytes;
-        let pv_seats = self.state.voting_config.persistent_seats;
-        let mut votes = Vec::new();
-        let mut data = Vec::new();
-        if emit_pv {
-            let body = VoteBody::stub_persistent(eb_slot, &voter_id, stake, &eb_hash);
-            let encoded = body.encode(pv_size);
-            info!(
-                node_id = %self.state.node_id,
-                eb_slot, tag = body.tag, pv_seats, size = encoded.len(),
-                "vote produced for eb"
-            );
-            let mut id = voter_id.clone();
-            id.push(0);
-            votes.push((eb_slot, id));
-            data.push(encoded);
+        if !emit_pv && npv_signature.is_none() {
+            return;
         }
-        if let Some(sig) = npv_signature {
-            let body =
-                VoteBody::stub_non_persistent(eb_slot, &voter_id, stake, sig, &eb_hash);
-            let encoded = body.encode(npv_size);
-            info!(
-                node_id = %self.state.node_id,
-                eb_slot, tag = body.tag, pv_seats, size = encoded.len(),
-                "vote produced for eb"
-            );
-            let mut id = voter_id.clone();
-            id.push(1);
-            votes.push((eb_slot, id));
-            data.push(encoded);
-        }
-        if !votes.is_empty() {
-            self.pending_telemetry.push(NodeEvent::VTBundleGenerated {
-                node: self.state.node_id.clone(),
-                slot: eb_slot,
-                count: votes.len(),
-            });
-            let _ = self
-                .commands
-                .send(NetworkCommand::InjectLeiosVotes { votes, data })
-                .await;
-        }
+        let node_id = self.state.node_id.clone();
+        let Some(voter_id) = self.state.elections.voter_index(&node_id) else {
+            // Not in the shared voter registry — can't produce a vote
+            // that downstream nodes could resolve to a weight.
+            return;
+        };
+        let vote = Vote {
+            slot: eb_slot,
+            eb_hash,
+            voter_id,
+            // Signature is mocked in the prototype.
+            vote_signature: true,
+        };
+        info!(
+            node_id = %node_id,
+            eb_slot, voter_id, "vote produced for eb"
+        );
+        self.pending_telemetry.push(NodeEvent::VTBundleGenerated {
+            node: node_id,
+            slot: eb_slot,
+            count: 1,
+        });
+        let _ = self
+            .commands
+            .send(NetworkCommand::InjectLeiosVotes { votes: vec![vote] })
+            .await;
     }
 
     // -- Test helpers (delegate through state) -----------------------------
@@ -676,11 +598,10 @@ mod tests {
         leios.on_slot(3).await;
         assert!(leios.election_voted(&point_hash(0)));
 
-        // Check that InjectLeiosVotes was sent.
+        // Check that InjectLeiosVotes was sent with one inline vote.
         match rx.try_recv() {
-            Ok(NetworkCommand::InjectLeiosVotes { votes, data }) => {
+            Ok(NetworkCommand::InjectLeiosVotes { votes }) => {
                 assert_eq!(votes.len(), 1);
-                assert!(!data.is_empty());
             }
             other => panic!("expected InjectLeiosVotes, got {:?}", other),
         }
@@ -798,35 +719,45 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn votes_received_triggers_vote_validation() {
-        let (tx, _rx) = mpsc::channel(8);
-        let (validator, mut outcome_rx) = test_validator();
-        let mut leios = test_leios(tx, validator);
-
-        let vote_ids = vec![(10u64, vec![0xAAu8])];
-        leios
-            .handle_event(&NetworkEvent::LeiosVotesReceived {
-                vote_ids: vote_ids.clone(),
-                vote_data: vec![vec![0x01]],
-            })
-            .await;
-
-        match outcome_rx.recv().await.expect("outcome") {
-            crate::validation::LedgerOutcome::VotesValidated { vote_ids: got, .. } => {
-                assert_eq!(got, vote_ids);
-            }
-            other => panic!("expected VotesValidated, got {other:?}"),
-        }
-    }
-
     // -- Vote aggregation tests ---------------------------------------------
     //
     // Under EveryoneVotes (test_leios mode) every registered pool has 1
-    // PV seat, so each PV vote contributes weight 1. The 10-pool test
+    // PV seat, so each inline vote contributes weight 1. The 10-pool test
     // registry yields expected_total_weight=10; quorum at 0.75 needs
-    // ≥7 distinct voters. Voter ids in tests must match registry node_ids
-    // ("test", "peer-0".."peer-8") for the PV-lookup weight to be 1.
+    // ≥7 distinct voters. Voter ids are compact indices into the sorted
+    // registry: "peer-0".."peer-8" → 0..8, "test" → 9.
+
+    /// An inline vote for `eb_hash` at `slot` from voter index `voter_id`.
+    fn inline_vote(slot: u64, eb_hash: [u8; 32], voter_id: u16) -> Vote {
+        Vote {
+            slot,
+            eb_hash,
+            voter_id,
+            vote_signature: true,
+        }
+    }
+
+    #[tokio::test]
+    async fn votes_received_records_vote() {
+        let (tx, _rx) = mpsc::channel(8);
+        let (validator, _outcome_rx) = test_validator();
+        let mut leios = test_leios(tx, validator);
+
+        leios.on_slot(0).await;
+        leios.on_validated_eb(point(0));
+        let eb_hash = point_hash(0);
+
+        // peer-0 is voter index 0 in the sorted registry.
+        leios
+            .handle_event(&NetworkEvent::LeiosVotesReceived {
+                peer_id: net_core::peer::PeerId(1),
+                votes: vec![inline_vote(0, eb_hash, 0)],
+            })
+            .await;
+
+        assert_eq!(leios.election_voter_count(&eb_hash), 1);
+        assert!(!leios.election_quorum(&eb_hash));
+    }
 
     #[tokio::test]
     async fn votes_attributed_to_eb_election() {
@@ -838,8 +769,12 @@ mod tests {
         leios.on_validated_eb(point(0));
 
         let eb_hash = point_hash(0);
-        let body = crate::production::VoteBody::stub_persistent(0, b"peer-0", 100, &eb_hash);
-        leios.on_validated_votes(&[body.encode(130)]);
+        leios
+            .handle_event(&NetworkEvent::LeiosVotesReceived {
+                peer_id: net_core::peer::PeerId(1),
+                votes: vec![inline_vote(0, eb_hash, 0)],
+            })
+            .await;
         assert_eq!(leios.election_voter_count(&eb_hash), 1);
         assert!(!leios.election_quorum(&eb_hash));
     }
@@ -855,20 +790,19 @@ mod tests {
         let _ = leios.drain_telemetry();
 
         let eb_hash = point_hash(0);
-        // 8 voters out of 10 pools clears the τ = 0.75 quorum: in
-        // `EveryoneVotes` each pool has weight 1, so the threshold
-        // `ceil(0.75 × 10) = 8`.
-        let voters = [
-            "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5", "peer-6",
-        ];
-        let bodies: Vec<Vec<u8>> = voters
+        // 8 distinct voter indices reach the τ = 0.75 quorum: in
+        // `EveryoneVotes` each pool has weight 1, so the threshold is
+        // `ceil(0.75 × 10) = 8`.  test(9) + peer-0..peer-6 (0..6).
+        let votes: Vec<Vote> = [9u16, 0, 1, 2, 3, 4, 5, 6]
             .iter()
-            .map(|v| {
-                crate::production::VoteBody::stub_persistent(0, v.as_bytes(), 100, &eb_hash)
-                    .encode(130)
-            })
+            .map(|&id| inline_vote(0, eb_hash, id))
             .collect();
-        leios.on_validated_votes(&bodies);
+        leios
+            .handle_event(&NetworkEvent::LeiosVotesReceived {
+                peer_id: net_core::peer::PeerId(1),
+                votes,
+            })
+            .await;
 
         let drained = leios.drain_telemetry();
         let cert = drained
@@ -887,9 +821,13 @@ mod tests {
             assert_eq!(*voters, 8);
         }
 
-        // Subsequent votes don't re-fire.
-        let body_extra = crate::production::VoteBody::stub_persistent(0, b"peer-7", 100, &eb_hash);
-        leios.on_validated_votes(&[body_extra.encode(130)]);
+        // Subsequent votes don't re-fire (peer-7 → index 7, a new voter).
+        leios
+            .handle_event(&NetworkEvent::LeiosVotesReceived {
+                peer_id: net_core::peer::PeerId(1),
+                votes: vec![inline_vote(0, eb_hash, 7)],
+            })
+            .await;
         let drained2 = leios.drain_telemetry();
         assert!(!drained2
             .iter()
@@ -909,20 +847,22 @@ mod tests {
 
         let hash0 = point_hash(0);
         let hash5 = point_hash(5);
-        // 8 voters per EB clears the τ = 0.75 quorum (ceil(0.75 × 10) = 8).
-        let voters = [
-            "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5", "peer-6",
-        ];
-        let mut all_bodies = Vec::new();
+        // 8 distinct voter indices reach the τ = 0.75 quorum
+        // (ceil(0.75 × 10) = 8): test(9) + peer-0..peer-6.
+        let voter_ids = [9u16, 0, 1, 2, 3, 4, 5, 6];
+        let mut all_votes = Vec::new();
         for slot in [0u64, 5u64] {
             let hash = point_hash(slot);
-            for v in &voters {
-                let body =
-                    crate::production::VoteBody::stub_persistent(slot, v.as_bytes(), 100, &hash);
-                all_bodies.push(body.encode(130));
+            for &id in &voter_ids {
+                all_votes.push(inline_vote(slot, hash, id));
             }
         }
-        leios.on_validated_votes(&all_bodies);
+        leios
+            .handle_event(&NetworkEvent::LeiosVotesReceived {
+                peer_id: net_core::peer::PeerId(1),
+                votes: all_votes,
+            })
+            .await;
 
         // Neither is CertEligible yet.
         assert_eq!(leios.eb_certifiable_slot(&hash0), None);

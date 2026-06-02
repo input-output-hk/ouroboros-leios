@@ -510,12 +510,30 @@ pub async fn serve_peersharing(
     }
 }
 
+/// Translate a stored notification into the LeiosNotify wire message.
+/// `eb_size` isn't tracked store-side, so block offers serve `0` (the
+/// CDDL marks the field redundant with the announcement).
+fn notification_to_ln_msg(n: &crate::store::leios_store::LeiosNotification) -> LnMsg {
+    use crate::store::leios_store::LeiosNotification;
+    match n {
+        LeiosNotification::BlockOffer { point } => LnMsg::MsgLeiosBlockOffer {
+            point: point.clone(),
+            eb_size: 0,
+        },
+        LeiosNotification::BlockTxsOffer { point } => LnMsg::MsgLeiosBlockTxsOffer {
+            point: point.clone(),
+        },
+        LeiosNotification::Votes { votes } => LnMsg::MsgLeiosVotes {
+            votes: votes.clone(),
+        },
+    }
+}
+
 /// Serve LeiosNotify for one connection.
 ///
 /// Sends notifications about available Leios data as the store is populated.
 /// Uses `LeiosStore::subscribe()` to wake when new items are injected.
 pub async fn serve_leios_notify(ln_send: CodecSend, ln_recv: CodecRecv, store: Arc<LeiosStore>) {
-    use crate::store::leios_store::LeiosNotification;
 
     let mut runner = Runner::<LeiosNotify>::new(Role::Server, ln_send, ln_recv);
     let mut read_index: usize = 0;
@@ -532,19 +550,7 @@ pub async fn serve_leios_notify(ln_send: CodecSend, ln_recv: CodecRecv, store: A
                 let pending = store.notifications_after(&mut read_index);
                 if let Some(notification) = pending.first() {
                     read_index += 1;
-                    let response = match notification {
-                        LeiosNotification::BlockOffer { point } => LnMsg::MsgLeiosBlockOffer {
-                            point: point.clone(),
-                        },
-                        LeiosNotification::BlockTxsOffer { point } => {
-                            LnMsg::MsgLeiosBlockTxsOffer {
-                                point: point.clone(),
-                            }
-                        }
-                        LeiosNotification::VotesOffer { votes } => LnMsg::MsgLeiosVotesOffer {
-                            votes: votes.clone(),
-                        },
-                    };
+                    let response = notification_to_ln_msg(notification);
                     if runner.send(&response).await.is_err() {
                         break;
                     }
@@ -557,23 +563,7 @@ pub async fn serve_leios_notify(ln_send: CodecSend, ln_recv: CodecRecv, store: A
                         let pending = store.notifications_after(&mut read_index);
                         if let Some(notification) = pending.first() {
                             read_index += 1;
-                            let response = match notification {
-                                LeiosNotification::BlockOffer { point } => {
-                                    LnMsg::MsgLeiosBlockOffer {
-                                        point: point.clone(),
-                                    }
-                                }
-                                LeiosNotification::BlockTxsOffer { point } => {
-                                    LnMsg::MsgLeiosBlockTxsOffer {
-                                        point: point.clone(),
-                                    }
-                                }
-                                LeiosNotification::VotesOffer { votes } => {
-                                    LnMsg::MsgLeiosVotesOffer {
-                                        votes: votes.clone(),
-                                    }
-                                }
-                            };
+                            let response = notification_to_ln_msg(notification);
                             if runner.send(&response).await.is_err() {
                                 return;
                             }
@@ -625,16 +615,6 @@ pub async fn serve_leios_fetch(lf_send: CodecSend, lf_recv: CodecRecv, store: Ar
                 };
                 if runner
                     .send(&LfMsg::MsgLeiosBlockTxs { transactions })
-                    .await
-                    .is_err()
-                {
-                    break;
-                }
-            }
-            LfMsg::MsgLeiosVotesRequest { votes: ids } => {
-                let votes = store.get_votes(&ids);
-                if runner
-                    .send(&LfMsg::MsgLeiosVoteDelivery { votes })
                     .await
                     .is_err()
                 {
