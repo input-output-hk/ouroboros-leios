@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Initialize upstream (immdb-server) data directory
-# Generates leios.db and schedule.json using leiosdemo202510
+# Generates leios.db and schedule.json using leios-schedule-gen
 
 set -euo pipefail
 
@@ -20,15 +20,15 @@ echo "  REF_SLOT: $REF_SLOT"
 # Create data directory if needed
 mkdir -p "$DATA_DIR"
 
-# Generate leios.db and base schedule using leiosdemo202510
+# Generate leios.db and base schedule using leios-schedule-gen
 echo "Generating leios.db and schedule..."
-if [ -f "$CONFIG_DIR/manifest.json" ] && command -v leiosdemo202510 &> /dev/null; then
-    # Clean up any existing files (leiosdemo202510 requires paths to not exist)
+if [ -f "$CONFIG_DIR/manifest.json" ] && command -v leios-schedule-gen &> /dev/null; then
+    # Clean up any existing files (leios-schedule-gen requires paths to not exist)
     rm -f "$DATA_DIR/leios.db"
     rm -f "$DATA_DIR/base-schedule.json"
     rm -f "$DATA_DIR/schedule.json"
 
-    leiosdemo202510 generate \
+    leios-schedule-gen \
         "$DATA_DIR/leios.db" \
         "$CONFIG_DIR/manifest.json" \
         "$DATA_DIR/base-schedule.json"
@@ -40,7 +40,7 @@ if [ -f "$CONFIG_DIR/manifest.json" ] && command -v leiosdemo202510 &> /dev/null
     jq "map(.[0] = $RELEASE_TIME)" "$DATA_DIR/base-schedule.json" > "$DATA_DIR/schedule.json"
     echo "  schedule.json created with release time $RELEASE_TIME"
 else
-    echo "  WARNING: leiosdemo202510 or manifest.json not found"
+    echo "  WARNING: leios-schedule-gen or manifest.json not found"
     echo "  Creating empty schedule..."
     echo "[]" > "$DATA_DIR/schedule.json"
 fi

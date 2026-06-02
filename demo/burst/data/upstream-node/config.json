@@ -52,10 +52,10 @@
       "severity": "Notice"
     },
     "BlockFetch.Remote": {
-      "severity": "Notice"
+      "severity": "Debug"
     },
     "BlockFetch.Remote.Serialised": {
-      "severity": "Notice"
+      "severity": "Debug"
     },
     "BlockFetch.Server": {
       "severity": "Debug"
@@ -97,10 +97,10 @@
       "severity": "Notice"
     },
     "ChainSync.Remote": {
-      "severity": "Notice"
+      "severity": "Debug"
     },
     "ChainSync.Remote.Serialised": {
-      "severity": "Notice"
+      "severity": "Debug"
     },
     "ChainSync.ServerBlock": {
       "severity": "Notice"
@@ -271,12 +271,26 @@
     "Version.NodeVersion": {
       "severity": "Info"
     },
-    "LeiosNotify.Remote": { "severity": "Debug", "maxFrequency": 0 },
-    "LeiosFetch.Remote": { "severity": "Debug", "maxFrequency": 0 },
-    "Consensus.LeiosKernel": { "severity": "Debug", "maxFrequency": 0 },
-    "Consensus.LeiosPeer": { "severity": "Debug", "maxFrequency": 0 }
+    "LeiosNotify.Remote": {
+      "severity": "Debug",
+      "maxFrequency": 0
+    },
+    "LeiosFetch.Remote": {
+      "severity": "Debug",
+      "maxFrequency": 0
+    },
+    "Consensus.LeiosKernel": {
+      "severity": "Debug",
+      "maxFrequency": 0
+    },
+    "Consensus.LeiosPeer": {
+      "severity": "Debug",
+      "maxFrequency": 0
+    }
   },
   "TurnOnLogMetrics": true,
   "TurnOnLogging": true,
-  "UseTraceDispatcher": true
+  "UseTraceDispatcher": true,
+  "DijkstraGenesisFile": "../genesis/genesis.dijkstra.json",
+  "TestDijkstraHardForkAtEpoch": 0
 }

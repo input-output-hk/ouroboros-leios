@@ -1,4 +1,3 @@
-import os
 import sys
 import json
 import pandas as pd
@@ -22,14 +21,18 @@ def filter_log_events(log_path: str, filter_text: str, subfilter_text: str = "")
     Reads a log file, parses JSON lines, and extracts relevant fields
     based on the filter type.
     """
-    log_filename = os.path.basename(log_path)
-    print(f"\n--- Analyzing Log: {log_filename} for event: '{filter_text}' ---")
-
     records = []
 
     try:
         with open(log_path, "r") as f:
             for line in f:
+                # Fast-path reject: ~all lines don't carry our target ns.
+                # JSON-parsing each line over a multi-MB log full of tx CBOR
+                # payloads is the hot loop; this substring check is ~free.
+                if filter_text not in line:
+                    continue
+                if subfilter_text and subfilter_text not in line:
+                    continue
                 try:
                     pc_log_entry = json.loads(line)
                     log_entry = json.loads(pc_log_entry["message"])
@@ -112,15 +115,7 @@ def create_and_clean_df(records: list, node_id: str) -> pd.DataFrame:
         raise
 
     # Deduplication: Keep only the first (earliest) occurrence
-    initial_rows = len(df)
     df = df.sort_values(by="at").drop_duplicates(subset=["hash"], keep="first")
-
-    if len(df) < initial_rows:
-        duplicates_removed = initial_rows - len(df)
-        print(
-            f"Warning: Removed {duplicates_removed} duplicate log entries from node {node_id}.",
-            file=sys.stderr,
-        )
 
     return df
 
@@ -135,16 +130,19 @@ def load_block_arrivals(df_headers: pd.DataFrame, log_path: str, node_id: str):
     # add slot column
     df = pd.merge(df, df_headers, on="hash", how="left")
 
-    if df["slot"].isna().any():
-        print(
-            f"Error: {node_id} downloaded somes blocks with unknown slot.",
-            file=sys.stderr,
-        )
-        print(
-            df[df["slot"].isnull()],
-            file=sys.stderr,
-        )
-        raise
+    if df.empty:
+        # Nothing observed at this node yet. The caller already handles
+        # empty dataframes; bail out before the typed arithmetic below,
+        # which would otherwise raise on the object-typed empty Series
+        # that pandas hands back.
+        return df.assign(latency_ms=pd.Series(dtype="Int64"))
+
+    # Blocks forged locally never produce a ChainSync DownloadedHeader, so
+    # they show up here with no slot/slot_onset. They don't have a
+    # peer-download latency to report; drop them from the latency table.
+    df = df.dropna(subset=["slot"])
+    if df.empty:
+        return df.assign(latency_ms=pd.Series(dtype="Int64"))
 
     # Use 'Int64' to allow NaNs; see https://stackoverflow.com/a/54194908
     df["latency_ms"] = (
@@ -302,9 +300,6 @@ def load_sendrecv_upstream(log_path: str):
     Reads a log file, parses JSON lines, and extracts relevant fields
     for the upstream node.
     """
-    log_filename = os.path.basename(log_path)
-    print(f"\n--- Analyzing Log: {log_filename} for Leios SendRecvs ---")
-
     records = []
 
     try:
@@ -312,15 +307,27 @@ def load_sendrecv_upstream(log_path: str):
             n = 0
             for line in f:
                 n = n + 1
+                # Fast-path reject: SendRecv records on the upstream
+                # carry "mux_at"; most lines don't. The inner JSON is
+                # embedded as an escaped string in process-compose's
+                # `message` field, so we look for the bare field name
+                # rather than the quoted form `"mux_at"`.
+                if "mux_at" not in line:
+                    continue
                 try:
                     pc_log_entry = json.loads(line)
                     log_entry = json.loads(pc_log_entry["message"])
+                    # immdb-server emits `msg` as a string for ChainSync /
+                    # BlockFetch SendRecv events but as an object with a
+                    # `kind` field for LeiosFetch and the mapped MsgBlock.
+                    raw_msg = log_entry["msg"]
+                    msg_kind = raw_msg["kind"] if isinstance(raw_msg, dict) else raw_msg
                     record = {
                         "at": log_entry["at"],
                         "mux_at": log_entry["mux_at"],
                         "connection_id": log_entry["connectionId"],
                         "direction": log_entry["direction"],
-                        "msg": str(log_entry["msg"]),
+                        "msg": msg_kind,
                         "prevCount": log_entry["prevCount"],
                     }
                     if record["msg"] not in msgs_SendRecv:
@@ -348,9 +355,6 @@ def load_sendrecv_node(log_path: str):
     Reads a log file, parses JSON lines, and extracts relevant fields
     for a cardano-node.
     """
-    log_filename = os.path.basename(log_path)
-    print(f"\n--- Analyzing Log: {log_filename} for Leios SendRecvs: ---")
-
     records = []
 
     try:
@@ -359,6 +363,16 @@ def load_sendrecv_node(log_path: str):
             cntrs = {}
             for line in f:
                 n = n + 1
+                # Fast-path reject: SendRecv records on cardano-node have
+                # ns starting with one of LeiosFetch.Remote, ChainSync.Remote
+                # or BlockFetch.Remote. Almost all lines fail this cheap
+                # substring check.
+                if (
+                    "LeiosFetch.Remote" not in line
+                    and "ChainSync.Remote" not in line
+                    and "BlockFetch.Remote" not in line
+                ):
+                    continue
                 try:
                     pc_log_entry = json.loads(line)
                     log_entry = json.loads(pc_log_entry["message"])
@@ -372,9 +386,16 @@ def load_sendrecv_node(log_path: str):
                     prevCount = cntrs.get((direction, msg, connection_id), 0)
                     cntrs[(direction, msg, connection_id)] = prevCount + 1
 
+                    # mux_at: the bearer-side timestamp for this message.
+                    # ouroboros-network plumbs a Time on TraceSendMsg/TraceRecvMsg
+                    # but the LogFormatting in Network/Tracing/Driver.hs currently
+                    # discards it, so the JSON has no data.mux_at. Fall back to the
+                    # outer 'at' so the joined table still renders; the resulting
+                    # send_/recv_/transport_latency columns degenerate to 0 until
+                    # the network side is fixed.
                     record = {
                         "at": log_entry["at"],
-                        "mux_at": log_entry["data"]["mux_at"],
+                        "mux_at": log_entry["data"].get("mux_at", log_entry["at"]),
                         "connection_id": connection_id,
                         "direction": direction,
                         "msg": msg,
@@ -550,18 +571,12 @@ if __name__ == "__main__":
             posix_time = int(initial_time_str)
             # Convert from POSIX seconds to a UTC datetime object
             initial_time = pd.to_datetime(posix_time, unit="s", utc=True)
-            print(
-                f"Note: Interpreted initial-time '{initial_time_str}' as POSIX timestamp (UTC)."
-            )
         except ValueError:
             # If not an integer, try to parse as a standard datetime string
             initial_time = pd.to_datetime(initial_time_str)
             # If the provided string has no timezone, assume UTC for consistency
             if initial_time.tzinfo is None:
                 initial_time = initial_time.tz_localize("UTC")
-                print(
-                    f"Note: Interpreted initial-time '{initial_time_str}' as datetime string (assuming UTC)."
-                )
             else:
                 # If it has a timezone, convert it to UTC for consistency
                 initial_time = initial_time.tz_convert("UTC")
@@ -572,13 +587,9 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    print("\n--- Initial Configuration ---")
-    print(f"Initial Slot: {initial_slot}")
-    print(f"Initial Time: {initial_time}")
-    print(f"node0 Log File: {log_path_node0}")
-    print(f"downstream Log File: {log_path_downstream}")
-    if plot_output_file:
-        print(f"Plot Output File: {plot_output_file}")
+    # Mark the start of a new analysis run so successive iterations are
+    # easy to tell apart in the process-compose log viewer.
+    print("=" * 80)
 
     # Collect header data
     #
@@ -597,8 +608,6 @@ if __name__ == "__main__":
         .dropna(subset=["slot"])
         .drop_duplicates(subset=["hash"], keep="first")
     )
-
-    print(f"Created Hash-to-Slot lookup table with {len(df_headers)} unique entries.")
 
     try:
         # Calculate the difference in slots (where 1 slot happens to be 1 second)
@@ -637,11 +646,7 @@ if __name__ == "__main__":
 
     #    plot_onset_vs_arrival(df_merged, plot_output_file)
 
-    print("\n--- Extracted and Merged Data Summary ---")
-    print(
-        "Each row represents a unique Praos block seen by both nodes, joined by hash and slot."
-    )
-    # Which columns to display
+    print("\n== Praos blocks (node0 / downstream) ==")
     display_columns = [
         "slot",
         "hash",
@@ -666,8 +671,6 @@ if __name__ == "__main__":
         [(x[0], x[1][1]) for x in schedule_json if x[1][2] is None],
         columns=["offer_slot", "hash"],
     )
-
-    print(f"Created Hash-to-Offer lookup table with {len(df_schedule)} unique entries.")
 
     try:
         # Calculate the difference in slots (where 1 slot happens to be 1 second)
@@ -702,11 +705,7 @@ if __name__ == "__main__":
         how="outer",
     )
 
-    print("\n--- Extracted and Merged Data Summary for Leios blocks ---")
-    print(
-        "Each row represents a unique Leios block seen by both nodes, joined by hash and offer slot."
-    )
-    # Which columns to display
+    print("\n== Leios EB arrivals (node0 / downstream) ==")
     leios_display_columns = [
         "offer_slot",
         "hash",
@@ -737,19 +736,7 @@ if __name__ == "__main__":
         how="outer",
     )
 
-    print("\n--- Extracted and Merged Data Summary for Leios blocks ---")
-    print(
-        "Each row represents a unique Leios closure seen by both nodes, joined by hash and offer slot."
-    )
-    # Which columns to display
-    leios_display_columns = [
-        "offer_slot",
-        "hash",
-        "offer",
-        "latency_ms_node0",
-        "latency_ms_downstream",
-    ]
-
+    print("\n== Leios closure (EB+txs) arrivals (node0 / downstream) ==")
     print(df_leios_blocktxs_merged[leios_display_columns])
 
     # ---------------------------------------- and finally for each BlockTxs mini protocol message
@@ -757,6 +744,17 @@ if __name__ == "__main__":
     df_sendrecv_upstream = load_sendrecv_upstream(log_path_upstream)
     df_sendrecv_node0 = load_sendrecv_node(log_path_node0)
     df_sendrecv_downstream = load_sendrecv_node(log_path_downstream)
+
+    if (
+        df_sendrecv_upstream.empty
+        or df_sendrecv_node0.empty
+        or df_sendrecv_downstream.empty
+    ):
+        print(
+            "\nNo SendRecv messages captured on one of the nodes yet; "
+            "skipping the per-message latency breakdown."
+        )
+        sys.exit(0)
 
     df_sendrecv_upstream_node0 = join_sendrecv(
         df_sendrecv_upstream["connection_id"][0],
@@ -784,11 +782,7 @@ if __name__ == "__main__":
         "recv_latency_ms",
         "pull_at",
     ]
-    print(
-        "\n--- Extracted and Merged Data Summary for requests and replies between upstream and node0 ---"
-    )
+    print("\n== SendRecv upstream -> node0 ==")
     print(df_sendrecv_upstream_node0[sendrecv_display_columns])
-    print(
-        "\n--- Extracted and Merged Data Summary for requests and replies between node0 and downstream ---"
-    )
+    print("\n== SendRecv node0 -> downstream ==")
     print(df_sendrecv_node0_downstream[sendrecv_display_columns])

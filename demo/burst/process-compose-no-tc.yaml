@@ -1,0 +1,104 @@
+version: "0.5"
+is_strict: true
+
+# Variant of process-compose.yaml without Linux network namespaces or
+# traffic control: useful when running in an environment that lacks sudo
+# or the ability to create veth pairs.  The three nodes bind to distinct
+# 127.0.0.{1,2,3} addresses to avoid EADDRNOTAVAIL on outbound sockets.
+
+processes:
+  PrepareUpstreamNode:
+    command: bash "${SOURCE_DIR}/scripts/prepare-upstream-node.sh"
+    availability:
+      restart: "on_failure"
+
+  UpstreamNode:
+    command: |
+      UPSTREAM_NODE_DIR="${UPSTREAM_NODE_DIR}" \
+      REF_SLOT="${REF_SLOT}" \
+      ONSET_OF_REF_SLOT="${ONSET_OF_REF_SLOT}" \
+      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
+      IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
+      bash "${SOURCE_DIR}/scripts/upstream-node.sh"
+    log_location: "${WORKING_DIR}/upstream-node.log"
+    depends_on:
+      PrepareUpstreamNode:
+        condition: process_completed_successfully
+    availability:
+      restart: "always"
+
+  PrepareNode0:
+    command: |
+      NODE0_DIR="${NODE0_DIR}" \
+      DATA_DIR="${DATA_DIR}" \
+      CLUSTER_RUN="${CLUSTER_RUN}" \
+      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
+      IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
+      bash "${SOURCE_DIR}/scripts/prepare-node0.sh"
+    availability:
+      restart: "on_failure"
+
+  Node0:
+    command: |
+      NODE0_DIR="${NODE0_DIR}" \
+      PORT_NODE0="${PORT_NODE0}" \
+      IP_NODE0="${IP_NODE0}" \
+      bash "${SOURCE_DIR}/scripts/node0.sh"
+    log_location: "${WORKING_DIR}/node0.log"
+    depends_on:
+      PrepareNode0:
+        condition: process_completed_successfully
+    availability:
+      restart: "always"
+
+  PrepareDownstreamNode:
+    command: |
+      DOWNSTREAM_NODE_DIR="${DOWNSTREAM_NODE_DIR}" \
+      DATA_DIR="${DATA_DIR}" \
+      CLUSTER_RUN="${CLUSTER_RUN}" \
+      PORT_NODE0="${PORT_NODE0}" \
+      IP_NODE0="${IP_NODE0}" \
+      bash "${SOURCE_DIR}/scripts/prepare-downstream-node.sh"
+    availability:
+      restart: "on_failure"
+
+  DownstreamNode:
+    command: |
+      DOWNSTREAM_NODE_DIR="${DOWNSTREAM_NODE_DIR}" \
+      PORT_DOWNSTREAM_NODE="${PORT_DOWNSTREAM_NODE}" \
+      IP_DOWNSTREAM_NODE="${IP_DOWNSTREAM_NODE}" \
+      bash "${SOURCE_DIR}/scripts/downstream-node.sh"
+    log_location: "${WORKING_DIR}/downstream-node.log"
+    depends_on:
+      PrepareDownstreamNode:
+        condition: process_completed_successfully
+    availability:
+      restart: "always"
+
+  Analyse:
+    command: |
+      set -uo pipefail;
+      while true; do
+        sleep 1
+        # Don't let an analyse.py crash kill the loop (and trigger a
+        # process-compose hot-restart): the script is meant to be polled
+        # until enough data has accumulated to produce a clean run.
+        python "${SOURCE_DIR}/analyse.py" \
+          "$REF_SLOT" "$ONSET_OF_REF_SLOT" \
+          "$UPSTREAM_NODE_DIR/schedule.json" \
+          "$WORKING_DIR/upstream-node.log" \
+          "$WORKING_DIR/node0.log" \
+          "$WORKING_DIR/downstream-node.log" \
+          "$WORKING_DIR/scatter_plot.png" || true
+      done;
+
+    log_location: "${WORKING_DIR}/analyse.log"
+    depends_on:
+      UpstreamNode:
+        condition: process_started
+      Node0:
+        condition: process_started
+      DownstreamNode:
+        condition: process_started
+    availability:
+      restart: "always"
