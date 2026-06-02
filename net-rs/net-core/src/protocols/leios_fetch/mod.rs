@@ -26,12 +26,12 @@ pub const INGRESS_LIMIT: usize = 25_165_824;
 /// Max message size for request messages (StIdle).
 pub const SIZE_LIMIT_SMALL: usize = 65_535;
 
-/// Max buffer size while a delivery is in flight (StBlock, StBlockTxs,
-/// StVotes, StBlockRange).  This is a *buffer* bound enforced at the
-/// mux demuxer, not a per-message size cap; the actual per-message
-/// caps (MAX_BLOCK_SIZE, MAX_TRANSACTIONS, MAX_VOTES, MAX_TRANSACTION_SIZE)
-/// are checked during CBOR decoding.  The 50% headroom over those caps
-/// absorbs the segments that arrive while the consumer is mid-decode.
+/// Max buffer size while a delivery is in flight (StBlock, StBlockTxs).
+/// This is a *buffer* bound enforced at the mux demuxer, not a
+/// per-message size cap; the actual per-message caps (MAX_BLOCK_SIZE,
+/// MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE) are checked during CBOR
+/// decoding.  The headroom over those caps absorbs the segments that
+/// arrive while the consumer is mid-decode.
 pub const SIZE_LIMIT_LARGE: usize = 25_165_824;
 
 /// Maximum entries in a bitmap TX request.
@@ -43,19 +43,10 @@ pub const MAX_TRANSACTIONS: usize = 65_536;
 /// Maximum size of a single opaque transaction blob.
 pub const MAX_TRANSACTION_SIZE: usize = 65_536;
 
-/// Maximum size of an opaque EB block blob.
+/// Maximum size of the raw endorser-block manifest blob (CBOR map).
 pub const MAX_BLOCK_SIZE: usize = 16_777_216;
 
-/// Maximum number of vote IDs in a request or votes in a delivery.
-pub const MAX_VOTES: usize = 1024;
-
-/// Maximum size of an opaque voter ID.
-pub const MAX_VOTER_ID_SIZE: usize = 256;
-
-/// Maximum size of an opaque vote blob.
-pub const MAX_VOTE_SIZE: usize = 1024;
-
-/// Timeout for server states (120s — block range may involve large transfers).
+/// Timeout for server states (120s — large transfers).
 pub const TIMEOUT_SERVER: Duration = Duration::from_secs(120);
 
 // --- State machine ---
@@ -69,8 +60,6 @@ pub enum State {
     StBlock,
     /// Server must deliver transactions. Server has agency.
     StBlockTxs,
-    /// Server must deliver next or last block+txs in range. Server has agency.
-    StBlockRange,
     /// Protocol complete. Nobody has agency.
     StDone,
 }
@@ -80,30 +69,21 @@ pub enum State {
 pub enum Message {
     /// Client requests an EB. [0, point]
     MsgLeiosBlockRequest { point: Point },
-    /// Server delivers an EB. [1, block]
+    /// Server delivers an EB.  `[1, endorser_block]` where
+    /// `endorser_block = { tx_hash => tx_size }` — `block` holds the raw
+    /// CBOR map bytes (opaque pass-through; the consumer parses the
+    /// manifest).
     MsgLeiosBlock { block: Vec<u8> },
-    /// Client requests selective transactions via bitmap. [2, point, bitmap]
+    /// Client requests selective transactions via bitmap. [2, point, bitmaps]
     MsgLeiosBlockTxsRequest {
         point: Point,
         bitmap: BTreeMap<u16, u64>,
     },
-    /// Server delivers transactions. [3, [tx, ...]]
-    MsgLeiosBlockTxs { transactions: Vec<Vec<u8>> },
-    /// Client requests a certified EB range. [6, start_slot, end_slot, start_hash, end_hash]
-    MsgLeiosBlockRangeRequest {
-        start_slot: u64,
-        end_slot: u64,
-        start_hash: [u8; 32],
-        end_hash: [u8; 32],
-    },
-    /// Server delivers next block+txs in range (more to follow). [7, block, [tx, ...]]
-    MsgLeiosNextBlockAndTxsInRange {
-        block: Vec<u8>,
-        transactions: Vec<Vec<u8>>,
-    },
-    /// Server delivers last block+txs in range (end of sequence). [8, block, [tx, ...]]
-    MsgLeiosLastBlockAndTxsInRange {
-        block: Vec<u8>,
+    /// Server delivers transactions. `[3, point, bitmaps, tx_list]` —
+    /// the server echoes the request's point and bitmap.
+    MsgLeiosBlockTxs {
+        point: Point,
+        bitmap: BTreeMap<u16, u64>,
         transactions: Vec<Vec<u8>>,
     },
     /// Client terminates. [9]
@@ -128,7 +108,6 @@ impl Protocol for LeiosFetch {
             State::StIdle => Agency::Client,
             State::StBlock => Agency::Server,
             State::StBlockTxs => Agency::Server,
-            State::StBlockRange => Agency::Server,
             State::StDone => Agency::Nobody,
         }
     }
@@ -139,13 +118,6 @@ impl Protocol for LeiosFetch {
             (State::StBlock, Message::MsgLeiosBlock { .. }) => Ok(State::StIdle),
             (State::StIdle, Message::MsgLeiosBlockTxsRequest { .. }) => Ok(State::StBlockTxs),
             (State::StBlockTxs, Message::MsgLeiosBlockTxs { .. }) => Ok(State::StIdle),
-            (State::StIdle, Message::MsgLeiosBlockRangeRequest { .. }) => Ok(State::StBlockRange),
-            (State::StBlockRange, Message::MsgLeiosNextBlockAndTxsInRange { .. }) => {
-                Ok(State::StBlockRange)
-            }
-            (State::StBlockRange, Message::MsgLeiosLastBlockAndTxsInRange { .. }) => {
-                Ok(State::StIdle)
-            }
             (State::StIdle, Message::MsgDone) => Ok(State::StDone),
             _ => Err(ProtocolError::InvalidMessage(format!(
                 "{msg:?} not valid in state {state:?}"
@@ -156,9 +128,7 @@ impl Protocol for LeiosFetch {
     fn size_limit(state: &State) -> usize {
         match state {
             State::StIdle => SIZE_LIMIT_SMALL,
-            State::StBlock | State::StBlockTxs | State::StBlockRange => {
-                SIZE_LIMIT_LARGE
-            }
+            State::StBlock | State::StBlockTxs => SIZE_LIMIT_LARGE,
             State::StDone => 0,
         }
     }
@@ -166,9 +136,7 @@ impl Protocol for LeiosFetch {
     fn timeout(state: &State) -> Option<Duration> {
         match state {
             State::StIdle => None,
-            State::StBlock | State::StBlockTxs | State::StBlockRange => {
-                Some(TIMEOUT_SERVER)
-            }
+            State::StBlock | State::StBlockTxs => Some(TIMEOUT_SERVER),
             State::StDone => None,
         }
     }
@@ -204,53 +172,12 @@ pub async fn fetch_block_txs(
         .await?;
     let msg = runner.recv().await?;
     match msg {
-        Message::MsgLeiosBlockTxs { transactions } => Ok(transactions),
+        // The server echoes point + bitmap; the client already knows
+        // them, so only the tx list is returned.
+        Message::MsgLeiosBlockTxs { transactions, .. } => Ok(transactions),
         other => Err(ProtocolError::InvalidMessage(format!(
             "expected MsgLeiosBlockTxs, got {other:?}"
         ))),
-    }
-}
-
-/// Fetch a certified EB range. Collects all blocks+txs until the last one.
-pub async fn fetch_block_range(
-    runner: &mut Runner<LeiosFetch>,
-    start_slot: u64,
-    end_slot: u64,
-    start_hash: [u8; 32],
-    end_hash: [u8; 32],
-) -> Result<Vec<(Vec<u8>, Vec<Vec<u8>>)>, ProtocolError> {
-    runner
-        .send(&Message::MsgLeiosBlockRangeRequest {
-            start_slot,
-            end_slot,
-            start_hash,
-            end_hash,
-        })
-        .await?;
-
-    let mut results = Vec::new();
-    loop {
-        let msg = runner.recv().await?;
-        match msg {
-            Message::MsgLeiosNextBlockAndTxsInRange {
-                block,
-                transactions,
-            } => {
-                results.push((block, transactions));
-            }
-            Message::MsgLeiosLastBlockAndTxsInRange {
-                block,
-                transactions,
-            } => {
-                results.push((block, transactions));
-                return Ok(results);
-            }
-            other => {
-                return Err(ProtocolError::InvalidMessage(format!(
-                    "expected MsgLeiosNextBlockAndTxsInRange or MsgLeiosLastBlockAndTxsInRange, got {other:?}"
-                )));
-            }
-        }
     }
 }
 
@@ -277,19 +204,11 @@ mod tests {
         h
     }
 
-    fn test_hash2() -> [u8; 32] {
-        let mut h = [0u8; 32];
-        h[0] = 0xDE;
-        h[31] = 0xEF;
-        h
-    }
-
     #[test]
     fn agency_correct() {
         assert_eq!(LeiosFetch::agency(&State::StIdle), Agency::Client);
         assert_eq!(LeiosFetch::agency(&State::StBlock), Agency::Server);
         assert_eq!(LeiosFetch::agency(&State::StBlockTxs), Agency::Server);
-        assert_eq!(LeiosFetch::agency(&State::StBlockRange), Agency::Server);
         assert_eq!(LeiosFetch::agency(&State::StDone), Agency::Nobody);
     }
 
@@ -336,42 +255,8 @@ mod tests {
             LeiosFetch::transition(
                 &State::StBlockTxs,
                 &Message::MsgLeiosBlockTxs {
-                    transactions: vec![],
-                }
-            )
-            .unwrap(),
-            State::StIdle
-        );
-        // Block range: request → next → next → last
-        assert_eq!(
-            LeiosFetch::transition(
-                &State::StIdle,
-                &Message::MsgLeiosBlockRangeRequest {
-                    start_slot: 1,
-                    end_slot: 10,
-                    start_hash: [0; 32],
-                    end_hash: [0; 32],
-                }
-            )
-            .unwrap(),
-            State::StBlockRange
-        );
-        assert_eq!(
-            LeiosFetch::transition(
-                &State::StBlockRange,
-                &Message::MsgLeiosNextBlockAndTxsInRange {
-                    block: vec![],
-                    transactions: vec![],
-                }
-            )
-            .unwrap(),
-            State::StBlockRange
-        );
-        assert_eq!(
-            LeiosFetch::transition(
-                &State::StBlockRange,
-                &Message::MsgLeiosLastBlockAndTxsInRange {
-                    block: vec![],
+                    point: Point::Specific { slot: 1, hash: [0; 32] },
+                    bitmap: BTreeMap::new(),
                     transactions: vec![],
                 }
             )
@@ -408,21 +293,14 @@ mod tests {
         assert!(LeiosFetch::transition(
             &State::StBlock,
             &Message::MsgLeiosBlockTxs {
+                point: Point::Specific { slot: 1, hash: [0; 32] },
+                bitmap: BTreeMap::new(),
                 transactions: vec![],
             }
         )
         .is_err());
         // Done in server state
         assert!(LeiosFetch::transition(&State::StBlock, &Message::MsgDone).is_err());
-        // Next in wrong state
-        assert!(LeiosFetch::transition(
-            &State::StBlockTxs,
-            &Message::MsgLeiosNextBlockAndTxsInRange {
-                block: vec![],
-                transactions: vec![],
-            }
-        )
-        .is_err());
     }
 
     #[test]
@@ -430,10 +308,6 @@ mod tests {
         assert_eq!(LeiosFetch::size_limit(&State::StIdle), SIZE_LIMIT_SMALL);
         assert_eq!(LeiosFetch::size_limit(&State::StBlock), SIZE_LIMIT_LARGE);
         assert_eq!(LeiosFetch::size_limit(&State::StBlockTxs), SIZE_LIMIT_LARGE);
-        assert_eq!(
-            LeiosFetch::size_limit(&State::StBlockRange),
-            SIZE_LIMIT_LARGE
-        );
     }
 
     #[test]
@@ -442,10 +316,6 @@ mod tests {
         assert_eq!(LeiosFetch::timeout(&State::StBlock), Some(TIMEOUT_SERVER));
         assert_eq!(
             LeiosFetch::timeout(&State::StBlockTxs),
-            Some(TIMEOUT_SERVER)
-        );
-        assert_eq!(
-            LeiosFetch::timeout(&State::StBlockRange),
             Some(TIMEOUT_SERVER)
         );
         assert_eq!(LeiosFetch::timeout(&State::StDone), None);
@@ -505,10 +375,9 @@ mod tests {
                 other => panic!("expected MsgLeiosBlockRequest, got {other:?}"),
             }
 
+            // A valid CBOR `endorser_block` map { hash => size } (empty here).
             runner
-                .send(&Message::MsgLeiosBlock {
-                    block: vec![0xEB, 0x01, 0x02],
-                })
+                .send(&Message::MsgLeiosBlock { block: vec![0xA0] })
                 .await
                 .unwrap();
 
@@ -522,7 +391,7 @@ mod tests {
             let block = fetch_block(&mut runner, Point::Specific { slot: 42, hash })
                 .await
                 .unwrap();
-            assert_eq!(block, vec![0xEB, 0x01, 0x02]);
+            assert_eq!(block, vec![0xA0]);
 
             done(&mut runner).await.unwrap();
         });
@@ -542,18 +411,21 @@ mod tests {
             let mut runner = Runner::<LeiosFetch>::new(Role::Server, ss, sr);
 
             let msg = runner.recv().await.unwrap();
-            match msg {
+            let (req_point, req_bitmap) = match msg {
                 Message::MsgLeiosBlockTxsRequest { point, bitmap } => {
                     assert_eq!(point, Point::Specific { slot: 100, hash });
                     assert_eq!(bitmap.len(), 2);
                     assert_eq!(bitmap[&0], 0xFF); // first 8 txs
                     assert_eq!(bitmap[&1], 0x01); // tx 64
+                    (point, bitmap)
                 }
                 other => panic!("expected MsgLeiosBlockTxsRequest, got {other:?}"),
-            }
+            };
 
             runner
                 .send(&Message::MsgLeiosBlockTxs {
+                    point: req_point,
+                    bitmap: req_bitmap,
                     transactions: vec![vec![0x01], vec![0x02], vec![0x03]],
                 })
                 .await
@@ -574,69 +446,6 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(txs.len(), 3);
-
-            done(&mut runner).await.unwrap();
-        });
-
-        client.await.unwrap();
-        server.await.unwrap();
-        ra.abort();
-        rb.abort();
-    }
-
-    #[tokio::test]
-    async fn leios_fetch_block_range() {
-        let ((cs, cr), (ss, sr), ra, rb) = make_leios_fetch_mux_pair();
-
-        let server = tokio::spawn(async move {
-            let mut runner = Runner::<LeiosFetch>::new(Role::Server, ss, sr);
-
-            let msg = runner.recv().await.unwrap();
-            match msg {
-                Message::MsgLeiosBlockRangeRequest {
-                    start_slot,
-                    end_slot,
-                    ..
-                } => {
-                    assert_eq!(start_slot, 10);
-                    assert_eq!(end_slot, 12);
-                }
-                other => panic!("expected MsgLeiosBlockRangeRequest, got {other:?}"),
-            }
-
-            // Send 2 blocks: next, then last
-            runner
-                .send(&Message::MsgLeiosNextBlockAndTxsInRange {
-                    block: vec![0xE1],
-                    transactions: vec![vec![0x01]],
-                })
-                .await
-                .unwrap();
-
-            runner
-                .send(&Message::MsgLeiosLastBlockAndTxsInRange {
-                    block: vec![0xE2],
-                    transactions: vec![vec![0x02], vec![0x03]],
-                })
-                .await
-                .unwrap();
-
-            let msg = runner.recv().await.unwrap();
-            assert!(matches!(msg, Message::MsgDone));
-        });
-
-        let client = tokio::spawn(async move {
-            let mut runner = Runner::<LeiosFetch>::new(Role::Client, cs, cr);
-
-            let results = fetch_block_range(&mut runner, 10, 12, test_hash(), test_hash2())
-                .await
-                .unwrap();
-
-            assert_eq!(results.len(), 2);
-            assert_eq!(results[0].0, vec![0xE1]);
-            assert_eq!(results[0].1, vec![vec![0x01]]);
-            assert_eq!(results[1].0, vec![0xE2]);
-            assert_eq!(results[1].1, vec![vec![0x02], vec![0x03]]);
 
             done(&mut runner).await.unwrap();
         });

@@ -1,14 +1,16 @@
-//! CBOR encoding for LeiosFetch messages.
+//! CBOR encoding for LeiosFetch messages (CIP-0164 prototype,
+//! cardano-blueprint `leios-prototype`).
 //!
 //! Wire format:
-//!   msgLeiosBlockRequest           = [0, point]          where point = [slot, hash32]
-//!   msgLeiosBlock                  = [1, block]
-//!   msgLeiosBlockTxsRequest        = [2, point, { u16 => u64, ... }]
-//!   msgLeiosBlockTxs               = [3, [tx, ...]]
-//!   msgLeiosBlockRangeRequest      = [6, startSlot, endSlot, startHash, endHash]
-//!   msgLeiosNextBlockAndTxsInRange = [7, block, [tx, ...]]
-//!   msgLeiosLastBlockAndTxsInRange = [8, block, [tx, ...]]
-//!   msgDone                        = [9]
+//!   msgLeiosBlockRequest    = [0, point]              point = [slot, hash32]
+//!   msgLeiosBlock           = [1, endorser_block]     endorser_block = { hash => word32 }
+//!   msgLeiosBlockTxsRequest = [2, point, bitmaps]     bitmaps = { word16 => word64 }
+//!   msgLeiosBlockTxs        = [3, point, bitmaps, tx_list]   tx_list = [ *tx ]
+//!   msgClientDone           = [9]
+//!
+//! `endorser_block` and each `tx` are carried as raw CBOR (opaque
+//! pass-through): the codec splices/captures their bytes verbatim, so
+//! the exact map/tx shape lives with the consumer, not here.
 
 use std::collections::BTreeMap;
 
@@ -36,7 +38,8 @@ impl minicbor::Encode<()> for Message {
             Message::MsgLeiosBlock { block } => {
                 e.array(2)?;
                 e.u32(1)?;
-                e.bytes(block)?;
+                // `block` is the raw CBOR `endorser_block` map — splice verbatim.
+                encode_raw(e, block)?;
             }
             Message::MsgLeiosBlockTxsRequest { point, bitmap } => {
                 e.array(3)?;
@@ -44,41 +47,16 @@ impl minicbor::Encode<()> for Message {
                 minicbor::Encode::encode(point, e, &mut ())?;
                 encode_bitmap(e, bitmap)?;
             }
-            Message::MsgLeiosBlockTxs { transactions } => {
-                e.array(2)?;
+            Message::MsgLeiosBlockTxs {
+                point,
+                bitmap,
+                transactions,
+            } => {
+                e.array(4)?;
                 e.u32(3)?;
-                encode_blob_list(e, transactions)?;
-            }
-            Message::MsgLeiosBlockRangeRequest {
-                start_slot,
-                end_slot,
-                start_hash,
-                end_hash,
-            } => {
-                e.array(5)?;
-                e.u32(6)?;
-                e.u64(*start_slot)?;
-                e.u64(*end_slot)?;
-                e.bytes(start_hash)?;
-                e.bytes(end_hash)?;
-            }
-            Message::MsgLeiosNextBlockAndTxsInRange {
-                block,
-                transactions,
-            } => {
-                e.array(3)?;
-                e.u32(7)?;
-                e.bytes(block)?;
-                encode_blob_list(e, transactions)?;
-            }
-            Message::MsgLeiosLastBlockAndTxsInRange {
-                block,
-                transactions,
-            } => {
-                e.array(3)?;
-                e.u32(8)?;
-                e.bytes(block)?;
-                encode_blob_list(e, transactions)?;
+                minicbor::Encode::encode(point, e, &mut ())?;
+                encode_bitmap(e, bitmap)?;
+                encode_tx_list(e, transactions)?;
             }
             Message::MsgDone => {
                 e.array(1)?;
@@ -100,7 +78,9 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
                 Ok(Message::MsgLeiosBlockRequest { point })
             }
             1 => {
-                let block = decode_block(d)?;
+                // endorser_block is a CBOR map { tx_hash => tx_size };
+                // captured as raw bytes for opaque pass-through.
+                let block = decode_raw_bounded(d, MAX_BLOCK_SIZE, "endorser block")?;
                 Ok(Message::MsgLeiosBlock { block })
             }
             2 => {
@@ -109,37 +89,12 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
                 Ok(Message::MsgLeiosBlockTxsRequest { point, bitmap })
             }
             3 => {
-                let transactions =
-                    decode_blob_list(d, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE, "transaction")?;
-                Ok(Message::MsgLeiosBlockTxs { transactions })
-            }
-            6 => {
-                let start_slot = d.u64()?;
-                let end_slot = d.u64()?;
-                let start_hash = decode_hash32(d)?;
-                let end_hash = decode_hash32(d)?;
-                Ok(Message::MsgLeiosBlockRangeRequest {
-                    start_slot,
-                    end_slot,
-                    start_hash,
-                    end_hash,
-                })
-            }
-            7 => {
-                let block = decode_block(d)?;
-                let transactions =
-                    decode_blob_list(d, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE, "transaction")?;
-                Ok(Message::MsgLeiosNextBlockAndTxsInRange {
-                    block,
-                    transactions,
-                })
-            }
-            8 => {
-                let block = decode_block(d)?;
-                let transactions =
-                    decode_blob_list(d, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE, "transaction")?;
-                Ok(Message::MsgLeiosLastBlockAndTxsInRange {
-                    block,
+                let point = Point::decode(d, &mut ())?;
+                let bitmap = decode_bitmap(d)?;
+                let transactions = decode_tx_list(d)?;
+                Ok(Message::MsgLeiosBlockTxs {
+                    point,
+                    bitmap,
                     transactions,
                 })
             }
@@ -165,43 +120,83 @@ fn encode_bitmap<W: minicbor::encode::Write>(
     Ok(())
 }
 
-fn encode_blob_list<W: minicbor::encode::Write>(
+/// Encode a tx list `[ tx, ... ]`, splicing each tx's raw CBOR verbatim
+/// (txs are opaque pass-through — `tx.tx` may be any CBOR shape).
+fn encode_tx_list<W: minicbor::encode::Write>(
     e: &mut Encoder<W>,
-    blobs: &[Vec<u8>],
+    txs: &[Vec<u8>],
 ) -> Result<(), EncodeError<W::Error>> {
-    e.array(blobs.len() as u64)?;
-    for blob in blobs {
-        e.bytes(blob)?;
+    e.array(txs.len() as u64)?;
+    for tx in txs {
+        encode_raw(e, tx)?;
     }
     Ok(())
 }
 
-// --- Decode helpers ---
-
-/// Decode a 32-byte hash from CBOR bytes.
-fn decode_hash32(d: &mut Decoder<'_>) -> Result<[u8; 32], DecodeError> {
-    let bytes = d.bytes()?;
-    if bytes.len() != 32 {
-        return Err(DecodeError::message(format!(
-            "expected 32-byte hash, got {} bytes",
-            bytes.len()
-        )));
-    }
-    let mut hash = [0u8; 32];
-    hash.copy_from_slice(bytes);
-    Ok(hash)
+/// Splice a raw, already-CBOR-encoded value into the output verbatim.
+fn encode_raw<W: minicbor::encode::Write>(
+    e: &mut Encoder<W>,
+    raw: &[u8],
+) -> Result<(), EncodeError<W::Error>> {
+    e.writer_mut().write_all(raw).map_err(EncodeError::write)
 }
 
-/// Decode an opaque block blob with size limit.
-fn decode_block(d: &mut Decoder<'_>) -> Result<Vec<u8>, DecodeError> {
-    let bytes = d.bytes()?;
-    if bytes.len() > MAX_BLOCK_SIZE {
+// --- Decode helpers ---
+
+/// Capture the next CBOR value's raw bytes verbatim (opaque pass-through),
+/// enforcing a size bound.
+fn decode_raw_bounded(
+    d: &mut Decoder<'_>,
+    max_size: usize,
+    name: &str,
+) -> Result<Vec<u8>, DecodeError> {
+    let start = d.position();
+    d.skip()?;
+    let raw = &d.input()[start..d.position()];
+    if raw.len() > max_size {
         return Err(DecodeError::message(format!(
-            "block is {} bytes, maximum is {MAX_BLOCK_SIZE}",
-            bytes.len()
+            "{name} is {} bytes, maximum is {max_size}",
+            raw.len()
         )));
     }
-    Ok(bytes.to_vec())
+    Ok(raw.to_vec())
+}
+
+/// Decode a tx list, capturing each tx's raw CBOR (count- and
+/// size-bounded).
+fn decode_tx_list(d: &mut Decoder<'_>) -> Result<Vec<Vec<u8>>, DecodeError> {
+    let len = d.array()?;
+    match len {
+        Some(n) => {
+            let n = n as usize;
+            if n > MAX_TRANSACTIONS {
+                return Err(DecodeError::message(format!(
+                    "transaction list has {n} entries, maximum is {MAX_TRANSACTIONS}"
+                )));
+            }
+            let mut items = Vec::with_capacity(n);
+            for _ in 0..n {
+                items.push(decode_raw_bounded(d, MAX_TRANSACTION_SIZE, "transaction")?);
+            }
+            Ok(items)
+        }
+        None => {
+            let mut items = Vec::new();
+            loop {
+                if d.datatype()? == minicbor::data::Type::Break {
+                    d.skip()?;
+                    break;
+                }
+                if items.len() >= MAX_TRANSACTIONS {
+                    return Err(DecodeError::message(format!(
+                        "transaction list exceeds maximum of {MAX_TRANSACTIONS}"
+                    )));
+                }
+                items.push(decode_raw_bounded(d, MAX_TRANSACTION_SIZE, "transaction")?);
+            }
+            Ok(items)
+        }
+    }
 }
 
 /// Decode the bitmap map { u16 => u64 } with bounds checking.
@@ -242,63 +237,6 @@ fn decode_bitmap(d: &mut Decoder<'_>) -> Result<BTreeMap<u16, u64>, DecodeError>
             Ok(bitmap)
         }
     }
-}
-
-/// Decode a list of opaque byte blobs with count and per-item size limits.
-fn decode_blob_list(
-    d: &mut Decoder<'_>,
-    max_count: usize,
-    max_item_size: usize,
-    item_name: &str,
-) -> Result<Vec<Vec<u8>>, DecodeError> {
-    let len = d.array()?;
-    match len {
-        Some(n) => {
-            let n = n as usize;
-            if n > max_count {
-                return Err(DecodeError::message(format!(
-                    "{item_name} list has {n} entries, maximum is {max_count}"
-                )));
-            }
-            let mut items = Vec::with_capacity(n);
-            for _ in 0..n {
-                items.push(decode_bounded_bytes(d, max_item_size, item_name)?);
-            }
-            Ok(items)
-        }
-        None => {
-            let mut items = Vec::new();
-            loop {
-                if d.datatype()? == minicbor::data::Type::Break {
-                    d.skip()?;
-                    break;
-                }
-                if items.len() >= max_count {
-                    return Err(DecodeError::message(format!(
-                        "{item_name} list exceeds maximum of {max_count}"
-                    )));
-                }
-                items.push(decode_bounded_bytes(d, max_item_size, item_name)?);
-            }
-            Ok(items)
-        }
-    }
-}
-
-/// Decode bytes with a size limit.
-fn decode_bounded_bytes(
-    d: &mut Decoder<'_>,
-    max_size: usize,
-    name: &str,
-) -> Result<Vec<u8>, DecodeError> {
-    let bytes = d.bytes()?;
-    if bytes.len() > max_size {
-        return Err(DecodeError::message(format!(
-            "{name} is {} bytes, maximum is {max_size}",
-            bytes.len()
-        )));
-    }
-    Ok(bytes.to_vec())
 }
 
 #[cfg(test)]
@@ -345,12 +283,18 @@ mod tests {
 
     #[test]
     fn block_round_trip() {
+        // `block` is raw CBOR — a `{ hash => size }` manifest map.  Built
+        // here as a 1-entry map: 0xA1 (map(1)) + 0x5820<32B hash> + 0x18 0x2A (42).
+        let mut block = vec![0xA1, 0x58, 0x20];
+        block.extend_from_slice(&test_hash());
+        block.extend_from_slice(&[0x18, 0x2A]);
         let msg = Message::MsgLeiosBlock {
-            block: vec![0xEB, 0x01, 0x02],
+            block: block.clone(),
         };
         let decoded = round_trip(&msg);
         match decoded {
-            Message::MsgLeiosBlock { block } => assert_eq!(block, vec![0xEB, 0x01, 0x02]),
+            // The raw manifest bytes round-trip verbatim.
+            Message::MsgLeiosBlock { block: got } => assert_eq!(got, block),
             other => panic!("expected MsgLeiosBlock, got {other:?}"),
         }
     }
@@ -404,17 +348,33 @@ mod tests {
         }
     }
 
+    /// A single CBOR value used as an opaque tx in tests (uint).
+    fn tx(n: u8) -> Vec<u8> {
+        vec![n] // 0..=23 encode as a 1-byte CBOR uint
+    }
+
     #[test]
     fn block_txs_round_trip() {
+        let mut bitmap = BTreeMap::new();
+        bitmap.insert(0u16, 0x3u64);
         let msg = Message::MsgLeiosBlockTxs {
-            transactions: vec![vec![0x01, 0x02], vec![0x03]],
+            point: Point::Specific {
+                slot: 7,
+                hash: test_hash(),
+            },
+            bitmap,
+            transactions: vec![tx(1), tx(2)],
         };
         let decoded = round_trip(&msg);
         match decoded {
-            Message::MsgLeiosBlockTxs { transactions } => {
-                assert_eq!(transactions.len(), 2);
-                assert_eq!(transactions[0], vec![0x01, 0x02]);
-                assert_eq!(transactions[1], vec![0x03]);
+            Message::MsgLeiosBlockTxs {
+                point,
+                bitmap,
+                transactions,
+            } => {
+                assert_eq!(point, Point::Specific { slot: 7, hash: test_hash() });
+                assert_eq!(bitmap[&0], 0x3);
+                assert_eq!(transactions, vec![tx(1), tx(2)]);
             }
             other => panic!("expected MsgLeiosBlockTxs, got {other:?}"),
         }
@@ -423,75 +383,17 @@ mod tests {
     #[test]
     fn block_txs_empty_round_trip() {
         let msg = Message::MsgLeiosBlockTxs {
+            point: Point::Specific {
+                slot: 0,
+                hash: [0; 32],
+            },
+            bitmap: BTreeMap::new(),
             transactions: vec![],
         };
         let decoded = round_trip(&msg);
         match decoded {
-            Message::MsgLeiosBlockTxs { transactions } => assert!(transactions.is_empty()),
+            Message::MsgLeiosBlockTxs { transactions, .. } => assert!(transactions.is_empty()),
             other => panic!("expected MsgLeiosBlockTxs, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn block_range_request_round_trip() {
-        let msg = Message::MsgLeiosBlockRangeRequest {
-            start_slot: 100,
-            end_slot: 200,
-            start_hash: test_hash(),
-            end_hash: [0xFF; 32],
-        };
-        let decoded = round_trip(&msg);
-        match decoded {
-            Message::MsgLeiosBlockRangeRequest {
-                start_slot,
-                end_slot,
-                start_hash,
-                end_hash,
-            } => {
-                assert_eq!(start_slot, 100);
-                assert_eq!(end_slot, 200);
-                assert_eq!(start_hash, test_hash());
-                assert_eq!(end_hash, [0xFF; 32]);
-            }
-            other => panic!("expected MsgLeiosBlockRangeRequest, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn next_block_in_range_round_trip() {
-        let msg = Message::MsgLeiosNextBlockAndTxsInRange {
-            block: vec![0xE1],
-            transactions: vec![vec![0x01]],
-        };
-        let decoded = round_trip(&msg);
-        match decoded {
-            Message::MsgLeiosNextBlockAndTxsInRange {
-                block,
-                transactions,
-            } => {
-                assert_eq!(block, vec![0xE1]);
-                assert_eq!(transactions, vec![vec![0x01]]);
-            }
-            other => panic!("expected MsgLeiosNextBlockAndTxsInRange, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn last_block_in_range_round_trip() {
-        let msg = Message::MsgLeiosLastBlockAndTxsInRange {
-            block: vec![0xE2],
-            transactions: vec![vec![0x02], vec![0x03]],
-        };
-        let decoded = round_trip(&msg);
-        match decoded {
-            Message::MsgLeiosLastBlockAndTxsInRange {
-                block,
-                transactions,
-            } => {
-                assert_eq!(block, vec![0xE2]);
-                assert_eq!(transactions.len(), 2);
-            }
-            other => panic!("expected MsgLeiosLastBlockAndTxsInRange, got {other:?}"),
         }
     }
 
@@ -558,12 +460,19 @@ mod tests {
     fn transaction_list_exceeds_max_fails() {
         let mut buf = Vec::new();
         let mut e = minicbor::Encoder::new(&mut buf);
-        e.array(2).unwrap();
+        e.array(4).unwrap();
         e.u32(3).unwrap();
+        // point
+        e.array(2).unwrap();
+        e.u64(0).unwrap();
+        e.bytes(&[0u8; 32]).unwrap();
+        // empty bitmap
+        e.map(0).unwrap();
+        // oversized tx list
         let n = MAX_TRANSACTIONS + 1;
         e.array(n as u64).unwrap();
         for _ in 0..n {
-            e.bytes(&[0x01]).unwrap();
+            e.u8(1).unwrap();
         }
 
         let result: Result<Message, _> = minicbor::decode(&buf);
