@@ -657,6 +657,15 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
         }
     };
 
+    // Record the concrete IP this connection landed on (the host may be
+    // a round-robin DNS name resolving differently per reconnection).
+    tracing::info!(
+        %peer_id,
+        host = %config.address,
+        resolved_ip = %conn.resolved_addr,
+        "peer connected"
+    );
+
     // Report successful connection.
     let _ = event_sender
         .send((

@@ -18,6 +18,9 @@ use crate::protocols::handshake::n2n;
 pub struct Connection {
     pub running: RunningMux,
     pub channels: Vec<(CodecSend, CodecRecv)>,
+    /// The peer's resolved socket address (the concrete IP:port the TCP
+    /// connection landed on — useful for round-robin DNS hosts).
+    pub resolved_addr: SocketAddr,
 }
 
 /// A duplex connection with separate channel sets for initiator and responder.
@@ -27,6 +30,10 @@ pub struct DuplexConnection {
     pub initiator_channels: Vec<(CodecSend, CodecRecv)>,
     /// Channels for responder-direction protocols (we act as server).
     pub responder_channels: Vec<(CodecSend, CodecRecv)>,
+    /// The peer's resolved socket address (the concrete IP:port the TCP
+    /// connection landed on — useful when the host is a round-robin DNS
+    /// name, to attribute activity to a specific backend).
+    pub resolved_addr: SocketAddr,
 }
 
 /// Connect to a Cardano node, set up the mux with the given protocols,
@@ -112,7 +119,11 @@ pub async fn connect_and_handshake_with_config(
         }
     }
 
-    Ok(Connection { running, channels })
+    Ok(Connection {
+        running,
+        channels,
+        resolved_addr: addr,
+    })
 }
 
 /// Accept a connection and perform the server-side handshake.
@@ -191,7 +202,11 @@ pub async fn handshake_accepted(
         }
     }
 
-    Ok(Connection { running, channels })
+    Ok(Connection {
+        running,
+        channels,
+        resolved_addr: peer_addr,
+    })
 }
 
 /// Complete a duplex handshake on an already-accepted TCP connection.
@@ -262,6 +277,7 @@ pub async fn handshake_accepted_duplex(
         running,
         initiator_channels,
         responder_channels,
+        resolved_addr: peer_addr,
     })
 }
 
@@ -342,6 +358,7 @@ pub async fn connect_duplex(
         running,
         initiator_channels,
         responder_channels,
+        resolved_addr: addr,
     })
 }
 
@@ -412,5 +429,6 @@ pub async fn accept_duplex(
         running,
         initiator_channels,
         responder_channels,
+        resolved_addr: peer_addr,
     })
 }

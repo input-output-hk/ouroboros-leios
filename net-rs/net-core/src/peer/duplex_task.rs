@@ -104,6 +104,17 @@ pub(crate) async fn run_duplex_task(config: DuplexTaskConfig) {
         }
     };
 
+    // Record the concrete IP this connection landed on — `config.address`
+    // may be a round-robin DNS name, so the resolved peer differs per
+    // (re)connection.  Lets per-peer Leios logs (keyed by peer_id) be
+    // attributed to a specific backend.
+    tracing::info!(
+        %peer_id,
+        host = %config.address,
+        resolved_ip = %conn.resolved_addr,
+        "peer connected (duplex)"
+    );
+
     let _ = event_sender
         .send((
             peer_id,
