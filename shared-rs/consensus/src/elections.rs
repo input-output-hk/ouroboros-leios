@@ -312,6 +312,31 @@ impl Elections {
         }
     }
 
+    /// Resolve a compact voter index to its registered node id.
+    ///
+    /// The index is a pool's position in the network stake registry
+    /// (sorted by node id — `BTreeMap` key order), identical on every
+    /// node that shares the same registry.  Returns `None` for an index
+    /// outside the local registry (e.g. a foreign voter from an external
+    /// relay we hold no stake entry for — its votes gossip but carry no
+    /// resolvable weight).
+    pub fn voter_id_at(&self, index: u16) -> Option<&str> {
+        self.cfg
+            .stake_registry
+            .keys()
+            .nth(index as usize)
+            .map(String::as_str)
+    }
+
+    /// The compact voter index for a registered node id, if present.
+    pub fn voter_index(&self, node_id: &str) -> Option<u16> {
+        self.cfg
+            .stake_registry
+            .keys()
+            .position(|k| k == node_id)
+            .and_then(|p| u16::try_from(p).ok())
+    }
+
     pub fn phase(&self, eb_hash: &[u8; 32]) -> Option<PipelinePhase> {
         self.elections.get(eb_hash).map(|e| e.phase)
     }
@@ -412,6 +437,34 @@ mod tests {
 
     fn h(byte: u8) -> [u8; 32] {
         [byte; 32]
+    }
+
+    #[test]
+    fn voter_index_round_trips_in_registry_order() {
+        let mut registry = BTreeMap::new();
+        // Insertion order differs from sorted order on purpose.
+        registry.insert("pool-c".to_string(), 10u64);
+        registry.insert("pool-a".to_string(), 30u64);
+        registry.insert("pool-b".to_string(), 20u64);
+        let e = Elections::new(ElectionsConfig {
+            node_id: "pool-a".to_string(),
+            pipeline: test_pipeline(),
+            committee_selection: CommitteeSelection::EveryoneVotes,
+            persistent_committee: BTreeMap::new(),
+            stake_registry: registry,
+            total_stake: 60,
+            expected_total_weight: 3,
+            quorum_weight_fraction: 0.75,
+        });
+        // BTreeMap key order: pool-a=0, pool-b=1, pool-c=2.
+        assert_eq!(e.voter_index("pool-a"), Some(0));
+        assert_eq!(e.voter_index("pool-b"), Some(1));
+        assert_eq!(e.voter_index("pool-c"), Some(2));
+        assert_eq!(e.voter_id_at(0), Some("pool-a"));
+        assert_eq!(e.voter_id_at(2), Some("pool-c"));
+        // Out-of-range / unregistered.
+        assert_eq!(e.voter_id_at(3), None);
+        assert_eq!(e.voter_index("pool-z"), None);
     }
 
     #[test]

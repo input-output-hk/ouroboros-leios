@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::watch;
 
 use crate::protocols::leios_fetch::bitmap;
-use crate::types::Point;
+use crate::types::{Point, Vote};
 
 /// Resolves a transaction body by its 32-byte hash. The Leios store calls
 /// this when a peer asks for an EB's txs and only the manifest is cached
@@ -31,8 +31,8 @@ pub enum LeiosNotification {
     BlockOffer { point: Point },
     /// An EB's transactions are available for download.
     BlockTxsOffer { point: Point },
-    /// Votes are available for download.
-    VotesOffer { votes: Vec<(u64, Vec<u8>)> },
+    /// Votes delivered inline (no offer/fetch round-trip).
+    Votes { votes: Vec<Vote> },
 }
 
 /// Key for block lookups.
@@ -56,8 +56,8 @@ struct LeiosStoreInner {
     /// a fetched EB manifest. Pairs with `tx_body_resolver` to serve the
     /// bodies indirectly without keeping a duplicate copy.
     eb_tx_hashes: HashMap<BlockKey, Vec<[u8; 32]>>,
-    /// Votes keyed by (slot, voter_id).
-    votes: HashMap<(u64, Vec<u8>), Vec<u8>>,
+    /// Votes keyed by (slot, eb_hash, voter_id), for dedup and re-serving.
+    votes: HashMap<(u64, [u8; 32], u16), Vote>,
     /// Notification queue for the LeiosNotify server.  Front-pruned
     /// alongside the slot-window eviction of the other maps so
     /// long-running connections don't accumulate notifications for
@@ -100,8 +100,8 @@ impl LeiosStoreInner {
 ///
 /// `notifications_bytes_estimate` is a precise byte sum over the
 /// notifications log: each `BlockOffer` / `BlockTxsOffer` is fixed-size,
-/// but `VotesOffer` carries a variable-length `Vec<(u64, Vec<u8>)>` so
-/// its payload bytes are summed directly.
+/// but `Votes` carries a variable-length `Vec<Vote>` so its payload
+/// bytes are summed directly.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct LeiosStoreStats {
     pub blocks: usize,
@@ -249,21 +249,21 @@ impl LeiosStore {
         self.inject_block_txs(point, indexed);
     }
 
-    /// Inject votes. Generates a VotesOffer notification.
-    ///
-    /// `ids` are `(slot, voter_id)` pairs; `data` are the corresponding
-    /// opaque vote blobs (same length).
-    pub fn inject_votes(&self, ids: Vec<(u64, Vec<u8>)>, data: Vec<Vec<u8>>) {
-        if ids.is_empty() {
+    /// Inject votes for inline re-serving. Generates a `Votes` notification
+    /// carrying the full vote bodies (deduped by `(slot, eb_hash, voter_id)`).
+    pub fn inject_votes(&self, votes: Vec<Vote>) {
+        if votes.is_empty() {
             return;
         }
         let mut inner = self.inner.lock().unwrap();
-        let max_in_batch = ids.iter().map(|(s, _)| *s).max().unwrap_or(0);
-        for (id, blob) in ids.iter().zip(data.iter()) {
-            inner.votes.insert(id.clone(), blob.clone());
+        let max_in_batch = votes.iter().map(|v| v.slot).max().unwrap_or(0);
+        for vote in &votes {
+            inner
+                .votes
+                .insert((vote.slot, vote.eb_hash, vote.voter_id), vote.clone());
         }
         inner.max_slot = inner.max_slot.max(max_in_batch);
-        Self::push_notification(&mut inner, LeiosNotification::VotesOffer { votes: ids });
+        Self::push_notification(&mut inner, LeiosNotification::Votes { votes });
         self.bump_version(&mut inner);
     }
 
@@ -342,21 +342,12 @@ impl LeiosStore {
         inner.eb_tx_hashes.get(&key).cloned()
     }
 
-    /// Look up votes by their `(slot, voter_id)` identifiers.
-    /// Returns one blob per requested id (empty vec if not found).
-    pub fn get_votes(&self, ids: &[(u64, Vec<u8>)]) -> Vec<Vec<u8>> {
-        let inner = self.inner.lock().unwrap();
-        ids.iter()
-            .filter_map(|id| inner.votes.get(id).cloned())
-            .collect()
-    }
-
     /// Snapshot of internal map sizes — for memory diagnostics.
     pub fn stats(&self) -> LeiosStoreStats {
         let inner = self.inner.lock().unwrap();
         // Each ring-buffer slot costs sizeof(LeiosNotification);
-        // `notification_heap_bytes` adds only the extra `VotesOffer`
-        // payload on top, so the enum size isn't counted twice.
+        // `notification_heap_bytes` adds only the extra `Votes` payload
+        // on top, so the enum size isn't counted twice.
         let per_entry_overhead = std::mem::size_of::<LeiosNotification>();
         let notifications_bytes_estimate = inner.notifications.len() * per_entry_overhead
             + inner
@@ -468,7 +459,7 @@ impl LeiosStore {
             inner.blocks.retain(|key, _| key.slot >= cutoff);
             inner.block_txs.retain(|key, _| key.slot >= cutoff);
             inner.eb_tx_hashes.retain(|key, _| key.slot >= cutoff);
-            inner.votes.retain(|(slot, _), _| *slot >= cutoff);
+            inner.votes.retain(|(slot, _, _), _| *slot >= cutoff);
             // Front-prune `notifications` for entries that reference
             // only data older than the cutoff.  `push_notification`
             // refuses anything already below cutoff, so any below-cutoff
@@ -547,23 +538,20 @@ fn notification_evictable(n: &LeiosNotification, cutoff: u64) -> bool {
             Point::Specific { slot, .. } => *slot < cutoff,
             Point::Origin => true,
         },
-        LeiosNotification::VotesOffer { votes } => votes.iter().all(|(s, _)| *s < cutoff),
+        LeiosNotification::Votes { votes } => votes.iter().all(|v| v.slot < cutoff),
     }
 }
 
 /// Extra heap bytes beyond the fixed `size_of::<LeiosNotification>()`
 /// slot in the deque.  Zero for `BlockOffer` / `BlockTxsOffer` (no heap
-/// payload); sums the variable-length `Vec<(u64, Vec<u8>)>` allocation
-/// for `VotesOffer`.  The caller adds the fixed per-entry size
-/// separately — keeping the two parts separate avoids double-counting
+/// payload); for `Votes` it's the `Vec<Vote>` allocation (each `Vote` is
+/// fixed-size, no internal heap).  The caller adds the fixed per-entry
+/// size separately — keeping the two parts separate avoids double-counting
 /// the enum size.
 fn notification_heap_bytes(n: &LeiosNotification) -> usize {
     match n {
         LeiosNotification::BlockOffer { .. } | LeiosNotification::BlockTxsOffer { .. } => 0,
-        LeiosNotification::VotesOffer { votes } => votes
-            .iter()
-            .map(|(_, id)| std::mem::size_of::<(u64, Vec<u8>)>() + id.len())
-            .sum(),
+        LeiosNotification::Votes { votes } => votes.len() * std::mem::size_of::<Vote>(),
     }
 }
 
@@ -834,20 +822,29 @@ mod tests {
         assert_eq!(store.get_eb_manifest(99, &eb_hash), None);
     }
 
+    /// Test helper: a vote at `slot` from voter index `voter_id`.
+    fn vote(slot: u64, voter_id: u16) -> Vote {
+        Vote {
+            slot,
+            eb_hash: [voter_id as u8; 32],
+            voter_id,
+            vote_signature: true,
+        }
+    }
+
     #[test]
-    fn inject_and_get_votes() {
+    fn inject_votes_stores_and_dedups() {
         let (store, _rx) = LeiosStore::new(100);
-        let ids = vec![(100, vec![0x01]), (101, vec![0x02])];
-        let data = vec![vec![0xA0], vec![0xB0]];
+        store.inject_votes(vec![vote(100, 1), vote(101, 2)]);
+        assert_eq!(store.stats().votes, 2);
 
-        store.inject_votes(ids.clone(), data.clone());
+        // Re-injecting the same votes is idempotent (keyed by slot/eb/voter).
+        store.inject_votes(vec![vote(100, 1)]);
+        assert_eq!(store.stats().votes, 2);
 
-        let result = store.get_votes(&ids);
-        assert_eq!(result, data);
-
-        // Unknown vote returns empty.
-        let result = store.get_votes(&[(999, vec![0xFF])]);
-        assert!(result.is_empty());
+        // A distinct voter at the same slot is a new entry.
+        store.inject_votes(vec![vote(100, 3)]);
+        assert_eq!(store.stats().votes, 3);
     }
 
     #[test]
@@ -857,7 +854,7 @@ mod tests {
         let point = Point::Specific { slot: 1, hash };
 
         store.inject_block(point, vec![0x01]);
-        store.inject_votes(vec![(10, vec![0x02])], vec![vec![0x03]]);
+        store.inject_votes(vec![vote(10, 2)]);
 
         let all = store.notifications_after(&mut 0);
         assert_eq!(all.len(), 2);
@@ -867,7 +864,7 @@ mod tests {
                 point: Point::Specific { slot: 1, .. }
             }
         ));
-        assert!(matches!(all[1], LeiosNotification::VotesOffer { .. }));
+        assert!(matches!(all[1], LeiosNotification::Votes { .. }));
 
         let after_first = store.notifications_after(&mut 1);
         assert_eq!(after_first.len(), 1);
@@ -883,7 +880,7 @@ mod tests {
 
         // Inject votes/blocks at slot 1, then advance the clock far past
         // the retention window. Old entries must be evicted.
-        store.inject_votes(vec![(1, vec![0xAA])], vec![vec![0x01]]);
+        store.inject_votes(vec![vote(1, 0xAA)]);
         store.inject_block(
             Point::Specific {
                 slot: 1,
@@ -900,7 +897,7 @@ mod tests {
         );
 
         // Pre-eviction sanity.
-        assert_eq!(store.get_votes(&[(1, vec![0xAA])]), vec![vec![0x01]]);
+        assert_eq!(store.stats().votes, 1);
         assert!(store.get_block(1, &[0x11; 32]).is_some());
 
         // Inject something far in the future — past the retention cutoff.
@@ -913,8 +910,9 @@ mod tests {
             vec![0xD0],
         );
 
-        assert!(
-            store.get_votes(&[(1, vec![0xAA])]).is_empty(),
+        assert_eq!(
+            store.stats().votes,
+            0,
             "old vote should be evicted past retention window"
         );
         assert!(
@@ -952,7 +950,7 @@ mod tests {
             },
             vec![0xB1],
         );
-        store.inject_votes(vec![(1, vec![0xAA])], vec![vec![0x01]]);
+        store.inject_votes(vec![vote(1, 0xAA)]);
         assert_eq!(store.notification_count(), 3);
 
         // Inject a recent block to push max_slot past the retention
@@ -1119,7 +1117,7 @@ mod tests {
         let (store, _rx) = LeiosStore::new_with_retention(10_000, None, RETENTION, 0);
 
         for slot in 0..SLOTS {
-            store.inject_votes(vec![(slot, vec![0xAA; 32])], vec![vec![0xBB; 100]]);
+            store.inject_votes(vec![vote(slot, (slot & 0xFFFF) as u16)]);
             store.inject_block(
                 Point::Specific {
                     slot,

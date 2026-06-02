@@ -668,11 +668,11 @@ async fn record_network_event(
                 len: transactions.len()
             }).await
         }
-        NetworkEvent::LeiosVotesReceived { ref vote_data, .. } => {
+        NetworkEvent::LeiosVotesReceived { ref votes, .. } => {
             telem
                 .record(NodeEvent::VotesReceived {
                     node: node_id.into(),
-                    count: vote_data.len(),
+                    count: votes.len(),
                 })
                 .await;
         }

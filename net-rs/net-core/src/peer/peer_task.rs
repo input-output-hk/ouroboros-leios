@@ -449,9 +449,6 @@ pub(crate) enum LeiosFetchCommand {
         point: Point,
         bitmap: std::collections::BTreeMap<u16, u64>,
     },
-    Votes {
-        votes: Vec<(u64, Vec<u8>)>,
-    },
 }
 
 /// Spawn the LeiosNotify sub-task. Continuous request_next loop.
@@ -480,9 +477,9 @@ pub(crate) fn spawn_leios_notify(
                         .send((peer_id, PeerEvent::LeiosBlockTxsOffered { point }))
                         .await;
                 }
-                Ok(LeiosNotifyEvent::VotesOffer { votes }) => {
+                Ok(LeiosNotifyEvent::Votes { votes }) => {
                     let _ = event_sender
-                        .send((peer_id, PeerEvent::LeiosVotesOffered { votes }))
+                        .send((peer_id, PeerEvent::LeiosVotesReceived { votes }))
                         .await;
                 }
                 Err(e) => {
@@ -553,32 +550,6 @@ pub(crate) fn spawn_leios_fetch(
                                     peer_id,
                                     PeerEvent::Failed {
                                         reason: format!("leios_fetch block_txs: {e}"),
-                                    },
-                                ))
-                                .await;
-                            return;
-                        }
-                    }
-                }
-                LeiosFetchCommand::Votes { votes } => {
-                    match leios_fetch::fetch_votes(&mut runner, votes.clone()).await {
-                        Ok(vote_data) => {
-                            let _ = event_sender
-                                .send((
-                                    peer_id,
-                                    PeerEvent::LeiosVotesFetched {
-                                        vote_ids: votes,
-                                        vote_data,
-                                    },
-                                ))
-                                .await;
-                        }
-                        Err(e) => {
-                            let _ = event_sender
-                                .send((
-                                    peer_id,
-                                    PeerEvent::Failed {
-                                        reason: format!("leios_fetch votes: {e}"),
                                     },
                                 ))
                                 .await;
@@ -1113,16 +1084,22 @@ mod tests {
                         slot: 42,
                         hash: [0xAB; 32],
                     },
+                    eb_size: 0,
                 })
                 .await
                 .unwrap();
 
-            // Second: receive request, reply with votes offer.
+            // Second: receive request, reply with inline votes.
             let msg = runner.recv().await.unwrap();
             assert!(matches!(msg, LnMsg::MsgLeiosNotificationRequestNext));
             runner
-                .send(&LnMsg::MsgLeiosVotesOffer {
-                    votes: vec![(100, vec![0x01])],
+                .send(&LnMsg::MsgLeiosVotes {
+                    votes: vec![crate::types::Vote {
+                        slot: 100,
+                        eb_hash: [0xAB; 32],
+                        voter_id: 1,
+                        vote_signature: true,
+                    }],
                 })
                 .await
                 .unwrap();
@@ -1154,10 +1131,12 @@ mod tests {
 
             let (_id, event2) = event_receiver.recv().await.unwrap();
             match event2 {
-                PeerEvent::LeiosVotesOffered { votes } => {
-                    assert_eq!(votes, vec![(100, vec![0x01])]);
+                PeerEvent::LeiosVotesReceived { votes } => {
+                    assert_eq!(votes.len(), 1);
+                    assert_eq!(votes[0].slot, 100);
+                    assert_eq!(votes[0].voter_id, 1);
                 }
-                other => panic!("expected LeiosVotesOffered, got {other:?}"),
+                other => panic!("expected LeiosVotesReceived, got {other:?}"),
             }
         })
         .await;

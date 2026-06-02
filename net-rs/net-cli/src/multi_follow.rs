@@ -107,14 +107,11 @@ pub async fn run(
             NetworkEvent::LeiosBlockTxsOffered { peer_id, point } => {
                 println!("  leios: EB transactions offered at {point} by {peer_id}");
             }
-            NetworkEvent::LeiosVotesOffered { peer_id, votes } => {
-                println!("  leios: {} vote(s) offered by {peer_id}", votes.len());
-            }
             NetworkEvent::LeiosBlockReceived { point, block } => {
                 println!("  leios: EB received at {point} ({} bytes)", block.len());
             }
-            NetworkEvent::LeiosVotesReceived { vote_data, .. } => {
-                println!("  leios: {} vote(s) received", vote_data.len());
+            NetworkEvent::LeiosVotesReceived { peer_id, votes } => {
+                println!("  leios: {} vote(s) received from {peer_id}", votes.len());
             }
             NetworkEvent::LeiosBlockTxsReceived {
                 point,

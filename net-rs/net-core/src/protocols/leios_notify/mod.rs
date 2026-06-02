@@ -9,7 +9,7 @@ pub mod codec;
 use std::time::Duration;
 
 use crate::protocols::{Agency, Protocol, ProtocolError, Runner};
-use crate::types::{Point, WrappedHeader};
+use crate::types::{Point, Vote, WrappedHeader};
 
 /// LeiosNotify protocol ID in the multiplexer.
 pub const PROTOCOL_ID: u16 = 18;
@@ -20,11 +20,8 @@ pub const INGRESS_LIMIT: usize = 65_536;
 /// Max message size for all LeiosNotify states.
 pub const SIZE_LIMIT: usize = 65_535;
 
-/// Maximum number of vote offers in a single MsgLeiosVotesOffer.
-pub const MAX_VOTES_OFFERED: usize = 1024;
-
-/// Maximum voter ID size in bytes.
-pub const MAX_VOTER_ID_SIZE: usize = 256;
+/// Maximum number of votes in a single MsgLeiosVotes.
+pub const MAX_VOTES: usize = 1024;
 
 /// Timeout for StBusy — unused (long-poll: no timeout, see `timeout()`).
 #[allow(dead_code)]
@@ -50,12 +47,13 @@ pub enum Message {
     MsgLeiosNotificationRequestNext,
     /// Server announces an RB header containing an EB announcement. [1, header]
     MsgLeiosBlockAnnouncement { header: WrappedHeader },
-    /// Server offers an endorser block for download. [2, point]
-    MsgLeiosBlockOffer { point: Point },
+    /// Server offers an endorser block for download. [2, point, eb_size]
+    MsgLeiosBlockOffer { point: Point, eb_size: u32 },
     /// Server offers an EB's transactions for download. [3, point]
     MsgLeiosBlockTxsOffer { point: Point },
-    /// Server offers votes for download. [4, [(slot, voter_id), ...]]
-    MsgLeiosVotesOffer { votes: Vec<(u64, Vec<u8>)> },
+    /// Server delivers votes inline (no offer/fetch round-trip).
+    /// [4, [vote, ...]] where vote = [slot, eb_hash, voter_id, signature].
+    MsgLeiosVotes { votes: Vec<Vote> },
     /// Client terminates. [5]
     MsgDone,
 }
@@ -88,7 +86,7 @@ impl Protocol for LeiosNotify {
             (State::StBusy, Message::MsgLeiosBlockAnnouncement { .. }) => Ok(State::StIdle),
             (State::StBusy, Message::MsgLeiosBlockOffer { .. }) => Ok(State::StIdle),
             (State::StBusy, Message::MsgLeiosBlockTxsOffer { .. }) => Ok(State::StIdle),
-            (State::StBusy, Message::MsgLeiosVotesOffer { .. }) => Ok(State::StIdle),
+            (State::StBusy, Message::MsgLeiosVotes { .. }) => Ok(State::StIdle),
             _ => Err(ProtocolError::InvalidMessage(format!(
                 "{msg:?} not valid in state {state:?}"
             ))),
@@ -120,8 +118,8 @@ pub enum LeiosNotifyEvent {
     BlockOffer { point: Point },
     /// An EB's transactions are available for download.
     BlockTxsOffer { point: Point },
-    /// Votes are available for download.
-    VotesOffer { votes: Vec<(u64, Vec<u8>)> },
+    /// Votes delivered inline (no fetch needed).
+    Votes { votes: Vec<Vote> },
 }
 
 /// Request the next notification from the server.
@@ -136,9 +134,13 @@ pub async fn request_next(
         Message::MsgLeiosBlockAnnouncement { header } => {
             Ok(LeiosNotifyEvent::BlockAnnouncement { header })
         }
-        Message::MsgLeiosBlockOffer { point } => Ok(LeiosNotifyEvent::BlockOffer { point }),
+        // `eb_size` is consumed here: the CDDL marks it as redundant with
+        // the announcement, and the fetch path keys on the point alone.
+        Message::MsgLeiosBlockOffer { point, eb_size: _ } => {
+            Ok(LeiosNotifyEvent::BlockOffer { point })
+        }
         Message::MsgLeiosBlockTxsOffer { point } => Ok(LeiosNotifyEvent::BlockTxsOffer { point }),
-        Message::MsgLeiosVotesOffer { votes } => Ok(LeiosNotifyEvent::VotesOffer { votes }),
+        Message::MsgLeiosVotes { votes } => Ok(LeiosNotifyEvent::Votes { votes }),
         other => Err(ProtocolError::InvalidMessage(format!(
             "expected notification, got {other:?}"
         ))),
@@ -196,6 +198,7 @@ mod tests {
                         slot: 1,
                         hash: [0; 32],
                     },
+                    eb_size: 0,
                 }
             )
             .unwrap(),
@@ -217,7 +220,7 @@ mod tests {
         assert_eq!(
             LeiosNotify::transition(
                 &State::StBusy,
-                &Message::MsgLeiosVotesOffer { votes: vec![] }
+                &Message::MsgLeiosVotes { votes: vec![] }
             )
             .unwrap(),
             State::StIdle
@@ -234,6 +237,7 @@ mod tests {
                     slot: 1,
                     hash: [0; 32]
                 },
+                eb_size: 0,
             }
         )
         .is_err());
@@ -330,6 +334,7 @@ mod tests {
                         slot: 42,
                         hash: test_hash_clone,
                     },
+                    eb_size: 1234,
                 })
                 .await
                 .unwrap();
@@ -347,12 +352,25 @@ mod tests {
                 .await
                 .unwrap();
 
-            // 4. Votes offer
+            // 4. Inline votes
             let msg = runner.recv().await.unwrap();
             assert!(matches!(msg, Message::MsgLeiosNotificationRequestNext));
             runner
-                .send(&Message::MsgLeiosVotesOffer {
-                    votes: vec![(100, vec![0x01, 0x02]), (101, vec![0x03, 0x04])],
+                .send(&Message::MsgLeiosVotes {
+                    votes: vec![
+                        Vote {
+                            slot: 100,
+                            eb_hash: [0x11; 32],
+                            voter_id: 1,
+                            vote_signature: true,
+                        },
+                        Vote {
+                            slot: 101,
+                            eb_hash: [0x22; 32],
+                            voter_id: 2,
+                            vote_signature: false,
+                        },
+                    ],
                 })
                 .await
                 .unwrap();
@@ -404,15 +422,31 @@ mod tests {
                 other => panic!("expected BlockTxsOffer, got {other:?}"),
             }
 
-            // 4. Votes offer
+            // 4. Inline votes
             let event = request_next(&mut runner).await.unwrap();
             match event {
-                LeiosNotifyEvent::VotesOffer { votes } => {
+                LeiosNotifyEvent::Votes { votes } => {
                     assert_eq!(votes.len(), 2);
-                    assert_eq!(votes[0], (100, vec![0x01, 0x02]));
-                    assert_eq!(votes[1], (101, vec![0x03, 0x04]));
+                    assert_eq!(
+                        votes[0],
+                        Vote {
+                            slot: 100,
+                            eb_hash: [0x11; 32],
+                            voter_id: 1,
+                            vote_signature: true,
+                        }
+                    );
+                    assert_eq!(
+                        votes[1],
+                        Vote {
+                            slot: 101,
+                            eb_hash: [0x22; 32],
+                            voter_id: 2,
+                            vote_signature: false,
+                        }
+                    );
                 }
-                other => panic!("expected VotesOffer, got {other:?}"),
+                other => panic!("expected Votes, got {other:?}"),
             }
 
             done(&mut runner).await.unwrap();

@@ -111,19 +111,18 @@ async fn leios_generator(commands: mpsc::Sender<NetworkCommand>, rate: f64) {
             })
             .await;
 
-        // Inject some votes for this EB.
+        // Inject some inline votes for this EB.
         let num_votes = rng.gen_range(1..=3u8);
-        let mut vote_ids = Vec::new();
-        let mut vote_data = Vec::new();
-        for v in 0..num_votes {
-            vote_ids.push((slot, vec![v]));
-            vote_data.push(vec![0xA0, v]); // minimal CBOR
-        }
-        let _ = commands
-            .send(NetworkCommand::InjectLeiosVotes {
-                votes: vote_ids,
-                data: vote_data,
+        let votes: Vec<net_core::types::Vote> = (0..num_votes)
+            .map(|v| net_core::types::Vote {
+                slot,
+                eb_hash: hash,
+                voter_id: v as u16,
+                vote_signature: true,
             })
+            .collect();
+        let _ = commands
+            .send(NetworkCommand::InjectLeiosVotes { votes })
             .await;
 
         println!("  leios: generated EB at slot {slot} ({num_votes} votes)");

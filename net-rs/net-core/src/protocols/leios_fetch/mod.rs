@@ -69,8 +69,6 @@ pub enum State {
     StBlock,
     /// Server must deliver transactions. Server has agency.
     StBlockTxs,
-    /// Server must deliver votes. Server has agency.
-    StVotes,
     /// Server must deliver next or last block+txs in range. Server has agency.
     StBlockRange,
     /// Protocol complete. Nobody has agency.
@@ -91,10 +89,6 @@ pub enum Message {
     },
     /// Server delivers transactions. [3, [tx, ...]]
     MsgLeiosBlockTxs { transactions: Vec<Vec<u8>> },
-    /// Client requests votes. [4, [(slot, voter_id), ...]]
-    MsgLeiosVotesRequest { votes: Vec<(u64, Vec<u8>)> },
-    /// Server delivers votes. [5, [vote, ...]]
-    MsgLeiosVoteDelivery { votes: Vec<Vec<u8>> },
     /// Client requests a certified EB range. [6, start_slot, end_slot, start_hash, end_hash]
     MsgLeiosBlockRangeRequest {
         start_slot: u64,
@@ -134,7 +128,6 @@ impl Protocol for LeiosFetch {
             State::StIdle => Agency::Client,
             State::StBlock => Agency::Server,
             State::StBlockTxs => Agency::Server,
-            State::StVotes => Agency::Server,
             State::StBlockRange => Agency::Server,
             State::StDone => Agency::Nobody,
         }
@@ -146,8 +139,6 @@ impl Protocol for LeiosFetch {
             (State::StBlock, Message::MsgLeiosBlock { .. }) => Ok(State::StIdle),
             (State::StIdle, Message::MsgLeiosBlockTxsRequest { .. }) => Ok(State::StBlockTxs),
             (State::StBlockTxs, Message::MsgLeiosBlockTxs { .. }) => Ok(State::StIdle),
-            (State::StIdle, Message::MsgLeiosVotesRequest { .. }) => Ok(State::StVotes),
-            (State::StVotes, Message::MsgLeiosVoteDelivery { .. }) => Ok(State::StIdle),
             (State::StIdle, Message::MsgLeiosBlockRangeRequest { .. }) => Ok(State::StBlockRange),
             (State::StBlockRange, Message::MsgLeiosNextBlockAndTxsInRange { .. }) => {
                 Ok(State::StBlockRange)
@@ -165,7 +156,7 @@ impl Protocol for LeiosFetch {
     fn size_limit(state: &State) -> usize {
         match state {
             State::StIdle => SIZE_LIMIT_SMALL,
-            State::StBlock | State::StBlockTxs | State::StVotes | State::StBlockRange => {
+            State::StBlock | State::StBlockTxs | State::StBlockRange => {
                 SIZE_LIMIT_LARGE
             }
             State::StDone => 0,
@@ -175,7 +166,7 @@ impl Protocol for LeiosFetch {
     fn timeout(state: &State) -> Option<Duration> {
         match state {
             State::StIdle => None,
-            State::StBlock | State::StBlockTxs | State::StVotes | State::StBlockRange => {
+            State::StBlock | State::StBlockTxs | State::StBlockRange => {
                 Some(TIMEOUT_SERVER)
             }
             State::StDone => None,
@@ -216,23 +207,6 @@ pub async fn fetch_block_txs(
         Message::MsgLeiosBlockTxs { transactions } => Ok(transactions),
         other => Err(ProtocolError::InvalidMessage(format!(
             "expected MsgLeiosBlockTxs, got {other:?}"
-        ))),
-    }
-}
-
-/// Fetch votes from the server.
-pub async fn fetch_votes(
-    runner: &mut Runner<LeiosFetch>,
-    votes: Vec<(u64, Vec<u8>)>,
-) -> Result<Vec<Vec<u8>>, ProtocolError> {
-    runner
-        .send(&Message::MsgLeiosVotesRequest { votes })
-        .await?;
-    let msg = runner.recv().await?;
-    match msg {
-        Message::MsgLeiosVoteDelivery { votes } => Ok(votes),
-        other => Err(ProtocolError::InvalidMessage(format!(
-            "expected MsgLeiosVoteDelivery, got {other:?}"
         ))),
     }
 }
@@ -315,7 +289,6 @@ mod tests {
         assert_eq!(LeiosFetch::agency(&State::StIdle), Agency::Client);
         assert_eq!(LeiosFetch::agency(&State::StBlock), Agency::Server);
         assert_eq!(LeiosFetch::agency(&State::StBlockTxs), Agency::Server);
-        assert_eq!(LeiosFetch::agency(&State::StVotes), Agency::Server);
         assert_eq!(LeiosFetch::agency(&State::StBlockRange), Agency::Server);
         assert_eq!(LeiosFetch::agency(&State::StDone), Agency::Nobody);
     }
@@ -365,23 +338,6 @@ mod tests {
                 &Message::MsgLeiosBlockTxs {
                     transactions: vec![],
                 }
-            )
-            .unwrap(),
-            State::StIdle
-        );
-        // Votes request/response
-        assert_eq!(
-            LeiosFetch::transition(
-                &State::StIdle,
-                &Message::MsgLeiosVotesRequest { votes: vec![] }
-            )
-            .unwrap(),
-            State::StVotes
-        );
-        assert_eq!(
-            LeiosFetch::transition(
-                &State::StVotes,
-                &Message::MsgLeiosVoteDelivery { votes: vec![] }
             )
             .unwrap(),
             State::StIdle
@@ -460,7 +416,7 @@ mod tests {
         assert!(LeiosFetch::transition(&State::StBlock, &Message::MsgDone).is_err());
         // Next in wrong state
         assert!(LeiosFetch::transition(
-            &State::StVotes,
+            &State::StBlockTxs,
             &Message::MsgLeiosNextBlockAndTxsInRange {
                 block: vec![],
                 transactions: vec![],
@@ -474,7 +430,6 @@ mod tests {
         assert_eq!(LeiosFetch::size_limit(&State::StIdle), SIZE_LIMIT_SMALL);
         assert_eq!(LeiosFetch::size_limit(&State::StBlock), SIZE_LIMIT_LARGE);
         assert_eq!(LeiosFetch::size_limit(&State::StBlockTxs), SIZE_LIMIT_LARGE);
-        assert_eq!(LeiosFetch::size_limit(&State::StVotes), SIZE_LIMIT_LARGE);
         assert_eq!(
             LeiosFetch::size_limit(&State::StBlockRange),
             SIZE_LIMIT_LARGE
@@ -489,7 +444,6 @@ mod tests {
             LeiosFetch::timeout(&State::StBlockTxs),
             Some(TIMEOUT_SERVER)
         );
-        assert_eq!(LeiosFetch::timeout(&State::StVotes), Some(TIMEOUT_SERVER));
         assert_eq!(
             LeiosFetch::timeout(&State::StBlockRange),
             Some(TIMEOUT_SERVER)
@@ -620,52 +574,6 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(txs.len(), 3);
-
-            done(&mut runner).await.unwrap();
-        });
-
-        client.await.unwrap();
-        server.await.unwrap();
-        ra.abort();
-        rb.abort();
-    }
-
-    #[tokio::test]
-    async fn leios_fetch_votes() {
-        let ((cs, cr), (ss, sr), ra, rb) = make_leios_fetch_mux_pair();
-
-        let server = tokio::spawn(async move {
-            let mut runner = Runner::<LeiosFetch>::new(Role::Server, ss, sr);
-
-            let msg = runner.recv().await.unwrap();
-            match msg {
-                Message::MsgLeiosVotesRequest { votes } => {
-                    assert_eq!(votes.len(), 2);
-                    assert_eq!(votes[0], (10, vec![0xAA]));
-                    assert_eq!(votes[1], (20, vec![0xBB]));
-                }
-                other => panic!("expected MsgLeiosVotesRequest, got {other:?}"),
-            }
-
-            runner
-                .send(&Message::MsgLeiosVoteDelivery {
-                    votes: vec![vec![0x01, 0x02], vec![0x03, 0x04]],
-                })
-                .await
-                .unwrap();
-
-            let msg = runner.recv().await.unwrap();
-            assert!(matches!(msg, Message::MsgDone));
-        });
-
-        let client = tokio::spawn(async move {
-            let mut runner = Runner::<LeiosFetch>::new(Role::Client, cs, cr);
-
-            let vote_ids = vec![(10, vec![0xAA]), (20, vec![0xBB])];
-            let votes = fetch_votes(&mut runner, vote_ids).await.unwrap();
-            assert_eq!(votes.len(), 2);
-            assert_eq!(votes[0], vec![0x01, 0x02]);
-            assert_eq!(votes[1], vec![0x03, 0x04]);
 
             done(&mut runner).await.unwrap();
         });

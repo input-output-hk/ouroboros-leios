@@ -53,7 +53,7 @@ use crate::mempool::{MempoolEffect, MempoolState, TxId};
 use crate::peer::PeerId;
 use crate::praos::{PraosEffect, PraosState};
 use crate::production::BodyPath;
-use crate::types::Point;
+use crate::types::{Point, Vote};
 
 /// Shared handle to a per-node behaviour.  The I/O wrapper holds one
 /// `BehaviourHandle` per node; cloning it (cheap `Arc::clone`) gives
@@ -212,15 +212,6 @@ pub trait Behaviour: Send + Sync {
         BehaviourOutcome::Continue
     }
 
-    fn on_votes_offered(
-        &mut self,
-        _state: &LeiosState,
-        _peer: PeerId,
-        _vote_ids: &[(u64, Vec<u8>)],
-    ) -> BehaviourOutcome<LeiosEffect> {
-        BehaviourOutcome::Continue
-    }
-
     fn on_eb_received(
         &mut self,
         _state: &LeiosState,
@@ -230,19 +221,12 @@ pub trait Behaviour: Send + Sync {
         BehaviourOutcome::Continue
     }
 
+    /// Votes arrived inline via `LeiosNotify` (no offer/fetch). The hook
+    /// sees the full vote batch before aggregation.
     fn on_votes_received(
         &mut self,
         _state: &LeiosState,
-        _vote_ids: &[(u64, Vec<u8>)],
-        _vote_data: &[Vec<u8>],
-    ) -> BehaviourOutcome<LeiosEffect> {
-        BehaviourOutcome::Continue
-    }
-
-    fn on_validated_votes(
-        &mut self,
-        _state: &LeiosState,
-        _vote_bodies: &[Vec<u8>],
+        _votes: &[Vote],
     ) -> BehaviourOutcome<LeiosEffect> {
         BehaviourOutcome::Continue
     }
@@ -479,21 +463,6 @@ impl Behaviour for CompositeBehaviour {
         BehaviourOutcome::Continue
     }
 
-    fn on_votes_offered(
-        &mut self,
-        state: &LeiosState,
-        peer: PeerId,
-        vote_ids: &[(u64, Vec<u8>)],
-    ) -> BehaviourOutcome<LeiosEffect> {
-        for c in self.children.iter_mut() {
-            let out = c.on_votes_offered(state, peer, vote_ids);
-            if !out.is_continue() {
-                return out;
-            }
-        }
-        BehaviourOutcome::Continue
-    }
-
     fn on_eb_received(
         &mut self,
         state: &LeiosState,
@@ -512,25 +481,10 @@ impl Behaviour for CompositeBehaviour {
     fn on_votes_received(
         &mut self,
         state: &LeiosState,
-        vote_ids: &[(u64, Vec<u8>)],
-        vote_data: &[Vec<u8>],
+        votes: &[Vote],
     ) -> BehaviourOutcome<LeiosEffect> {
         for c in self.children.iter_mut() {
-            let out = c.on_votes_received(state, vote_ids, vote_data);
-            if !out.is_continue() {
-                return out;
-            }
-        }
-        BehaviourOutcome::Continue
-    }
-
-    fn on_validated_votes(
-        &mut self,
-        state: &LeiosState,
-        vote_bodies: &[Vec<u8>],
-    ) -> BehaviourOutcome<LeiosEffect> {
-        for c in self.children.iter_mut() {
-            let out = c.on_validated_votes(state, vote_bodies);
+            let out = c.on_votes_received(state, votes);
             if !out.is_continue() {
                 return out;
             }

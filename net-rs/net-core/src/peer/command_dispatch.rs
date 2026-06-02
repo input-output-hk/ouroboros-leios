@@ -64,11 +64,6 @@ pub(crate) async fn dispatch_command(
                 let _ = lf.send(LeiosFetchCommand::BlockTxs { point, bitmap }).await;
             }
         }
-        Some(PeerCommand::FetchLeiosVotes { votes }) => {
-            if let Some(ref lf) = senders.leios_fetch {
-                let _ = lf.send(LeiosFetchCommand::Votes { votes }).await;
-            }
-        }
         Some(PeerCommand::ReIntersect) => {
             let _ = senders.chainsync_reintersect.send(()).await;
         }
