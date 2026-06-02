@@ -10,7 +10,7 @@ FROM ghcr.io/blinklabs-io/cardano-cli:10.14.0.0-1 AS cardano-cli
 FROM ghcr.io/blinklabs-io/haskell:9.6.7-3.12.1.0-3 AS cardano-node-build
 
 # From intersectmbo/cardano-node leios-prototype branch
-ARG CARDANO_NODE_VERSION_LEIOS=c53f7c0d9509675d0a5eddb5a45cd53dd09b1bff
+ARG CARDANO_NODE_VERSION_LEIOS=cad83cf183e7fb8908d92c1e5435cb3b23282939
 
 RUN git init cardano-node \
     && cd cardano-node \
