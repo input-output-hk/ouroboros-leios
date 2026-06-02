@@ -451,6 +451,20 @@ pub(crate) enum LeiosFetchCommand {
     },
 }
 
+/// Full hex of a 32-byte hash, for cross-referencing a peer's
+/// (e.g. a relay's) server-side logs.
+fn hex32(h: &[u8; 32]) -> String {
+    h.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// `(slot, full_eb_hash_hex)` for an EB point, used in Leios trace logs.
+fn eb_fields(point: &Point) -> (u64, String) {
+    match point {
+        Point::Specific { slot, hash } => (*slot, hex32(hash)),
+        Point::Origin => (0, "origin".to_string()),
+    }
+}
+
 /// Spawn the LeiosNotify sub-task. Continuous request_next loop.
 pub(crate) fn spawn_leios_notify(
     ln_send: CodecSend,
@@ -463,21 +477,37 @@ pub(crate) fn spawn_leios_notify(
         loop {
             match leios_notify::request_next(&mut runner).await {
                 Ok(LeiosNotifyEvent::BlockAnnouncement { header }) => {
+                    tracing::info!(%peer_id, header_bytes = header.raw.len(), "leios_notify: EB announcement (header)");
                     let _ = event_sender
                         .send((peer_id, PeerEvent::LeiosBlockAnnounced { header }))
                         .await;
                 }
                 Ok(LeiosNotifyEvent::BlockOffer { point }) => {
+                    let (slot, eb_hash) = eb_fields(&point);
+                    tracing::info!(%peer_id, slot, eb_hash, "leios_notify: EB offered");
                     let _ = event_sender
                         .send((peer_id, PeerEvent::LeiosBlockOffered { point }))
                         .await;
                 }
                 Ok(LeiosNotifyEvent::BlockTxsOffer { point }) => {
+                    let (slot, eb_hash) = eb_fields(&point);
+                    tracing::info!(%peer_id, slot, eb_hash, "leios_notify: EB txs offered");
                     let _ = event_sender
                         .send((peer_id, PeerEvent::LeiosBlockTxsOffered { point }))
                         .await;
                 }
                 Ok(LeiosNotifyEvent::Votes { votes }) => {
+                    tracing::info!(%peer_id, count = votes.len(), "leios_notify: votes received");
+                    for v in &votes {
+                        tracing::debug!(
+                            %peer_id,
+                            slot = v.slot,
+                            eb_hash = %hex32(&v.eb_hash),
+                            voter_id = v.voter_id,
+                            sig = v.vote_signature,
+                            "leios_notify: vote"
+                        );
+                    }
                     let _ = event_sender
                         .send((peer_id, PeerEvent::LeiosVotesReceived { votes }))
                         .await;
@@ -512,13 +542,21 @@ pub(crate) fn spawn_leios_fetch(
         while let Some(cmd) = command_receiver.recv().await {
             match cmd {
                 LeiosFetchCommand::Block { point } => {
+                    let (slot, eb_hash) = eb_fields(&point);
+                    tracing::info!(%peer_id, slot, eb_hash, "leios_fetch: requesting EB");
                     match leios_fetch::fetch_block(&mut runner, point.clone()).await {
                         Ok(block) => {
+                            tracing::info!(
+                                %peer_id, slot, eb_hash,
+                                manifest_bytes = block.len(),
+                                "leios_fetch: EB received"
+                            );
                             let _ = event_sender
                                 .send((peer_id, PeerEvent::LeiosBlockFetched { point, block }))
                                 .await;
                         }
                         Err(e) => {
+                            tracing::warn!(%peer_id, slot, eb_hash, error = %e, "leios_fetch: EB request failed");
                             let _ = event_sender
                                 .send((
                                     peer_id,
@@ -532,8 +570,22 @@ pub(crate) fn spawn_leios_fetch(
                     }
                 }
                 LeiosFetchCommand::BlockTxs { point, bitmap } => {
+                    let (slot, eb_hash) = eb_fields(&point);
+                    let requested: Vec<u32> =
+                        leios_fetch::bitmap::iter_indices(&bitmap).collect();
+                    tracing::info!(
+                        %peer_id, slot, eb_hash,
+                        requested = requested.len(),
+                        indices = ?requested.iter().take(16).collect::<Vec<_>>(),
+                        "leios_fetch: requesting EB txs"
+                    );
                     match leios_fetch::fetch_block_txs(&mut runner, point.clone(), bitmap).await {
                         Ok(transactions) => {
+                            tracing::info!(
+                                %peer_id, slot, eb_hash,
+                                received = transactions.len(),
+                                "leios_fetch: EB txs received"
+                            );
                             let _ = event_sender
                                 .send((
                                     peer_id,
@@ -545,6 +597,12 @@ pub(crate) fn spawn_leios_fetch(
                                 .await;
                         }
                         Err(e) => {
+                            tracing::warn!(
+                                %peer_id, slot, eb_hash,
+                                requested = requested.len(),
+                                error = %e,
+                                "leios_fetch: EB txs request failed"
+                            );
                             let _ = event_sender
                                 .send((
                                     peer_id,
