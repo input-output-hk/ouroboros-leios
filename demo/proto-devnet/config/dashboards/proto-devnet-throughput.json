@@ -65,6 +65,7 @@
               "mode": "off"
             }
           },
+          "fieldMinMax": false,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -78,38 +79,10 @@
                 "value": 80
               }
             ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Load (assumed 204B per tx)"
-            },
-            "properties": [
-              {
-                "id": "custom.axisPlacement",
-                "value": "right"
-              },
-              {
-                "id": "unit",
-                "value": "TxkB/s"
-              }
-            ]
           },
-          {
-            "matcher": {
-              "id": "byFrameRefID",
-              "options": "Mempool bytes"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "deckbytes"
-              }
-            ]
-          }
-        ]
+          "unit": "bytes"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -139,8 +112,8 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "cardano_node_metrics_mempoolBytes_int / 1000",
-          "legendFormat": "{{process}} mempool",
+          "expr": "cardano_node_metrics_mempoolBytes_int",
+          "legendFormat": "{{process}}",
           "range": true,
           "refId": "Mempool bytes"
         }
@@ -295,14 +268,10 @@
               {
                 "color": "green",
                 "value": 0
-              },
-              {
-                "color": "red",
-                "value": 200
               }
             ]
           },
-          "unit": "kBs"
+          "unit": "Bps"
         },
         "overrides": []
       },
@@ -334,13 +303,13 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"cardano_node_metrics\"}[300s]) / 1000",
-          "legendFormat": "{{alias}} txkB/s",
+          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"cardano_node_metrics\"}[300s])",
+          "legendFormat": "{{process}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Confirmed tx throughput",
+      "title": "Confirmed tx throughput (tx kB / 300s)",
       "type": "timeseries"
     }
   ],
