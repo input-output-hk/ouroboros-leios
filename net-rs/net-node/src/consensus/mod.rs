@@ -97,7 +97,6 @@ impl Consensus {
         leios.set_rtt(rtt);
         leios.set_eb_policy(fetch_policy.eb.into_eb_policy());
         leios.set_eb_txs_policy(fetch_policy.eb_txs.into_eb_txs_policy());
-        leios.set_vote_policy(fetch_policy.votes.into_vote_policy());
         let behaviour_seed = rng_seed.unwrap_or_else(|| {
             shared_consensus::behaviour::seed_from_node_id(praos.node_id_str())
         });

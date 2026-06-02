@@ -31,7 +31,6 @@ use crate::config::CommitteeSelection;
 use crate::elections::{Elections, SlotEffect};
 use crate::fetch::{
     CandidateTracker, EbFetchPolicy, EbTxsFetchPolicy, LowestRttFirst, PeerRtt, UniformRtt,
-    VoteFetchPolicy,
 };
 use crate::peer::PeerId;
 use crate::pipeline::PipelineConfig;
@@ -286,11 +285,9 @@ pub struct LeiosStateSizes {
     pub cand_block_offers: usize,
     pub cand_eb_offers: usize,
     pub cand_eb_txs_offers: usize,
-    pub cand_vote_offers: usize,
     pub cand_pending_block: usize,
     pub cand_pending_eb: usize,
     pub cand_pending_eb_txs: usize,
-    pub cand_pending_vote: usize,
     pub cand_eb_txs_attempts: usize,
 }
 
@@ -343,8 +340,6 @@ pub struct LeiosState {
     pub eb_policy: Box<dyn EbFetchPolicy + Send + Sync>,
     /// Strategy for picking peer(s) to fetch EB transactions from.
     pub eb_txs_policy: Box<dyn EbTxsFetchPolicy + Send + Sync>,
-    /// Strategy for grouping a vote-id batch across peers.
-    pub vote_policy: Box<dyn VoteFetchPolicy + Send + Sync>,
     /// Live per-peer RTT lookup, consulted by every fetch policy.
     pub rtt: Box<dyn PeerRtt + Send + Sync>,
 
@@ -360,7 +355,7 @@ pub struct LeiosState {
 
 impl LeiosState {
     /// Construct a new state with the default fetch policy
-    /// ([`LowestRttFirst`] for all three traffic classes) and a
+    /// ([`LowestRttFirst`] for both fetch-bearing traffic classes) and a
     /// zero-RTT [`UniformRtt`] oracle.
     pub fn new(
         node_id: String,
@@ -373,7 +368,6 @@ impl LeiosState {
             elections,
             voting_config,
             pipeline,
-            Box::new(LowestRttFirst),
             Box::new(LowestRttFirst),
             Box::new(LowestRttFirst),
             Box::new(UniformRtt(Duration::ZERO)),
@@ -389,7 +383,6 @@ impl LeiosState {
         pipeline: PipelineConfig,
         eb_policy: Box<dyn EbFetchPolicy + Send + Sync>,
         eb_txs_policy: Box<dyn EbTxsFetchPolicy + Send + Sync>,
-        vote_policy: Box<dyn VoteFetchPolicy + Send + Sync>,
         rtt: Box<dyn PeerRtt + Send + Sync>,
     ) -> Self {
         Self {
@@ -405,7 +398,6 @@ impl LeiosState {
             candidates: CandidateTracker::new(),
             eb_policy,
             eb_txs_policy,
-            vote_policy,
             rtt,
             behaviour: Arc::new(Mutex::new(Box::new(HonestBehaviour))),
         }
@@ -514,11 +506,6 @@ impl LeiosState {
             })
             .collect();
         crate::bitmap::from_indices(&missing)
-    }
-
-    /// Replace the vote fetch policy.
-    pub fn set_vote_policy(&mut self, policy: Box<dyn VoteFetchPolicy + Send + Sync>) {
-        self.vote_policy = policy;
     }
 
     /// Replace the per-peer RTT oracle.
@@ -1219,11 +1206,9 @@ impl LeiosState {
             cand_block_offers,
             cand_eb_offers,
             cand_eb_txs_offers,
-            cand_vote_offers,
             cand_pending_block,
             cand_pending_eb,
             cand_pending_eb_txs,
-            cand_pending_vote,
             cand_eb_txs_attempts,
         ) = self.candidates.state_sizes();
         LeiosStateSizes {
@@ -1238,11 +1223,9 @@ impl LeiosState {
             cand_block_offers,
             cand_eb_offers,
             cand_eb_txs_offers,
-            cand_vote_offers,
             cand_pending_block,
             cand_pending_eb,
             cand_pending_eb_txs,
-            cand_pending_vote,
             cand_eb_txs_attempts,
         }
     }
@@ -1266,11 +1249,9 @@ impl LeiosState {
             cand_block_offers = s.cand_block_offers,
             cand_eb_offers = s.cand_eb_offers,
             cand_eb_txs_offers = s.cand_eb_txs_offers,
-            cand_vote_offers = s.cand_vote_offers,
             cand_pending_block = s.cand_pending_block,
             cand_pending_eb = s.cand_pending_eb,
             cand_pending_eb_txs = s.cand_pending_eb_txs,
-            cand_pending_vote = s.cand_pending_vote,
             cand_eb_txs_attempts = s.cand_eb_txs_attempts,
             "leios state sizes"
         );
@@ -1955,12 +1936,6 @@ mod tests {
         state.candidates.note_eb_offered(point(8, 0xBB), peer);
         state.candidates.note_eb_txs_offered(point(5, 0xCC), peer);
         state.candidates.note_eb_txs_offered(point(8, 0xDD), peer);
-        state
-            .candidates
-            .note_vote_offered((5, b"voter".to_vec()), peer);
-        state
-            .candidates
-            .note_vote_offered((8, b"voter".to_vec()), peer);
 
         state.set_chain_tip_context(ChainTipContext {
             tip_rb_slot: Some(8),
@@ -1970,19 +1945,9 @@ mod tests {
 
         assert!(state.candidates.eb_candidates(&point(5, 0xAA)).is_empty());
         assert!(state.candidates.eb_txs_candidates(&point(5, 0xCC)).is_empty());
-        assert!(
-            state
-                .candidates
-                .vote_candidates(&(5, b"voter".to_vec()))
-                .is_empty()
-        );
         assert_eq!(state.candidates.eb_candidates(&point(8, 0xBB)), vec![peer]);
         assert_eq!(
             state.candidates.eb_txs_candidates(&point(8, 0xDD)),
-            vec![peer]
-        );
-        assert_eq!(
-            state.candidates.vote_candidates(&(8, b"voter".to_vec())),
             vec![peer]
         );
     }

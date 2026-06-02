@@ -181,15 +181,6 @@ impl LeiosConsensus {
         self.state.set_eb_txs_policy(policy);
     }
 
-    /// Replace the VoteFetchPolicy shared-consensus consults when emitting
-    /// `FetchLeiosVotes`.
-    pub fn set_vote_policy(
-        &mut self,
-        policy: Box<dyn shared_consensus::fetch::VoteFetchPolicy + Send + Sync>,
-    ) {
-        self.state.set_vote_policy(policy);
-    }
-
     /// Install a shared behaviour handle on the underlying state.  The
     /// `Consensus` facade hands the same handle to every owned state
     /// machine and the coordinator.

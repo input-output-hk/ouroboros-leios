@@ -1,10 +1,11 @@
 //! Multi-peer fetch routing.
 //!
-//! Four independently-swappable policy traits — one per traffic class
-//! (Praos block fetch, Leios EB fetch, Leios EB-tx fetch, Leios vote
-//! fetch) — let consumers plug in different selection algorithms per
-//! channel as research evolves.  Stock implementations
-//! ([`LowestRttFirst`], [`BroadcastN`]) implement all four traits, so
+//! Three independently-swappable policy traits — one per fetch-bearing
+//! traffic class (Praos block fetch, Leios EB fetch, Leios EB-tx fetch)
+//! — let consumers plug in different selection algorithms per channel
+//! as research evolves.  (Votes are delivered inline via LeiosNotify,
+//! so there is no vote-fetch policy.)  Stock implementations
+//! ([`LowestRttFirst`], [`BroadcastN`]) implement all three traits, so
 //! the trivial wiring case stays a single-line policy choice.
 //!
 //! The candidate-peer set (which peers have offered which point) and
@@ -23,15 +24,10 @@ use std::time::Duration;
 use crate::peer::PeerId;
 use crate::types::Point;
 
-/// Vote identity used by the candidate tracker and the vote-fetch
-/// policy — `(slot, voter_id)`, matching the wire-format tuple a vote
-/// announcement carries.
+/// Generic vote identity — `(slot, voter_id)`.  No longer tied to a
+/// fetch policy (votes are delivered inline); retained as a shared
+/// tuple type for consumers that key vote state by slot + voter.
 pub type VoteId = (u64, Vec<u8>);
-
-/// Resolve the offer-set for a single [`VoteId`].  Borrowed by
-/// [`VoteFetchPolicy::pick`] so the policy can inspect a per-vote
-/// candidate list without owning the offer map.
-pub type VoteCandidateLookup<'a> = dyn Fn(&VoteId) -> Vec<PeerId> + 'a;
 
 // ---------------------------------------------------------------------------
 // Oracles
@@ -139,18 +135,6 @@ pub trait EbTxsFetchPolicy {
     ) -> Vec<PeerId>;
 }
 
-/// Group a list of vote ids by the peer to fetch each from.  A single
-/// vote id can be assigned to one peer; the policy decides how to
-/// fan a batch out across the candidate set.
-pub trait VoteFetchPolicy {
-    fn pick(
-        &self,
-        votes: &[VoteId],
-        candidates_for: &VoteCandidateLookup<'_>,
-        rtt: &dyn PeerRtt,
-    ) -> BTreeMap<PeerId, Vec<VoteId>>;
-}
-
 // ---------------------------------------------------------------------------
 // Stock policies
 // ---------------------------------------------------------------------------
@@ -192,24 +176,6 @@ impl EbTxsFetchPolicy for LowestRttFirst {
         rtt: &dyn PeerRtt,
     ) -> Vec<PeerId> {
         Self::pick_one(candidates, rtt)
-    }
-}
-
-impl VoteFetchPolicy for LowestRttFirst {
-    fn pick(
-        &self,
-        votes: &[VoteId],
-        candidates_for: &VoteCandidateLookup<'_>,
-        rtt: &dyn PeerRtt,
-    ) -> BTreeMap<PeerId, Vec<VoteId>> {
-        let mut grouped: BTreeMap<PeerId, Vec<(u64, Vec<u8>)>> = BTreeMap::new();
-        for vote in votes {
-            let candidates = candidates_for(vote);
-            if let Some(picked) = LowestRttFirst::pick_one(&candidates, rtt).first() {
-                grouped.entry(*picked).or_default().push(vote.clone());
-            }
-        }
-        grouped
     }
 }
 
@@ -266,24 +232,6 @@ impl EbTxsFetchPolicy for BroadcastN {
     }
 }
 
-impl VoteFetchPolicy for BroadcastN {
-    fn pick(
-        &self,
-        votes: &[VoteId],
-        candidates_for: &VoteCandidateLookup<'_>,
-        rtt: &dyn PeerRtt,
-    ) -> BTreeMap<PeerId, Vec<VoteId>> {
-        let mut grouped: BTreeMap<PeerId, Vec<(u64, Vec<u8>)>> = BTreeMap::new();
-        for vote in votes {
-            let candidates = candidates_for(vote);
-            for picked in self.pick_n(&candidates, rtt) {
-                grouped.entry(picked).or_default().push(vote.clone());
-            }
-        }
-        grouped
-    }
-}
-
 /// Fetch suppressor.  Every `pick` returns an empty result so the
 /// matching offer never fans out into a fetch effect.  Primarily
 /// useful as `EbTxsFetchPolicy` — evaluating the protocol in a
@@ -292,7 +240,8 @@ impl VoteFetchPolicy for BroadcastN {
 /// fetch carrying anything for them.  Implemented for all four
 /// traffic classes so a config can plug it in symmetrically; outside
 /// EB-txs the other classes have no organic fallback, so using
-/// `NoFetch` there will stall the relevant pipeline.
+/// `NoFetch` there will stall the relevant pipeline.  (Votes are
+/// delivered inline, so there is no vote-fetch class to suppress.)
 pub struct NoFetch;
 
 impl BlockFetchPolicy for NoFetch {
@@ -319,17 +268,6 @@ impl EbTxsFetchPolicy for NoFetch {
     }
 }
 
-impl VoteFetchPolicy for NoFetch {
-    fn pick(
-        &self,
-        _: &[VoteId],
-        _: &VoteCandidateLookup<'_>,
-        _: &dyn PeerRtt,
-    ) -> BTreeMap<PeerId, Vec<VoteId>> {
-        BTreeMap::new()
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Candidate tracker
 // ---------------------------------------------------------------------------
@@ -347,12 +285,10 @@ pub struct CandidateTracker {
     block_offers: BTreeMap<Point, BTreeSet<PeerId>>,
     eb_offers: BTreeMap<Point, BTreeSet<PeerId>>,
     eb_txs_offers: BTreeMap<Point, BTreeSet<PeerId>>,
-    vote_offers: BTreeMap<VoteId, BTreeSet<PeerId>>,
 
     pending_block_fetches: BTreeSet<Point>,
     pending_eb_fetches: BTreeSet<Point>,
     pending_eb_txs_fetches: BTreeSet<Point>,
-    pending_vote_fetches: BTreeSet<VoteId>,
 
     /// Per-EB set of peers we've already asked for EB-txs.  Used to
     /// skip a peer on retry after a partial response.
@@ -381,32 +317,20 @@ impl CandidateTracker {
         self.eb_txs_offers.entry(point).or_default().insert(peer);
     }
 
-    /// Record that `peer` offered a vote bundle.
-    pub fn note_vote_offered(&mut self, vote: VoteId, peer: PeerId) {
-        self.vote_offers.entry(vote).or_default().insert(peer);
-    }
-
     // -- Candidate queries --------------------------------------------------
 
     /// Return the size of each internal map for diagnostic logging.
-    /// `(block_offers, eb_offers, eb_txs_offers, vote_offers,
-    /// pending_block, pending_eb, pending_eb_txs, pending_vote,
-    /// eb_txs_attempts)`.
+    /// `(block_offers, eb_offers, eb_txs_offers, pending_block,
+    /// pending_eb, pending_eb_txs, eb_txs_attempts)`.
     #[allow(clippy::type_complexity)]
-    pub fn state_sizes(
-        &self,
-    ) -> (
-        usize, usize, usize, usize, usize, usize, usize, usize, usize,
-    ) {
+    pub fn state_sizes(&self) -> (usize, usize, usize, usize, usize, usize, usize) {
         (
             self.block_offers.len(),
             self.eb_offers.len(),
             self.eb_txs_offers.len(),
-            self.vote_offers.len(),
             self.pending_block_fetches.len(),
             self.pending_eb_fetches.len(),
             self.pending_eb_txs_fetches.len(),
-            self.pending_vote_fetches.len(),
             self.eb_txs_attempts.len(),
         )
     }
@@ -437,13 +361,6 @@ impl CandidateTracker {
                     .copied()
                     .collect()
             })
-            .unwrap_or_default()
-    }
-
-    pub fn vote_candidates(&self, vote: &VoteId) -> Vec<PeerId> {
-        self.vote_offers
-            .get(vote)
-            .map(|s| s.iter().copied().collect())
             .unwrap_or_default()
     }
 
@@ -481,13 +398,6 @@ impl CandidateTracker {
         self.pending_eb_txs_fetches.remove(point);
     }
 
-    pub fn start_vote_fetch(&mut self, vote: VoteId) -> bool {
-        self.pending_vote_fetches.insert(vote)
-    }
-    pub fn finish_vote_fetch(&mut self, vote: &VoteId) {
-        self.pending_vote_fetches.remove(vote);
-    }
-
     // -- Pruning ------------------------------------------------------------
 
     /// Drop a peer from every offer map and attempts set on disconnect.
@@ -501,26 +411,21 @@ impl CandidateTracker {
         for offers in self.eb_txs_offers.values_mut() {
             offers.remove(&peer);
         }
-        for offers in self.vote_offers.values_mut() {
-            offers.remove(&peer);
-        }
         for attempts in self.eb_txs_attempts.values_mut() {
             attempts.remove(&peer);
         }
     }
 
     /// Drop offer / pending / attempt entries for slots strictly older
-    /// than `min_slot`.  Bounds memory.  Vote keys carry their slot in
-    /// the tuple, EB keys via `Point::Specific.slot`.
+    /// than `min_slot`.  Bounds memory.  EB keys carry their slot via
+    /// `Point::Specific.slot`.
     pub fn prune_below_slot(&mut self, min_slot: u64) {
         self.block_offers.retain(|p, _| point_slot(p) >= min_slot);
         self.eb_offers.retain(|p, _| point_slot(p) >= min_slot);
         self.eb_txs_offers.retain(|p, _| point_slot(p) >= min_slot);
-        self.vote_offers.retain(|(s, _), _| *s >= min_slot);
         self.pending_block_fetches.retain(|p| point_slot(p) >= min_slot);
         self.pending_eb_fetches.retain(|p| point_slot(p) >= min_slot);
         self.pending_eb_txs_fetches.retain(|p| point_slot(p) >= min_slot);
-        self.pending_vote_fetches.retain(|(s, _)| *s >= min_slot);
         self.eb_txs_attempts.retain(|p, _| point_slot(p) >= min_slot);
     }
 }
@@ -630,33 +535,6 @@ mod tests {
         assert!(picked.is_empty());
     }
 
-    // -- VoteFetchPolicy ----------------------------------------------------
-
-    #[test]
-    fn vote_fetch_groups_by_lowest_rtt_per_vote() {
-        let policy = LowestRttFirst;
-        let rtt = rtts(&[(1, 50), (2, 10)]);
-        let votes = vec![(10u64, b"voter-a".to_vec()), (10u64, b"voter-b".to_vec())];
-        let candidates_for = |v: &VoteId| {
-            // voter-a is offered by both peers; voter-b only by pid(1).
-            if v.1 == b"voter-a" {
-                vec![pid(1), pid(2)]
-            } else {
-                vec![pid(1)]
-            }
-        };
-        let grouped = VoteFetchPolicy::pick(&policy, &votes, &candidates_for, &rtt);
-        // pid(2) (lower RTT) gets voter-a; pid(1) (only candidate) gets voter-b.
-        assert_eq!(
-            grouped.get(&pid(2)).cloned().unwrap_or_default(),
-            vec![(10u64, b"voter-a".to_vec())]
-        );
-        assert_eq!(
-            grouped.get(&pid(1)).cloned().unwrap_or_default(),
-            vec![(10u64, b"voter-b".to_vec())]
-        );
-    }
-
     // -- CandidateTracker ---------------------------------------------------
 
     #[test]
@@ -699,12 +577,10 @@ mod tests {
         t.note_block_offered(pt(1, 1), pid(1));
         t.note_eb_offered(pt(2, 2), pid(1));
         t.note_eb_txs_offered(pt(3, 3), pid(1));
-        t.note_vote_offered((4, b"v".to_vec()), pid(1));
         t.forget_peer(pid(1));
         assert!(t.block_candidates(&pt(1, 1)).is_empty());
         assert!(t.eb_candidates(&pt(2, 2)).is_empty());
         assert!(t.eb_txs_candidates(&pt(3, 3)).is_empty());
-        assert!(t.vote_candidates(&(4, b"v".to_vec())).is_empty());
     }
 
     #[test]
@@ -712,13 +588,9 @@ mod tests {
         let mut t = CandidateTracker::new();
         t.note_eb_offered(pt(5, 1), pid(1));
         t.note_eb_offered(pt(15, 1), pid(2));
-        t.note_vote_offered((5, b"a".to_vec()), pid(1));
-        t.note_vote_offered((15, b"b".to_vec()), pid(2));
         t.prune_below_slot(10);
         assert!(t.eb_candidates(&pt(5, 1)).is_empty());
         assert_eq!(t.eb_candidates(&pt(15, 1)), vec![pid(2)]);
-        assert!(t.vote_candidates(&(5, b"a".to_vec())).is_empty());
-        assert_eq!(t.vote_candidates(&(15, b"b".to_vec())), vec![pid(2)]);
     }
 
     // -- PeerRttCache -------------------------------------------------------

@@ -57,7 +57,7 @@
 //! |-------------------------------|-------|---------------------------------------------------|
 //! | `WfaLs.non_persistent_voters` | `0`   | sim collapses PV/NPV into one probability         |
 //! | `PraosState` `k`              | `2160` | sim doesn't model security parameter           |
-//! | Fetch policies (RB/EB/EB-txs/votes) | YAML `fetch-policy.{block,eb,eb-txs,votes}` (default `lowest-rtt` everywhere, matching `LeiosState::new`).  RTT oracle is `UniformRtt(0)` — sim drives fetches via its own `Message` enum |
+//! | Fetch policies (RB/EB/EB-txs) | YAML `fetch-policy.{block,eb,eb-txs}` (default `lowest-rtt` everywhere, matching `LeiosState::new`).  RTT oracle is `UniformRtt(0)` — sim drives fetches via its own `Message` enum.  Votes are delivered inline, no fetch policy |
 
 use std::{
     collections::BTreeMap,
@@ -496,7 +496,6 @@ impl NodeImpl for SharedConsensus {
         let fp = sim_config.fetch_policy;
         leios.set_eb_policy(fp.eb.into_eb_policy());
         leios.set_eb_txs_policy(fp.eb_txs.into_eb_txs_policy());
-        leios.set_vote_policy(fp.votes.into_vote_policy());
         // Cardano-mainnet security parameter; sim doesn't model a
         // distinct `k`, and 2160 sets `PraosState`'s chain-tree
         // pruning depth comfortably beyond any sim run length.

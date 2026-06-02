@@ -117,8 +117,6 @@ pub struct FetchPolicy {
     pub eb: FetchPolicyKind,
     #[serde(default)]
     pub eb_txs: FetchPolicyKind,
-    #[serde(default)]
-    pub votes: FetchPolicyKind,
 }
 
 impl FetchPolicyKind {
@@ -155,16 +153,6 @@ impl FetchPolicyKind {
         }
     }
 
-    pub fn into_vote_policy(self) -> Box<dyn shared_consensus::fetch::VoteFetchPolicy + Send + Sync> {
-        use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
-        match self {
-            FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
-            FetchPolicyKind::Broadcast { n } => Box::new(BroadcastN {
-                n: n.unwrap_or(usize::MAX),
-            }),
-            FetchPolicyKind::NoFetch => Box::new(NoFetch),
-        }
-    }
 }
 
 #[derive(Deserialize)]
