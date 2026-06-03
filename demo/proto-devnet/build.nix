@@ -22,11 +22,12 @@
           pkgs.jq
           pkgs.yq
           pkgs.envsubst
-          inputs'.cardano-node.packages.cardano-testnet
-          inputs'.cardano-node.packages.cardano-cli
-          inputs'.cardano-node.packages.tx-centrifuge
-          # Use the patched cardano-node
+          # tx-centrifuge from its own pinned input (bench/leios branch).
+          inputs'.cardano-node-tx-centrifuge.packages.tx-centrifuge
+          # Patched cardano-node + matching CLI from the
+          # leios-prototype branch.
           inputs'.cardano-node-leios.packages.cardano-node
+          inputs'.cardano-node-leios.packages.cardano-cli
         ];
         # To easily interact with node1 on the devnet from within the demo dir
         CARDANO_NODE_NETWORK_ID = 164;

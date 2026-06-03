@@ -72,7 +72,7 @@ TraceOptions:
   ChainDB:
     severity: Debug
   ChainDB.AddBlockEvent.AddBlockValidation:
-    severity: Silence
+    severity: Debug
   ChainDB.AddBlockEvent.AddBlockValidation.ValidCandidate:
     maxFrequency: 2.0
   ChainDB.AddBlockEvent.AddedBlockToQueue:
