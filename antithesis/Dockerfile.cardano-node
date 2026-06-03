@@ -1,77 +1,54 @@
-FROM ghcr.io/blinklabs-io/haskell:9.6.7-3.12.1.0-3 AS cardano-node-build
+# Antithesis-flavoured cardano-node image. Copies the statically-linked
+# binaries from the cardano-node-leios base, layers Antithesis-specific
+# tools (jq, sqlite3, iproute2, …) on a slim Debian runtime, and adds
+# the proto-devnet configs / per-role init scripts.
+#
+# Build args:
+#   BASE_IMAGE  Fully-qualified base image reference (ghcr.io/.../
+#               cardano-node-leios:<tag>). CI passes the SHA-tagged
+#               base built earlier in the same workflow run.
 
-# From intersectmbo/cardano-node leios-prototype branch
-ARG CARDANO_NODE_VERSION=cad83cf183e7fb8908d92c1e5435cb3b23282939
+ARG BASE_IMAGE=ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:latest
 
-RUN git init cardano-node \
-    && cd cardano-node \
-    && git remote add origin https://github.com/intersectmbo/cardano-node.git \
-    && git fetch --depth 1 origin ${CARDANO_NODE_VERSION} \
-    && git checkout FETCH_HEAD \
-    && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
-    && echo "tests: False" >> cabal.project.local
+FROM ${BASE_IMAGE} AS leios
 
-RUN --mount=type=cache,target=/root/.cabal/store,id=cabal-store-cardano-node \
-    --mount=type=cache,target=/root/.cabal/packages,id=cabal-packages \
-    --mount=type=cache,target=/cardano-node/dist-newstyle,id=dist-cardano-node \
-    cd cardano-node \
-    && cabal update \
-    && cabal install exe:cardano-node --install-method=copy --installdir=/root/.local/bin/
+FROM debian:bookworm-slim
 
-FROM debian:bookworm-slim AS cardano-node-leios
-
-ENV LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
-ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"
-
-COPY --from=cardano-node-build /usr/local/lib/ /usr/local/lib/
-COPY --from=cardano-node-build /usr/local/include/ /usr/local/include/
-COPY --from=cardano-node-build /root/.local/bin/cardano-* /usr/local/bin/
+COPY --from=leios /bin/cardano-node /usr/local/bin/cardano-node
+COPY --from=leios /bin/cardano-cli  /usr/local/bin/cardano-cli
 
 RUN apt-get update -y && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
       bc \
+      ca-certificates \
       curl \
       iproute2 \
       jq \
-      libffi8 \
-      libgmp10 \
-      liblmdb0 \
-      libncursesw5 \
-      libnuma1 \
-      libsnappy1v5 \
-      libsystemd0 \
-      libssl3 \
-      libtinfo6 \
-      llvm-14-runtime \
       lsof \
       netbase \
-      pkg-config \
       procps \
       socat \
-      sqlite3 \
-      wget \
-      zlib1g && \
-    rm -rf /var/lib/apt/lists/* && \
-    ldconfig
+      sqlite3 && \
+    rm -rf /var/lib/apt/lists/*
 
-# Create directories for Leios
+# Directories Antithesis scripts expect.
 RUN mkdir -p /app/config /app/genesis /app/scripts /data /logs
 
-# Copy genesis files (baked in)
+# Genesis (baked in)
 COPY demo/burst/data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup/genesis/*.json /app/genesis/
 
-# Copy config files
+# Node configs
 COPY demo/burst/data/node0/config.json /app/config/node0-config.json
 COPY demo/burst/data/downstream-node/config.json /app/config/downstream-config.json
 COPY demo/burst/data/topology.template.json /app/config/topology.template.json
 
-# Copy scripts
+# Per-role init/run + WAN emulation scripts
 COPY antithesis/scripts/init-node0.sh /app/scripts/
 COPY antithesis/scripts/init-downstream.sh /app/scripts/
 COPY antithesis/scripts/run-cardano-node.sh /app/scripts/
 COPY antithesis/scripts/setup-wan-emulation.sh /app/scripts/
 
-RUN chmod +x /app/scripts/*.sh /usr/local/bin/*
+RUN chmod +x /app/scripts/*.sh
 
 WORKDIR /data
 

@@ -1,24 +1,41 @@
 name: "antithesis-leios"
 
+# Antithesis-specific images + test submission via Moog. Runs less
+# often than the cardano-node-leios base build:
+#
+#   - push to main when antithesis/, demo/, or this workflow changes
+#   - workflow_dispatch for ad-hoc runs
+#
+# The base image (`cardano-node-leios`) is built and published by the
+# `cardano-node-leios` workflow; we consume the `:latest` tag from
+# GHCR. If you want to pin to a specific base, override BASE_IMAGE in
+# the matrix below.
+
 on:
-  pull_request:
-    paths:
-      - "antithesis/**"
-      - "demo/**"
-      - "flake.lock"
   push:
     branches:
       - main
     paths:
       - "antithesis/**"
       - "demo/**"
+      - ".github/workflows/antithesis-leios.yaml"
       - "flake.lock"
   workflow_dispatch:
     inputs:
+      base_image_tag:
+        description: 'Tag of cardano-node-leios base image to use (default: latest)'
+        required: false
+        default: 'latest'
+        type: string
       push_images:
         description: 'Push images to GHCR'
         required: false
-        default: 'false'
+        default: 'true'
+        type: boolean
+      submit_antithesis:
+        description: 'Submit test run to Antithesis via Moog'
+        required: false
+        default: 'true'
         type: boolean
 
 env:
@@ -37,11 +54,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
-      # Extract cardano-node git revisions from flake.lock so the Docker
-      # builds stay in sync with the Nix-pinned versions without requiring
-      # manual edits to the Dockerfiles. ouroboros-consensus is intentionally
-      # NOT extracted here because flake.lock currently trails the Dockerfile
-      # default and we don't want CI to silently downgrade that component.
+      # Extract cardano-node refs from flake.lock for the bp image
+      # (still built via Dockerfile / cabal, not via nix).
       - name: Extract cardano-node refs from flake.lock
         id: refs
         run: |
@@ -61,51 +75,62 @@ jobs:
           echo "cardano-node-leios: $cn_leios"
           echo "cardano-node (tx-centrifuge): $cn_txcent"
 
+      - name: Resolve base image reference
+        id: base
+        run: |
+          tag="${{ github.event.inputs.base_image_tag || 'latest' }}"
+          echo "ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-leios:${tag}" >> "$GITHUB_OUTPUT"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to Container Registry
-        if: github.event_name == 'push' || github.event.inputs.push_images == 'true'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata for cardano-node-leios
-        id: meta-cardano-node
+      # ----------------------------------------------------------------
+      # cardano-node-antithesis — derived from the base image. Adds
+      # proto-devnet configs, genesis files, and per-role scripts.
+      # ----------------------------------------------------------------
+      - name: Extract metadata for cardano-node-antithesis
+        id: meta-antithesis
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-leios
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-antithesis
           tags: |
             type=sha
             type=ref,event=branch
-            type=ref,event=pr
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build cardano-node-leios image
+      - name: Build cardano-node-antithesis image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: .
           file: ./antithesis/Dockerfile.cardano-node
           platforms: linux/amd64
           push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
-          tags: ${{ steps.meta-cardano-node.outputs.tags }}
-          labels: ${{ steps.meta-cardano-node.outputs.labels }}
+          tags: ${{ steps.meta-antithesis.outputs.tags }}
+          labels: ${{ steps.meta-antithesis.outputs.labels }}
           build-args: |
-            CARDANO_NODE_VERSION=${{ steps.refs.outputs.cn_leios }}
-          cache-from: type=gha,scope=cardano-node-leios
-          cache-to: type=gha,mode=max,scope=cardano-node-leios
+            BASE_IMAGE=${{ steps.base.outputs.ref }}
+          cache-from: type=gha,scope=cardano-node-antithesis
+          cache-to: type=gha,mode=max,scope=cardano-node-antithesis
 
+      # ----------------------------------------------------------------
+      # cardano-node-bp — block-producer image (separate Dockerfile,
+      # builds cardano-node + tx-centrifuge from source).
+      # ----------------------------------------------------------------
       - name: Extract metadata for cardano-node-bp
-        id: meta-cardano-node-bp
+        id: meta-bp
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-bp
           tags: |
             type=sha
             type=ref,event=branch
-            type=ref,event=pr
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build cardano-node-bp image
@@ -115,23 +140,25 @@ jobs:
           file: ./antithesis/Dockerfile.cardano-node-bp
           platforms: linux/amd64
           push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
-          tags: ${{ steps.meta-cardano-node-bp.outputs.tags }}
-          labels: ${{ steps.meta-cardano-node-bp.outputs.labels }}
+          tags: ${{ steps.meta-bp.outputs.tags }}
+          labels: ${{ steps.meta-bp.outputs.labels }}
           build-args: |
             CARDANO_NODE_VERSION_LEIOS=${{ steps.refs.outputs.cn_leios }}
             CARDANO_NODE_VERSION_TXCENT=${{ steps.refs.outputs.cn_txcent }}
           cache-from: type=gha,scope=cardano-node-bp
           cache-to: type=gha,mode=max,scope=cardano-node-bp
 
+      # ----------------------------------------------------------------
+      # immdb-server — Antithesis infra.
+      # ----------------------------------------------------------------
       - name: Extract metadata for immdb-server
-        id: meta-immdb-server
+        id: meta-immdb
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/immdb-server
           tags: |
             type=sha
             type=ref,event=branch
-            type=ref,event=pr
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build immdb-server image
@@ -141,11 +168,14 @@ jobs:
           file: ./antithesis/Dockerfile.immdb-server
           platforms: linux/amd64
           push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
-          tags: ${{ steps.meta-immdb-server.outputs.tags }}
-          labels: ${{ steps.meta-immdb-server.outputs.labels }}
+          tags: ${{ steps.meta-immdb.outputs.tags }}
+          labels: ${{ steps.meta-immdb.outputs.labels }}
           cache-from: type=gha,scope=immdb-server
           cache-to: type=gha,mode=max,scope=immdb-server
 
+      # ----------------------------------------------------------------
+      # leios-analysis — post-run analysis image.
+      # ----------------------------------------------------------------
       - name: Extract metadata for analysis
         id: meta-analysis
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
@@ -154,7 +184,6 @@ jobs:
           tags: |
             type=sha
             type=ref,event=branch
-            type=ref,event=pr
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build analysis image
@@ -190,7 +219,11 @@ jobs:
   check-moog-secrets:
     name: "Check Moog secrets"
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Submission fires on main pushes and when explicitly requested via
+    # workflow_dispatch.
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      || (github.event_name == 'workflow_dispatch' && github.event.inputs.submit_antithesis == 'true')
     outputs:
       available: ${{ steps.check.outputs.available }}
     steps:

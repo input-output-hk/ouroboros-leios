@@ -24,6 +24,24 @@ nix run github:input-output-hk/ouroboros-leios#leios-testnet-relay
 Or enter the `nix develop` shell (also available via `direnv allow`)
 and follow [without nix instructions](#without-nix).
 
+### With Docker
+
+A pre-built relay image is published on every push to `main`:
+
+```shell
+docker run --rm -p 3010:3010 -v testnet-data:/data \
+  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:latest
+```
+
+The image bakes in the pinned `cardano-playground` snapshot and runs the
+node directly (no process-compose / X-ray observability — that's
+host-side; see `./run.sh` for the full setup). Built from
+[`./Dockerfile`](./Dockerfile) on top of the generic
+`cardano-node-leios` base — a minimal `dockerTools.streamLayeredImage`
+holding statically-linked `cardano-node` + `cardano-cli` from the
+`cardano-node-leios` flake input (see [`../docker/build.nix`](../docker/build.nix)).
+
+
 ### Without Nix
 
 Install these prerequisites:
