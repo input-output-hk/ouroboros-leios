@@ -1318,6 +1318,48 @@ impl PraosState {
                 }
             }
         }
+        // Final fallback: trust the ChainSync intersection anchor as the
+        // common ancestor even when it isn't in `adopted_ancestors`.  This
+        // is the multi-peer reconnect-handover case: after reconnecting to
+        // a peer on a divergent fork, our per-peer fragment is too short to
+        // reach the fork point and `adopted_ancestors` may be truncated by
+        // pruning — but `find_intersection` already probed back to genesis,
+        // so its anchor is authoritative.  Bound the switch by k (Praos
+        // finality): a reorg deeper than the security parameter would roll
+        // back settled blocks, so it is refused (the peer is left
+        // unresolved → OrphanCandidate → cooldown, no spin).
+        //
+        // Restricted to a *real block we hold* (not Origin): a switch that
+        // shares only genesis needs a full re-sync from block 1, which the
+        // range-fetch path can't anchor at Origin — that is out of scope
+        // here and not the round-robin-backend case (those share real
+        // history at the fork point).
+        if ancestor.is_none() {
+            if let Some(anchor) = candidate.anchor() {
+                if anchor.hash != [0u8; 32] {
+                    if let Some(anchor_bn) = self.chain_tree.block_number(&anchor.hash) {
+                        let reorg_depth = adopted_bn.saturating_sub(anchor_bn);
+                        if reorg_depth <= self.security_param_k {
+                            info!(
+                                node_id = %self.node_id,
+                                %peer_id,
+                                reorg_depth,
+                                "select_chain: trusting intersection anchor as common ancestor (reorg within k)"
+                            );
+                            ancestor = Some(anchor.hash);
+                        } else {
+                            info!(
+                                node_id = %self.node_id,
+                                %peer_id,
+                                reorg_depth,
+                                k = self.security_param_k,
+                                "select_chain: refusing reorg deeper than k (settled blocks); skipping peer"
+                            );
+                        }
+                    }
+                }
+            }
+        }
         let ancestor = match ancestor {
             Some(a) => a,
             None => {
@@ -2524,6 +2566,66 @@ mod tests {
         // Too-deep / zero rollbacks are no-ops.
         assert!(s.force_rollback(0).is_empty());
         assert!(s.force_rollback(999).is_empty());
+    }
+
+    #[test]
+    fn select_chain_trusts_intersection_anchor_within_k() {
+        // Reconnect-handover: the peer is on a divergent fork; our fragment
+        // doesn't reach the fork point and adopted_ancestors is truncated,
+        // but the ChainSync intersection anchor points at a real block we
+        // hold, within k.  Trust it and switch (WaitingForBlocks), don't
+        // declare orphan.
+        let mut s = fresh(); // k = 100
+        // Adopted tip = block 10, but its parent (9) is absent → ancestors(10)
+        // = {10} (truncated, as after pruning).
+        install_validated_block(&mut s, 110, 10, 10, Some(9));
+        s.adopted_tip_hash = Some(h(10));
+        // A real block 5 we hold — the would-be common ancestor, reorg depth 5.
+        install_validated_block(&mut s, 105, 5, 5, Some(4));
+
+        let pid = PeerId(7);
+        s.record_peer_intersection(pid, pt(105, 5)); // anchor = block 5
+        // Peer fragment: divergent blocks 11, 12 (prev not in our ancestry).
+        s.record_peer_tip(pid, pt(111, 11), 11, 11, h(11), 111, Some(h(99)));
+        s.record_peer_tip(pid, pt(112, 12), 12, 12, h(12), 112, Some(h(11)));
+
+        match s.select_chain_once(&HashSet::new()) {
+            SelectionDecision::WaitingForBlocks {
+                ancestor,
+                anchor_point,
+                ..
+            } => {
+                assert_eq!(ancestor, h(5), "trusts the intersection anchor as ancestor");
+                assert_eq!(
+                    anchor_point,
+                    Some(pt(105, 5)),
+                    "fetch range anchored at the intersection block"
+                );
+            }
+            other => panic!("expected WaitingForBlocks (anchor-trust switch), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn select_chain_refuses_reorg_deeper_than_k() {
+        // Same shape, but the intersection anchor is deeper than k below the
+        // adopted tip → a settled-block reorg, which must be refused.
+        let mut s = fresh(); // k = 100
+        install_validated_block(&mut s, 300, 200, 200, Some(199));
+        s.adopted_tip_hash = Some(h(200));
+        install_validated_block(&mut s, 150, 50, 50, Some(49)); // depth 150 > k
+
+        let pid = PeerId(7);
+        s.record_peer_intersection(pid, pt(150, 50));
+        s.record_peer_tip(pid, pt(301, 201), 201, 201, h(201), 301, Some(h(99)));
+
+        assert!(
+            matches!(
+                s.select_chain_once(&HashSet::new()),
+                SelectionDecision::OrphanCandidate { .. }
+            ),
+            "reorg of depth 150 > k=100 must be refused"
+        );
     }
 
     #[test]
