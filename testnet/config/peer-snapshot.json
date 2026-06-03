@@ -1,0 +1,36 @@
+{
+  "bigLedgerPools": [
+    {
+      "accumulatedStake": 0.35690666406468613,
+      "relativeStake": 0.35690666406468613,
+      "relays": [
+        {
+          "domain": "leios-node.play.dev.cardano.org",
+          "port": 3001
+        }
+      ]
+    },
+    {
+      "accumulatedStake": 0.6784573255652744,
+      "relativeStake": 0.3215506615005882,
+      "relays": [
+        {
+          "domain": "leios-node.play.dev.cardano.org",
+          "port": 3001
+        }
+      ]
+    },
+    {
+      "accumulatedStake": 1,
+      "relativeStake": 0.3215426744347257,
+      "relays": [
+        {
+          "domain": "leios-node.play.dev.cardano.org",
+          "port": 3001
+        }
+      ]
+    }
+  ],
+  "slotNo": 518370,
+  "version": 1
+}
