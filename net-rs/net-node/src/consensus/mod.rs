@@ -182,6 +182,14 @@ impl Consensus {
         }
     }
 
+    /// Consult the behaviour for whether to reset accepted (inbound)
+    /// peer connections this slot.  The caller issues
+    /// `NetworkCommand::DropInboundPeers` when this returns true.  Honest
+    /// nodes pay one cheap `false`-returning hook call per slot.
+    pub fn should_drop_inbound_peers(&mut self, slot: u64) -> bool {
+        self.leios.state_mut().ask_drop_inbound_peers(slot)
+    }
+
     /// Notify the Leios layer of a new slot tick.
     pub async fn on_slot(&mut self, slot: u64) {
         // Bump Praos's slot first so subsequent header-arrival paths

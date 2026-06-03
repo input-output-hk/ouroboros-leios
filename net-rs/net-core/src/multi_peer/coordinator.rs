@@ -854,6 +854,31 @@ impl Coordinator {
                 self.emit_event(NetworkEvent::PeerSnapshot { peers });
             }
 
+            NetworkCommand::DropInboundPeers => {
+                // Drop every accepted (inbound) peer — those carrying an
+                // ip_guard.  Send `Disconnect` (not a task abort, which
+                // leaves the mux/bearer up): the peer task exits its loop
+                // and tears the connection down, so the remote outbound
+                // side observes EOF, reconnects, and re-intersects.
+                // Outbound peers are left untouched; the disconnect event
+                // then runs the normal `remove_peer` cleanup.
+                let inbound: Vec<PeerId> = self
+                    .peers
+                    .iter()
+                    .filter(|(_, p)| p.ip_guard.is_some())
+                    .map(|(id, _)| *id)
+                    .collect();
+                if !inbound.is_empty() {
+                    tracing::info!(
+                        count = inbound.len(),
+                        "DropInboundPeers: resetting accepted peer connections"
+                    );
+                    for peer_id in inbound {
+                        self.send_peer_command(peer_id, PeerCommand::Disconnect);
+                    }
+                }
+            }
+
             NetworkCommand::Shutdown => {
                 // Disconnect all peers.
                 let peer_ids: Vec<PeerId> = self.peers.keys().copied().collect();

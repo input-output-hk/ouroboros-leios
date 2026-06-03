@@ -197,6 +197,13 @@ pub enum NetworkCommand {
     /// Request a snapshot of all connected peers (for telemetry).
     QueryPeers,
 
+    /// Drop all currently-accepted (inbound) peer connections.  The
+    /// remote (outbound) side observes the disconnect and reconnects,
+    /// re-running ChainSync intersection from scratch.  Used by the
+    /// `DropInboundPeers` behaviour to mimic a relay that resets
+    /// inbound connections (the reconnect-handover trigger).
+    DropInboundPeers,
+
     /// Shut down all peers and stop the coordinator.
     Shutdown,
 }
