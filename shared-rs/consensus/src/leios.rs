@@ -427,6 +427,16 @@ impl LeiosState {
         guard.rb_production_strategy(self, praos, slot)
     }
 
+    /// Consult the behaviour for a deliberate self-reorg this slot.
+    /// Returns the rollback depth the behaviour wants (see
+    /// [`crate::behaviour::behaviours::DeepReorg`]), or `None` for the
+    /// honest default.
+    pub fn ask_praos_reorg(&mut self, slot: u64) -> Option<u64> {
+        let arc = self.behaviour.clone();
+        let mut guard = arc.lock().expect("behaviour mutex poisoned");
+        guard.praos_reorg(slot)
+    }
+
     /// Short name of the current behaviour, e.g. `"honest"`,
     /// `"rb-header-equivocator"`.  Useful for telemetry and structured logs.
     pub fn behaviour_name(&self) -> &'static str {

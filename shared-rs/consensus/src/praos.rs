@@ -1069,6 +1069,54 @@ impl PraosState {
         fx
     }
 
+    /// Deliberately roll the *own* adopted chain back by `depth` blocks
+    /// and re-anchor at that ancestor, abandoning the suffix, so the next
+    /// block produced forks from there.  Emits `InjectRollback` so the
+    /// served chain store mirrors it — downstream followers then see a
+    /// `RollBackward(depth)` + `RollForward(fork)`.
+    ///
+    /// This is a deliberate self-reorg trigger (the `DeepReorg`
+    /// behaviour); it is *not* part of honest consensus.  No-op if there
+    /// is no adopted tip or the chain is shorter than `depth`.
+    pub fn force_rollback(&mut self, depth: u64) -> Vec<PraosEffect> {
+        let mut fx = Vec::new();
+        if depth == 0 {
+            return fx;
+        }
+        let tip = match self.adopted_tip_hash {
+            Some(h) => h,
+            None => return fx,
+        };
+        // ancestors() yields [tip, parent, grandparent, …]; index `depth`
+        // is the block `depth` steps back.
+        let ancestors = self.chain_tree.ancestors(tip);
+        let target_hash = match ancestors.get(depth as usize) {
+            Some(h) => *h,
+            None => return fx, // chain too short to roll back this far
+        };
+        let target = match self.chain_tree.point(&target_hash) {
+            Some(p) => p.clone(),
+            None => return fx,
+        };
+        let target_bn = self.chain_tree.block_number(&target_hash).unwrap_or(0);
+
+        // Re-anchor every chain-state pointer at the target.
+        self.adopted_tip_hash = Some(target_hash);
+        self.last_validated_tip = Some(target_hash);
+        self.queued_validator_tip = Some(target_hash);
+        // Drop the abandoned suffix so it can't be re-selected as best tip.
+        self.chain_tree.remove_above(target_bn);
+
+        info!(
+            node_id = %self.node_id,
+            %target,
+            depth,
+            "force rollback: self-reorg, abandoning chain suffix"
+        );
+        fx.push(PraosEffect::InjectRollback { target });
+        fx
+    }
+
     // -- Periodic retry -----------------------------------------------------
 
     /// Periodic slot-driven retry: evict stale in-flight fetches and
@@ -2443,6 +2491,39 @@ mod tests {
         s.in_flight.insert(pt(100, 1), stale);
         let _ = s.retry_select_chain(Instant::now());
         assert!(s.in_flight.is_empty());
+    }
+
+    #[test]
+    fn force_rollback_reanchors_and_abandons_suffix() {
+        // Deliberate self-reorg: roll back `depth` blocks, abandon the
+        // suffix, and emit InjectRollback so the served chain mirrors it.
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 1, None);
+        install_validated_block(&mut s, 101, 2, 2, Some(1));
+        install_validated_block(&mut s, 102, 3, 3, Some(2));
+        install_validated_block(&mut s, 103, 4, 4, Some(3));
+        install_validated_block(&mut s, 104, 5, 5, Some(4));
+        s.adopted_tip_hash = Some(h(5));
+        s.last_validated_tip = Some(h(5));
+
+        let fx = s.force_rollback(2); // 5 -> 3
+
+        assert_eq!(s.adopted_tip_hash, Some(h(3)), "re-anchored 2 blocks back");
+        assert_eq!(
+            s.chain_tree.best_tip_hash(),
+            Some(h(3)),
+            "abandoned suffix pruned; best tip is the target"
+        );
+        assert!(s.chain_tree.block_number(&h(4)).is_none(), "block 4 abandoned");
+        assert!(s.chain_tree.block_number(&h(5)).is_none(), "block 5 abandoned");
+        match fx.as_slice() {
+            [PraosEffect::InjectRollback { target }] => assert_eq!(*target, pt(102, 3)),
+            other => panic!("expected single InjectRollback to block 3, got {other:?}"),
+        }
+
+        // Too-deep / zero rollbacks are no-ops.
+        assert!(s.force_rollback(0).is_empty());
+        assert!(s.force_rollback(999).is_empty());
     }
 
     #[test]

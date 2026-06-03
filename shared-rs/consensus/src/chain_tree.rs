@@ -290,6 +290,19 @@ impl ChainTree {
         true
     }
 
+    /// Drop every block strictly above `block_number` and recompute the
+    /// best tip.  Used to abandon a chain suffix on a deliberate
+    /// self-reorg (see [`crate::praos::PraosState::force_rollback`]): the
+    /// rolled-back blocks must leave the tree so they aren't re-selected
+    /// as the best tip.
+    pub fn remove_above(&mut self, block_number: u64) {
+        let before = self.nodes.len();
+        self.nodes.retain(|_, node| node.block_number <= block_number);
+        if self.nodes.len() != before {
+            self.recompute_best_tip();
+        }
+    }
+
     /// Recompute `best_tip` by scanning all nodes for the highest
     /// `block_number` (ties broken by lower hash).  Deterministic despite
     /// HashMap iteration: the result is the maximum under the total order

@@ -168,6 +168,20 @@ impl Consensus {
         self.leios.state_mut().ask_rb_production_strategy(praos, slot)
     }
 
+    /// Consult the behaviour for a deliberate self-reorg this slot and,
+    /// if requested, roll the adopted chain back and diffuse the
+    /// rollback to peers.  Returns the depth rolled back, or `None` when
+    /// the behaviour is honest or the chain is too short.  Honest nodes
+    /// pay only one cheap `None`-returning hook call per slot.
+    pub async fn maybe_force_reorg(&mut self, slot: u64) -> Option<u64> {
+        let depth = self.leios.state_mut().ask_praos_reorg(slot)?;
+        if self.praos.force_rollback(depth).await {
+            Some(depth)
+        } else {
+            None
+        }
+    }
+
     /// Notify the Leios layer of a new slot tick.
     pub async fn on_slot(&mut self, slot: u64) {
         // Bump Praos's slot first so subsequent header-arrival paths

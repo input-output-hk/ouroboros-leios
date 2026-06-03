@@ -85,10 +85,12 @@ pub mod selection;
 pub mod behaviours {
     //! Concrete [`super::Behaviour`] implementations.  Each lives in its
     //! own file so contributors can add one without touching the others.
+    pub mod deep_reorg;
     pub mod lazy_voter;
     pub mod rb_equivocator;
     pub mod t22;
 
+    pub use deep_reorg::DeepReorg;
     pub use lazy_voter::LazyVoter;
     pub use rb_equivocator::RbHeaderEquivocator;
     pub use t22::T22ThreatBehaviour;
@@ -332,6 +334,17 @@ pub trait Behaviour: Send + Sync {
         _slot: u64,
     ) -> RbProductionStrategy {
         RbProductionStrategy::Normal
+    }
+
+    /// Deliberately trigger a self-reorg on a producing node: return
+    /// `Some(depth)` to roll the adopted chain back `depth` blocks this
+    /// slot.  The I/O wrapper calls [`PraosState::force_rollback`] and
+    /// diffuses the resulting rollback, so downstream followers see a
+    /// deep `RollBackward` + fork.  `None` (the default) leaves the
+    /// chain untouched.  Exercises deep-rollback recovery; not part of
+    /// honest consensus.
+    fn praos_reorg(&mut self, _slot: u64) -> Option<u64> {
+        None
     }
 
     /// Hand the I/O wrapper's freshly-produced RB variants to the
@@ -606,6 +619,15 @@ impl Behaviour for CompositeBehaviour {
             }
         }
         RbProductionStrategy::Normal
+    }
+
+    fn praos_reorg(&mut self, slot: u64) -> Option<u64> {
+        for c in self.children.iter_mut() {
+            if let Some(depth) = c.praos_reorg(slot) {
+                return Some(depth);
+            }
+        }
+        None
     }
 
     fn transform_outbound(
