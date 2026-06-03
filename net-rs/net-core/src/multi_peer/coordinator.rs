@@ -142,6 +142,12 @@ const PEER_EVENTS_CAPACITY: usize = 32768;
 /// way to TCP. Kept proportional (~1.5%) to NETWORK_EVENTS_CAPACITY.
 const MIN_EMIT_HEADROOM: usize = 1024;
 
+/// First re-intersection backoff for an address (the first attempt is
+/// always allowed; rapid repeats grow from here).
+const REINTERSECT_BACKOFF_BASE: Duration = Duration::from_secs(1);
+/// Cap on the per-address re-intersection backoff.
+const REINTERSECT_BACKOFF_MAX: Duration = Duration::from_secs(30);
+
 /// Per-peer state tracked by the coordinator.
 struct PeerState {
     address: String,
@@ -193,6 +199,12 @@ struct Coordinator {
     pending_fetches: HashMap<Point, PeerId>,
     /// Peers waiting to be reconnected (address, next attempt time, current backoff).
     reconnect_queue: Vec<(String, Instant, Duration)>,
+    /// Per-address re-intersection throttle: `(next_allowed, backoff)`.
+    /// A peer on an unreconcilable fork re-intersects in a tight loop;
+    /// `ReIntersect` is rate-limited per *address* (stable across the
+    /// reconnect handovers that change `PeerId`) with exponential backoff
+    /// so the node backs off gracefully instead of spinning.
+    reintersect_throttle: HashMap<String, (Instant, Duration)>,
 
     /// Shared chain state for responder peers.
     chain_store: Arc<ChainStore>,
@@ -239,6 +251,7 @@ impl Coordinator {
         Self {
             config,
             peers: HashMap::new(),
+            reintersect_throttle: HashMap::new(),
             next_peer_id: 0,
             peer_events,
             peer_event_sender,
@@ -757,7 +770,44 @@ impl Coordinator {
             }
 
             NetworkCommand::ReIntersect { peer_id } => {
-                self.send_peer_command(peer_id, PeerCommand::ReIntersect);
+                // Throttle re-intersection per address with exponential
+                // backoff: a peer stuck on an unreconcilable fork (or a
+                // churning reconnect handover) re-intersects in a tight
+                // loop. Keyed by address (stable across the reconnects that
+                // change PeerId), so the node backs off gracefully instead
+                // of spinning. The first attempt for an address always
+                // passes; rapid repeats grow the backoff to a cap; a quiet
+                // peer resets.
+                let now = Instant::now();
+                let address = self.peers.get(&peer_id).map(|p| p.address.clone());
+                let allow = match &address {
+                    None => true, // unknown peer — let it through
+                    Some(addr) => match self.reintersect_throttle.get(addr).copied() {
+                        Some((next_allowed, _)) if now < next_allowed => false,
+                        Some((next_allowed, backoff)) => {
+                            let next_backoff = if now > next_allowed + backoff {
+                                REINTERSECT_BACKOFF_BASE // went quiet → reset
+                            } else {
+                                (backoff * 2).min(REINTERSECT_BACKOFF_MAX)
+                            };
+                            self.reintersect_throttle
+                                .insert(addr.clone(), (now + next_backoff, next_backoff));
+                            true
+                        }
+                        None => {
+                            self.reintersect_throttle.insert(
+                                addr.clone(),
+                                (now + REINTERSECT_BACKOFF_BASE, REINTERSECT_BACKOFF_BASE),
+                            );
+                            true
+                        }
+                    },
+                };
+                if allow {
+                    self.send_peer_command(peer_id, PeerCommand::ReIntersect);
+                } else if let Some(addr) = &address {
+                    tracing::debug!(%peer_id, address = %addr, "re-intersect throttled (peer churning on a fork)");
+                }
             }
 
             NetworkCommand::DiscoverPeers => {
