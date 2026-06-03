@@ -65,12 +65,13 @@ watch -n1 "cardano-cli query tip"
 Override defaults by setting environment variables before running. See
 `run.sh` for the full list and their defaults:
 
-| Env var       | Default            | Notes                                  |
-|---------------|--------------------|----------------------------------------|
-| `CARDANO_NODE`| `cardano-node`     | Path to the binary                     |
-| `WORKING_DIR` | `./tmp-testnet`    | Where the node's DB / socket / log go  |
-| `PORT`        | `3010`             | Local listening port                   |
-| `HOST_ADDR`   | `0.0.0.0`          | Bind address                           |
+| Env var       | Default                       | Notes                                  |
+|---------------|-------------------------------|----------------------------------------|
+| `CARDANO_NODE`| `cardano-node`                | Path to the binary                     |
+| `WORKING_DIR` | `./tmp-testnet`               | Where the node's DB / socket go        |
+| `PORT`        | `3010`                        | Local listening port                   |
+| `HOST_ADDR`   | `0.0.0.0`                     | Bind address                           |
+| `LOG_FILE`    | `${WORKING_DIR}/node.log`     | Where `tee` writes the combined log    |
 
 Example:
 

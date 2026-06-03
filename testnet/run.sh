@@ -17,6 +17,7 @@ set -euo pipefail
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 : "${PORT:=3010}"
 : "${HOST_ADDR:=0.0.0.0}"
+: "${LOG_FILE:=${WORKING_DIR}/node.log}"
 
 # cardano-node binary. Override CARDANO_NODE to point at the locally
 # built one with the issue-#890 staging fixes, e.g.
@@ -35,16 +36,20 @@ cd "$WORKING_DIR"
 
 mkdir -p db
 
+mkdir -p "$(dirname "$LOG_FILE")"
+
 echo "Starting Leios testnet relay"
 echo "  binary:    $($CARDANO_NODE --version 2>&1 | head -1)"
 echo "  workdir:   $WORKING_DIR"
 echo "  bind:      $HOST_ADDR:$PORT"
 echo "  topology:  $(jq -c '.bootstrapPeers' topology.json)"
+echo "  log file:  $LOG_FILE"
 
-exec "$CARDANO_NODE" run \
+"$CARDANO_NODE" run \
   --config config.json \
   --host-addr "$HOST_ADDR" \
   --port "$PORT" \
   --topology topology.json \
   --database-path db \
-  --socket-path node.socket
+  --socket-path node.socket \
+  2>&1 | tee "$LOG_FILE"
