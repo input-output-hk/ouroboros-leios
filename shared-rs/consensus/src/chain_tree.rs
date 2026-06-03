@@ -265,18 +265,47 @@ impl ChainTree {
             None => false,
         };
         if pruned {
-            self.best_tip = None;
-            for (hash, node) in &self.nodes {
-                let is_new_best = match &self.best_tip {
-                    None => true,
-                    Some((_, best_bn)) => {
-                        let best_hash = self.best_tip_hash().unwrap_or([0xFF; 32]);
-                        is_better_tip(node.block_number, hash, *best_bn, &best_hash)
-                    }
-                };
-                if is_new_best {
-                    self.best_tip = Some((node.point.clone(), node.block_number));
+            self.recompute_best_tip();
+        }
+    }
+
+    /// Remove a single block node — used to drop a fork tip that no
+    /// connected peer can serve, so it stops being chosen as `best_tip`
+    /// and wedging chain selection.  This happens after a deep rollback:
+    /// blocks we cached from the peer's chain become unreachable when the
+    /// peer rolls back past them, but they linger here as a far-ahead,
+    /// disconnected best tip that the gap-bridge can never fetch.
+    ///
+    /// Recomputes `best_tip` from the remaining nodes when the removed
+    /// node was the best tip.  Returns true if a node was removed.  If a
+    /// peer later re-announces that chain, ChainSync re-inserts it.
+    pub fn remove_fork_tip(&mut self, hash: &[u8; 32]) -> bool {
+        let was_best = self.best_tip_hash() == Some(*hash);
+        if self.nodes.remove(hash).is_none() {
+            return false;
+        }
+        if was_best {
+            self.recompute_best_tip();
+        }
+        true
+    }
+
+    /// Recompute `best_tip` by scanning all nodes for the highest
+    /// `block_number` (ties broken by lower hash).  Deterministic despite
+    /// HashMap iteration: the result is the maximum under the total order
+    /// defined by [`is_better_tip`], independent of visit order.
+    fn recompute_best_tip(&mut self) {
+        self.best_tip = None;
+        for (hash, node) in &self.nodes {
+            let is_new_best = match &self.best_tip {
+                None => true,
+                Some((_, best_bn)) => {
+                    let best_hash = self.best_tip_hash().unwrap_or([0xFF; 32]);
+                    is_better_tip(node.block_number, hash, *best_bn, &best_hash)
                 }
+            };
+            if is_new_best {
+                self.best_tip = Some((node.point.clone(), node.block_number));
             }
         }
     }
