@@ -13,6 +13,7 @@
 //! and tracks the current tip so `rollback` is meaningful.
 
 use std::fmt;
+use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -83,8 +84,8 @@ pub enum LedgerCommand {
     ValidateEb { point: Point },
     /// Validate a vote bundle (fake delay, then succeed).
     ValidateVotes {
-        vote_ids: Vec<(u64, Vec<u8>)>,
-        vote_data: Vec<Vec<u8>>,
+        vote_ids: Vec<(u64, Arc<Vec<u8>>)>,
+        vote_data: Vec<Arc<Vec<u8>>>,
     },
 }
 
@@ -104,8 +105,8 @@ pub enum LedgerOutcome {
     /// Vote validation completed.
     VotesValidated {
         #[allow(dead_code)] // kept for future telemetry/diagnostics
-        vote_ids: Vec<(u64, Vec<u8>)>,
-        vote_data: Vec<Vec<u8>>,
+        vote_ids: Vec<(u64, Arc<Vec<u8>>)>,
+        vote_data: Vec<Arc<Vec<u8>>>,
     },
 }
 
@@ -487,8 +488,8 @@ mod tests {
         let rx = test_dyn_config(0.0, 0.0, 0.0);
         let (validator, mut outcome_rx) = Validator::new(rx);
 
-        let vote_ids = vec![(10u64, vec![0xAAu8]), (20u64, vec![0xBBu8])];
-        let vote_data = vec![vec![0x01], vec![0x02]];
+        let vote_ids = vec![(10u64, Arc::new(vec![0xAAu8])), (20u64, Arc::new(vec![0xBBu8]))];
+        let vote_data = vec![Arc::new(vec![0x01]), Arc::new(vec![0x02])];
         validator
             .submit(LedgerCommand::ValidateVotes {
                 vote_ids: vote_ids.clone(),

@@ -450,7 +450,7 @@ pub(crate) enum LeiosFetchCommand {
         bitmap: std::collections::BTreeMap<u16, u64>,
     },
     Votes {
-        votes: Vec<(u64, Vec<u8>)>,
+        votes: Vec<(u64, Arc<Vec<u8>>)>,
     },
 }
 
@@ -1122,7 +1122,7 @@ mod tests {
             assert!(matches!(msg, LnMsg::MsgLeiosNotificationRequestNext));
             runner
                 .send(&LnMsg::MsgLeiosVotesOffer {
-                    votes: vec![(100, vec![0x01])],
+                    votes: vec![(100, Arc::new(vec![0x01]))],
                 })
                 .await
                 .unwrap();
@@ -1155,7 +1155,7 @@ mod tests {
             let (_id, event2) = event_receiver.recv().await.unwrap();
             match event2 {
                 PeerEvent::LeiosVotesOffered { votes } => {
-                    assert_eq!(votes, vec![(100, vec![0x01])]);
+                    assert_eq!(votes, vec![(100, Arc::new(vec![0x01]))]);
                 }
                 other => panic!("expected LeiosVotesOffered, got {other:?}"),
             }

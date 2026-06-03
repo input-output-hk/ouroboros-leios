@@ -34,7 +34,7 @@ struct OfferDedup {
     /// `(peer, slot, voter_id)` already forwarded as part of
     /// `LeiosVotesOffered`.  Per-vote because a single offer event
     /// carries a batch.
-    seen_votes: BTreeSet<(PeerId, u64, Vec<u8>)>,
+    seen_votes: BTreeSet<(PeerId, u64, Arc<Vec<u8>>)>,
     max_slot: u64,
     window: u64,
 }
@@ -74,8 +74,8 @@ impl OfferDedup {
     fn fresh_votes(
         &mut self,
         peer: PeerId,
-        votes: Vec<(u64, Vec<u8>)>,
-    ) -> Vec<(u64, Vec<u8>)> {
+        votes: Vec<(u64, Arc<Vec<u8>>)>,
+    ) -> Vec<(u64, Arc<Vec<u8>>)> {
         let mut out = Vec::with_capacity(votes.len());
         for (slot, voter_id) in votes {
             self.update_slot(slot);

@@ -191,7 +191,7 @@ pub enum LeiosEffect {
     /// [`VoteFetchPolicy`] into one batch per peer.  The wrapper
     /// dispatches each (`peer`, `votes`) tuple as a separate fetch.
     FetchLeiosVotes {
-        per_peer: BTreeMap<PeerId, Vec<(u64, Vec<u8>)>>,
+        per_peer: BTreeMap<PeerId, Vec<(u64, Arc<Vec<u8>>)>>,
     },
     /// Record the EB-tx manifest in the network-side store so this
     /// node can serve EB-tx requests back to peers.
@@ -230,8 +230,8 @@ pub enum LeiosEffect {
     ValidateEb { point: Point },
     /// Submit fetched vote bodies for ledger validation.
     ValidateVotes {
-        vote_ids: Vec<(u64, Vec<u8>)>,
-        vote_data: Vec<Vec<u8>>,
+        vote_ids: Vec<(u64, Arc<Vec<u8>>)>,
+        vote_data: Vec<Arc<Vec<u8>>>,
     },
 
     /// Telemetry event the I/O layer should forward to its sink.
@@ -950,8 +950,8 @@ impl LeiosState {
     /// Received vote bodies; submit to the validator.
     pub fn on_votes_received(
         &mut self,
-        vote_ids: Vec<(u64, Vec<u8>)>,
-        vote_data: Vec<Vec<u8>>,
+        vote_ids: Vec<(u64, Arc<Vec<u8>>)>,
+        vote_data: Vec<Arc<Vec<u8>>>,
     ) -> Vec<LeiosEffect> {
         let appended: Vec<LeiosEffect> = match self
             .invoke_hook(|b, s| b.on_votes_received(s, &vote_ids, &vote_data))
@@ -1655,7 +1655,7 @@ mod tests {
     #[test]
     fn on_votes_offered_emits_fetch() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        let votes = vec![(10u64, vec![0u8; 8])];
+        let votes = vec![(10u64, Arc::new(vec![0u8; 8]))];
         let peer = PeerId(1);
         let fx = state.on_votes_offered(peer, votes.clone());
         assert_eq!(fx.len(), 1);
@@ -1680,8 +1680,8 @@ mod tests {
     #[test]
     fn on_votes_received_emits_validate_votes() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        let ids = vec![(10u64, vec![0u8; 8])];
-        let bodies = vec![vec![0xAB]];
+        let ids = vec![(10u64, Arc::new(vec![0u8; 8]))];
+        let bodies = vec![Arc::new(vec![0xAB])];
         let fx = state.on_votes_received(ids.clone(), bodies.clone());
         assert_eq!(fx.len(), 1);
         match &fx[0] {
@@ -1934,10 +1934,10 @@ mod tests {
         state.candidates.note_eb_txs_offered(point(8, 0xDD), peer);
         state
             .candidates
-            .note_vote_offered((5, b"voter".to_vec()), peer);
+            .note_vote_offered((5, Arc::new(b"voter".to_vec())), peer);
         state
             .candidates
-            .note_vote_offered((8, b"voter".to_vec()), peer);
+            .note_vote_offered((8, Arc::new(b"voter".to_vec())), peer);
 
         state.set_chain_tip_context(ChainTipContext {
             tip_rb_slot: Some(8),
@@ -1950,7 +1950,7 @@ mod tests {
         assert!(
             state
                 .candidates
-                .vote_candidates(&(5, b"voter".to_vec()))
+                .vote_candidates(&(5, Arc::new(b"voter".to_vec())))
                 .is_empty()
         );
         assert_eq!(state.candidates.eb_candidates(&point(8, 0xBB)), vec![peer]);
@@ -1959,7 +1959,7 @@ mod tests {
             vec![peer]
         );
         assert_eq!(
-            state.candidates.vote_candidates(&(8, b"voter".to_vec())),
+            state.candidates.vote_candidates(&(8, Arc::new(b"voter".to_vec()))),
             vec![peer]
         );
     }

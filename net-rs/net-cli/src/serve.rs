@@ -4,6 +4,7 @@
 //! Uses the multi-peer coordinator in responder-only mode. The block
 //! generator injects blocks via `NetworkCommand::InjectBlock`.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use rand::rngs::StdRng;
@@ -116,8 +117,8 @@ async fn leios_generator(commands: mpsc::Sender<NetworkCommand>, rate: f64) {
         let mut vote_ids = Vec::new();
         let mut vote_data = Vec::new();
         for v in 0..num_votes {
-            vote_ids.push((slot, vec![v]));
-            vote_data.push(vec![0xA0, v]); // minimal CBOR
+            vote_ids.push((slot, Arc::new(vec![v])));
+            vote_data.push(Arc::new(vec![0xA0, v])); // minimal CBOR
         }
         let _ = commands
             .send(NetworkCommand::InjectLeiosVotes {

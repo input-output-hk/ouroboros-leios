@@ -32,7 +32,7 @@ pub enum LeiosNotification {
     /// An EB's transactions are available for download.
     BlockTxsOffer { point: Point },
     /// Votes are available for download.
-    VotesOffer { votes: Vec<(u64, Vec<u8>)> },
+    VotesOffer { votes: Vec<(u64, Arc<Vec<u8>>)> },
 }
 
 /// Key for block lookups.
@@ -57,7 +57,7 @@ struct LeiosStoreInner {
     /// bodies indirectly without keeping a duplicate copy.
     eb_tx_hashes: HashMap<BlockKey, Vec<[u8; 32]>>,
     /// Votes keyed by (slot, voter_id).
-    votes: HashMap<(u64, Vec<u8>), Vec<u8>>,
+    votes: HashMap<(u64, Arc<Vec<u8>>), Arc<Vec<u8>>>,
     /// Notification queue for the LeiosNotify server.  Front-pruned
     /// alongside the slot-window eviction of the other maps so
     /// long-running connections don't accumulate notifications for
@@ -230,7 +230,7 @@ impl LeiosStore {
     ///
     /// `ids` are `(slot, voter_id)` pairs; `data` are the corresponding
     /// opaque vote blobs (same length).
-    pub fn inject_votes(&self, ids: Vec<(u64, Vec<u8>)>, data: Vec<Vec<u8>>) {
+    pub fn inject_votes(&self, ids: Vec<(u64, Arc<Vec<u8>>)>, data: Vec<Arc<Vec<u8>>>) {
         if ids.is_empty() {
             return;
         }
@@ -325,7 +325,7 @@ impl LeiosStore {
 
     /// Look up votes by their `(slot, voter_id)` identifiers.
     /// Returns one blob per requested id (empty vec if not found).
-    pub fn get_votes(&self, ids: &[(u64, Vec<u8>)]) -> Vec<Vec<u8>> {
+    pub fn get_votes(&self, ids: &[(u64, Arc<Vec<u8>>)]) -> Vec<Arc<Vec<u8>>> {
         let inner = self.inner.lock().unwrap();
         ids.iter()
             .filter_map(|id| inner.votes.get(id).cloned())
@@ -731,8 +731,8 @@ mod tests {
     #[test]
     fn inject_and_get_votes() {
         let (store, _rx) = LeiosStore::new(100);
-        let ids = vec![(100, vec![0x01]), (101, vec![0x02])];
-        let data = vec![vec![0xA0], vec![0xB0]];
+        let ids = vec![(100, Arc::new(vec![0x01])), (101, Arc::new(vec![0x02]))];
+        let data = vec![Arc::new(vec![0xA0]), Arc::new(vec![0xB0])];
 
         store.inject_votes(ids.clone(), data.clone());
 
@@ -740,7 +740,7 @@ mod tests {
         assert_eq!(result, data);
 
         // Unknown vote returns empty.
-        let result = store.get_votes(&[(999, vec![0xFF])]);
+        let result = store.get_votes(&[(999, Arc::new(vec![0xFF]))]);
         assert!(result.is_empty());
     }
 
@@ -751,7 +751,7 @@ mod tests {
         let point = Point::Specific { slot: 1, hash };
 
         store.inject_block(point, vec![0x01]);
-        store.inject_votes(vec![(10, vec![0x02])], vec![vec![0x03]]);
+        store.inject_votes(vec![(10, Arc::new(vec![0x02]))], vec![Arc::new(vec![0x03])]);
 
         let all = store.notifications_after(&mut 0);
         assert_eq!(all.len(), 2);
@@ -777,7 +777,7 @@ mod tests {
 
         // Inject votes/blocks at slot 1, then advance the clock far past
         // the retention window. Old entries must be evicted.
-        store.inject_votes(vec![(1, vec![0xAA])], vec![vec![0x01]]);
+        store.inject_votes(vec![(1, Arc::new(vec![0xAA]))], vec![Arc::new(vec![0x01])]);
         store.inject_block(
             Point::Specific {
                 slot: 1,
@@ -794,7 +794,7 @@ mod tests {
         );
 
         // Pre-eviction sanity.
-        assert_eq!(store.get_votes(&[(1, vec![0xAA])]), vec![vec![0x01]]);
+        assert_eq!(store.get_votes(&[(1, Arc::new(vec![0xAA]))]), vec![Arc::new(vec![0x01])]);
         assert!(store.get_block(1, &[0x11; 32]).is_some());
 
         // Inject something far in the future — past the retention cutoff.
@@ -808,7 +808,7 @@ mod tests {
         );
 
         assert!(
-            store.get_votes(&[(1, vec![0xAA])]).is_empty(),
+            store.get_votes(&[(1, Arc::new(vec![0xAA]))]).is_empty(),
             "old vote should be evicted past retention window"
         );
         assert!(
@@ -846,7 +846,7 @@ mod tests {
             },
             vec![0xB1],
         );
-        store.inject_votes(vec![(1, vec![0xAA])], vec![vec![0x01]]);
+        store.inject_votes(vec![(1, Arc::new(vec![0xAA]))], vec![Arc::new(vec![0x01])]);
         assert_eq!(store.notification_count(), 3);
 
         // Inject a recent block to push max_slot past the retention

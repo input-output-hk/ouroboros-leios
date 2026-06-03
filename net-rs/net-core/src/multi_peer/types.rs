@@ -85,7 +85,7 @@ pub enum NetworkEvent {
     /// Leios: votes are available for download from a peer.
     LeiosVotesOffered {
         peer_id: PeerId,
-        votes: Vec<(u64, Vec<u8>)>,
+        votes: Vec<(u64, Arc<Vec<u8>>)>,
     },
 
     /// Leios: a fetched endorser block arrived.
@@ -94,8 +94,8 @@ pub enum NetworkEvent {
     /// Leios: fetched votes arrived.
     /// `vote_ids` are (slot, issuer_id) keys; `vote_data` are the CBOR bodies.
     LeiosVotesReceived {
-        vote_ids: Vec<(u64, Vec<u8>)>,
-        vote_data: Vec<Vec<u8>>,
+        vote_ids: Vec<(u64, Arc<Vec<u8>>)>,
+        vote_data: Vec<Arc<Vec<u8>>>,
     },
 
     /// Leios: fetched transactions for an EB arrived.
@@ -177,7 +177,7 @@ pub enum NetworkCommand {
     /// per peer in the policy's per-peer grouping).
     FetchLeiosVotes {
         peer_id: PeerId,
-        votes: Vec<(u64, Vec<u8>)>,
+        votes: Vec<(u64, Arc<Vec<u8>>)>,
     },
 
     /// Inject a Leios block into the Leios store (for responder peers to serve).
@@ -201,8 +201,8 @@ pub enum NetworkCommand {
 
     /// Inject votes into the Leios store (for responder peers to serve).
     InjectLeiosVotes {
-        votes: Vec<(u64, Vec<u8>)>,
-        data: Vec<Vec<u8>>,
+        votes: Vec<(u64, Arc<Vec<u8>>)>,
+        data: Vec<Arc<Vec<u8>>>,
     },
 
     /// Provide transactions to a specific peer via TxSubmission.

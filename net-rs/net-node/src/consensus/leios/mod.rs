@@ -288,7 +288,7 @@ impl LeiosConsensus {
 
     /// Vote validation completed; record each vote, fire quorum
     /// telemetry if quorum forms.
-    pub fn on_validated_votes(&mut self, vote_data: &[Vec<u8>]) {
+    pub fn on_validated_votes(&mut self, vote_data: &[Arc<Vec<u8>>]) {
         // Decode wire-format vote bodies up front so we can lend them
         // to the state machine as borrowed `ValidatedVote` views.
         let decoded: Vec<VoteBody> = vote_data
@@ -511,8 +511,8 @@ impl LeiosConsensus {
             );
             let mut id = voter_id.clone();
             id.push(0);
-            votes.push((eb_slot, id));
-            data.push(encoded);
+            votes.push((eb_slot, Arc::new(id)));
+            data.push(Arc::new(encoded));
         }
         if let Some(sig) = npv_signature {
             let body =
@@ -525,8 +525,8 @@ impl LeiosConsensus {
             );
             let mut id = voter_id.clone();
             id.push(1);
-            votes.push((eb_slot, id));
-            data.push(encoded);
+            votes.push((eb_slot, Arc::new(id)));
+            data.push(Arc::new(encoded));
         }
         if !votes.is_empty() {
             self.pending_telemetry.push(NodeEvent::VTBundleGenerated {
@@ -805,11 +805,11 @@ mod tests {
         let (validator, mut outcome_rx) = test_validator();
         let mut leios = test_leios(tx, validator);
 
-        let vote_ids = vec![(10u64, vec![0xAAu8])];
+        let vote_ids = vec![(10u64, Arc::new(vec![0xAAu8]))];
         leios
             .handle_event(&NetworkEvent::LeiosVotesReceived {
                 vote_ids: vote_ids.clone(),
-                vote_data: vec![vec![0x01]],
+                vote_data: vec![Arc::new(vec![0x01])],
             })
             .await;
 
@@ -840,7 +840,7 @@ mod tests {
 
         let eb_hash = point_hash(0);
         let body = crate::production::VoteBody::stub_persistent(0, b"peer-0", 100, &eb_hash);
-        leios.on_validated_votes(&[body.encode(130)]);
+        leios.on_validated_votes(&[Arc::new(body.encode(130))]);
         assert_eq!(leios.election_voter_count(&eb_hash), 1);
         assert!(!leios.election_quorum(&eb_hash));
     }
@@ -859,11 +859,10 @@ mod tests {
         let voters = [
             "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5",
         ];
-        let bodies: Vec<Vec<u8>> = voters
+        let bodies: Vec<Arc<Vec<u8>>> = voters
             .iter()
             .map(|v| {
-                crate::production::VoteBody::stub_persistent(0, v.as_bytes(), 100, &eb_hash)
-                    .encode(130)
+                Arc::new(VoteBody::stub_persistent(0, v.as_bytes(), 100, &eb_hash).encode(130))
             })
             .collect();
         leios.on_validated_votes(&bodies);
@@ -887,7 +886,7 @@ mod tests {
 
         // Subsequent votes don't re-fire.
         let body8 = crate::production::VoteBody::stub_persistent(0, b"peer-6", 100, &eb_hash);
-        leios.on_validated_votes(&[body8.encode(130)]);
+        leios.on_validated_votes(&[Arc::new(body8.encode(130))]);
         let drained2 = leios.drain_telemetry();
         assert!(!drained2
             .iter()
@@ -916,7 +915,7 @@ mod tests {
             for v in &voters {
                 let body =
                     crate::production::VoteBody::stub_persistent(slot, v.as_bytes(), 100, &hash);
-                all_bodies.push(body.encode(130));
+                all_bodies.push(Arc::new(body.encode(130)));
             }
         }
         leios.on_validated_votes(&all_bodies);
