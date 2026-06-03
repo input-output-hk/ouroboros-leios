@@ -243,6 +243,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     store.tick_slot(slot);
                 }
 
+                // Behaviour-driven self-reorg (e.g. DeepReorg): re-anchor
+                // the adopted chain before production so the producer forks
+                // and downstream followers see a deep rollback. No-op for
+                // honest nodes.
+                if let Some(depth) = consensus.maybe_force_reorg(slot).await {
+                    info!(node_id = %node_id, slot, depth, "behaviour: forced deep self-reorg");
+                }
+
                 // Leios: advance pipeline phases and trigger voting.
                 if leios {
                     consensus.on_slot(slot).await;

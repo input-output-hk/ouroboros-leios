@@ -107,6 +107,17 @@ impl PraosConsensus {
         &self.state
     }
 
+    /// Deliberate self-reorg (the `DeepReorg` behaviour): roll the
+    /// adopted chain back `depth` blocks, abandon the suffix, and diffuse
+    /// the resulting `InjectRollback` so downstream followers see a deep
+    /// rollback.  Returns true if a rollback was actually emitted.
+    pub async fn force_rollback(&mut self, depth: u64) -> bool {
+        let fx = self.state.force_rollback(depth);
+        let emitted = !fx.is_empty();
+        self.dispatch(fx).await;
+        emitted
+    }
+
     /// Drain effects to the I/O sinks.  Network-side effects go to
     /// `commands`; validator effects go to `validator.submit`.  Header
     /// and body bytes are rehydrated into the wire types here; the

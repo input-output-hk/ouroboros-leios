@@ -17,7 +17,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::behaviours::{LazyVoter, RbHeaderEquivocator, T22ThreatBehaviour};
+use super::behaviours::{DeepReorg, LazyVoter, RbHeaderEquivocator, T22ThreatBehaviour};
 use super::{Behaviour, CompositeBehaviour, HonestBehaviour};
 use crate::leios::NoVoteReason;
 
@@ -61,6 +61,12 @@ pub enum BehaviourSpec {
         non_voting_threshold: u8,
         hide_eb_tx_received: bool,
     },
+    /// Producer-side chain chaos: every `every_slots` slots, roll this
+    /// node's adopted chain back `depth` blocks and fork, so downstream
+    /// followers must recover from a deep rollback that orphans their
+    /// adopted tip.  See [`super::behaviours::DeepReorg`].
+    #[serde(rename = "deep-reorg")]
+    DeepReorg { every_slots: u64, depth: u64 },
 }
 
 fn default_lazy_reason() -> NoVoteReason {
@@ -115,6 +121,9 @@ pub fn build(spec: &BehaviourSpec, seed: u64) -> Box<dyn Behaviour> {
             non_voting_threshold,
             hide_eb_tx_received,
         } => Box::new(T22ThreatBehaviour::new(*vote_threshold, *non_voting_threshold, *hide_eb_tx_received)),
+        BehaviourSpec::DeepReorg { every_slots, depth } => {
+            Box::new(DeepReorg::new(*every_slots, *depth))
+        }
     }
 }
 
