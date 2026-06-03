@@ -216,7 +216,7 @@ pub trait Behaviour: Send + Sync {
         &mut self,
         _state: &LeiosState,
         _peer: PeerId,
-        _vote_ids: &[(u64, Vec<u8>)],
+        _vote_ids: &[(u64, Arc<Vec<u8>>)],
     ) -> BehaviourOutcome<LeiosEffect> {
         BehaviourOutcome::Continue
     }
@@ -233,8 +233,8 @@ pub trait Behaviour: Send + Sync {
     fn on_votes_received(
         &mut self,
         _state: &LeiosState,
-        _vote_ids: &[(u64, Vec<u8>)],
-        _vote_data: &[Vec<u8>],
+        _vote_ids: &[(u64, Arc<Vec<u8>>)],
+        _vote_data: &[Arc<Vec<u8>>],
     ) -> BehaviourOutcome<LeiosEffect> {
         BehaviourOutcome::Continue
     }
@@ -483,7 +483,7 @@ impl Behaviour for CompositeBehaviour {
         &mut self,
         state: &LeiosState,
         peer: PeerId,
-        vote_ids: &[(u64, Vec<u8>)],
+        vote_ids: &[(u64, Arc<Vec<u8>>)],
     ) -> BehaviourOutcome<LeiosEffect> {
         for c in self.children.iter_mut() {
             let out = c.on_votes_offered(state, peer, vote_ids);
@@ -512,8 +512,8 @@ impl Behaviour for CompositeBehaviour {
     fn on_votes_received(
         &mut self,
         state: &LeiosState,
-        vote_ids: &[(u64, Vec<u8>)],
-        vote_data: &[Vec<u8>],
+        vote_ids: &[(u64, Arc<Vec<u8>>)],
+        vote_data: &[Arc<Vec<u8>>],
     ) -> BehaviourOutcome<LeiosEffect> {
         for c in self.children.iter_mut() {
             let out = c.on_votes_received(state, vote_ids, vote_data);

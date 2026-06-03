@@ -191,7 +191,7 @@ pub enum LeiosEffect {
     /// [`VoteFetchPolicy`] into one batch per peer.  The wrapper
     /// dispatches each (`peer`, `votes`) tuple as a separate fetch.
     FetchLeiosVotes {
-        per_peer: BTreeMap<PeerId, Vec<(u64, Vec<u8>)>>,
+        per_peer: BTreeMap<PeerId, Vec<(u64, Arc<Vec<u8>>)>>,
     },
     /// Record the EB-tx manifest in the network-side store so this
     /// node can serve EB-tx requests back to peers.
@@ -230,8 +230,8 @@ pub enum LeiosEffect {
     ValidateEb { point: Point },
     /// Submit fetched vote bodies for ledger validation.
     ValidateVotes {
-        vote_ids: Vec<(u64, Vec<u8>)>,
-        vote_data: Vec<Vec<u8>>,
+        vote_ids: Vec<(u64, Arc<Vec<u8>>)>,
+        vote_data: Vec<Arc<Vec<u8>>>,
     },
 
     /// Telemetry event the I/O layer should forward to its sink.
@@ -271,7 +271,7 @@ pub enum LeiosTelemetryEvent {
 pub struct EbTxMatchOutcome {
     /// Bodies whose blake2b-256 hash maps to a requested manifest
     /// index, in ascending manifest-index order.
-    pub matched_bodies: Vec<Vec<u8>>,
+    pub matched_bodies: Vec<Arc<Vec<u8>>>,
     /// Number of indices that the original request bitmap selected.
     /// Zero means "manifest not cached at request time" (fallback path).
     pub requested: usize,
@@ -490,7 +490,7 @@ impl LeiosState {
             .iter()
             .enumerate()
             .filter_map(|(i, h)| {
-                let tx_id: crate::mempool::TxId = h.to_vec();
+                let tx_id: crate::mempool::TxId = Arc::new(h.to_vec());
                 if mempool.has_tx(&tx_id) {
                     None
                 } else {
@@ -950,8 +950,8 @@ impl LeiosState {
     /// Received vote bodies; submit to the validator.
     pub fn on_votes_received(
         &mut self,
-        vote_ids: Vec<(u64, Vec<u8>)>,
-        vote_data: Vec<Vec<u8>>,
+        vote_ids: Vec<(u64, Arc<Vec<u8>>)>,
+        vote_data: Vec<Arc<Vec<u8>>>,
     ) -> Vec<LeiosEffect> {
         let appended: Vec<LeiosEffect> = match self
             .invoke_hook(|b, s| b.on_votes_received(s, &vote_ids, &vote_data))
@@ -1091,7 +1091,7 @@ impl LeiosState {
     pub fn match_eb_tx_response(
         &mut self,
         point: &Point,
-        bodies_with_hashes: &[(Vec<u8>, [u8; 32])],
+        bodies_with_hashes: &[(Arc<Vec<u8>>, [u8; 32])],
     ) -> EbTxMatchOutcome {
         // A response means the in-flight fetch for this point is done;
         // clear the candidate tracker's pending guard so a retry (which
@@ -1124,13 +1124,13 @@ impl LeiosState {
             .map(|(i, h)| (h, i))
             .collect();
         // Match each body, sorting by manifest index.
-        let mut matched: BTreeMap<usize, Vec<u8>> = BTreeMap::new();
+        let mut matched: BTreeMap<usize, Arc<Vec<u8>>> = BTreeMap::new();
         for (body, body_hash) in bodies_with_hashes {
             if let Some(&idx) = manifest_index.get(body_hash) {
                 matched.entry(idx).or_insert_with(|| body.clone());
             }
         }
-        let matched_bodies: Vec<Vec<u8>> = matched.values().cloned().collect();
+        let matched_bodies: Vec<Arc<Vec<u8>>> = matched.values().cloned().collect();
 
         // Compute `requested` and `remaining_bitmap`.
         let (requested, remaining_bitmap) =
@@ -1304,6 +1304,7 @@ fn indices_to_bitmap(indices: &[u32]) -> BTreeMap<u16, u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     fn pipeline() -> PipelineConfig {
         PipelineConfig {
@@ -1575,14 +1576,18 @@ mod tests {
         state.eb_tx_hashes.insert(h(1), (10, vec![ha, hb, hc]));
         // Body order arrives as [b, a, c] but should come out [a, b, c].
         let bodies = vec![
-            (b"body-b".to_vec(), hb),
-            (b"body-a".to_vec(), ha),
-            (b"body-c".to_vec(), hc),
+            (Arc::new(b"body-b".to_vec()), hb),
+            (Arc::new(b"body-a".to_vec()), ha),
+            (Arc::new(b"body-c".to_vec()), hc),
         ];
         let outcome = state.match_eb_tx_response(&point(10, 1), &bodies);
         assert_eq!(
             outcome.matched_bodies,
-            vec![b"body-a".to_vec(), b"body-b".to_vec(), b"body-c".to_vec()]
+            vec![
+                Arc::new(b"body-a".to_vec()),
+                Arc::new(b"body-b".to_vec()),
+                Arc::new(b"body-c".to_vec())
+            ]
         );
     }
 
@@ -1592,9 +1597,12 @@ mod tests {
         let ha = h(0xA0);
         state.eb_tx_hashes.insert(h(1), (10, vec![ha]));
         let bogus = h(0xFF);
-        let bodies = vec![(b"body-a".to_vec(), ha), (b"bogus".to_vec(), bogus)];
+        let bodies = vec![
+            (Arc::new(b"body-a".to_vec()), ha),
+            (Arc::new(b"bogus".to_vec()), bogus),
+        ];
         let outcome = state.match_eb_tx_response(&point(10, 1), &bodies);
-        assert_eq!(outcome.matched_bodies, vec![b"body-a".to_vec()]);
+        assert_eq!(outcome.matched_bodies, vec![Arc::new(b"body-a".to_vec())]);
     }
 
     #[test]
@@ -1647,7 +1655,7 @@ mod tests {
     #[test]
     fn on_votes_offered_emits_fetch() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        let votes = vec![(10u64, vec![0u8; 8])];
+        let votes = vec![(10u64, Arc::new(vec![0u8; 8]))];
         let peer = PeerId(1);
         let fx = state.on_votes_offered(peer, votes.clone());
         assert_eq!(fx.len(), 1);
@@ -1672,8 +1680,8 @@ mod tests {
     #[test]
     fn on_votes_received_emits_validate_votes() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        let ids = vec![(10u64, vec![0u8; 8])];
-        let bodies = vec![vec![0xAB]];
+        let ids = vec![(10u64, Arc::new(vec![0u8; 8]))];
+        let bodies = vec![Arc::new(vec![0xAB])];
         let fx = state.on_votes_received(ids.clone(), bodies.clone());
         assert_eq!(fx.len(), 1);
         match &fx[0] {
@@ -1745,9 +1753,11 @@ mod tests {
         requested.insert(0u16, 0b11u64);
         state.pending_eb_tx_fetches.insert(h(1), (10, requested));
         // Only body for index 0 (ha) arrives.
-        let outcome =
-            state.match_eb_tx_response(&point(10, 1), &[(b"body-a".to_vec(), ha)]);
-        assert_eq!(outcome.matched_bodies, vec![b"body-a".to_vec()]);
+        let outcome = state.match_eb_tx_response(
+            &point(10, 1),
+            &[(Arc::new(b"body-a".to_vec()), ha)],
+        );
+        assert_eq!(outcome.matched_bodies, vec![Arc::new(b"body-a".to_vec())]);
         assert_eq!(outcome.requested, 2);
         // Index 1 still missing.
         let mut expected_remaining = BTreeMap::new();
@@ -1768,8 +1778,10 @@ mod tests {
         let mut requested = BTreeMap::new();
         requested.insert(0u16, 0b1u64);
         state.pending_eb_tx_fetches.insert(h(1), (10, requested));
-        let outcome =
-            state.match_eb_tx_response(&point(10, 1), &[(b"body-a".to_vec(), ha)]);
+        let outcome = state.match_eb_tx_response(
+            &point(10, 1),
+            &[(Arc::new(b"body-a".to_vec()), ha)],
+        );
         assert!(outcome.remaining_bitmap.is_empty());
         assert!(!state.pending_eb_tx_fetches.contains_key(&h(1)));
     }
@@ -1779,9 +1791,9 @@ mod tests {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
         let outcome = state.match_eb_tx_response(
             &point(10, 1),
-            &[(b"some-body".to_vec(), h(0xAA))],
+            &[(Arc::new(b"some-body".to_vec()), h(0xAA))],
         );
-        assert_eq!(outcome.matched_bodies, vec![b"some-body".to_vec()]);
+        assert_eq!(outcome.matched_bodies, vec![Arc::new(b"some-body".to_vec())]);
         assert_eq!(outcome.requested, 0);
         assert!(outcome.remaining_bitmap.is_empty());
     }
@@ -1922,10 +1934,10 @@ mod tests {
         state.candidates.note_eb_txs_offered(point(8, 0xDD), peer);
         state
             .candidates
-            .note_vote_offered((5, b"voter".to_vec()), peer);
+            .note_vote_offered((5, Arc::new(b"voter".to_vec())), peer);
         state
             .candidates
-            .note_vote_offered((8, b"voter".to_vec()), peer);
+            .note_vote_offered((8, Arc::new(b"voter".to_vec())), peer);
 
         state.set_chain_tip_context(ChainTipContext {
             tip_rb_slot: Some(8),
@@ -1938,7 +1950,7 @@ mod tests {
         assert!(
             state
                 .candidates
-                .vote_candidates(&(5, b"voter".to_vec()))
+                .vote_candidates(&(5, Arc::new(b"voter".to_vec())))
                 .is_empty()
         );
         assert_eq!(state.candidates.eb_candidates(&point(8, 0xBB)), vec![peer]);
@@ -1947,7 +1959,7 @@ mod tests {
             vec![peer]
         );
         assert_eq!(
-            state.candidates.vote_candidates(&(8, b"voter".to_vec())),
+            state.candidates.vote_candidates(&(8, Arc::new(b"voter".to_vec()))),
             vec![peer]
         );
     }
@@ -2065,8 +2077,8 @@ mod tests {
 
         let mut mempool = crate::mempool::MempoolState::new(4096);
         // Local mempool has txs 0 (h(1)) and 2 (h(3)); 1 (h(2)) and 3 (h(4)) are missing.
-        mempool.admit_validated(h(1).to_vec(), vec![0u8; 16], 16);
-        mempool.admit_validated(h(3).to_vec(), vec![0u8; 16], 16);
+        mempool.admit_validated(Arc::new(h(1).to_vec()), Arc::new(vec![0u8; 16]), 16);
+        mempool.admit_validated(Arc::new(h(3).to_vec()), Arc::new(vec![0u8; 16]), 16);
 
         let bitmap = state.missing_eb_tx_bitmap(&h(0xAB), &mempool);
         let indices: Vec<u32> = crate::bitmap::iter_indices(&bitmap).collect();
@@ -2080,8 +2092,8 @@ mod tests {
         state.eb_tx_hashes.insert(h(0xCD), (50, manifest));
 
         let mut mempool = crate::mempool::MempoolState::new(4096);
-        mempool.admit_validated(h(5).to_vec(), vec![0u8; 8], 8);
-        mempool.admit_validated(h(6).to_vec(), vec![0u8; 8], 8);
+        mempool.admit_validated(Arc::new(h(5).to_vec()), Arc::new(vec![0u8; 8]), 8);
+        mempool.admit_validated(Arc::new(h(6).to_vec()), Arc::new(vec![0u8; 8]), 8);
 
         let bitmap = state.missing_eb_tx_bitmap(&h(0xCD), &mempool);
         assert!(bitmap.is_empty());

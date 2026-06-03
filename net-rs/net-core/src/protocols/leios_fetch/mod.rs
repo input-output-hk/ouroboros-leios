@@ -8,6 +8,7 @@ pub mod bitmap;
 pub mod codec;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::protocols::{Agency, Protocol, ProtocolError, Runner};
@@ -90,11 +91,11 @@ pub enum Message {
         bitmap: BTreeMap<u16, u64>,
     },
     /// Server delivers transactions. [3, [tx, ...]]
-    MsgLeiosBlockTxs { transactions: Vec<Vec<u8>> },
+    MsgLeiosBlockTxs { transactions: Vec<Arc<Vec<u8>>> },
     /// Client requests votes. [4, [(slot, voter_id), ...]]
-    MsgLeiosVotesRequest { votes: Vec<(u64, Vec<u8>)> },
+    MsgLeiosVotesRequest { votes: Vec<(u64, Arc<Vec<u8>>)> },
     /// Server delivers votes. [5, [vote, ...]]
-    MsgLeiosVoteDelivery { votes: Vec<Vec<u8>> },
+    MsgLeiosVoteDelivery { votes: Vec<Arc<Vec<u8>>> },
     /// Client requests a certified EB range. [6, start_slot, end_slot, start_hash, end_hash]
     MsgLeiosBlockRangeRequest {
         start_slot: u64,
@@ -105,12 +106,12 @@ pub enum Message {
     /// Server delivers next block+txs in range (more to follow). [7, block, [tx, ...]]
     MsgLeiosNextBlockAndTxsInRange {
         block: Vec<u8>,
-        transactions: Vec<Vec<u8>>,
+        transactions: Vec<Arc<Vec<u8>>>,
     },
     /// Server delivers last block+txs in range (end of sequence). [8, block, [tx, ...]]
     MsgLeiosLastBlockAndTxsInRange {
         block: Vec<u8>,
-        transactions: Vec<Vec<u8>>,
+        transactions: Vec<Arc<Vec<u8>>>,
     },
     /// Client terminates. [9]
     MsgDone,
@@ -207,7 +208,7 @@ pub async fn fetch_block_txs(
     runner: &mut Runner<LeiosFetch>,
     point: Point,
     bitmap: BTreeMap<u16, u64>,
-) -> Result<Vec<Vec<u8>>, ProtocolError> {
+) -> Result<Vec<Arc<Vec<u8>>>, ProtocolError> {
     runner
         .send(&Message::MsgLeiosBlockTxsRequest { point, bitmap })
         .await?;
@@ -223,8 +224,8 @@ pub async fn fetch_block_txs(
 /// Fetch votes from the server.
 pub async fn fetch_votes(
     runner: &mut Runner<LeiosFetch>,
-    votes: Vec<(u64, Vec<u8>)>,
-) -> Result<Vec<Vec<u8>>, ProtocolError> {
+    votes: Vec<(u64, Arc<Vec<u8>>)>,
+) -> Result<Vec<Arc<Vec<u8>>>, ProtocolError> {
     runner
         .send(&Message::MsgLeiosVotesRequest { votes })
         .await?;
@@ -244,7 +245,7 @@ pub async fn fetch_block_range(
     end_slot: u64,
     start_hash: [u8; 32],
     end_hash: [u8; 32],
-) -> Result<Vec<(Vec<u8>, Vec<Vec<u8>>)>, ProtocolError> {
+) -> Result<Vec<(Vec<u8>, Vec<Arc<Vec<u8>>>)>, ProtocolError> {
     runner
         .send(&Message::MsgLeiosBlockRangeRequest {
             start_slot,
@@ -600,7 +601,7 @@ mod tests {
 
             runner
                 .send(&Message::MsgLeiosBlockTxs {
-                    transactions: vec![vec![0x01], vec![0x02], vec![0x03]],
+                    transactions: vec![Arc::new(vec![0x01]), Arc::new(vec![0x02]), Arc::new(vec![0x03])],
                 })
                 .await
                 .unwrap();
@@ -641,15 +642,15 @@ mod tests {
             match msg {
                 Message::MsgLeiosVotesRequest { votes } => {
                     assert_eq!(votes.len(), 2);
-                    assert_eq!(votes[0], (10, vec![0xAA]));
-                    assert_eq!(votes[1], (20, vec![0xBB]));
+                    assert_eq!(votes[0], (10, Arc::new(vec![0xAA])));
+                    assert_eq!(votes[1], (20, Arc::new(vec![0xBB])));
                 }
                 other => panic!("expected MsgLeiosVotesRequest, got {other:?}"),
             }
 
             runner
                 .send(&Message::MsgLeiosVoteDelivery {
-                    votes: vec![vec![0x01, 0x02], vec![0x03, 0x04]],
+                    votes: vec![Arc::new(vec![0x01, 0x02]), Arc::new(vec![0x03, 0x04])],
                 })
                 .await
                 .unwrap();
@@ -661,11 +662,11 @@ mod tests {
         let client = tokio::spawn(async move {
             let mut runner = Runner::<LeiosFetch>::new(Role::Client, cs, cr);
 
-            let vote_ids = vec![(10, vec![0xAA]), (20, vec![0xBB])];
+            let vote_ids = vec![(10, Arc::new(vec![0xAA])), (20, Arc::new(vec![0xBB]))];
             let votes = fetch_votes(&mut runner, vote_ids).await.unwrap();
             assert_eq!(votes.len(), 2);
-            assert_eq!(votes[0], vec![0x01, 0x02]);
-            assert_eq!(votes[1], vec![0x03, 0x04]);
+            assert_eq!(votes[0], Arc::new(vec![0x01, 0x02]));
+            assert_eq!(votes[1], Arc::new(vec![0x03, 0x04]));
 
             done(&mut runner).await.unwrap();
         });
@@ -700,7 +701,7 @@ mod tests {
             runner
                 .send(&Message::MsgLeiosNextBlockAndTxsInRange {
                     block: vec![0xE1],
-                    transactions: vec![vec![0x01]],
+                    transactions: vec![Arc::new(vec![0x01])],
                 })
                 .await
                 .unwrap();
@@ -708,7 +709,7 @@ mod tests {
             runner
                 .send(&Message::MsgLeiosLastBlockAndTxsInRange {
                     block: vec![0xE2],
-                    transactions: vec![vec![0x02], vec![0x03]],
+                    transactions: vec![Arc::new(vec![0x02]), Arc::new(vec![0x03])],
                 })
                 .await
                 .unwrap();
@@ -726,9 +727,9 @@ mod tests {
 
             assert_eq!(results.len(), 2);
             assert_eq!(results[0].0, vec![0xE1]);
-            assert_eq!(results[0].1, vec![vec![0x01]]);
+            assert_eq!(results[0].1, vec![Arc::new(vec![0x01])]);
             assert_eq!(results[1].0, vec![0xE2]);
-            assert_eq!(results[1].1, vec![vec![0x02], vec![0x03]]);
+            assert_eq!(results[1].1, vec![Arc::new(vec![0x02]), Arc::new(vec![0x03])]);
 
             done(&mut runner).await.unwrap();
         });

@@ -624,7 +624,9 @@ pub async fn serve_leios_fetch(lf_send: CodecSend, lf_recv: CodecRecv, store: Ar
                     break;
                 };
                 if runner
-                    .send(&LfMsg::MsgLeiosBlockTxs { transactions })
+                    .send(&LfMsg::MsgLeiosBlockTxs {
+                        transactions: transactions.iter().map(|x| x.clone()).collect()
+                    })
                     .await
                     .is_err()
                 {
@@ -659,6 +661,7 @@ mod tests {
     use crate::protocols::leios_fetch::{self, LeiosFetch};
     use crate::protocols::leios_notify::{self, LeiosNotify};
     use crate::types::{BlockBody, Point, WrappedHeader};
+    use std::sync::Arc;
 
     fn make_point(slot: u64) -> Point {
         Point::Specific {
@@ -987,7 +990,7 @@ mod tests {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0x77u8; 32];
         let point = Point::Specific { slot: 50, hash };
-        let txs: Vec<Vec<u8>> = (0..100u8).map(|i| vec![i, i, i]).collect();
+        let txs: Vec<Arc<Vec<u8>>> = (0..100u8).map(|i| Arc::new(vec![i, i, i])).collect();
         store.inject_block_txs_full(point.clone(), txs);
 
         let server_handle =
@@ -1002,10 +1005,10 @@ mod tests {
 
         // Server returns those four in ascending order.
         assert_eq!(got.len(), 4);
-        assert_eq!(got[0], vec![0, 0, 0]);
-        assert_eq!(got[1], vec![5, 5, 5]);
-        assert_eq!(got[2], vec![64, 64, 64]);
-        assert_eq!(got[3], vec![99, 99, 99]);
+        assert_eq!(*got[0], vec![0, 0, 0]);
+        assert_eq!(*got[1], vec![5, 5, 5]);
+        assert_eq!(*got[2], vec![64, 64, 64]);
+        assert_eq!(*got[3], vec![99, 99, 99]);
 
         let _ = leios_fetch::done(&mut client).await;
         server_handle.await.ok();
@@ -1018,9 +1021,9 @@ mod tests {
         use crate::store::leios_store::TxBodyResolver;
         use std::sync::Arc;
 
-        struct StubResolver(std::collections::HashMap<Vec<u8>, Vec<u8>>);
+        struct StubResolver(std::collections::HashMap<Vec<u8>, Arc<Vec<u8>>>);
         impl TxBodyResolver for StubResolver {
-            fn resolve_body(&self, tx_id: &[u8]) -> Option<Vec<u8>> {
+            fn resolve_body(&self, tx_id: &[u8]) -> Option<Arc<Vec<u8>>> {
                 self.0.get(tx_id).cloned()
             }
         }
@@ -1040,13 +1043,14 @@ mod tests {
         let h2 = [0xA2u8; 32];
         let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(
             [
-                (h0.to_vec(), vec![0xB0]),
-                (h1.to_vec(), vec![0xB1]),
-                (h2.to_vec(), vec![0xB2]),
+                (h0.to_vec(), Arc::new(vec![0xB0])),
+                (h1.to_vec(), Arc::new(vec![0xB1])),
+                (h2.to_vec(), Arc::new(vec![0xB2])),
             ]
             .into_iter()
             .collect(),
         ));
+
         // Receiver-style store: only the manifest is recorded; bodies
         // come from the resolver.
         let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
@@ -1062,7 +1066,8 @@ mod tests {
         let got = leios_fetch::fetch_block_txs(&mut client, point, bitmap)
             .await
             .expect("server should respond");
-        assert_eq!(got, vec![vec![0xB0u8], vec![0xB2u8]]);
+        assert_eq!(*got[0], vec![0xB0u8]);
+        assert_eq!(*got[1], vec![0xB2u8]);
 
         let _ = leios_fetch::done(&mut client).await;
         server_handle.await.ok();

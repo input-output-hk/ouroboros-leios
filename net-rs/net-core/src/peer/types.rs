@@ -47,7 +47,7 @@ pub enum PeerEvent {
     PeersDiscovered { peers: Vec<PeerAddress> },
 
     /// TxSubmission server: received a transaction from a client.
-    TransactionReceived { body: Vec<u8> },
+    TransactionReceived { body: Arc<Vec<u8>> },
 
     /// TxSubmission client: peer requested `count` tx ids (blocking mode).
     TxsRequested { count: u16 },
@@ -62,7 +62,7 @@ pub enum PeerEvent {
     LeiosBlockTxsOffered { point: Point },
 
     /// LeiosNotify: votes are available for download.
-    LeiosVotesOffered { votes: Vec<(u64, Vec<u8>)> },
+    LeiosVotesOffered { votes: Vec<(u64, Arc<Vec<u8>>)> },
 
     /// LeiosFetch: a requested endorser block arrived.
     LeiosBlockFetched { point: Point, block: Vec<u8> },
@@ -70,14 +70,14 @@ pub enum PeerEvent {
     /// LeiosFetch: requested votes arrived.
     /// `vote_ids` are (slot, issuer_id) keys; `vote_data` are the CBOR bodies.
     LeiosVotesFetched {
-        vote_ids: Vec<(u64, Vec<u8>)>,
-        vote_data: Vec<Vec<u8>>,
+        vote_ids: Vec<(u64, Arc<Vec<u8>>)>,
+        vote_data: Vec<Arc<Vec<u8>>>,
     },
 
     /// LeiosFetch: requested transactions for an EB arrived.
     LeiosBlockTxsFetched {
         point: Point,
-        transactions: Vec<Vec<u8>>,
+        transactions: Vec<Arc<Vec<u8>>>,
     },
 
     /// BlockFetch: peer responded with NoBlocks for a requested range.
@@ -106,7 +106,7 @@ pub enum PeerCommand {
     },
 
     /// Fetch votes via LeiosFetch.
-    FetchLeiosVotes { votes: Vec<(u64, Vec<u8>)> },
+    FetchLeiosVotes { votes: Vec<(u64, Arc<Vec<u8>>)> },
 
     /// Provide transactions to this peer via TxSubmission.
     ProvideTxs { txs: Vec<PendingTx> },

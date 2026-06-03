@@ -7,6 +7,7 @@
 pub mod codec;
 
 use std::collections::VecDeque;
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::mpsc;
@@ -44,11 +45,11 @@ pub const MAX_TX_SIZE: usize = 2_500_000;
 
 /// Opaque transaction ID stored as raw CBOR bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TxId(pub Vec<u8>);
+pub struct TxId(pub Arc<Vec<u8>>);
 
 /// Opaque transaction body stored as raw CBOR bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TxBody(pub Vec<u8>);
+pub struct TxBody(pub Arc<Vec<u8>>);
 
 /// A transaction ID paired with its serialized size (for flow control).
 #[derive(Debug, Clone)]
@@ -375,7 +376,7 @@ mod tests {
             TxSubmission::transition(
                 &State::StIdle,
                 &Message::MsgRequestTxs {
-                    tx_ids: vec![TxId(vec![0x42])]
+                    tx_ids: vec![TxId(Arc::new(vec![0x42]))]
                 }
             )
             .unwrap(),
@@ -429,7 +430,7 @@ mod tests {
         assert!(TxSubmission::transition(
             &State::StTxIdsBlocking,
             &Message::MsgRequestTxs {
-                tx_ids: vec![TxId(vec![])]
+                tx_ids: vec![TxId(Arc::new(vec![]))]
             }
         )
         .is_err());
@@ -503,8 +504,8 @@ mod tests {
 
     fn make_test_tx(id_byte: u8, size: usize) -> PendingTx {
         PendingTx {
-            tx_id: TxId(vec![id_byte; 32]),
-            body: TxBody(vec![id_byte; size]),
+            tx_id: TxId(Arc::new(vec![id_byte; 32])),
+            body: TxBody(Arc::new(vec![id_byte; size])),
             size: size as u32,
         }
     }

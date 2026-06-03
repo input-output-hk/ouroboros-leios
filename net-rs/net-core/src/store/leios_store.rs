@@ -21,7 +21,7 @@ use crate::types::Point;
 /// locally — typically the host application's mempool answers.
 pub trait TxBodyResolver: Send + Sync {
     /// Return the body for `tx_id`, or `None` if unknown.
-    fn resolve_body(&self, tx_id: &[u8]) -> Option<Vec<u8>>;
+    fn resolve_body(&self, tx_id: &[u8]) -> Option<Arc<Vec<u8>>>;
 }
 
 /// A notification about available Leios data, served by LeiosNotify.
@@ -32,7 +32,7 @@ pub enum LeiosNotification {
     /// An EB's transactions are available for download.
     BlockTxsOffer { point: Point },
     /// Votes are available for download.
-    VotesOffer { votes: Vec<(u64, Vec<u8>)> },
+    VotesOffer { votes: Vec<(u64, Arc<Vec<u8>>)> },
 }
 
 /// Key for block lookups.
@@ -51,13 +51,13 @@ struct LeiosStoreInner {
     /// shot. `get_block_txs` falls through to manifest+resolver for any
     /// index missing here, so partial holdings still serve subsets to
     /// downstream peers.
-    block_txs: HashMap<BlockKey, BTreeMap<u32, Vec<u8>>>,
+    block_txs: HashMap<BlockKey, BTreeMap<u32, Arc<Vec<u8>>>>,
     /// Per-EB ordered tx hash list. Populated by receivers after decoding
     /// a fetched EB manifest. Pairs with `tx_body_resolver` to serve the
     /// bodies indirectly without keeping a duplicate copy.
     eb_tx_hashes: HashMap<BlockKey, Vec<[u8; 32]>>,
     /// Votes keyed by (slot, voter_id).
-    votes: HashMap<(u64, Vec<u8>), Vec<u8>>,
+    votes: HashMap<(u64, Arc<Vec<u8>>), Arc<Vec<u8>>>,
     /// Notification queue for the LeiosNotify server.  Front-pruned
     /// alongside the slot-window eviction of the other maps so
     /// long-running connections don't accumulate notifications for
@@ -193,7 +193,7 @@ impl LeiosStore {
     ///
     /// The `point` must be `Point::Specific { slot, hash }`. If
     /// `Point::Origin` is passed, the transactions are silently dropped.
-    pub fn inject_block_txs(&self, point: Point, indexed: BTreeMap<u32, Vec<u8>>) {
+    pub fn inject_block_txs(&self, point: Point, indexed: BTreeMap<u32, Arc<Vec<u8>>>) {
         let (slot, hash) = match &point {
             Point::Specific { slot, hash } => (*slot, *hash),
             Point::Origin => return,
@@ -217,8 +217,8 @@ impl LeiosStore {
     /// Convenience for the producer path: inject a complete ordered body
     /// list, indices `0..bodies.len()`. Equivalent to constructing a
     /// `BTreeMap` and calling `inject_block_txs`.
-    pub fn inject_block_txs_full(&self, point: Point, bodies: Vec<Vec<u8>>) {
-        let indexed: BTreeMap<u32, Vec<u8>> = bodies
+    pub fn inject_block_txs_full(&self, point: Point, bodies: Vec<Arc<Vec<u8>>>) {
+        let indexed: BTreeMap<u32, Arc<Vec<u8>>> = bodies
             .into_iter()
             .enumerate()
             .map(|(i, b)| (i as u32, b))
@@ -230,7 +230,7 @@ impl LeiosStore {
     ///
     /// `ids` are `(slot, voter_id)` pairs; `data` are the corresponding
     /// opaque vote blobs (same length).
-    pub fn inject_votes(&self, ids: Vec<(u64, Vec<u8>)>, data: Vec<Vec<u8>>) {
+    pub fn inject_votes(&self, ids: Vec<(u64, Arc<Vec<u8>>)>, data: Vec<Arc<Vec<u8>>>) {
         if ids.is_empty() {
             return;
         }
@@ -289,7 +289,7 @@ impl LeiosStore {
         slot: u64,
         hash: &[u8; 32],
         bitmap: &BTreeMap<u16, u64>,
-    ) -> Option<Vec<Vec<u8>>> {
+    ) -> Option<Vec<Arc<Vec<u8>>>> {
         let key = BlockKey { slot, hash: *hash };
         let (block_txs, manifest) = {
             let inner = self.inner.lock().unwrap();
@@ -302,7 +302,7 @@ impl LeiosStore {
             return None;
         }
         let resolver = self.tx_body_resolver.as_ref();
-        let selected: Vec<Vec<u8>> = bitmap::iter_indices(bitmap)
+        let selected: Vec<Arc<Vec<u8>>> = bitmap::iter_indices(bitmap)
             .filter_map(|i| {
                 if let Some(body) = block_txs.as_ref().and_then(|m| m.get(&i).cloned()) {
                     return Some(body);
@@ -325,7 +325,7 @@ impl LeiosStore {
 
     /// Look up votes by their `(slot, voter_id)` identifiers.
     /// Returns one blob per requested id (empty vec if not found).
-    pub fn get_votes(&self, ids: &[(u64, Vec<u8>)]) -> Vec<Vec<u8>> {
+    pub fn get_votes(&self, ids: &[(u64, Arc<Vec<u8>>)]) -> Vec<Arc<Vec<u8>>> {
         let inner = self.inner.lock().unwrap();
         ids.iter()
             .filter_map(|id| inner.votes.get(id).cloned())
@@ -482,7 +482,7 @@ mod tests {
     fn get_block_txs_with_select_all_returns_all() {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0xCDu8; 32];
-        let txs = vec![vec![10, 20], vec![30, 40]];
+        let txs = vec![Arc::new(vec![10, 20]), Arc::new(vec![30, 40])];
         let point = Point::Specific { slot: 42, hash };
 
         store.inject_block_txs_full(point, txs.clone());
@@ -496,7 +496,7 @@ mod tests {
     fn get_block_txs_empty_bitmap_returns_empty() {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0xCDu8; 32];
-        let txs = vec![vec![10, 20], vec![30, 40]];
+        let txs = vec![Arc::new(vec![10, 20]), Arc::new(vec![30, 40])];
         let point = Point::Specific { slot: 42, hash };
 
         store.inject_block_txs_full(point, txs);
@@ -509,7 +509,7 @@ mod tests {
     fn get_block_txs_filters_by_bitmap_and_orders_ascending() {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0xEFu8; 32];
-        let txs: Vec<Vec<u8>> = (0..70u8).map(|i| vec![i]).collect();
+        let txs: Vec<Arc<Vec<u8>>> = (0..70u8).map(|i| Arc::new(vec![i])).collect();
         let point = Point::Specific { slot: 1, hash };
 
         store.inject_block_txs_full(point, txs);
@@ -517,12 +517,12 @@ mod tests {
         // Pick out-of-order indices spanning two segments to check ordering.
         let bitmap = bitmap::from_indices(&[65, 0, 63]);
         let got = store.get_block_txs(1, &hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![0u8], vec![63u8], vec![65u8]]);
+        assert_eq!(got, vec![Arc::new(vec![0u8]), Arc::new(vec![63u8]), Arc::new(vec![65u8])]);
     }
 
-    struct StubResolver(HashMap<Vec<u8>, Vec<u8>>);
+    struct StubResolver(HashMap<Vec<u8>, Arc<Vec<u8>>>);
     impl TxBodyResolver for StubResolver {
-        fn resolve_body(&self, tx_id: &[u8]) -> Option<Vec<u8>> {
+        fn resolve_body(&self, tx_id: &[u8]) -> Option<Arc<Vec<u8>>> {
             self.0.get(tx_id).cloned()
         }
     }
@@ -533,9 +533,9 @@ mod tests {
         let h1 = [0x20u8; 32];
         let h2 = [0x30u8; 32];
         let bodies = HashMap::from([
-            (h0.to_vec(), vec![1u8]),
-            (h1.to_vec(), vec![2u8]),
-            (h2.to_vec(), vec![3u8]),
+            (h0.to_vec(), Arc::new(vec![1u8])),
+            (h1.to_vec(), Arc::new(vec![2u8])),
+            (h2.to_vec(), Arc::new(vec![3u8])),
         ]);
         let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(bodies));
         let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
@@ -550,7 +550,7 @@ mod tests {
         // Bitmap selects indices 0 and 2.
         let bitmap = bitmap::from_indices(&[0, 2]);
         let got = store.get_block_txs(5, &eb_hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![1u8], vec![3u8]]);
+        assert_eq!(got, vec![Arc::new(vec![1u8]), Arc::new(vec![3u8])]);
     }
 
     #[test]
@@ -559,7 +559,7 @@ mod tests {
         let h1 = [0x50u8; 32];
         // Only h0 is resolvable.
         let resolver: Arc<dyn TxBodyResolver> =
-            Arc::new(StubResolver(HashMap::from([(h0.to_vec(), vec![0xAA])])));
+            Arc::new(StubResolver(HashMap::from([(h0.to_vec(), Arc::new(vec![0xAA]))])));
         let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
 
         let eb_hash = [0xCCu8; 32];
@@ -571,7 +571,7 @@ mod tests {
 
         let bitmap = bitmap::from_indices(&[0, 1]);
         let got = store.get_block_txs(7, &eb_hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![0xAA]]);
+        assert_eq!(got, vec![Arc::new(vec![0xAA])]);
     }
 
     #[test]
@@ -585,14 +585,14 @@ mod tests {
             slot: 1,
             hash: eb_hash,
         };
-        store.inject_block_txs_full(point.clone(), vec![vec![100u8], vec![200u8]]);
+        store.inject_block_txs_full(point.clone(), vec![Arc::new(vec![100u8]), Arc::new(vec![200u8])]);
         // Pretend we also have manifest hashes (would normally be set
         // separately; here we make sure the block_txs path wins).
         store.record_eb_manifest(point, vec![[0; 32], [0; 32]]);
 
         let bitmap = bitmap::from_indices(&[0, 1]);
         let got = store.get_block_txs(1, &eb_hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![100u8], vec![200u8]]);
+        assert_eq!(got, vec![Arc::new(vec![100u8]), Arc::new(vec![200u8])]);
     }
 
     #[test]
@@ -607,14 +607,14 @@ mod tests {
     fn get_block_txs_ignores_out_of_range_bits() {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0xAA; 32];
-        let txs = vec![vec![1u8], vec![2u8]];
+        let txs = vec![Arc::new(vec![1u8]), Arc::new(vec![2u8])];
         let point = Point::Specific { slot: 5, hash };
         store.inject_block_txs_full(point, txs);
 
         // Bit 99 is past the available 2 txs; should be silently dropped.
         let bitmap = bitmap::from_indices(&[0, 99]);
         let got = store.get_block_txs(5, &hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![1u8]]);
+        assert_eq!(got, vec![Arc::new(vec![1u8])]);
     }
 
     #[test]
@@ -625,19 +625,19 @@ mod tests {
 
         // First batch: indices 0 and 2.
         let mut first = BTreeMap::new();
-        first.insert(0u32, vec![0xA0]);
-        first.insert(2u32, vec![0xA2]);
+        first.insert(0u32, Arc::new(vec![0xA0]));
+        first.insert(2u32, Arc::new(vec![0xA2]));
         store.inject_block_txs(point.clone(), first);
 
         // Second batch: indices 1 and 3.
         let mut second = BTreeMap::new();
-        second.insert(1u32, vec![0xA1]);
-        second.insert(3u32, vec![0xA3]);
+        second.insert(1u32, Arc::new(vec![0xA1]));
+        second.insert(3u32, Arc::new(vec![0xA3]));
         store.inject_block_txs(point, second);
 
         let bitmap = bitmap::from_indices(&[0, 1, 2, 3]);
         let got = store.get_block_txs(7, &hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![0xA0], vec![0xA1], vec![0xA2], vec![0xA3]]);
+        assert_eq!(got, vec![Arc::new(vec![0xA0]), Arc::new(vec![0xA1]), Arc::new(vec![0xA2]), Arc::new(vec![0xA3])]);
     }
 
     #[test]
@@ -647,11 +647,11 @@ mod tests {
         let point = Point::Specific { slot: 8, hash };
 
         let mut a = BTreeMap::new();
-        a.insert(0u32, vec![0xB0]);
+        a.insert(0u32, Arc::new(vec![0xB0]));
         store.inject_block_txs(point.clone(), a);
 
         let mut b = BTreeMap::new();
-        b.insert(1u32, vec![0xB1]);
+        b.insert(1u32, Arc::new(vec![0xB1]));
         store.inject_block_txs(point, b);
 
         // One BlockTxsOffer notification, not two.
@@ -670,17 +670,17 @@ mod tests {
         let point = Point::Specific { slot: 9, hash };
 
         let mut a = BTreeMap::new();
-        a.insert(0u32, vec![0xC0]);
+        a.insert(0u32, Arc::new(vec![0xC0]));
         store.inject_block_txs(point.clone(), a);
 
         // Conflicting body for index 0 — first writer wins.
         let mut b = BTreeMap::new();
-        b.insert(0u32, vec![0xFF]);
+        b.insert(0u32, Arc::new(vec![0xFF]));
         store.inject_block_txs(point, b);
 
         let bitmap = bitmap::from_indices(&[0]);
         let got = store.get_block_txs(9, &hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![0xC0]]);
+        assert_eq!(got, vec![Arc::new(vec![0xC0])]);
     }
 
     #[test]
@@ -692,7 +692,7 @@ mod tests {
         let h2 = [0x30u8; 32];
         let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(HashMap::from([(
             h1.to_vec(),
-            vec![0xD1],
+            Arc::new(vec![0xD1]),
         )])));
         let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
 
@@ -704,13 +704,13 @@ mod tests {
         store.record_eb_manifest(point.clone(), vec![h0, h1, h2]);
 
         let mut partial = BTreeMap::new();
-        partial.insert(0u32, vec![0xD0]);
-        partial.insert(2u32, vec![0xD2]);
+        partial.insert(0u32, Arc::new(vec![0xD0]));
+        partial.insert(2u32, Arc::new(vec![0xD2]));
         store.inject_block_txs(point, partial);
 
         let bitmap = bitmap::from_indices(&[0, 1, 2]);
         let got = store.get_block_txs(11, &eb_hash, &bitmap).unwrap();
-        assert_eq!(got, vec![vec![0xD0], vec![0xD1], vec![0xD2]]);
+        assert_eq!(got, vec![Arc::new(vec![0xD0]), Arc::new(vec![0xD1]), Arc::new(vec![0xD2])]);
     }
 
     #[test]
@@ -731,8 +731,8 @@ mod tests {
     #[test]
     fn inject_and_get_votes() {
         let (store, _rx) = LeiosStore::new(100);
-        let ids = vec![(100, vec![0x01]), (101, vec![0x02])];
-        let data = vec![vec![0xA0], vec![0xB0]];
+        let ids = vec![(100, Arc::new(vec![0x01])), (101, Arc::new(vec![0x02]))];
+        let data = vec![Arc::new(vec![0xA0]), Arc::new(vec![0xB0])];
 
         store.inject_votes(ids.clone(), data.clone());
 
@@ -740,7 +740,7 @@ mod tests {
         assert_eq!(result, data);
 
         // Unknown vote returns empty.
-        let result = store.get_votes(&[(999, vec![0xFF])]);
+        let result = store.get_votes(&[(999, Arc::new(vec![0xFF]))]);
         assert!(result.is_empty());
     }
 
@@ -751,7 +751,7 @@ mod tests {
         let point = Point::Specific { slot: 1, hash };
 
         store.inject_block(point, vec![0x01]);
-        store.inject_votes(vec![(10, vec![0x02])], vec![vec![0x03]]);
+        store.inject_votes(vec![(10, Arc::new(vec![0x02]))], vec![Arc::new(vec![0x03])]);
 
         let all = store.notifications_after(&mut 0);
         assert_eq!(all.len(), 2);
@@ -777,7 +777,7 @@ mod tests {
 
         // Inject votes/blocks at slot 1, then advance the clock far past
         // the retention window. Old entries must be evicted.
-        store.inject_votes(vec![(1, vec![0xAA])], vec![vec![0x01]]);
+        store.inject_votes(vec![(1, Arc::new(vec![0xAA]))], vec![Arc::new(vec![0x01])]);
         store.inject_block(
             Point::Specific {
                 slot: 1,
@@ -794,7 +794,7 @@ mod tests {
         );
 
         // Pre-eviction sanity.
-        assert_eq!(store.get_votes(&[(1, vec![0xAA])]), vec![vec![0x01]]);
+        assert_eq!(store.get_votes(&[(1, Arc::new(vec![0xAA]))]), vec![Arc::new(vec![0x01])]);
         assert!(store.get_block(1, &[0x11; 32]).is_some());
 
         // Inject something far in the future — past the retention cutoff.
@@ -808,7 +808,7 @@ mod tests {
         );
 
         assert!(
-            store.get_votes(&[(1, vec![0xAA])]).is_empty(),
+            store.get_votes(&[(1, Arc::new(vec![0xAA]))]).is_empty(),
             "old vote should be evicted past retention window"
         );
         assert!(
@@ -846,7 +846,7 @@ mod tests {
             },
             vec![0xB1],
         );
-        store.inject_votes(vec![(1, vec![0xAA])], vec![vec![0x01]]);
+        store.inject_votes(vec![(1, Arc::new(vec![0xAA]))], vec![Arc::new(vec![0x01])]);
         assert_eq!(store.notification_count(), 3);
 
         // Inject a recent block to push max_slot past the retention

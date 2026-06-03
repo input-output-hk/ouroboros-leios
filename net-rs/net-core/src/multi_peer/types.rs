@@ -1,7 +1,7 @@
 //! Event and command types for the coordinator ↔ application boundary.
 
 use std::collections::BTreeMap;
-
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::peer::{ConnectionMode, PeerId};
@@ -68,7 +68,7 @@ pub enum NetworkEvent {
     PeersDiscovered { peers: Vec<PeerAddress> },
 
     /// A transaction was received from an inbound peer (via TxSubmission server).
-    TransactionReceived { peer_id: PeerId, body: Vec<u8> },
+    TransactionReceived { peer_id: PeerId, body: Arc<Vec<u8>> },
 
     /// TxSubmission client: a peer requested `count` tx ids (blocking mode).
     TxsRequested { peer_id: PeerId, count: u16 },
@@ -85,7 +85,7 @@ pub enum NetworkEvent {
     /// Leios: votes are available for download from a peer.
     LeiosVotesOffered {
         peer_id: PeerId,
-        votes: Vec<(u64, Vec<u8>)>,
+        votes: Vec<(u64, Arc<Vec<u8>>)>,
     },
 
     /// Leios: a fetched endorser block arrived.
@@ -94,14 +94,14 @@ pub enum NetworkEvent {
     /// Leios: fetched votes arrived.
     /// `vote_ids` are (slot, issuer_id) keys; `vote_data` are the CBOR bodies.
     LeiosVotesReceived {
-        vote_ids: Vec<(u64, Vec<u8>)>,
-        vote_data: Vec<Vec<u8>>,
+        vote_ids: Vec<(u64, Arc<Vec<u8>>)>,
+        vote_data: Vec<Arc<Vec<u8>>>,
     },
 
     /// Leios: fetched transactions for an EB arrived.
     LeiosBlockTxsReceived {
         point: Point,
-        transactions: Vec<Vec<u8>>,
+        transactions: Vec<Arc<Vec<u8>>>,
     },
 
     /// Response to `QueryPeers`: snapshot of all connected peers.
@@ -177,7 +177,7 @@ pub enum NetworkCommand {
     /// per peer in the policy's per-peer grouping).
     FetchLeiosVotes {
         peer_id: PeerId,
-        votes: Vec<(u64, Vec<u8>)>,
+        votes: Vec<(u64, Arc<Vec<u8>>)>,
     },
 
     /// Inject a Leios block into the Leios store (for responder peers to serve).
@@ -187,7 +187,7 @@ pub enum NetworkCommand {
     /// (for responder peers to serve via `MsgLeiosBlockTxsRequest`).
     InjectLeiosBlockTxs {
         point: Point,
-        transactions: Vec<Vec<u8>>,
+        transactions: Vec<Arc<Vec<u8>>>,
     },
 
     /// Record the ordered tx-hash list of an EB whose body the receiver
@@ -201,8 +201,8 @@ pub enum NetworkCommand {
 
     /// Inject votes into the Leios store (for responder peers to serve).
     InjectLeiosVotes {
-        votes: Vec<(u64, Vec<u8>)>,
-        data: Vec<Vec<u8>>,
+        votes: Vec<(u64, Arc<Vec<u8>>)>,
+        data: Vec<Arc<Vec<u8>>>,
     },
 
     /// Provide transactions to a specific peer via TxSubmission.

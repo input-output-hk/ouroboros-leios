@@ -26,7 +26,7 @@ use crate::types::Point;
 /// Vote identity used by the candidate tracker and the vote-fetch
 /// policy — `(slot, voter_id)`, matching the wire-format tuple a vote
 /// announcement carries.
-pub type VoteId = (u64, Vec<u8>);
+pub type VoteId = (u64, Arc<Vec<u8>>);
 
 /// Resolve the offer-set for a single [`VoteId`].  Borrowed by
 /// [`VoteFetchPolicy::pick`] so the policy can inspect a per-vote
@@ -202,7 +202,7 @@ impl VoteFetchPolicy for LowestRttFirst {
         candidates_for: &VoteCandidateLookup<'_>,
         rtt: &dyn PeerRtt,
     ) -> BTreeMap<PeerId, Vec<VoteId>> {
-        let mut grouped: BTreeMap<PeerId, Vec<(u64, Vec<u8>)>> = BTreeMap::new();
+        let mut grouped: BTreeMap<PeerId, Vec<(u64, Arc<Vec<u8>>)>> = BTreeMap::new();
         for vote in votes {
             let candidates = candidates_for(vote);
             if let Some(picked) = LowestRttFirst::pick_one(&candidates, rtt).first() {
@@ -273,7 +273,7 @@ impl VoteFetchPolicy for BroadcastN {
         candidates_for: &VoteCandidateLookup<'_>,
         rtt: &dyn PeerRtt,
     ) -> BTreeMap<PeerId, Vec<VoteId>> {
-        let mut grouped: BTreeMap<PeerId, Vec<(u64, Vec<u8>)>> = BTreeMap::new();
+        let mut grouped: BTreeMap<PeerId, Vec<(u64, Arc<Vec<u8>>)>> = BTreeMap::new();
         for vote in votes {
             let candidates = candidates_for(vote);
             for picked in self.pick_n(&candidates, rtt) {
@@ -636,10 +636,10 @@ mod tests {
     fn vote_fetch_groups_by_lowest_rtt_per_vote() {
         let policy = LowestRttFirst;
         let rtt = rtts(&[(1, 50), (2, 10)]);
-        let votes = vec![(10u64, b"voter-a".to_vec()), (10u64, b"voter-b".to_vec())];
+        let votes = vec![(10u64, Arc::new(b"voter-a".to_vec())), (10u64, Arc::new(b"voter-b".to_vec()))];
         let candidates_for = |v: &VoteId| {
             // voter-a is offered by both peers; voter-b only by pid(1).
-            if v.1 == b"voter-a" {
+            if *v.1 == b"voter-a" {
                 vec![pid(1), pid(2)]
             } else {
                 vec![pid(1)]
@@ -649,11 +649,11 @@ mod tests {
         // pid(2) (lower RTT) gets voter-a; pid(1) (only candidate) gets voter-b.
         assert_eq!(
             grouped.get(&pid(2)).cloned().unwrap_or_default(),
-            vec![(10u64, b"voter-a".to_vec())]
+            vec![(10u64, Arc::new(b"voter-a".to_vec()))]
         );
         assert_eq!(
             grouped.get(&pid(1)).cloned().unwrap_or_default(),
-            vec![(10u64, b"voter-b".to_vec())]
+            vec![(10u64, Arc::new(b"voter-b".to_vec()))]
         );
     }
 
@@ -699,12 +699,12 @@ mod tests {
         t.note_block_offered(pt(1, 1), pid(1));
         t.note_eb_offered(pt(2, 2), pid(1));
         t.note_eb_txs_offered(pt(3, 3), pid(1));
-        t.note_vote_offered((4, b"v".to_vec()), pid(1));
+        t.note_vote_offered((4, Arc::new(b"v".to_vec())), pid(1));
         t.forget_peer(pid(1));
         assert!(t.block_candidates(&pt(1, 1)).is_empty());
         assert!(t.eb_candidates(&pt(2, 2)).is_empty());
         assert!(t.eb_txs_candidates(&pt(3, 3)).is_empty());
-        assert!(t.vote_candidates(&(4, b"v".to_vec())).is_empty());
+        assert!(t.vote_candidates(&(4, Arc::new(b"v".to_vec()))).is_empty());
     }
 
     #[test]
@@ -712,13 +712,13 @@ mod tests {
         let mut t = CandidateTracker::new();
         t.note_eb_offered(pt(5, 1), pid(1));
         t.note_eb_offered(pt(15, 1), pid(2));
-        t.note_vote_offered((5, b"a".to_vec()), pid(1));
-        t.note_vote_offered((15, b"b".to_vec()), pid(2));
+        t.note_vote_offered((5, Arc::new(b"a".to_vec())), pid(1));
+        t.note_vote_offered((15, Arc::new(b"b".to_vec())), pid(2));
         t.prune_below_slot(10);
         assert!(t.eb_candidates(&pt(5, 1)).is_empty());
         assert_eq!(t.eb_candidates(&pt(15, 1)), vec![pid(2)]);
-        assert!(t.vote_candidates(&(5, b"a".to_vec())).is_empty());
-        assert_eq!(t.vote_candidates(&(15, b"b".to_vec())), vec![pid(2)]);
+        assert!(t.vote_candidates(&(5, Arc::new(b"a".to_vec()))).is_empty());
+        assert_eq!(t.vote_candidates(&(15, Arc::new(b"b".to_vec()))), vec![pid(2)]);
     }
 
     // -- PeerRttCache -------------------------------------------------------

@@ -54,13 +54,13 @@ pub struct EbKey {
 /// Opaque transaction identifier.  Conventionally Blake2b-256 of the
 /// body, but this crate doesn't enforce that — the wrapper picks the hash
 /// scheme and supplies it on every entry path.
-pub type TxId = Vec<u8>;
+pub type TxId = Arc<Vec<u8>>;
 
 /// A transaction body the mempool is holding.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingTx {
     pub tx_id: TxId,
-    pub body: Vec<u8>,
+    pub body: Arc<Vec<u8>>,
     pub size: u32,
 }
 
@@ -75,7 +75,7 @@ pub enum MempoolEffect {
     /// validator returns, the wrapper calls
     /// [`MempoolState::on_tx_validated`] or
     /// [`MempoolState::on_tx_validation_failed`].
-    ValidateTx { tx_id: TxId, body: Vec<u8> },
+    ValidateTx { tx_id: TxId, body: Arc<Vec<u8>> },
     /// A tx was dropped before reaching the mempool (overflow,
     /// validation failure) or evicted from it.  Telemetry only — the
     /// wrapper forwards this to its events sink.
@@ -142,7 +142,7 @@ pub struct MempoolState {
     /// Bodies currently with the validator.  Cleared on
     /// `on_tx_validated` (body moves to `txs`) or
     /// `on_tx_validation_failed` (body dropped).
-    pub pending_validation: BTreeMap<TxId, Vec<u8>>,
+    pub pending_validation: BTreeMap<TxId, Arc<Vec<u8>>>,
     /// Per-EB ordered tx-hash list — the "EB Body" in CIP-0164 terms.
     /// Producers populate this from `produce_eb`; receivers from
     /// `record_eb_manifest` after decoding a fetched EB body.
@@ -211,7 +211,7 @@ impl MempoolState {
     /// `AlreadyKnown` and discards.  Otherwise records the body and
     /// emits `ValidateTx`; the wrapper validates and reports back via
     /// [`Self::on_tx_validated`] or [`Self::on_tx_validation_failed`].
-    pub fn on_tx_received(&mut self, tx_id: TxId, body: Vec<u8>) -> Vec<MempoolEffect> {
+    pub fn on_tx_received(&mut self, tx_id: TxId, body: Arc<Vec<u8>>) -> Vec<MempoolEffect> {
         let appended: Vec<MempoolEffect> =
             match self.invoke_hook(|b, s| b.on_tx_received(s, &tx_id, &body)) {
                 BehaviourOutcome::Continue => Vec::new(),
@@ -274,7 +274,7 @@ impl MempoolState {
     pub fn admit_validated(
         &mut self,
         tx_id: TxId,
-        body: Vec<u8>,
+        body: Arc<Vec<u8>>,
         size: u32,
     ) -> Vec<MempoolEffect> {
         if self.contains(&tx_id) {
@@ -347,7 +347,7 @@ impl MempoolState {
     /// mempool sizes this prototype targets keep it acceptable.  Used
     /// by the LeiosFetch BlockTxs server (via the `TxBodyResolver`
     /// trait in the consumer's wrapper) to resolve manifest entries.
-    pub fn get_body_by_id(&self, id: &[u8]) -> Option<Vec<u8>> {
+    pub fn get_body_by_id(&self, id: Arc<Vec<u8>>) -> Option<Arc<Vec<u8>>> {
         if let Some(body) = self
             .txs
             .iter()
@@ -356,7 +356,7 @@ impl MempoolState {
         {
             return Some(body);
         }
-        self.eb_pinned.get(id).map(|tx| tx.body.clone())
+        self.eb_pinned.get(&id).map(|tx| tx.body.clone())
     }
 
     /// Return up to `max_count` txs not yet advertised to `peer_id`,
@@ -587,7 +587,7 @@ impl MempoolState {
     /// wrapper hashes incoming bodies and matches against the manifest
     /// before calling here.  No-op if the tx is already known via
     /// `txs` or `eb_pinned`.
-    pub fn merge_eb_body(&mut self, tx_id: TxId, body: Vec<u8>, size: u32) {
+    pub fn merge_eb_body(&mut self, tx_id: TxId, body: Arc<Vec<u8>>, size: u32) {
         if self.contains(&tx_id) || self.eb_pinned.contains_key(&tx_id) {
             return;
         }
@@ -618,16 +618,16 @@ impl MempoolState {
     /// returns bodies for every requested index whose body is locally
     /// resolvable.  Out-of-range indices and indices whose body is
     /// missing are silently dropped (partial response).
-    pub fn get_eb_bodies<I>(&self, eb_key: &EbKey, indices: I) -> Option<Vec<Vec<u8>>>
+    pub fn get_eb_bodies<I>(&self, eb_key: &EbKey, indices: I) -> Option<Vec<Arc<Vec<u8>>>>
     where
         I: IntoIterator<Item = u32>,
     {
         let manifest = self.eb_manifests.get(eb_key)?;
-        let bodies: Vec<Vec<u8>> = indices
+        let bodies: Vec<Arc<Vec<u8>>> = indices
             .into_iter()
             .filter_map(|i| {
                 let tx_id = manifest.get(i as usize)?;
-                self.get_body_by_id(tx_id)
+                self.get_body_by_id(tx_id.clone())
             })
             .collect();
         Some(bodies)
@@ -688,7 +688,7 @@ impl MempoolState {
     fn admit_internal(
         &mut self,
         tx_id: TxId,
-        body: Vec<u8>,
+        body: Arc<Vec<u8>>,
         size: u32,
     ) -> Vec<MempoolEffect> {
         let mut fx = Vec::new();
@@ -755,13 +755,18 @@ fn hex_short(id: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     fn pid(n: u64) -> PeerId {
         PeerId(n)
     }
 
-    fn tx(id: u8, size: u32) -> (TxId, Vec<u8>, u32) {
-        (vec![id; 32], vec![0u8; size as usize], size)
+    fn tx(id: u8, size: u32) -> (TxId, Arc<Vec<u8>>, u32) {
+        (
+            Arc::new(vec![id; 32]),
+            Arc::new(vec![0u8; size as usize]),
+            size,
+        )
     }
 
     fn admit(state: &mut MempoolState, id: u8, size: u32) -> Vec<MempoolEffect> {
@@ -877,7 +882,7 @@ mod tests {
                 tx_id,
                 reason: TxRejectReason::QueueFull,
             } => {
-                assert_eq!(*tx_id, vec![1u8; 32]);
+                assert_eq!(*tx_id, Arc::new(vec![1u8; 32]));
             }
             other => panic!("expected TxRejected QueueFull, got {other:?}"),
         }
@@ -893,10 +898,10 @@ mod tests {
         admit(&mut s, 1, 100);
         admit(&mut s, 2, 200);
         admit(&mut s, 3, 300);
-        let included = vec![vec![1u8; 32], vec![3u8; 32]];
+        let included = vec![Arc::new(vec![1u8; 32]), Arc::new(vec![3u8; 32])];
         s.on_block_applied(&included);
         assert_eq!(s.len(), 1);
-        assert_eq!(s.txs.front().unwrap().tx_id, vec![2u8; 32]);
+        assert_eq!(s.txs.front().unwrap().tx_id, Arc::new(vec![2u8; 32]));
         assert_eq!(s.total_bytes(), 200);
     }
 
@@ -912,7 +917,7 @@ mod tests {
     fn on_block_applied_unknown_ids_is_noop() {
         let mut s = MempoolState::new(10);
         admit(&mut s, 1, 100);
-        s.on_block_applied(&[vec![99u8; 32]]);
+        s.on_block_applied(&[Arc::new(vec![99u8; 32])]);
         assert_eq!(s.len(), 1);
     }
 
@@ -986,7 +991,7 @@ mod tests {
         admit(&mut s, 2, 100);
         let next = s.peek_unannounced_for_peer(peer, 10);
         assert_eq!(next.len(), 1);
-        assert_eq!(next[0].tx_id, vec![2u8; 32]);
+        assert_eq!(next[0].tx_id, Arc::new(vec![2u8; 32]));
     }
 
     #[test]
@@ -998,8 +1003,8 @@ mod tests {
         let _ = s.peek_unannounced_for_peer(peer, 10);
         admit(&mut s, 3, 100);
         let advertised = s.peer_advertised.get(&peer).unwrap();
-        assert!(!advertised.contains(&vec![1u8; 32]));
-        assert!(advertised.contains(&vec![2u8; 32]));
+        assert!(!advertised.contains(&Arc::new(vec![1u8; 32])));
+        assert!(advertised.contains(&Arc::new(vec![2u8; 32])));
     }
 
     #[test]
@@ -1024,10 +1029,10 @@ mod tests {
         admit(&mut s, 2, 100);
         let peer = pid(0);
         let _ = s.peek_unannounced_for_peer(peer, 10);
-        s.on_block_applied(&[vec![1u8; 32]]);
+        s.on_block_applied(&[Arc::new(vec![1u8; 32])]);
         let advertised = s.peer_advertised.get(&peer).unwrap();
-        assert!(!advertised.contains(&vec![1u8; 32]));
-        assert!(advertised.contains(&vec![2u8; 32]));
+        assert!(!advertised.contains(&Arc::new(vec![1u8; 32])));
+        assert!(advertised.contains(&Arc::new(vec![2u8; 32])));
     }
 
     #[test]
@@ -1100,11 +1105,18 @@ mod tests {
         let eb = eb_key(50, 0xEE);
         let (manifest, evictions) = s.produce_eb(eb, 3);
 
-        assert_eq!(manifest, vec![vec![1u8; 32], vec![2u8; 32], vec![3u8; 32]]);
+        assert_eq!(
+            manifest,
+            vec![
+                Arc::new(vec![1u8; 32]),
+                Arc::new(vec![2u8; 32]),
+                Arc::new(vec![3u8; 32])
+            ]
+        );
         assert!(evictions.is_empty(), "no older EBs to evict yet");
         assert!(s.is_empty(), "txs are drained");
         assert_eq!(s.total_bytes(), 0);
-        assert!(s.eb_pinned.contains_key(&vec![1u8; 32]));
+        assert!(s.eb_pinned.contains_key(&Arc::new(vec![1u8; 32])));
         assert_eq!(s.get_eb_manifest(&eb), Some(manifest.as_slice()));
     }
 
@@ -1116,12 +1128,12 @@ mod tests {
         let eb = eb_key(10, 0x11);
         let _ = s.produce_eb(eb, 2);
         // Both still locally available, just under different roofs.
-        assert!(s.has_tx(&vec![1u8; 32]));
-        assert!(s.has_tx(&vec![2u8; 32]));
-        assert!(!s.has_tx(&vec![99u8; 32]));
+        assert!(s.has_tx(&Arc::new(vec![1u8; 32])));
+        assert!(s.has_tx(&Arc::new(vec![2u8; 32])));
+        assert!(!s.has_tx(&Arc::new(vec![99u8; 32])));
         // After draining into an EB, a new tx in the free pool is also has_tx-true.
         admit(&mut s, 3, 100);
-        assert!(s.has_tx(&vec![3u8; 32]));
+        assert!(s.has_tx(&Arc::new(vec![3u8; 32])));
     }
 
     #[test]
@@ -1131,12 +1143,12 @@ mod tests {
         s.admit_validated(id1.clone(), body1.clone(), sz1);
         s.produce_eb(eb_key(5, 0x55), 1);
         // Now id1 is in eb_pinned, not txs.
-        assert_eq!(s.get_body_by_id(&id1), Some(body1));
+        assert_eq!(s.get_body_by_id(id1), Some(body1));
         // A fresh free tx resolves from `txs`.
         let (id2, body2, sz2) = tx(2, 60);
         s.admit_validated(id2.clone(), body2.clone(), sz2);
-        assert_eq!(s.get_body_by_id(&id2), Some(body2));
-        assert_eq!(s.get_body_by_id(&[99u8; 32]), None);
+        assert_eq!(s.get_body_by_id(id2), Some(body2));
+        assert_eq!(s.get_body_by_id(Arc::new(vec![99u8; 32])), None);
     }
 
     #[test]
@@ -1144,8 +1156,8 @@ mod tests {
         // Receiver-side flow: see the EB header → fetch body → decode
         // manifest → record. Bodies arrive later via merge_eb_body.
         let mut s = MempoolState::new(10);
-        let id_a = vec![0xAAu8; 32];
-        let id_b = vec![0xBBu8; 32];
+        let id_a = Arc::new(vec![0xAAu8; 32]);
+        let id_b = Arc::new(vec![0xBBu8; 32]);
         let eb = eb_key(20, 0x77);
         s.record_eb_manifest(eb, vec![id_a.clone(), id_b.clone()]);
 
@@ -1153,29 +1165,29 @@ mod tests {
         assert_eq!(s.missing_eb_indices(&eb), vec![0, 1]);
 
         // Merge the second body first (out-of-order delivery is fine).
-        s.merge_eb_body(id_b.clone(), vec![0xB0], 1);
+        s.merge_eb_body(id_b.clone(), Arc::new(vec![0xB0]), 1);
         assert_eq!(s.missing_eb_indices(&eb), vec![0]);
         assert!(s.has_tx(&id_b));
 
         // Then the first.
-        s.merge_eb_body(id_a.clone(), vec![0xA0], 1);
+        s.merge_eb_body(id_a.clone(), Arc::new(vec![0xA0]), 1);
         assert!(s.missing_eb_indices(&eb).is_empty());
     }
 
     #[test]
     fn get_eb_bodies_returns_partial_subset_in_index_order() {
         let mut s = MempoolState::new(10);
-        let ids: Vec<TxId> = (0..5).map(|i| vec![i as u8; 32]).collect();
+        let ids: Vec<TxId> = (0..5).map(|i| Arc::new(vec![i as u8; 32])).collect();
         let eb = eb_key(30, 0x33);
         s.record_eb_manifest(eb, ids.clone());
         // Only bodies for indices 1 and 3 are locally available.
-        s.merge_eb_body(ids[1].clone(), vec![0x11], 1);
-        s.merge_eb_body(ids[3].clone(), vec![0x33], 1);
+        s.merge_eb_body(ids[1].clone(), Arc::new(vec![0x11]), 1);
+        s.merge_eb_body(ids[3].clone(), Arc::new(vec![0x33]), 1);
 
         // Server gets a bitmap request for [0, 1, 2, 3, 4]; returns only the
         // bodies it has, in ascending index order.
         let got = s.get_eb_bodies(&eb, 0..5).unwrap();
-        assert_eq!(got, vec![vec![0x11], vec![0x33]]);
+        assert_eq!(got, vec![Arc::new(vec![0x11]), Arc::new(vec![0x33])]);
     }
 
     #[test]
@@ -1188,12 +1200,12 @@ mod tests {
     #[test]
     fn merge_eb_body_idempotent_against_existing() {
         let mut s = MempoolState::new(10);
-        let id = vec![0xCCu8; 32];
+        let id = Arc::new(vec![0xCCu8; 32]);
         s.record_eb_manifest(eb_key(40, 0x40), vec![id.clone()]);
-        s.merge_eb_body(id.clone(), vec![0xCC], 1);
+        s.merge_eb_body(id.clone(), Arc::new(vec![0xCC]), 1);
         // Second call with a different (faked) body must not overwrite.
-        s.merge_eb_body(id.clone(), vec![0xFF], 1);
-        assert_eq!(s.get_body_by_id(&id), Some(vec![0xCC]));
+        s.merge_eb_body(id.clone(), Arc::new(vec![0xFF]), 1);
+        assert_eq!(s.get_body_by_id(id), Some(Arc::new(vec![0xCC])));
     }
 
     #[test]
@@ -1212,15 +1224,15 @@ mod tests {
         // Tight window so the test stays small.
         let mut s = MempoolState::new_with_eb_retention(100, 5);
         let old_eb = eb_key(1, 0x01);
-        let evicted_id = vec![0xAAu8; 32];
+        let evicted_id = Arc::new(vec![0xAAu8; 32]);
         let evictions_initial = s.record_eb_manifest(old_eb, vec![evicted_id.clone()]);
         assert!(evictions_initial.is_empty(), "no evictions on first record");
-        s.merge_eb_body(evicted_id.clone(), vec![0xAA], 1);
+        s.merge_eb_body(evicted_id.clone(), Arc::new(vec![0xAA]), 1);
         assert!(s.has_tx(&evicted_id));
         assert!(s.get_eb_manifest(&old_eb).is_some());
 
         // Push max_eb_slot far past the window.
-        let evictions = s.record_eb_manifest(eb_key(100, 0x02), vec![vec![0xBBu8; 32]]);
+        let evictions = s.record_eb_manifest(eb_key(100, 0x02), vec![Arc::new(vec![0xBBu8; 32])]);
 
         // Old EB and its body are evicted; new EB stays.
         assert!(s.get_eb_manifest(&old_eb).is_none());
@@ -1242,9 +1254,9 @@ mod tests {
     fn produce_eb_emits_evictions_for_aged_pins() {
         let mut s = MempoolState::new_with_eb_retention(100, 5);
         // Old EB with a pinned body.
-        let old_id = vec![0xAAu8; 32];
+        let old_id = Arc::new(vec![0xAAu8; 32]);
         let _ = s.record_eb_manifest(eb_key(1, 0x01), vec![old_id.clone()]);
-        s.merge_eb_body(old_id.clone(), vec![0xAA], 1);
+        s.merge_eb_body(old_id.clone(), Arc::new(vec![0xAA]), 1);
 
         // Produce a new EB far past the retention window — the
         // producer-side path also evicts the aged closure.
@@ -1265,10 +1277,10 @@ mod tests {
         // Same tx referenced by two EBs — pruning one shouldn't drop
         // the body if the other still references it.
         let mut s = MempoolState::new_with_eb_retention(100, 5);
-        let id = vec![0xCCu8; 32];
+        let id = Arc::new(vec![0xCCu8; 32]);
         s.record_eb_manifest(eb_key(1, 0x01), vec![id.clone()]);
         s.record_eb_manifest(eb_key(95, 0x02), vec![id.clone()]);
-        s.merge_eb_body(id.clone(), vec![0xCC], 1);
+        s.merge_eb_body(id.clone(), Arc::new(vec![0xCC]), 1);
         // Bump max so the slot=1 EB falls out of the window but slot=95 stays.
         s.record_eb_manifest(eb_key(99, 0x03), vec![]);
         assert!(s.get_eb_manifest(&eb_key(1, 0x01)).is_none());

@@ -34,7 +34,7 @@ struct OfferDedup {
     /// `(peer, slot, voter_id)` already forwarded as part of
     /// `LeiosVotesOffered`.  Per-vote because a single offer event
     /// carries a batch.
-    seen_votes: BTreeSet<(PeerId, u64, Vec<u8>)>,
+    seen_votes: BTreeSet<(PeerId, u64, Arc<Vec<u8>>)>,
     max_slot: u64,
     window: u64,
 }
@@ -74,8 +74,8 @@ impl OfferDedup {
     fn fresh_votes(
         &mut self,
         peer: PeerId,
-        votes: Vec<(u64, Vec<u8>)>,
-    ) -> Vec<(u64, Vec<u8>)> {
+        votes: Vec<(u64, Arc<Vec<u8>>)>,
+    ) -> Vec<(u64, Arc<Vec<u8>>)> {
         let mut out = Vec::with_capacity(votes.len());
         for (slot, voter_id) in votes {
             self.update_slot(slot);
@@ -592,7 +592,7 @@ impl Coordinator {
                             .enumerate()
                             .map(|(i, h)| (*h, i as u32))
                             .collect();
-                        let indexed: BTreeMap<u32, Vec<u8>> = transactions
+                        let indexed: BTreeMap<u32, Arc<Vec<u8>>> = transactions
                             .iter()
                             .filter_map(|body| {
                                 let id = blake2b_256(body);
@@ -2442,9 +2442,9 @@ mod tests {
     async fn record_leios_eb_manifest_enables_resolver_backed_serve() {
         use crate::store::leios_store::TxBodyResolver;
 
-        struct StubResolver(std::collections::HashMap<Vec<u8>, Vec<u8>>);
+        struct StubResolver(std::collections::HashMap<Vec<u8>, Arc<Vec<u8>>>);
         impl TxBodyResolver for StubResolver {
-            fn resolve_body(&self, tx_id: &[u8]) -> Option<Vec<u8>> {
+            fn resolve_body(&self, tx_id: &[u8]) -> Option<Arc<Vec<u8>>> {
                 self.0.get(tx_id).cloned()
             }
         }
@@ -2452,7 +2452,7 @@ mod tests {
         let h0 = [0x01u8; 32];
         let h1 = [0x02u8; 32];
         let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(
-            [(h0.to_vec(), vec![10u8]), (h1.to_vec(), vec![20u8])]
+            [(h0.to_vec(), Arc::new(vec![10u8])), (h1.to_vec(), Arc::new(vec![20u8]))]
                 .into_iter()
                 .collect(),
         ));
@@ -2500,7 +2500,7 @@ mod tests {
                 }
             }
         }
-        assert_eq!(got, Some(vec![vec![10u8], vec![20u8]]));
+        assert_eq!(got, Some(vec![Arc::new(vec![10u8]), Arc::new(vec![20u8])]));
 
         net_cmd_sender
             .send(NetworkCommand::Shutdown)
@@ -2533,7 +2533,7 @@ mod tests {
 
         let hash = [0xA1u8; 32];
         let point = Point::Specific { slot: 7, hash };
-        let txs: Vec<Vec<u8>> = vec![vec![1, 2, 3], vec![4, 5, 6]];
+        let txs: Vec<Arc<Vec<u8>>> = vec![Arc::new(vec![1, 2, 3]), Arc::new(vec![4, 5, 6])];
 
         net_cmd_sender
             .send(NetworkCommand::InjectLeiosBlockTxs {
@@ -2588,9 +2588,9 @@ mod tests {
         // Manifest must be in place before the coordinator can position
         // received bodies. In production net-node records this after
         // decoding the EB body; here we set it directly.
-        let body0 = b"alpha".to_vec();
-        let body1 = b"bravo".to_vec();
-        let body2 = b"charlie".to_vec();
+        let body0 = Arc::new(b"alpha".to_vec());
+        let body1 = Arc::new(b"bravo".to_vec());
+        let body2 = Arc::new(b"charlie".to_vec());
         let h0 = blake2b_256(&body0);
         let h1 = blake2b_256(&body1);
         let h2 = blake2b_256(&body2);
@@ -2670,7 +2670,7 @@ mod tests {
                 PeerId(3),
                 PeerEvent::LeiosBlockTxsFetched {
                     point: point.clone(),
-                    transactions: vec![b"orphan".to_vec()],
+                    transactions: vec![Arc::new(b"orphan".to_vec())],
                 },
             )
             .await;

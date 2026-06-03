@@ -8,6 +8,7 @@
 mod leios;
 mod praos;
 
+use std::sync::Arc;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::{mpsc, watch};
@@ -254,7 +255,7 @@ impl Consensus {
     /// EB manifest. Returns the bodies whose hash lies in the manifest,
     /// in manifest-index order, plus how many indices were requested
     /// and which indices remain unfilled.
-    pub fn match_eb_tx_response(&mut self, point: &Point, bodies: &[Vec<u8>]) -> EbTxMatchOutcome {
+    pub fn match_eb_tx_response(&mut self, point: &Point, bodies: &[Arc<Vec<u8>>]) -> EbTxMatchOutcome {
         self.leios.match_eb_tx_response(point, bodies)
     }
 

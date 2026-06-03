@@ -6,6 +6,7 @@
 
 pub mod codec;
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::protocols::{Agency, Protocol, ProtocolError, Runner};
@@ -55,7 +56,7 @@ pub enum Message {
     /// Server offers an EB's transactions for download. [3, point]
     MsgLeiosBlockTxsOffer { point: Point },
     /// Server offers votes for download. [4, [(slot, voter_id), ...]]
-    MsgLeiosVotesOffer { votes: Vec<(u64, Vec<u8>)> },
+    MsgLeiosVotesOffer { votes: Vec<(u64, Arc<Vec<u8>>)> },
     /// Client terminates. [5]
     MsgDone,
 }
@@ -121,7 +122,7 @@ pub enum LeiosNotifyEvent {
     /// An EB's transactions are available for download.
     BlockTxsOffer { point: Point },
     /// Votes are available for download.
-    VotesOffer { votes: Vec<(u64, Vec<u8>)> },
+    VotesOffer { votes: Vec<(u64, Arc<Vec<u8>>)> },
 }
 
 /// Request the next notification from the server.
@@ -352,7 +353,7 @@ mod tests {
             assert!(matches!(msg, Message::MsgLeiosNotificationRequestNext));
             runner
                 .send(&Message::MsgLeiosVotesOffer {
-                    votes: vec![(100, vec![0x01, 0x02]), (101, vec![0x03, 0x04])],
+                    votes: vec![(100, Arc::new(vec![0x01, 0x02])), (101, Arc::new(vec![0x03, 0x04]))],
                 })
                 .await
                 .unwrap();
@@ -409,8 +410,8 @@ mod tests {
             match event {
                 LeiosNotifyEvent::VotesOffer { votes } => {
                     assert_eq!(votes.len(), 2);
-                    assert_eq!(votes[0], (100, vec![0x01, 0x02]));
-                    assert_eq!(votes[1], (101, vec![0x03, 0x04]));
+                    assert_eq!(votes[0], (100, Arc::new(vec![0x01, 0x02])));
+                    assert_eq!(votes[1], (101, Arc::new(vec![0x03, 0x04])));
                 }
                 other => panic!("expected VotesOffer, got {other:?}"),
             }

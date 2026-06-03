@@ -10,7 +10,7 @@
 # Behaviour invokes T21/T22 threat model, parameter description is given below.
 
 num_nodes = 25
-degree = 3
+degree = 7
 min_latency_ms = 5
 max_latency_ms = 100
 

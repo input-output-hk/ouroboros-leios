@@ -13,7 +13,7 @@
 //!   msgDone                        = [9]
 
 use std::collections::BTreeMap;
-
+use std::sync::Arc;
 use minicbor::decode::Error as DecodeError;
 use minicbor::encode::Error as EncodeError;
 use minicbor::{Decoder, Encoder};
@@ -50,7 +50,7 @@ impl minicbor::Encode<()> for Message {
             Message::MsgLeiosBlockTxs { transactions } => {
                 e.array(2)?;
                 e.u32(3)?;
-                encode_blob_list(e, transactions)?;
+                encode_blob_list(e, transactions.as_slice())?;
             }
             Message::MsgLeiosVotesRequest { votes } => {
                 e.array(2)?;
@@ -87,7 +87,7 @@ impl minicbor::Encode<()> for Message {
                 e.array(3)?;
                 e.u32(7)?;
                 e.bytes(block)?;
-                encode_blob_list(e, transactions)?;
+                encode_blob_list(e, transactions.as_slice())?;
             }
             Message::MsgLeiosLastBlockAndTxsInRange {
                 block,
@@ -96,7 +96,7 @@ impl minicbor::Encode<()> for Message {
                 e.array(3)?;
                 e.u32(8)?;
                 e.bytes(block)?;
-                encode_blob_list(e, transactions)?;
+                encode_blob_list(e, transactions.as_slice())?;
             }
             Message::MsgDone => {
                 e.array(1)?;
@@ -129,6 +129,7 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
             3 => {
                 let transactions =
                     decode_blob_list(d, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE, "transaction")?;
+                let transactions = transactions.into_iter().map(|tx| tx.into()).collect();
                 Ok(Message::MsgLeiosBlockTxs { transactions })
             }
             4 => {
@@ -155,6 +156,7 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
                 let block = decode_block(d)?;
                 let transactions =
                     decode_blob_list(d, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE, "transaction")?;
+                let transactions = transactions.into_iter().map(|tx| tx.into()).collect();
                 Ok(Message::MsgLeiosNextBlockAndTxsInRange {
                     block,
                     transactions,
@@ -164,6 +166,7 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
                 let block = decode_block(d)?;
                 let transactions =
                     decode_blob_list(d, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE, "transaction")?;
+                let transactions = transactions.into_iter().map(|tx| tx.into()).collect();
                 Ok(Message::MsgLeiosLastBlockAndTxsInRange {
                     block,
                     transactions,
@@ -193,7 +196,7 @@ fn encode_bitmap<W: minicbor::encode::Write>(
 
 fn encode_blob_list<W: minicbor::encode::Write>(
     e: &mut Encoder<W>,
-    blobs: &[Vec<u8>],
+    blobs: &[Arc<Vec<u8>>],
 ) -> Result<(), EncodeError<W::Error>> {
     e.array(blobs.len() as u64)?;
     for blob in blobs {
@@ -276,7 +279,7 @@ fn decode_blob_list(
     max_count: usize,
     max_item_size: usize,
     item_name: &str,
-) -> Result<Vec<Vec<u8>>, DecodeError> {
+) -> Result<Vec<Arc<Vec<u8>>>, DecodeError> {
     let len = d.array()?;
     match len {
         Some(n) => {
@@ -288,7 +291,7 @@ fn decode_blob_list(
             }
             let mut items = Vec::with_capacity(n);
             for _ in 0..n {
-                items.push(decode_bounded_bytes(d, max_item_size, item_name)?);
+                items.push(Arc::new(decode_bounded_bytes(d, max_item_size, item_name)?));
             }
             Ok(items)
         }
@@ -304,7 +307,7 @@ fn decode_blob_list(
                         "{item_name} list exceeds maximum of {max_count}"
                     )));
                 }
-                items.push(decode_bounded_bytes(d, max_item_size, item_name)?);
+                items.push(Arc::new(decode_bounded_bytes(d, max_item_size, item_name)?));
             }
             Ok(items)
         }
@@ -328,7 +331,7 @@ fn decode_bounded_bytes(
 }
 
 /// Decode a list of (slot, voter_id) pairs with bounds checking.
-fn decode_vote_id_list(d: &mut Decoder<'_>) -> Result<Vec<(u64, Vec<u8>)>, DecodeError> {
+fn decode_vote_id_list(d: &mut Decoder<'_>) -> Result<Vec<(u64, Arc<Vec<u8>>)>, DecodeError> {
     let len = d.array()?;
     match len {
         Some(n) => {
@@ -364,7 +367,7 @@ fn decode_vote_id_list(d: &mut Decoder<'_>) -> Result<Vec<(u64, Vec<u8>)>, Decod
 }
 
 /// Decode a single (slot, voter_id) pair.
-fn decode_vote_id_pair(d: &mut Decoder<'_>) -> Result<(u64, Vec<u8>), DecodeError> {
+fn decode_vote_id_pair(d: &mut Decoder<'_>) -> Result<(u64, Arc<Vec<u8>>), DecodeError> {
     let _pair_len = d.array()?;
     let slot = d.u64()?;
     let voter_id = d.bytes()?;
@@ -374,13 +377,14 @@ fn decode_vote_id_pair(d: &mut Decoder<'_>) -> Result<(u64, Vec<u8>), DecodeErro
             voter_id.len()
         )));
     }
-    Ok((slot, voter_id.to_vec()))
+    Ok((slot, Arc::new(voter_id.to_vec())))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::types::Point;
+    use std::sync::Arc;
 
     fn round_trip(msg: &Message) -> Message {
         let encoded = minicbor::to_vec(msg).unwrap();
@@ -483,14 +487,14 @@ mod tests {
     #[test]
     fn block_txs_round_trip() {
         let msg = Message::MsgLeiosBlockTxs {
-            transactions: vec![vec![0x01, 0x02], vec![0x03]],
+            transactions: vec![Arc::new(vec![0x01, 0x02]), Arc::new(vec![0x03])],
         };
         let decoded = round_trip(&msg);
         match decoded {
             Message::MsgLeiosBlockTxs { transactions } => {
                 assert_eq!(transactions.len(), 2);
-                assert_eq!(transactions[0], vec![0x01, 0x02]);
-                assert_eq!(transactions[1], vec![0x03]);
+                assert_eq!(*transactions[0], vec![0x01, 0x02]);
+                assert_eq!(*transactions[1], vec![0x03]);
             }
             other => panic!("expected MsgLeiosBlockTxs, got {other:?}"),
         }
@@ -511,14 +515,14 @@ mod tests {
     #[test]
     fn votes_request_round_trip() {
         let msg = Message::MsgLeiosVotesRequest {
-            votes: vec![(10, vec![0xAA]), (20, vec![0xBB, 0xCC])],
+            votes: vec![(10, Arc::new(vec![0xAA])), (20, Arc::new(vec![0xBB, 0xCC]))],
         };
         let decoded = round_trip(&msg);
         match decoded {
             Message::MsgLeiosVotesRequest { votes } => {
                 assert_eq!(votes.len(), 2);
-                assert_eq!(votes[0], (10, vec![0xAA]));
-                assert_eq!(votes[1], (20, vec![0xBB, 0xCC]));
+                assert_eq!(votes[0], (10, Arc::new(vec![0xAA])));
+                assert_eq!(votes[1], (20, Arc::new(vec![0xBB, 0xCC])));
             }
             other => panic!("expected MsgLeiosVotesRequest, got {other:?}"),
         }
@@ -527,13 +531,13 @@ mod tests {
     #[test]
     fn vote_delivery_round_trip() {
         let msg = Message::MsgLeiosVoteDelivery {
-            votes: vec![vec![0x01, 0x02], vec![0x03, 0x04]],
+            votes: vec![Arc::new(vec![0x01, 0x02]), Arc::new(vec![0x03, 0x04])],
         };
         let decoded = round_trip(&msg);
         match decoded {
             Message::MsgLeiosVoteDelivery { votes } => {
                 assert_eq!(votes.len(), 2);
-                assert_eq!(votes[0], vec![0x01, 0x02]);
+                assert_eq!(votes[0], Arc::new(vec![0x01, 0x02]));
             }
             other => panic!("expected MsgLeiosVoteDelivery, got {other:?}"),
         }
@@ -568,7 +572,7 @@ mod tests {
     fn next_block_in_range_round_trip() {
         let msg = Message::MsgLeiosNextBlockAndTxsInRange {
             block: vec![0xE1],
-            transactions: vec![vec![0x01]],
+            transactions: vec![Arc::new(vec![0x01])],
         };
         let decoded = round_trip(&msg);
         match decoded {
@@ -577,7 +581,7 @@ mod tests {
                 transactions,
             } => {
                 assert_eq!(block, vec![0xE1]);
-                assert_eq!(transactions, vec![vec![0x01]]);
+                assert_eq!(*transactions[0], vec![0x01]);
             }
             other => panic!("expected MsgLeiosNextBlockAndTxsInRange, got {other:?}"),
         }
@@ -587,7 +591,7 @@ mod tests {
     fn last_block_in_range_round_trip() {
         let msg = Message::MsgLeiosLastBlockAndTxsInRange {
             block: vec![0xE2],
-            transactions: vec![vec![0x02], vec![0x03]],
+            transactions: vec![Arc::new(vec![0x02]), Arc::new(vec![0x03])],
         };
         let decoded = round_trip(&msg);
         match decoded {

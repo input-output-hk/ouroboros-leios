@@ -12,6 +12,7 @@
 //! Inner lists (txIdsAndSizes, txIdList, txList) use indefinite-length
 //! encoding per the Haskell codec.
 
+use std::sync::Arc;
 use minicbor::decode::Error as DecodeError;
 use minicbor::encode::Error as EncodeError;
 use minicbor::{Decoder, Encoder};
@@ -44,7 +45,7 @@ impl<'a> minicbor::Decode<'a, ()> for TxId {
                 raw.len()
             )));
         }
-        Ok(TxId(raw.to_vec()))
+        Ok(TxId(Arc::new(raw.to_vec())))
     }
 }
 
@@ -73,7 +74,7 @@ impl<'a> minicbor::Decode<'a, ()> for TxBody {
                 raw.len()
             )));
         }
-        Ok(TxBody(raw.to_vec()))
+        Ok(TxBody(Arc::new(raw.to_vec())))
     }
 }
 
@@ -264,11 +265,11 @@ mod tests {
     }
 
     fn make_tx_id() -> TxId {
-        TxId(vec![0xaa; 32])
+        TxId(Arc::new(vec![0xaa; 32]))
     }
 
     fn make_tx_body(payload: &[u8]) -> TxBody {
-        TxBody(payload.to_vec())
+        TxBody(Arc::new(payload.to_vec()))
     }
 
     #[test]
@@ -397,7 +398,7 @@ mod tests {
         let raw_hash: Vec<u8> = (0..32).collect();
         let msg = Message::MsgReplyTxIds {
             tx_ids: vec![TxIdAndSize {
-                tx_id: TxId(raw_hash.clone()),
+                tx_id: TxId(Arc::new(raw_hash.clone())),
                 size: 1234,
             }],
         };
@@ -405,7 +406,7 @@ mod tests {
         match decoded {
             Message::MsgReplyTxIds { tx_ids } => {
                 assert_eq!(tx_ids.len(), 1);
-                assert_eq!(tx_ids[0].tx_id.0, raw_hash);
+                assert_eq!(*tx_ids[0].tx_id.0, raw_hash);
                 assert_eq!(tx_ids[0].size, 1234);
             }
             other => panic!("expected MsgReplyTxIds, got {other:?}"),
@@ -419,14 +420,14 @@ mod tests {
         let body_a: Vec<u8> = (0..200).map(|i| (i * 7) as u8).collect();
         let body_b: Vec<u8> = (0..1500).map(|i| (i * 31) as u8).collect();
         let msg = Message::MsgReplyTxs {
-            txs: vec![TxBody(body_a.clone()), TxBody(body_b.clone())],
+            txs: vec![TxBody(Arc::new(body_a.clone())), TxBody(Arc::new(body_b.clone()))],
         };
         let decoded = round_trip(&msg);
         match decoded {
             Message::MsgReplyTxs { txs } => {
                 assert_eq!(txs.len(), 2);
-                assert_eq!(txs[0].0, body_a);
-                assert_eq!(txs[1].0, body_b);
+                assert_eq!(*txs[0].0, body_a);
+                assert_eq!(*txs[1].0, body_b);
             }
             other => panic!("expected MsgReplyTxs, got {other:?}"),
         }

@@ -8,6 +8,7 @@
 //!   msgLeiosVotesOffer              = [4, [(slot, voterId), ...]]
 //!   msgDone                         = [5]
 
+use std::sync::Arc;
 use minicbor::decode::Error as DecodeError;
 use minicbor::encode::Error as EncodeError;
 use minicbor::{Decoder, Encoder};
@@ -92,7 +93,7 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
 }
 
 /// Decode a list of (slot, voter_id) pairs with bounds checking.
-fn decode_vote_offers(d: &mut Decoder<'_>) -> Result<Vec<(u64, Vec<u8>)>, DecodeError> {
+fn decode_vote_offers(d: &mut Decoder<'_>) -> Result<Vec<(u64, Arc<Vec<u8>>)>, DecodeError> {
     let len = d.array()?;
     match len {
         Some(n) => {
@@ -128,7 +129,7 @@ fn decode_vote_offers(d: &mut Decoder<'_>) -> Result<Vec<(u64, Vec<u8>)>, Decode
 }
 
 /// Decode a single (slot, voter_id) pair.
-fn decode_vote_offer_pair(d: &mut Decoder<'_>) -> Result<(u64, Vec<u8>), DecodeError> {
+fn decode_vote_offer_pair(d: &mut Decoder<'_>) -> Result<(u64, Arc<Vec<u8>>), DecodeError> {
     let _pair_len = d.array()?;
     let slot = d.u64()?;
     let voter_id = d.bytes()?;
@@ -138,7 +139,7 @@ fn decode_vote_offer_pair(d: &mut Decoder<'_>) -> Result<(u64, Vec<u8>), DecodeE
             voter_id.len()
         )));
     }
-    Ok((slot, voter_id.to_vec()))
+    Ok((slot, Arc::new(voter_id.to_vec())))
 }
 
 #[cfg(test)]
@@ -227,14 +228,14 @@ mod tests {
     #[test]
     fn votes_offer_round_trip() {
         let msg = Message::MsgLeiosVotesOffer {
-            votes: vec![(100, vec![0x01, 0x02, 0x03]), (200, vec![0x04, 0x05])],
+            votes: vec![(100, Arc::new(vec![0x01, 0x02, 0x03])), (200, Arc::new(vec![0x04, 0x05]))],
         };
         let decoded = round_trip(&msg);
         match decoded {
             Message::MsgLeiosVotesOffer { votes } => {
                 assert_eq!(votes.len(), 2);
-                assert_eq!(votes[0], (100, vec![0x01, 0x02, 0x03]));
-                assert_eq!(votes[1], (200, vec![0x04, 0x05]));
+                assert_eq!(votes[0], (100, Arc::new(vec![0x01, 0x02, 0x03])));
+                assert_eq!(votes[1], (200, Arc::new(vec![0x04, 0x05])));
             }
             other => panic!("expected MsgLeiosVotesOffer, got {other:?}"),
         }
