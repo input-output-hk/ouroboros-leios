@@ -832,8 +832,23 @@ impl PraosState {
         to: &Point,
         now: Instant,
     ) -> Vec<PraosEffect> {
-        self.in_flight.remove(from);
-        self.in_flight.remove(to);
+        // Clear the whole failed range, not just its endpoints: blocks are
+        // now tracked in flight individually, so drop every in-flight marker
+        // whose slot falls within [from, to] so re-selection can refetch the
+        // entire range from a different peer.
+        let slot_of = |p: &Point| match p {
+            Point::Specific { slot, .. } => Some(*slot),
+            Point::Origin => None,
+        };
+        if let (Some(from_slot), Some(to_slot)) = (slot_of(from), slot_of(to)) {
+            self.in_flight.retain(|p, _| match slot_of(p) {
+                Some(s) => s < from_slot || s > to_slot,
+                None => true,
+            });
+        } else {
+            self.in_flight.remove(from);
+            self.in_flight.remove(to);
+        }
         self.block_fetch_cooldown
             .insert(peer_id, now + BLOCK_FETCH_COOLDOWN);
         debug!(
@@ -1633,25 +1648,50 @@ impl PraosState {
             return;
         }
         self.evict_stale_in_flight(now);
+
+        // Only fetch blocks that aren't already part of an outstanding
+        // request.  `in_flight` is keyed per block — every block we ask
+        // for is recorded below and removed as it arrives (see
+        // `on_block_received`) — so filtering here collapses the request
+        // to the *frontier* gap.  Without it, every ChainSync roll-forward
+        // re-issues a range from the anchor to the new tip, re-fetching the
+        // whole not-yet-validated backlog; during deep catch-up (a follower
+        // thousands of blocks behind a live peer) that amplifies block
+        // traffic super-linearly.
+        let to_fetch: Vec<Point> = missing
+            .iter()
+            .filter(|p| !self.in_flight.contains_key(p))
+            .cloned()
+            .collect();
+        if to_fetch.is_empty() {
+            return;
+        }
+
         // The BlockFetch range lower bound must be a real block point.
         // A standard Cardano server rejects — and resets the bearer on —
         // a range anchored at Origin, since genesis carries no block.
-        // When the only anchor we have is the genesis intersection, fall
-        // back to the oldest block we actually need.
+        // Use the supplied anchor only when the frontier still begins at
+        // the oldest missing block (no in-flight prefix was filtered off);
+        // otherwise start at the first block we actually still need so the
+        // range doesn't overlap an outstanding request.
+        let frontier_is_oldest = to_fetch.first() == missing.first();
         let from = match anchor_point {
-            Some(p) if !matches!(p, Point::Origin) => p,
-            _ => missing.first().unwrap().clone(),
+            Some(p) if frontier_is_oldest && !matches!(p, Point::Origin) => p,
+            _ => to_fetch.first().unwrap().clone(),
         };
-        let to = missing.last().unwrap().clone();
-        if self.in_flight.contains_key(&to) {
-            return;
+        let to = to_fetch.last().unwrap().clone();
+
+        // Record every block in the issued range as in flight so later
+        // roll-forwards skip it until it arrives or its marker goes stale.
+        for p in &to_fetch {
+            self.in_flight.insert(p.clone(), now);
         }
-        self.in_flight.insert(to.clone(), now);
         let peers = self.choose_block_fetch_peers(&to, peer_id);
         debug!(
             node_id = %self.node_id,
             %from,
             %to,
+            fetch_len = to_fetch.len(),
             peer_count = peers.len(),
             "fetching missing chain blocks"
         );
@@ -2420,6 +2460,68 @@ mod tests {
         assert!(fx
             .iter()
             .any(|e| matches!(e, PraosEffect::FetchBlockRange { .. })));
+    }
+
+    #[test]
+    fn deep_catch_up_does_not_refetch_in_flight_blocks() {
+        // Regression: during catch-up, successive roll-forwards must fetch
+        // only the new frontier block, not re-issue a range back to the
+        // anchor.  The old behaviour re-fetched the whole not-yet-validated
+        // backlog on every roll-forward, amplifying block traffic
+        // super-linearly against a far-ahead peer.
+        let mut s = fresh();
+        install_validated_block(&mut s, 100, 1, 1, None);
+        s.adopted_tip_hash = Some(h(1));
+        let now = Instant::now();
+        let pid = PeerId(7);
+
+        let range_of = |fx: &[PraosEffect]| {
+            fx.iter().find_map(|e| match e {
+                PraosEffect::FetchBlockRange { from, to, .. } => {
+                    Some((from.clone(), to.clone()))
+                }
+                _ => None,
+            })
+        };
+
+        // First roll-forward: peer announces block 2 (prev = adopted block 1).
+        let fx1 = s.on_tip_advanced(
+            pid,
+            pt(101, 2),
+            2,
+            2,
+            h(2),
+            101,
+            Some(h(1)),
+            &[0xAA; 4],
+            now,
+        );
+        assert_eq!(
+            range_of(&fx1),
+            Some((pt(101, 2), pt(101, 2))),
+            "first roll-forward fetches block 2"
+        );
+        assert!(s.in_flight.contains_key(&pt(101, 2)));
+
+        // Second roll-forward BEFORE block 2 validates: peer announces block
+        // 3 (prev = block 2).  Block 2 is still in flight, so the new fetch
+        // must cover only block 3 — not the overlapping range [2, 3].
+        let fx2 = s.on_tip_advanced(
+            pid,
+            pt(102, 3),
+            3,
+            3,
+            h(3),
+            102,
+            Some(h(2)),
+            &[0xAA; 4],
+            now,
+        );
+        assert_eq!(
+            range_of(&fx2),
+            Some((pt(102, 3), pt(102, 3))),
+            "second fetch must not re-include the in-flight block 2"
+        );
     }
 
     #[test]
