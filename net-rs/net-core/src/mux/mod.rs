@@ -251,6 +251,12 @@ impl<S: scheduler::Scheduler> Mux<S> {
         // Spawn a supervisor that aborts the surviving task when one fails.
         let muxer_abort = muxer_handle.abort_handle();
         let demuxer_abort = demuxer_handle.abort_handle();
+        // Keep clones so an external `abort()` can tear down the muxer and
+        // demuxer directly — they own the bearer's read/write halves, so
+        // aborting only the supervisor would leave the socket open (the
+        // remote then only notices via keepalive timeout).
+        let muxer_abort_ext = muxer_abort.clone();
+        let demuxer_abort_ext = demuxer_abort.clone();
 
         let (error_tx, error_rx) = tokio::sync::watch::channel(None);
 
@@ -285,6 +291,8 @@ impl<S: scheduler::Scheduler> Mux<S> {
 
         RunningMux {
             supervisor,
+            muxer_abort: muxer_abort_ext,
+            demuxer_abort: demuxer_abort_ext,
             error_rx,
             stats,
         }
@@ -296,6 +304,11 @@ impl<S: scheduler::Scheduler> Mux<S> {
 /// via `wait()` or `error()`.
 pub struct RunningMux {
     supervisor: JoinHandle<()>,
+    /// Abort handles for the muxer (egress/writer) and demuxer
+    /// (ingress/reader) tasks — they own the bearer's halves, so
+    /// `abort()` must cancel them to actually close the socket.
+    muxer_abort: tokio::task::AbortHandle,
+    demuxer_abort: tokio::task::AbortHandle,
     error_rx: tokio::sync::watch::Receiver<Option<String>>,
     /// Per-connection byte counters (shared with muxer/demuxer tasks).
     pub stats: Arc<MuxStats>,
@@ -317,8 +330,12 @@ impl RunningMux {
         self.error_rx.borrow().clone()
     }
 
-    /// Abort the mux (both tasks).
+    /// Abort the mux. Cancels the muxer and demuxer (which own the
+    /// bearer's write/read halves, so the socket is closed and the
+    /// remote sees EOF promptly) as well as the supervisor.
     pub fn abort(&self) {
+        self.muxer_abort.abort();
+        self.demuxer_abort.abort();
         self.supervisor.abort();
     }
 }
