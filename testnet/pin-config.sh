@@ -7,7 +7,9 @@
 set -euo pipefail
 
 REF="${1:-next-2026-05-15}"
-BASE="https://raw.githubusercontent.com/input-output-hk/cardano-playground/${REF}/static/book.play.dev.cardano.org/environments-pre/leios"
+# Canonical configs live under docs/; the static/ tree is generated for
+# the book site and lags behind redeployments.
+BASE="https://raw.githubusercontent.com/input-output-hk/cardano-playground/${REF}/docs/environments-pre/leios"
 DEST="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/config"
 
 mkdir -p "$DEST"
