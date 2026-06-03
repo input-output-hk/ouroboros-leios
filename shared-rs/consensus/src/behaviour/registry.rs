@@ -17,7 +17,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::behaviours::{DeepReorg, LazyVoter, RbHeaderEquivocator, T22ThreatBehaviour};
+use super::behaviours::{
+    DeepReorg, DropInboundPeers, LazyVoter, RbHeaderEquivocator, T22ThreatBehaviour,
+};
 use super::{Behaviour, CompositeBehaviour, HonestBehaviour};
 use crate::leios::NoVoteReason;
 
@@ -67,6 +69,14 @@ pub enum BehaviourSpec {
     /// adopted tip.  See [`super::behaviours::DeepReorg`].
     #[serde(rename = "deep-reorg")]
     DeepReorg { every_slots: u64, depth: u64 },
+    /// Server-side chaos: each slot, with `probability`, reset all
+    /// accepted (inbound) peer connections so the remote reconnects and
+    /// re-intersects.  Mimics a relay that RSTs inbound peers — the
+    /// reconnect-handover trigger.  Compose with [`Self::DeepReorg`] so
+    /// the reconnect lands on a reorged chain.  See
+    /// [`super::behaviours::DropInboundPeers`].
+    #[serde(rename = "drop-inbound-peers")]
+    DropInboundPeers { probability: f64 },
 }
 
 fn default_lazy_reason() -> NoVoteReason {
@@ -123,6 +133,9 @@ pub fn build(spec: &BehaviourSpec, seed: u64) -> Box<dyn Behaviour> {
         } => Box::new(T22ThreatBehaviour::new(*vote_threshold, *non_voting_threshold, *hide_eb_tx_received)),
         BehaviourSpec::DeepReorg { every_slots, depth } => {
             Box::new(DeepReorg::new(*every_slots, *depth))
+        }
+        BehaviourSpec::DropInboundPeers { probability } => {
+            Box::new(DropInboundPeers::new(seed, *probability))
         }
     }
 }

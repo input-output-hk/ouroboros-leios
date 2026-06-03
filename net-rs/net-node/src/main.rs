@@ -250,6 +250,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 if let Some(depth) = consensus.maybe_force_reorg(slot).await {
                     info!(node_id = %node_id, slot, depth, "behaviour: forced deep self-reorg");
                 }
+                // Behaviour-driven inbound reset (DropInboundPeers): RST
+                // accepted peers so they reconnect and re-intersect.
+                if consensus.should_drop_inbound_peers(slot) {
+                    let _ = commands.send(NetworkCommand::DropInboundPeers).await;
+                    info!(node_id = %node_id, slot, "behaviour: dropping inbound peers");
+                }
 
                 // Leios: advance pipeline phases and trigger voting.
                 if leios {

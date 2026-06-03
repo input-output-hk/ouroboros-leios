@@ -437,6 +437,16 @@ impl LeiosState {
         guard.praos_reorg(slot)
     }
 
+    /// Consult the behaviour for whether to reset inbound peer
+    /// connections this slot (see
+    /// [`crate::behaviour::behaviours::DropInboundPeers`]).  `false` for
+    /// the honest default.
+    pub fn ask_drop_inbound_peers(&mut self, slot: u64) -> bool {
+        let arc = self.behaviour.clone();
+        let mut guard = arc.lock().expect("behaviour mutex poisoned");
+        guard.drop_inbound_peers(slot)
+    }
+
     /// Short name of the current behaviour, e.g. `"honest"`,
     /// `"rb-header-equivocator"`.  Useful for telemetry and structured logs.
     pub fn behaviour_name(&self) -> &'static str {

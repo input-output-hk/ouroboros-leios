@@ -86,11 +86,13 @@ pub mod behaviours {
     //! Concrete [`super::Behaviour`] implementations.  Each lives in its
     //! own file so contributors can add one without touching the others.
     pub mod deep_reorg;
+    pub mod drop_inbound;
     pub mod lazy_voter;
     pub mod rb_equivocator;
     pub mod t22;
 
     pub use deep_reorg::DeepReorg;
+    pub use drop_inbound::DropInboundPeers;
     pub use lazy_voter::LazyVoter;
     pub use rb_equivocator::RbHeaderEquivocator;
     pub use t22::T22ThreatBehaviour;
@@ -345,6 +347,15 @@ pub trait Behaviour: Send + Sync {
     /// honest consensus.
     fn praos_reorg(&mut self, _slot: u64) -> Option<u64> {
         None
+    }
+
+    /// Deliberately reset accepted (inbound) peer connections this slot.
+    /// `true` asks the I/O wrapper to drop every inbound peer, so the
+    /// remote reconnects and re-runs ChainSync intersection from scratch
+    /// — mimicking a relay that resets inbound connections.  The default
+    /// is `false`.  Not part of honest consensus.
+    fn drop_inbound_peers(&mut self, _slot: u64) -> bool {
+        false
     }
 
     /// Hand the I/O wrapper's freshly-produced RB variants to the
@@ -628,6 +639,18 @@ impl Behaviour for CompositeBehaviour {
             }
         }
         None
+    }
+
+    fn drop_inbound_peers(&mut self, slot: u64) -> bool {
+        // Poll every child (no short-circuit) so a child that tracks
+        // per-call state stays deterministic.
+        let mut drop = false;
+        for c in self.children.iter_mut() {
+            if c.drop_inbound_peers(slot) {
+                drop = true;
+            }
+        }
+        drop
     }
 
     fn transform_outbound(
