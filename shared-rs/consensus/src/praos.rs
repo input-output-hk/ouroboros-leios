@@ -33,6 +33,14 @@ use crate::types::Point;
 /// window, allow a fresh fetch.
 pub const IN_FLIGHT_TTL: Duration = Duration::from_secs(15);
 
+/// Minimum interval between chain_tree gap-bridge fetches anchored at the
+/// same adopted tip.  Without it, an advancing `best_tip` (the live peer
+/// keeps producing) defeats the per-block in-flight dedup — `gap_point`
+/// changes every tick, so the bridge re-issues the entire
+/// `[adopted_tip → best_tip]` range continuously, amplifying block
+/// traffic.  Resets as soon as the adopted tip advances (real progress).
+pub const BRIDGE_COOLDOWN: Duration = Duration::from_secs(10);
+
 /// After a peer is classified as `OrphanCandidate`, this much time must
 /// pass before it is reconsidered for chain selection.  Caps the
 /// orphan-cascade rate at 1/sec per peer even when re-intersection
@@ -226,6 +234,11 @@ pub struct PraosState {
 
     /// Points currently being fetched (avoid duplicate requests).
     pub in_flight: BTreeMap<Point, Instant>,
+    /// Gap-bridge rate-limit: `(adopted_tip_point, next_allowed)`.  The
+    /// bridge re-fetches `[adopted_tip → best_tip]`; this stops it from
+    /// re-issuing every retry tick while `best_tip` advances.  Cleared
+    /// (allowed immediately) when the adopted tip changes.
+    pub bridge_cooldown: Option<(Point, Instant)>,
     /// Hashes already submitted to the validator but not yet
     /// `Applied` / `ApplyFailed`.
     pub in_flight_validation: BTreeSet<[u8; 32]>,
@@ -307,6 +320,7 @@ impl PraosState {
             orphan_cooldown: BTreeMap::new(),
             block_fetch_cooldown: BTreeMap::new(),
             in_flight: BTreeMap::new(),
+            bridge_cooldown: None,
             in_flight_validation: BTreeSet::new(),
             queued_validator_tip: None,
             last_validated_tip: None,
@@ -1152,7 +1166,18 @@ impl PraosState {
                     _ => 0,
                 };
                 if let Some(from) = from {
-                    if to_slot > from_slot && !self.in_flight.contains_key(&gap_point) {
+                    // Rate-limit the bridge: skip if we recently bridged from
+                    // this same adopted tip.  An advancing best_tip changes
+                    // `gap_point` every tick and defeats the in-flight dedup,
+                    // so without this the whole range re-fetches continuously.
+                    let bridge_cooling = matches!(
+                        &self.bridge_cooldown,
+                        Some((cooled_from, until)) if *cooled_from == from && now < *until
+                    );
+                    if to_slot > from_slot
+                        && !self.in_flight.contains_key(&gap_point)
+                        && !bridge_cooling
+                    {
                         let peers = self.choose_block_fetch_peers(&gap_point, None);
                         if peers.is_empty() {
                             // No connected peer can serve this gap, so the
@@ -1180,6 +1205,7 @@ impl PraosState {
                                 "retry: fetching gap to bridge chain_tree"
                             );
                             self.in_flight.insert(gap_point.clone(), now);
+                            self.bridge_cooldown = Some((from.clone(), now + BRIDGE_COOLDOWN));
                             fx.push(PraosEffect::FetchBlockRange {
                                 from,
                                 to: gap_point,
