@@ -20,7 +20,7 @@
           # ledger pinned via the cardano-node-leios flake input.
           inputs'.cardano-node-leios.packages.cardano-node
           # CLI to query the local node socket (e.g. tip catchup checks).
-          inputs'.cardano-node.packages.cardano-cli
+          inputs'.cardano-node-leios.packages.cardano-cli
           pkgs.process-compose
           pkgs.envsubst
           pkgs.bash

@@ -46,7 +46,7 @@ jobs:
         id: refs
         run: |
           cn_leios=$(jq -r '.nodes["cardano-node-leios"].locked.rev' flake.lock)
-          cn_txcent=$(jq -r '.nodes["cardano-node"].locked.rev' flake.lock)
+          cn_txcent=$(jq -r '.nodes["cardano-node-tx-centrifuge"].locked.rev' flake.lock)
           for name in cn_leios cn_txcent; do
             value=${!name}
             if [ -z "$value" ] || [ "$value" = "null" ]; then
