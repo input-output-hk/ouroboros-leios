@@ -1,55 +1,79 @@
 #!/usr/bin/env bash
 #
-# Connect a Leios-prototype cardano-node to the public Leios testnet
-# (https://book.play.dev.cardano.org/environments-pre/leios) as a
-# non-block-producing relay. Use this to verify a locally-built node
-# can catch up to the testnet chain via the CertRB staging area
-# (issue #890) and the Phase 2 emergency-fetch path.
-#
-# Configs in ./config are a snapshot of
-#   cardano-playground/static/book.play.dev.cardano.org/environments-pre/leios
-# at tag/branch next-2026-05-15. Re-pin with ./pin-config.sh when the
-# upstream testnet rolls.
+# Orchestrate a Leios testnet relay alongside the X-ray observability
+# stack (Prometheus + Loki + Grafana via Alloy) using process-compose.
+# For just the node, run ./run-node.sh instead.
 
-set -euo pipefail
+set -eo pipefail
 
+# Set defaults for all environment variables.
+# Override by exporting before invoking this script.
+set -a
 : "${WORKING_DIR:=$(pwd)/tmp-testnet}"
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 : "${PORT:=3010}"
 : "${HOST_ADDR:=0.0.0.0}"
-: "${LOG_FILE:=${WORKING_DIR}/node.log}"
+: "${METRICS_PORT:=12798}"
+# X-ray observability (on by default, disable with XRAY=0)
+: "${XRAY:=1}"
+: "${XRAY_SOURCE_DIR:=${SOURCE_DIR}/../demo/extras/x-ray}"
+set +a
 
-# cardano-node binary. Override CARDANO_NODE to point at the locally
-# built one with the issue-#890 staging fixes, e.g.
-#   CARDANO_NODE=/path/to/cardano-node/dist-newstyle/.../cardano-node ./run.sh
-: "${CARDANO_NODE:=cardano-node}"
-
-if ! command -v "$CARDANO_NODE" >/dev/null 2>&1; then
-  echo "error: cardano-node not on PATH and CARDANO_NODE not set" >&2
+# Check for required commands
+REQUIRED_COMMANDS=(
+  "process-compose"
+  "cardano-node"
+  "cardano-cli"
+  "envsubst"
+  "jq"
+)
+MISSING_COMMANDS=()
+for cmd in "${REQUIRED_COMMANDS[@]}"; do
+  if ! command -v "$cmd" &>/dev/null; then
+    MISSING_COMMANDS+=("$cmd")
+  fi
+done
+if [ ${#MISSING_COMMANDS[@]} -gt 0 ]; then
+  echo "Error: The following required commands are not available:"
+  for cmd in "${MISSING_COMMANDS[@]}"; do
+    echo "  - $cmd"
+  done
+  echo ""
+  echo "Please install the missing commands or use nix:"
+  echo "  nix run github:input-output-hk/ouroboros-leios#leios-testnet-relay"
   exit 1
 fi
 
 mkdir -p "$WORKING_DIR"
-cp -rf "$SOURCE_DIR/config/." "$WORKING_DIR/"
-chmod u+w -R "$WORKING_DIR"
-cd "$WORKING_DIR"
 
-mkdir -p db
-
-mkdir -p "$(dirname "$LOG_FILE")"
+# Generate Alloy config so its scrape targets resolve to the node's
+# actual Prometheus endpoint.
+if [ "$XRAY" = "1" ]; then
+  export ALLOY_CONFIG="${WORKING_DIR}/config.alloy"
+  envsubst <"${SOURCE_DIR}/config/alloy.template" >"${ALLOY_CONFIG}"
+fi
 
 echo "Starting Leios testnet relay"
-echo "  binary:    $($CARDANO_NODE --version 2>&1 | head -1)"
-echo "  workdir:   $WORKING_DIR"
-echo "  bind:      $HOST_ADDR:$PORT"
-echo "  topology:  $(jq -c '.bootstrapPeers' topology.json)"
-echo "  log file:  $LOG_FILE"
+echo "  binary:     $(cardano-node --version 2>&1 | head -1)"
+echo "  workdir:    $WORKING_DIR"
+echo "  bind:       $HOST_ADDR:$PORT"
+echo "  metrics:    127.0.0.1:$METRICS_PORT"
 
-"$CARDANO_NODE" run \
-  --config config.json \
-  --host-addr "$HOST_ADDR" \
-  --port "$PORT" \
-  --topology topology.json \
-  --database-path db \
-  --socket-path node.socket \
-  2>&1 | tee "$LOG_FILE"
+XRAY_COMPOSE=()
+if [ "$XRAY" = "1" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "${XRAY_SOURCE_DIR}/env.sh"
+  set +a
+  # Grafana provisioning expects this directory to exist even if we ship
+  # no testnet-specific dashboards.
+  mkdir -p "$DEMO_DASHBOARDS_DIR"
+  XRAY_COMPOSE=(-f "${XRAY_SOURCE_DIR}/process-compose.yaml")
+  echo "  X-ray:      enabled XRAY=${XRAY} (Grafana at http://localhost:3000)"
+else
+  echo "  X-ray:      disabled XRAY=${XRAY}"
+fi
+
+process-compose --no-server \
+  -f "${SOURCE_DIR}/process-compose.yaml" \
+  "${XRAY_COMPOSE[@]}"

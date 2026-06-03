@@ -28,11 +28,16 @@ and follow [without nix instructions](#without-nix).
 
 Install these prerequisites:
 
+- `process-compose` for orchestrating the relay and observability stack.
 - `cardano-node` patched with Leios support (the `leios-prototype`
   branch). Build instructions in the top-level repo.
 - `cardano-cli` compatible with the cardano-node version.
-- `jq` for the run script's config inspection.
+- `jq` and `envsubst` for config inspection / templating.
 - `curl` if you intend to refresh the pinned config snapshot.
+
+When `XRAY=1` (the default), also install the X-ray stack dependencies:
+`prometheus`, `loki`, `grafana`, `alloy`, `ss_http_exporter` — see
+[`../demo/extras/x-ray`](../demo/extras/x-ray) for details.
 
 Ensure they are on your PATH, or point at a specific binary:
 
@@ -42,41 +47,53 @@ CARDANO_NODE=/path/to/cardano-node ./run.sh
 
 ## What's included
 
-`run.sh` will:
+`run.sh` orchestrates a `process-compose` session with:
 
-1. Stage the pinned configs (under `config/`) into a working directory
-   (default `./tmp-testnet`).
-2. Launch a single `cardano-node` in non-producing mode bound to
-   `0.0.0.0:3010`, connected to the testnet relay
+1. The Leios relay (`Node`) — a single `cardano-node` in non-producing
+   mode bound to `0.0.0.0:3010`, connected to the testnet relay
    (`leios-node.play.dev.cardano.org:3001`) per the pinned `topology.json`.
-3. Surface the node socket at `${WORKING_DIR}/node.socket` and a
-   prometheus endpoint at `127.0.0.1:12798`.
+2. A tip watcher (`ObserveTip`) — `cardano-cli query tip` re-run on the
+   node socket every 0.5s.
+3. The X-ray observability stack (enabled by default, disable with
+   `XRAY=0`): Alloy scrapes the node's Prometheus endpoint and tails
+   logs into Loki; Grafana exposes them at <http://localhost:3000>.
 
-While it's running, observe progress:
+The pinned configs (under `config/`) are staged into a working
+directory (default `./tmp-testnet`). The node socket lands at
+`${WORKING_DIR}/node.socket`, the Prometheus endpoint at
+`127.0.0.1:12798`, and the combined log at `${WORKING_DIR}/node.log`.
 
-```shell
-export CARDANO_NODE_NETWORK_ID=164
-export CARDANO_NODE_SOCKET_PATH=tmp-testnet/node.socket
-watch -n1 "cardano-cli query tip"
-```
+For just the node — no process-compose, no observability — run
+[`./run-node.sh`](./run-node.sh) directly.
 
 ## Configuration
 
 Override defaults by setting environment variables before running. See
-`run.sh` for the full list and their defaults:
+`run.sh` / `run-node.sh` for the full list and their defaults:
 
 | Env var       | Default                       | Notes                                  |
 |---------------|-------------------------------|----------------------------------------|
 | `CARDANO_NODE`| `cardano-node`                | Path to the binary                     |
-| `WORKING_DIR` | `./tmp-testnet`               | Where the node's DB / socket go        |
+| `WORKING_DIR` | `./tmp-testnet`               | Where the node's DB / socket / log go  |
 | `PORT`        | `3010`                        | Local listening port                   |
 | `HOST_ADDR`   | `0.0.0.0`                     | Bind address                           |
-| `LOG_FILE`    | `${WORKING_DIR}/node.log`     | Where `tee` writes the combined log    |
+| `METRICS_PORT`| `12798`                       | Prometheus scrape target               |
+| `XRAY`        | `1`                           | Set `0` to skip the observability stack|
+| `LOG_FILE`    | `${WORKING_DIR}/node.log`     | Combined log (consumed by `run-node.sh`)|
 
 Example:
 
 ```shell
 WORKING_DIR=my-relay PORT=3011 ./run.sh
+```
+
+## Observability with X-ray
+
+The X-ray stack is on by default. Grafana is reachable at
+<http://localhost:3000>. To run just the relay without it:
+
+```shell
+XRAY=0 ./run.sh
 ```
 
 ## Trace events to watch
