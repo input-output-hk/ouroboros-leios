@@ -4,7 +4,10 @@ is_strict: true
 processes:
   Node:
     command: bash "${SOURCE_DIR}/run-node.sh"
-    log_location: "${WORKING_DIR}/node.log"
+    # process-compose's process-level capture goes to a separate
+    # rotation file; the authoritative node.log is written by tee -a
+    # inside run-node.sh so the format stays consistent across restarts.
+    log_location: "${WORKING_DIR}/process-compose-node.log"
 
   ObserveTip:
     environment:

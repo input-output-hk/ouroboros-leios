@@ -44,11 +44,18 @@ echo "  bind:      $HOST_ADDR:$PORT"
 echo "  topology:  $(jq -c '.bootstrapPeers' topology.json)"
 echo "  log file:  $LOG_FILE"
 
-"$CARDANO_NODE" run \
-  --config config.json \
-  --host-addr "$HOST_ADDR" \
-  --port "$PORT" \
-  --topology topology.json \
-  --database-path db \
-  --socket-path node.socket \
-  2>&1 | tee "$LOG_FILE"
+# Append so each restart accumulates on top of the previous run's
+# output — otherwise process-compose's restart silently truncates the
+# log and we lose forensics on whatever caused the restart. Prefix a
+# marker line so it's easy to find run boundaries.
+{
+  echo "==== run started at $(date -u +%Y-%m-%dT%H:%M:%SZ) (pid $$) ===="
+  "$CARDANO_NODE" run \
+    --config config.json \
+    --host-addr "$HOST_ADDR" \
+    --port "$PORT" \
+    --topology topology.json \
+    --database-path db \
+    --socket-path node.socket \
+    2>&1
+} | tee -a "$LOG_FILE"
