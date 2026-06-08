@@ -1,0 +1,33 @@
+# Passive stake-0 follower for the Leios dev relay
+# (leios-node.play.dev.cardano.org:3001, network magic 164).
+#
+# Overlay on top of leios-dev.toml:
+#   cargo run --release -p net-node -- \
+#       --config configs/leios-dev.toml \
+#       --config configs/follow-dev-relay.toml
+
+node_id = "dev-relay-follower"
+seed = 1
+
+[production]
+stake = 0
+
+[transactions]
+tx_rate = 0.0
+
+[telemetry]
+stats_interval_secs = 10
+
+[[telemetry.stats_sinks]]
+type = "log"
+
+# Suppress EB-tx fetch — the relay RSTs on MsgLeiosBlockTxsRequest
+# (upstream CDDL/behaviour gap, cardano-scaling/cardano-blueprint#68).
+# Without this, every EB sighting triggers a doomed fetch and tears
+# down the bearer.  Mempool tx diffusion still works as the organic
+# fallback.
+[fetch_policy.eb_txs]
+kind = "no_fetch"
+
+[[peers]]
+address = "leios-node.play.dev.cardano.org:3001"

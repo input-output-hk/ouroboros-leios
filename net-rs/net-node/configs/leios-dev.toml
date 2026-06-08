@@ -1,0 +1,36 @@
+# Base configuration for the public Leios prototype dev network
+# (leios-node.play.dev.cardano.org), network magic 164.
+#
+# Mirrors the parameters in testnet/config/shelley-genesis.json
+# (systemStart 2026-05-29T00:00:00Z = 1780012800 unix, slotLength 1s)
+# and pairs with an overlay config that adds the peer + identity.
+
+network_magic = 164
+slot_duration_ms = 1000
+genesis_time_unix = 1780012800
+leios_enabled = true
+scheduler = "priority-wfq"
+security_param_k = 2160
+
+[production]
+total_stake = 1000
+rb_generation_probability = 0.05
+vote_generation_probability = 0.8
+stage_length_slots = 20
+
+[production.committee_selection]
+type = "StakeCentile"
+top_centile_of_stake = 0.99
+
+[transactions]
+tx_rate = 0.0
+tx_size_min = 250
+tx_size_max = 16384
+
+[validation]
+rb_head_validation_ms = 1.0
+rb_body_validation_ms_constant = 0.3539
+rb_body_validation_ms_per_byte = 0.0000215
+tx_validation_ms = 0.6201
+eb_validation_ms = 2.0
+vote_validation_ms = 1.0
