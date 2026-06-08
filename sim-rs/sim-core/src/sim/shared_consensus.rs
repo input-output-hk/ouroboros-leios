@@ -2071,7 +2071,10 @@ impl SharedConsensus {
                     }
                 }
                 LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::QuorumReached { .. })
-                | LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::ElectionExpired { .. }) => {
+                | LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::ElectionExpired { .. })
+                | LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::LeiosElectionInfo {
+                    ..
+                }) => {
                     // No 1:1 sim telemetry; sim's stat aggregator
                     // derives equivalent signals from `votes_by_eb`
                     // counts on the receive path.
