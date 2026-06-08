@@ -58,6 +58,23 @@ pub const ORPHAN_COOLDOWN: Duration = Duration::from_secs(1);
 /// long enough for a different one to be picked.
 pub const BLOCK_FETCH_COOLDOWN: Duration = Duration::from_secs(2);
 
+/// How long validation must be frozen with peers offering strictly-better
+/// tips before a stuck-rollup WARN is considered.  Catches genuine wedges
+/// without crying wolf during the short pauses between bursts of
+/// validation.
+pub const STUCK_THRESHOLD: Duration = Duration::from_secs(30);
+
+/// Minimum interval between stuck-rollup WARNs.  The per-event INFO logs
+/// already fire ~1/sec; this rollup is a synthesised once-per-minute
+/// summary aimed at an operator skimming logs.
+pub const STUCK_WARNING_INTERVAL: Duration = Duration::from_secs(60);
+
+/// Per-peer cooldown between non-contiguous-header WARNs emitted at
+/// ChainSync ingress.  The signal is "upstream is forwarding a gappy
+/// chain"; reporting every individual gap floods the log without adding
+/// information.
+pub const GAP_WARNING_INTERVAL: Duration = Duration::from_secs(10);
+
 /// Snapshot of [`PraosState`]'s internal collection sizes plus byte
 /// estimates for the equivocation tracking maps.  Emitted per slot via
 /// telemetry so leak rate can be plotted independently of run length.
@@ -248,6 +265,17 @@ pub struct PraosState {
     pub queued_validator_tip: Option<[u8; 32]>,
     /// Hash of the last block the validator has actually `Applied`.
     pub last_validated_tip: Option<[u8; 32]>,
+    /// Wall-clock instant of the last successful validation.  Drives the
+    /// once-per-minute "chain stuck" rollup WARN; `None` until the first
+    /// block is validated so a freshly-booted node doesn't immediately
+    /// complain about being stuck.
+    pub last_validated_at: Option<Instant>,
+    /// Throttle for the stuck-rollup WARN: the timestamp of the most
+    /// recent emission.  Compared against [`STUCK_WARNING_INTERVAL`].
+    pub last_stuck_warning_at: Option<Instant>,
+    /// Per-peer throttle for the ChainSync ingress-time non-contiguous
+    /// header WARN.  Compared against [`GAP_WARNING_INTERVAL`].
+    pub last_gap_warning_at: BTreeMap<PeerId, Instant>,
 
     /// Slot at which this node first observed each header hash.
     /// Populated by [`PraosState::note_header_first_seen`] from any
@@ -324,6 +352,9 @@ impl PraosState {
             in_flight_validation: BTreeSet::new(),
             queued_validator_tip: None,
             last_validated_tip: None,
+            last_validated_at: None,
+            last_stuck_warning_at: None,
+            last_gap_warning_at: BTreeMap::new(),
             header_first_seen: BTreeMap::new(),
             header_hashes_by_slot_issuer: BTreeMap::new(),
             equivocating_rb_slots: BTreeSet::new(),
@@ -653,10 +684,61 @@ impl PraosState {
             prev_hash: header_prev_hash,
         };
         let cap = self.peer_chain_cap();
-        self.peer_chains
+        let chain = self
+            .peer_chains
             .entry(peer_id)
-            .or_insert_with(|| PeerChain::new(cap))
-            .append(entry);
+            .or_insert_with(|| PeerChain::new(cap));
+
+        // Detect non-contiguous ChainSync forwarding: the just-arrived
+        // header should link to the previously-announced one's hash via
+        // `prev_hash`.  When it doesn't, the upstream skipped one or more
+        // blocks on this branch.  PeerChain doesn't enforce contiguity
+        // (sliding-window cap means some divergence is expected at the
+        // anchor edge), so we check explicitly here and only fire when
+        // the previous entry is still in the window — that rules out
+        // anchor-edge false positives.
+        let gap_after_hash = chain.iter().next_back().and_then(|prev| {
+            match (entry.prev_hash, prev.hash) {
+                (Some(p), h) if p != h => {
+                    Some((prev.hash, prev.block_no, prev.point.clone()))
+                }
+                _ => None,
+            }
+        });
+
+        chain.append(entry);
+
+        if let Some((prev_hash, prev_block_no, prev_point)) = gap_after_hash {
+            let now = Instant::now();
+            let throttled = matches!(
+                self.last_gap_warning_at.get(&peer_id),
+                Some(last) if now.saturating_duration_since(*last) < GAP_WARNING_INTERVAL,
+            );
+            if !throttled {
+                warn!(
+                    node_id = %self.node_id,
+                    %peer_id,
+                    prev_block_no,
+                    %prev_point,
+                    prev_hash = format!(
+                        "{:02x}{:02x}{:02x}{:02x}",
+                        prev_hash[0], prev_hash[1], prev_hash[2], prev_hash[3]
+                    ),
+                    new_block_no = header_block_no,
+                    new_prev_hash_expected = format!(
+                        "{:02x}{:02x}{:02x}{:02x}",
+                        prev_hash[0], prev_hash[1], prev_hash[2], prev_hash[3]
+                    ),
+                    new_prev_hash_actual = header_prev_hash.map(|h| format!(
+                        "{:02x}{:02x}{:02x}{:02x}",
+                        h[0], h[1], h[2], h[3]
+                    )).unwrap_or_else(|| "none".to_string()),
+                    gap_block_count = header_block_no.saturating_sub(prev_block_no).saturating_sub(1),
+                    "ChainSync forwarded a non-contiguous header: upstream skipped one or more blocks between the last announced tip and this one"
+                );
+                self.last_gap_warning_at.insert(peer_id, now);
+            }
+        }
     }
 
     /// Store the ChainSync intersection as the peer chain's anchor.
@@ -1007,6 +1089,7 @@ impl PraosState {
         };
         self.validated.insert(hash);
         self.last_validated_tip = Some(hash);
+        self.last_validated_at = Some(now);
         info!(
             node_id = %self.node_id,
             %point,
@@ -1197,7 +1280,87 @@ impl PraosState {
                 }
             }
         }
+        self.maybe_emit_stuck_warning(now);
         fx
+    }
+
+    /// Synthesised once-per-minute WARN that surfaces a wedged-chain
+    /// diagnosis without forcing an operator to grep across the per-event
+    /// INFO traffic.  Fires when:
+    ///
+    /// - we've validated at least one block (otherwise we're still
+    ///   booting, not stuck),
+    /// - validation has been frozen for [`STUCK_THRESHOLD`] or longer,
+    /// - the throttle ([`STUCK_WARNING_INTERVAL`]) has elapsed since the
+    ///   last emission, and
+    /// - some peer announces a strictly-better tip than the one we've
+    ///   adopted (otherwise there's nothing to be stuck on).
+    ///
+    /// The diagnostic counts how many entries in that peer's announced
+    /// replay carry a `prev_hash` we don't have locally (neither in
+    /// `chain_tree` nor in `block_cache`).  A nonzero count means the
+    /// peer's chain has parents we never received — typically because
+    /// ChainSync skipped their headers and BlockFetch range requests
+    /// don't include them either.  In a healthy interop that count is
+    /// zero; a steady nonzero count points the operator at an upstream
+    /// chain inconsistency rather than at a local consensus bug.
+    fn maybe_emit_stuck_warning(&mut self, now: Instant) {
+        let last_validated_at = match self.last_validated_at {
+            Some(t) => t,
+            None => return,
+        };
+        let stuck_for = now.saturating_duration_since(last_validated_at);
+        if stuck_for < STUCK_THRESHOLD {
+            return;
+        }
+        if let Some(last) = self.last_stuck_warning_at {
+            if now.saturating_duration_since(last) < STUCK_WARNING_INTERVAL {
+                return;
+            }
+        }
+        let our_block_no = self
+            .adopted_tip_hash
+            .and_then(|h| self.chain_tree.block_number(&h))
+            .unwrap_or(0);
+        // Pick the peer with the highest announced tip strictly above
+        // ours.  Ties broken by PeerId order so the choice is stable
+        // across calls; the warning is informational, not load-bearing.
+        let best = self
+            .peer_chains
+            .iter()
+            .filter_map(|(pid, chain)| {
+                chain.iter().next_back().map(|e| (*pid, e.block_no, chain))
+            })
+            .filter(|(_, bn, _)| *bn > our_block_no)
+            .max_by_key(|(pid, bn, _)| (*bn, *pid));
+        let (peer_id, peer_tip_block_no, peer_chain) = match best {
+            Some(b) => b,
+            None => return,
+        };
+        let adopted_ancestors: HashSet<[u8; 32]> = self
+            .adopted_tip_hash
+            .map(|h| self.chain_tree.ancestors(h).into_iter().collect())
+            .unwrap_or_default();
+        let unreachable_parents = peer_chain
+            .iter()
+            .filter(|e| match e.prev_hash {
+                Some(p) => {
+                    !adopted_ancestors.contains(&p) && !self.block_cache.contains_key(&p)
+                }
+                None => false,
+            })
+            .count();
+        warn!(
+            node_id = %self.node_id,
+            stuck_secs = stuck_for.as_secs(),
+            adopted_tip_block_no = our_block_no,
+            %peer_id,
+            peer_tip_block_no,
+            unreachable_parent_hashes = unreachable_parents,
+            peer_chain_len = peer_chain.iter().count(),
+            "chain stuck: best peer offers a strictly-better tip but its replay has parent hashes we never received — likely upstream chain inconsistency (gappy ChainSync forwarding)"
+        );
+        self.last_stuck_warning_at = Some(now);
     }
 
     // -- Pure algorithm queries (also used by tests) ------------------------
