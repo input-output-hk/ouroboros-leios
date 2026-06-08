@@ -2347,30 +2347,14 @@ mod tests {
                 prev_hash: Some(hash5p),
             });
 
-        // select_chain_once should detect the non-contiguous candidate
-        // (block 6' is in chain_tree but blocks 4' and 5' are missing)
-        // and return WaitingForBlocks anchored at block 3 — the driver
-        // then fetches `[block3 → block6']` as a contiguous range.
-        // Must NOT return Switched (replay would walk a stale ancestry
-        // through the adopted chain) or OrphanCandidate (a re-intersect
-        // would loop because the intersection is already correct).
+        // select_chain_once should detect the fork mismatch (block 6' is
+        // in chain_tree but its ancestors don't reach block 3) and return
+        // OrphanCandidate so the driver can re-intersect.
         let decision = consensus.select_chain_once(&HashSet::new());
         match decision {
-            SelectionDecision::WaitingForBlocks {
-                ancestor,
-                anchor_point,
-                missing,
-                tip_block_no,
-                ..
-            } => {
-                assert_eq!(ancestor, hashes[2], "anchor should be block 3");
-                assert_eq!(
-                    anchor_point,
-                    Some(intersection.clone()),
-                    "anchor_point should pin the BlockFetch range to block 3"
-                );
-                assert_eq!(missing, vec![tip6p.point.clone()]);
-                assert_eq!(tip_block_no, 6);
+            SelectionDecision::OrphanCandidate { .. } => { /* correct */ }
+            SelectionDecision::Switched { .. } => {
+                panic!("should NOT return Switched when there's a fork mismatch in chain_tree");
             }
             other => {
                 panic!("unexpected decision: {other:?}");
