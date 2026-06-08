@@ -592,8 +592,10 @@ impl NodeImpl for SharedConsensus {
         };
         let leios_fx = self.leios.on_slot(slot, &tx_known);
         self.apply_leios_effects(&mut out, leios_fx);
-        // Praos RB lottery — shared formula with net-rs, sim-rs keeps
-        // its own VRF draw form (`Rng::draw_range`).
+        // Praos RB lottery — shared formula with net-rs.  Threshold lives
+        // in `[0, 2^64)` (φ(σ) = 1 − (1−f)^σ scaled by 2^64); sim-rs draws
+        // a deterministic `u64` from its VRF-style oracle and compares
+        // directly, mirroring net-rs's `draw < threshold` form.
         let success_rate = self.sim_config.block_generation_probability;
         let params = con_lottery::LotteryParams::new(success_rate);
         let target = params.rb_win_threshold(self.config_stake, self.total_stake);
