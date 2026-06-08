@@ -269,27 +269,6 @@ impl ChainTree {
         }
     }
 
-    /// Remove a single block node — used to drop a fork tip that no
-    /// connected peer can serve, so it stops being chosen as `best_tip`
-    /// and wedging chain selection.  This happens after a deep rollback:
-    /// blocks we cached from the peer's chain become unreachable when the
-    /// peer rolls back past them, but they linger here as a far-ahead,
-    /// disconnected best tip that the gap-bridge can never fetch.
-    ///
-    /// Recomputes `best_tip` from the remaining nodes when the removed
-    /// node was the best tip.  Returns true if a node was removed.  If a
-    /// peer later re-announces that chain, ChainSync re-inserts it.
-    pub fn remove_fork_tip(&mut self, hash: &[u8; 32]) -> bool {
-        let was_best = self.best_tip_hash() == Some(*hash);
-        if self.nodes.remove(hash).is_none() {
-            return false;
-        }
-        if was_best {
-            self.recompute_best_tip();
-        }
-        true
-    }
-
     /// Drop every block strictly above `block_number` and recompute the
     /// best tip.  Used to abandon a chain suffix on a deliberate
     /// self-reorg (see [`crate::praos::PraosState::force_rollback`]): the

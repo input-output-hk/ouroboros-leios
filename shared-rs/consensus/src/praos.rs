@@ -1179,39 +1179,20 @@ impl PraosState {
                         && !bridge_cooling
                     {
                         let peers = self.choose_block_fetch_peers(&gap_point, None);
-                        if peers.is_empty() {
-                            // No connected peer can serve this gap, so the
-                            // best tip is on a fork the peers have abandoned
-                            // — typically a deep rollback left us holding
-                            // blocks the peers rolled back past.  Re-issuing
-                            // a peerless fetch is a silent no-op that wedges
-                            // chain selection forever (best_tip never
-                            // advances, the live tip never adopts).  Drop the
-                            // unreachable tip so best_tip falls back to a
-                            // block we can still pursue; ChainSync re-inserts
-                            // it if a peer ever serves that chain again.
-                            info!(
-                                node_id = %self.node_id,
-                                tip = %gap_point,
-                                "retry: best_tip unreachable (no peer offers it); pruning fork tip"
-                            );
-                            self.chain_tree.remove_fork_tip(&best);
-                        } else {
-                            info!(
-                                node_id = %self.node_id,
-                                %from,
-                                to = %gap_point,
-                                peer_count = peers.len(),
-                                "retry: fetching gap to bridge chain_tree"
-                            );
-                            self.in_flight.insert(gap_point.clone(), now);
-                            self.bridge_cooldown = Some((from.clone(), now + BRIDGE_COOLDOWN));
-                            fx.push(PraosEffect::FetchBlockRange {
-                                from,
-                                to: gap_point,
-                                peers,
-                            });
-                        }
+                        info!(
+                            node_id = %self.node_id,
+                            %from,
+                            to = %gap_point,
+                            peer_count = peers.len(),
+                            "retry: fetching gap to bridge chain_tree"
+                        );
+                        self.in_flight.insert(gap_point.clone(), now);
+                        self.bridge_cooldown = Some((from.clone(), now + BRIDGE_COOLDOWN));
+                        fx.push(PraosEffect::FetchBlockRange {
+                            from,
+                            to: gap_point,
+                            peers,
+                        });
                     }
                 }
             }
@@ -1450,54 +1431,31 @@ impl PraosState {
                 let walk_result = self.walk_ancestors_hybrid(last_hash);
                 let walk: HashSet<[u8; 32]> = walk_result.chain.iter().copied().collect();
                 let all_on_chain = replay_hashes.iter().all(|h| walk.contains(h));
-                let reaches_ancestor = if ancestor == [0u8; 32] {
-                    walk_result.reached_origin
-                } else {
-                    walk.contains(&ancestor)
-                };
-                if !all_on_chain || !reaches_ancestor {
-                    // Our cached copy of this (strictly better) candidate
-                    // chain is non-contiguous: the peer fragment skipped a
-                    // header, and that gap block was never fetched because it
-                    // never appeared in `missing` (it isn't in the fragment).
-                    // Abandoning the peer and re-intersecting just loops
-                    // forever — the gap never heals.  Instead, fetch the
-                    // contiguous range from the common ancestor up to the
-                    // candidate tip: a range request needs only the two
-                    // endpoints, and the peer streams every intermediate
-                    // block, filling the gap so a later pass can switch.
-                    //
-                    // A genesis ancestor can't anchor a range (a standard
-                    // server resets the bearer on an Origin lower bound), so
-                    // fall back to the conservative orphan verdict there.
-                    let anchor_pt = if ancestor == [0u8; 32] {
-                        None
-                    } else {
-                        self.chain_tree.point(&ancestor).cloned()
-                    };
-                    if let Some(anchor_pt) = anchor_pt {
-                        info!(
-                            node_id = %self.node_id,
-                            %peer_id,
-                            tip_block_no = candidate_tip.block_no,
-                            all_on_chain,
-                            reaches_ancestor,
-                            "select_chain: cached candidate chain non-contiguous; fetching range to heal gap"
-                        );
-                        return SelectionDecision::WaitingForBlocks {
-                            peer_id,
-                            ancestor,
-                            anchor_point: Some(anchor_pt),
-                            missing: vec![candidate_tip.point.clone()],
-                            tip_block_no: candidate_tip.block_no,
-                        };
-                    }
+                if !all_on_chain {
                     tracing::debug!(
                         node_id = %self.node_id,
                         %peer_id,
                         tip_block_no = candidate_tip.block_no,
                         replay_len = replay_hashes.len(),
-                        "select_chain: non-contiguous replay rooted at genesis; skipping peer"
+                        "select_chain: non-contiguous replay (mixed forks); skipping peer"
+                    );
+                    return SelectionDecision::OrphanCandidate {
+                        peer_id,
+                        tip_block_no: candidate_tip.block_no,
+                    };
+                }
+                let reaches_ancestor = if ancestor == [0u8; 32] {
+                    walk_result.reached_origin
+                } else {
+                    walk.contains(&ancestor)
+                };
+                if !reaches_ancestor {
+                    info!(
+                        node_id = %self.node_id,
+                        %peer_id,
+                        tip_block_no = candidate_tip.block_no,
+                        ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
+                        "select_chain: fork mismatch (replay doesn't reach ancestor); skipping peer"
                     );
                     return SelectionDecision::OrphanCandidate {
                         peer_id,
@@ -2651,82 +2609,6 @@ mod tests {
                 SelectionDecision::OrphanCandidate { .. }
             ),
             "reorg of depth 150 > k=100 must be refused"
-        );
-    }
-
-    #[test]
-    fn select_chain_heals_noncontiguous_cached_candidate_via_range_fetch() {
-        // A peer announces a strictly-better chain, but our cached copy has a
-        // gap (the fragment skipped a header that was never fetched).  Rather
-        // than declare it an orphan and loop on re-intersection forever,
-        // select_chain must request the contiguous range [ancestor ..
-        // candidate_tip] so the peer can stream the missing block and heal it.
-        let mut s = fresh();
-        install_validated_block(&mut s, 100, 1, 1, None); // adopted tip = block 1
-        s.adopted_tip_hash = Some(h(1));
-
-        // Cached blocks 2 (prev 1) and 4 (prev 3) — block 3 absent, so the
-        // cached chain 1→2→_→4 is non-contiguous.
-        install_validated_block(&mut s, 101, 2, 2, Some(1));
-        install_validated_block(&mut s, 103, 4, 4, Some(3));
-
-        // Peer fragment skips block 3: announces 2 then 4.
-        let pid = PeerId(7);
-        s.record_peer_tip(pid, pt(101, 2), 2, 2, h(2), 101, Some(h(1)));
-        s.record_peer_tip(pid, pt(103, 4), 4, 4, h(4), 103, Some(h(3)));
-
-        match s.select_chain_once(&HashSet::new()) {
-            SelectionDecision::WaitingForBlocks {
-                anchor_point,
-                missing,
-                ..
-            } => {
-                assert_eq!(
-                    anchor_point,
-                    Some(pt(100, 1)),
-                    "range anchored at the common ancestor (adopted tip)"
-                );
-                assert_eq!(
-                    missing,
-                    vec![pt(103, 4)],
-                    "range extends to the candidate tip so the gap is streamed"
-                );
-            }
-            other => panic!("expected WaitingForBlocks range-heal, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn retry_prunes_unreachable_best_tip_instead_of_peerless_fetch() {
-        // A deep rollback can leave us holding a far-ahead block from a fork
-        // the peers abandoned: it lingers as chain_tree.best_tip, but no
-        // connected peer can serve the gap needed to reach it.  The periodic
-        // retry must drop that tip rather than re-issue a peerless bridge
-        // fetch forever (which wedges selection — best_tip never advances and
-        // the live tip never adopts).
-        let mut s = fresh();
-        install_validated_block(&mut s, 100, 1, 1, None); // adopted tip = block 1
-        s.adopted_tip_hash = Some(h(1));
-
-        // Disconnected fork tip far ahead: block 10 at slot 200 whose parent
-        // h(98) we don't have — as if fetched earlier from a now-abandoned
-        // fork.  Lives in chain_tree only.
-        s.chain_tree
-            .insert(h(10), pt(200, 10), 10, 200, Some(h(98)), 0, None, false);
-        assert_eq!(s.chain_tree.best_tip_hash(), Some(h(10)));
-
-        // No peer chains → no peer offers the gap block.
-        let fx = s.retry_select_chain(Instant::now());
-
-        assert!(
-            !fx.iter()
-                .any(|e| matches!(e, PraosEffect::FetchBlockRange { .. })),
-            "must not emit a peerless bridge fetch"
-        );
-        assert_eq!(
-            s.chain_tree.best_tip_hash(),
-            Some(h(1)),
-            "unreachable fork tip pruned; best_tip falls back to adopted"
         );
     }
 
