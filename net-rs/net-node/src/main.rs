@@ -232,6 +232,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 telem.current_slot = slot;
                 retry_counter += 1;
 
+                // Advance the LeiosStore retention clock on every wall-clock
+                // slot. Injects alone can't drive eviction: a node that stops
+                // receiving Leios data (peer disconnect, partition) would
+                // freeze its retention window at the last seen `max_slot` and
+                // keep stale notifications forever. Ticking here keeps the
+                // window moving regardless of traffic, so eviction happens
+                // before the memory telemetry snapshot below reads `stats()`.
+                if let Some(store) = handle.leios_store.as_ref() {
+                    store.tick_slot(slot);
+                }
+
                 // Leios: advance pipeline phases and trigger voting.
                 if leios {
                     consensus.on_slot(slot).await;
