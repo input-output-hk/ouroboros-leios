@@ -51,7 +51,10 @@ echo "Output snapshot    : $OUT_DIR"
 
 # Prereqs that the proto-devnet run.sh also checks; we want them visible early.
 for cmd in cardano-node cardano-cli process-compose tx-centrifuge sqlite3 jq yq envsubst tar db-immutaliser; do
-  command -v "$cmd" >/dev/null || { echo "Missing: $cmd" >&2; exit 1; }
+  command -v "$cmd" >/dev/null || {
+    echo "Missing: $cmd" >&2
+    exit 1
+  }
 done
 
 # Run proto-devnet in the background with TC + XRAY disabled (sandbox-friendly
@@ -95,11 +98,15 @@ export CARDANO_NODE_NETWORK_ID=164
 export CARDANO_NODE_SOCKET_PATH="$node1_sock"
 
 # Wait for the socket and the first block.
-deadline=$(( $(date +%s) + TIMEOUT_SECS ))
+deadline=$(($(date +%s) + TIMEOUT_SECS))
 echo -n "Waiting for node1 socket"
 while [ ! -S "$node1_sock" ]; do
-  [ "$(date +%s)" -gt "$deadline" ] && { echo " timed out"; exit 1; }
-  sleep 1; echo -n .
+  [ "$(date +%s)" -gt "$deadline" ] && {
+    echo " timed out"
+    exit 1
+  }
+  sleep 1
+  echo -n .
 done
 echo " up"
 
@@ -113,7 +120,11 @@ while :; do
     echo "Reached $block blocks; harvesting."
     break
   fi
-  [ "$(date +%s)" -gt "$deadline" ] && { echo ""; echo "Timed out at $block blocks"; exit 1; }
+  [ "$(date +%s)" -gt "$deadline" ] && {
+    echo ""
+    echo "Timed out at $block blocks"
+    exit 1
+  }
   sleep 2
 done
 
@@ -142,10 +153,10 @@ db-immutaliser \
   --volatile-db "$imm_work/volatile" \
   --config "$src_node/config.yaml" \
   >"$HARVEST_WORKDIR/immutaliser.log" 2>&1 || {
-    echo "db-immutaliser failed; tail of its log:" >&2
-    tail -20 "$HARVEST_WORKDIR/immutaliser.log" >&2
-    exit 1
-  }
+  echo "db-immutaliser failed; tail of its log:" >&2
+  tail -20 "$HARVEST_WORKDIR/immutaliser.log" >&2
+  exit 1
+}
 
 echo "Packing $imm_work/immutable -> $OUT_DIR/immutable.tar.gz"
 (cd "$imm_work" && tar -czf "$OUT_DIR/immutable.tar.gz" immutable)
