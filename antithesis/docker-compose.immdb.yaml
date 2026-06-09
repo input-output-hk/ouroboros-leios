@@ -34,7 +34,7 @@ services:
   # Init Containers
   # ==========================================================================
   init-upstream:
-    image: ghcr.io/input-output-hk/ouroboros-leios/immdb-server:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-immdb-server:${GIT_SHA:-latest}
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.immdb-server
@@ -48,10 +48,10 @@ services:
       - leios-net
 
   init-node0:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-antithesis:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-burst:${GIT_SHA:-latest}
     build:
       context: ..
-      dockerfile: antithesis/Dockerfile.cardano-node
+      dockerfile: antithesis/Dockerfile.cardano-node-burst
     command: /app/scripts/init-node0.sh
     environment:
       <<: *common-env
@@ -64,10 +64,10 @@ services:
       - leios-net
 
   init-downstream:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-antithesis:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-burst:${GIT_SHA:-latest}
     build:
       context: ..
-      dockerfile: antithesis/Dockerfile.cardano-node
+      dockerfile: antithesis/Dockerfile.cardano-node-burst
     command: /app/scripts/init-downstream.sh
     environment:
       <<: *common-env
@@ -82,10 +82,10 @@ services:
   init-dingo:
     # Dingo uses the same configs and sits in the same place in the topology as 'node0', so
     # we reuse the image and scripts
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-antithesis:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-burst:${GIT_SHA:-latest}
     build:
       context: ..
-      dockerfile: antithesis/Dockerfile.cardano-node
+      dockerfile: antithesis/Dockerfile.cardano-node-burst
     command: /app/scripts/init-node0.sh
     environment:
       <<: *common-env
@@ -101,7 +101,7 @@ services:
   # Main Services
   # ==========================================================================
   upstream:
-    image: ghcr.io/input-output-hk/ouroboros-leios/immdb-server:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-immdb-server:${GIT_SHA:-latest}
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.immdb-server
@@ -129,10 +129,10 @@ services:
       start_period: 10s
 
   node0:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-antithesis:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-burst:${GIT_SHA:-latest}
     build:
       context: ..
-      dockerfile: antithesis/Dockerfile.cardano-node
+      dockerfile: antithesis/Dockerfile.cardano-node-burst
     command: ["/app/scripts/run-cardano-node.sh", "node0"]
     depends_on:
       init-node0:
@@ -159,10 +159,10 @@ services:
       start_period: 30s
 
   downstream:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-antithesis:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-burst:${GIT_SHA:-latest}
     build:
       context: ..
-      dockerfile: antithesis/Dockerfile.cardano-node
+      dockerfile: antithesis/Dockerfile.cardano-node-burst
     command: ["/app/scripts/run-cardano-node.sh", "downstream"]
     depends_on:
       init-downstream:
@@ -222,7 +222,7 @@ services:
   # Analysis Container
   # ==========================================================================
   analysis-immdb:
-    image: ghcr.io/input-output-hk/ouroboros-leios/leios-analysis:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-analysis:${GIT_SHA:-latest}
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.analysis

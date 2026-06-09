@@ -184,8 +184,8 @@ antithesis/
 ├── docker-compose.devnet.yaml        # Proto-devnet stack (3 pools) — local
 ├── docker-compose.immdb.yaml         # ImmDB mock stack — local
 ├── docker-compose.observability.yaml # Observability overlay (Prometheus, Loki, Grafana)
-├── Dockerfile.cardano-node-bp        # Block producer image (proto-devnet)
-├── Dockerfile.cardano-node           # Leios node image (immdb)
+├── Dockerfile.cardano-node-devnet    # Proto-devnet node image (pools + tx-centrifuge)
+├── Dockerfile.cardano-node-burst     # Burst-demo node image (immdb)
 ├── Dockerfile.immdb-server           # ImmDB server image (immdb)
 ├── Dockerfile.analysis               # Analysis container image
 ├── analyse.py                        # Log parsing and metrics

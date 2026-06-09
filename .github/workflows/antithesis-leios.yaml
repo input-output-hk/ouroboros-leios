@@ -20,6 +20,8 @@ on:
       - "demo/**"
       - ".github/workflows/antithesis-leios.yaml"
       - "flake.lock"
+    tags:
+      - "*"
   workflow_dispatch:
     inputs:
       base_image_tag:
@@ -54,26 +56,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
-      # Extract cardano-node refs from flake.lock for the bp image
-      # (still built via Dockerfile / cabal, not via nix).
-      - name: Extract cardano-node refs from flake.lock
-        id: refs
+      - name: Install nix
+        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+            substituters = https://cache.nixos.org https://cache.iog.io
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
+
+      # Build tx-centrifuge statically and stage it into the build
+      # context. The devnet Dockerfile COPYs it from
+      # antithesis/artifacts/tx-centrifuge.
+      - name: Build tx-centrifuge static binary
         run: |
-          cn_leios=$(jq -r '.nodes["cardano-node-leios"].locked.rev' flake.lock)
-          cn_txcent=$(jq -r '.nodes["cardano-node-tx-centrifuge"].locked.rev' flake.lock)
-          for name in cn_leios cn_txcent; do
-            value=${!name}
-            if [ -z "$value" ] || [ "$value" = "null" ]; then
-              echo "::error::Failed to extract $name from flake.lock"
-              exit 1
-            fi
-          done
-          {
-            echo "cn_leios=$cn_leios"
-            echo "cn_txcent=$cn_txcent"
-          } >> "$GITHUB_OUTPUT"
-          echo "cardano-node-leios: $cn_leios"
-          echo "cardano-node (tx-centrifuge): $cn_txcent"
+          set -euo pipefail
+          nix build .#tx-centrifuge-static -o result-tx-centrifuge
+          mkdir -p antithesis/artifacts
+          cp -v result-tx-centrifuge/bin/tx-centrifuge antithesis/artifacts/tx-centrifuge
+          chmod +x antithesis/artifacts/tx-centrifuge
 
       - name: Resolve base image reference
         id: base
@@ -92,76 +92,79 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # ----------------------------------------------------------------
-      # cardano-node-antithesis — derived from the base image. Adds
-      # proto-devnet configs, genesis files, and per-role scripts.
+      # antithesis-cardano-node-burst — derived from the base image.
+      # Adds burst-demo configs/genesis and node0/downstream scripts.
       # ----------------------------------------------------------------
-      - name: Extract metadata for cardano-node-antithesis
-        id: meta-antithesis
+      - name: Extract metadata for antithesis-cardano-node-burst
+        id: meta-burst
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-antithesis
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/antithesis-cardano-node-burst
           tags: |
             type=sha
             type=ref,event=branch
+            type=ref,event=tag
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build cardano-node-antithesis image
+      - name: Build antithesis-cardano-node-burst image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: .
-          file: ./antithesis/Dockerfile.cardano-node
+          file: ./antithesis/Dockerfile.cardano-node-burst
           platforms: linux/amd64
           push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
-          tags: ${{ steps.meta-antithesis.outputs.tags }}
-          labels: ${{ steps.meta-antithesis.outputs.labels }}
+          tags: ${{ steps.meta-burst.outputs.tags }}
+          labels: ${{ steps.meta-burst.outputs.labels }}
           build-args: |
             BASE_IMAGE=${{ steps.base.outputs.ref }}
-          cache-from: type=gha,scope=cardano-node-antithesis
-          cache-to: type=gha,mode=max,scope=cardano-node-antithesis
+          cache-from: type=gha,scope=antithesis-cardano-node-burst
+          cache-to: type=gha,mode=max,scope=antithesis-cardano-node-burst
 
       # ----------------------------------------------------------------
-      # cardano-node-bp — block-producer image (separate Dockerfile,
-      # builds cardano-node + tx-centrifuge from source).
+      # antithesis-cardano-node-devnet — derived from the base image.
+      # Adds proto-devnet configs, pool keys, tx-centrifuge, and
+      # pool-mode scripts.
       # ----------------------------------------------------------------
-      - name: Extract metadata for cardano-node-bp
-        id: meta-bp
+      - name: Extract metadata for antithesis-cardano-node-devnet
+        id: meta-devnet
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-bp
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/antithesis-cardano-node-devnet
           tags: |
             type=sha
             type=ref,event=branch
+            type=ref,event=tag
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build cardano-node-bp image
+      - name: Build antithesis-cardano-node-devnet image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: .
-          file: ./antithesis/Dockerfile.cardano-node-bp
+          file: ./antithesis/Dockerfile.cardano-node-devnet
           platforms: linux/amd64
           push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
-          tags: ${{ steps.meta-bp.outputs.tags }}
-          labels: ${{ steps.meta-bp.outputs.labels }}
+          tags: ${{ steps.meta-devnet.outputs.tags }}
+          labels: ${{ steps.meta-devnet.outputs.labels }}
           build-args: |
-            CARDANO_NODE_VERSION_LEIOS=${{ steps.refs.outputs.cn_leios }}
-            CARDANO_NODE_VERSION_TXCENT=${{ steps.refs.outputs.cn_txcent }}
-          cache-from: type=gha,scope=cardano-node-bp
-          cache-to: type=gha,mode=max,scope=cardano-node-bp
+            BASE_IMAGE=${{ steps.base.outputs.ref }}
+          cache-from: type=gha,scope=antithesis-cardano-node-devnet
+          cache-to: type=gha,mode=max,scope=antithesis-cardano-node-devnet
 
       # ----------------------------------------------------------------
-      # immdb-server — Antithesis infra.
+      # antithesis-immdb-server — Antithesis infra.
       # ----------------------------------------------------------------
-      - name: Extract metadata for immdb-server
+      - name: Extract metadata for antithesis-immdb-server
         id: meta-immdb
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/immdb-server
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/antithesis-immdb-server
           tags: |
             type=sha
             type=ref,event=branch
+            type=ref,event=tag
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build immdb-server image
+      - name: Build antithesis-immdb-server image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: .
@@ -170,23 +173,24 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
           tags: ${{ steps.meta-immdb.outputs.tags }}
           labels: ${{ steps.meta-immdb.outputs.labels }}
-          cache-from: type=gha,scope=immdb-server
-          cache-to: type=gha,mode=max,scope=immdb-server
+          cache-from: type=gha,scope=antithesis-immdb-server
+          cache-to: type=gha,mode=max,scope=antithesis-immdb-server
 
       # ----------------------------------------------------------------
-      # leios-analysis — post-run analysis image.
+      # antithesis-analysis — post-run analysis image.
       # ----------------------------------------------------------------
-      - name: Extract metadata for analysis
+      - name: Extract metadata for antithesis-analysis
         id: meta-analysis
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/leios-analysis
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/antithesis-analysis
           tags: |
             type=sha
             type=ref,event=branch
+            type=ref,event=tag
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build analysis image
+      - name: Build antithesis-analysis image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: .
@@ -195,8 +199,8 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
           tags: ${{ steps.meta-analysis.outputs.tags }}
           labels: ${{ steps.meta-analysis.outputs.labels }}
-          cache-from: type=gha,scope=leios-analysis
-          cache-to: type=gha,mode=max,scope=leios-analysis
+          cache-from: type=gha,scope=antithesis-analysis
+          cache-to: type=gha,mode=max,scope=antithesis-analysis
 
   # ==========================================================================
   # Submit to Antithesis via Moog

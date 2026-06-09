@@ -23,7 +23,7 @@ x-node-hosts: &node-hosts
   PORT_DINGO: "3001"
 
 x-node-image: &node-image
-  image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${IMAGE_TAG:-latest}
+  image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-devnet:${IMAGE_TAG:-latest}
 
 x-dingo-image: &dingo-image
   image: ghcr.io/blinklabs-io/dingo:main-antithesis
@@ -244,7 +244,7 @@ services:
   # Analysis Container (Antithesis assertions)
   # ==========================================================================
   analysis:
-    image: ghcr.io/input-output-hk/ouroboros-leios/leios-analysis:${IMAGE_TAG:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-analysis:${IMAGE_TAG:-latest}
     container_name: analysis
     hostname: analysis
     init: true
