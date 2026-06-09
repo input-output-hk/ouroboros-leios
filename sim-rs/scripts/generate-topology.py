@@ -168,9 +168,6 @@ def generate(source_path, target_n, seed):
 
     # --- Step 4: Build relay graph (K-NN + random) ---
     # Split: ~60% close, ~40% random (typical for this kind of topology)
-    relay_locs = [(i, locs[i]) for i in relay_list]
-    relay_set = set(relay_list)
-
     producers = {i: {} for i in range(target_n)}
 
     print(f"Building relay graph ({n_relay} relays)...", file=sys.stderr)
@@ -265,8 +262,11 @@ def generate(source_path, target_n, seed):
                 frontier.append(peer)
 
     if len(visited) < target_n:
-        print(f"WARNING: graph still not fully connected! "
-              f"Reachable: {len(visited)}/{target_n}", file=sys.stderr)
+        print(
+            f"WARNING: graph still not fully connected! "
+            f"Reachable: {len(visited)}/{target_n}",
+            file=sys.stderr,
+        )
 
     # --- Step 6: Assign stake ---
     bp_list = sorted(bp_indices)
@@ -311,7 +311,9 @@ if __name__ == "__main__":
     parser.add_argument("source", help="Path to source topology YAML/JSON file")
     parser.add_argument("target_nodes", type=int, help="Target number of nodes")
     parser.add_argument("-o", "--output", help="Output file (default: stdout)")
-    parser.add_argument("-s", "--seed", type=int, default=42, help="Random seed (default: 42)")
+    parser.add_argument(
+        "-s", "--seed", type=int, default=42, help="Random seed (default: 42)"
+    )
     args = parser.parse_args()
 
     if args.output:
@@ -325,4 +327,4 @@ if __name__ == "__main__":
         sys.stdout = orig_stdout
         print(f"Wrote {args.output}", file=sys.stderr)
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        os.system(f'{script_dir}/summarize-topology.py -1 {args.output}')
+        os.system(f"{script_dir}/summarize-topology.py -1 {args.output}")

@@ -2,8 +2,6 @@
 """Print summary statistics for a topology YAML/JSON file."""
 
 import json
-import math
-import sys
 
 
 def percentile(sorted_vals, p):
@@ -54,17 +52,21 @@ def summarize(path, verbose=False):
             print(f"  Bandwidth: {bw[0]:,} - {bw[-1]:,} B/s")
 
     if rd:
-        print(f"  Relay degree: min={relay_deg[0]}  p25={percentile(relay_deg, 25)}"
-              f"  med={percentile(relay_deg, 50)}  p75={percentile(relay_deg, 75)}"
-              f"  max={relay_deg[-1]}")
+        print(
+            f"  Relay degree: min={relay_deg[0]}  p25={percentile(relay_deg, 25)}"
+            f"  med={percentile(relay_deg, 50)}  p75={percentile(relay_deg, 75)}"
+            f"  max={relay_deg[-1]}"
+        )
     if bp_deg:
         print(f"  BP degree:    min={bp_deg[0]}  max={bp_deg[-1]}")
 
     if m:
-        print(f"  Latency (ms): min={lats[0]:.2f}  p5={percentile(lats, 5):.1f}"
-              f"  p25={percentile(lats, 25):.1f}  med={percentile(lats, 50):.1f}"
-              f"  p75={percentile(lats, 75):.1f}  p95={percentile(lats, 95):.1f}"
-              f"  max={lats[-1]:.1f}")
+        print(
+            f"  Latency (ms): min={lats[0]:.2f}  p5={percentile(lats, 5):.1f}"
+            f"  p25={percentile(lats, 25):.1f}  med={percentile(lats, 50):.1f}"
+            f"  p75={percentile(lats, 75):.1f}  p95={percentile(lats, 95):.1f}"
+            f"  max={lats[-1]:.1f}"
+        )
 
     if stakes:
         print(f"  Stake total:  {sum(stakes):,}")
@@ -88,9 +90,7 @@ def summarize_oneline(path):
     )
     m = len(lats)
     relay_deg = sorted(
-        len(v.get("producers", {}))
-        for v in nodes.values()
-        if v.get("stake", 0) == 0
+        len(v.get("producers", {})) for v in nodes.values() if v.get("stake", 0) == 0
     )
     rd = len(relay_deg)
     print(
@@ -105,8 +105,12 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Summarize a topology YAML/JSON file.")
     parser.add_argument("topology", nargs="+", help="Path(s) to topology file(s)")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Show extra detail")
-    parser.add_argument("-1", "--oneline", action="store_true", help="One-line summary per file")
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Show extra detail"
+    )
+    parser.add_argument(
+        "-1", "--oneline", action="store_true", help="One-line summary per file"
+    )
     args = parser.parse_args()
 
     for path in args.topology:
