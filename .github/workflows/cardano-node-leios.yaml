@@ -21,7 +21,6 @@ on:
       - "flake.nix"
       - "flake.lock"
   push:
-    tags:
     branches:
       - main
     paths:
@@ -30,6 +29,8 @@ on:
       - ".github/workflows/cardano-node-leios.yaml"
       - "flake.nix"
       - "flake.lock"
+    tags:
+      - "*"
   workflow_dispatch:
     inputs:
       push_images:
@@ -115,6 +116,7 @@ jobs:
             type=sha
             type=ref,event=branch
             type=ref,event=pr
+            type=ref,event=tag
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build cardano-node-leios (base) image via nix
@@ -163,6 +165,7 @@ jobs:
             type=sha
             type=ref,event=branch
             type=ref,event=pr
+            type=ref,event=tag
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build cardano-node-testnet image
