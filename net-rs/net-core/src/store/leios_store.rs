@@ -84,14 +84,32 @@ struct LeiosStoreInner {
     stats_log_interval: u64,
 }
 
+impl LeiosStoreInner {
+    /// True when every collection is empty — used by `tick_slot` to skip
+    /// the eviction sweep once the store has drained.
+    fn is_empty(&self) -> bool {
+        self.blocks.is_empty()
+            && self.block_txs.is_empty()
+            && self.eb_tx_hashes.is_empty()
+            && self.votes.is_empty()
+            && self.notifications.is_empty()
+    }
+}
+
 /// Snapshot of internal map sizes — for memory diagnostics.
-#[derive(Debug, Clone)]
+///
+/// `notifications_bytes_estimate` is a precise byte sum over the
+/// notifications log: each `BlockOffer` / `BlockTxsOffer` is fixed-size,
+/// but `VotesOffer` carries a variable-length `Vec<(u64, Vec<u8>)>` so
+/// its payload bytes are summed directly.
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct LeiosStoreStats {
     pub blocks: usize,
     pub block_txs: usize,
     pub eb_tx_hashes: usize,
     pub votes: usize,
     pub notifications: usize,
+    pub notifications_bytes_estimate: usize,
     pub max_slot: u64,
 }
 
@@ -101,6 +119,17 @@ pub struct LeiosStoreStats {
 /// pipeline. Smaller than `LeiosTracker`'s 1000-slot dedup window because
 /// the tracker stores tiny offer IDs while this store holds full bodies.
 pub const DEFAULT_RETENTION_SLOTS: u64 = 100;
+
+/// Hard ceiling on the `notifications` deque, independent of the slot
+/// window. Slot-window eviction is the primary bound, but it relies on
+/// front-only popping and on `max_slot` advancing; a peer that floods
+/// offers within the active window, or injects with out-of-order slots
+/// that bury an evictable entry behind a higher-slot front, could still
+/// inflate the deque. This backstop guarantees a fixed upper bound on
+/// notification memory regardless of inject order or offer rate — the
+/// same role `capacity` plays for `blocks`. Sized well above normal
+/// operation (cluster runs peak around ~120 notifications/node).
+pub const MAX_NOTIFICATIONS: usize = 10_000;
 
 /// Thread-safe content-addressed store for Leios data.
 ///
@@ -171,12 +200,9 @@ impl LeiosStore {
             Point::Origin => return,
         };
         let mut inner = self.inner.lock().unwrap();
-        let key = BlockKey { slot, hash };
-        inner.blocks.insert(key, block);
-        inner
-            .notifications
-            .push_back(LeiosNotification::BlockOffer { point });
+        inner.blocks.insert(BlockKey { slot, hash }, block);
         inner.max_slot = inner.max_slot.max(slot);
+        Self::push_notification(&mut inner, LeiosNotification::BlockOffer { point });
         self.bump_version(&mut inner);
     }
 
@@ -199,18 +225,15 @@ impl LeiosStore {
             Point::Origin => return,
         };
         let mut inner = self.inner.lock().unwrap();
-        let key = BlockKey { slot, hash };
-        let entry = inner.block_txs.entry(key).or_default();
+        let entry = inner.block_txs.entry(BlockKey { slot, hash }).or_default();
         let first_injection = entry.is_empty();
         for (idx, body) in indexed {
             entry.entry(idx).or_insert(body);
         }
-        if first_injection {
-            inner
-                .notifications
-                .push_back(LeiosNotification::BlockTxsOffer { point });
-        }
         inner.max_slot = inner.max_slot.max(slot);
+        if first_injection {
+            Self::push_notification(&mut inner, LeiosNotification::BlockTxsOffer { point });
+        }
         self.bump_version(&mut inner);
     }
 
@@ -239,10 +262,8 @@ impl LeiosStore {
         for (id, blob) in ids.iter().zip(data.iter()) {
             inner.votes.insert(id.clone(), blob.clone());
         }
-        inner
-            .notifications
-            .push_back(LeiosNotification::VotesOffer { votes: ids });
         inner.max_slot = inner.max_slot.max(max_in_batch);
+        Self::push_notification(&mut inner, LeiosNotification::VotesOffer { votes: ids });
         self.bump_version(&mut inner);
     }
 
@@ -268,10 +289,8 @@ impl LeiosStore {
         inner
             .eb_tx_hashes
             .insert(BlockKey { slot, hash }, tx_hashes);
-        inner
-            .notifications
-            .push_back(LeiosNotification::BlockTxsOffer { point });
         inner.max_slot = inner.max_slot.max(slot);
+        Self::push_notification(&mut inner, LeiosNotification::BlockTxsOffer { point });
         self.bump_version(&mut inner);
     }
 
@@ -335,12 +354,24 @@ impl LeiosStore {
     /// Snapshot of internal map sizes — for memory diagnostics.
     pub fn stats(&self) -> LeiosStoreStats {
         let inner = self.inner.lock().unwrap();
+        // Each ring-buffer slot costs sizeof(LeiosNotification);
+        // `notification_heap_bytes` adds only the extra `VotesOffer`
+        // payload on top, so the enum size isn't counted twice.
+        let per_entry_overhead = std::mem::size_of::<LeiosNotification>();
+        let notifications_bytes_estimate = inner.notifications.len() * per_entry_overhead
+            + inner
+                .notifications
+                .iter()
+                .map(notification_heap_bytes)
+                .sum::<usize>()
+            + std::mem::size_of::<VecDeque<LeiosNotification>>();
         LeiosStoreStats {
             blocks: inner.blocks.len(),
             block_txs: inner.block_txs.len(),
             eb_tx_hashes: inner.eb_tx_hashes.len(),
             votes: inner.votes.len(),
             notifications: inner.notifications.len(),
+            notifications_bytes_estimate,
             max_slot: inner.max_slot,
         }
     }
@@ -361,6 +392,11 @@ impl LeiosStore {
         }
         let local = *after - inner.notifications_pruned_count;
         if local >= inner.notifications.len() {
+            // Clamp to the next-write index so a consumer that overshot
+            // (asked for an index beyond `notification_count()`)
+            // reconverges on the next inject instead of staying stuck
+            // forever.
+            *after = inner.notifications_pruned_count + inner.notifications.len();
             return Vec::new();
         }
         inner.notifications.range(local..).cloned().collect()
@@ -370,6 +406,32 @@ impl LeiosStore {
     pub fn notification_count(&self) -> usize {
         let inner = self.inner.lock().unwrap();
         inner.notifications_pruned_count + inner.notifications.len()
+    }
+
+    /// Advance the retention clock to `current_slot`.  Triggers slot-window
+    /// eviction even when no injects are happening, so a node that stops
+    /// receiving Leios data (peer disconnects, partition) doesn't freeze
+    /// its retention window at the last seen `max_slot`.  Cluster runs
+    /// showed nodes with `slot − max_slot` of 100+ — retention stalled and
+    /// stale notifications stayed retained.  Host should call once per
+    /// wall-clock slot from its slot ticker.
+    ///
+    /// Does **not** bump the version counter or wake watch subscribers:
+    /// no new notification was added, so there's nothing for a subscriber
+    /// to consume.  Eviction is silent — already-delivered notifications
+    /// disappearing from the back of the buffer doesn't concern readers.
+    pub fn tick_slot(&self, current_slot: u64) {
+        let mut inner = self.inner.lock().unwrap();
+        if current_slot > inner.max_slot {
+            inner.max_slot = current_slot;
+            // Skip the O(n) retain sweep when nothing is retained — the
+            // common idle/partition case this method exists for. Once the
+            // store drains, every subsequent wall-clock tick is a cheap
+            // no-op rather than four empty `retain` passes per slot.
+            if !inner.is_empty() {
+                Self::evict_old(&mut inner);
+            }
+        }
     }
 
     /// Subscribe to change notifications.
@@ -382,12 +444,25 @@ impl LeiosStore {
         self.inner.lock().unwrap().version
     }
 
-    fn bump_version(&self, inner: &mut LeiosStoreInner) {
-        inner.version += 1;
+    /// Push a notification, dropping it on the floor if all the slots it
+    /// references are already below the retention cutoff.  The front-only
+    /// pop_front eviction loop in `evict_old` can't reach a notification
+    /// queued at the back, so a late-arriving offer for data that's
+    /// already past retention has to be filtered at the source.  Caller
+    /// must have updated `max_slot` already so the cutoff reflects the
+    /// post-inject state.
+    fn push_notification(inner: &mut LeiosStoreInner, notif: LeiosNotification) {
+        let cutoff = inner.max_slot.saturating_sub(inner.retention_slots);
+        if cutoff == 0 || !notification_evictable(&notif, cutoff) {
+            inner.notifications.push_back(notif);
+        }
+    }
 
-        // Slot-window eviction. Bounds memory under sustained EB / vote
-        // load: receivers were accumulating every vote and every EB
-        // manifest forever, leaking ~70 MB/s on a 25-node cluster.
+    /// Run slot-window eviction across all maps plus the capacity backstop
+    /// on `blocks`.  Pure data work — does not touch `version` or the
+    /// watch channel.  Used by both `bump_version` (after an inject) and
+    /// `tick_slot` (silent wall-clock advance).
+    fn evict_old(inner: &mut LeiosStoreInner) {
         let cutoff = inner.max_slot.saturating_sub(inner.retention_slots);
         if cutoff > 0 {
             inner.blocks.retain(|key, _| key.slot >= cutoff);
@@ -395,13 +470,11 @@ impl LeiosStore {
             inner.eb_tx_hashes.retain(|key, _| key.slot >= cutoff);
             inner.votes.retain(|(slot, _), _| *slot >= cutoff);
             // Front-prune `notifications` for entries that reference
-            // only data older than the cutoff.  Notifications are
-            // pushed in arrival order, which roughly tracks slot
-            // order under normal operation — a non-evictable item at
-            // the front means later items are at least as recent, so
-            // stopping there is safe.  Worst case (out-of-order
-            // arrivals) leaks a small tail past the cutoff; the next
-            // bump catches it up.
+            // only data older than the cutoff.  `push_notification`
+            // refuses anything already below cutoff, so any below-cutoff
+            // survivors must have aged past the boundary while at the
+            // front — `pop_front` is both safe and O(evicted) without
+            // scanning the whole deque.
             while let Some(front) = inner.notifications.front() {
                 if notification_evictable(front, cutoff) {
                     inner.notifications.pop_front();
@@ -410,6 +483,17 @@ impl LeiosStore {
                     break;
                 }
             }
+        }
+
+        // Capacity backstop on `notifications` (independent of slot
+        // window). Front-only popping keeps absolute indexing intact:
+        // every pop increments `notifications_pruned_count`, and a
+        // subscriber whose cursor falls behind is fast-forwarded by
+        // `notifications_after`. Drops the oldest offers first, matching
+        // the slot-window prune direction.
+        while inner.notifications.len() > MAX_NOTIFICATIONS {
+            inner.notifications.pop_front();
+            inner.notifications_pruned_count += 1;
         }
 
         // Capacity backstop on `blocks` (independent of slot window).
@@ -425,10 +509,16 @@ impl LeiosStore {
                 inner.block_txs.remove(&key);
             }
         }
+    }
+
+    fn bump_version(&self, inner: &mut LeiosStoreInner) {
+        inner.version += 1;
+        Self::evict_old(inner);
 
         // Optional diagnostic: emit a stats line every Nth bump so we can
         // spot unbounded growth from outside. `0` disables.
         if inner.stats_log_interval > 0 && inner.version.is_multiple_of(inner.stats_log_interval) {
+            let cutoff = inner.max_slot.saturating_sub(inner.retention_slots);
             tracing::info!(
                 version = inner.version,
                 max_slot = inner.max_slot,
@@ -458,6 +548,22 @@ fn notification_evictable(n: &LeiosNotification, cutoff: u64) -> bool {
             Point::Origin => true,
         },
         LeiosNotification::VotesOffer { votes } => votes.iter().all(|(s, _)| *s < cutoff),
+    }
+}
+
+/// Extra heap bytes beyond the fixed `size_of::<LeiosNotification>()`
+/// slot in the deque.  Zero for `BlockOffer` / `BlockTxsOffer` (no heap
+/// payload); sums the variable-length `Vec<(u64, Vec<u8>)>` allocation
+/// for `VotesOffer`.  The caller adds the fixed per-entry size
+/// separately — keeping the two parts separate avoids double-counting
+/// the enum size.
+fn notification_heap_bytes(n: &LeiosNotification) -> usize {
+    match n {
+        LeiosNotification::BlockOffer { .. } | LeiosNotification::BlockTxsOffer { .. } => 0,
+        LeiosNotification::VotesOffer { votes } => votes
+            .iter()
+            .map(|(_, id)| std::mem::size_of::<(u64, Vec<u8>)>() + id.len())
+            .sum(),
     }
 }
 
@@ -874,6 +980,189 @@ mod tests {
                 point: Point::Specific { slot: 100, .. }
             }
         ));
+    }
+
+    #[test]
+    fn late_slot_inject_drops_notification_below_cutoff() {
+        // max_slot advances to 100 first; a subsequent inject at slot 1 lands
+        // below cutoff=95 and must be dropped at the source — the front-only
+        // eviction loop in `evict_old` can't reach a late-slot entry at the
+        // back of the deque.
+        let (store, _rx) = LeiosStore::new_with_retention(1000, None, 5, 0);
+        store.inject_block(
+            Point::Specific {
+                slot: 100,
+                hash: [0xAA; 32],
+            },
+            vec![0xA0],
+        );
+        let count_before = store.notification_count();
+
+        store.inject_block(
+            Point::Specific {
+                slot: 1,
+                hash: [0xBB; 32],
+            },
+            vec![0xB0],
+        );
+
+        // Notification was filtered at the source — count unchanged.
+        assert_eq!(store.notification_count(), count_before);
+    }
+
+    #[test]
+    fn notifications_after_overshoot_clamps_to_next_write() {
+        let (store, _rx) = LeiosStore::new(100);
+        store.inject_block(
+            Point::Specific {
+                slot: 1,
+                hash: [0u8; 32],
+            },
+            vec![0xA0],
+        );
+
+        // Overshoot: only 1 notification exists (next-write index 1)
+        // but we ask for everything ≥ 10.
+        let mut cursor = 10usize;
+        let entries = store.notifications_after(&mut cursor);
+        assert!(entries.is_empty());
+        assert_eq!(
+            cursor, 1,
+            "cursor should clamp to next-write index, not echo the overshoot"
+        );
+    }
+
+    #[tokio::test]
+    async fn tick_slot_does_not_wake_subscribers() {
+        // tick_slot advances the retention clock but adds no new notifications,
+        // so it must not wake watch subscribers — those are waiting for new
+        // data, and there isn't any.
+        let (store, _rx) = LeiosStore::new_with_retention(1000, None, 5, 0);
+        let mut sub = store.subscribe();
+
+        store.tick_slot(100);
+
+        let result =
+            tokio::time::timeout(std::time::Duration::from_millis(50), sub.changed()).await;
+        assert!(
+            result.is_err(),
+            "tick_slot must not signal on the watch channel"
+        );
+    }
+
+    #[test]
+    fn tick_slot_still_evicts_old_data() {
+        // Eviction must run even without a watch wake-up.
+        let (store, _rx) = LeiosStore::new_with_retention(1000, None, 5, 0);
+        store.inject_block(
+            Point::Specific {
+                slot: 1,
+                hash: [0x11; 32],
+            },
+            vec![0xB0],
+        );
+        assert!(store.get_block(1, &[0x11; 32]).is_some());
+
+        store.tick_slot(100);
+
+        assert!(
+            store.get_block(1, &[0x11; 32]).is_none(),
+            "tick_slot should still evict past retention"
+        );
+    }
+
+    #[test]
+    fn notifications_capped_by_capacity_backstop() {
+        // Flood offers all within the retention window (same slot, distinct
+        // hashes) so slot-window eviction never fires. The capacity backstop
+        // must still bound the deque, and absolute indexing must stay intact:
+        // `notification_count` (pruned + retained) reflects every push.
+        let (store, _rx) = LeiosStore::new_with_retention(MAX_NOTIFICATIONS, None, 1000, 0);
+        let pushed = MAX_NOTIFICATIONS + 250;
+        for i in 0..pushed {
+            let mut hash = [0u8; 32];
+            hash[0] = (i & 0xff) as u8;
+            hash[1] = ((i >> 8) & 0xff) as u8;
+            store.inject_block(Point::Specific { slot: 10, hash }, vec![0xAB]);
+        }
+
+        let stats = store.stats();
+        assert!(
+            stats.notifications <= MAX_NOTIFICATIONS,
+            "deque must stay within the backstop: {} > {}",
+            stats.notifications,
+            MAX_NOTIFICATIONS
+        );
+        assert_eq!(
+            store.notification_count(),
+            pushed,
+            "pruned + retained must account for every pushed notification"
+        );
+
+        // A subscriber whose cursor fell behind the pruned front is
+        // fast-forwarded rather than reading a stale local index.
+        let mut cursor = 0usize;
+        let entries = store.notifications_after(&mut cursor);
+        assert!(cursor >= pushed - MAX_NOTIFICATIONS, "cursor fast-forwarded past pruned front");
+        assert_eq!(entries.len(), stats.notifications);
+    }
+
+    #[test]
+    fn long_run_stays_bounded_under_sustained_load() {
+        // Stress test for the eviction guarantee that motivates this PR.
+        // Simulates a node receiving sustained Leios traffic for many
+        // retention windows in a row: votes + EBs every slot, plus a
+        // wall-clock `tick_slot` running ahead.  Both the data maps and
+        // the notifications deque must stay O(retention) — not O(slots).
+        const RETENTION: u64 = 100;
+        const SLOTS: u64 = 10_000;
+        let (store, _rx) = LeiosStore::new_with_retention(10_000, None, RETENTION, 0);
+
+        for slot in 0..SLOTS {
+            store.inject_votes(vec![(slot, vec![0xAA; 32])], vec![vec![0xBB; 100]]);
+            store.inject_block(
+                Point::Specific {
+                    slot,
+                    hash: [0xCC; 32],
+                },
+                vec![0xDD; 100],
+            );
+            // Wall-clock leads inject slots; exercises tick_slot eviction.
+            if slot % 7 == 0 {
+                store.tick_slot(slot + 5);
+            }
+        }
+
+        let stats = store.stats();
+        let bound = (RETENTION * 2) as usize;
+        assert!(
+            stats.votes <= bound,
+            "votes leaked: {} > {} after {} slots",
+            stats.votes,
+            bound,
+            SLOTS
+        );
+        assert!(
+            stats.blocks <= bound,
+            "blocks leaked: {} > {} after {} slots",
+            stats.blocks,
+            bound,
+            SLOTS
+        );
+        assert!(
+            stats.notifications <= bound * 2,
+            "notifications leaked: {} > {} after {} slots",
+            stats.notifications,
+            bound * 2,
+            SLOTS
+        );
+        let byte_bound = stats.notifications * 10_000 + 4096;
+        assert!(
+            stats.notifications_bytes_estimate <= byte_bound,
+            "notifications_bytes_estimate looks inflated: {} > {}",
+            stats.notifications_bytes_estimate,
+            byte_bound
+        );
     }
 
     #[tokio::test]
