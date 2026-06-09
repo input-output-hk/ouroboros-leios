@@ -7,8 +7,9 @@
 #   nix build .#cardano-node-leios-image   # streamed tarball; pipe into `docker load`
 #
 # CI publishes the image as ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios
-# on every push to main. Scenario images (cardano-node-antithesis,
-# cardano-node-testnet) layer their configs/scripts on top.
+# on every push to main. Scenario images (antithesis-cardano-node-burst,
+# antithesis-cardano-node-devnet, cardano-node-testnet) layer their
+# configs/scripts on top.
 # `inputs` is a top-level (not perSystem) module argument in
 # flake-parts — perSystem only sees `inputs'` (per-system flattened),
 # which auto-flattens standard outputs (packages / devShells / apps /
@@ -36,6 +37,10 @@
         packages = {
           cardano-node-static = muslJobs.cardano-node;
           cardano-cli-static = muslJobs.cardano-cli;
+          # tx-centrifuge lives on a different cardano-node ref
+          # (bench/leios snapshot) than the rest of the binaries; we
+          # intentionally keep it pinned separately. Same hydraJobs shape.
+          tx-centrifuge-static = inputs.cardano-node-tx-centrifuge.hydraJobs.${system}.musl;
 
           # Streamed layered image: `nix build .#cardano-node-leios-image`
           # produces a script that, when run, writes the image tarball to

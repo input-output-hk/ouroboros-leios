@@ -28,10 +28,10 @@ services:
   # Init Containers
   # ==========================================================================
   init-pool1:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-devnet:${GIT_SHA:-latest}
     build:
       context: ..
-      dockerfile: antithesis/Dockerfile.cardano-node-bp
+      dockerfile: antithesis/Dockerfile.cardano-node-devnet
     command: ["/app/scripts/init-pool-node.sh", "1"]
     environment:
       <<: [*common-env, *node-ips]
@@ -43,10 +43,10 @@ services:
       - leios-net
 
   init-pool2:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-devnet:${GIT_SHA:-latest}
     build:
       context: ..
-      dockerfile: antithesis/Dockerfile.cardano-node-bp
+      dockerfile: antithesis/Dockerfile.cardano-node-devnet
     command: ["/app/scripts/init-pool-node.sh", "2"]
     depends_on:
       init-pool1:
@@ -61,10 +61,10 @@ services:
       - leios-net
 
   init-pool3:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-devnet:${GIT_SHA:-latest}
     build:
       context: ..
-      dockerfile: antithesis/Dockerfile.cardano-node-bp
+      dockerfile: antithesis/Dockerfile.cardano-node-devnet
     command: ["/app/scripts/init-pool-node.sh", "3"]
     depends_on:
       init-pool1:
@@ -80,10 +80,10 @@ services:
 
   init-dingo1:
     # NOTE: we reuse the cardano-node image for convenience when doing the init
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-devnet:${GIT_SHA:-latest}
     build:
       context: ..
-      dockerfile: antithesis/Dockerfile.cardano-node-bp
+      dockerfile: antithesis/Dockerfile.cardano-node-devnet
     command: ["/app/scripts/init-dingo-node.sh", "1"]
     depends_on:
       init-pool1:
@@ -101,10 +101,10 @@ services:
   # Block Producer Nodes
   # ==========================================================================
   pool1:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-devnet:${GIT_SHA:-latest}
     build:
       context: ..
-      dockerfile: antithesis/Dockerfile.cardano-node-bp
+      dockerfile: antithesis/Dockerfile.cardano-node-devnet
     command: ["/app/scripts/run-pool-node.sh", "pool1"]
     depends_on:
       init-pool1:
@@ -129,10 +129,10 @@ services:
       start_period: 30s
 
   pool2:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-devnet:${GIT_SHA:-latest}
     build:
       context: ..
-      dockerfile: antithesis/Dockerfile.cardano-node-bp
+      dockerfile: antithesis/Dockerfile.cardano-node-devnet
     command: ["/app/scripts/run-pool-node.sh", "pool2"]
     depends_on:
       init-pool2:
@@ -159,10 +159,10 @@ services:
       start_period: 30s
 
   pool3:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-devnet:${GIT_SHA:-latest}
     build:
       context: ..
-      dockerfile: antithesis/Dockerfile.cardano-node-bp
+      dockerfile: antithesis/Dockerfile.cardano-node-devnet
     command: ["/app/scripts/run-pool-node.sh", "pool3"]
     depends_on:
       init-pool3:
@@ -223,10 +223,10 @@ services:
   # TX Centrifuge
   # ==========================================================================
   tx-centrifuge:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-devnet:${GIT_SHA:-latest}
     build:
       context: ..
-      dockerfile: antithesis/Dockerfile.cardano-node-bp
+      dockerfile: antithesis/Dockerfile.cardano-node-devnet
     command: ["${TX_CENTRIFUGE_SCRIPT:-/app/scripts/run-tx-centrifuge.sh}"]
     depends_on:
       pool1:
@@ -249,7 +249,7 @@ services:
   # Analysis Container
   # ==========================================================================
   analysis:
-    image: ghcr.io/input-output-hk/ouroboros-leios/leios-analysis:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-analysis:${GIT_SHA:-latest}
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.analysis
