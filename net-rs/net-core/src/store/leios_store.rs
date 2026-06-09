@@ -84,6 +84,18 @@ struct LeiosStoreInner {
     stats_log_interval: u64,
 }
 
+impl LeiosStoreInner {
+    /// True when every collection is empty — used by `tick_slot` to skip
+    /// the eviction sweep once the store has drained.
+    fn is_empty(&self) -> bool {
+        self.blocks.is_empty()
+            && self.block_txs.is_empty()
+            && self.eb_tx_hashes.is_empty()
+            && self.votes.is_empty()
+            && self.notifications.is_empty()
+    }
+}
+
 /// Snapshot of internal map sizes — for memory diagnostics.
 ///
 /// `notifications_bytes_estimate` is a precise byte sum over the
@@ -107,6 +119,17 @@ pub struct LeiosStoreStats {
 /// pipeline. Smaller than `LeiosTracker`'s 1000-slot dedup window because
 /// the tracker stores tiny offer IDs while this store holds full bodies.
 pub const DEFAULT_RETENTION_SLOTS: u64 = 100;
+
+/// Hard ceiling on the `notifications` deque, independent of the slot
+/// window. Slot-window eviction is the primary bound, but it relies on
+/// front-only popping and on `max_slot` advancing; a peer that floods
+/// offers within the active window, or injects with out-of-order slots
+/// that bury an evictable entry behind a higher-slot front, could still
+/// inflate the deque. This backstop guarantees a fixed upper bound on
+/// notification memory regardless of inject order or offer rate — the
+/// same role `capacity` plays for `blocks`. Sized well above normal
+/// operation (cluster runs peak around ~120 notifications/node).
+pub const MAX_NOTIFICATIONS: usize = 10_000;
 
 /// Thread-safe content-addressed store for Leios data.
 ///
@@ -401,7 +424,13 @@ impl LeiosStore {
         let mut inner = self.inner.lock().unwrap();
         if current_slot > inner.max_slot {
             inner.max_slot = current_slot;
-            Self::evict_old(&mut inner);
+            // Skip the O(n) retain sweep when nothing is retained — the
+            // common idle/partition case this method exists for. Once the
+            // store drains, every subsequent wall-clock tick is a cheap
+            // no-op rather than four empty `retain` passes per slot.
+            if !inner.is_empty() {
+                Self::evict_old(&mut inner);
+            }
         }
     }
 
@@ -454,6 +483,17 @@ impl LeiosStore {
                     break;
                 }
             }
+        }
+
+        // Capacity backstop on `notifications` (independent of slot
+        // window). Front-only popping keeps absolute indexing intact:
+        // every pop increments `notifications_pruned_count`, and a
+        // subscriber whose cursor falls behind is fast-forwarded by
+        // `notifications_after`. Drops the oldest offers first, matching
+        // the slot-window prune direction.
+        while inner.notifications.len() > MAX_NOTIFICATIONS {
+            inner.notifications.pop_front();
+            inner.notifications_pruned_count += 1;
         }
 
         // Capacity backstop on `blocks` (independent of slot window).
@@ -1029,6 +1069,42 @@ mod tests {
             store.get_block(1, &[0x11; 32]).is_none(),
             "tick_slot should still evict past retention"
         );
+    }
+
+    #[test]
+    fn notifications_capped_by_capacity_backstop() {
+        // Flood offers all within the retention window (same slot, distinct
+        // hashes) so slot-window eviction never fires. The capacity backstop
+        // must still bound the deque, and absolute indexing must stay intact:
+        // `notification_count` (pruned + retained) reflects every push.
+        let (store, _rx) = LeiosStore::new_with_retention(MAX_NOTIFICATIONS, None, 1000, 0);
+        let pushed = MAX_NOTIFICATIONS + 250;
+        for i in 0..pushed {
+            let mut hash = [0u8; 32];
+            hash[0] = (i & 0xff) as u8;
+            hash[1] = ((i >> 8) & 0xff) as u8;
+            store.inject_block(Point::Specific { slot: 10, hash }, vec![0xAB]);
+        }
+
+        let stats = store.stats();
+        assert!(
+            stats.notifications <= MAX_NOTIFICATIONS,
+            "deque must stay within the backstop: {} > {}",
+            stats.notifications,
+            MAX_NOTIFICATIONS
+        );
+        assert_eq!(
+            store.notification_count(),
+            pushed,
+            "pruned + retained must account for every pushed notification"
+        );
+
+        // A subscriber whose cursor fell behind the pruned front is
+        // fast-forwarded rather than reading a stale local index.
+        let mut cursor = 0usize;
+        let entries = store.notifications_after(&mut cursor);
+        assert!(cursor >= pushed - MAX_NOTIFICATIONS, "cursor fast-forwarded past pruned front");
+        assert_eq!(entries.len(), stats.notifications);
     }
 
     #[test]
