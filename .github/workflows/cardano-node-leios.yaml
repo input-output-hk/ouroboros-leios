@@ -1,0 +1,180 @@
+name: "cardano-node-leios"
+
+# Build and publish the patched cardano-node + cardano-cli (from the
+# `cardano-node-leios` flake input) as:
+#
+#   1. A workflow artifact of statically-linked x86_64-linux binaries.
+#   2. A minimal `cardano-node-leios` docker image on GHCR.
+#   3. A derived `cardano-node-testnet` image (pinned testnet configs).
+#
+# Runs on every PR + push to main so the artifacts are fresh and the
+# nix build keeps working as the flake inputs evolve. The
+# Antithesis-specific images and test submission live in their own
+# workflow (antithesis-leios.yaml), which pulls this base from GHCR.
+
+on:
+  pull_request:
+    paths:
+      - "docker/**"
+      - "testnet/**"
+      - ".github/workflows/cardano-node-leios.yaml"
+      - "flake.nix"
+      - "flake.lock"
+  push:
+    branches:
+      - main
+    paths:
+      - "docker/**"
+      - "testnet/**"
+      - ".github/workflows/cardano-node-leios.yaml"
+      - "flake.nix"
+      - "flake.lock"
+  workflow_dispatch:
+    inputs:
+      push_images:
+        description: 'Push images to GHCR (even from a PR-style run)'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  build:
+    name: "Build static binaries and docker images"
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Install nix
+        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+            substituters = https://cache.nixos.org https://cache.iog.io
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to Container Registry
+        if: github.event_name == 'push' || github.event.inputs.push_images == 'true'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ----------------------------------------------------------------
+      # Static binaries — musl-linked cardano-node + cardano-cli.
+      # Built first because they're a strict sub-derivation of the
+      # docker image below: nix will reuse the exact same store paths
+      # when assembling the image.
+      # ----------------------------------------------------------------
+      - name: Build static binaries (cardano-node, cardano-cli)
+        run: |
+          set -euo pipefail
+          nix build .#cardano-node-static -o result-cardano-node
+          nix build .#cardano-cli-static  -o result-cardano-cli
+
+          mkdir -p artifacts
+          cp -v result-cardano-node/bin/cardano-node artifacts/
+          cp -v result-cardano-cli/bin/cardano-cli  artifacts/
+          chmod +x artifacts/*
+          (cd artifacts && sha256sum cardano-node cardano-cli > SHA256SUMS)
+
+      - name: Upload static binaries as workflow artifact
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        with:
+          name: cardano-node-leios-static-linux-x86_64-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+
+      # ----------------------------------------------------------------
+      # cardano-node-leios base image — built via nix from the flake's
+      # `cardano-node-leios` input. The flake exposes
+      # `packages.x86_64-linux.cardano-node-leios-image`, a streamed
+      # docker tarball of the statically-linked cardano-node +
+      # cardano-cli on a minimal layer (bash, coreutils, ca-certs).
+      # Reuses the static binaries built above from the nix store.
+      # ----------------------------------------------------------------
+      - name: Extract metadata for cardano-node-leios (base)
+        id: meta-base
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-leios
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build cardano-node-leios (base) image via nix
+        id: build-base
+        run: |
+          set -euo pipefail
+          nix build .#cardano-node-leios-image -o result-image
+          ./result-image | docker load
+
+          # Re-tag the loaded image (named `cardano-node-leios:latest`
+          # by streamLayeredImage) with every metadata-action tag.
+          local_ref=cardano-node-leios:latest
+          tags="${{ steps.meta-base.outputs.tags }}"
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            docker tag "$local_ref" "$tag"
+            echo "tagged $tag"
+          done <<< "$tags"
+
+          # SHA-based ref for the derived (testnet) build below.
+          base_ref="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-leios:sha-$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          echo "ref=$base_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Push cardano-node-leios (base) image
+        if: github.event_name == 'push' || github.event.inputs.push_images == 'true'
+        run: |
+          set -euo pipefail
+          tags="${{ steps.meta-base.outputs.tags }}"
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            docker push "$tag"
+          done <<< "$tags"
+
+      # ----------------------------------------------------------------
+      # cardano-node-testnet derived image: pinned cardano-playground
+      # configs + run-node.sh on top of the base. Only built when the
+      # base was pushed in this same job (BuildKit's docker-container
+      # driver can't see the locally-loaded base).
+      # ----------------------------------------------------------------
+      - name: Extract metadata for cardano-node-testnet
+        id: meta-testnet
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-testnet
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build cardano-node-testnet image
+        if: github.event_name == 'push' || github.event.inputs.push_images == 'true'
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        with:
+          context: .
+          file: ./testnet/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta-testnet.outputs.tags }}
+          labels: ${{ steps.meta-testnet.outputs.labels }}
+          build-args: |
+            BASE_IMAGE=${{ steps.build-base.outputs.ref }}
+          cache-from: type=gha,scope=cardano-node-testnet
+          cache-to: type=gha,mode=max,scope=cardano-node-testnet

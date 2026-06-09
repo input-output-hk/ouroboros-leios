@@ -48,7 +48,7 @@ services:
       - leios-net
 
   init-node0:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-antithesis:${GIT_SHA:-latest}
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.cardano-node
@@ -64,7 +64,7 @@ services:
       - leios-net
 
   init-downstream:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-antithesis:${GIT_SHA:-latest}
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.cardano-node
@@ -82,7 +82,7 @@ services:
   init-dingo:
     # Dingo uses the same configs and sits in the same place in the topology as 'node0', so
     # we reuse the image and scripts
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-antithesis:${GIT_SHA:-latest}
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.cardano-node
@@ -129,7 +129,7 @@ services:
       start_period: 10s
 
   node0:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-antithesis:${GIT_SHA:-latest}
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.cardano-node
@@ -159,7 +159,7 @@ services:
       start_period: 30s
 
   downstream:
-    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-antithesis:${GIT_SHA:-latest}
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.cardano-node
