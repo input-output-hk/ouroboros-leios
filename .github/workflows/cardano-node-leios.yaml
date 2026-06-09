@@ -21,6 +21,7 @@ on:
       - "flake.nix"
       - "flake.lock"
   push:
+    tags:
     branches:
       - main
     paths:
