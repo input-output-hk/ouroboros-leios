@@ -110,11 +110,16 @@ fn encode_bitmap<W: minicbor::encode::Write>(
     e: &mut Encoder<W>,
     bitmap: &BTreeMap<u16, u64>,
 ) -> Result<(), EncodeError<W::Error>> {
-    e.map(bitmap.len() as u64)?;
+    // Indefinite-length map per the leios-prototype CDDL:
+    //   bitmaps = { * base.word16 => base.word64 }  ; indefinite-length
+    // The prototype relay's parser rejects the definite-length form
+    // and immediately RSTs the bearer on receipt.
+    e.begin_map()?;
     for (index, bits) in bitmap {
         e.u16(*index)?;
         e.u64(*bits)?;
     }
+    e.end()?;
     Ok(())
 }
 
