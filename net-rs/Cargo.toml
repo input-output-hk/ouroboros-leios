@@ -1,3 +1,0 @@
-[workspace]
-members = ["net-core", "net-cli", "net-node", "net-cluster"]
-resolver = "2"

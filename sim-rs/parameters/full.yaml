@@ -1,4 +1,0 @@
-leios-variant: full
-leios-mempool-sampling-strategy: random
-leios-late-ib-inclusion: true
-praos-chain-quality: 100
