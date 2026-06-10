@@ -95,9 +95,9 @@ pub struct PraosStateSizes {
     pub equivocating_rb_slots: usize,
     pub orphan_cooldown: usize,
     pub block_fetch_cooldown: usize,
-    /// Rough byte estimate covering `header_hashes_by_slot_issuer` (outer
-    /// + inner) and `equivocating_rb_slots`.  Multiplies counts by
-    /// per-entry constants — not exact heap usage.
+    /// Rough byte estimate covering `header_hashes_by_slot_issuer` (outer +
+    /// inner) and `equivocating_rb_slots`.  Multiplies counts by per-entry
+    /// constants — not exact heap usage.
     pub equivocation_bytes_estimate: usize,
 }
 

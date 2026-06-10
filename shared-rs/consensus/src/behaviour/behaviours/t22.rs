@@ -29,12 +29,12 @@ could be unimplementable in practice, e.g. in case of direct links between hones
 Parameters:
 -----------
 - `vote_threshold`: Percentage of EB-related messages (0-100), that are to be delivered to
-   voting (committee) nodes.
+  voting (committee) nodes.
 - `non_voting_threshold`: Percentage of EB-related messages (0-100), that are to be delivered
-   to non-voting (non-committee) nodes.
+  to non-voting (non-committee) nodes.
 - `hide_eb_tx_received`: In case of `false`, only eb-offered, eb-txs-offered events are
-   ignored (so block offers are dropped). In case of `true`, also eb-received and tx-received
-   events are ignored.
+  ignored (so block offers are dropped). In case of `true`, also eb-received and tx-received
+  events are ignored.
 
 The threshold parameters are probabilistic: they specify average cutoff. So, if some threshold
 is set to 70, it means that for some points 75% of nodes will have hash%100 > 70 (and pass the
@@ -82,8 +82,7 @@ impl T22ThreatBehaviour {
         };
         // `checksum % 100` yields values in 0..=99, so use `< threshold` to make
         // threshold semantics match percentages exactly: 0 => 0%, 100 => 100%.
-        let decision = ((checksum % 100) as u8) < threshold;
-        decision
+        ((checksum % 100) as u8) < threshold
     }
 }
 
