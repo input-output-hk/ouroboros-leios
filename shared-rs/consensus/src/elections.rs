@@ -123,14 +123,31 @@ pub struct Elections {
     cfg: ElectionsConfig,
     current_slot: u64,
     elections: BTreeMap<[u8; 32], EbElection>,
+    /// `stake_registry` keys in `BTreeMap` order, for O(1) compact-index
+    /// → node-id lookup on the vote-receive path.  Registry entries past
+    /// `u16::MAX` are still cached so `voter_id_at` keeps resolving them
+    /// for incoming votes; `voter_index` truncates symmetrically.
+    voter_ids: Vec<String>,
+    /// Reverse map of `voter_ids` for O(log N) node-id → compact-index
+    /// lookup on the vote-emit path.  Only entries that fit in `u16` are
+    /// recorded — matches the original `try_from` behaviour.
+    voter_index_map: BTreeMap<String, u16>,
 }
 
 impl Elections {
     pub fn new(cfg: ElectionsConfig) -> Self {
+        let voter_ids: Vec<String> = cfg.stake_registry.keys().cloned().collect();
+        let voter_index_map: BTreeMap<String, u16> = voter_ids
+            .iter()
+            .enumerate()
+            .filter_map(|(i, id)| u16::try_from(i).ok().map(|i| (id.clone(), i)))
+            .collect();
         Self {
             cfg,
             current_slot: 0,
             elections: BTreeMap::new(),
+            voter_ids,
+            voter_index_map,
         }
     }
 
@@ -321,20 +338,12 @@ impl Elections {
     /// relay we hold no stake entry for — its votes gossip but carry no
     /// resolvable weight).
     pub fn voter_id_at(&self, index: u16) -> Option<&str> {
-        self.cfg
-            .stake_registry
-            .keys()
-            .nth(index as usize)
-            .map(String::as_str)
+        self.voter_ids.get(index as usize).map(String::as_str)
     }
 
     /// The compact voter index for a registered node id, if present.
     pub fn voter_index(&self, node_id: &str) -> Option<u16> {
-        self.cfg
-            .stake_registry
-            .keys()
-            .position(|k| k == node_id)
-            .and_then(|p| u16::try_from(p).ok())
+        self.voter_index_map.get(node_id).copied()
     }
 
     pub fn phase(&self, eb_hash: &[u8; 32]) -> Option<PipelinePhase> {
