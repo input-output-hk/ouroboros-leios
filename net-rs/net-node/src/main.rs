@@ -87,7 +87,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .behaviour
         .clone()
         .unwrap_or(shared_consensus::behaviour::BehaviourSpec::Honest);
-    info!(?behaviour_spec, behaviour_seed, "materialising per-node behaviour");
+    info!(
+        ?behaviour_spec,
+        behaviour_seed, "materialising per-node behaviour"
+    );
     let behaviour_handle =
         shared_consensus::behaviour::build_handle(&behaviour_spec, behaviour_seed);
 
@@ -676,11 +679,13 @@ async fn record_network_event(
                 .await;
         }
         NetworkEvent::LeiosBlockTxsReceived { transactions, .. } => {
-            telem.record(NodeEvent::EBTxsReceived {
-                node: node_id.into(),
-                slot: telem.current_slot,
-                len: transactions.len()
-            }).await
+            telem
+                .record(NodeEvent::EBTxsReceived {
+                    node: node_id.into(),
+                    slot: telem.current_slot,
+                    len: transactions.len(),
+                })
+                .await
         }
         NetworkEvent::LeiosVotesReceived { ref votes, .. } => {
             telem

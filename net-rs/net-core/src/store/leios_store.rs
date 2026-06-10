@@ -533,11 +533,12 @@ impl LeiosStore {
 /// evicted from the slot-window-pruned maps and can never be served.
 fn notification_evictable(n: &LeiosNotification, cutoff: u64) -> bool {
     match n {
-        LeiosNotification::BlockOffer { point }
-        | LeiosNotification::BlockTxsOffer { point } => match point {
-            Point::Specific { slot, .. } => *slot < cutoff,
-            Point::Origin => true,
-        },
+        LeiosNotification::BlockOffer { point } | LeiosNotification::BlockTxsOffer { point } => {
+            match point {
+                Point::Specific { slot, .. } => *slot < cutoff,
+                Point::Origin => true,
+            }
+        }
         LeiosNotification::Votes { votes } => votes.iter().all(|v| v.slot < cutoff),
     }
 }
@@ -784,10 +785,8 @@ mod tests {
         let h0 = [0x10u8; 32];
         let h1 = [0x20u8; 32];
         let h2 = [0x30u8; 32];
-        let resolver: Arc<dyn TxBodyResolver> = Arc::new(StubResolver(HashMap::from([(
-            h1.to_vec(),
-            vec![0xD1],
-        )])));
+        let resolver: Arc<dyn TxBodyResolver> =
+            Arc::new(StubResolver(HashMap::from([(h1.to_vec(), vec![0xD1])])));
         let (store, _rx) = LeiosStore::new_with_resolver(100, Some(resolver));
 
         let eb_hash = [0xDDu8; 32];
@@ -1101,7 +1100,10 @@ mod tests {
         // fast-forwarded rather than reading a stale local index.
         let mut cursor = 0usize;
         let entries = store.notifications_after(&mut cursor);
-        assert!(cursor >= pushed - MAX_NOTIFICATIONS, "cursor fast-forwarded past pruned front");
+        assert!(
+            cursor >= pushed - MAX_NOTIFICATIONS,
+            "cursor fast-forwarded past pruned front"
+        );
         assert_eq!(entries.len(), stats.notifications);
     }
 

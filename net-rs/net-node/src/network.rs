@@ -6,7 +6,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use net_core::multi_peer::types::NetworkCommand;
-use net_core::multi_peer::{spawn_coordinator, CoordinatorConfig, CoordinatorHandle, PeerRttObserver};
+use net_core::multi_peer::{
+    spawn_coordinator, CoordinatorConfig, CoordinatorHandle, PeerRttObserver,
+};
 use net_core::mux::scheduler::SchedulerType;
 use net_core::store::leios_store::TxBodyResolver;
 

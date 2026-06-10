@@ -122,7 +122,9 @@ pub enum FetchPolicyKind {
 
 impl FetchPolicyKind {
     /// Build a [`BlockFetchPolicy`] handle from this config.
-    pub fn into_block_policy(self) -> Box<dyn shared_consensus::fetch::BlockFetchPolicy + Send + Sync> {
+    pub fn into_block_policy(
+        self,
+    ) -> Box<dyn shared_consensus::fetch::BlockFetchPolicy + Send + Sync> {
         use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
@@ -146,7 +148,9 @@ impl FetchPolicyKind {
     }
 
     /// Build an [`EbTxsFetchPolicy`] handle from this config.
-    pub fn into_eb_txs_policy(self) -> Box<dyn shared_consensus::fetch::EbTxsFetchPolicy + Send + Sync> {
+    pub fn into_eb_txs_policy(
+        self,
+    ) -> Box<dyn shared_consensus::fetch::EbTxsFetchPolicy + Send + Sync> {
         use shared_consensus::fetch::{BroadcastN, LowestRttFirst, NoFetch};
         match self {
             FetchPolicyKind::LowestRtt => Box::new(LowestRttFirst),
@@ -156,7 +160,6 @@ impl FetchPolicyKind {
             FetchPolicyKind::NoFetch => Box::new(NoFetch),
         }
     }
-
 }
 
 /// Per-traffic-class fetch-policy selection.  Each class is set

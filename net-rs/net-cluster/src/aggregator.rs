@@ -10,8 +10,8 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
-use tokio::sync::{mpsc, RwLock};
 use crate::types::{EventWindow, IngestedEvent};
+use tokio::sync::{mpsc, RwLock};
 
 /// Run the aggregator as a tokio task.
 ///

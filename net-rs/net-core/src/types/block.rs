@@ -169,8 +169,7 @@ impl BlockBody {
             Some(n) => n,
             None => return Err(DecodeError::message("indefinite tx_bodies array")),
         };
-        u32::try_from(tx_count)
-            .map_err(|_| DecodeError::message("tx_bodies length exceeds u32"))
+        u32::try_from(tx_count).map_err(|_| DecodeError::message("tx_bodies length exceeds u32"))
     }
 
     /// Extract the header from this block in ChainSync wire format:

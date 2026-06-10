@@ -459,5 +459,4 @@ mod tests {
             other => panic!("expected EbValidated, got {other:?}"),
         }
     }
-
 }

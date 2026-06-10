@@ -18,9 +18,9 @@ use rand::{Rng, SeedableRng};
 use tokio::sync::{mpsc, watch};
 use tracing::{info, warn};
 
-use shared_consensus::mempool::{EbKey, MempoolState};
 use net_core::peer::PeerId;
 use net_core::protocols::txsubmission::{PendingTx, TxBody, TxId};
+use shared_consensus::mempool::{EbKey, MempoolState};
 
 use crate::config::{DynamicConfig, TxConfig};
 
@@ -139,15 +139,18 @@ impl Mempool {
     /// admits do not signal — nothing new to fan out.
     pub fn push(&mut self, tx: PendingTx) {
         use shared_consensus::mempool::{MempoolEffect, TxRejectReason};
-        let effects = self.state.admit_validated(
-            tx.tx_id.0.clone(),
-            tx.body.0.clone(),
-            tx.size,
-        );
-        let admitted = !effects.iter().any(|e| matches!(
-            e,
-            MempoolEffect::TxRejected { reason: TxRejectReason::AlreadyKnown, .. }
-        ));
+        let effects = self
+            .state
+            .admit_validated(tx.tx_id.0.clone(), tx.body.0.clone(), tx.size);
+        let admitted = !effects.iter().any(|e| {
+            matches!(
+                e,
+                MempoolEffect::TxRejected {
+                    reason: TxRejectReason::AlreadyKnown,
+                    ..
+                }
+            )
+        });
         if admitted {
             if let Err(mpsc::error::TrySendError::Full(_)) = self.admit_tx.try_send(tx) {
                 // Fanout channel full — peer will pick the tx up via
@@ -178,7 +181,6 @@ impl Mempool {
     pub fn forget_peer(&mut self, peer_id: PeerId) {
         self.state.forget_peer(to_con_pid(peer_id));
     }
-
 
     pub fn get_body_by_id(&self, id: &[u8]) -> Option<Vec<u8>> {
         self.state.get_body_by_id(id)

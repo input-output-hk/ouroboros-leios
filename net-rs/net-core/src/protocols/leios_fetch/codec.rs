@@ -18,9 +18,7 @@ use minicbor::decode::Error as DecodeError;
 use minicbor::encode::Error as EncodeError;
 use minicbor::{Decoder, Encoder};
 
-use super::{
-    Message, MAX_BITMAP_ENTRIES, MAX_BLOCK_SIZE, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE,
-};
+use super::{Message, MAX_BITMAP_ENTRIES, MAX_BLOCK_SIZE, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE};
 use crate::types::Point;
 
 impl minicbor::Encode<()> for Message {
@@ -372,7 +370,13 @@ mod tests {
                 bitmap,
                 transactions,
             } => {
-                assert_eq!(point, Point::Specific { slot: 7, hash: test_hash() });
+                assert_eq!(
+                    point,
+                    Point::Specific {
+                        slot: 7,
+                        hash: test_hash()
+                    }
+                );
                 assert_eq!(bitmap[&0], 0x3);
                 assert_eq!(transactions, vec![tx(1), tx(2)]);
             }

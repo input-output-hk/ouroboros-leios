@@ -11,17 +11,17 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use shared_consensus::elections::{Elections, ElectionsConfig};
-use shared_consensus::leios::{
-    ChainTipContext, LeiosEffect, LeiosState, LeiosTelemetryEvent, VotingConfig,
-};
-pub use shared_consensus::leios::EbTxMatchOutcome;
-pub use shared_consensus::pipeline::PipelineConfig;
-use shared_consensus::committee;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::{Point, Vote};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
+use shared_consensus::committee;
+use shared_consensus::elections::{Elections, ElectionsConfig};
+pub use shared_consensus::leios::EbTxMatchOutcome;
+use shared_consensus::leios::{
+    ChainTipContext, LeiosEffect, LeiosState, LeiosTelemetryEvent, VotingConfig,
+};
+pub use shared_consensus::pipeline::PipelineConfig;
 use tokio::sync::{mpsc, watch};
 use tracing::info;
 
@@ -67,8 +67,11 @@ impl LeiosConsensus {
         dyn_config: watch::Receiver<DynamicConfig>,
     ) -> Self {
         let total_stake: u64 = stake_registry_entries.iter().map(|e| e.stake).sum();
-        let persistent_committee =
-            committee::build_committee(&committee_selection, stake_registry_entries, committee_seed);
+        let persistent_committee = committee::build_committee(
+            &committee_selection,
+            stake_registry_entries,
+            committee_seed,
+        );
         let expected_total_weight = committee::expected_total_weight(
             &committee_selection,
             &persistent_committee,
@@ -208,10 +211,12 @@ impl LeiosConsensus {
         let known = self.mempool.lock().unwrap().all_known_tx_ids();
         let tx_known = |h: &[u8; 32]| known.contains(h.as_slice());
         let mut fx = self.state.on_slot(slot, &tx_known);
-        fx.push(LeiosEffect::EmitTelemetry(LeiosTelemetryEvent::LeiosElectionInfo {
-            eb_slot: slot,
-            perm_committee: self.state.voting_config.persistent_seats > 0,
-        }));
+        fx.push(LeiosEffect::EmitTelemetry(
+            LeiosTelemetryEvent::LeiosElectionInfo {
+                eb_slot: slot,
+                perm_committee: self.state.voting_config.persistent_seats > 0,
+            },
+        ));
         self.dispatch(fx).await;
     }
 
@@ -219,10 +224,9 @@ impl LeiosConsensus {
     pub async fn handle_event(&mut self, event: &NetworkEvent) -> bool {
         let now = Instant::now();
         let (consumed, fx): (bool, Vec<LeiosEffect>) = match event {
-            NetworkEvent::LeiosBlockOffered { peer_id, point } => (
-                true,
-                self.state.on_eb_offered(point.clone(), *peer_id, now),
-            ),
+            NetworkEvent::LeiosBlockOffered { peer_id, point } => {
+                (true, self.state.on_eb_offered(point.clone(), *peer_id, now))
+            }
             NetworkEvent::LeiosBlockTxsOffered { peer_id, point } => {
                 let bitmap = self.bitmap_for_missing_txs(point);
                 (
@@ -273,11 +277,7 @@ impl LeiosConsensus {
     /// Verify a `LeiosBlockTxsReceived` response against the cached
     /// manifest.  Bodies are blake2b-hashed here (the wire-format body
     /// hash) before being matched, since shared-consensus is format-agnostic.
-    pub fn match_eb_tx_response(
-        &mut self,
-        point: &Point,
-        bodies: &[Vec<u8>],
-    ) -> EbTxMatchOutcome {
+    pub fn match_eb_tx_response(&mut self, point: &Point, bodies: &[Vec<u8>]) -> EbTxMatchOutcome {
         let bodies_with_hashes: Vec<(Vec<u8>, [u8; 32])> = bodies
             .iter()
             .map(|body| {
@@ -403,7 +403,7 @@ impl LeiosConsensus {
                             node: node_id,
                             slot: eb_slot,
                             pers_committee_member: perm_committee,
-                        }
+                        },
                     };
                     self.pending_telemetry.push(node_event);
                 }
@@ -470,7 +470,6 @@ impl LeiosConsensus {
         self.state.elections.voter_count(hash)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -633,9 +632,9 @@ mod tests {
         assert!(
             leios
                 .handle_event(&NetworkEvent::LeiosBlockOffered {
-                peer_id: net_core::peer::PeerId(1),
-                point: p.clone(),
-            })
+                    peer_id: net_core::peer::PeerId(1),
+                    point: p.clone(),
+                })
                 .await
         );
 
@@ -1139,5 +1138,4 @@ mod tests {
         assert_eq!(outcome2.requested, 2);
         assert!(outcome2.remaining_bitmap.is_empty());
     }
-
 }

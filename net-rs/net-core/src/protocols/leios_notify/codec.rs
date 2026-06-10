@@ -108,9 +108,9 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
         // Tolerate (and skip) any trailing elements beyond the fields we
         // read — keeps us forward-compatible with added fields.
         let consumed = match tag {
-            0 | 5 => 1,                 // tag only
-            1 | 3 | 4 => 2,             // tag + payload
-            2 => 3,                     // tag + point + eb_size
+            0 | 5 => 1,     // tag only
+            1 | 3 | 4 => 2, // tag + payload
+            2 => 3,         // tag + point + eb_size
             _ => unreachable!(),
         };
         skip_trailing(d, len, consumed)?;
@@ -122,11 +122,7 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
 /// given we have already consumed `consumed` of them.  Handles both
 /// definite-length arrays (skip `len - consumed`) and indefinite-length
 /// arrays (skip until the break marker).
-fn skip_trailing(
-    d: &mut Decoder<'_>,
-    len: Option<u64>,
-    consumed: u64,
-) -> Result<(), DecodeError> {
+fn skip_trailing(d: &mut Decoder<'_>, len: Option<u64>, consumed: u64) -> Result<(), DecodeError> {
     match len {
         Some(n) => {
             for _ in consumed..n {

@@ -571,8 +571,7 @@ pub(crate) fn spawn_leios_fetch(
                 }
                 LeiosFetchCommand::BlockTxs { point, bitmap } => {
                     let (slot, eb_hash) = eb_fields(&point);
-                    let requested: Vec<u32> =
-                        leios_fetch::bitmap::iter_indices(&bitmap).collect();
+                    let requested: Vec<u32> = leios_fetch::bitmap::iter_indices(&bitmap).collect();
                     tracing::info!(
                         %peer_id, slot, eb_hash,
                         requested = requested.len(),
