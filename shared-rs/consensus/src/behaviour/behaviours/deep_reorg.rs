@@ -38,7 +38,7 @@ impl Behaviour for DeepReorg {
         if self.depth == 0 || slot == 0 {
             return None;
         }
-        if slot % self.every_slots == 0 && slot != self.last_fired {
+        if slot.is_multiple_of(self.every_slots) && slot != self.last_fired {
             self.last_fired = slot;
             return Some(self.depth);
         }
