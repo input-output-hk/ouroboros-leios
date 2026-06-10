@@ -44,7 +44,7 @@ pub async fn run(
                             accumulated_before_flush = 0;
                         }
                         else {
-                            accumulated_before_flush += len.clone();
+                            accumulated_before_flush += len;
                         }
                     }
                     None => {

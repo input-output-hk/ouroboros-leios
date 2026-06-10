@@ -173,6 +173,7 @@ impl AggregatedVotes {
 /// Returns the `Arc<ServerState>` (shared with the aggregator) and a
 /// `JoinHandle` for the server task. The server must be started before
 /// spawning net-node children so they can connect immediately.
+#[allow(clippy::too_many_arguments)]
 pub async fn start(
     port: u16,
     event_tx: mpsc::Sender<Vec<IngestedEvent>>,
