@@ -75,7 +75,11 @@ mod tests {
         let seg = CurveSegment::new(D, Curve::Linear);
         approx(seg.interp(1.0, 0.1, Duration::ZERO), 1.0, 1e-12);
         approx(seg.interp(1.0, 0.1, D), 0.1, 1e-12);
-        approx(seg.interp(1.0, 0.1, Duration::from_millis(500)), 0.55, 1e-12);
+        approx(
+            seg.interp(1.0, 0.1, Duration::from_millis(500)),
+            0.55,
+            1e-12,
+        );
     }
 
     #[test]

@@ -130,7 +130,11 @@ pub fn build(spec: &BehaviourSpec, seed: u64) -> Box<dyn Behaviour> {
             vote_threshold,
             non_voting_threshold,
             hide_eb_tx_received,
-        } => Box::new(T22ThreatBehaviour::new(*vote_threshold, *non_voting_threshold, *hide_eb_tx_received)),
+        } => Box::new(T22ThreatBehaviour::new(
+            *vote_threshold,
+            *non_voting_threshold,
+            *hide_eb_tx_received,
+        )),
         BehaviourSpec::DeepReorg { every_slots, depth } => {
             Box::new(DeepReorg::new(*every_slots, *depth))
         }
@@ -195,7 +199,10 @@ mod tests {
             BehaviourSpec::Composite { children } => {
                 assert_eq!(children.len(), 3);
                 assert!(matches!(children[0], BehaviourSpec::Honest));
-                assert!(matches!(children[1], BehaviourSpec::RbHeaderEquivocator { ways: 2 }));
+                assert!(matches!(
+                    children[1],
+                    BehaviourSpec::RbHeaderEquivocator { ways: 2 }
+                ));
                 assert!(matches!(
                     children[2],
                     BehaviourSpec::T22 {

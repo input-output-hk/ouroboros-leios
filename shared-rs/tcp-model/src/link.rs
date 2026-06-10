@@ -47,7 +47,10 @@ impl LinkState {
     /// Multiplier on nominal bandwidth at time `t`. `1.0` when no envelope
     /// is active or the active envelope has fully released.
     pub fn bw_mult(&self, t: Duration) -> f64 {
-        self.current.as_ref().map(|e| e.bw_mult_at(t)).unwrap_or(1.0)
+        self.current
+            .as_ref()
+            .map(|e| e.bw_mult_at(t))
+            .unwrap_or(1.0)
     }
 
     /// Stall-window end-time if `t` lies inside an active stall, else `t`.
@@ -196,7 +199,9 @@ impl LinkState {
     }
 
     fn loss_envelope(&self, t: Duration, start_mult: f64, lat_stall: Duration) -> Envelope {
-        let depth = (start_mult * self.cfg.loss_bw_depth).max(1e-6).min(start_mult);
+        let depth = (start_mult * self.cfg.loss_bw_depth)
+            .max(1e-6)
+            .min(start_mult);
         Envelope {
             fired_at: t,
             bw_start: start_mult,

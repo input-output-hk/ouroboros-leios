@@ -27,6 +27,7 @@ use tracing::info;
 
 use crate::aggregation::QuorumFormed;
 use crate::behaviour::{Behaviour, BehaviourOutcome, HonestBehaviour};
+use crate::committee;
 use crate::config::CommitteeSelection;
 use crate::elections::{Elections, SlotEffect};
 use crate::fetch::{
@@ -34,9 +35,8 @@ use crate::fetch::{
 };
 use crate::peer::PeerId;
 use crate::pipeline::PipelineConfig;
-use crate::types::Vote;
 use crate::types::Point;
-use crate::committee;
+use crate::types::Vote;
 
 /// How long an in-flight fetch entry remains "active" before being
 /// considered stale and eligible for retry.
@@ -246,7 +246,7 @@ pub enum LeiosTelemetryEvent {
     LeiosElectionInfo {
         eb_slot: u64,
         perm_committee: bool,
-    }
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -543,20 +543,15 @@ impl LeiosState {
     /// locally?" — used by the CIP-0164 `MissingTX` voting check in
     /// TX-by-references mode.  Wrappers without a mempool surface yet
     /// can pass `&|_| true`; in that case the predicate is a no-op.
-    pub fn on_slot(
-        &mut self,
-        slot: u64,
-        tx_known: &dyn Fn(&[u8; 32]) -> bool,
-    ) -> Vec<LeiosEffect> {
+    pub fn on_slot(&mut self, slot: u64, tx_known: &dyn Fn(&[u8; 32]) -> bool) -> Vec<LeiosEffect> {
         // Behaviour reactive hook.  Replace short-circuits the honest
         // path; Append accumulates extras to splice in after the
         // honest fx.
-        let appended: Vec<LeiosEffect> =
-            match self.invoke_hook(|b, s| b.on_slot_leios(s, slot)) {
-                BehaviourOutcome::Continue => Vec::new(),
-                BehaviourOutcome::Replace(effects) => return effects,
-                BehaviourOutcome::Append(extra) => extra,
-            };
+        let appended: Vec<LeiosEffect> = match self.invoke_hook(|b, s| b.on_slot_leios(s, slot)) {
+            BehaviourOutcome::Continue => Vec::new(),
+            BehaviourOutcome::Replace(effects) => return effects,
+            BehaviourOutcome::Append(extra) => extra,
+        };
 
         let mut fx: Vec<LeiosEffect> = Vec::new();
         for eff in self.elections.on_slot(slot) {
@@ -575,9 +570,7 @@ impl LeiosState {
                     drop(guard);
                     let resolved = decision.resolve(honest_vote);
                     match resolved {
-                        Ok((emit_pv, npv_signature))
-                            if emit_pv || npv_signature.is_some() =>
-                        {
+                        Ok((emit_pv, npv_signature)) if emit_pv || npv_signature.is_some() => {
                             info!(
                                 node_id = %self.node_id,
                                 eb_slot,
@@ -673,7 +666,8 @@ impl LeiosState {
         // EB is potentially relevant to the chain we'll soon adopt.
         if let Some(min_keep) = self.chain_tip_ctx.tip_rb_slot {
             self.eb_tx_hashes.retain(|_, (s, _)| *s >= min_keep);
-            self.pending_eb_tx_fetches.retain(|_, (s, _)| *s >= min_keep);
+            self.pending_eb_tx_fetches
+                .retain(|_, (s, _)| *s >= min_keep);
             self.endorsed_unvalidated_ebs.retain(|_, s| *s >= min_keep);
             self.elections.prune_below_slot(min_keep);
             self.candidates.prune_below_slot(min_keep);
@@ -764,22 +758,26 @@ impl LeiosState {
         // persistent seat is *not* eligible as an NPV candidate.  A
         // pool emits exactly one vote per election: PV xor NPV.
         let emit_pv = self.voting_config.persistent_seats > 0;
-        let n_npv = self.voting_config.committee_selection.non_persistent_voters();
+        let n_npv = self
+            .voting_config
+            .committee_selection
+            .non_persistent_voters();
         let npv_signature = if emit_pv || n_npv == 0 {
             None
         } else {
-            let sig = committee::npv_eligibility_signature(
-                self.node_id.as_bytes(),
-                eb_hash,
-                eb_slot,
-            );
+            let sig =
+                committee::npv_eligibility_signature(self.node_id.as_bytes(), eb_hash, eb_slot);
             let wins = committee::count_npv_wins(
                 &sig,
                 self.voting_config.stake,
                 self.voting_config.total_stake,
                 n_npv,
             );
-            if wins > 0 { Some(sig) } else { None }
+            if wins > 0 {
+                Some(sig)
+            } else {
+                None
+            }
         };
         Ok((emit_pv, npv_signature))
     }
@@ -791,12 +789,7 @@ impl LeiosState {
     /// against the current candidate set and emits one
     /// `FetchLeiosBlock` carrying the chosen peers.  Idempotent: a
     /// repeat offer from the same peer is silently absorbed.
-    pub fn on_eb_offered(
-        &mut self,
-        point: Point,
-        peer: PeerId,
-        now: Instant,
-    ) -> Vec<LeiosEffect> {
+    pub fn on_eb_offered(&mut self, point: Point, peer: PeerId, now: Instant) -> Vec<LeiosEffect> {
         let appended: Vec<LeiosEffect> =
             match self.invoke_hook(|b, s| b.on_eb_offered(s, &point, peer)) {
                 BehaviourOutcome::Continue => Vec::new(),
@@ -809,9 +802,7 @@ impl LeiosState {
             return appended;
         }
         let candidates = self.candidates.eb_candidates(&point);
-        let peers = self
-            .eb_policy
-            .pick(&point, &candidates, self.rtt.as_ref());
+        let peers = self.eb_policy.pick(&point, &candidates, self.rtt.as_ref());
         if peers.is_empty() {
             return appended;
         }
@@ -839,13 +830,12 @@ impl LeiosState {
         bitmap: BTreeMap<u16, u64>,
         now: Instant,
     ) -> Vec<LeiosEffect> {
-        let appended: Vec<LeiosEffect> = match self
-            .invoke_hook(|b, s| b.on_eb_txs_offered(s, &point, peer, &bitmap))
-        {
-            BehaviourOutcome::Continue => Vec::new(),
-            BehaviourOutcome::Replace(effects) => return effects,
-            BehaviourOutcome::Append(extra) => extra,
-        };
+        let appended: Vec<LeiosEffect> =
+            match self.invoke_hook(|b, s| b.on_eb_txs_offered(s, &point, peer, &bitmap)) {
+                BehaviourOutcome::Continue => Vec::new(),
+                BehaviourOutcome::Replace(effects) => return effects,
+                BehaviourOutcome::Append(extra) => extra,
+            };
         self.evict_stale_in_flight(now);
         let slot = match &point {
             Point::Specific { slot, .. } => *slot,
@@ -871,9 +861,9 @@ impl LeiosState {
             return appended;
         }
         let candidates = self.candidates.eb_txs_candidates(&point);
-        let peers =
-            self.eb_txs_policy
-                .pick(&point, &bitmap, &candidates, self.rtt.as_ref());
+        let peers = self
+            .eb_txs_policy
+            .pick(&point, &bitmap, &candidates, self.rtt.as_ref());
         if peers.is_empty() {
             return appended;
         }
@@ -908,13 +898,12 @@ impl LeiosState {
         manifest_hashes: Option<Vec<[u8; 32]>>,
     ) -> Vec<LeiosEffect> {
         let hashes_for_hook: &[[u8; 32]] = manifest_hashes.as_deref().unwrap_or(&[]);
-        let appended: Vec<LeiosEffect> = match self.invoke_hook(|b, s| {
-            b.on_eb_received(s, &point, hashes_for_hook)
-        }) {
-            BehaviourOutcome::Continue => Vec::new(),
-            BehaviourOutcome::Replace(effects) => return effects,
-            BehaviourOutcome::Append(extra) => extra,
-        };
+        let appended: Vec<LeiosEffect> =
+            match self.invoke_hook(|b, s| b.on_eb_received(s, &point, hashes_for_hook)) {
+                BehaviourOutcome::Continue => Vec::new(),
+                BehaviourOutcome::Replace(effects) => return effects,
+                BehaviourOutcome::Append(extra) => extra,
+            };
         self.in_flight.remove(&point);
         let mut fx = Vec::new();
         if let (Some(hashes), Point::Specific { slot, hash }) = (manifest_hashes, &point) {
@@ -1024,7 +1013,9 @@ impl LeiosState {
         if self.elections.is_announced(&eb_hash) {
             return;
         }
-        self.endorsed_unvalidated_ebs.entry(eb_hash).or_insert(eb_slot);
+        self.endorsed_unvalidated_ebs
+            .entry(eb_hash)
+            .or_insert(eb_slot);
     }
 
     /// Producer-side EB-safety predicate consumed by
@@ -1049,11 +1040,9 @@ impl LeiosState {
         let mut fx = Vec::new();
         for body in vote_bodies {
             let voter_id_str = String::from_utf8_lossy(body.voter_id).into_owned();
-            let weight = self.elections.weight_for(
-                &voter_id_str,
-                body.tag,
-                body.eligibility_signature,
-            );
+            let weight =
+                self.elections
+                    .weight_for(&voter_id_str, body.tag, body.eligibility_signature);
             if weight == 0 {
                 continue;
             }
@@ -1123,11 +1112,8 @@ impl LeiosState {
             };
         };
         // Build hash → manifest-index map.
-        let manifest_index: BTreeMap<&[u8; 32], usize> = manifest
-            .iter()
-            .enumerate()
-            .map(|(i, h)| (h, i))
-            .collect();
+        let manifest_index: BTreeMap<&[u8; 32], usize> =
+            manifest.iter().enumerate().map(|(i, h)| (h, i)).collect();
         // Match each body, sorting by manifest index.
         let mut matched: BTreeMap<usize, Vec<u8>> = BTreeMap::new();
         for (body, body_hash) in bodies_with_hashes {
@@ -1138,27 +1124,25 @@ impl LeiosState {
         let matched_bodies: Vec<Vec<u8>> = matched.values().cloned().collect();
 
         // Compute `requested` and `remaining_bitmap`.
-        let (requested, remaining_bitmap) =
-            match self.pending_eb_tx_fetches.get(&hash).cloned() {
-                Some((_, bitmap)) => {
-                    let requested_indices: BTreeSet<u32> = bitmap_to_indices(&bitmap);
-                    let matched_indices: BTreeSet<u32> =
-                        matched.keys().map(|i| *i as u32).collect();
-                    let remaining: Vec<u32> = requested_indices
-                        .difference(&matched_indices)
-                        .copied()
-                        .collect();
-                    let remaining_bitmap = indices_to_bitmap(&remaining);
-                    if remaining.is_empty() {
-                        self.pending_eb_tx_fetches.remove(&hash);
-                    } else {
-                        self.pending_eb_tx_fetches
-                            .insert(hash, (eb_slot, remaining_bitmap.clone()));
-                    }
-                    (requested_indices.len(), remaining_bitmap)
+        let (requested, remaining_bitmap) = match self.pending_eb_tx_fetches.get(&hash).cloned() {
+            Some((_, bitmap)) => {
+                let requested_indices: BTreeSet<u32> = bitmap_to_indices(&bitmap);
+                let matched_indices: BTreeSet<u32> = matched.keys().map(|i| *i as u32).collect();
+                let remaining: Vec<u32> = requested_indices
+                    .difference(&matched_indices)
+                    .copied()
+                    .collect();
+                let remaining_bitmap = indices_to_bitmap(&remaining);
+                if remaining.is_empty() {
+                    self.pending_eb_tx_fetches.remove(&hash);
+                } else {
+                    self.pending_eb_tx_fetches
+                        .insert(hash, (eb_slot, remaining_bitmap.clone()));
                 }
-                None => (0, BTreeMap::new()),
-            };
+                (requested_indices.len(), remaining_bitmap)
+            }
+            None => (0, BTreeMap::new()),
+        };
         EbTxMatchOutcome {
             matched_bodies,
             requested,
@@ -1184,9 +1168,9 @@ impl LeiosState {
             return Vec::new();
         }
         let candidates = self.candidates.eb_txs_candidates(&point);
-        let peers =
-            self.eb_txs_policy
-                .pick(&point, &bitmap, &candidates, self.rtt.as_ref());
+        let peers = self
+            .eb_txs_policy
+            .pick(&point, &bitmap, &candidates, self.rtt.as_ref());
         if peers.is_empty() {
             return Vec::new();
         }
@@ -1539,7 +1523,10 @@ mod tests {
         assert_eq!(fx.len(), 2);
         assert!(matches!(fx[0], LeiosEffect::RecordLeiosEbManifest { .. }));
         assert!(matches!(fx[1], LeiosEffect::ValidateEb { .. }));
-        assert_eq!(state.eb_tx_hashes.get(&h(1)).map(|(_, v)| v), Some(&manifest));
+        assert_eq!(
+            state.eb_tx_hashes.get(&h(1)).map(|(_, v)| v),
+            Some(&manifest)
+        );
     }
 
     #[test]
@@ -1573,7 +1560,9 @@ mod tests {
     fn slot_tick_prunes_stale_eb_tx_state_via_chain_progress() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
         state.eb_tx_hashes.insert(h(1), (10, vec![h(0xAA)]));
-        state.pending_eb_tx_fetches.insert(h(1), (10, BTreeMap::new()));
+        state
+            .pending_eb_tx_fetches
+            .insert(h(1), (10, BTreeMap::new()));
         // No chain tip set → no prune, EB stays even far past the
         // old time-based expiry.
         state.on_slot(1_000_000, &tx_all);
@@ -1643,12 +1632,7 @@ mod tests {
     #[test]
     fn on_eb_txs_offered_origin_point_is_noop() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        let fx = state.on_eb_txs_offered(
-            Point::Origin,
-            PeerId(1),
-            BTreeMap::new(),
-            Instant::now(),
-        );
+        let fx = state.on_eb_txs_offered(Point::Origin, PeerId(1), BTreeMap::new(), Instant::now());
         assert!(fx.is_empty());
     }
 
@@ -1744,7 +1728,9 @@ mod tests {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
         // The retry path consults eb_txs_candidates, so we need at
         // least one peer that hasn't been attempted.
-        state.candidates.note_eb_txs_offered(point(10, 1), PeerId(1));
+        state
+            .candidates
+            .note_eb_txs_offered(point(10, 1), PeerId(1));
         let mut bitmap = BTreeMap::new();
         bitmap.insert(0u16, 0b10u64);
         let fx = state.retry_eb_tx_fetch(point(10, 1), bitmap.clone());
@@ -1781,8 +1767,7 @@ mod tests {
         requested.insert(0u16, 0b11u64);
         state.pending_eb_tx_fetches.insert(h(1), (10, requested));
         // Only body for index 0 (ha) arrives.
-        let outcome =
-            state.match_eb_tx_response(&point(10, 1), &[(b"body-a".to_vec(), ha)]);
+        let outcome = state.match_eb_tx_response(&point(10, 1), &[(b"body-a".to_vec(), ha)]);
         assert_eq!(outcome.matched_bodies, vec![b"body-a".to_vec()]);
         assert_eq!(outcome.requested, 2);
         // Index 1 still missing.
@@ -1791,7 +1776,10 @@ mod tests {
         assert_eq!(outcome.remaining_bitmap, expected_remaining);
         // pending_eb_tx_fetches updated to remaining-only.
         assert_eq!(
-            state.pending_eb_tx_fetches.get(&h(1)).map(|(_, b)| b.clone()),
+            state
+                .pending_eb_tx_fetches
+                .get(&h(1))
+                .map(|(_, b)| b.clone()),
             Some(expected_remaining)
         );
     }
@@ -1804,8 +1792,7 @@ mod tests {
         let mut requested = BTreeMap::new();
         requested.insert(0u16, 0b1u64);
         state.pending_eb_tx_fetches.insert(h(1), (10, requested));
-        let outcome =
-            state.match_eb_tx_response(&point(10, 1), &[(b"body-a".to_vec(), ha)]);
+        let outcome = state.match_eb_tx_response(&point(10, 1), &[(b"body-a".to_vec(), ha)]);
         assert!(outcome.remaining_bitmap.is_empty());
         assert!(!state.pending_eb_tx_fetches.contains_key(&h(1)));
     }
@@ -1813,10 +1800,8 @@ mod tests {
     #[test]
     fn match_eb_tx_response_unknown_manifest_passes_bodies_through() {
         let mut state = LeiosState::new("n0".into(), elections_for("n0"), cfg(0), pipeline());
-        let outcome = state.match_eb_tx_response(
-            &point(10, 1),
-            &[(b"some-body".to_vec(), h(0xAA))],
-        );
+        let outcome =
+            state.match_eb_tx_response(&point(10, 1), &[(b"some-body".to_vec(), h(0xAA))]);
         assert_eq!(outcome.matched_bodies, vec![b"some-body".to_vec()]);
         assert_eq!(outcome.requested, 0);
         assert!(outcome.remaining_bitmap.is_empty());
@@ -1873,9 +1858,7 @@ mod tests {
         assert_eq!(fx.len(), 1, "expected one NoVote, got {fx:?}");
         match &fx[0] {
             LeiosEffect::NoVote {
-                eb_hash: h,
-                reason,
-                ..
+                eb_hash: h, reason, ..
             } => {
                 assert_eq!(*h, eb_hash);
                 assert_eq!(*reason, expected);
@@ -1964,7 +1947,10 @@ mod tests {
         let _ = state.on_slot(30, &tx_all);
 
         assert!(state.candidates.eb_candidates(&point(5, 0xAA)).is_empty());
-        assert!(state.candidates.eb_txs_candidates(&point(5, 0xCC)).is_empty());
+        assert!(state
+            .candidates
+            .eb_txs_candidates(&point(5, 0xCC))
+            .is_empty());
         assert_eq!(state.candidates.eb_candidates(&point(8, 0xBB)), vec![peer]);
         assert_eq!(
             state.candidates.eb_txs_candidates(&point(8, 0xDD)),
@@ -2130,7 +2116,9 @@ mod tests {
             _slot: u64,
         ) -> BehaviourOutcome<LeiosEffect> {
             self.slot_calls += 1;
-            self.slot_reply.clone().unwrap_or(BehaviourOutcome::Continue)
+            self.slot_reply
+                .clone()
+                .unwrap_or(BehaviourOutcome::Continue)
         }
         fn decide_vote(
             &mut self,

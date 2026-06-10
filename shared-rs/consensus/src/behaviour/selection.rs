@@ -221,8 +221,11 @@ mod tests {
     #[test]
     fn stake_ordered_filters_zero_stake_and_takes_top_n() {
         let stakes = vec![10, 100, 50, 0, 200];
-        let set =
-            resolve_selection(&BehaviourSelection::StakeOrdered { count: 2 }, &stakes, None);
+        let set = resolve_selection(
+            &BehaviourSelection::StakeOrdered { count: 2 },
+            &stakes,
+            None,
+        );
         // Sorted desc by stake: 4 (200), 1 (100), 2 (50), 0 (10); top 2 = {1, 4}.
         assert_eq!(set.iter().copied().collect::<Vec<_>>(), vec![1, 4]);
     }
@@ -252,7 +255,11 @@ mod tests {
     fn stake_random_is_deterministic_for_seed() {
         let stakes = vec![10, 0, 20, 0, 30, 0, 40, 0, 50];
         let mk = |seed: u64| -> BTreeSet<usize> {
-            resolve_selection(&BehaviourSelection::StakeRandom { count: 2 }, &stakes, Some(seed))
+            resolve_selection(
+                &BehaviourSelection::StakeRandom { count: 2 },
+                &stakes,
+                Some(seed),
+            )
         };
         assert_eq!(mk(42), mk(42));
         let a = mk(42);
@@ -443,7 +450,10 @@ mod tests {
                 BehaviourSpec::RbHeaderEquivocator { ways: 2 },
                 BehaviourSelection::Nodes { indices: vec![0] },
             ),
-            (BehaviourSpec::Honest, BehaviourSelection::Nodes { indices: vec![0] }),
+            (
+                BehaviourSpec::Honest,
+                BehaviourSelection::Nodes { indices: vec![0] },
+            ),
         ];
         let out = resolve_specs(&items, &[1], None);
         match out.get(&0) {

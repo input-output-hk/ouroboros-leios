@@ -56,17 +56,15 @@ pub fn record_vote(
         None => {
             let elapsed = current_slot.saturating_sub(eb_slot);
             let phase = pipeline.phase_for_elapsed(elapsed);
-            elections
-                .entry(*eb_hash)
-                .or_insert(EbElection {
-                    announced_slot: eb_slot,
-                    phase,
-                    seen_slot: current_slot,
-                    voted: false,
-                    voter_weights: BTreeMap::new(),
-                    quorum_reached: false,
-                    body_validated_locally: false,
-                })
+            elections.entry(*eb_hash).or_insert(EbElection {
+                announced_slot: eb_slot,
+                phase,
+                seen_slot: current_slot,
+                voted: false,
+                voter_weights: BTreeMap::new(),
+                quorum_reached: false,
+                body_validated_locally: false,
+            })
         }
     };
 

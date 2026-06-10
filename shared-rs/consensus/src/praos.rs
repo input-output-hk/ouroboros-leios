@@ -292,8 +292,7 @@ pub struct PraosState {
     /// (`on_block_received`, `register_self_produced`); insertions
     /// that grow a set past size 1 flag the slot in
     /// [`PraosState::equivocating_rb_slots`].
-    pub header_hashes_by_slot_issuer:
-        BTreeMap<(u64, Vec<u8>), BTreeSet<[u8; 32]>>,
+    pub header_hashes_by_slot_issuer: BTreeMap<(u64, Vec<u8>), BTreeSet<[u8; 32]>>,
     /// Slots at which RB-header equivocation has been detected.
     /// CIP-0164's "It has not detected any equivocating RB header for
     /// the same slot" voting condition consults this set via
@@ -395,10 +394,7 @@ impl PraosState {
     }
 
     /// Replace the block-fetch policy.
-    pub fn set_fetch_policy(
-        &mut self,
-        policy: Box<dyn BlockFetchPolicy + Send + Sync>,
-    ) {
+    pub fn set_fetch_policy(&mut self, policy: Box<dyn BlockFetchPolicy + Send + Sync>) {
         self.block_policy = policy;
     }
 
@@ -420,8 +416,12 @@ impl PraosState {
     /// and by `log_state_sizes` for the periodic info line.
     pub fn state_sizes(&self) -> PraosStateSizes {
         let peer_chain_total: usize = self.peer_chains.values().map(|c| c.len()).sum();
-        let peer_chain_max: usize =
-            self.peer_chains.values().map(|c| c.len()).max().unwrap_or(0);
+        let peer_chain_max: usize = self
+            .peer_chains
+            .values()
+            .map(|c| c.len())
+            .max()
+            .unwrap_or(0);
         let issuer_key_count = self.header_hashes_by_slot_issuer.len();
         let issuer_hashes_total: usize = self
             .header_hashes_by_slot_issuer
@@ -431,8 +431,9 @@ impl PraosState {
         // Rough byte estimate: outer BTreeMap entry ~ 100 bytes (key tuple
         // + tree overhead, amortized); each inner BTreeSet<[u8;32]> entry
         // ~ 80 bytes (32-byte hash + tree overhead).
-        let equivocation_bytes_estimate =
-            issuer_key_count * 100 + issuer_hashes_total * 80 + self.equivocating_rb_slots.len() * 56;
+        let equivocation_bytes_estimate = issuer_key_count * 100
+            + issuer_hashes_total * 80
+            + self.equivocating_rb_slots.len() * 56;
         PraosStateSizes {
             chain_tree: self.chain_tree.len(),
             block_cache: self.block_cache.len(),
@@ -544,10 +545,7 @@ impl PraosState {
     /// announced EB hash.  Used by the I/O wrapper to feed
     /// [`crate::leios::LeiosState::on_chain_endorsement`] on every
     /// successful block apply.
-    pub fn parent_announced_eb_for_cert(
-        &self,
-        point: &Point,
-    ) -> Option<(u64, [u8; 32])> {
+    pub fn parent_announced_eb_for_cert(&self, point: &Point) -> Option<(u64, [u8; 32])> {
         let hash = match point {
             Point::Specific { hash, .. } => *hash,
             Point::Origin => return None,
@@ -572,7 +570,9 @@ impl PraosState {
     /// surfaces a header (peer tip announcement, fetched body, self-
     /// produced) without coordinating among them.
     pub fn note_header_first_seen(&mut self, header_hash: [u8; 32], current_slot: u64) {
-        self.header_first_seen.entry(header_hash).or_insert(current_slot);
+        self.header_first_seen
+            .entry(header_hash)
+            .or_insert(current_slot);
     }
 
     /// Record an observed RB header for equivocation detection.
@@ -583,12 +583,7 @@ impl PraosState {
     /// arrives for the same `(slot, issuer)`, the slot is added to
     /// [`Self::equivocating_rb_slots`] and CIP-0164 voters will
     /// abstain from voting on any EB associated with that slot.
-    fn note_header_for_equivocation(
-        &mut self,
-        slot: u64,
-        issuer: &[u8],
-        header_hash: [u8; 32],
-    ) {
+    fn note_header_for_equivocation(&mut self, slot: u64, issuer: &[u8], header_hash: [u8; 32]) {
         if issuer.is_empty() {
             return;
         }
@@ -626,7 +621,9 @@ impl PraosState {
         match self.adopted_tip_hash {
             Some(hash) => {
                 let block_no = self.chain_tree.block_number(&hash);
-                let entries = self.chain_tree.snapshot(hash, 10, block_no, eb_manifest_count);
+                let entries = self
+                    .chain_tree
+                    .snapshot(hash, 10, block_no, eb_manifest_count);
                 let tip_hash = Some(format!("{:02x}{:02x}", hash[30], hash[31]));
                 (entries, block_no, tip_hash)
             }
@@ -641,8 +638,7 @@ impl PraosState {
     /// [`Self::chain_tree_snapshot`] can surface it after the wrapper's
     /// short-lived manifest cache has aged out.
     pub fn record_announced_eb_tx_count(&mut self, eb_hash: &[u8; 32], count: u32) {
-        self.chain_tree
-            .record_announced_eb_tx_count(eb_hash, count);
+        self.chain_tree.record_announced_eb_tx_count(eb_hash, count);
     }
 
     // -- Peer-event mutations (no effects) ----------------------------------
@@ -697,14 +693,14 @@ impl PraosState {
         // anchor edge), so we check explicitly here and only fire when
         // the previous entry is still in the window — that rules out
         // anchor-edge false positives.
-        let gap_after_hash = chain.iter().next_back().and_then(|prev| {
-            match (entry.prev_hash, prev.hash) {
-                (Some(p), h) if p != h => {
-                    Some((prev.hash, prev.block_no, prev.point.clone()))
-                }
-                _ => None,
-            }
-        });
+        let gap_after_hash =
+            chain
+                .iter()
+                .next_back()
+                .and_then(|prev| match (entry.prev_hash, prev.hash) {
+                    (Some(p), h) if p != h => Some((prev.hash, prev.block_no, prev.point.clone())),
+                    _ => None,
+                });
 
         chain.append(entry);
 
@@ -979,11 +975,7 @@ impl PraosState {
 
     /// A peer disconnected; drop its fragment and re-run selection in
     /// case its absence frees up a different peer.
-    pub fn on_peer_disconnected(
-        &mut self,
-        peer_id: PeerId,
-        now: Instant,
-    ) -> Vec<PraosEffect> {
+    pub fn on_peer_disconnected(&mut self, peer_id: PeerId, now: Instant) -> Vec<PraosEffect> {
         use crate::behaviour::BehaviourOutcome;
         let appended: Vec<PraosEffect> =
             match self.invoke_hook(|b, s| b.on_peer_disconnected(s, peer_id)) {
@@ -1035,17 +1027,15 @@ impl PraosState {
                     info.announced_eb_hash,
                     info.certified_eb,
                 );
-                self.block_cache
-                    .entry(hash)
-                    .or_insert(CachedBlock {
-                        point: point.clone(),
-                        block_no: info.block_number,
-                        prev_hash: info.prev_hash,
-                        header: header_bytes,
-                        body: body_bytes.clone(),
-                        announced_eb_hash: info.announced_eb_hash,
-                        certified_eb: info.certified_eb,
-                    });
+                self.block_cache.entry(hash).or_insert(CachedBlock {
+                    point: point.clone(),
+                    block_no: info.block_number,
+                    prev_hash: info.prev_hash,
+                    header: header_bytes,
+                    body: body_bytes.clone(),
+                    announced_eb_hash: info.announced_eb_hash,
+                    certified_eb: info.certified_eb,
+                });
                 self.submit_for_validation_internal(point, body_bytes, info.prev_hash, &mut fx);
                 self.try_switch_and_execute_internal(hash, &mut fx);
             }
@@ -1341,9 +1331,7 @@ impl PraosState {
         let best = self
             .peer_chains
             .iter()
-            .filter_map(|(pid, chain)| {
-                chain.iter().next_back().map(|e| (*pid, e.block_no, chain))
-            })
+            .filter_map(|(pid, chain)| chain.iter().next_back().map(|e| (*pid, e.block_no, chain)))
             .filter(|(_, bn, _)| *bn > our_block_no)
             .max_by_key(|(pid, bn, _)| (*bn, *pid));
         let (peer_id, peer_tip_block_no, peer_chain) = match best {
@@ -1357,9 +1345,7 @@ impl PraosState {
         let unreachable_parents = peer_chain
             .iter()
             .filter(|e| match e.prev_hash {
-                Some(p) => {
-                    !adopted_ancestors.contains(&p) && !self.block_cache.contains_key(&p)
-                }
+                Some(p) => !adopted_ancestors.contains(&p) && !self.block_cache.contains_key(&p),
                 None => false,
             })
             .count();
@@ -1483,9 +1469,7 @@ impl PraosState {
                         // either it's already in the adopted chain's
                         // ancestry, or we have no adopted chain (fresh
                         // node) so any parent is acceptable.
-                        if adopted_ancestors.contains(&parent)
-                            || self.adopted_tip_hash.is_none()
-                        {
+                        if adopted_ancestors.contains(&parent) || self.adopted_tip_hash.is_none() {
                             ancestor = Some(parent);
                         }
                     }
@@ -1998,11 +1982,7 @@ impl PraosState {
     /// in the candidate pool; otherwise the candidate set is the union
     /// of every peer whose announced chain contains `point`.  The
     /// policy then picks one or more from that pool.
-    fn choose_block_fetch_peers(
-        &self,
-        point: &Point,
-        hint: Option<PeerId>,
-    ) -> Vec<PeerId> {
+    fn choose_block_fetch_peers(&self, point: &Point, hint: Option<PeerId>) -> Vec<PeerId> {
         let mut candidates: Vec<PeerId> = self
             .peer_chains
             .iter()
@@ -2017,7 +1997,8 @@ impl PraosState {
                 candidates.push(h);
             }
         }
-        self.block_policy.pick(point, &candidates, self.rtt.as_ref())
+        self.block_policy
+            .pick(point, &candidates, self.rtt.as_ref())
     }
 }
 
@@ -2092,9 +2073,16 @@ mod tests {
         let hash = h(seed);
         let point = pt(slot, seed);
         let prev_hash = prev_seed.map(h);
-        state
-            .chain_tree
-            .insert(hash, point.clone(), block_no, slot, prev_hash, 0, None, false);
+        state.chain_tree.insert(
+            hash,
+            point.clone(),
+            block_no,
+            slot,
+            prev_hash,
+            0,
+            None,
+            false,
+        );
         state.block_cache.insert(
             hash,
             CachedBlock {
@@ -2215,8 +2203,20 @@ mod tests {
     #[test]
     fn two_distinct_headers_same_slot_issuer_flag_slot() {
         let mut s = fresh();
-        s.on_block_received(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)), 0);
-        s.on_block_received(pt(100, 2), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)), 0);
+        s.on_block_received(
+            pt(100, 1),
+            vec![],
+            vec![],
+            Some(parsed_with_issuer(100, 0xAA)),
+            0,
+        );
+        s.on_block_received(
+            pt(100, 2),
+            vec![],
+            vec![],
+            Some(parsed_with_issuer(100, 0xAA)),
+            0,
+        );
         assert!(s.is_equivocating_slot(100));
         assert!(s.equivocating_rb_slots.contains(&100));
     }
@@ -2226,8 +2226,20 @@ mod tests {
         // Two different producers winning the same slot via VRF is a
         // legitimate Praos fork — not equivocation by CIP-0164.
         let mut s = fresh();
-        s.on_block_received(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)), 0);
-        s.on_block_received(pt(100, 2), vec![], vec![], Some(parsed_with_issuer(100, 0xBB)), 0);
+        s.on_block_received(
+            pt(100, 1),
+            vec![],
+            vec![],
+            Some(parsed_with_issuer(100, 0xAA)),
+            0,
+        );
+        s.on_block_received(
+            pt(100, 2),
+            vec![],
+            vec![],
+            Some(parsed_with_issuer(100, 0xBB)),
+            0,
+        );
         assert!(!s.is_equivocating_slot(100));
     }
 
@@ -2246,7 +2258,13 @@ mod tests {
         // Same hash arriving twice (e.g., from two peers) isn't
         // equivocation — it's the same header.
         let mut s = fresh();
-        s.on_block_received(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)), 0);
+        s.on_block_received(
+            pt(100, 1),
+            vec![],
+            vec![],
+            Some(parsed_with_issuer(100, 0xAA)),
+            0,
+        );
         // Second on_block_received with the same hash is a no-op via
         // the block_cache dedup; manually probe the tracker invariant.
         s.note_header_for_equivocation(100, &[0xAA; 4], h(1));
@@ -2259,8 +2277,20 @@ mod tests {
         // headers at the same slot equivocates against itself; the
         // tracker honors that.
         let mut s = fresh();
-        s.register_self_produced(pt(100, 1), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)), 0);
-        s.register_self_produced(pt(100, 2), vec![], vec![], Some(parsed_with_issuer(100, 0xAA)), 0);
+        s.register_self_produced(
+            pt(100, 1),
+            vec![],
+            vec![],
+            Some(parsed_with_issuer(100, 0xAA)),
+            0,
+        );
+        s.register_self_produced(
+            pt(100, 2),
+            vec![],
+            vec![],
+            Some(parsed_with_issuer(100, 0xAA)),
+            0,
+        );
         assert!(s.is_equivocating_slot(100));
     }
 
@@ -2326,7 +2356,13 @@ mod tests {
     #[test]
     fn adopted_tip_announced_eb_none_for_pre_leios_header() {
         let mut s = fresh();
-        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)), 0);
+        s.register_self_produced(
+            pt(100, 1),
+            vec![0xAA],
+            vec![0xBB],
+            Some(hi(1, 100, None)),
+            0,
+        );
         // hi() defaults announced_eb_hash to None.
         assert_eq!(s.adopted_tip_announced_eb(), None);
     }
@@ -2334,7 +2370,13 @@ mod tests {
     #[test]
     fn note_header_first_seen_is_used_for_arrival() {
         let mut s = fresh();
-        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)), 0);
+        s.register_self_produced(
+            pt(100, 1),
+            vec![0xAA],
+            vec![0xBB],
+            Some(hi(1, 100, None)),
+            0,
+        );
         // Wrapper observed the header at slot 102 (e.g., body arrived
         // 2 slots after the RB's own slot via fetch).
         s.note_header_first_seen(h(1), 102);
@@ -2344,7 +2386,13 @@ mod tests {
     #[test]
     fn note_header_first_seen_is_idempotent() {
         let mut s = fresh();
-        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)), 0);
+        s.register_self_produced(
+            pt(100, 1),
+            vec![0xAA],
+            vec![0xBB],
+            Some(hi(1, 100, None)),
+            0,
+        );
         s.note_header_first_seen(h(1), 105);
         // Subsequent calls don't overwrite — only the first arrival counts.
         s.note_header_first_seen(h(1), 200);
@@ -2354,8 +2402,7 @@ mod tests {
     #[test]
     fn register_self_produced_origin_point_is_noop() {
         let mut s = fresh();
-        let fx =
-            s.register_self_produced(Point::Origin, vec![], vec![], Some(hi(1, 0, None)), 0);
+        let fx = s.register_self_produced(Point::Origin, vec![], vec![], Some(hi(1, 0, None)), 0);
         assert!(fx.is_empty());
         assert!(s.self_produced.contains(&Point::Origin));
     }
@@ -2365,7 +2412,13 @@ mod tests {
     #[test]
     fn on_block_applied_emits_inject_block() {
         let mut s = fresh();
-        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)), 0);
+        s.register_self_produced(
+            pt(100, 1),
+            vec![0xAA],
+            vec![0xBB],
+            Some(hi(1, 100, None)),
+            0,
+        );
         let fx = s.on_block_applied(pt(100, 1), Instant::now());
         assert!(matches!(fx[0], PraosEffect::InjectBlock { .. }));
         assert!(s.validated.contains(&h(1)));
@@ -2387,7 +2440,8 @@ mod tests {
         install_validated_block(&mut s, 101, 2, 2, Some(1));
         install_validated_block(&mut s, 102, 3, 3, Some(2));
         // Stage block 4 in cache (not yet validated).
-        s.chain_tree.insert(h(4), pt(103, 4), 4, 103, Some(h(3)), 0, None, false);
+        s.chain_tree
+            .insert(h(4), pt(103, 4), 4, 103, Some(h(3)), 0, None, false);
         s.block_cache.insert(
             h(4),
             CachedBlock {
@@ -2414,7 +2468,13 @@ mod tests {
     #[test]
     fn on_block_apply_failed_rewinds_to_last_validated() {
         let mut s = fresh();
-        s.register_self_produced(pt(100, 1), vec![0xAA], vec![0xBB], Some(hi(1, 100, None)), 0);
+        s.register_self_produced(
+            pt(100, 1),
+            vec![0xAA],
+            vec![0xBB],
+            Some(hi(1, 100, None)),
+            0,
+        );
         let _ = s.on_block_applied(pt(100, 1), Instant::now());
         s.register_self_produced(
             pt(101, 2),
@@ -2481,7 +2541,9 @@ mod tests {
             Some(hi(1, 100, None)),
             0,
         );
-        assert!(fx.iter().any(|e| matches!(e, PraosEffect::ValidatorApply { .. })));
+        assert!(fx
+            .iter()
+            .any(|e| matches!(e, PraosEffect::ValidatorApply { .. })));
         assert!(s.block_cache.contains_key(&h(1)));
         assert_eq!(s.chain_tree.block_number(&h(1)), Some(1));
     }
@@ -2716,17 +2778,41 @@ mod tests {
             Some(h(3)),
             "abandoned suffix pruned; best tip is the target"
         );
-        assert!(s.chain_tree.block_number(&h(4)).is_none(), "block 4 abandoned");
-        assert!(s.chain_tree.block_number(&h(5)).is_none(), "block 5 abandoned");
+        assert!(
+            s.chain_tree.block_number(&h(4)).is_none(),
+            "block 4 abandoned"
+        );
+        assert!(
+            s.chain_tree.block_number(&h(5)).is_none(),
+            "block 5 abandoned"
+        );
         // Cache and validated set must also drop the suffix, otherwise the
         // on_block_received dedup would block re-adoption when a peer
         // re-offers blocks 4/5.
-        assert!(!s.block_cache.contains_key(&h(4)), "block 4 evicted from cache");
-        assert!(!s.block_cache.contains_key(&h(5)), "block 5 evicted from cache");
-        assert!(s.block_cache.contains_key(&h(3)), "target block kept in cache");
-        assert!(!s.validated.contains(&h(4)), "block 4 cleared from validated");
-        assert!(!s.validated.contains(&h(5)), "block 5 cleared from validated");
-        assert!(s.validated.contains(&h(3)), "target block kept in validated");
+        assert!(
+            !s.block_cache.contains_key(&h(4)),
+            "block 4 evicted from cache"
+        );
+        assert!(
+            !s.block_cache.contains_key(&h(5)),
+            "block 5 evicted from cache"
+        );
+        assert!(
+            s.block_cache.contains_key(&h(3)),
+            "target block kept in cache"
+        );
+        assert!(
+            !s.validated.contains(&h(4)),
+            "block 4 cleared from validated"
+        );
+        assert!(
+            !s.validated.contains(&h(5)),
+            "block 5 cleared from validated"
+        );
+        assert!(
+            s.validated.contains(&h(3)),
+            "target block kept in validated"
+        );
         match fx.as_slice() {
             [PraosEffect::InjectRollback { target }] => assert_eq!(*target, pt(102, 3)),
             other => panic!("expected single InjectRollback to block 3, got {other:?}"),
@@ -2745,8 +2831,8 @@ mod tests {
         // hold, within k.  Trust it and switch (WaitingForBlocks), don't
         // declare orphan.
         let mut s = fresh(); // k = 100
-        // Adopted tip = block 10, but its parent (9) is absent → ancestors(10)
-        // = {10} (truncated, as after pruning).
+                             // Adopted tip = block 10, but its parent (9) is absent → ancestors(10)
+                             // = {10} (truncated, as after pruning).
         install_validated_block(&mut s, 110, 10, 10, Some(9));
         s.adopted_tip_hash = Some(h(10));
         // A real block 5 we hold — the would-be common ancestor, reorg depth 5.
@@ -2754,7 +2840,7 @@ mod tests {
 
         let pid = PeerId(7);
         s.record_peer_intersection(pid, pt(105, 5)); // anchor = block 5
-        // Peer fragment: divergent blocks 11, 12 (prev not in our ancestry).
+                                                     // Peer fragment: divergent blocks 11, 12 (prev not in our ancestry).
         s.record_peer_tip(pid, pt(111, 11), 11, 11, h(11), 111, Some(h(99)));
         s.record_peer_tip(pid, pt(112, 12), 12, 12, h(12), 112, Some(h(11)));
 
@@ -2871,9 +2957,7 @@ mod tests {
 
         let range_of = |fx: &[PraosEffect]| {
             fx.iter().find_map(|e| match e {
-                PraosEffect::FetchBlockRange { from, to, .. } => {
-                    Some((from.clone(), to.clone()))
-                }
+                PraosEffect::FetchBlockRange { from, to, .. } => Some((from.clone(), to.clone())),
                 _ => None,
             })
         };

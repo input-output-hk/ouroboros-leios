@@ -397,7 +397,10 @@ mod tests {
         };
         // Committee contents irrelevant — denominator is the network total.
         let committee = BTreeMap::new();
-        assert_eq!(expected_total_weight(&selection, &committee, 1_000_000), 1_000_000);
+        assert_eq!(
+            expected_total_weight(&selection, &committee, 1_000_000),
+            1_000_000
+        );
     }
 
     // -- NPV eligibility ----------------------------------------------------
