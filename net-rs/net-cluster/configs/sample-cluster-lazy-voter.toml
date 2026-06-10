@@ -35,8 +35,9 @@ rb_generation_probability = 0.05
 # no-vote signal and masks the lazy-stake effect.
 tx_rate = 1.0
 
-[topology_source]
-type = "random"
+topology_source = "random"
+
+[topology_random]
 num_nodes = 30
 degree = 3
 min_latency_ms = 5

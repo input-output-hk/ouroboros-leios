@@ -19,8 +19,9 @@ stats_interval_secs = 1
 rb_generation_probability = 0.05
 tx_rate = 1.0
 
-[topology_source]
-type = "random"
+topology_source = "random"
+
+[topology_random]
 num_nodes = 25
 degree = 5
 min_latency_ms = 5

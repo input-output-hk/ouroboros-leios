@@ -82,37 +82,38 @@ export interface NodeSeriesPoint {
 }
 
 /**
- * Mirrors net-cluster's `TopologySource` enum (internally tagged on `type`,
- * snake_case).  See net-cluster/src/config.rs.
- *
- * `random` mode: cluster generates a random connected graph from these
- * params.  `yaml` mode: cluster loads a pre-built topology from disk;
- * `num_nodes`/`degree`/etc. don't exist in this variant because they're
- * either derived from the YAML or don't apply.
+ * Mirrors net-cluster's topology config (see net-cluster/src/config.rs).
+ * `topology_source` is a scalar selector; the mode-specific params live in
+ * separate `topology_random` / `topology_yaml` objects.
  */
-export type TopologySource =
-  | {
-      type: "random";
-      num_nodes: number;
-      degree: number;
-      min_latency_ms: number;
-      max_latency_ms: number;
-      stake_distribution: string;
-    }
-  | {
-      type: "yaml";
-      path: string;
-      node_limit?: number | null;
-    };
+export type TopologySource = "random" | "yaml";
+
+export interface RandomTopologyConfig {
+  num_nodes: number;
+  degree: number;
+  min_latency_ms: number;
+  max_latency_ms: number;
+  stake_distribution: string;
+}
+
+export interface YamlTopologyConfig {
+  path: string;
+  node_limit?: number | null;
+}
 
 export interface ClusterControlConfig {
   /**
-   * When present in a POST body, replaces the cluster's current
-   * topology source wholesale.  When `null`/omitted, leaves the
-   * topology unchanged.  When read from GET /api/config, always
-   * reflects the cluster's current source.
+   * Topology mode.  In a POST body, switches the mode (omit to leave
+   * unchanged).  From GET /api/config, reflects the cluster's current mode.
    */
   topology_source?: TopologySource | null;
+  /**
+   * Random-mode params.  In a POST body, replaces them wholesale (omit to
+   * leave unchanged).  From GET /api/config, reflects current values.
+   */
+  topology_random?: RandomTopologyConfig | null;
+  /** YAML-mode params; same semantics as `topology_random`. */
+  topology_yaml?: YamlTopologyConfig | null;
   seed?: number;
   node_config: Record<string, unknown>;
 }

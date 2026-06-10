@@ -27,15 +27,17 @@ export function ControlPanel() {
   const [rbBodyValidationMs, setRbBodyValidationMs] = useState("1000");
 
   const topologySource = clusterConfig?.topology_source ?? null;
-  const isYaml = topologySource?.type === "yaml";
+  const isYaml = topologySource === "yaml";
+  const randomConfig = clusterConfig?.topology_random ?? null;
+  const yamlConfig = clusterConfig?.topology_yaml ?? null;
 
   useEffect(() => {
     if (clusterConfig) {
-      if (topologySource?.type === "random") {
-        setNumNodes(String(topologySource.num_nodes));
-        setDegree(String(topologySource.degree));
-        setMinLatency(String(topologySource.min_latency_ms));
-        setMaxLatency(String(topologySource.max_latency_ms));
+      if (randomConfig) {
+        setNumNodes(String(randomConfig.num_nodes));
+        setDegree(String(randomConfig.degree));
+        setMinLatency(String(randomConfig.min_latency_ms));
+        setMaxLatency(String(randomConfig.max_latency_ms));
       }
       setSeed(clusterConfig.seed != null ? String(clusterConfig.seed) : "");
 
@@ -45,7 +47,7 @@ export function ControlPanel() {
       const rbVal = nc["validation.rb_body_validation_ms_constant"];
       if (rbVal != null) setRbBodyValidationMs(String(rbVal));
     }
-  }, [clusterConfig, topologySource]);
+  }, [clusterConfig, randomConfig]);
 
   const numNodesN = Number(numNodes) || 0;
   const minLatencyN = Number(minLatency) || 0;
@@ -62,23 +64,20 @@ export function ControlPanel() {
 
   const handleRestart = () => {
     restartCluster({
-      // In YAML mode we don't override topology_source — the cluster
-      // restarts with whatever YAML was loaded at startup.  In random
-      // mode we send back the edited params.
-      topology_source: isYaml
+      // In YAML mode we don't override the topology — the cluster restarts
+      // with whatever YAML was loaded at startup.  In random mode we send
+      // back the mode selector plus the edited params.
+      topology_source: isYaml ? undefined : "random",
+      topology_random: isYaml
         ? undefined
         : {
-            type: "random",
             num_nodes: numNodesN,
             degree: Number(degree) || 1,
             min_latency_ms: minLatencyN,
             max_latency_ms: maxLatencyN,
             // Preserve whatever stake distribution the cluster was
             // configured with (we don't expose a UI for it yet).
-            stake_distribution:
-              topologySource?.type === "random"
-                ? topologySource.stake_distribution
-                : "equal",
+            stake_distribution: randomConfig?.stake_distribution ?? "equal",
           },
       seed: seed !== "" ? Number(seed) : undefined,
       node_config: nodeConfigPayload(),
@@ -143,7 +142,7 @@ export function ControlPanel() {
         Cluster Topology
       </Typography>
 
-      {isYaml && topologySource?.type === "yaml" && (
+      {isYaml && yamlConfig && (
         <Box
           sx={{
             p: 1,
@@ -158,11 +157,11 @@ export function ControlPanel() {
             YAML-loaded topology
           </Typography>
           <Box sx={{ mt: 0.5, fontFamily: "ui-monospace, monospace", fontSize: 11, wordBreak: "break-all" }}>
-            {topologySource.path}
+            {yamlConfig.path}
           </Box>
-          {topologySource.node_limit != null && (
+          {yamlConfig.node_limit != null && (
             <Box sx={{ mt: 0.5 }}>
-              capped at first <b>{topologySource.node_limit}</b> nodes (top-N by stake)
+              capped at first <b>{yamlConfig.node_limit}</b> nodes (top-N by stake)
             </Box>
           )}
           <Box sx={{ mt: 0.5, opacity: 0.7 }}>

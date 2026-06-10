@@ -611,6 +611,8 @@ mod tests {
             attack_tx,
             current_config: RwLock::new(ClusterControlConfig {
                 topology_source: None,
+                topology_random: None,
+                topology_yaml: None,
                 seed: None,
                 node_config: HashMap::new(),
             }),

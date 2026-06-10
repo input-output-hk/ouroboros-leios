@@ -2,7 +2,7 @@
 //!
 //! Two sources, selected by [`crate::config::TopologySource`]:
 //!
-//! - [`generate`] — random connected graph (legacy default); honours
+//! - [`generate_random`] — random connected graph (legacy default); honours
 //!   `num_nodes` / `degree` / `min_latency_ms` / `max_latency_ms` /
 //!   `stake_distribution`.
 //! - [`load_from_yaml`] — read a v3/v4-style topology YAML
@@ -21,7 +21,7 @@ use std::path::Path;
 use rand::prelude::*;
 use serde::Serialize;
 
-use crate::config::{BehaviourSelection, ClusterConfig, TopologySource};
+use crate::config::{BehaviourSelection, ClusterConfig};
 use crate::raw_topology::{self, RawTopology};
 
 /// A peer link from one node to another.
@@ -76,7 +76,7 @@ pub struct Topology {
     /// happens to carry.
     ///
     /// In random mode this equals the `total_stake` passed to
-    /// [`generate`] (the random `distribute_stake` is sum-preserving),
+    /// [`generate_random`] (the random `distribute_stake` is sum-preserving),
     /// so behaviour is unchanged.  In YAML mode this is the sum of the
     /// YAML's per-node `stake` fields, which is critical: a v4 YAML
     /// carries real mainnet ADA values (~1e8 per pool), and if
@@ -89,20 +89,17 @@ pub struct Topology {
 /// Generate a random cluster topology from the given config.
 ///
 /// The `total_stake` parameter comes from the base config and is divided
-/// among nodes according to the stake distribution strategy.  The caller
-/// is responsible for ensuring `config.topology_source` is the `Random`
-/// variant.
-pub fn generate(config: &ClusterConfig, total_stake: u64) -> Topology {
-    let TopologySource::Random {
+/// among nodes according to the stake distribution strategy.  Reads the
+/// random-mode knobs from `config.topology_random`; the caller selects this
+/// path when `config.topology_source` is `Random`.
+pub fn generate_random(config: &ClusterConfig, total_stake: u64) -> Topology {
+    let crate::config::RandomTopologyConfig {
         num_nodes,
         degree,
         min_latency_ms,
         max_latency_ms,
         stake_distribution,
-    } = &config.topology_source
-    else {
-        panic!("topology::generate called with non-Random topology_source");
-    };
+    } = &config.topology_random;
     let n = *num_nodes;
     let mut rng = match config.seed {
         Some(s) => StdRng::seed_from_u64(s),
@@ -178,7 +175,7 @@ pub fn generate(config: &ClusterConfig, total_stake: u64) -> Topology {
 /// Load a cluster topology from a v3/v4-style YAML file.
 ///
 /// The YAML is parsed into [`RawTopology`] (see [`crate::raw_topology`]) and
-/// then converted into the same [`Topology`] shape produced by [`generate`].
+/// then converted into the same [`Topology`] shape produced by [`generate_random`].
 /// Per-node fields:
 ///
 /// - `node_id`, `index`: synthesised as `node-{i}` over the loaded slice
@@ -643,7 +640,8 @@ mod tests {
 
     fn test_config(num_nodes: usize, degree: usize) -> ClusterConfig {
         ClusterConfig {
-            topology_source: TopologySource::Random {
+            topology_source: crate::config::TopologySource::Random,
+            topology_random: crate::config::RandomTopologyConfig {
                 num_nodes,
                 degree,
                 min_latency_ms: 10,
@@ -660,7 +658,7 @@ mod tests {
     #[test]
     fn test_single_node() {
         let config = test_config(1, 0);
-        let topo = generate(&config, 1000);
+        let topo = generate_random(&config, 1000);
         assert_eq!(topo.nodes.len(), 1);
         assert!(topo.edges.is_empty());
         assert_eq!(topo.nodes[0].stake, 1000);
@@ -669,7 +667,7 @@ mod tests {
     #[test]
     fn test_two_nodes() {
         let config = test_config(2, 1);
-        let topo = generate(&config, 1000);
+        let topo = generate_random(&config, 1000);
         assert_eq!(topo.nodes.len(), 2);
         assert!(!topo.edges.is_empty());
         // Directional: only the `from` node has a peer link.
@@ -680,7 +678,7 @@ mod tests {
     #[test]
     fn test_connectivity() {
         let config = test_config(10, 2);
-        let topo = generate(&config, 10000);
+        let topo = generate_random(&config, 10000);
 
         // Verify connectivity via BFS from node 0.
         let adj = build_adjacency(&topo);
@@ -691,7 +689,7 @@ mod tests {
     #[test]
     fn test_port_allocation() {
         let config = test_config(5, 2);
-        let topo = generate(&config, 5000);
+        let topo = generate_random(&config, 5000);
         for (i, node) in topo.nodes.iter().enumerate() {
             assert_eq!(node.listen_port, 30000 + i as u16);
             assert_eq!(node.node_id, format!("node-{i}"));
@@ -891,7 +889,7 @@ mod tests {
     #[test]
     fn test_latency_range() {
         let config = test_config(5, 3);
-        let topo = generate(&config, 5000);
+        let topo = generate_random(&config, 5000);
         for edge in &topo.edges {
             assert!(edge.latency_ms >= 10);
             assert!(edge.latency_ms <= 100);
@@ -901,8 +899,8 @@ mod tests {
     #[test]
     fn test_deterministic_with_seed() {
         let config = test_config(5, 2);
-        let topo1 = generate(&config, 5000);
-        let topo2 = generate(&config, 5000);
+        let topo1 = generate_random(&config, 5000);
+        let topo2 = generate_random(&config, 5000);
         assert_eq!(topo1.edges.len(), topo2.edges.len());
         for (e1, e2) in topo1.edges.iter().zip(topo2.edges.iter()) {
             assert_eq!(e1.from, e2.from);
@@ -920,7 +918,7 @@ mod tests {
                 address: "relay.example.com:3001".to_string(),
                 inject_into_nodes: 2,
             });
-        let topo = generate(&config, 5000);
+        let topo = generate_random(&config, 5000);
         let count = topo
             .nodes
             .iter()
@@ -986,9 +984,9 @@ nodes:
 
     fn yaml_test_config() -> ClusterConfig {
         // Note: when YAML mode is exercised through `build_from_raw` we
-        // don't actually need to set `topology_source = Yaml { .. }` —
-        // the loader doesn't read it — but we keep the default Random
-        // here so the rest of the ClusterConfig stays valid.
+        // don't actually need to set `topology_source = "yaml"` — the
+        // builder doesn't read it — but we keep the default Random here
+        // so the rest of the ClusterConfig stays valid.
         ClusterConfig {
             base_config: "test.toml".to_string(),
             base_port: 31000,
@@ -1227,7 +1225,7 @@ nodes:
         // sum-preserving, so Topology.total_stake should equal the
         // input total_stake.
         let config = test_config(5, 2);
-        let topo = generate(&config, 12_345);
+        let topo = generate_random(&config, 12_345);
         assert_eq!(topo.total_stake, 12_345);
     }
 

@@ -23,8 +23,9 @@ aggregator_port = 9200
 stats_interval_secs = 1
 rb_generation_probability = 0.05
 
-[topology_source]
-type = "random"
+topology_source = "random"
+
+[topology_random]
 num_nodes = 10
 degree = 3
 min_latency_ms = 5

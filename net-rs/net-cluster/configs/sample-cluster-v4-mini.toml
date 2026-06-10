@@ -12,11 +12,10 @@
 #     --config net-cluster/configs/sample-cluster-v4-mini.toml \
 #     --net-node-bin target/release/net-node
 #
-# This loads the first 25 nodes from topology-v4-mainnet.yaml (top-25
-# by stake) and wires them with the YAML's per-link latencies.  Random-
-# mode fields (`num_nodes`, `degree`, latency range, stake_distribution)
-# are not just ignored here — putting them under `[topology_source]` with
-# `type = "yaml"` would be a parse-time error.
+# This loads the first 100 nodes from topology-v4-mainnet.yaml (top-100
+# by stake) and wires them with the YAML's per-link latencies.  Because
+# `topology_source = "yaml"`, only the [topology_yaml] section is read;
+# any [topology_random] section is ignored.
 
 # Base net-node config shared by all spawned nodes.
 base_config = "net-node/configs/mainnet.toml"
@@ -48,11 +47,12 @@ rb_generation_probability = 0.05
 # is enough to fill RB bodies and exercise EB production / voting.
 tx_rate = 1.0
 
-# YAML topology source.  Path is relative to the cluster process's
+# YAML topology mode.  Path is relative to the cluster process's
 # working directory at startup (typically the net-rs/ directory).
 # Stake comes directly from the YAML's per-node `stake` field — no
-# top-level `stake_distribution` knob applies here.
-[topology_source]
-type = "yaml"
+# `stake_distribution` knob applies here.
+topology_source = "yaml"
+
+[topology_yaml]
 path = "../data/simulation/pseudo-mainnet/topology-v4-mainnet.yaml"
 node_limit = 100

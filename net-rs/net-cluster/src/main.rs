@@ -374,12 +374,15 @@ fn build_topology(
     current_config: &config::ClusterConfig,
     total_stake: u64,
 ) -> Result<topology::Topology, Box<dyn std::error::Error + Send + Sync>> {
-    match &current_config.topology_source {
-        config::TopologySource::Random { .. } => {
-            Ok(topology::generate(current_config, total_stake))
-        }
-        config::TopologySource::Yaml { path, node_limit } => {
-            topology::load_from_yaml(current_config, std::path::Path::new(path), *node_limit)
+    match current_config.topology_source {
+        config::TopologySource::Random => Ok(topology::generate_random(current_config, total_stake)),
+        config::TopologySource::Yaml => {
+            let yaml = &current_config.topology_yaml;
+            topology::load_from_yaml(
+                current_config,
+                std::path::Path::new(&yaml.path),
+                yaml.node_limit,
+            )
         }
     }
 }
@@ -388,27 +391,25 @@ fn build_topology(
 /// topology source: in random mode we surface the graph-gen knobs; in YAML
 /// mode we surface the path / limit instead.
 fn log_cluster_config_summary(config: &config::ClusterConfig) {
-    match &config.topology_source {
-        config::TopologySource::Random {
-            num_nodes,
-            degree,
-            min_latency_ms,
-            max_latency_ms,
-            ..
-        } => {
+    match config.topology_source {
+        config::TopologySource::Random => {
+            let r = &config.topology_random;
             tracing::info!(
                 "loaded cluster config: random topology, {} nodes, degree={}, latency={}–{}ms, ports {}–{}",
-                num_nodes,
-                degree,
-                min_latency_ms,
-                max_latency_ms,
+                r.num_nodes,
+                r.degree,
+                r.min_latency_ms,
+                r.max_latency_ms,
                 config.base_port,
-                config.base_port + num_nodes.saturating_sub(1) as u16,
+                config.base_port + r.num_nodes.saturating_sub(1) as u16,
             );
         }
-        config::TopologySource::Yaml { path, node_limit } => {
+        config::TopologySource::Yaml => {
+            let y = &config.topology_yaml;
             tracing::info!(
-                "loaded cluster config: YAML topology from {path}, node_limit={node_limit:?}, base_port={}",
+                "loaded cluster config: YAML topology from {}, node_limit={:?}, base_port={}",
+                y.path,
+                y.node_limit,
                 config.base_port,
             );
         }

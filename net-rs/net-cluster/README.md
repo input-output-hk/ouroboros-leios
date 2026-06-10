@@ -4,14 +4,16 @@ Cluster orchestrator that spawns multiple `net-node` instances with auto-generat
 
 ## Features
 
-- Two topology sources: **random graph** (`[topology_source] type =
-  "random"` with `num_nodes` / `degree` / `min_latency_ms` /
-  `max_latency_ms` / `stake_distribution` inside the same table) or
-  **YAML** (`type = "yaml"` with `path` + optional `node_limit`, loading
+- Two topology modes, selected by the scalar `topology_source =
+  "random" | "yaml"`: **random graph** (`[topology_random]` with
+  `num_nodes` / `degree` / `min_latency_ms` / `max_latency_ms` /
+  `stake_distribution`) or **YAML** (`[topology_yaml]` with `path` +
+  optional `node_limit`, loading
   `data/simulation/pseudo-mainnet/topology-v*.yaml` — same schema as
   `sim-rs` and `topology-checker`)
-- Schema-level mode separation: random-mode fields under `type = "yaml"`
-  (or vice versa) are rejected at parse time, not silently ignored
+- Each section uses `deny_unknown_fields`, so a typo or stray key inside
+  a section is rejected at parse time; only the section matching the
+  selected mode is read, so an unused populated section is ignored
 - Stake distribution: `"equal"` or `"mainnet-shaped"` (random mode) —
   taken directly from the YAML's `stake` field (YAML mode)
 - Per-node TOML overlay generation (ports, peers, delays, stake)
@@ -50,11 +52,11 @@ RUST_LOG=info cargo run -p net-cluster -- \
   --net-node-bin target/debug/net-node
 
 # Override settings (note dotted-key form — random-mode knobs live
-# under `[topology_source]`):
+# under `[topology_random]`):
 cargo run -p net-cluster -- \
   --config net-cluster/configs/sample-cluster.toml \
   --net-node-bin target/debug/net-node \
-  --set topology_source.num_nodes=10 --set topology_source.degree=3
+  --set topology_random.num_nodes=10 --set topology_random.degree=3
 
 # Ctrl-C to stop. Check merged event output:
 cat cluster-events.jsonl | python3 -m json.tool --no-ensure-ascii | head
@@ -78,13 +80,13 @@ Mapping from YAML → cluster:
 | `nodes[].region`, `.cpu-core-count`, etc. | Ignored — net-core has no notion of geography or CPU caps |
 
 `num_nodes`/`degree`/`min_latency_ms`/`max_latency_ms`/
-`stake_distribution` are the random-mode knobs and only exist inside
-`[topology_source]` when `type = "random"`.  Writing them under
-`type = "yaml"` is a **parse-time error** — the schema enforces the
-split rather than silently ignoring leftover fields.  In YAML mode node
-count comes from the YAML (optionally capped by `node_limit`), edges
-and per-link latencies come from the YAML's `producers` arrays, and
-per-node stake comes from the YAML's `stake` field.
+`stake_distribution` are the random-mode knobs and live in
+`[topology_random]`.  With `topology_source = "yaml"` only
+`[topology_yaml]` is read, so any `[topology_random]` section is
+ignored.  In YAML mode node count comes from the YAML (optionally
+capped by `node_limit`), edges and per-link latencies come from the
+YAML's `producers` arrays, and per-node stake comes from the YAML's
+`stake` field.
 
 ```toml
 # net-cluster/configs/sample-cluster-v4-mini.toml
@@ -97,8 +99,9 @@ stats_interval_secs = 2
 rb_generation_probability = 0.05     # mainnet Praos f_block
 tx_rate = 1.0
 
-[topology_source]
-type = "yaml"
+topology_source = "yaml"
+
+[topology_yaml]
 path = "../data/simulation/pseudo-mainnet/topology-v4-mainnet.yaml"
 node_limit = 25                      # first-N in YAML = top-N by stake in v4
 ```
@@ -125,7 +128,9 @@ Key fields in the cluster TOML config:
 
 | Field | Description |
 |-------|-------------|
-| `[topology_source]` | Optional topology selector.  `type = "random"` takes `num_nodes`, `degree`, `min_latency_ms`, `max_latency_ms`, `stake_distribution` (`"equal"` or `"mainnet-shaped"`). `type = "yaml"` takes `path` and optional `node_limit` (cap to top-N by stake). The schema rejects fields from the wrong variant at parse time. |
+| `topology_source` | Topology mode: `"random"` (default) or `"yaml"`. Selects which section below is read. |
+| `[topology_random]` | Random-mode params: `num_nodes`, `degree`, `min_latency_ms`, `max_latency_ms`, `stake_distribution` (`"equal"` or `"mainnet-shaped"`). Unknown keys are rejected at parse time. |
+| `[topology_yaml]` | YAML-mode params: `path` and optional `node_limit` (cap to top-N by stake). Unknown keys are rejected at parse time. |
 | `base_config` | Path to shared net-node base config |
 | `base_port` | Starting port for node allocation |
 | `seed` | RNG seed for reproducible topologies |
