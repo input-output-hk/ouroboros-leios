@@ -758,12 +758,12 @@ impl PraosState {
     pub fn record_peer_disconnected(&mut self, peer_id: PeerId) {
         self.peer_chains.remove(&peer_id);
         self.orphan_cooldown.remove(&peer_id);
+        self.last_gap_warning_at.remove(&peer_id);
     }
 
     // -- High-level event handlers (effect-emitting) ------------------------
 
     /// A peer announced a new tip.  Records it and runs chain selection.
-    #[allow(clippy::too_many_arguments)]
     #[allow(clippy::too_many_arguments)]
     pub fn on_tip_advanced(
         &mut self,
@@ -1338,14 +1338,20 @@ impl PraosState {
             Some(b) => b,
             None => return,
         };
-        let adopted_ancestors: HashSet<[u8; 32]> = self
-            .adopted_tip_hash
-            .map(|h| self.chain_tree.ancestors(h).into_iter().collect())
-            .unwrap_or_default();
+        // "Unreachable" means we have no record of the parent at all,
+        // anywhere in our local view of the network's chain.  Check the
+        // whole `chain_tree` (every fork we've heard of, not just our
+        // adopted ancestry) plus `block_cache` (fetched bodies not yet in
+        // the tree).  Restricting to adopted-tip ancestors here would
+        // false-positive whenever the peer's chain forks off into a
+        // branch we hold but haven't adopted.
         let unreachable_parents = peer_chain
             .iter()
             .filter(|e| match e.prev_hash {
-                Some(p) => !adopted_ancestors.contains(&p) && !self.block_cache.contains_key(&p),
+                Some(p) => {
+                    self.chain_tree.block_number(&p).is_none()
+                        && !self.block_cache.contains_key(&p)
+                }
                 None => false,
             })
             .count();
