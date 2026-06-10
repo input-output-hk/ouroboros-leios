@@ -1532,7 +1532,7 @@ mod consensus_behaviour_tests {
         // total 300, target 120 → cover with 2 nodes (100 + 100).
         let picked: Vec<NodeId> = out.keys().copied().collect();
         assert_eq!(picked, vec![NodeId::new(0), NodeId::new(1)]);
-        for (_, spec) in &out {
+        for spec in out.values() {
             assert!(matches!(spec, BehaviourSpec::LazyVoter { .. }));
         }
     }

@@ -75,7 +75,7 @@ impl<TMessage> TcpConnection<TMessage> {
             None => now,
         };
 
-        let old_state = std::mem::replace(&mut self.state, TcpState::default());
+        let old_state = std::mem::take(&mut self.state);
         let (forecast, _, new_state) =
             forecast_tcp_msg_send(&self.props, old_state, effective_now, bytes);
         self.state = new_state;

@@ -317,6 +317,7 @@ fn compute_bandwidth_delay(total_bps: u64, split: u64, bytes: u64) -> Duration {
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use std::time::Duration;
 
@@ -726,6 +727,7 @@ mod tests {
 ///
 /// Both present the same interface so the rest of the network layer can treat
 /// them uniformly.
+#[allow(clippy::large_enum_variant)]
 pub enum ConnectionKind<TProtocol, TMessage> {
     /// Fair-bandwidth-sharing model (the existing `Connection`).
     Simple(Connection<TProtocol, TMessage>),
