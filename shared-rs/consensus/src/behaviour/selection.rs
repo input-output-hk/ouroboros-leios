@@ -362,7 +362,7 @@ mod tests {
             out.get(&1),
             Some(BehaviourSpec::RbHeaderEquivocator { ways: 2 })
         ));
-        assert!(out.get(&2).is_none());
+        assert!(!out.contains_key(&2));
     }
 
     #[test]
