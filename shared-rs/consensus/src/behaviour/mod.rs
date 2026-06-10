@@ -189,11 +189,7 @@ pub trait Behaviour: Send + Sync {
 
     // -- Leios reactive hooks ------------------------------------------------
 
-    fn on_slot_leios(
-        &mut self,
-        _state: &LeiosState,
-        _slot: u64,
-    ) -> BehaviourOutcome<LeiosEffect> {
+    fn on_slot_leios(&mut self, _state: &LeiosState, _slot: u64) -> BehaviourOutcome<LeiosEffect> {
         BehaviourOutcome::Continue
     }
 
@@ -393,11 +389,7 @@ pub trait Behaviour: Send + Sync {
     /// when the wrapper asks.  Determinism is the behaviour's
     /// responsibility (see the seed accepted at
     /// [`registry::build`]).
-    fn transform_outbound(
-        &mut self,
-        _peer: PeerId,
-        _out: Outbound<'_>,
-    ) -> OutboundDecision {
+    fn transform_outbound(&mut self, _peer: PeerId, _out: Outbound<'_>) -> OutboundDecision {
         OutboundDecision::Send
     }
 }
@@ -442,11 +434,7 @@ impl Behaviour for CompositeBehaviour {
         "composite"
     }
 
-    fn on_slot_leios(
-        &mut self,
-        state: &LeiosState,
-        slot: u64,
-    ) -> BehaviourOutcome<LeiosEffect> {
+    fn on_slot_leios(&mut self, state: &LeiosState, slot: u64) -> BehaviourOutcome<LeiosEffect> {
         for c in self.children.iter_mut() {
             let out = c.on_slot_leios(state, slot);
             if !out.is_continue() {
@@ -653,11 +641,7 @@ impl Behaviour for CompositeBehaviour {
         drop
     }
 
-    fn transform_outbound(
-        &mut self,
-        peer: PeerId,
-        out: Outbound<'_>,
-    ) -> OutboundDecision {
+    fn transform_outbound(&mut self, peer: PeerId, out: Outbound<'_>) -> OutboundDecision {
         for c in self.children.iter_mut() {
             let d = c.transform_outbound(peer, out);
             if !d.is_send() {
@@ -806,11 +790,8 @@ mod tests {
             on_slot_calls: 0,
             on_slot_reply: BehaviourOutcome::Replace(vec![]),
         };
-        let mut composite = CompositeBehaviour::new(vec![
-            Box::new(first),
-            Box::new(second),
-            Box::new(third),
-        ]);
+        let mut composite =
+            CompositeBehaviour::new(vec![Box::new(first), Box::new(second), Box::new(third)]);
         let out = composite.on_slot_leios(&s, 5);
         assert!(matches!(out, BehaviourOutcome::Replace(_)));
         // Third never ran.  We can't introspect after wrapping in Box<dyn>,

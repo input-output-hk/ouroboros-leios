@@ -127,8 +127,8 @@ impl Behaviour for T22ThreatBehaviour {
         point: &Point,
         _tx_hashes: &[[u8; 32]],
     ) -> BehaviourOutcome<LeiosEffect> {
-        let skip_process =
-            self.hide_eb_tx_received && !self.should_process_eb_data("on_eb_received", state, point);
+        let skip_process = self.hide_eb_tx_received
+            && !self.should_process_eb_data("on_eb_received", state, point);
         if skip_process {
             BehaviourOutcome::Replace(vec![])
         } else {

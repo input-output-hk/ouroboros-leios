@@ -10,6 +10,7 @@ pub mod aggregation;
 pub mod behaviour;
 pub mod bitmap;
 pub mod chain_tree;
+pub mod committee;
 pub mod config;
 pub mod elections;
 pub mod fetch;
@@ -22,7 +23,6 @@ pub mod pipeline;
 pub mod praos;
 pub mod production;
 pub mod types;
-pub mod committee;
 
 pub use config::{CommitteeSelection, StakeEntry};
 pub use peer::PeerId;

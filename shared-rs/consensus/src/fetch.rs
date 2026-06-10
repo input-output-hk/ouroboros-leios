@@ -105,22 +105,12 @@ impl PeerRtt for PeerRttCache {
 
 /// Pick the peer(s) to issue a Praos `BlockFetch` request to.
 pub trait BlockFetchPolicy {
-    fn pick(
-        &self,
-        point: &Point,
-        candidates: &[PeerId],
-        rtt: &dyn PeerRtt,
-    ) -> Vec<PeerId>;
+    fn pick(&self, point: &Point, candidates: &[PeerId], rtt: &dyn PeerRtt) -> Vec<PeerId>;
 }
 
 /// Pick the peer(s) to fetch a Leios EB body from.
 pub trait EbFetchPolicy {
-    fn pick(
-        &self,
-        point: &Point,
-        candidates: &[PeerId],
-        rtt: &dyn PeerRtt,
-    ) -> Vec<PeerId>;
+    fn pick(&self, point: &Point, candidates: &[PeerId], rtt: &dyn PeerRtt) -> Vec<PeerId>;
 }
 
 /// Pick the peer(s) to fetch Leios EB transactions from, given the
@@ -423,10 +413,14 @@ impl CandidateTracker {
         self.block_offers.retain(|p, _| point_slot(p) >= min_slot);
         self.eb_offers.retain(|p, _| point_slot(p) >= min_slot);
         self.eb_txs_offers.retain(|p, _| point_slot(p) >= min_slot);
-        self.pending_block_fetches.retain(|p| point_slot(p) >= min_slot);
-        self.pending_eb_fetches.retain(|p| point_slot(p) >= min_slot);
-        self.pending_eb_txs_fetches.retain(|p| point_slot(p) >= min_slot);
-        self.eb_txs_attempts.retain(|p, _| point_slot(p) >= min_slot);
+        self.pending_block_fetches
+            .retain(|p| point_slot(p) >= min_slot);
+        self.pending_eb_fetches
+            .retain(|p| point_slot(p) >= min_slot);
+        self.pending_eb_txs_fetches
+            .retain(|p| point_slot(p) >= min_slot);
+        self.eb_txs_attempts
+            .retain(|p, _| point_slot(p) >= min_slot);
     }
 }
 
@@ -472,8 +466,7 @@ mod tests {
     fn lowest_rtt_first_picks_min() {
         let policy = LowestRttFirst;
         let rtt = rtts(&[(1, 50), (2, 10), (3, 30)]);
-        let picked =
-            BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2), pid(3)], &rtt);
+        let picked = BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2), pid(3)], &rtt);
         assert_eq!(picked, vec![pid(2)]);
     }
 
@@ -482,8 +475,7 @@ mod tests {
         let policy = LowestRttFirst;
         // pid(2) has no measurement → treated as effectively infinite.
         let rtt = rtts(&[(1, 50), (3, 100)]);
-        let picked =
-            BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2), pid(3)], &rtt);
+        let picked = BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2), pid(3)], &rtt);
         assert_eq!(picked, vec![pid(1)]);
     }
 
@@ -501,8 +493,7 @@ mod tests {
     fn broadcast_n_one_matches_request_from_first() {
         let policy = BroadcastN::one();
         let rtt = rtts(&[(1, 50), (2, 10), (3, 30)]);
-        let picked =
-            BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2), pid(3)], &rtt);
+        let picked = BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2), pid(3)], &rtt);
         assert_eq!(picked, vec![pid(2)]);
     }
 
@@ -510,8 +501,7 @@ mod tests {
     fn broadcast_n_two_picks_two_lowest() {
         let policy = BroadcastN { n: 2 };
         let rtt = rtts(&[(1, 50), (2, 10), (3, 30)]);
-        let picked =
-            BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2), pid(3)], &rtt);
+        let picked = BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2), pid(3)], &rtt);
         // Sorted ascending by RTT: pid(2) 10ms, pid(3) 30ms.
         assert_eq!(picked, vec![pid(2), pid(3)]);
     }
@@ -520,8 +510,7 @@ mod tests {
     fn broadcast_n_all_matches_request_from_all() {
         let policy = BroadcastN::all();
         let rtt = rtts(&[(1, 50), (2, 10), (3, 30)]);
-        let picked =
-            BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2), pid(3)], &rtt);
+        let picked = BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2), pid(3)], &rtt);
         // Sorted by RTT.
         assert_eq!(picked, vec![pid(2), pid(3), pid(1)]);
     }
@@ -530,8 +519,7 @@ mod tests {
     fn broadcast_n_zero_returns_empty() {
         let policy = BroadcastN { n: 0 };
         let rtt = UniformRtt(Duration::from_millis(10));
-        let picked =
-            BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2)], &rtt);
+        let picked = BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2)], &rtt);
         assert!(picked.is_empty());
     }
 
@@ -631,8 +619,7 @@ mod tests {
         cache.set(pid(2), Duration::from_millis(10));
         cache.set(pid(3), Duration::from_millis(30));
         let policy = LowestRttFirst;
-        let picked =
-            BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2), pid(3)], &cache);
+        let picked = BlockFetchPolicy::pick(&policy, &pt(1, 1), &[pid(1), pid(2), pid(3)], &cache);
         assert_eq!(picked, vec![pid(2)]);
     }
 }

@@ -15,9 +15,9 @@ use std::collections::BTreeMap;
 use tracing::info;
 
 use crate::aggregation::{self, hex_prefix, QuorumFormed};
+use crate::committee;
 use crate::config::CommitteeSelection;
 use crate::pipeline::{EbElection, PipelineConfig, PipelinePhase};
-use crate::committee;
 
 /// What the caller should do as a result of a slot tick.
 ///
@@ -209,8 +209,7 @@ impl Elections {
         // Pass 1: collect EligibleToVote in BTreeMap order.
         for (hash, election) in &self.elections {
             let elapsed = slot.saturating_sub(election.announced_slot);
-            if pipeline.phase_for_elapsed(elapsed) == PipelinePhase::Voting && !election.voted
-            {
+            if pipeline.phase_for_elapsed(elapsed) == PipelinePhase::Voting && !election.voted {
                 effects.push(SlotEffect::EligibleToVote {
                     eb_hash: *hash,
                     eb_slot: election.announced_slot,
@@ -226,8 +225,8 @@ impl Elections {
         // chain-progress prune in [`crate::leios::LeiosState::on_slot`]
         // (via [`Self::prune_below_slot`]), not by elapsed slots.
         for election in self.elections.values_mut() {
-            election.phase = pipeline
-                .phase_for_elapsed(slot.saturating_sub(election.announced_slot));
+            election.phase =
+                pipeline.phase_for_elapsed(slot.saturating_sub(election.announced_slot));
         }
         effects
     }
@@ -292,11 +291,7 @@ impl Elections {
         match (tag, npv_signature, &self.cfg.committee_selection) {
             (0, _, CommitteeSelection::StakeCentile { .. }) => {
                 if self.cfg.persistent_committee.contains_key(voter_id) {
-                    self.cfg
-                        .stake_registry
-                        .get(voter_id)
-                        .copied()
-                        .unwrap_or(0)
+                    self.cfg.stake_registry.get(voter_id).copied().unwrap_or(0)
                 } else {
                     0
                 }
@@ -312,12 +307,7 @@ impl Elections {
                 if self.cfg.persistent_committee.contains_key(voter_id) {
                     return 0;
                 }
-                let stake = self
-                    .cfg
-                    .stake_registry
-                    .get(voter_id)
-                    .copied()
-                    .unwrap_or(0);
+                let stake = self.cfg.stake_registry.get(voter_id).copied().unwrap_or(0);
                 committee::count_npv_wins(
                     sig,
                     stake,
@@ -397,8 +387,7 @@ impl Elections {
     /// RB is no longer the chain tip is permanently dead, and its
     /// election state is dead weight.
     pub fn prune_below_slot(&mut self, min_slot: u64) {
-        self.elections
-            .retain(|_, e| e.announced_slot >= min_slot);
+        self.elections.retain(|_, e| e.announced_slot >= min_slot);
     }
 
     /// Slot of the EB at `eb_hash` if it is both at quorum and

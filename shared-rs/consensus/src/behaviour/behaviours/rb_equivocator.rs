@@ -95,11 +95,7 @@ impl Behaviour for RbHeaderEquivocator {
             .map(|v| v.body.clone())
     }
 
-    fn transform_outbound(
-        &mut self,
-        peer: PeerId,
-        out: Outbound<'_>,
-    ) -> OutboundDecision {
+    fn transform_outbound(&mut self, peer: PeerId, out: Outbound<'_>) -> OutboundDecision {
         let Outbound::RbHeader { slot, header } = out;
         let Some(set) = self.variants.get(&slot) else {
             // Either this isn't a slot we equivocated on, or the cache
@@ -242,10 +238,7 @@ mod tests {
             },
         );
         match out {
-            OutboundDecision::Replace(OwnedOutbound::RbHeader {
-                slot,
-                header,
-            }) => {
+            OutboundDecision::Replace(OwnedOutbound::RbHeader { slot, header }) => {
                 assert_eq!(slot, 42);
                 assert_eq!(header, variant_header);
             }

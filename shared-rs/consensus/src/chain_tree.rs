@@ -276,7 +276,8 @@ impl ChainTree {
     /// as the best tip.
     pub fn remove_above(&mut self, block_number: u64) {
         let before = self.nodes.len();
-        self.nodes.retain(|_, node| node.block_number <= block_number);
+        self.nodes
+            .retain(|_, node| node.block_number <= block_number);
         if self.nodes.len() != before {
             self.recompute_best_tip();
         }
@@ -313,16 +314,7 @@ impl ChainTree {
         slot: u64,
         prev_hash: Option<[u8; 32]>,
     ) -> bool {
-        self.insert(
-            hash,
-            point,
-            block_number,
-            slot,
-            prev_hash,
-            0,
-            None,
-            false,
-        )
+        self.insert(hash, point, block_number, slot, prev_hash, 0, None, false)
     }
 
     /// Test-only convenience: snapshot with a no-op EB-manifest lookup.
@@ -444,9 +436,9 @@ impl ChainTree {
                 // (queries the wrapper's live manifest cache) so the
                 // count appears as soon as a manifest arrives, before
                 // it's been stashed.
-                let eb_tx_count = node.cached_eb_tx_count.or_else(|| {
-                    node.announced_eb_hash.as_ref().and_then(&eb_manifest_count)
-                });
+                let eb_tx_count = node
+                    .cached_eb_tx_count
+                    .or_else(|| node.announced_eb_hash.as_ref().and_then(&eb_manifest_count));
                 Some(ChainTreeEntry {
                     block_number: node.block_number,
                     hash: short_hash(h),

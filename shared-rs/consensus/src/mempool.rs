@@ -79,10 +79,7 @@ pub enum MempoolEffect {
     /// A tx was dropped before reaching the mempool (overflow,
     /// validation failure) or evicted from it.  Telemetry only — the
     /// wrapper forwards this to its events sink.
-    TxRejected {
-        tx_id: TxId,
-        reason: TxRejectReason,
-    },
+    TxRejected { tx_id: TxId, reason: TxRejectReason },
 }
 
 /// Why a tx was rejected.
@@ -255,11 +252,7 @@ impl MempoolState {
 
     /// Validator rejected `tx_id`.  Drops the pending body and emits
     /// `TxRejected { ValidationFailed }`.
-    pub fn on_tx_validation_failed(
-        &mut self,
-        tx_id: TxId,
-        reason: String,
-    ) -> Vec<MempoolEffect> {
+    pub fn on_tx_validation_failed(&mut self, tx_id: TxId, reason: String) -> Vec<MempoolEffect> {
         self.pending_validation.remove(&tx_id);
         vec![MempoolEffect::TxRejected {
             tx_id,
@@ -271,12 +264,7 @@ impl MempoolState {
     /// a locally-produced tx the wrapper has validated against its own
     /// ledger view, or a test fixture.  Bypasses the
     /// `on_tx_received` → `ValidateTx` → `on_tx_validated` dance.
-    pub fn admit_validated(
-        &mut self,
-        tx_id: TxId,
-        body: Vec<u8>,
-        size: u32,
-    ) -> Vec<MempoolEffect> {
+    pub fn admit_validated(&mut self, tx_id: TxId, body: Vec<u8>, size: u32) -> Vec<MempoolEffect> {
         if self.contains(&tx_id) {
             return vec![MempoolEffect::TxRejected {
                 tx_id,
@@ -489,24 +477,21 @@ impl MempoolState {
     /// collection grows without bound across consecutive lines, that's
     /// the leak.
     pub fn log_state_sizes(&self, node_id: &str) {
-        let peer_advertised_total: usize =
-            self.peer_advertised.values().map(|s| s.len()).sum();
+        let peer_advertised_total: usize = self.peer_advertised.values().map(|s| s.len()).sum();
         let peer_advertised_max: usize = self
             .peer_advertised
             .values()
             .map(|s| s.len())
             .max()
             .unwrap_or(0);
-        let peer_unannounced_total: usize =
-            self.peer_unannounced.values().map(|s| s.len()).sum();
+        let peer_unannounced_total: usize = self.peer_unannounced.values().map(|s| s.len()).sum();
         let peer_unannounced_max: usize = self
             .peer_unannounced
             .values()
             .map(|s| s.len())
             .max()
             .unwrap_or(0);
-        let eb_manifest_entries_total: usize =
-            self.eb_manifests.values().map(|v| v.len()).sum();
+        let eb_manifest_entries_total: usize = self.eb_manifests.values().map(|v| v.len()).sum();
         info!(
             node_id,
             txs = self.txs.len(),
@@ -541,11 +526,7 @@ impl MempoolState {
     /// Returns the manifest and any `TxRejected{EbClosurePruned}`
     /// effects emitted when older EB closures aged out of the
     /// retention window.
-    pub fn produce_eb(
-        &mut self,
-        eb_key: EbKey,
-        count: usize,
-    ) -> (Vec<TxId>, Vec<MempoolEffect>) {
+    pub fn produce_eb(&mut self, eb_key: EbKey, count: usize) -> (Vec<TxId>, Vec<MempoolEffect>) {
         let take = count.min(self.txs.len());
         let mut drained: Vec<PendingTx> = Vec::with_capacity(take);
         for _ in 0..take {
@@ -591,14 +572,8 @@ impl MempoolState {
         if self.contains(&tx_id) || self.eb_pinned.contains_key(&tx_id) {
             return;
         }
-        self.eb_pinned.insert(
-            tx_id.clone(),
-            PendingTx {
-                tx_id,
-                body,
-                size,
-            },
-        );
+        self.eb_pinned
+            .insert(tx_id.clone(), PendingTx { tx_id, body, size });
     }
 
     /// True iff the body for `tx_id` is locally available — either
@@ -685,12 +660,7 @@ impl MempoolState {
         fx
     }
 
-    fn admit_internal(
-        &mut self,
-        tx_id: TxId,
-        body: Vec<u8>,
-        size: u32,
-    ) -> Vec<MempoolEffect> {
+    fn admit_internal(&mut self, tx_id: TxId, body: Vec<u8>, size: u32) -> Vec<MempoolEffect> {
         let mut fx = Vec::new();
         if self.txs.len() >= self.capacity {
             if let Some(old) = self.txs.pop_front() {
@@ -716,11 +686,7 @@ impl MempoolState {
         for set in self.peer_unannounced.values_mut() {
             set.insert(tx_id.clone());
         }
-        self.txs.push_back(PendingTx {
-            tx_id,
-            body,
-            size,
-        });
+        self.txs.push_back(PendingTx { tx_id, body, size });
         fx
     }
 
@@ -739,8 +705,7 @@ impl MempoolState {
     /// entry exists.
     fn ensure_peer_registered(&mut self, peer_id: PeerId) {
         if !self.peer_unannounced.contains_key(&peer_id) {
-            self.peer_unannounced
-                .insert(peer_id, self.tx_index.clone());
+            self.peer_unannounced.insert(peer_id, self.tx_index.clone());
         }
     }
 }

@@ -144,10 +144,10 @@ mod tests {
             bw_release: CurveSegment::new(ms(2000), Curve::Linear),
             lat_stall: ms(1000),
         };
-        assert!((e.bw_mult_at(ms(1500)) - 0.4).abs() < 1e-12);     // mid-stall
-        assert!((e.bw_mult_at(ms(2000)) - 0.2).abs() < 1e-12);     // stall end → depth
-        assert!((e.bw_mult_at(ms(3000)) - 0.6).abs() < 1e-12);     // halfway recovery
-        assert!((e.bw_mult_at(ms(4000)) - 1.0).abs() < 1e-12);     // fully recovered
+        assert!((e.bw_mult_at(ms(1500)) - 0.4).abs() < 1e-12); // mid-stall
+        assert!((e.bw_mult_at(ms(2000)) - 0.2).abs() < 1e-12); // stall end → depth
+        assert!((e.bw_mult_at(ms(3000)) - 0.6).abs() < 1e-12); // halfway recovery
+        assert!((e.bw_mult_at(ms(4000)) - 1.0).abs() < 1e-12); // fully recovered
     }
 
     #[test]

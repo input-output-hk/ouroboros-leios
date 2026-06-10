@@ -290,7 +290,18 @@ mod tests {
         // the residual ends up in the manifest.
         let mut state = MempoolState::new(100);
         let leios = empty_leios();
-        populate(&mut state, &[(1, 200), (2, 200), (3, 200), (4, 200), (5, 200), (6, 200), (7, 200)]);
+        populate(
+            &mut state,
+            &[
+                (1, 200),
+                (2, 200),
+                (3, 200),
+                (4, 200),
+                (5, 200),
+                (6, 200),
+                (7, 200),
+            ],
+        );
         // 1400 bytes total, RB cap 500 → drain takes [1, 2] (400);
         // residual = [3..7]. EB cap 500 → manifest = first 2 of
         // residual = [3, 4] (400 ≤ 500; next would push to 600).
