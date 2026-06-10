@@ -1203,6 +1203,19 @@ impl PraosState {
         self.queued_validator_tip = Some(target_hash);
         // Drop the abandoned suffix so it can't be re-selected as best tip.
         self.chain_tree.remove_above(target_bn);
+        // Evict the suffix from the cache too.  The dedup at the top of
+        // `on_block_received` short-circuits when a hash is already in
+        // `block_cache` / `validated` / `in_flight_validation`, so a peer
+        // re-offering an abandoned block after the reorg would be silently
+        // dropped — `chain_tree` would never re-acquire it and the node
+        // would be pinned on its dead fork.  Mirror the k-prune retention
+        // pattern in `on_block_applied`, opposite direction.
+        self.block_cache.retain(|_, cb| cb.block_no <= target_bn);
+        self.validated.retain(|h| self.block_cache.contains_key(h));
+        self.in_flight_validation
+            .retain(|h| self.block_cache.contains_key(h));
+        self.header_first_seen
+            .retain(|h, _| self.block_cache.contains_key(h));
 
         info!(
             node_id = %self.node_id,
@@ -2705,6 +2718,15 @@ mod tests {
         );
         assert!(s.chain_tree.block_number(&h(4)).is_none(), "block 4 abandoned");
         assert!(s.chain_tree.block_number(&h(5)).is_none(), "block 5 abandoned");
+        // Cache and validated set must also drop the suffix, otherwise the
+        // on_block_received dedup would block re-adoption when a peer
+        // re-offers blocks 4/5.
+        assert!(!s.block_cache.contains_key(&h(4)), "block 4 evicted from cache");
+        assert!(!s.block_cache.contains_key(&h(5)), "block 5 evicted from cache");
+        assert!(s.block_cache.contains_key(&h(3)), "target block kept in cache");
+        assert!(!s.validated.contains(&h(4)), "block 4 cleared from validated");
+        assert!(!s.validated.contains(&h(5)), "block 5 cleared from validated");
+        assert!(s.validated.contains(&h(3)), "target block kept in validated");
         match fx.as_slice() {
             [PraosEffect::InjectRollback { target }] => assert_eq!(*target, pt(102, 3)),
             other => panic!("expected single InjectRollback to block 3, got {other:?}"),
