@@ -32,7 +32,14 @@ impl Behaviour for DropInboundPeers {
         if self.probability <= 0.0 || slot == 0 {
             return false;
         }
-        // Deterministic per-(seed, slot) draw in [0, 1): replays
+        // Bypass the draw at the top end: `u64 / u64::MAX as f64` can hit
+        // exactly 1.0 (the denominator rounds to 2^64 in f64), and the
+        // `<` test would then refuse to drop on the rare hash that maxes
+        // out — violating "always drop at probability=1.0".
+        if self.probability >= 1.0 {
+            return true;
+        }
+        // Deterministic per-(seed, slot) draw in [0, 1]: replays
         // identically from a seed (no clock / OS entropy).
         let mut h = blake2b_simd::Params::new().hash_length(8).to_state();
         h.update(&self.seed.to_le_bytes());
