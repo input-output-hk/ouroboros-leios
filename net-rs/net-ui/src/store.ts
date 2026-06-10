@@ -94,9 +94,15 @@ export interface DashboardState {
   loadConfig: () => Promise<void>;
   restartCluster: (config: ClusterControlConfig) => Promise<void>;
 
+  // Voting panel visibility
+  votingPanelVisible: boolean;
+  setVotingPanelVisible: (v: boolean) => void;
+
   // Voting panel data (column-major: [slot][row])
-  votingMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "EBGenerated" | "VoteCast" | "Committee" | "Incorrect")[][];
+  votingMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "EBGenerated" | "VoteCast" | "Committee" | "Incorrect" | "Empty")[][];
+  votingMatrixOverflowRow: number;
   votingSlotStart: number;
+  votingCounts: { ebReceivedPct: number; ebKnownToCommitteePct: number; votedPct: number }[];
 
   // Runtime attack trigger
   activeAttack: ActiveAttack | null;
@@ -139,8 +145,12 @@ export const useStore = create<DashboardState>()((set, get) => ({
   networkTipCounts: {},
 
   // Voting panel
+  votingPanelVisible: false,
+  setVotingPanelVisible: (v) => set({ votingPanelVisible: v }),
   votingMatrix: [],
+  votingMatrixOverflowRow: -1,
   votingSlotStart: 0,
+  votingCounts: [],
 
   pollStats: async () => {
     try {
@@ -234,20 +244,26 @@ export const useStore = create<DashboardState>()((set, get) => ({
 
       const curSnap = { time: now, bandwidth: totalBandwidth, messages: totalMessages, blocks: totalBlocks, forks: curForks };
 
+      /// Voting panel data preparation: step 1. fetch general info.
+
+      const showVotingPanel = get().votingPanelVisible;
       const VOTING_SLOTS = 24;
-      const MAX_NODES_VOTING_PANEL = 30;
-      const topoNodes = get().topology?.nodes ?? [];
+      const MAX_NODES_VOTING_PANEL = 20;
+      const topoNodes = showVotingPanel ? (get().topology?.nodes ?? []) : [];
       const nodeCount = topoNodes.length;
 
-      const aggregated_votes = await fetchAggregatedVotesHistory();
-      const votes_history = aggregated_votes.votes;
-      const votingSlotStart = aggregated_votes.last_slot;
+      const aggregated_votes = showVotingPanel ? await fetchAggregatedVotesHistory() : null;
+      const votes_history = aggregated_votes?.votes ?? [];
+      const votingSlotStart = aggregated_votes?.last_slot ?? 0;
+      const votes_count = aggregated_votes?.votes_count ?? [];
       let nodeIds: Record<string, number> = {};
-      for (let i = 0; i < aggregated_votes.node_ids.length; i++) {
-        nodeIds[aggregated_votes.node_ids[i]] = i;
+      for (const [i, nodeId] of (aggregated_votes?.node_ids ?? []).entries()) {
+        nodeIds[nodeId] = i;
       }
 
-      const nextMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "EBGenerated" | "VoteCast" | "Committee" | "Incorrect")[][] = Array.from(
+      /// Voting panel matrix preparation: step 2, build voting matrix.
+
+      const nextMatrix: ("NoEvent" | "RBReceived" | "EBReceived" | "EBGenerated" | "VoteCast" | "Committee" | "Incorrect" | "Empty")[][] = Array.from(
         {length: VOTING_SLOTS},
         (_, i) => {
           // Vote events in the string are written from older slots to most recent slot.
@@ -268,9 +284,26 @@ export const useStore = create<DashboardState>()((set, get) => ({
               return "NoEvent" as const;
             });
           }
-          return Array.from({length: nodeCount}, () => "NoEvent" as const);
+
+          return Array.from({length: Math.min(MAX_NODES_VOTING_PANEL, nodeCount)}, () => "NoEvent" as const);
         }
       )
+      const nextMatrixOverflowRow = nodeCount > MAX_NODES_VOTING_PANEL ? MAX_NODES_VOTING_PANEL : -1;
+
+      /// Voting panel matrix preparation: step 3, counts.
+
+      const nextCounts = Array.from({length: VOTING_SLOTS}, (_, i) => {
+        const votes = votes_count[votes_history.length - i - 1] ?? null;
+        if (!votes) return { ebReceivedPct: 0, ebKnownToCommitteePct: 0, votedPct: 0 };
+        const comm = votes.perm_committee_members;
+        return {
+          ebReceivedPct: nodeCount > 0 ? Math.floor((votes.eb_known / nodeCount) * 100) : 0,
+          ebKnownToCommitteePct: comm > 0 ? Math.floor((votes.committee_members_know_eb / comm) * 100) : 0,
+          votedPct: comm > 0 ? Math.floor((votes.votes_cast / comm) * 100) : 0,
+        };
+      });
+
+      /// Stats
 
       if (prevSnapshot) {
         const changed =
@@ -325,14 +358,18 @@ export const useStore = create<DashboardState>()((set, get) => ({
             networkChainTree,
             networkTipCounts: tipCounts,
             votingMatrix: nextMatrix,
+            votingMatrixOverflowRow: nextMatrixOverflowRow,
             votingSlotStart,
+            votingCounts: nextCounts,
           }));
         } else {
           // No change — just update latestStats, don't emit a data point
           set({
             latestStats: stats, networkChainTree, networkTipCounts: tipCounts,
             votingMatrix: nextMatrix,
+            votingMatrixOverflowRow: nextMatrixOverflowRow,
             votingSlotStart,
+            votingCounts: nextCounts,
           });
         }
       } else {
@@ -348,7 +385,9 @@ export const useStore = create<DashboardState>()((set, get) => ({
           networkChainTree,
           networkTipCounts: tipCounts,
           votingMatrix: nextMatrix,
+          votingMatrixOverflowRow: nextMatrixOverflowRow,
           votingSlotStart,
+          votingCounts: nextCounts,
         });
       }
     } catch (e) {
@@ -613,6 +652,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
           selectedNodeId: null,
           selectedEdge: null,
           votingMatrix: [],
+          votingMatrixOverflowRow: -1,
           votingSlotStart: 0,
           activeAttack: null,
           attackingIndices: new Set<number>(),

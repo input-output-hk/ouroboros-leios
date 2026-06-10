@@ -28,12 +28,18 @@ export default function App() {
   const networkTipCounts = useStore((s) => s.networkTipCounts);
   const selectedNodeId = useStore((s) => s.selectedNodeId);
   const selectedEdge = useStore((s) => s.selectedEdge);
+  const setVotingPanelVisible = useStore((s) => s.setVotingPanelVisible);
   const [eventLogOpen, setEventLogOpen] = useState(true);
   const [chartsOpen, setChartsOpen] = useState(true);
   const [chainTreeOpen, setChainTreeOpen] = useState(true);
   const [controlPanelOpen, setControlPanelOpen] = useState(false);
   const [votingPanelOpen, setVotingPanelOpen] = useState(false);
   const [attackPanelOpen, setAttackPanelOpen] = useState(false);
+
+  // Sync voting panel visibility to store
+  useEffect(() => {
+    setVotingPanelVisible(votingPanelOpen);
+  }, [votingPanelOpen, setVotingPanelVisible]);
 
   useEffect(() => {
     loadTopology();

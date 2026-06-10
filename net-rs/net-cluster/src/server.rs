@@ -17,9 +17,7 @@ use tokio::sync::{broadcast, mpsc, RwLock};
 use tower_http::cors::CorsLayer;
 use crate::config::{ActiveAttack, AttackRequest, ClusterControlConfig};
 use crate::topology::Topology;
-use crate::types::{
-    self, AggregatedVotesHistory, EventWindow, IngestedEvent, NodeVotes, StatsSnapshot, WINDOW_SIZE
-};
+use crate::types::{self, AggregatedVotesCount, AggregatedVotesHistory, EventWindow, IngestedEvent, NodeVotes, StatsSnapshot, WINDOW_SIZE};
 
 /// Control message sent from the HTTP handlers to the main loop for
 /// the runtime attack-trigger feature.
@@ -488,13 +486,29 @@ async fn get_votes_history(
     // History: from newest [idx=0, slot=last_slot] to oldest [idx=WINDOW_SIZE-1,
     //          slot=last_slot-WINDOW_SIZE+1].
     let mut history = Vec::new();
+    let mut votes_count = Vec::new();
     for slot in ((last_slot+1).saturating_sub(WINDOW_SIZE)..=last_slot).rev() {
         let Some(node_statuses) = votes.events.get(&slot) else {
             history.push("".to_string());
+            votes_count.push(AggregatedVotesCount::default());
             continue;
         };
+
         let mut str = String::new();
+        let mut count = AggregatedVotesCount::default();
         for node_id in &node_ids {
+            let statuses = node_statuses.get(node_id);
+            if let Some(statuses) = statuses {
+                let eb_known = statuses.eb_received || statuses.eb_generated;
+                count.votes_cast += statuses.vote_cast as u64;
+                count.rb_received += statuses.rb_received as u64;
+                count.eb_known += eb_known as u64;
+                if statuses.perm_committee_member {
+                    count.perm_committee_members += 1;
+                    count.committee_members_know_eb += eb_known as u64;
+                }
+            }
+
             // Priority: Vote > EB > RB > Committee membership.
             // Rationale:
             // 1. Vote cast only if all other events happened; correctness of node
@@ -503,7 +517,7 @@ async fn get_votes_history(
             // 3. Committee info will be shown in empty slots, and committee does not change
             //    often, so viewer will guess it from adjacent columns, no need to specify
             //    this info each time.
-            str.push(match node_statuses.get(node_id) {
+            str.push(match statuses {
                 Some(NodeVotes {vote_cast: true, eb_received: true, rb_received: true, ..}) => '1',
                 Some(NodeVotes {vote_cast: true, eb_generated: true, ..}) => 'G',
                 Some(NodeVotes {eb_received: true, rb_received: true, ..}) => 'E',
@@ -515,12 +529,14 @@ async fn get_votes_history(
             });
         }
         history.push(str);
+        votes_count.push(count);
     };
 
     Json(AggregatedVotesHistory{
         last_slot,
         node_ids,
         votes: history, // TODO: serialize the full history of votes
+        votes_count,
     })
 }
 
