@@ -1,10 +1,10 @@
 # Passive stake-0 follower for the Leios dev relay
 # (leios-node.play.dev.cardano.org:3001, network magic 164).
 #
-# Overlay on top of leios-dev.toml:
+# Overlay on top of leios-dev.toml; run from the net-rs/ workspace root:
 #   cargo run --release -p net-node -- \
-#       --config configs/leios-dev.toml \
-#       --config configs/follow-dev-relay.toml
+#       --config net-node/configs/leios-dev.toml \
+#       --config net-node/configs/follow-dev-relay.toml
 
 node_id = "dev-relay-follower"
 seed = 1
