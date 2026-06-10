@@ -60,6 +60,7 @@ pub fn generate_overlays(
             aggregator_port,
             stats_interval_secs,
             num_nodes,
+            topology.total_stake,
             &stake_registry,
         );
         let path = temp_dir.join(format!("node-{}.toml", node.index));
@@ -80,6 +81,7 @@ fn render_overlay(
     aggregator_port: u16,
     stats_interval_secs: u64,
     num_nodes: usize,
+    total_stake: u64,
     stake_registry: &[(String, u64)],
 ) -> String {
     let mut s = String::new();
@@ -92,6 +94,10 @@ fn render_overlay(
     writeln!(s).ok();
     writeln!(s, "[production]").ok();
     writeln!(s, "stake = {}", node.stake).ok();
+    // Override the base config's `total_stake` with the cluster's actual
+    // sum-of-stakes so the Praos lottery threshold uses the right ratio.
+    // See `Topology::total_stake` for the rationale.
+    writeln!(s, "total_stake = {total_stake}").ok();
     writeln!(s).ok();
     for (id, stake) in stake_registry {
         writeln!(s, "[[production.stake_registry]]").ok();
@@ -200,7 +206,7 @@ mod tests {
     #[test]
     fn test_render_overlay() {
         let node = sample_node();
-        let toml = render_overlay(&node, 9100, 5, 5, &[]);
+        let toml = render_overlay(&node, 9100, 5, 5, 500, &[]);
 
         assert!(toml.contains("node_id = \"node-0\""));
         assert!(toml.contains("listen_address = \"127.0.0.1:30000\""));
@@ -219,9 +225,27 @@ mod tests {
     #[test]
     fn test_render_parses_as_toml() {
         let node = sample_node();
-        let toml_str = render_overlay(&node, 9100, 5, 5, &[]);
+        let toml_str = render_overlay(&node, 9100, 5, 5, 500, &[]);
         let parsed: toml::Value = toml::from_str(&toml_str).expect("generated TOML should parse");
         assert_eq!(parsed["node_id"].as_str(), Some("node-0"));
+    }
+
+    #[test]
+    fn test_render_overlay_writes_total_stake() {
+        // The cluster-level total_stake must land in `[production]
+        // total_stake` so it overrides the base config (where
+        // `mainnet.toml` carries the synthetic `1000`).  Without this
+        // override, YAML-loaded clusters saturate the Praos lottery
+        // because every node's stake/total_stake ratio is huge.
+        let node = sample_node();
+        let toml_str = render_overlay(&node, 9100, 5, 5, 1_982_130_062, &[]);
+        let parsed: toml::Value = toml::from_str(&toml_str).expect("generated TOML should parse");
+        assert_eq!(
+            parsed["production"]["total_stake"].as_integer(),
+            Some(1_982_130_062)
+        );
+        // Per-node stake stays separate.
+        assert_eq!(parsed["production"]["stake"].as_integer(), Some(500));
     }
 
     #[test]
@@ -232,7 +256,7 @@ mod tests {
             ("node-1".to_string(), 300u64),
             ("node-2".to_string(), 0u64),
         ];
-        let toml_str = render_overlay(&node, 9100, 5, 3, &registry);
+        let toml_str = render_overlay(&node, 9100, 5, 3, 800, &registry);
         let parsed: toml::Value = toml::from_str(&toml_str).expect("generated TOML should parse");
         let entries = parsed["production"]["stake_registry"]
             .as_array()
@@ -249,10 +273,9 @@ mod tests {
         // A node with a behaviour spec should emit a `[behaviour]` table
         // that round-trips through the toml parser.
         let mut node = sample_node();
-        node.behaviour = Some(
-            shared_consensus::behaviour::BehaviourSpec::RbHeaderEquivocator { ways: 2 },
-        );
-        let toml_str = render_overlay(&node, 9100, 5, 1, &[]);
+        node.behaviour =
+            Some(shared_consensus::behaviour::BehaviourSpec::RbHeaderEquivocator { ways: 2 });
+        let toml_str = render_overlay(&node, 9100, 5, 1, 500, &[]);
         let parsed: toml::Value = toml::from_str(&toml_str).expect("generated TOML should parse");
         assert_eq!(
             parsed["behaviour"]["kind"].as_str(),
@@ -268,7 +291,7 @@ mod tests {
         // honest path stays implicit; net-node falls through to
         // HonestBehaviour).
         let node = sample_node();
-        let toml_str = render_overlay(&node, 9100, 5, 1, &[]);
+        let toml_str = render_overlay(&node, 9100, 5, 1, 500, &[]);
         assert!(
             !toml_str.contains("[behaviour]"),
             "expected no behaviour section, got: {toml_str}"
@@ -280,6 +303,7 @@ mod tests {
         let topo = crate::topology::Topology {
             nodes: vec![sample_node()],
             edges: Vec::new(),
+            total_stake: 500,
         };
         let dir = tempfile::tempdir().unwrap();
         let overlays = generate_overlays(&topo, dir.path(), 9100, 5, &HashMap::new()).unwrap();

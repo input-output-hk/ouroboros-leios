@@ -602,6 +602,7 @@ mod tests {
             topology: RwLock::new(Topology {
                 nodes: Vec::new(),
                 edges: Vec::new(),
+                total_stake: 0,
             }),
             event_window,
             event_broadcast,
@@ -609,10 +610,9 @@ mod tests {
             update_tx,
             attack_tx,
             current_config: RwLock::new(ClusterControlConfig {
-                num_nodes: Some(5),
-                degree: Some(3),
-                min_latency_ms: Some(5),
-                max_latency_ms: Some(300),
+                topology_source: None,
+                topology_random: None,
+                topology_yaml: None,
                 seed: None,
                 node_config: HashMap::new(),
             }),

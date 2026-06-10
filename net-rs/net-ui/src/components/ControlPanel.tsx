@@ -26,12 +26,19 @@ export function ControlPanel() {
   const [rbGenProb, setRbGenProb] = useState("0.05");
   const [rbBodyValidationMs, setRbBodyValidationMs] = useState("1000");
 
+  const topologySource = clusterConfig?.topology_source ?? null;
+  const isYaml = topologySource === "yaml";
+  const randomConfig = clusterConfig?.topology_random ?? null;
+  const yamlConfig = clusterConfig?.topology_yaml ?? null;
+
   useEffect(() => {
     if (clusterConfig) {
-      if (clusterConfig.num_nodes != null) setNumNodes(String(clusterConfig.num_nodes));
-      if (clusterConfig.degree != null) setDegree(String(clusterConfig.degree));
-      if (clusterConfig.min_latency_ms != null) setMinLatency(String(clusterConfig.min_latency_ms));
-      if (clusterConfig.max_latency_ms != null) setMaxLatency(String(clusterConfig.max_latency_ms));
+      if (randomConfig) {
+        setNumNodes(String(randomConfig.num_nodes));
+        setDegree(String(randomConfig.degree));
+        setMinLatency(String(randomConfig.min_latency_ms));
+        setMaxLatency(String(randomConfig.max_latency_ms));
+      }
       setSeed(clusterConfig.seed != null ? String(clusterConfig.seed) : "");
 
       const nc = clusterConfig.node_config ?? {};
@@ -40,12 +47,13 @@ export function ControlPanel() {
       const rbVal = nc["validation.rb_body_validation_ms_constant"];
       if (rbVal != null) setRbBodyValidationMs(String(rbVal));
     }
-  }, [clusterConfig]);
+  }, [clusterConfig, randomConfig]);
 
   const numNodesN = Number(numNodes) || 0;
   const minLatencyN = Number(minLatency) || 0;
   const maxLatencyN = Number(maxLatency) || 0;
-  const valid = numNodesN >= 1 && minLatencyN <= maxLatencyN;
+  // YAML-mode restarts don't edit topology params, so we don't validate them.
+  const valid = isYaml || (numNodesN >= 1 && minLatencyN <= maxLatencyN);
 
   const busy = restarting || updating;
 
@@ -56,10 +64,21 @@ export function ControlPanel() {
 
   const handleRestart = () => {
     restartCluster({
-      num_nodes: numNodesN,
-      degree: Number(degree) || 1,
-      min_latency_ms: minLatencyN,
-      max_latency_ms: maxLatencyN,
+      // In YAML mode we don't override the topology — the cluster restarts
+      // with whatever YAML was loaded at startup.  In random mode we send
+      // back the mode selector plus the edited params.
+      topology_source: isYaml ? undefined : "random",
+      topology_random: isYaml
+        ? undefined
+        : {
+            num_nodes: numNodesN,
+            degree: Number(degree) || 1,
+            min_latency_ms: minLatencyN,
+            max_latency_ms: maxLatencyN,
+            // Preserve whatever stake distribution the cluster was
+            // configured with (we don't expose a UI for it yet).
+            stake_distribution: randomConfig?.stake_distribution ?? "equal",
+          },
       seed: seed !== "" ? Number(seed) : undefined,
       node_config: nodeConfigPayload(),
     });
@@ -122,46 +141,81 @@ export function ControlPanel() {
       <Typography variant="subtitle2" sx={{ color: "#90caf9", fontWeight: 700 }}>
         Cluster Topology
       </Typography>
-      <TextField
-        label="Nodes"
-        type="number"
-        size="small"
-        value={numNodes}
-        onChange={(e) => setNumNodes(e.target.value)}
-        disabled={busy}
-        slotProps={{ htmlInput: { min: 1, max: 100 } }}
-        sx={numberFieldSx}
-      />
-      <TextField
-        label="Degree"
-        type="number"
-        size="small"
-        value={degree}
-        onChange={(e) => setDegree(e.target.value)}
-        disabled={busy}
-        slotProps={{ htmlInput: { min: 1, max: 50 } }}
-        sx={numberFieldSx}
-      />
-      <TextField
-        label="Min latency (ms)"
-        type="number"
-        size="small"
-        value={minLatency}
-        onChange={(e) => setMinLatency(e.target.value)}
-        disabled={busy}
-        slotProps={{ htmlInput: { min: 0 } }}
-        sx={numberFieldSx}
-      />
-      <TextField
-        label="Max latency (ms)"
-        type="number"
-        size="small"
-        value={maxLatency}
-        onChange={(e) => setMaxLatency(e.target.value)}
-        disabled={busy}
-        slotProps={{ htmlInput: { min: 0 } }}
-        sx={numberFieldSx}
-      />
+
+      {isYaml && yamlConfig && (
+        <Box
+          sx={{
+            p: 1,
+            borderRadius: 1,
+            border: "1px solid rgba(255,255,255,0.1)",
+            background: "rgba(144,202,249,0.05)",
+            fontSize: 12,
+            color: "rgba(255,255,255,0.75)",
+          }}
+        >
+          <Typography variant="caption" sx={{ display: "block", color: "#90caf9", fontWeight: 600 }}>
+            YAML-loaded topology
+          </Typography>
+          <Box sx={{ mt: 0.5, fontFamily: "ui-monospace, monospace", fontSize: 11, wordBreak: "break-all" }}>
+            {yamlConfig.path}
+          </Box>
+          {yamlConfig.node_limit != null && (
+            <Box sx={{ mt: 0.5 }}>
+              capped at first <b>{yamlConfig.node_limit}</b> nodes (top-N by stake)
+            </Box>
+          )}
+          <Box sx={{ mt: 0.5, opacity: 0.7 }}>
+            Topology params (nodes / degree / latencies) come from the YAML file and aren't editable here.
+            "Restart Cluster" reloads the same YAML.
+          </Box>
+        </Box>
+      )}
+
+      {!isYaml && (
+        <>
+          <TextField
+            label="Nodes"
+            type="number"
+            size="small"
+            value={numNodes}
+            onChange={(e) => setNumNodes(e.target.value)}
+            disabled={busy}
+            slotProps={{ htmlInput: { min: 1, max: 100 } }}
+            sx={numberFieldSx}
+          />
+          <TextField
+            label="Degree"
+            type="number"
+            size="small"
+            value={degree}
+            onChange={(e) => setDegree(e.target.value)}
+            disabled={busy}
+            slotProps={{ htmlInput: { min: 1, max: 50 } }}
+            sx={numberFieldSx}
+          />
+          <TextField
+            label="Min latency (ms)"
+            type="number"
+            size="small"
+            value={minLatency}
+            onChange={(e) => setMinLatency(e.target.value)}
+            disabled={busy}
+            slotProps={{ htmlInput: { min: 0 } }}
+            sx={numberFieldSx}
+          />
+          <TextField
+            label="Max latency (ms)"
+            type="number"
+            size="small"
+            value={maxLatency}
+            onChange={(e) => setMaxLatency(e.target.value)}
+            disabled={busy}
+            slotProps={{ htmlInput: { min: 0 } }}
+            sx={numberFieldSx}
+          />
+        </>
+      )}
+
       <TextField
         label="Seed (optional)"
         type="number"

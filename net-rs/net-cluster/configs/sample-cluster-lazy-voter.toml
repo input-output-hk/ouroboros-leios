@@ -18,11 +18,6 @@
 # (7 ≥ 6); raise `fraction` to 0.34 or above to push 4+ pools lazy
 # and force quorum failure.
 
-num_nodes = 30
-degree = 3
-min_latency_ms = 5
-max_latency_ms = 100
-
 base_config = "net-node/configs/mainnet.toml"
 base_port = 30300
 seed = 42
@@ -30,7 +25,6 @@ output_events = "cluster-events-lazy-voter.jsonl"
 ordering_window_secs = 1.0
 aggregator_port = 9300
 stats_interval_secs = 1
-stake_distribution = "mainnet-shaped"
 rb_generation_probability = 0.05
 
 # Drive the mempool from each node at 1 tx/s so RBs overflow into EBs
@@ -40,6 +34,15 @@ rb_generation_probability = 0.05
 # hub-spoke EB-tx fetch hard enough that MissingTX dominates the
 # no-vote signal and masks the lazy-stake effect.
 tx_rate = 1.0
+
+topology_source = "random"
+
+[topology_random]
+num_nodes = 30
+degree = 3
+min_latency_ms = 5
+max_latency_ms = 100
+stake_distribution = "mainnet-shaped"
 
 [behaviour]
 kind = "lazy-voter"

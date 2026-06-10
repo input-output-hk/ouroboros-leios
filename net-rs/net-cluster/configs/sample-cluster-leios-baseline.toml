@@ -9,11 +9,6 @@
 # cluster reaches quorum on its own and to compute deltas when a
 # behaviour is enabled.
 
-num_nodes = 30
-degree = 3
-min_latency_ms = 5
-max_latency_ms = 100
-
 base_config = "net-node/configs/mainnet.toml"
 base_port = 30400
 seed = 42
@@ -21,6 +16,14 @@ output_events = "cluster-events-leios-baseline.jsonl"
 ordering_window_secs = 1.0
 aggregator_port = 9100
 stats_interval_secs = 1
-stake_distribution = "mainnet-shaped"
 rb_generation_probability = 0.05
 tx_rate = 1.0
+
+topology_source = "random"
+
+[topology_random]
+num_nodes = 30
+degree = 3
+min_latency_ms = 5
+max_latency_ms = 100
+stake_distribution = "mainnet-shaped"

@@ -5,14 +5,9 @@
 #
 # Stake distribution is `mainnet-shaped`: ~71% of nodes are relays
 # (stake = 0, no votes) and ~29% are pools sharing the total stake
-# uniformly.  With `num_nodes = 30` that yields ~9 pool nodes.
+# uniformly.  With `num_nodes = 25` that yields ~7 pool nodes.
 #
 # Behaviour invokes T21/T22 threat model, parameter description is given below.
-
-num_nodes = 25
-degree = 5
-min_latency_ms = 5
-max_latency_ms = 100
 
 base_config = "net-node/configs/mainnet.toml"
 base_port = 30300
@@ -21,9 +16,17 @@ output_events = "cluster-events-t22.jsonl"
 ordering_window_secs = 1.0
 aggregator_port = 9100
 stats_interval_secs = 1
-stake_distribution = "mainnet-shaped"
 rb_generation_probability = 0.05
 tx_rate = 1.0
+
+topology_source = "random"
+
+[topology_random]
+num_nodes = 25
+degree = 5
+min_latency_ms = 5
+max_latency_ms = 100
+stake_distribution = "mainnet-shaped"
 
 [behaviour]
 kind = "t22"

@@ -39,8 +39,14 @@ Rust implementation of the Cardano node-to-node (N2N) network stack, covering bo
 - Fork-aware chain tree for tracking and visualizing competing branches
 
 **Cluster orchestrator** — spawn and manage multi-node test networks:
-- Auto-generated random topology with configurable degree and edge delays
-- Stake distribution (equal, weighted, or zipf)
+- Two topology modes, selected by `topology_source = "random" | "yaml"`:
+  `"random"` reads `[topology_random]` (random connected graph with
+  configurable degree and edge delays); `"yaml"` reads `[topology_yaml]`
+  (load a `data/simulation/pseudo-mainnet/topology-v*.yaml` file — same
+  schema as `sim-rs` and `topology-checker`).  Only the selected mode's
+  section is read, and each section rejects unknown keys at parse time.
+- Stake distribution: `"equal"` or `"mainnet-shaped"` (random mode) /
+  YAML's per-node `stake` field (YAML mode)
 - HTTP telemetry aggregation from all nodes
 - Time-ordered event merge with watermark flushing to JSONL
 - Per-node log capture

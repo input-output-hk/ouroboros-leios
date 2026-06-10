@@ -81,11 +81,39 @@ export interface NodeSeriesPoint {
   blocks: number;
 }
 
+/**
+ * Mirrors net-cluster's topology config (see net-cluster/src/config.rs).
+ * `topology_source` is a scalar selector; the mode-specific params live in
+ * separate `topology_random` / `topology_yaml` objects.
+ */
+export type TopologySource = "random" | "yaml";
+
+export interface RandomTopologyConfig {
+  num_nodes: number;
+  degree: number;
+  min_latency_ms: number;
+  max_latency_ms: number;
+  stake_distribution: string;
+}
+
+export interface YamlTopologyConfig {
+  path: string;
+  node_limit?: number | null;
+}
+
 export interface ClusterControlConfig {
-  num_nodes?: number;
-  degree?: number;
-  min_latency_ms?: number;
-  max_latency_ms?: number;
+  /**
+   * Topology mode.  In a POST body, switches the mode (omit to leave
+   * unchanged).  From GET /api/config, reflects the cluster's current mode.
+   */
+  topology_source?: TopologySource | null;
+  /**
+   * Random-mode params.  In a POST body, replaces them wholesale (omit to
+   * leave unchanged).  From GET /api/config, reflects current values.
+   */
+  topology_random?: RandomTopologyConfig | null;
+  /** YAML-mode params; same semantics as `topology_random`. */
+  topology_yaml?: YamlTopologyConfig | null;
   seed?: number;
   node_config: Record<string, unknown>;
 }

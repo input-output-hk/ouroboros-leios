@@ -6,11 +6,6 @@
 # This spawns 25 nodes with degree-3 random topology, 5–250ms latency
 # (matching real intercontinental geography), and equal stake distribution.
 
-num_nodes = 25
-degree = 3
-min_latency_ms = 5
-max_latency_ms = 250
-
 # Base config shared by all nodes (genesis, protocol params, etc.)
 base_config = "net-node/configs/mainnet.toml"
 
@@ -32,9 +27,6 @@ aggregator_port = 9100
 # Stats reporting interval (seconds)
 stats_interval_secs = 1
 
-# Stake distribution
-stake_distribution = "equal"
-
 # Block production rate.  Mainnet Praos f_block ≈ 0.05/slot.  Higher
 # values pack more RBs into each Leios voting window, which means the
 # chain-tip RB likely moves past the EB-referencing RB before voters
@@ -49,3 +41,15 @@ rb_generation_probability = 0.05
 # end-to-end.  1.0 tx/s/node × 25 nodes ≈ 25 tx/s aggregate is enough
 # to overflow RB bodies into EBs without saturating txsubmission.
 tx_rate = 1.0
+
+# Topology mode selector.  "random" reads the [topology_random] section
+# below; "yaml" would read a [topology_yaml] section instead.
+topology_source = "random"
+
+# Random-graph parameters.  Unknown keys here are a parse-time error.
+[topology_random]
+num_nodes = 25
+degree = 3
+min_latency_ms = 5
+max_latency_ms = 250
+stake_distribution = "equal"
