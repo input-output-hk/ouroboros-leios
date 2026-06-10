@@ -8,9 +8,9 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use tokio::sync::watch;
 
-use shared_consensus::mempool::EbKey;
 use net_core::protocols::txsubmission::PendingTx;
 use net_core::types::{BlockBody, Point, WrappedHeader};
+use shared_consensus::mempool::EbKey;
 
 use crate::config::{DynamicConfig, ProductionConfig};
 
@@ -528,7 +528,8 @@ mod tests {
         let mempool = empty_mempool();
         assert!(producer.is_active());
         for slot in 0..100 {
-            let result = producer.try_produce_block(slot, None, slot + 1, false, &mempool, &empty_leios());
+            let result =
+                producer.try_produce_block(slot, None, slot + 1, false, &mempool, &empty_leios());
             assert!(result.is_some(), "should produce at slot {slot}");
             match result.unwrap().point {
                 Point::Specific { slot: s, .. } => assert_eq!(s, slot),
@@ -840,5 +841,4 @@ mod tests {
             .count();
         assert_eq!(wins_after, 100);
     }
-
 }

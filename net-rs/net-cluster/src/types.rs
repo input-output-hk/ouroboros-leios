@@ -102,7 +102,7 @@ pub struct AggregatedVotesHistory {
     /// In case of multiple statuses for a node, the max is taken: '1','G' > 'E' > 'R' > ' *' > '.'
     pub votes: Vec<String>,
 
-    pub votes_count: Vec<AggregatedVotesCount>
+    pub votes_count: Vec<AggregatedVotesCount>,
 }
 
 /// An ingested event with extracted metadata for aggregation.

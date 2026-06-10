@@ -255,7 +255,10 @@ mod tests {
             LeiosFetch::transition(
                 &State::StBlockTxs,
                 &Message::MsgLeiosBlockTxs {
-                    point: Point::Specific { slot: 1, hash: [0; 32] },
+                    point: Point::Specific {
+                        slot: 1,
+                        hash: [0; 32]
+                    },
                     bitmap: BTreeMap::new(),
                     transactions: vec![],
                 }
@@ -293,7 +296,10 @@ mod tests {
         assert!(LeiosFetch::transition(
             &State::StBlock,
             &Message::MsgLeiosBlockTxs {
-                point: Point::Specific { slot: 1, hash: [0; 32] },
+                point: Point::Specific {
+                    slot: 1,
+                    hash: [0; 32]
+                },
                 bitmap: BTreeMap::new(),
                 transactions: vec![],
             }

@@ -129,8 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tokio::sync::mpsc::channel::<config::ClusterControlConfig>(1);
     let (update_tx, mut update_rx) =
         tokio::sync::mpsc::channel::<std::collections::HashMap<String, serde_json::Value>>(16);
-    let (attack_tx, mut attack_rx) =
-        tokio::sync::mpsc::channel::<server::AttackCommand>(4);
+    let (attack_tx, mut attack_rx) = tokio::sync::mpsc::channel::<server::AttackCommand>(4);
     let initial_stakes: Vec<u64> = topo.nodes.iter().map(|n| n.stake).collect();
     let (server_state, _server_handle) = server::start(
         current_config.aggregator_port,
@@ -375,7 +374,9 @@ fn build_topology(
     total_stake: u64,
 ) -> Result<topology::Topology, Box<dyn std::error::Error + Send + Sync>> {
     match current_config.topology_source {
-        config::TopologySource::Random => Ok(topology::generate_random(current_config, total_stake)),
+        config::TopologySource::Random => {
+            Ok(topology::generate_random(current_config, total_stake))
+        }
         config::TopologySource::Yaml => {
             let yaml = &current_config.topology_yaml;
             topology::load_from_yaml(

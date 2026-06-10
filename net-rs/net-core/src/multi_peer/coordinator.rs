@@ -632,9 +632,7 @@ impl Coordinator {
                 // Position bodies by content hash → manifest index so a
                 // partial response from the upstream peer still lands
                 // at the right slots in our sparse holdings.
-                if let (Some(store), Point::Specific { slot, hash }) =
-                    (&self.leios_store, &point)
-                {
+                if let (Some(store), Point::Specific { slot, hash }) = (&self.leios_store, &point) {
                     if let Some(manifest) = store.get_eb_manifest(*slot, hash) {
                         let by_hash: HashMap<[u8; 32], u32> = manifest
                             .iter()
@@ -841,10 +839,7 @@ impl Coordinator {
                 point,
                 bitmap,
             } => {
-                self.send_peer_command(
-                    peer_id,
-                    PeerCommand::FetchLeiosBlockTxs { point, bitmap },
-                );
+                self.send_peer_command(peer_id, PeerCommand::FetchLeiosBlockTxs { point, bitmap });
             }
 
             NetworkCommand::InjectLeiosBlock { point, block } => {

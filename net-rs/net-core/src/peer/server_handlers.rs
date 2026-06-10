@@ -8,9 +8,7 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
-use shared_consensus::behaviour::{
-    BehaviourHandle, Outbound, OutboundDecision, OwnedOutbound,
-};
+use shared_consensus::behaviour::{BehaviourHandle, Outbound, OutboundDecision, OwnedOutbound};
 
 use crate::types::{BlockBody, Point, Tip, WrappedHeader};
 
@@ -534,7 +532,6 @@ fn notification_to_ln_msg(n: &crate::store::leios_store::LeiosNotification) -> L
 /// Sends notifications about available Leios data as the store is populated.
 /// Uses `LeiosStore::subscribe()` to wake when new items are injected.
 pub async fn serve_leios_notify(ln_send: CodecSend, ln_recv: CodecRecv, store: Arc<LeiosStore>) {
-
     let mut runner = Runner::<LeiosNotify>::new(Role::Server, ln_send, ln_recv);
     let mut read_index: usize = 0;
     let mut subscription = store.subscribe();

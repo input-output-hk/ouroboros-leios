@@ -7,6 +7,12 @@ use std::collections::{BTreeSet, HashMap};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use crate::config::{ActiveAttack, AttackRequest, ClusterControlConfig};
+use crate::topology::Topology;
+use crate::types::{
+    self, AggregatedVotesCount, AggregatedVotesHistory, EventWindow, IngestedEvent, NodeVotes,
+    StatsSnapshot, WINDOW_SIZE,
+};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -15,9 +21,6 @@ use axum::Json;
 use futures_util::stream::Stream;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tower_http::cors::CorsLayer;
-use crate::config::{ActiveAttack, AttackRequest, ClusterControlConfig};
-use crate::topology::Topology;
-use crate::types::{self, AggregatedVotesCount, AggregatedVotesHistory, EventWindow, IngestedEvent, NodeVotes, StatsSnapshot, WINDOW_SIZE};
 
 /// Control message sent from the HTTP handlers to the main loop for
 /// the runtime attack-trigger feature.
@@ -128,9 +131,9 @@ impl AggregatedVotes {
                     }
                 }
                 Some("LeiosElectionInfo") => {
-                    let pers_committee = msg.and_then(
-                        |m| m.get("pers_committee_member")).and_then(|c| c.as_bool()
-                    );
+                    let pers_committee = msg
+                        .and_then(|m| m.get("pers_committee_member"))
+                        .and_then(|c| c.as_bool());
                     // No event happens, so no slot update needed.
                     self.update_for_slot_node(node_id, slot, |mask| {
                         mask.perm_committee_member = pers_committee.is_some_and(|x| x);
@@ -256,17 +259,32 @@ fn log_interesting_event(event: &IngestedEvent) {
         Some("RBReceived") => {
             let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
             let len = msg.and_then(|m| m.get("len")).and_then(|l| l.as_u64());
-            tracing::info!("{}: received block (slot {:?}, len {:?})", event.node_id, slot, len);
+            tracing::info!(
+                "{}: received block (slot {:?}, len {:?})",
+                event.node_id,
+                slot,
+                len
+            );
         }
         Some("EBReceived") => {
             let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
             let len = msg.and_then(|m| m.get("len")).and_then(|l| l.as_u64());
-            tracing::info!("{}: received EB (slot {:?}, len {:?})", event.node_id, slot, len);
+            tracing::info!(
+                "{}: received EB (slot {:?}, len {:?})",
+                event.node_id,
+                slot,
+                len
+            );
         }
         Some("EBTxsReceived") => {
             let slot = msg.and_then(|m| m.get("slot")).and_then(|s| s.as_u64());
             let len = msg.and_then(|m| m.get("len")).and_then(|c| c.as_u64());
-            tracing::info!("{}: received EB txs (slot {:?}, count {:?})", event.node_id, slot, len);
+            tracing::info!(
+                "{}: received EB txs (slot {:?}, count {:?})",
+                event.node_id,
+                slot,
+                len
+            );
         }
         _ => {}
     }
@@ -285,7 +303,11 @@ async fn receive_events(
 
     for event in &events {
         log_interesting_event(event);
-        state.aggregate_votes.write().await.update_aggregated_event(event);
+        state
+            .aggregate_votes
+            .write()
+            .await
+            .update_aggregated_event(event);
     }
 
     {
@@ -473,11 +495,15 @@ async fn get_node_stats(
     }
 }
 
-async fn get_votes_history(
-    State(state): State<Arc<ServerState>>,
-) -> Json<AggregatedVotesHistory> {
-    let node_ids: Vec<String> = state.topology.read().await
-        .nodes.iter().map(|t| t.node_id.clone()).collect();
+async fn get_votes_history(State(state): State<Arc<ServerState>>) -> Json<AggregatedVotesHistory> {
+    let node_ids: Vec<String> = state
+        .topology
+        .read()
+        .await
+        .nodes
+        .iter()
+        .map(|t| t.node_id.clone())
+        .collect();
 
     let votes = state.aggregate_votes.read().await;
 
@@ -487,7 +513,7 @@ async fn get_votes_history(
     //          slot=last_slot-WINDOW_SIZE+1].
     let mut history = Vec::new();
     let mut votes_count = Vec::new();
-    for slot in ((last_slot+1).saturating_sub(WINDOW_SIZE)..=last_slot).rev() {
+    for slot in ((last_slot + 1).saturating_sub(WINDOW_SIZE)..=last_slot).rev() {
         let Some(node_statuses) = votes.events.get(&slot) else {
             history.push("".to_string());
             votes_count.push(AggregatedVotesCount::default());
@@ -518,21 +544,46 @@ async fn get_votes_history(
             //    often, so viewer will guess it from adjacent columns, no need to specify
             //    this info each time.
             str.push(match statuses {
-                Some(NodeVotes {vote_cast: true, eb_received: true, rb_received: true, ..}) => '1',
-                Some(NodeVotes {vote_cast: true, eb_generated: true, ..}) => 'G',
-                Some(NodeVotes {eb_received: true, rb_received: true, ..}) => 'E',
-                Some(NodeVotes {rb_received: true, ..}) => 'R',
-                Some(NodeVotes {perm_committee_member: true, eb_received: false, vote_cast: false, ..}) => '*',
-                Some(NodeVotes {perm_committee_member: false, eb_received: false, vote_cast: false, ..}) => '.',
+                Some(NodeVotes {
+                    vote_cast: true,
+                    eb_received: true,
+                    rb_received: true,
+                    ..
+                }) => '1',
+                Some(NodeVotes {
+                    vote_cast: true,
+                    eb_generated: true,
+                    ..
+                }) => 'G',
+                Some(NodeVotes {
+                    eb_received: true,
+                    rb_received: true,
+                    ..
+                }) => 'E',
+                Some(NodeVotes {
+                    rb_received: true, ..
+                }) => 'R',
+                Some(NodeVotes {
+                    perm_committee_member: true,
+                    eb_received: false,
+                    vote_cast: false,
+                    ..
+                }) => '*',
+                Some(NodeVotes {
+                    perm_committee_member: false,
+                    eb_received: false,
+                    vote_cast: false,
+                    ..
+                }) => '.',
                 None => '.',
-                _ => '?'
+                _ => '?',
             });
         }
         history.push(str);
         votes_count.push(count);
-    };
+    }
 
-    Json(AggregatedVotesHistory{
+    Json(AggregatedVotesHistory {
         last_slot,
         node_ids,
         votes: history, // TODO: serialize the full history of votes
@@ -896,22 +947,28 @@ mod tests {
             let mut node_map = HashMap::new();
             if slot % 2 == 0 {
                 // Committee-only slot (no real events)
-                node_map.insert("node-0".to_string(), NodeVotes {
-                    perm_committee_member: true,
-                    rb_received: false,
-                    eb_received: false,
-                    eb_generated: false,
-                    vote_cast: false,
-                });
+                node_map.insert(
+                    "node-0".to_string(),
+                    NodeVotes {
+                        perm_committee_member: true,
+                        rb_received: false,
+                        eb_received: false,
+                        eb_generated: false,
+                        vote_cast: false,
+                    },
+                );
             } else {
                 // Slot with real events
-                node_map.insert("node-0".to_string(), NodeVotes {
-                    perm_committee_member: true,
-                    rb_received: true,
-                    eb_received: slot >= 21,
-                    eb_generated: false,
-                    vote_cast: slot >= 31,
-                });
+                node_map.insert(
+                    "node-0".to_string(),
+                    NodeVotes {
+                        perm_committee_member: true,
+                        rb_received: true,
+                        eb_received: slot >= 21,
+                        eb_generated: false,
+                        vote_cast: slot >= 31,
+                    },
+                );
             }
             votes.events.insert(slot, node_map);
         }
@@ -928,7 +985,7 @@ mod tests {
             // All elder odd slots should have been removed
             if !votes.slots.contains(&slot) {
                 assert!(slot < *votes.slots.first().unwrap());
-                assert!(votes.events.iter().all(|(k,_v)| slot < *k));
+                assert!(votes.events.iter().all(|(k, _v)| slot < *k));
             }
         }
 

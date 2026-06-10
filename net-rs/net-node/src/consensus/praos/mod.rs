@@ -328,12 +328,8 @@ impl PraosConsensus {
     pub async fn on_validation_outcome(&mut self, outcome: LedgerOutcome) -> bool {
         let now = Instant::now();
         let (rolled_back, fx) = match outcome {
-            LedgerOutcome::Applied { point } => {
-                (false, self.state.on_block_applied(point, now))
-            }
-            LedgerOutcome::RolledBack { target } => {
-                (true, self.state.on_block_rolled_back(target))
-            }
+            LedgerOutcome::Applied { point } => (false, self.state.on_block_applied(point, now)),
+            LedgerOutcome::RolledBack { target } => (true, self.state.on_block_rolled_back(target)),
             LedgerOutcome::ApplyFailed { point, error } => {
                 self.state.on_block_apply_failed(point, error);
                 (false, Vec::new())
@@ -360,10 +356,9 @@ impl PraosConsensus {
 
     #[allow(dead_code)]
     pub fn local_tip(&self) -> Option<Tip> {
-        self.state.local_tip().map(|(point, block_no)| Tip {
-            point,
-            block_no,
-        })
+        self.state
+            .local_tip()
+            .map(|(point, block_no)| Tip { point, block_no })
     }
 
     pub fn chain_tree_snapshot(
@@ -411,10 +406,7 @@ impl PraosConsensus {
     /// For an RB at `point` carrying a CIP-0164 cert, return the
     /// parent RB's (slot, announced_eb_hash).  Used by the facade to
     /// drive `LeiosState::on_chain_endorsement` at apply time.
-    pub fn parent_announced_eb_for_cert(
-        &self,
-        point: &Point,
-    ) -> Option<(u64, [u8; 32])> {
+    pub fn parent_announced_eb_for_cert(&self, point: &Point) -> Option<(u64, [u8; 32])> {
         self.state.parent_announced_eb_for_cert(point)
     }
 }
@@ -423,12 +415,7 @@ impl PraosConsensus {
 // directly to exercise inner state without going through async I/O.
 #[cfg(test)]
 impl PraosConsensus {
-    pub(super) fn record_peer_tip(
-        &mut self,
-        peer_id: PeerId,
-        tip: &Tip,
-        header: &WrappedHeader,
-    ) {
+    pub(super) fn record_peer_tip(&mut self, peer_id: PeerId, tip: &Tip, header: &WrappedHeader) {
         let info = match header.parsed.as_ref() {
             Some(i) => i,
             None => return,
@@ -501,9 +488,9 @@ mod tests {
 
     use crate::validation::{LedgerOutcome, Validator};
 
-    use shared_consensus::peer_chain::PeerChainEntry;
-    use shared_consensus::praos::{IN_FLIGHT_TTL, SelectionDecision};
     use super::*;
+    use shared_consensus::peer_chain::PeerChainEntry;
+    use shared_consensus::praos::{SelectionDecision, IN_FLIGHT_TTL};
 
     /// Placeholder peer id for tests that don't care which peer announced
     /// the tip — consensus is expected to ignore the value during phase 2.
@@ -686,7 +673,11 @@ mod tests {
             })
             .await;
 
-        let chain = consensus.state.peer_chains.get(&peer).expect("chain exists");
+        let chain = consensus
+            .state
+            .peer_chains
+            .get(&peer)
+            .expect("chain exists");
         assert_eq!(chain.len(), 2);
         assert_eq!(chain.tip().unwrap().block_no, 2);
         assert_eq!(chain.tip().unwrap().prev_hash, Some(hash1));
@@ -1114,15 +1105,36 @@ mod tests {
         let h2 = [2u8; 32];
         let h3 = [3u8; 32];
         // Insert blocks 1, 2, 3 with prev_hash links, 1 has prev=None.
-        consensus
-            .state.chain_tree
-            .insert(h1, Point::Specific { slot: 1, hash: h1 }, 1, 1, None, 0, None, false);
-        consensus
-            .state.chain_tree
-            .insert(h2, Point::Specific { slot: 2, hash: h2 }, 2, 2, Some(h1), 0, None, false);
-        consensus
-            .state.chain_tree
-            .insert(h3, Point::Specific { slot: 3, hash: h3 }, 3, 3, Some(h2), 0, None, false);
+        consensus.state.chain_tree.insert(
+            h1,
+            Point::Specific { slot: 1, hash: h1 },
+            1,
+            1,
+            None,
+            0,
+            None,
+            false,
+        );
+        consensus.state.chain_tree.insert(
+            h2,
+            Point::Specific { slot: 2, hash: h2 },
+            2,
+            2,
+            Some(h1),
+            0,
+            None,
+            false,
+        );
+        consensus.state.chain_tree.insert(
+            h3,
+            Point::Specific { slot: 3, hash: h3 },
+            3,
+            3,
+            Some(h2),
+            0,
+            None,
+            false,
+        );
 
         let walk = consensus.walk_ancestors_hybrid(h3);
         assert_eq!(walk.chain, vec![h3, h2, h1]);
@@ -1168,7 +1180,8 @@ mod tests {
             false,
         );
         consensus
-            .state.block_cache
+            .state
+            .block_cache
             .insert(h_mid, cached(Some(h_anchor), 11, 11, h_mid));
 
         // Walk should cross from chain_tree (h_tip) into block_cache
@@ -1222,11 +1235,21 @@ mod tests {
         let h2 = [2u8; 32];
 
         // h1 goes into chain_tree as a valid genesis child.
-        consensus
-            .state.chain_tree
-            .insert(h1, Point::Specific { slot: 1, hash: h1 }, 1, 1, None, 0, None, false);
+        consensus.state.chain_tree.insert(
+            h1,
+            Point::Specific { slot: 1, hash: h1 },
+            1,
+            1,
+            None,
+            0,
+            None,
+            false,
+        );
         // h2 goes ONLY into block_cache.
-        consensus.state.block_cache.insert(h2, cached(Some(h1), 2, 2, h2));
+        consensus
+            .state
+            .block_cache
+            .insert(h2, cached(Some(h1), 2, 2, h2));
 
         let walk = consensus.walk_ancestors_hybrid(h2);
         assert_eq!(walk.chain, vec![h2, h1]);
@@ -1737,7 +1760,8 @@ mod tests {
         // adopted_tip should now be block 6.
         assert_eq!(
             consensus
-                .state.chain_tree
+                .state
+                .chain_tree
                 .block_number(&consensus.state.adopted_tip_hash.unwrap()),
             Some(6),
             "adopted tip should be 6 after fork switch"
@@ -2083,7 +2107,12 @@ mod tests {
         // Set the anchor to block 3 in our adopted chain (a known common
         // ancestor). The anchor hash must be in our chain_tree.
         let block3_hash = consensus.state.chain_tree.ancestors(adopted_hash)[2]; // [5, 4, 3]
-        let block3_point = consensus.state.chain_tree.point(&block3_hash).unwrap().clone();
+        let block3_point = consensus
+            .state
+            .chain_tree
+            .point(&block3_hash)
+            .unwrap()
+            .clone();
         consensus.record_peer_intersection(peer, &block3_point);
 
         // Peer announces blocks 64..68 with different hashes (different
@@ -2337,7 +2366,8 @@ mod tests {
         };
         consensus.record_peer_intersection(peer, &intersection);
         consensus
-            .state.peer_chains
+            .state
+            .peer_chains
             .get_mut(&peer)
             .unwrap()
             .append(PeerChainEntry {

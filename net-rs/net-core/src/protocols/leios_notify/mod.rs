@@ -218,11 +218,8 @@ mod tests {
             State::StIdle
         );
         assert_eq!(
-            LeiosNotify::transition(
-                &State::StBusy,
-                &Message::MsgLeiosVotes { votes: vec![] }
-            )
-            .unwrap(),
+            LeiosNotify::transition(&State::StBusy, &Message::MsgLeiosVotes { votes: vec![] })
+                .unwrap(),
             State::StIdle
         );
     }

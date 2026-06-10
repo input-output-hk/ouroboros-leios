@@ -12,12 +12,12 @@ use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::{mpsc, watch};
 
-use shared_consensus::chain_tree::ChainTreeEntry;
-use shared_consensus::fetch::PeerRttCache;
-use shared_consensus::leios::ChainTipContext;
 use crate::config::{CommitteeSelection, DynamicConfig, FetchPolicyConfig, StakeEntry};
 use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerOutcome, Validator};
+use shared_consensus::chain_tree::ChainTreeEntry;
+use shared_consensus::fetch::PeerRttCache;
+use shared_consensus::leios::ChainTipContext;
 
 pub use leios::{EbTxMatchOutcome, LeiosConsensus, PipelineConfig};
 pub use praos::PraosConsensus;
@@ -97,9 +97,8 @@ impl Consensus {
         leios.set_rtt(rtt);
         leios.set_eb_policy(fetch_policy.eb.into_eb_policy());
         leios.set_eb_txs_policy(fetch_policy.eb_txs.into_eb_txs_policy());
-        let behaviour_seed = rng_seed.unwrap_or_else(|| {
-            shared_consensus::behaviour::seed_from_node_id(praos.node_id_str())
-        });
+        let behaviour_seed = rng_seed
+            .unwrap_or_else(|| shared_consensus::behaviour::seed_from_node_id(praos.node_id_str()));
         // Install the shared behaviour handle on every state machine so
         // a stateful behaviour (equivocation variant store, peer
         // partition map, …) sees events from every layer and the
@@ -131,7 +130,11 @@ impl Consensus {
         spec: &shared_consensus::behaviour::BehaviourSpec,
         _mempool: &crate::mempool::SharedMempool,
     ) {
-        tracing::info!(?spec, behaviour_seed = self.behaviour_seed, "swapping per-node behaviour");
+        tracing::info!(
+            ?spec,
+            behaviour_seed = self.behaviour_seed,
+            "swapping per-node behaviour"
+        );
         shared_consensus::behaviour::swap_handle(&self.behaviour_handle, spec, self.behaviour_seed);
     }
 
@@ -165,7 +168,9 @@ impl Consensus {
         // alongside.  Borrow split is done by passing `praos.state()`
         // before mutably borrowing the leios layer.
         let praos = self.praos.state();
-        self.leios.state_mut().ask_rb_production_strategy(praos, slot)
+        self.leios
+            .state_mut()
+            .ask_rb_production_strategy(praos, slot)
     }
 
     /// Consult the behaviour for a deliberate self-reorg this slot and,
@@ -307,12 +312,8 @@ impl Consensus {
                 // for the parent's announced EB needs that EB recorded
                 // in `LeiosState` until its body validates locally.
                 // `BodyPath::decide` reads this for the next own RB.
-                if let Some((eb_slot, eb_hash)) =
-                    self.praos.parent_announced_eb_for_cert(point)
-                {
-                    self.leios
-                        .state
-                        .on_chain_endorsement(eb_slot, eb_hash);
+                if let Some((eb_slot, eb_hash)) = self.praos.parent_announced_eb_for_cert(point) {
+                    self.leios.state.on_chain_endorsement(eb_slot, eb_hash);
                 }
                 self.praos.on_validation_outcome(outcome).await
             }

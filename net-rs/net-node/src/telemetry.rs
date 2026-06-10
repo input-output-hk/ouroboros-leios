@@ -12,10 +12,10 @@ use net_core::store::leios_store::LeiosStoreStats;
 use serde::Serialize;
 use tracing::info;
 
+use crate::config::{EventSinkConfig, StatsSinkConfig, TelemetryConfig};
 use shared_consensus::chain_tree::ChainTreeEntry;
 use shared_consensus::leios::LeiosStateSizes;
 use shared_consensus::praos::PraosStateSizes;
-use crate::config::{EventSinkConfig, StatsSinkConfig, TelemetryConfig};
 
 // ---------------------------------------------------------------------------
 // Event types (sim-rs compatible JSONL format)

@@ -86,10 +86,7 @@ pub enum NetworkEvent {
     LeiosBlockReceived { point: Point, block: Vec<u8> },
 
     /// Leios: votes delivered inline by a peer (no fetch round-trip).
-    LeiosVotesReceived {
-        peer_id: PeerId,
-        votes: Vec<Vote>,
-    },
+    LeiosVotesReceived { peer_id: PeerId, votes: Vec<Vote> },
 
     /// Leios: fetched transactions for an EB arrived.
     LeiosBlockTxsReceived {
