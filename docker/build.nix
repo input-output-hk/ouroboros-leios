@@ -40,7 +40,7 @@
           # tx-centrifuge lives on a different cardano-node ref
           # (bench/leios snapshot) than the rest of the binaries; we
           # intentionally keep it pinned separately. Same hydraJobs shape.
-          tx-centrifuge-static = inputs.cardano-node-tx-centrifuge.hydraJobs.${system}.musl;
+          tx-centrifuge-static = inputs.cardano-node-tx-centrifuge.hydraJobs.${system}.musl.tx-centrifuge;
 
           # Streamed layered image: `nix build .#cardano-node-leios-image`
           # produces a script that, when run, writes the image tarball to
