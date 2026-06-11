@@ -78,6 +78,27 @@ const createCborTransformer = <T>(): TransformStream<Uint8Array, T> => {
   });
 };
 
+// Map legacy trace message type strings to current enum values
+const LEGACY_MESSAGE_TYPE_MAP: Record<string, EServerMessageType> = {
+  VTBundleGenerated: EServerMessageType.VotesGenerated,
+  VTBundleSent: EServerMessageType.VotesSent,
+  VTBundleReceived: EServerMessageType.VotesReceived,
+  TXGenerated: EServerMessageType.TxsGenerated,
+  TXSent: EServerMessageType.TxsSent,
+  TXReceived: EServerMessageType.TxsReceived,
+};
+
+const normalizeMessageType = (event: IServerMessage): IServerMessage => {
+  const mapped = LEGACY_MESSAGE_TYPE_MAP[event.message.type];
+  if (mapped) {
+    return {
+      ...event,
+      message: { ...event.message, type: mapped } as IServerMessage["message"],
+    };
+  }
+  return event;
+};
+
 // Base event types (always included)
 const BASE_VISUALIZATION_EVENTS = new Set([
   EServerMessageType.EBGenerated,
@@ -86,16 +107,16 @@ const BASE_VISUALIZATION_EVENTS = new Set([
   EServerMessageType.RBGenerated,
   EServerMessageType.RBSent,
   EServerMessageType.RBReceived,
-  EServerMessageType.VTBundleGenerated,
-  EServerMessageType.VTBundleSent,
-  EServerMessageType.VTBundleReceived,
+  EServerMessageType.VotesGenerated,
+  EServerMessageType.VotesSent,
+  EServerMessageType.VotesReceived,
 ]);
 
-// Transaction events (optional)
+// Txs events (optional)
 const TRANSACTION_EVENTS = new Set([
-  EServerMessageType.TransactionGenerated,
-  EServerMessageType.TransactionSent,
-  EServerMessageType.TransactionReceived,
+  EServerMessageType.TxsGenerated,
+  EServerMessageType.TxsSent,
+  EServerMessageType.TxsReceived,
 ]);
 
 const consumeStream = async (
@@ -130,12 +151,13 @@ const consumeStream = async (
     }
   };
 
-  for await (const serverMessage of stream) {
+  for await (const rawMessage of stream) {
     eventCount++;
+    const serverMessage = normalizeMessageType(rawMessage);
     const { message } = serverMessage;
 
     // Filter only visualization-relevant events
-    if (message.type !== "__unknown" && allowedEvents.has(message.type)) {
+    if (allowedEvents.has(message.type as EServerMessageType)) {
       filteredCount++;
       batch.push(serverMessage);
 

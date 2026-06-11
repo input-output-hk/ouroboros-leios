@@ -9,7 +9,9 @@
     "dev": "npm run fetch-geodata && vite",
     "build": "npm run fetch-geodata && tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "gen:schema": "node schema/generate.mjs",
+    "validate:traces": "node schema/validate.mjs"
   },
   "dependencies": {
     "@types/d3-force": "^3.0.10",
@@ -30,13 +32,16 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^4.7.0",
+    "ajv": "^8.17.1",
     "eslint": "^9.38.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^15.15.0",
+    "prettier": "^3.4.2",
     "tailwindcss": "^4.1.16",
     "typescript": "~5.7.3",
     "typescript-eslint": "^8.46.2",
+    "typescript-json-schema": "~0.65.1",
     "vite": "^6.4.1",
     "vite-plugin-node-polyfills": "^0.26.0"
   }

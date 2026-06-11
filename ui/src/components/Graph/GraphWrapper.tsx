@@ -3,20 +3,25 @@
 import { useSimContext } from "@/contexts/SimContext/context";
 import { FC } from "react";
 import { Canvas } from "./modules/Canvas";
+import { EdgeStats } from "./modules/EdgeStats";
 import { NodeStats } from "./modules/NodeStats";
 
 export const GraphWrapper: FC = ({}) => {
   const {
     state: {
-      graph: { currentNode },
+      graph: { currentNode, currentEdge },
     },
   } = useSimContext();
   return (
     <div className="w-full h-full relative">
       <Canvas />
       {currentNode ? (
-        <div className="absolute right-10 top-10">
+        <div className="absolute right-10 top-32">
           <NodeStats />
+        </div>
+      ) : currentEdge ? (
+        <div className="absolute right-10 top-32">
+          <EdgeStats />
         </div>
       ) : null}
     </div>

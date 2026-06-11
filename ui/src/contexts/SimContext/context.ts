@@ -21,6 +21,7 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
     byType: {},
   },
   lastAggregatedTime: 0,
+  chain: { rbs: new Map(), ebs: new Map() },
 };
 
 export const defaultState: ISimContextState = {
@@ -34,13 +35,14 @@ export const defaultState: ISimContextState = {
     canvasScale: 6,
   },
   aggregatedData: defaultAggregatedData,
+  selectedBlock: undefined,
   tracePath: "",
   lokiHost: undefined,
   lokiConnectionState: EConnectionState.NotConnected,
   topography: { links: new Map(), nodes: new Map() },
   topologyPath: "",
   topologyLoaded: false,
-  layoutMode: "original",
+  layoutMode: "auto",
   mercatorParams: null,
   mapGeoJson: null,
   events: [],

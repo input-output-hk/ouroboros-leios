@@ -8,7 +8,7 @@ type LeiosBlockKind = "IB" | "EB" | "VTBundle"
 type BlockKind = LeiosBlockKind | "RB";
 type BlockAction = "Generated";
 
-type Event =
+export type Event =
     | CpuEvent
     | BlockEvent
     | NetworkEvent
@@ -74,7 +74,7 @@ interface GeneratedEndorserBlock extends GeneratedBlockEvent {
     endorser_blocks: BlockRef[];
 }
 
-interface GeneratedVote extends GeneratedBlockEvent {
+export interface GeneratedVote extends GeneratedBlockEvent {
     id: string;
     pipeline: number;
     votes: { [eb: string]: number };
@@ -84,7 +84,7 @@ interface GeneratedRankingBlock extends GeneratedBlockEvent {
     endorsement: Endorsement | null;
     endorsements?: Endorsement[] | null;
     id: string;
-    tx_payload_bytes: number;
+    tx_payload_bytes?: number;
     parent: BlockRef | null;
 }
 
@@ -100,7 +100,7 @@ type NetworkAction = "Sent" | "Received"
 type NetworkEvent = SentEvent | ReceivedEvent;
 type NetworkEventType = NetworkEvent["type"];
 
-interface SentEvent {
+export interface SentEvent {
     type: `${BlockKind}Sent`;
     sender: string;
     recipient: string;
@@ -108,14 +108,16 @@ interface SentEvent {
     sending_s?: number;
     id: string;
     ids?: string[];
+    slot?: number;
 }
 
-interface ReceivedEvent {
+export interface ReceivedEvent {
     type: `${BlockKind}Received`;
     sender?: string;
     recipient: string;
     id: string;
     ids?: string[];
+    slot?: number;
 }
 
 export interface UnknownEvent {

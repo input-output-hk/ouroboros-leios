@@ -8,30 +8,33 @@ import {
   IEndorserBlockGenerated,
   IEndorserBlockSent,
   IEndorserBlockReceived,
-  ITransactionSent,
-  ITransactionReceived,
+  ITxsSent,
+  ITxsReceived,
+  IVotesGenerated,
+  IVotesSent,
+  IVotesReceived,
 } from "@/components/Sim/types";
 import { useRef } from "react";
 import { EConnectionState } from "@/contexts/SimContext/types";
 
 // TODO: Replace with topology-based mapping
 const HOST_PORT_TO_NODE: Record<string, string> = {
-  // demo-burst
-  "10.0.0.1:3001": "UpstreamNode",
-  "10.0.0.2:3002": "Node0",
-  "10.0.0.3:3003": "DownstreamNode",
+  // demo-burst with TC
+  "172.28.0.110:3001": "UpstreamNode",
+  "172.28.0.120:3002": "Node0",
+  "172.28.0.130:3003": "DownstreamNode",
+  // demo-burst without TC
+  "127.1.0.1:3001": "UpstreamNode",
+  "127.1.0.2:3002": "Node0",
+  "127.1.0.3:3003": "DownstreamNode",
   // demo-proto-devnet with TC
   "172.28.0.10:3001": "Node1",
   "172.28.0.20:3002": "Node2",
   "172.28.0.30:3003": "Node3",
   // demo-proto-devnet without TC
-  "127.0.0.1:3001": "Node1",
-  "127.0.0.1:3002": "Node2",
-  "127.0.0.1:3003": "Node3",
-  // docker immdb mock
-  "172.28.0.110:3001": "UpstreamNode",
-  "172.28.0.120:3002": "Node0",
-  "172.28.0.130:3003": "DownstreamNode",
+  "127.2.0.1:3001": "Node1",
+  "127.2.0.2:3002": "Node2",
+  "127.2.0.3:3003": "Node3",
   // Add more mappings as needed
 };
 
@@ -43,6 +46,31 @@ const getNodesFromConnection = (connectionId: string): [string, string] => {
     }
   }
   return ["UNKNOWN", "UNKNOWN"];
+};
+
+// Per-RB info accumulated across three correlated tracer events on the
+// producer, consumed when the producer adopts the block. Sized to a small
+// cap as a memory bound; in practice an entry lives only ~ms before being
+// consumed and deleted. Order on a producer for the same RB:
+//
+//   1. Consensus.LeiosKernel.TraceLeiosKernel { kind: TraceLeiosBlockCertified,
+//                                               atSlot, ebHash }
+//   2. Forge.Loop.ForgedBlock                 { block, blockNo, blockPrev, slot }
+//   3. Forge.Loop.AdoptedBlock                { blockHash, blockSize, slot }
+//
+// Step 1 is slot-keyed because the RB hash isn't known yet; step 2
+// promotes it to a hash-keyed entry; step 3 consumes.
+const PENDING_CAP = 256;
+const pendingCerts = new Map<string, string>(); // `${producer}:${slot}` → ebHash
+const pendingForges = new Map<
+  string,
+  { blockNo: number; blockPrev?: string; certifiesEbId?: string }
+>();
+
+const evictOldest = <K, V>(m: Map<K, V>, cap: number) => {
+  if (m.size < cap) return;
+  const k = m.keys().next().value;
+  if (k !== undefined) m.delete(k);
 };
 
 const parseRankingBlockGenerated = (
@@ -57,24 +85,63 @@ const parseRankingBlockGenerated = (
     // carries the tracer namespace; the `data` field is what Loki streams as
     // the log line, with the legacy `forgedBlock` wrapper flattened away.
     //
-    // ns=Forge.Loop.ForgedBlock
-    // {"block":"8ee35205...","blockNo":25,"blockPrev":"625d1f62...","kind":"TraceForgedBlock","slot":753}
+    // Two events together produce one RBGenerated, correlated by hash:
     //
-    // TODO: size_bytes is not in this event — the matching
-    // Forge.Loop.AdoptedBlock carries `blockSize`. Correlate by hash to
-    // populate. Until then, fall back to 0.
+    //   ns=Forge.Loop.ForgedBlock   (first)
+    //   {"block":"8ee35205...","blockNo":25,"blockPrev":"625d1f62...",
+    //    "kind":"TraceForgedBlock","slot":753}
+    //
+    //   ns=Forge.Loop.AdoptedBlock  (second, ~ms later, only on adoption)
+    //   {"blockHash":"8ee35205...","blockSize":87239,
+    //    "kind":"TraceAdoptedBlock","slot":753}
+    //
+    // ForgedBlock has parent/block_number, AdoptedBlock has size. We stash
+    // the former and emit the RBGenerated message on the latter — so a
+    // forged-but-not-adopted block (loser in a fork) doesn't appear in the
+    // chain view, which matches "what made it into the chain".
+
+    // Step 1: cert. The RB hash isn't known yet — stash by producer:slot.
+    if (
+      streamLabels.ns === "Consensus.LeiosKernel.TraceLeiosKernel" &&
+      log.kind === "TraceLeiosBlockCertified" &&
+      log.ebHash !== undefined &&
+      log.atSlot !== undefined
+    ) {
+      evictOldest(pendingCerts, PENDING_CAP);
+      pendingCerts.set(`${streamLabels.process}:${log.atSlot}`, log.ebHash);
+      return null;
+    }
+
+    // Step 2: forge. Promote the cert (if any) from slot-keyed to hash-keyed.
     if (streamLabels.ns === "Forge.Loop.ForgedBlock" && log.block) {
+      const certKey = `${streamLabels.process}:${log.slot}`;
+      const certifiesEbId = pendingCerts.get(certKey);
+      pendingCerts.delete(certKey);
+      evictOldest(pendingForges, PENDING_CAP);
+      pendingForges.set(log.block, {
+        blockNo: log.blockNo,
+        blockPrev: log.blockPrev,
+        certifiesEbId,
+      });
+      return null;
+    }
+
+    // Step 3: adopt. Emit a complete RBGenerated.
+    if (streamLabels.ns === "Forge.Loop.AdoptedBlock" && log.blockHash) {
+      const forged = pendingForges.get(log.blockHash);
+      pendingForges.delete(log.blockHash);
       const message: IRankingBlockGenerated = {
         type: EServerMessageType.RBGenerated,
-        id: log.block,
+        id: log.blockHash,
         slot: log.slot,
         producer: streamLabels.process,
-        size_bytes: 0, // TODO: add size_bytes
-        header_bytes: 0, // TODO: used? have we access to the header?
-        endorsement: null,
-        transactions: [], // TODO: used?
+        size_bytes: log.blockSize ?? 0,
+        endorsement: forged?.certifiesEbId
+          ? { eb: { id: forged.certifiesEbId } }
+          : null,
+        block_number: forged?.blockNo,
+        parent: forged?.blockPrev ? { id: forged.blockPrev } : null,
       };
-
       return {
         time_s: timestamp,
         message,
@@ -82,7 +149,7 @@ const parseRankingBlockGenerated = (
     }
   } catch (error) {
     console.warn(
-      "Failed to parse Forge.Loop.ForgedBlock log line:",
+      "Failed to parse Forge.Loop.{Forged,Adopted}Block log line:",
       logLine,
       error,
     );
@@ -200,9 +267,6 @@ const parseEndorserBlockGenerated = (
         slot: log.slot,
         producer: streamLabels.process,
         size_bytes: log.ebSize,
-        pipeline: 0, // XXX: unused
-        transactions: [], // TODO: used?
-        endorser_blocks: [], // XXX: not relevant for linear leios
       };
 
       return {
@@ -299,22 +363,19 @@ const parseEndorserBlockReceived = (
   return null;
 };
 
-// HACK: plain enumeration of txs to emulate a sequence number on these messages
-const nextTxId: Record<string, number> = {};
+const txsId = (msg: any): string => {
+  const bitmapStr = (msg.bitmaps || []).join(",");
+  return `txs-${msg.ebHash}-${bitmapStr}`;
+};
 
-const parseTransactionSent = (
+const parseTxsSent = (
   timestamp: number,
   logLine: string,
 ): IServerMessage | null => {
   try {
     const log = JSON.parse(logLine);
 
-    // TODO: indicate this is many transactions or visualize as a very big transaction
-
-    // From immdb-server (no ns)
-    // {"at":"2025-12-15T15:19:01.5108Z","connectionId":"0.0.0.0:3001 10.0.0.2:3002","direction":"Send","msg":{"kind":"MsgLeiosBlockTxs","numTxs":30,"txs":"<elided>","txsBytesSize":491520},"mux_at":"2025-12-15T15:19:01.5107Z","prevCount":235}
-    // From cardano-node ns=LeiosFetch.Remote.Send.BlockTxs
-    // {"kind":"Send","msg":{"kind":"MsgLeiosBlockTxs","numTxs":30,"txs":"\u003celided\u003e","txsBytesSize":491520},"mux_at":"2025-12-05T14:06:12.52467535Z","peer":{"connectionId":"127.0.0.1:3002 127.0.0.1:3003"}}
+    // {"kind":"Send","msg":{"kind":"MsgLeiosBlockTxs","numTxs":1200,"txsBytesSize":241200,"bitmaps":[...],"ebHash":"...","ebSlot":1221},"peer":{"connectionId":"..."}}
     if (
       (log.direction || log.kind) === "Send" &&
       log.msg &&
@@ -324,11 +385,44 @@ const parseTransactionSent = (
         log.peer?.connectionId || log.connectionId,
       );
 
-      const txId = `${log.msg.ebHash}-${log.msg.bitmaps.reduce((acc: string, bitmap: any) => acc + bitmap, "")}`;
+      const message: ITxsSent = {
+        type: EServerMessageType.TxsSent,
+        id: txsId(log.msg),
+        sender,
+        recipient,
+        num_txs: log.msg.numTxs || 0,
+        msg_size_bytes: log.msg.txsBytesSize,
+      };
 
-      const message: ITransactionSent = {
-        type: EServerMessageType.TransactionSent,
-        id: txId,
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.error("Failed to parse TxsSent log line:", logLine, error);
+  }
+
+  return null;
+};
+
+const parseTxsReceived = (
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // {"kind":"Recv","msg":{"kind":"MsgLeiosBlockTxs","numTxs":1200,"txsBytesSize":241200,"bitmaps":[...],"ebHash":"...","ebSlot":1221},"peer":{"connectionId":"..."}}
+    if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlockTxs") {
+      const [recipient, sender] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
+
+      const message: ITxsReceived = {
+        type: EServerMessageType.TxsReceived,
+        id: txsId(log.msg),
+        num_txs: log.msg.numTxs || 0,
         sender,
         recipient,
         msg_size_bytes: log.msg.txsBytesSize,
@@ -340,35 +434,42 @@ const parseTransactionSent = (
       };
     }
   } catch (error) {
-    console.error("Failed to parse TransactionSent log line:", logLine, error);
+    console.warn("Failed to parse TxsReceived log line:", logLine, error);
   }
 
   return null;
 };
 
-const parseTransactionReceived = (
+const parseVotesGenerated = (
+  streamLabels: any,
   timestamp: number,
   logLine: string,
 ): IServerMessage | null => {
   try {
     const log = JSON.parse(logLine);
 
-    // From cardano-node ns=LeiosFetch.Remote.Receive.BlockTxs
-    // {"mux_at":"2025-12-05T14:06:12.52499731Z","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"},"kind":"Recv","msg":{"txsBytesSize":491520,"kind":"MsgLeiosBlockTxs","numTxs":30,"txs":"\u003celided\u003e"}}
-    if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlockTxs") {
-      const [recipient, sender] = getNodesFromConnection(
-        log.peer?.connectionId,
-      );
-
-      // FIXME: msg.txs is always elided
-      const txId = nextTxId[recipient] || 0;
-      nextTxId[recipient] = txId + 1;
-
-      const message: ITransactionReceived = {
-        type: EServerMessageType.TransactionReceived,
-        id: txId.toString(),
-        sender,
-        recipient,
+    // {"kind":"LeiosVoted","vote":{"slot":76,"ebHash":"...","voterId":228,"voteSignature":true},
+    //  "weight":0.333}
+    //
+    // `weight` is a stake fraction in [0,1]. The network-side
+    // `MsgLeiosVotes` still doesn't carry weight; only the producer's
+    // `LeiosVoted` does. See aggregator for how it's summed per EB.
+    if (log.kind === "LeiosVoted") {
+      const weight = typeof log.weight === "number" ? log.weight : undefined;
+      const message: IVotesGenerated = {
+        type: EServerMessageType.VotesGenerated,
+        id: `vote-${log.vote.slot}-${log.vote.voterId}-${log.vote.ebHash}`,
+        slot: log.vote.slot,
+        producer: streamLabels.process,
+        size_bytes: 100,
+        votes: [
+          {
+            voterId: log.vote.voterId,
+            ebHash: log.vote.ebHash,
+            slot: log.vote.slot,
+            weight,
+          },
+        ],
       };
 
       return {
@@ -377,11 +478,97 @@ const parseTransactionReceived = (
       };
     }
   } catch (error) {
-    console.warn(
-      "Failed to parse TransactionReceived log line:",
-      logLine,
-      error,
-    );
+    console.warn("Failed to parse LeiosVoted log line:", logLine, error);
+  }
+
+  return null;
+};
+
+const parseVotesSent = (
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // New: {"kind":"Send","msg":{"kind":"MsgLeiosVotes","votes":[{"ebHash":"...","slot":76,"voteSignature":true,"voterId":228}]},"mux_at":"...","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"}}
+    // Old (pre-rename): votes carried `electionId` instead of `slot`.
+    if (
+      (log.direction || log.kind) === "Send" &&
+      log.msg &&
+      log.msg.kind === "MsgLeiosVotes"
+    ) {
+      const [sender, recipient] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
+
+      const votes = (log.msg.votes || []).map((v: any) => ({
+        voterId: v.voterId,
+        ebHash: v.ebHash,
+        slot: v.slot ?? v.electionId,
+      }));
+      const firstVote = votes[0] || {};
+      const voteId = `vote-${firstVote.slot}-${firstVote.voterId}-${firstVote.ebHash}`;
+
+      const message: IVotesSent = {
+        type: EServerMessageType.VotesSent,
+        slot: firstVote.slot || 0,
+        id: voteId,
+        sender,
+        recipient,
+        votes,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.error("Failed to parse VotesSent log line:", logLine, error);
+  }
+
+  return null;
+};
+
+const parseVotesReceived = (
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // New: {"kind":"Recv","msg":{"kind":"MsgLeiosVotes","votes":[{"voterId":228,"ebHash":"...","slot":76,"voteSignature":true}]},"mux_at":"...","peer":{"connectionId":"127.0.0.1:3001 127.0.0.1:3002"}}
+    // Old (pre-rename): votes carried `electionId` instead of `slot`.
+    if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosVotes") {
+      const [recipient, sender] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
+
+      const votes = (log.msg.votes || []).map((v: any) => ({
+        voterId: v.voterId,
+        ebHash: v.ebHash,
+        slot: v.slot ?? v.electionId,
+      }));
+      const firstVote = votes[0] || {};
+      const voteId = `vote-${firstVote.slot}-${firstVote.voterId}-${firstVote.ebHash}`;
+
+      const message: IVotesReceived = {
+        type: EServerMessageType.VotesReceived,
+        slot: firstVote.slot || 0,
+        id: voteId,
+        sender,
+        recipient,
+        votes,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to parse VotesReceived log line:", logLine, error);
   }
 
   return null;
@@ -394,7 +581,7 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
   // 3. Loki naturally returns results in chronological order within a single stream
   // 4. Sorting large event arrays in the reducer is too expensive for dense simulation data
   const query =
-    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock"';
+    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|TraceAdoptedBlock|TraceLeiosBlockCertified|MsgLeiosVotes|LeiosVoted"';
   const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${encodeURIComponent(query)}&limit=5000`;
 
   let hasAutoStartedPlayback = false;
@@ -449,8 +636,11 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
                     parseEndorserBlockGenerated(stream.stream, ts, logLine) ||
                     parseEndorserBlockSent(ts, logLine) ||
                     parseEndorserBlockReceived(ts, logLine) ||
-                    parseTransactionSent(ts, logLine) ||
-                    parseTransactionReceived(ts, logLine);
+                    parseTxsSent(ts, logLine) ||
+                    parseTxsReceived(ts, logLine) ||
+                    parseVotesGenerated(stream.stream, ts, logLine) ||
+                    parseVotesSent(ts, logLine) ||
+                    parseVotesReceived(ts, logLine);
                   if (event) {
                     console.warn(
                       "Parsed",

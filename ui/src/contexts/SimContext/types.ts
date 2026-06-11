@@ -1,11 +1,11 @@
-import { IServerMessage, ITransformedNodeMap } from "@/components/Sim/types";
+import { IServerMessage, ITransformedNodeMap, IVote } from "@/components/Sim/types";
 import { Dispatch, RefObject } from "react";
 
 // Types of messages submitted between nodes
 export enum EMessageType {
   EB = "eb",
   RB = "rb",
-  TX = "tx",
+  Txs = "txs",
   Votes = "votes",
 }
 
@@ -33,6 +33,40 @@ export interface ISimulationGlobalData {
   leiosTxOnChain: number;
 }
 
+export interface IChainRB {
+  id: string;
+  slot: number;
+  blockNumber?: number;
+  producer: string;
+  sizeBytes: number;
+  parentId?: string;
+  certifiesEbId?: string;
+  announcesEbId?: string;
+}
+
+export interface IChainEB {
+  id: string;
+  slot: number;
+  producer: string;
+  sizeBytes: number;
+  // FIXME: temporary proxy — count of `Vote` records seen targeting this EB.
+  // Replace with proper sum-of-vote-weights / total-stake once the trace
+  // carries vote weights (especially from the real cardano-node prototype).
+  voteCount?: number;
+}
+
+export interface IChainState {
+  rbs: Map<string, IChainRB>;
+  ebs: Map<string, IChainEB>;
+  /** Wall-clock time at which slot 0 happened. Computed once from the
+   *  first observed RBGenerated event as `time_s - slot`, assuming a
+   *  1-second slot duration. Used by the renderer to map `currentTime`
+   *  to a slot number, so the leading-edge projection works whether
+   *  `currentTime` is epoch-seconds (Loki) or trace-relative (simulator).
+   *  Undefined until the first RB is seen. */
+  slotZeroTime?: number;
+}
+
 export interface IMessageAnimation {
   id: string;
   type: EMessageType;
@@ -42,13 +76,16 @@ export interface IMessageAnimation {
   receivedTime: number;
   progress: number; // 0-1, calculated based on current timeline position
   sizeBytes: number; // payload size for visual scaling
+  slot?: number;
+  votes?: IVote[];
+  numTxs?: number;
 }
 
 export interface IMessageTypeCounts {
   [EMessageType.RB]: number;
   [EMessageType.EB]: number;
   [EMessageType.Votes]: number;
-  [EMessageType.TX]: number;
+  [EMessageType.Txs]: number;
 }
 
 export interface IEdgeState {
@@ -72,6 +109,7 @@ export interface ISimulationAggregatedDataState {
     byType: Record<string, number>;
   };
   lastAggregatedTime: number; // Timestamp up to which aggregation was last computed
+  chain: IChainState; // Blockchain entities derived from RBGenerated/EBGenerated up to currentTime
 }
 
 export interface IGraphContextState {
@@ -80,9 +118,10 @@ export interface IGraphContextState {
   canvasOffsetX: number;
   canvasOffsetY: number;
   currentNode?: string;
+  currentEdge?: string; // Edge key "source|target" (sorted)
 }
 
-export type LayoutMode = "original" | "auto" | "circular" | "mercator";
+export type LayoutMode = "none" | "auto" | "circular" | "mercator";
 
 export interface MercatorParams {
   xOffset: number;
@@ -103,6 +142,18 @@ export interface IScenario {
   duration: number;
   trace?: string;
   loki?: string;
+  // Total vote weight per pipeline; used as the certification denominator
+  // in the chain view. For sim-rs wfa-ls traces this is the sum of
+  // `persistent-vote-generation-probability + non-persistent-...` (default
+  // 500), letting us treat lottery hit counts as stake-like weights.
+  // When absent we assume per-vote weights already sum to ≤1.0 (the
+  // prototype's eventual stake-weighted shape).
+  totalVotes?: number;
+}
+
+export interface ISelectedBlock {
+  kind: "rb" | "eb";
+  id: string;
 }
 
 export interface ISimContextState {
@@ -111,6 +162,7 @@ export interface ISimContextState {
   autoStart: boolean;
   graph: IGraphContextState;
   aggregatedData: ISimulationAggregatedDataState;
+  selectedBlock?: ISelectedBlock;
   tracePath: string;
   lokiHost?: string;
   lokiConnectionState: EConnectionState;
@@ -132,6 +184,7 @@ export type TSimContextActions =
   | { type: "SET_SCENARIOS"; payload: IScenario[] }
   | { type: "SET_SCENARIO"; payload: string; autoStart?: boolean }
   | { type: "SET_CURRENT_NODE"; payload: string | undefined }
+  | { type: "SET_CURRENT_EDGE"; payload: string | undefined }
   | {
       type: "SET_CANVAS_PROPS";
       payload: Partial<{
@@ -155,7 +208,8 @@ export type TSimContextActions =
   | { type: "SET_LAYOUT_MODE"; payload: LayoutMode }
   | { type: "SET_NODE_POSITIONS"; payload: Map<string, { fx: number; fy: number }> }
   | { type: "SET_MERCATOR_PARAMS"; payload: MercatorParams | null }
-  | { type: "SET_MAP_GEOJSON"; payload: GeoJSON.FeatureCollection };
+  | { type: "SET_MAP_GEOJSON"; payload: GeoJSON.FeatureCollection }
+  | { type: "SET_SELECTED_BLOCK"; payload: ISelectedBlock | undefined };
 
 export interface ISimContext {
   state: ISimContextState;

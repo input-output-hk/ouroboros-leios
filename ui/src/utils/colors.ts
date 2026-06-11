@@ -2,9 +2,9 @@
 // These colors are used consistently across pie charts, network animations, and node activities
 
 export enum EMessageColor {
-  TX = "#26de81",
+  TXS = "#26de81",
   EB = "#4b7bec",
-  VOTES = "#2d98da",
+  VOTES = "#9b59b6",
   RB = "#fc5c65",
 }
 
