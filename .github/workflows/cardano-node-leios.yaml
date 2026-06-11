@@ -6,6 +6,8 @@ name: "cardano-node-leios"
 #   1. A workflow artifact of statically-linked x86_64-linux binaries.
 #   2. A minimal `cardano-node-leios` docker image on GHCR.
 #   3. A derived `cardano-node-testnet` image (pinned testnet configs).
+#   4. A draft GitHub release (on tag pushes only) with the static
+#      binaries attached and the annotated tag's body as release notes.
 #
 # Runs on every PR + push to main so the artifacts are fresh and the
 # nix build keeps working as the flake inputs evolve. The
@@ -182,3 +184,50 @@ jobs:
             BASE_IMAGE=${{ steps.build-base.outputs.ref }}
           cache-from: type=gha,scope=cardano-node-testnet
           cache-to: type=gha,mode=max,scope=cardano-node-testnet
+
+  draft-release:
+    name: "Draft GitHub release"
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          # Need the tag object itself (annotation), not just the tip commit.
+          fetch-depth: 0
+
+      - name: Download static binaries artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cardano-node-leios-static-linux-x86_64-${{ github.sha }}
+          path: artifacts/
+
+      - name: Extract tag annotation body
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          # %(contents:body) yields the annotation body (subject + blank
+          # line stripped, PGP signature excluded). Fall back to the
+          # whole contents for lightweight or subject-only tags.
+          git tag -l --format='%(contents:body)' "$tag" > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            git tag -l --format='%(contents)' "$tag" > release-notes.md
+          fi
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          gh release create "$tag" \
+            --draft \
+            --title "$tag" \
+            --notes-file release-notes.md \
+            artifacts/cardano-node \
+            artifacts/cardano-cli \
+            artifacts/SHA256SUMS
