@@ -538,6 +538,10 @@
         },
         "voterId": {
           "type": "number"
+        },
+        "weight": {
+          "description": "Stake-weighted vote weight, as a fraction of total stake in [0,1].\nCurrently only carried by the producer's `LeiosVoted` trace; the\nnetwork-side `MsgLeiosVotes` doesn't surface weights yet.",
+          "type": "number"
         }
       },
       "required": ["ebHash", "voterId"],
