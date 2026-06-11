@@ -48,6 +48,9 @@ site/static/formal-spec/
 result
 result-*
 
+# Workflow-staged binaries (e.g. tx-centrifuge for the devnet image)
+antithesis/artifacts/
+
 /.dir-locals.el
 
 # Vite dev cache
