@@ -9,7 +9,7 @@ mkdir "$NODE0_DIR"
 echo "Working directory created for node0: $NODE0_DIR"
 
 jq \
-  --argjson port "$PORT_UPSTREAM_NODE" \
+  --argjson port 3001 \
   --arg address "$IP_UPSTREAM_NODE" \
   '.localRoots[0].accessPoints[0].port = $port | .localRoots[0].accessPoints[0].address = $address' \
   "$DATA_DIR/topology.template.json" >"$NODE0_DIR/topology.json"

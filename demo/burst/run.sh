@@ -39,15 +39,9 @@ if [ "$TC" = "1" ]; then
   : "${IP_NODE0:=10.0.0.2}"
   : "${IP_DOWNSTREAM_NODE:=10.0.0.3}"
 
-  # Traffic control settings
-  : "${RATE_UP_TO_N0:=10Mbps}"
-  : "${DELAY_UP_TO_N0:=200ms}"
-  : "${RATE_N0_TO_UP:=10Mbps}"
-  : "${DELAY_N0_TO_UP:=200ms}"
-  : "${RATE_N0_TO_DOWN:=10Mbps}"
-  : "${DELAY_N0_TO_DOWN:=200ms}"
-  : "${RATE_DOWN_TO_N0:=10Mbps}"
-  : "${DELAY_DOWN_TO_N0:=200ms}"
+# Traffic control settings
+: "${RATE:=10mbit}"
+: "${DELAY:=200}"
 else
   # Each node on its own loopback IP — cardano-node uses host-addr as
   # the source IP for outbound sockets, so sharing 127.0.0.1 would
@@ -122,9 +116,23 @@ echo "Starting burst demo with process-compose..."
 echo "  WORKING_DIR: $WORKING_DIR"
 echo "  CLUSTER_RUN: $CLUSTER_RUN"
 echo "  REF_SLOT: $REF_SLOT"
+echo "  Traffic control: ${RATE} / ${DELAY}ms"
+
+cleanup() {
+  echo "Cleaning up network namespaces..."
+  sudo ip netns del "leios-experiment:upstream" 2>/dev/null || true
+  sudo ip netns del "leios-experiment:node0" 2>/dev/null || true
+  sudo ip netns del "leios-experiment:downstream" 2>/dev/null || true
+  # Clean up host-side veth interfaces in case they weren't removed with the namespace
+  sudo ip link del "host->up" 2>/dev/null || true
+  sudo ip link del "host->n0" 2>/dev/null || true
+  sudo ip link del "host->down" 2>/dev/null || true
+}
+
 if [ "$TC" = "1" ]; then
-  echo "  Traffic control: enabled TC=${TC} (${RATE_UP_TO_N0} / ${DELAY_UP_TO_N0})"
+  echo "  Traffic control: enabled TC=${TC} (${RATE} / ${DELAY}ms)"
   PC_FILE="process-compose.yaml"
+  trap cleanup EXIT
 else
   echo "  Traffic control: disabled TC=${TC} (nodes on distinct loopback)"
   PC_FILE="process-compose-no-tc.yaml"
