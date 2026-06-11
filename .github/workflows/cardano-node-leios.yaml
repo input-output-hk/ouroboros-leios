@@ -197,8 +197,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
-          # Need the tag object itself (annotation), not just the tip commit.
+          # `fetch-tags` is needed in addition to `fetch-depth: 0` because
+          # checkout only fetches the single triggering ref by default,
+          # which leaves annotated tag *objects* (and thus their bodies)
+          # absent from the local repo.
           fetch-depth: 0
+          fetch-tags: true
 
       - name: Download static binaries artifact
         uses: actions/download-artifact@v4
@@ -213,10 +217,12 @@ jobs:
           # %(contents:body) yields the annotation body (subject + blank
           # line stripped, PGP signature excluded). Fall back to the
           # whole contents for lightweight or subject-only tags.
-          git tag -l --format='%(contents:body)' "$tag" > release-notes.md
+          git for-each-ref "refs/tags/${tag}" --format='%(contents:body)' > release-notes.md
           if [ ! -s release-notes.md ]; then
-            git tag -l --format='%(contents)' "$tag" > release-notes.md
+            git for-each-ref "refs/tags/${tag}" --format='%(contents)' > release-notes.md
           fi
+          echo "--- release-notes.md ($(wc -c < release-notes.md) bytes) ---"
+          cat release-notes.md
 
       - name: Draft release
         env:
@@ -224,9 +230,13 @@ jobs:
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
+          # Prettify the tag name for the release title:
+          # `prototype-2026w24` → `Prototype 2026w24`.
+          title="${tag//-/ }"
+          title="${title^}"
           gh release create "$tag" \
             --draft \
-            --title "$tag" \
+            --title "$title" \
             --notes-file release-notes.md \
             artifacts/cardano-node \
             artifacts/cardano-cli \
