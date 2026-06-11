@@ -26,20 +26,22 @@ nix run .#ui-live
 
 ## Add a scenario from sim-rs
 
-To prepare a scenario to visualize, find or add the topology to the public directory, for example:
+The Rust Leios simulator (`sim-rs`) and a few baseline topologies (`small.yaml`,
+`thousand.yaml`) now live in [cardano-scaling/leios-tools](https://github.com/cardano-scaling/leios-tools).
+Bundled topologies in `public/topologies/` are kept here directly.
 
-```sh
-mkdir -p public/topologies
-ln -sr ../sim-rs/test_data/small.yaml public/topologies/small.yaml
-```
-
-And generate a trace to visualize using the built `sim-rs`, for example using the CIP scenario:
+To add a new topology, drop the YAML file in `public/topologies/`. Then generate
+a trace to visualize with a build of `sim-rs` from the leios-tools repo, for
+example using the CIP scenario:
 
 ```bash
 mkdir -p public/traces
 cat ../analysis/sims/cip/experiments/NA,0.200/config.yaml \
   | jq '."tx-start-time" = 20' > public/traces/config-200txkbs.json
-../sim-rs/target/release/sim-cli -p public/traces/config-200txkbs.json public/topologies/small.yaml public/traces/small-200txkbs.jsonl -s 120
+/path/to/leios-tools/sim-rs/target/release/sim-cli \
+  -p public/traces/config-200txkbs.json \
+  public/topologies/small.yaml \
+  public/traces/small-200txkbs.jsonl -s 120
 ```
 
 You might want to filter out `Cpu` events (not visualized) and compress the trace:
