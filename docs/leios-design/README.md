@@ -468,6 +468,10 @@ The per-component view of these risks (latency overheads in the Ledger, Network,
 
 The Network layer implements the mini-protocols that enable the Consensus layer to satisfy its diffusion requirements (**REQ-DiffuseLeiosBlocks**, **REQ-DiffuseLeiosVotes**) and prioritization requirements (**REQ-PrioritizePraosOverLeios**, **REQ-PrioritizeFreshOverStaleLeios**) defined in the [Resource management](#resource-management) section. While Consensus drives the scheduling logic for when to diffuse blocks and votes, Network provides the protocol mechanisms to actually transmit them over the peer-to-peer network.
 
+> [!WARNING]
+>
+> TODO: Write out the actual risk and requirements from above, and what it means on the network layer
+
 - **RSK-LeiosNetworkingOverheadLatency**: Same as RSK-LeiosLedgerOverheadLatency, but for the Diffusion Layer components handling frequent 15000% bursts in a caught-up node.
 
 ### Message latencies
@@ -478,20 +482,32 @@ Due to extra volume that Leios imposes on the protocol, it is imperative that th
 >
 > TODO: investigate possibility to use TCP_NOTSENT_LOWAT on cardano network despite its non-portability.
 
-### Transaction submission
+### High-throughput transaction submission
 
-Current cardano-node (10.7, at the time of this writing) is by default using the legacy transaction submission protocol which fetches all transactions from every peer that offers them, even if some of those transactions are repeated. This scheme is found to be effective and robust in the current protocol implementation, but it necessarily leads to higher bandwidth consumption. A new protocol version v2 is being rolled out and tested, which is expected to bring cpu, memory and bandwidth use down, which in turn frees those resources for other tasks, and Leios in particular.
+Leios raises the protocol's target consensus data rate well above Praos. Since the available transaction volume always exceeds what consensus can include, the transaction submission layer between mempools must sustain throughput that exceeds the target consensus data rate — otherwise the [high-throughput mempool](#high-throughput-mempool) will starve and EBs will not fill.
+
+- **REQ-LeiosTxSubmissionThroughput** The transaction submission protocol must sustain a data rate exceeding the target Leios consensus data rate across realistic peer valencies.
+
+Current cardano-node (10.7, at the time of this writing) is by default using the legacy transaction submission protocol which fetches all transactions from every peer that offers them, even if some of those transactions are repeated. This scheme is found to be effective and robust in the current protocol implementation, but it necessarily leads to higher bandwidth consumption. A new protocol version v2 is being rolled out and tested, which is expected to bring cpu, memory and bandwidth use down, which in turn frees those resources for other tasks, and Leios in particular. Of the v2 variants, the "v2 undecision" variant has shown the highest sustained data rates across realistic peer valencies and is therefore the candidate that best fits **REQ-LeiosTxSubmissionThroughput**.
 
 ### New mini-protocols
 
 The node must include new mini-protocols (**NEW-LeiosMiniProtocols**) to diffuse EB announcements, EBs themselves, EBs' transactions, and votes for EBs. These protocols enable the Consensus layer to satisfy **REQ-DiffuseLeiosBlocks** and **REQ-DiffuseLeiosVotes**. The Leios mini-protocols will require new fetch decision logic (**NEW-LeiosFetchDecisionLogic**), since the node should not necessarily simply download every such object from every peer that offers it. Such fetch decision logic is also required for TxSubmission and for Peras votes; the Leios logic will likely be similar but not equivalent.
 
+> [!WARNING]
+>
+> TODO: anything to add on top of what is in the CIP?
+> TODO: leios fetch decision logic is more a consensus thing?
+
 ### Traffic prioritization
 
-The existing multiplexer is intentionally fair amongst the different mini-protocols. In the current CIP, the Praos traffic and Leios traffic are carried by different mini-protocols. Therefore, introducing a simple bias in the multiplexer (**NEW-LeiosPraosMuxBias**) to strongly (TODO fully?) prefer sending messages from Praos mini protocols over messages from Leios mini protocols would directly enable the Consensus layer to satisfy **REQ-PrioritizePraosOverLeios** and mitigate **RSK-LeiosPraosContentionNetworkBandwidth**. This multiplexer bias is the primary mechanism to ensure that Praos traffic and computation are prioritized over Leios, so that the diffusion and adoption of any RB is only negligibly slower.
+The existing multiplexer is intentionally fair amongst the different mini-protocols. In the current CIP, the Praos traffic and Leios traffic are carried by different mini-protocols. Therefore, introducing a simple bias in the multiplexer (**NEW-LeiosPraosMuxBias**) to prefer sending messages from Praos mini protocols over messages from Leios mini protocols would directly enable the Consensus layer to satisfy **REQ-PrioritizePraosOverLeios** and mitigate **RSK-LeiosPraosContentionNetworkBandwidth**. This multiplexer bias is the primary candidate mechanism to ensure that Praos traffic and computation are prioritized over Leios, so that the diffusion and adoption of any RB is only negligibly slower.
+
+> [!WARNING]
+>
+> TODO: How much prioritization is actually needed? The existing fair multiplexer may already be sufficient to keep Praos > Leios in practice, in which case **NEW-LeiosPraosMuxBias** can be skipped or weakened. Prototypes should measure this before committing to a strong (or full) Praos-over-Leios bias.
 
 It is not yet clear how best to mitigate **RSK-LeiosLeiosContentionNetworkBandwidth** or, more generally, how to enable the Consensus layer to satisfy **REQ-PrioritizeFreshOverStaleLeios** (aka freshest first delivery) in the Network Layer. One notable option is to "rotate" the two proposed Leios mini-protocols into a less natural pair: one would send all requests and only requests and the other would send all replies and only replies. In that way, the server can—when it has received multiple outstanding requests, which seems likelying during ATK-LeiosProtocolBurst—reply to requests in a different order than the client sent them, which is inevitable since the client will commonly request an EB as soon it's offered, which means the client will request maximally fresh EBs after having requesting less fresh EBs. If the client were to avoid sending any request that requires a massive atomic reply (eg a MsgLeiosBlockTxsRequest for 10 megabytes), then the server can prioritize effectively even without needing to implement any kind of preemption mechanism. This option can be formulated in the existing mini protocol infrastructure, but another option would be to instead enrich the mini-protocol infrastructure to somehow directly allow for server-side reordering. Whether any of this is needed requires further investigation through prototypes (EXP-LeiosDiffusionOnly).
-
 
 ## Consensus
 
