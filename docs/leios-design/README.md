@@ -1,13 +1,14 @@
 ---
 title: Leios technical design and implementation plan
 status: Draft
-version: 0.7
+version: 0.10
 author:
   - Sebastian Nagel <sebastian.nagel@iohk.io>
   - Nicolas Frisby <nick.frisby@iohk.io>
   - Thomas Vellekoop <thomas.vellekoop@iohk.io>
   - Michael Karg <michael.karg@iohk.io>
   - Martin Kourim <martin.kourim@iohk.io>
+  - Marcin Wójtowicz <marcin.wojtowicz@iohk.io>
 ---
 
 # Introduction
@@ -23,7 +24,9 @@ Besides collecting node-specific details in this document, we intend to contribu
 This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
 
 | Version | Date       | Changes                                                            |
-| ------- | ---------- | ------------------------------------------------------------------ |
+|---------|------------|--------------------------------------------------------------------|
+| 0.10    | 2026-06-19 | Significantly extend technical design chapter                      |
+| 0.9     | 2026-03-19 | Expand network sections                                            |
 | 0.8     | 2026-03-02 | Performance and quality assurance strategy                         |
 | 0.7     | 2026-02-13 | Re-order technical design and add notes from prototyping           |
 | 0.6     | 2025-11-25 | Risks and mitigations with key threats                             |
