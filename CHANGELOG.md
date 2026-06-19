@@ -5,6 +5,24 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w25 - 2026-06-19
+
+Stabilization release on EB fetching / staging plus the two Dijkstra-era query
+fixes in api/cli. No N2N or N2C wire format changes since w24.
+
+- Fixed stalls of block fetch. This improves staying in sync and catching up behavior.
+  - First round of fixes to the staging area [#2074](https://github.com/IntersectMBO/ouroboros-consensus/pull/2074)
+  - Second round of improvements to the fetching logic [#2083](https://github.com/IntersectMBO/ouroboros-consensus/pull/2083)
+  - We are looking into a more holistic change to catching up semantics, ideally with better performance next.
+
+- Fix `db-synthesizer`to honor `ExperimentalHardForksEnabled` [#2077](https://github.com/IntersectMBO/ouroboros-consensus/pull/2077)
+
+- Fix `cardano-cli` queries about stake and governance. This should be fairly usable now on `Dijkstra`.
+
+> [!IMPORTANT]
+>
+> The network mini-protocols and CDDL wire formats in [CIP-164](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md) have evolved and the prototype is not consistent with them (yet). Use the `leios-prototype` branch in [cardano-blueprint](https://cardano-scaling.github.io/cardano-blueprint/pr-preview/pr-67/network/node-to-node/leios-notify/index.html) for network protocol descriptions and CDDLs, as well as the `leios-prototype` branch in [cardano-ledger](https://github.com/IntersectMBO/cardano-ledger/blob/leios-prototype/eras/dijkstra/impl/cddl/data/dijkstra.cddl#L19) for the block format used currently.
+
 ## prototype-2026w24 - 2026-06-11
 
 A few hot fixes and some progress on the voting pipeline of the prototype
