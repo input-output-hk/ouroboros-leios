@@ -462,21 +462,13 @@ Contention for the following primary node resources might unacceptably degrade t
 
 Both GC pressure and disk bandwidth are notoriously difficult to model and so were not amenable to the simulations that drove the first version of the CIP. Prototypes rather than simulations will be necessary to assess these risks with high confidence.
 
-The same risks can also be viewed from a different perspective, which is more actionable in terms of planning prototypes/experiments/etc: per major component of the node.
-
-- **RSK-LeiosLedgerOverheadLatency**: Parsing a transaction, checking it for validity, and updating the ledger state accordingly all utilize CPU and heap (and also disk bandwidth with UTxO/Ledger HD). Frequent bursts of that resource consumption proportional to 15000% of a full Praos block might disrupt the caught-up node in heretofore unnoticed ways. Only syncing nodes have processed so many/much transactions in a short duration, and latency has never been a fundamental priority for a syncing node. Disruption of the RTS is the main concern here, since there is plenty of CPU available—the ledger is not internally parallelized, and only ChainSel and the Mempool could invoke it simultaneously.
-- **RSK-LeiosNetworkingOverheadLatency**: Same as RSK-LeiosLedgerOverheadLatency, but for the Diffusion Layer components handling frequent 15000% bursts in a caught-up node.
-- **RSK-LeiosMempoolOverheadLatency**: Same as RSK-LeiosLedgerOverheadLatency, but for the Mempool frequently revalidating 15000% load in a caught-up node during congestion (ie 30000% the capacity of a Praos block, since the Leios Mempool capacity is now two EBs instead of two Praos blocks).
-
-> [!WARNING]
->
-> TBD: Is this motivating to _not_ implement high churn components like the transaction cache in a garbage collected language and instead rely on implementations with more control over memory allocations? For example using an off-the-shelf key-value store for the transaction cache, or implementing a custom one in Rust and exposing it via FFI?
+The per-component view of these risks (latency overheads in the Ledger, Network, and Mempool components) is treated in the respective sections below.
 
 ## Network
 
 The Network layer implements the mini-protocols that enable the Consensus layer to satisfy its diffusion requirements (**REQ-DiffuseLeiosBlocks**, **REQ-DiffuseLeiosVotes**) and prioritization requirements (**REQ-PrioritizePraosOverLeios**, **REQ-PrioritizeFreshOverStaleLeios**) defined in the [Resource management](#resource-management) section. While Consensus drives the scheduling logic for when to diffuse blocks and votes, Network provides the protocol mechanisms to actually transmit them over the peer-to-peer network.
 
-Similar resource contention risks apply to the Network layer, including network bandwidth contention between Praos and Leios, networking overhead latency, and contention between fresh and stale Leios traffic.
+- **RSK-LeiosNetworkingOverheadLatency**: Same as RSK-LeiosLedgerOverheadLatency, but for the Diffusion Layer components handling frequent 15000% bursts in a caught-up node.
 
 ### Message latencies
 
@@ -514,6 +506,8 @@ CIP-0164 implies functional requirements for the node to issue EBs alongside RBs
 >     - decouple tx diffusion from mempool syncing -> need to re-apply txs added while syncing
 >     - only block producers: keep a view (or two for Leios in Dijkstra) of txs to put into blocks -> only do slot dependent checks in ledger?
 > TODO: More advanced DAG-style mempool model?
+
+- **RSK-LeiosMempoolOverheadLatency**: Same as RSK-LeiosLedgerOverheadLatency, but for the Mempool frequently revalidating 15000% load in a caught-up node during congestion (ie 30000% the capacity of a Praos block, since the Leios Mempool capacity is now two EBs instead of two Praos blocks).
 
 ### Block production
 
@@ -610,6 +604,10 @@ Note: if all possibly-relevant EBs needed to fit in the LeiosTxCache, its worst 
 
 The first version of LeiosTxCache should reliably cache all relevant transactions that are less than an hour or so old—that age spans 180 active slots on average. A transaction is born when its oldest containing EB was announced or when it _entered_ the Mempool (if it hasn't yet been observed in an EB). (Note that that means some tx's age in the LeiosTxCache can increase when an older EB that contains it arrives.) Simple index maintained as a pair of priority queues (index and age) in manually managed fixed size bytearrays, backed by a double-buffered mmapped file for the transactions' serializations. Those implementation choices prevent the sheer number of transactions from increasing GC pressure (adversarial load might lead to a ballpark number of 131000 transactions per hour), and persistence's only benefit here would be to slightly increase parallelism/simplify synchronization, since persistence would let readers release the lock before finishing their search.
 
+> [!WARNING]
+>
+> TBD: Is this motivating to _not_ implement high churn components like the transaction cache in a garbage collected language and instead rely on implementations with more control over memory allocations? For example using an off-the-shelf key-value store for the transaction cache, or implementing a custom one in Rust and exposing it via FFI?
+
 ### Voting and certification
 
 > [!WARNING]
@@ -688,6 +686,8 @@ The first will not need to change functionally, while the latter two will need t
 - **REQ-LedgerNewEra** The ledger must be prepared with a new era that includes all changes required by CIP-164.
 
 See [Era and hard-fork coordination](#era-and-hard-fork-coordination) for a discussion on which era to target. For the remainder of this document, let's assume the changes will go into the `Dijkstra` era.
+
+- **RSK-LeiosLedgerOverheadLatency**: Parsing a transaction, checking it for validity, and updating the ledger state accordingly all utilize CPU and heap (and also disk bandwidth with UTxO/Ledger HD). Frequent bursts of that resource consumption proportional to 15000% of a full Praos block might disrupt the caught-up node in heretofore unnoticed ways. Only syncing nodes have processed so many/much transactions in a short duration, and latency has never been a fundamental priority for a syncing node. Disruption of the RTS is the main concern here, since there is plenty of CPU available—the ledger is not internally parallelized, and only ChainSel and the Mempool could invoke it simultaneously.
 
 ### Transaction validation levels
 
