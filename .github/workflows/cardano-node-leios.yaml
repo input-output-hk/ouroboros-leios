@@ -197,12 +197,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
-          # `fetch-tags` is needed in addition to `fetch-depth: 0` because
-          # checkout only fetches the single triggering ref by default,
-          # which leaves annotated tag *objects* (and thus their bodies)
-          # absent from the local repo.
           fetch-depth: 0
-          fetch-tags: true
+
+      # actions/checkout writes the triggering tag as a *lightweight* ref
+      # pointing at the commit, so %(contents:body) falls through to the
+      # commit message. Delete the local ref and refetch the real tag
+      # object so the annotation is available.
+      - name: Refetch annotated tag object
+        run: |
+          git tag -d "${GITHUB_REF_NAME}" || true
+          git fetch origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}" --no-tags
 
       - name: Download static binaries artifact
         uses: actions/download-artifact@v4
