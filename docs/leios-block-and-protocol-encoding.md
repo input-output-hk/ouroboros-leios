@@ -502,10 +502,11 @@ chunk index `C`, octets 1–8 = 64-bit mask for `C*64..(C+1)*64`).
 > *sends* the point in `MsgLeiosBlockRequest`: a client that follows the CDDL
 > literally (flat) and a peer that uses the wire (nested) would **fail the decode
 > and reset** the protocol. **net-node uses the array encoding** (`Point::Specific`
-> → `e.array(2)`), matching the wire, so net-node ↔ relay interop is fine — it is
-> the CDDL/spec that needs fixing to match (§10 row 8). The issue is open
-> (ambiguity not formally resolved; the live deployment may have shifted since — a
-> doc/issue status can't tell us).
+> → `e.array(2)`), matching the wire — and we have **confirmed this interoperates
+> against the live relays**: the `MsgLeiosBlock` and `MsgLeiosBlockTxs` fetches
+> (§7.2) succeeded with no reset, with net-node sending the array-encoded `point`.
+> So the wire is the nested array and the implementations agree; only the
+> CDDL/spec still needs fixing to match (§10 row 8, [cardano-blueprint#68][cb68]).
 
 ---
 
@@ -523,9 +524,11 @@ R=34.251.133.12:3001
 ./target/debug/net-cli capture     $R --magic 164             # handshake hex
 ./target/debug/net-cli chain-sync  $R --magic 164 --count 10  # real Leios headers
 ./target/debug/net-cli block-fetch $R --magic 164 --dump-hex  # real ranking_block
-# LeiosNotify/LeiosFetch message bytes: --wire-hex dumps `WIRE_HEX recv …` to stderr
-./target/debug/net-cli multi-follow --host $R --magic 164 --leios --wire-hex 2>&1 \
-  | grep WIRE_HEX
+# Leios message bytes: --wire-hex dumps `WIRE_HEX recv …` to stderr.
+#   --fetch-eb / --fetch-eb-txs actively request the EB body / its txs on each
+#   offer, so the LeiosFetch replies (MsgLeiosBlock / MsgLeiosBlockTxs) are captured.
+./target/debug/net-cli multi-follow --host $R --magic 164 --leios \
+  --wire-hex --fetch-eb --fetch-eb-txs 2>&1 | grep WIRE_HEX
 ```
 
 ### 7.2 Captured samples
@@ -559,29 +562,28 @@ reflects the optional `announced_eb` array (≈ +36 B) on EB-announcing headers.
 Two blocks decoded (CBOR skeleton):
 
 ```
-; (a) block#98947, slot 2113724, 40275 B — no EB announcement, no certificate
+; (a) block#98947, slot 2113724, 40275 B — plain RB (no EB announcement)
 #6.24([ 8,                          ; era_tag
-        [ [ header_body(array 10),  ; base header, NO Leios extension
-            kes_sig=bytes(448) ],
+        [ [ header_body(array 10),  ; base header, no Leios extension
+            kes_sig = bytes(448) ],
           [* tx_body],              ; indefinite
           [* tx_witness_set],       ; indefinite
-          {0 aux},                  ; auxiliary_data_set = map
+          {0 aux},                  ; auxiliary_data_set = map (empty here)
           [],                       ; invalid_transactions
-          null,                     ; eb_certificate = null
-          null ] ])                 ; peras_cert = null
+          null,                     ; eb_certificate (absent)
+          null ] ])                 ; peras_cert (absent)
 
-; (b) block#98963, slot 2114025, 87236 B — EB-ANNOUNCING header
-#6.24([ 8,
-        [ [ header_body(array 11),  ; 10 base + 1 announcement element:
+; (b) block#98963, slot 2114025, 87236 B — EB-announcing RB
+#6.24([ 8,                          ; era_tag
+        [ [ header_body(array 11),  ; 10 base fields (…, §4.2) + 1 announcement element:
             ;   field[10] = array(2) [ bytes32 announced_eb_hash, uint 17715 announced_eb_size ]
-            ;   vrf_result   = [bytes(64), bytes(80)]
-            ;   op_cert      = [bytes32, 0, 0, bytes(64)]
-            ;   protocol_ver = [12, 0]
-            kes_sig=bytes(448) ],
-          [* tx_body], [* tx_witness_set],
-          {0 aux}, [],
-          null,                     ; eb_certificate = null (mock; not implemented)
-          null ] ])                 ; peras_cert = null
+            kes_sig = bytes(448) ],
+          [* tx_body],              ; indefinite
+          [* tx_witness_set],       ; indefinite
+          {0 aux},                  ; auxiliary_data_set = map (empty here)
+          [],                       ; invalid_transactions
+          null,                     ; eb_certificate (absent; mock array(0) only in a certifying RB, §5.1)
+          null ] ])                 ; peras_cert (absent)
 ```
 
 > ✓ Validates §4.2 (incl. the **nested `announced_eb` `array(2)`**) and §4.3
@@ -658,17 +660,12 @@ captured via `--fetch-eb-txs` (issues a `MsgLeiosBlockTxsRequest` with bitmap
 
 > ✓ Validates §6.8 `MsgLeiosBlockTxs` = `[3, point, tx_bitmap, [* tx]]`: the reply
 > **echoes the `point` and the `tx_bitmap`**, the bitmap is an **indefinite** map,
-> and the tx list is a **definite** array of opaque tx bytes. The auto-fetch of
-> EB txs is disabled in net-node (historical), but the path works when triggered —
-> here via `--fetch-eb-txs`.
+> and the tx list is a **definite** array of opaque tx bytes.
 
 **Not yet wire-captured:**
 - `MsgLeiosBlockAnnouncement` (proto 18, tag 1 — the RB header): not pushed in
   the capture window. Its payload type (the `announcement` codec parameter,
   decoded as `wrapped_header`) is unconfirmed on the wire.
-- `MsgLeiosBlockTxs` (proto 19, the **transaction** fetch): net-node does not
-  issue `MsgLeiosBlockTxsRequest` yet, so its reply is unseen. The request's
-  bitmap is aligned to indefinite (§6.8), so it should interop once exercised.
 
 ---
 
