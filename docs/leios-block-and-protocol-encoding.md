@@ -60,6 +60,15 @@ against the middle one (**#1196**), so all three matter:
   no custom tags beyond `#6.24` (CBOR-in-CBOR).
 - **Reference specs:** CIP-0164 Appendix B + §"Leios Mini-Protocols" / IER tables
   at v1, v2, v3 (see above).
+- **Authoritative Haskell source (validated against):** the prototype's Leios
+  network code is in **ouroboros-consensus** at the commit cardano-node's
+  `leios-prototype` branch pins — `e3803b0c` — specifically
+  `LeiosDemoOnlyTestNotify.hs` (proto 18), `LeiosDemoOnlyTestFetch.hs` (proto 19)
+  and `LeiosDemoTypes.hs` (vote/point/EB/announcement encoders). It is **not** in
+  `ouroboros-network` (whose pinned commit `ff3e39af` has no Leios protocols; its
+  `leios-prototype`-branch `ObjectDiffusion` protocol is for **Peras**, not
+  Leios). §6.7, §6.8, §5.1, §4.1, §4.2 and §4.4 are confirmed against this source
+  (`✓` markers inline); they also match the live captures (§7).
 - **Out of scope:** Praos-internal ledger structures (tx bodies, witness sets,
   non-Leios certs) — opaque CBOR, not reparsed.
 
@@ -92,8 +101,10 @@ Protocol IDs are the mux `ProtocolId` (`u16`) constants in
 | 19 | LeiosFetch    | `leios_fetch/mod.rs`  | **LeiosFetch** (2 of 2) | LeiosFetch                |
 
 > The prototype's **two-protocol split matches v1 & v2** (the split came only in v3).
-> Protocol-ID numbers (18/19) are an implementation choice; no CIP version fixes
-> them.
+> Protocol IDs **18/19 are fixed by the prototype's Haskell source** —
+> `leiosNotifyMiniProtocolNum = 18` and `leiosFetchMiniProtocolNum = 19` in
+> ouroboros-consensus `LeiosDemoOnlyTest{Notify,Fetch}.hs` (@ `e3803b0c`); no CIP
+> version assigns numbers. net-node matches.
 
 ---
 
@@ -219,12 +230,13 @@ ranking_block =
 
 ### 4.4 Endorser Block (EB)
 
-LeiosFetch `MsgLeiosBlock` sends the EB body as an **opaque CBOR map** spliced
-verbatim (`leios_fetch/codec.rs`): tx-hash → tx-size.
+LeiosFetch `MsgLeiosBlock` carries the EB body. net-node relays it as opaque
+CBOR; the **authoritative encoding is `encodeLeiosEb`** in ouroboros-consensus
+`LeiosDemoTypes.hs` (@ `e3803b0c`):
 
 ```cddl
-; prototype
-endorser_block = { * hash32 => uint }   ; tx_hash => tx_size ; indefinite map
+; prototype — per encodeLeiosEb (definite map, word32 size)
+endorser_block = { * hash32 => uint32 }   ; tx_hash => tx_size ; DEFINITE map (encodeMapLen)
 ```
 
 *CIP v1/v2/v3 (Appendix B, identical):*
@@ -233,9 +245,14 @@ endorser_block = { * hash32 => uint }   ; tx_hash => tx_size ; indefinite map
 endorser_block = [ transaction_references : omap<hash32, uint16> ]   ; omap = {* K => V}
 ```
 
-> **Comparison:** both "ordered map hash→size". Flag: CIP wraps the omap in a
-> 1-element array (prototype sends bare map); CIP value `uint16` vs prototype `uint`; prototype
-> indefinite map vs deterministic definite. `; TODO` confirm bare-map vs `[map]`.
+> **Comparison (corrected against Haskell source):** the prototype sends a
+> **bare, definite-length CBOR map** `{hash32 => uint32}` — *not* array-wrapped,
+> *not* indefinite, and the size is **uint32** (`encodeWord32`), not the CIP's
+> `uint16`. (An earlier draft mislabeled this as an indefinite map / generic
+> uint, inferred from net-node's opaque relay path; the source is definite.)
+> Divergences for the CIP: drop the 1-element array wrapper, and widen the size
+> to `uint32`. Note: the LeiosFetch **tx-bitmap** *is* an indefinite map (§6.8) —
+> only the EB body is definite.
 
 ---
 
@@ -389,6 +406,7 @@ peer_address =
 **Implementation:**
 
 ```cddl
+; ✓ validated against ouroboros-consensus LeiosDemoOnlyTestNotify.hs @ e3803b0c
 leiosNotifyMessage =
     [ 0 ]                         ; MsgLeiosNotificationRequestNext   (no N arg)
   / [ 1, wrapped_header ]         ; MsgLeiosBlockAnnouncement
@@ -445,14 +463,15 @@ leiosNotifyMessage =
 **Implementation:**
 
 ```cddl
+; ✓ validated against ouroboros-consensus LeiosDemoOnlyTestFetch.hs @ e3803b0c
 leiosFetchMessage =
     [ 0, point ]                        ; MsgLeiosBlockRequest (single block)
-  / [ 1, endorser_block ]               ; MsgLeiosBlock (opaque map, §4.4)
+  / [ 1, endorser_block ]               ; MsgLeiosBlock (§4.4)
   / [ 2, point, tx_bitmap ]             ; MsgLeiosBlockTxsRequest
-  / [ 3, point, tx_bitmap, [* tx] ]     ; MsgLeiosBlockTxs (tx = opaque)
-  / [ 9 ]                               ; MsgDone
+  / [ 3, point, tx_bitmap, [* tx] ]     ; MsgLeiosBlockTxs (echoes point+bitmap; tx = bytes)
+  / [ 9 ]                               ; MsgDone (note: word 9)
 
-tx_bitmap = { * uint => uint }    ; word16 chunk-index => word64 mask ; indefinite
+tx_bitmap = { * uint => uint }    ; word16 chunk-index => word64 mask ; INDEFINITE (encodeMapLenIndef)
 ```
 
 **CIP v1 (#1078) & v2 (#1196) — `LeiosFetch` (IER, identical):**
@@ -632,7 +651,7 @@ Two blocks decoded (CBOR skeleton):
 |--------------------------|---------------------------------------|------------------------------------|------------------------------------|------------------------------------|
 | RB header extensions     | announced_eb/size/certified_eb        | same                               | same                               | same                               |
 | RB body eb_certificate   | always-present (null when absent)     | `? eb_certificate` (omittable)     | `? eb_certificate` (omittable)     | `? eb_certificate` (omittable)     |
-| EB body                  | bare indefinite map hash→uint         | `[ omap<hash32,uint16> ]`          | `[ omap<hash32,uint16> ]`          | `[ omap<hash32,uint16> ]`          |
+| EB body                  | bare **definite** map hash→uint32     | `[ omap<hash32,uint16> ]`          | `[ omap<hash32,uint16> ]`          | `[ omap<hash32,uint16> ]`          |
 | Vote                     | `[slot,hash,voter_id,sig]` var-len    | tagged union (persistent/non-)     | `[slot,hash,voter_id,sig]` 48B     | `[slot,hash,voter_id,sig]` 48B     |
 | Certificate              | `[slot,hash,bitfield,aggsig]` var-len | persistent ids + `{pool=>sig}`     | `[slot,hash,bitfield,aggsig]` 48B  | `[slot,hash,bitfield,aggsig]` 48B  |
 | # Leios protocols        | **2** (Notify 18, Fetch 19)           | **2** (Notify, Fetch)              | **2** (Notify, Fetch)              | **4** (Announce/Votes/Notify/Fetch)|
@@ -675,11 +694,11 @@ running implementation. These are independent of the v3 protocol restructuring.
 |---|------------------------------|------------------------|-----------|------|
 | 1 | `announced_eb` is a **CBOR `array(2)` `[hash32, uint32]`** (make the array encoding explicit) | grouped 2-array, value 17715 observed | groups via `? ( … )` but encoding implicit | §4.2 |
 | 2 | `eb_certificate` is **always present, `null` when absent** (and there is a trailing **`peras_cert`** slot → `era_block` = array(7)) | always-present null slots | `? eb_certificate` (omittable); no `peras_cert` | §4.3 |
-| 3 | EB body is a **bare, indefinite CBOR map** `{hash32 => uint}` | bare indefinite map | `[ omap<hash32,uint16> ]` (array-wrapped) | §4.4 |
-| 4 | EB tx-size value width | generic `uint` | `uint16` | §4.4 |
+| 3 | EB body is a **bare, definite CBOR map** `{hash32 => uint32}` (drop the array wrapper) | definite map, `encodeMapLen` | `[ omap<hash32,uint16> ]` (array-wrapped) | §4.4 |
+| 4 | EB tx-size value is **uint32** (`encodeWord32`) | uint32 | `uint16` | §4.4 |
 | 5 | `transaction_bodies` / `transaction_witness_sets` are **indefinite-length** arrays | indefinite | `[* … ]` (width-agnostic) | §4.3 |
 | 6 | `MsgLeiosBlockTxs` reply **echoes `point` + `bitmap`** before the tx list | `[3, point, bitmap, [*tx]]` | reply carries only the tx list | §6.8 |
-| 7 | Record the **mini-protocol number registry** (`LeiosNotify`=18, `LeiosFetch`=19) | IDs 18 / 19 | no numbers assigned | §3 |
+| 7 | Record the **mini-protocol number registry** (`LeiosNotify`=18, `LeiosFetch`=19) | IDs 18 / 19 (fixed in source) | no numbers assigned | §3 |
 
 **Resolved by capture:** vote signatures are **48 bytes on the wire** (§7.2), so
 the prototype's vote already matches the CIP's `bytes .size 48` MinSig — the
@@ -703,20 +722,22 @@ Remaining:
 2. Capture the still-unseen messages: **`MsgLeiosBlockAnnouncement`** (proto 18,
    tag 1) and the **LeiosFetch** replies (proto 19: `MsgLeiosBlock`,
    `MsgLeiosBlockTxs` — trigger a fetch). (§6.7-6.8)
-3. **Cross-check against the Haskell source.** The deployed prototype's wire
-   format (validated above) matches net-node's `leios_notify`/`leios_fetch`.
-   Note that the `ouroboros-network` **`leios-prototype` branch HEAD** has since
-   refactored Leios diffusion into a single generic **`ObjectDiffusion`**
-   mini-protocol (TxSubmission-shaped: `MsgRequestObjectIds` / `MsgReplyObjectIds`
-   / `MsgRequestObjects` / `MsgReplyObjects`, keys 0–5), which does **not** match
-   the deployed two-protocol design. cardano-node `leios-prototype` pins
-   `ouroboros-network` commit `ff3e39af` — diff the Leios codecs at that exact
-   commit (not branch HEAD) to confirm the deployed encoding, and track
-   `ObjectDiffusion` as the likely next protocol revision.
+3. ~~Cross-check against the Haskell source.~~ **Done** — see the validation
+   note below §1 and the `✓` markers in §6.7/§6.8. The Leios network protocols
+   live in **ouroboros-consensus** (`LeiosDemoOnlyTest{Notify,Fetch}.hs`,
+   `LeiosDemoTypes.hs`) at the pin cardano-node uses (`e3803b0c`), **not** in
+   ouroboros-network. (`ouroboros-network`'s `ObjectDiffusion` is for **Peras**
+   votes/certs, and is a red herring for Leios.) All message framings, the
+   18/19 protocol numbers, and the vote/point/EB leaf types match net-node and
+   the live captures, with one correction folded in (§4.4: the EB body is a
+   *definite* `uint32`-valued map). Remaining net-node check: confirm net-node's
+   `MsgLeiosBlock` decoder accepts the **definite** EB map the relay emits.
 
 ---
 
-*Generated against `leios-tools` @ `net-rs` `4c799c1`; CIP-0164 v1 @ `630bda34`
-(#1078), v2 @ `5690adca` (#1196), v3 @ `master`/`bc28ab90` (#1167); wire captures
-from the prototype devnet relays (port 3001, magic 164) on 2026-06-22. Re-verify
-file:line references after rebasing any repo.*
+*Generated against `leios-tools` @ `net-rs` `4c799c1`; validated against the
+prototype's Haskell source in `ouroboros-consensus` @ `e3803b0c` (the pin in
+cardano-node `leios-prototype`); CIP-0164 v1 @ `630bda34` (#1078), v2 @
+`5690adca` (#1196), v3 @ `master`/`bc28ab90` (#1167); wire captures from the
+prototype devnet relays (port 3001, magic 164) on 2026-06-22. Re-verify file:line
+references after rebasing any repo.*
