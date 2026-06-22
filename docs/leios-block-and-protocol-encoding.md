@@ -47,6 +47,7 @@ shape; §9 is that delta.
 [pr1078]: https://github.com/cardano-foundation/CIPs/pull/1078
 [pr1196]: https://github.com/cardano-foundation/CIPs/pull/1196
 [pr1167]: https://github.com/cardano-foundation/CIPs/pull/1167
+[cb68]: https://github.com/cardano-scaling/cardano-blueprint/issues/68
 
 ## 1. Scope and sources
 
@@ -260,7 +261,7 @@ CBOR; the **authoritative encoding is `encodeLeiosEb`** in ouroboros-consensus
 `invalid_transactions`, §4.3).
 
 ```cddl
-; prototype — per encodeLeiosEb (definite map, word32 size)
+; prototype — per encodeLeiosEb; WIRE-CONFIRMED (§7.2 MsgLeiosBlock, map(639))
 endorser_block = { * hash32 => uint32 }   ; tx_hash => tx_size ; DEFINITE map (encodeMapLen)
 ```
 
@@ -461,12 +462,12 @@ leiosNotifyMessage =
 ; ✓ validated against ouroboros-consensus LeiosDemoOnlyTestFetch.hs @ e3803b0c
 leiosFetchMessage =
     [ 0, point ]                        ; MsgLeiosBlockRequest (single block)
-  / [ 1, endorser_block ]               ; MsgLeiosBlock (§4.4)
+  / [ 1, endorser_block ]               ; MsgLeiosBlock (§4.4)         ✓ live §7.2
   / [ 2, point, tx_bitmap ]             ; MsgLeiosBlockTxsRequest
-  / [ 3, point, tx_bitmap, [* tx] ]     ; MsgLeiosBlockTxs (echoes point+bitmap; tx = bytes)
+  / [ 3, point, tx_bitmap, [* tx] ]     ; MsgLeiosBlockTxs (echoes point+bitmap; tx = bytes)  ✓ live §7.2
   / [ 9 ]                               ; MsgDone (note: word 9)
 
-tx_bitmap = { * uint => uint }    ; word16 chunk-index => word64 mask ; INDEFINITE (encodeMapLenIndef)
+tx_bitmap = { * uint => uint }    ; word16 chunk-index => word64 mask ; INDEFINITE (encodeMapLenIndef)  ✓ live §7.2
 ```
 
 **CIP — `LeiosFetch`:**
@@ -491,6 +492,20 @@ chunk index `C`, octets 1–8 = 64-bit mask for `C*64..(C+1)*64`).
 > - **`MsgLeiosBlockTxs` echoes `point` + `bitmap`** ahead of the tx list; the
 >   CIP reply carries just the tx list.
 > - `MsgDone` tag is `9` (non-contiguous).
+
+> **EB `point` encoding (spec vs wire) — [cardano-blueprint#68][cb68].** The EB
+> point is specified in the CDDL as a **transparent group** `(slot, eb_hash)`
+> (inlines as **two flat fields**) but encoded on the wire as a **nested
+> `array(2)`** (`encodeLeiosPoint` = `encodeListLen 2` in `LeiosDemoTypes.hs`,
+> confirmed by the offer captures, §7.2) — the **same group-vs-nested-array
+> mismatch** as `announced_eb` (§4.2). It matters in LeiosFetch because the client
+> *sends* the point in `MsgLeiosBlockRequest`: a client that follows the CDDL
+> literally (flat) and a peer that uses the wire (nested) would **fail the decode
+> and reset** the protocol. **net-node uses the array encoding** (`Point::Specific`
+> → `e.array(2)`), matching the wire, so net-node ↔ relay interop is fine — it is
+> the CDDL/spec that needs fixing to match (§10 row 8). The issue is open
+> (ambiguity not formally resolved; the live deployment may have shifted since — a
+> doc/issue status can't tell us).
 
 ---
 
@@ -605,13 +620,55 @@ Two blocks decoded (CBOR skeleton):
 > bytes** (fixed 48-B MinSig). The `eb_size` in an offer matches the
 > `announced_eb_size` carried in the RB header (§4.2).
 
+**LeiosFetch `MsgLeiosBlock` — the EB body (proto 19)** — real bytes captured via
+`multi-follow --leios --wire-hex --fetch-eb` (the `--fetch-eb` flag issues a
+`MsgLeiosBlockRequest` on each offer), EB at slot 2132960, **23009 B**:
+
+```
+8201 b9027f 5820 d33cb51a…15cb2d 18c8 5820 ebf15364…03f21cc 18c8 …
+  82 01                       ; array(2), 1 = MsgLeiosBlock
+     b9 027f                  ; map(639)  ← DEFINITE (0xb9 = map, 2-byte length 0x027f)
+        5820 d33cb5…15cb2d    ; tx_hash (32 B)
+        18 c8                 ; tx_size = 200   (canonical uint; type is uint32)
+        5820 ebf153…03f21cc   ; tx_hash (32 B)
+        18 c8                 ; tx_size = 200
+        … 639 entries total, all keys bytes(32), values uint; 0 trailing bytes
+```
+
+> ✓ Validates §6.8 (`MsgLeiosBlock` = `[1, endorser_block]`) and §4.4 — the EB
+> body is a **definite** CBOR map (`map(639)`) of `hash32 => uint`, confirming on
+> the wire what was read from `encodeLeiosEb`. (Sizes are 200 here — uniform
+> synthetic txs — encoded as canonical minimal uint, e.g. `18c8`.) net-node's
+> `point` request encoding interoperated with the relay (no reset), per §6.8.
+
+**LeiosFetch `MsgLeiosBlockTxs` — the transaction fetch (proto 19)** — real bytes
+captured via `--fetch-eb-txs` (issues a `MsgLeiosBlockTxsRequest` with bitmap
+`{0: 0xff..ff}` = tx indices 0–63 on each txs-offer), EB at slot 2133539,
+**5510 B**, 27 txs:
+
+```
+8403 821a00208e23 5820 13d48978…a8f5ce7 bf 00 1b ffffffffffffffff ff 981b 5820… …
+  84 03                       ; array(4), 3 = MsgLeiosBlockTxs
+     82 1a00208e23 5820 …     ; point = [slot 2133539, eb_hash(32)]   (ECHOED)
+     bf 00 1b ffffffffffffffff ff   ; bitmap = INDEFINITE map { 0 => 0xffffffffffffffff } (ECHOED)
+     98 1b                    ; array(27)  ← DEFINITE tx_list
+        5820 …                ; tx (opaque bytes; 200 B each here)
+        … 27 txs, total 5400 tx bytes; 0 trailing bytes
+```
+
+> ✓ Validates §6.8 `MsgLeiosBlockTxs` = `[3, point, tx_bitmap, [* tx]]`: the reply
+> **echoes the `point` and the `tx_bitmap`**, the bitmap is an **indefinite** map,
+> and the tx list is a **definite** array of opaque tx bytes. The auto-fetch of
+> EB txs is disabled in net-node (historical), but the path works when triggered —
+> here via `--fetch-eb-txs`.
+
 **Not yet wire-captured:**
 - `MsgLeiosBlockAnnouncement` (proto 18, tag 1 — the RB header): not pushed in
   the capture window. Its payload type (the `announcement` codec parameter,
   decoded as `wrapped_header`) is unconfirmed on the wire.
-- LeiosFetch replies (proto 19: `MsgLeiosBlock`, `MsgLeiosBlockTxs`): net-node
-  only sends `MsgLeiosBlockRequest` when it decides to fetch; no fetch issued in
-  the window. (Framing validated against source, §6.8.)
+- `MsgLeiosBlockTxs` (proto 19, the **transaction** fetch): net-node does not
+  issue `MsgLeiosBlockTxsRequest` yet, so its reply is unseen. The request's
+  bitmap is aligned to indefinite (§6.8), so it should interop once exercised.
 
 ---
 
@@ -666,17 +723,15 @@ Leaf-level encoding facts confirmed on the wire (and against source) that the
 | 5 | `transaction_bodies` / `transaction_witness_sets` are **indefinite-length** arrays | indefinite | `[* … ]` (width-agnostic) | §4.3 |
 | 6 | `MsgLeiosBlockTxs` reply **echoes `point` + `bitmap`** before the tx list | `[3, point, bitmap, [*tx]]` | reply carries only the tx list | §6.8 |
 | 7 | Record the **mini-protocol number registry** (`LeiosNotify`=18, `LeiosFetch`=19) | IDs 18 / 19 (fixed in source) | no numbers assigned | §3 |
+| 8 | Specify the EB **`point` as an explicit nested `array(2)`** `[slot, eb_hash]` (resolve [**cardano-blueprint#68**][cb68]) | nested `array(2)` (`encodeListLen 2`) | **transparent group** `(slot, eb_hash)` = two flat fields → decode/reset mismatch | §6.8 |
 
 ## 11. Not yet captured on the wire
 
-The following are validated against the Haskell source but were not observed in
-the live capture window (the relay pushed offers + votes only, and net-node
-issued no fetch):
+The following are validated against the Haskell source but not yet observed on
+the wire:
 
 - `MsgLeiosBlockAnnouncement` (proto 18, tag 1) — incl. confirming its
   `announcement` payload is the full RB header.
-- LeiosFetch replies `MsgLeiosBlock` / `MsgLeiosBlockTxs` (proto 19) — trigger a
-  fetch to capture.
 
 A non-null certificate cannot be captured until the prototype implements one
 (§9 row 7); today the `eb_certificate` slot is always `null`/`array(0)`.
