@@ -16,7 +16,7 @@ diverged. This document:
   the running prototype.
 
 **`net-node` reflects the prototype.** The Rust stack in
-[`leios-tools`](../../leios-tools) (`net-rs/net-core`) is a faithful
+[`leios-tools`](https://github.com/cardano-scaling/leios-tools) (`net-rs/net-core`) is a faithful
 reimplementation of the prototype's wire format; its `minicbor`
 encoders/decoders are used here as the legible source of the CDDL. Where this
 doc says "the prototype", that is the cardano-node implementation as observed on
@@ -51,23 +51,28 @@ shape; §9 is that delta.
 ## 1. Scope and sources
 
 - **Implementation tracked:** the **cardano-node Leios prototype** (prototype
-  devnet relays). Its wire format is read from `net-node`
+  testnet relays). Its wire format is read from `net-node`
   (`leios-tools/net-rs/net-core`, CBOR via `minicbor` v0.25) and confirmed
   against live captures (§7). Standard CBOR (RFC 8949); no custom tags beyond
   `#6.24` (CBOR-in-CBOR).
 - **Authoritative Haskell source (validated against):** the prototype's Leios
   network code is in **ouroboros-consensus** at the commit cardano-node's
-  `leios-prototype` branch pins — `e3803b0c` — specifically
-  `LeiosDemoOnlyTestNotify.hs` (proto 18), `LeiosDemoOnlyTestFetch.hs` (proto 19)
-  and `LeiosDemoTypes.hs` (vote / point / EB / announcement / certificate types).
+  `leios-prototype` branch pins —
+  [`e3803b0c`](https://github.com/IntersectMBO/ouroboros-consensus/tree/e3803b0c86fc0b5f0a7b8f3a977aebf5afe31b8b/ouroboros-consensus/src/ouroboros-consensus)
+  — specifically `LeiosDemoOnlyTestNotify.hs` (proto 18),
+  `LeiosDemoOnlyTestFetch.hs` (proto 19) and `LeiosDemoTypes.hs` (vote / point /
+  EB / announcement / certificate types).
   It is **not** in `ouroboros-network` (whose pinned commit `ff3e39af` has no
   Leios protocols; that repo's `ObjectDiffusion` protocol is for **Peras**, not
   Leios). §4.1, §4.2, §4.4, §5.1, §6.7 and §6.8 are confirmed against this source
   (`✓` markers inline) and match the live captures (§7).
-- **Reference spec:** CIP-0164, Appendix B "Wire Format Specifications (CDDL)"
-  and §"Leios Mini-Protocols" / IER table (current published version).
-- **Out of scope:** Praos-internal ledger structures (tx bodies, witness sets,
-  non-Leios certs) — opaque CBOR, not reparsed.
+- **Reference spec:** [CIP-0164](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164),
+  Appendix B "Wire Format Specifications (CDDL)" and §"Leios Mini-Protocols" /
+  IER table (current published version).
+- **Out of scope:** the node-to-client (N2C) path — including the merged/client
+  block (§4.3), which the prototype node implements but net-node (N2N-only) does
+  not use; and Praos-internal ledger structures (tx bodies, witness sets,
+  non-Leios certs), carried as opaque CBOR and not reparsed.
 
 ## 2. Conventions
 
@@ -149,7 +154,7 @@ block_header_body =
   , operational_cert : [ bytes32, uint, uint, bytes .size 64 ]; observed
   , protocol_version : [ uint, uint ]                         ; observed [12, 0]
   ; --- Leios header extension (optional) ---
-  , ? announced_eb   : [ hash32, uint32 ]   ; grouped 2-elem array
+  , ? announced_eb   : [ hash32, uint32 ]   ; ONE nested array(2) element
                                             ;   [announced_eb_hash, announced_eb_size]
   , ? certified_eb   : bool                 ; omitted (absent) when not set
   ]
@@ -166,11 +171,36 @@ block_header_body =
    ]
 ```
 
-> **Match.** On the wire the `announced_eb` / `announced_eb_size` pair is a single
-> **grouped 2-element array** (`array(2)` = `[hash32, uint32]`), exactly the CIP's
-> `? ( … )` group — one array element, not two flat fields. `certified_eb` is
-> **omitted** when absent (so an EB-announcing-but-not-certifying header is
-> `array(11)`: 10 base + the announcement group).
+> **Divergence (CDDL semantics).** On the wire the announcement is **one nested
+> `array(2)`** = `[announced_eb_hash, announced_eb_size]` — a single header_body
+> element (an EB-announcing-but-not-certifying header is therefore `array(11)`:
+> 10 base + 1 element). Confirmed by the capture (§7.2, field[10] = `array(2)`)
+> and by `EbAnnouncement`'s `encodeListLen 2` in the source. The CIP's
+> `? ( announced_eb : hash32, announced_eb_size : uint32 )` is a **transparent
+> CDDL group**: `( … )` inlines its members as **two flat array entries**, so the
+> CIP would put `announced_eb` and `announced_eb_size` as separate fields (an
+> announcing header would be `array(12)`). Nested array (wire) vs flat pair (CIP)
+> differ — the CIP should make it an explicit nested array to match (§10).
+>
+> **Decoding `array(11)` requires type-checking, not position.** Both
+> `announced_eb` and `certified_eb` are optional and trailing, so a header_body
+> with exactly one extra field (`array(11)`) is ambiguous by arity alone — the
+> single extra element is either `announced_eb` (a CBOR **array**) or
+> `certified_eb` (a CBOR **bool**). A decoder must inspect the element's CBOR
+> type to tell which is present: `array(2)` ⇒ `announced_eb`, `bool` ⇒
+> `certified_eb`. (In this nested encoding `array(10)` ⇒ neither and `array(12)` ⇒
+> both — announcement element then bool.) net-node decodes them by exactly this
+> dispatch.
+>
+> The **original CIP design** avoided this *via the length alone* — no
+> type-checking. With the flat transparent group, `announced_eb` contributes
+> **two** elements (`hash32`, `uint32`) and `certified_eb` **one** (`bool`), so
+> the four presence combinations map to four distinct lengths: `array(10)` ⇒
+> neither, `array(11)` ⇒ `certified_eb` only, `array(12)` ⇒ `announced_eb` only,
+> `array(13)` ⇒ both. The length is the discriminator. The prototype's nested
+> `array(2)` collapses `announced_eb` to a single element, making `array(11)`
+> ambiguous and forcing the type dispatch above. (This is a concrete cost of the
+> nested-vs-flat divergence, not just a notational one.)
 
 ### 4.3 Block body / Ranking Block
 
@@ -216,8 +246,10 @@ ranking_block =
 > - **`eb_certificate` is a mock, not implemented** — `array(0)` placeholder
 >   (certifying block) or `null` (absent), not a `leios_certificate` (§5.1). Both
 >   sampled blocks carried `null`.
-> - The CIP "Merged Block" (`eb_tx_references`) is not implemented on the NtN
->   path.
+> - The CIP "Merged Block" (`eb_tx_references`) is a **node-to-client (N2C)**
+>   structure — the prototype node implements it for local clients, but it does
+>   not appear on the **node-to-node (N2N)** path this doc covers, and net-node
+>   (N2N-only) does not use it. Out of scope here.
 
 ### 4.4 Endorser Block (EB)
 
@@ -506,7 +538,7 @@ recv:  0e11766f 8000 0009  83010f8418a4f501f4
 
 **ChainSync headers (proto 2)** — real Leios RB headers are **821–858 bytes**
 (`chain-sync --count 10`, tip slot 2113724 / block#98947). The size spread
-reflects the optional `announced_eb` group (≈ +36 B) on EB-announcing headers.
+reflects the optional `announced_eb` array (≈ +36 B) on EB-announcing headers.
 
 **Block body (proto 3) — real `ranking_block`** via `block-fetch --dump-hex`.
 Two blocks decoded (CBOR skeleton):
@@ -525,8 +557,8 @@ Two blocks decoded (CBOR skeleton):
 
 ; (b) block#98963, slot 2114025, 87236 B — EB-ANNOUNCING header
 #6.24([ 8,
-        [ [ header_body(array 11),  ; 10 base + Leios announcement group:
-            ;   field[10] = [ bytes32 announced_eb_hash, uint 17715 announced_eb_size ]
+        [ [ header_body(array 11),  ; 10 base + 1 announcement element:
+            ;   field[10] = array(2) [ bytes32 announced_eb_hash, uint 17715 announced_eb_size ]
             ;   vrf_result   = [bytes(64), bytes(80)]
             ;   op_cert      = [bytes32, 0, 0, bytes(64)]
             ;   protocol_ver = [12, 0]
@@ -537,7 +569,7 @@ Two blocks decoded (CBOR skeleton):
           null ] ])                 ; peras_cert = null
 ```
 
-> ✓ Validates §4.2 (incl. the **grouped `announced_eb` 2-array**) and §4.3
+> ✓ Validates §4.2 (incl. the **nested `announced_eb` `array(2)`**) and §4.3
 > (era_block = array(7), aux map, indefinite tx arrays, always-present
 > `eb_certificate`/`peras_cert` slots — both `null` here).
 
@@ -597,7 +629,7 @@ Two blocks decoded (CBOR skeleton):
 | Block fetch request      | single point                            | list + NoMoreBlocks                |
 | Tx bitmap                | CBOR map `{u16 => u64}` (indefinite)    | CBOR bytes, 9-octet roaring slices |
 | Vote delivery            | push (batched array, in Notify)         | push (LeiosVotes protocol, single) |
-| Merged/client block      | not implemented (NtN)                   | specified                          |
+| Merged/client block (N2C) | implemented in node; not on N2N path   | specified                          |
 
 The vote format matches; everything else differs because the prototype predates
 the CIP's protocol refactor. §9 and §10 split the gap by direction.
@@ -627,7 +659,7 @@ Leaf-level encoding facts confirmed on the wire (and against source) that the
 
 | # | CIP should specify / change | Prototype wire reality | CIP today | Refs |
 |---|------------------------------|------------------------|-----------|------|
-| 1 | `announced_eb` is a **CBOR `array(2)` `[hash32, uint32]`** (make the array explicit) | grouped 2-array, value 17715 observed | groups via `? ( … )`, encoding implicit | §4.2 |
+| 1 | Make `announced_eb` an **explicit nested `array(2)`** `[hash32, uint32]` | one nested `array(2)` element (header = array(11)) | `? ( … )` **transparent group** = two flat entries (would be array(12)) | §4.2 |
 | 2 | `eb_certificate` is **always present** (`null`/`array(0)` when absent), plus a trailing **`peras_cert`** slot → `era_block` = array(7) | always-present slots | `? eb_certificate` (omittable); no `peras_cert` | §4.3 |
 | 3 | EB body is a **bare, definite CBOR map** `{hash32 => uint32}` (drop the array wrapper) | definite map, `encodeMapLen` | `[ omap<hash32, uint16> ]` | §4.4 |
 | 4 | EB tx-size value is **uint32** (`encodeWord32`) | uint32 | `uint16` | §4.4 |
@@ -648,11 +680,3 @@ issued no fetch):
 
 A non-null certificate cannot be captured until the prototype implements one
 (§9 row 7); today the `eb_certificate` slot is always `null`/`array(0)`.
-
----
-
-*Sources: prototype wire format read from `leios-tools` `net-rs` (`net-core`),
-validated against `ouroboros-consensus` @ `e3803b0c` (the pin in cardano-node
-`leios-prototype`) — `LeiosDemoOnlyTest{Notify,Fetch}.hs`, `LeiosDemoTypes.hs`;
-CIP-0164 current published version; live wire captures from the prototype devnet
-relays (port 3001, magic 164), 2026-06-22.*
