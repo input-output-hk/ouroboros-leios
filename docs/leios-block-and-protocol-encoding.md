@@ -199,9 +199,11 @@ ranking_block =
   , transaction_witness_sets : [* transaction_witness_set]; INDEFINITE array; opaque
   , auxiliary_data_set       : {* transaction_index => auxiliary_data}  ; CONFIRMED map (empty=map(0))
   , invalid_transactions     : [* transaction_index]      ; Conway+ (word16 idx)
-  , eb_certificate           : leios_certificate / null   ; ALWAYS present; null when absent (§5)
-  , peras_cert               : peras_cert / null          ; ALWAYS present; null when absent
+  , eb_certificate           : array(0) / null   ; ALWAYS present; mock placeholder, null when absent (§5)
+  , peras_cert               : peras_cert / null  ; ALWAYS present; null when absent
   ]
+  ; NOTE: eb_certificate is a MOCK — array(0) placeholder or null, NOT a
+  ;       leios_certificate yet (§5.1). Observed null in both captured RBs.
 ```
 
 *CIP v1/v2/v3 (Appendix B, identical):*
@@ -220,13 +222,13 @@ ranking_block =
 > - `transaction_bodies` / `transaction_witness_sets` are **indefinite-length**
 >   arrays on the wire.
 > - **Divergence:** the wire `era_block` is **array(7)** — both `eb_certificate`
->   *and* a trailing `peras_cert` are **always present as explicit `null`** when
->   absent, rather than the CIP's truly-optional (omittable) `? eb_certificate`.
+>   *and* a trailing `peras_cert` are **always present** (as `null` when absent),
+>   rather than the CIP's truly-optional (omittable) `? eb_certificate`.
 >   `peras_cert` is in no CIP-0164 version (Peras, separate). Flag.
+> - **`eb_certificate` is a mock, not implemented.** Its slot holds an `array(0)`
+>   placeholder (certifying block) or `null` (absent) — *not* a
+>   `leios_certificate` (§5.1). Both sampled blocks carried `null`.
 > - CIP "Merged Block" (`eb_tx_references`) not implemented on the NtN path.
-> - *Note:* both sampled blocks carried `eb_certificate = null` (an EB's
->   certificate rides in a later RB than the announcing one), so the non-null
->   `leios_certificate` layout (§5) is not yet pinned by capture — see §11.
 
 ### 4.4 Endorser Block (EB)
 
@@ -259,7 +261,10 @@ endorser_block = [ transaction_references : omap<hash32, uint16> ]   ; omap = {*
 ## 5. Votes and Certificates — **v1 differs from v2/v3**
 
 This is what #1196 changed. v2 and v3 share the same vote/cert format; v1 is the
-old two-cohort scheme. **The implementation matches v2/v3.**
+old two-cohort scheme. **The prototype's vote matches v2/v3** (confirmed on the
+wire). **The prototype's certificate is not yet implemented** — it is a mock
+(§5.1), emitted on the wire as an `array(0)` placeholder (or `null` when absent),
+so the v2/v3 certificate structure is a target, not current reality.
 
 ### 5.1 Implementation
 
@@ -273,10 +278,20 @@ leios_vote =
   , voter_id : uint            ; small committee index (0,1,2 observed)
   , vote_signature : bytes .size 48 ]   ; 48-B BLS MinSig confirmed on the wire
 
-leios_certificate =                ; not yet wire-confirmed (no certifying RB captured)
+; prototype CERTIFICATE IS NOT IMPLEMENTED YET.
+; ouroboros-consensus LeiosDemoTypes.hs @ e3803b0c:
+;   newtype LeiosCertificate = LeiosCertificate { leiosCertificateEbPoint :: LeiosPoint }
+;   -- FIXME(bladyjoker): Mocked   (no bitfield, no aggregated_signature, no CBOR instance)
+; On the wire the eb_certificate slot is a placeholder, NOT the CIP structure below:
+eb_certificate_wire =
+    array(0)     ; empty-array placeholder when a block "certifies" (mock)
+  / null         ; absent — observed in every captured (non-certifying) RB
+; The [slot, hash, signers, aggregated_signature] shape below is CIP/net-node-decoder
+; INTENT, not what the prototype emits today.
+leios_certificate =                ; net-node decoder shape (speculative; not on wire yet)
   [ slot_no : uint, endorser_block_hash : hash32
   , signers : bytes            ; committee bitfield, MSB-first
-  , aggregated_signature : bytes ]   ; net-node decodes variable-length; expect bytes .size 48
+  , aggregated_signature : bytes ]
 ```
 
 ### 5.2 CIP v2 (#1196) and v3 (#1167) — stake-based committee / bitfield (identical)
@@ -650,10 +665,10 @@ Two blocks decoded (CBOR skeleton):
 | Concern                  | prototype (cardano-node)              | v1 (#1078)                         | **v2 (#1196) ← target**            | v3 (#1167, master)                 |
 |--------------------------|---------------------------------------|------------------------------------|------------------------------------|------------------------------------|
 | RB header extensions     | announced_eb/size/certified_eb        | same                               | same                               | same                               |
-| RB body eb_certificate   | always-present (null when absent)     | `? eb_certificate` (omittable)     | `? eb_certificate` (omittable)     | `? eb_certificate` (omittable)     |
+| RB body eb_certificate   | **mock**: array(0)/null, always-present | `? eb_certificate` (omittable)   | `? eb_certificate` (omittable)     | `? eb_certificate` (omittable)     |
 | EB body                  | bare **definite** map hash→uint32     | `[ omap<hash32,uint16> ]`          | `[ omap<hash32,uint16> ]`          | `[ omap<hash32,uint16> ]`          |
 | Vote                     | `[slot,hash,voter_id,sig]` var-len    | tagged union (persistent/non-)     | `[slot,hash,voter_id,sig]` 48B     | `[slot,hash,voter_id,sig]` 48B     |
-| Certificate              | `[slot,hash,bitfield,aggsig]` var-len | persistent ids + `{pool=>sig}`     | `[slot,hash,bitfield,aggsig]` 48B  | `[slot,hash,bitfield,aggsig]` 48B  |
+| Certificate              | **not implemented** (mock array(0))   | persistent ids + `{pool=>sig}`     | `[slot,hash,bitfield,aggsig]` 48B  | `[slot,hash,bitfield,aggsig]` 48B  |
 | # Leios protocols        | **2** (Notify 18, Fetch 19)           | **2** (Notify, Fetch)              | **2** (Notify, Fetch)              | **4** (Announce/Votes/Notify/Fetch)|
 | RequestNext token `N`    | none                                  | none (∅)                           | none (∅)                           | `N` per RequestNext                |
 | Block fetch request      | single point                          | single (slot+hash)                 | single (slot+hash)                 | list + NoMoreBlocks                |
@@ -679,10 +694,13 @@ the current CIP (**v3 / #1167**). These are structural, not encoding nits.
 | 4 | **Batch block fetch**: `MsgLeiosMultiBlockRequest` (list of EB hashes) + `MsgLeiosNoMoreBlocks` terminator | single `MsgLeiosBlockRequest(point)` | multi-request + terminator | §6.8 |
 | 5 | **Re-encode tx-bitmap** as the roaring byte-string (9-octet slices) | CBOR map `{u16=>u64}` | CBOR `bytes` | §4.4-note, §6.8 |
 | 6 | **Slim announcement/offer payloads** to `(slot, EB hash, block_height)` | full RB header / `point (+eb_size)` | tuple | §6.7 |
+| 7 | **Implement the `leios_certificate`** — bitfield `signers` + aggregated BLS signature | mock `array(0)`/`null` placeholder | `[slot, hash, signers, aggregated_signature]` | §5.1, §4.3 |
 
-**Already aligned with v3 (no work):** vote & certificate *format* (stake-based
-`voter_id` + bitfield — v2 = v3); absence of range/Genesis bulk-sync messages
-(prototype never implemented them and v3 removed them).
+**Already aligned with v3 (no work):** the *vote* format (stake-based `voter_id`
++ 48-B MinSig — v2 = v3, confirmed on the wire); absence of range/Genesis
+bulk-sync messages (prototype never implemented them and v3 removed them). Note
+the *certificate* format is **not** yet aligned — it is unimplemented (row 7),
+not merely different.
 
 ## 10. Summary 2 — CIP → Prototype (update the CIP to reflect the prototype)
 
@@ -702,9 +720,12 @@ running implementation. These are independent of the v3 protocol restructuring.
 
 **Resolved by capture:** vote signatures are **48 bytes on the wire** (§7.2), so
 the prototype's vote already matches the CIP's `bytes .size 48` MinSig — the
-earlier "variable-length" note reflected only net-node's lenient *decoder*. The
-certificate's `aggregated_signature` size remains unconfirmed (no certifying RB
-captured; §11.1).
+earlier "variable-length" note reflected only net-node's lenient *decoder*.
+
+**Certificate — not a CIP gap, a prototype gap.** The CIP's `leios_certificate`
+is correct; the *prototype* hasn't implemented it (mock `array(0)` placeholder,
+§5.1). So this is a prototype → CIP item (build the real bitfield + aggregated
+signature), not a CIP → prototype one. See §9 and §11.1.
 
 ## 11. Open questions / TODO
 
@@ -716,9 +737,13 @@ encodings and the 48-byte vote signature.**
 
 Remaining:
 
-1. Capture a **non-null `leios_certificate`** from the RB that certifies an
-   announced EB (scan headers for `certified_eb` / non-null `eb_certificate`) and
-   pin §5's cert layout — incl. `aggregated_signature` size — against the wire.
+1. ~~Validate the certificate.~~ **Answered** — the prototype certificate is a
+   **mock** (`LeiosCertificate { leiosCertificateEbPoint } -- FIXME … Mocked` in
+   `LeiosDemoTypes.hs @ e3803b0c`, no bitfield / aggregated_signature / CBOR
+   instance). On the wire the `eb_certificate` slot is an `array(0)` placeholder
+   (certifying block) or `null` (absent); the CIP `leios_certificate` is not yet
+   emitted. Implementing it is a **prototype → CIP** task (§9). Capturing a real
+   one is moot until then.
 2. Capture the still-unseen messages: **`MsgLeiosBlockAnnouncement`** (proto 18,
    tag 1) and the **LeiosFetch** replies (proto 19: `MsgLeiosBlock`,
    `MsgLeiosBlockTxs` — trigger a fetch). (§6.7-6.8)
@@ -736,11 +761,8 @@ Remaining:
    (`announcement`) — net-node decodes it as the full RB header (`wrapped_header`,
    §6.7); confirm against the prototype's node-wiring instantiation and a live
    capture (none seen in-window).
-5. **Certificate encoding (§5) is unvalidated.** The *vote* is confirmed (source
-   + capture), but the `leios_certificate` (`signers` bitfield +
-   `aggregated_signature`) is an RB-body field absent from the consensus Leios
-   network source — it lives in cardano-ledger (pin `4bf2edca`). Validate there,
-   and/or capture a certifying RB.
+5. ~~Certificate encoding unvalidated.~~ **Answered (item 1):** the cert is a
+   mock; the real `leios_certificate` is not implemented in the prototype.
 
 ---
 
