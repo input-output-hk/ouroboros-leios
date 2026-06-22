@@ -5,7 +5,8 @@
 > two-way comparison to CIP-0164 "Ouroboros Linear Leios".
 
 The prototype implements an **earlier revision** of CIP-0164's Leios networking
-than the current published CIP, so the two have diverged. This document:
+than the current published CIP (see the revision history below), so the two have
+diverged. This document:
 
 - gives the prototype's actual wire format (§3–§7), validated against the
   authoritative Haskell source **and** live relay captures;
@@ -20,6 +21,27 @@ reimplementation of the prototype's wire format; its `minicbor`
 encoders/decoders are used here as the legible source of the CDDL. Where this
 doc says "the prototype", that is the cardano-node implementation as observed on
 the wire and mirrored by `net-node`.
+
+## Where the prototype sits — CIP-0164 revision history
+
+CIP-0164's Leios networking changed across three merged PRs. **The prototype
+implements the middle revision (#1196)** — that is the baseline for the
+prototype → CIP gap in §9.
+
+| PR | Merge | Date | What it changed |
+|----|-------|------|------------------|
+| [#1078][pr1078] | `630bda34` | 2026-01-06 | First published Leios CIP. **2 Leios mini-protocols** (LeiosNotify + LeiosFetch); **two-cohort** votes & certs (persistent / non-persistent); `{u16=>u64}` map tx-bitmap; vote delivery via offer→request; range/Genesis bulk-sync messages. |
+| [#1196][pr1196] | `5690adca` | 2026-05-27 | "Replace wFA^LS committee with **stake-based committee selection**." Keeps #1078's protocol structure, map bitmap and vote-delivery; **replaces votes & certs** with a uniform `voter_id`-indexed vote + bitfield certificate. **← the prototype tracks this.** |
+| [#1167][pr1167] | `bc28ab90` | 2026-06-09 | "Refine Leios protocols." **Splits LeiosNotify into 3 protocols**; **direct single-vote push**; **roaring byte-string** tx-bitmap; `RequestNext(N)` token budget; **drops** range/Genesis messages. Votes & certs unchanged from #1196. **Current `master`** — the "CIP-0164 (current)" column throughout this doc. |
+
+So the prototype = #1196's design: two protocols, no-arg `RequestNext`,
+single-block fetch, map tx-bitmap, and #1196's `voter_id` vote (the certificate
+from #1196 is specified but the prototype only mocks it, §5.1). The current CIP
+(#1167) moved ahead on protocol shape; §9 is exactly that delta.
+
+[pr1078]: https://github.com/cardano-foundation/CIPs/pull/1078
+[pr1196]: https://github.com/cardano-foundation/CIPs/pull/1196
+[pr1167]: https://github.com/cardano-foundation/CIPs/pull/1167
 
 ## 1. Scope and sources
 
