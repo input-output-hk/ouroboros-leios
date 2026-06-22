@@ -730,8 +730,17 @@ Remaining:
    votes/certs, and is a red herring for Leios.) All message framings, the
    18/19 protocol numbers, and the vote/point/EB leaf types match net-node and
    the live captures, with one correction folded in (§4.4: the EB body is a
-   *definite* `uint32`-valued map). Remaining net-node check: confirm net-node's
-   `MsgLeiosBlock` decoder accepts the **definite** EB map the relay emits.
+   *definite* `uint32`-valued map). net-node decodes `MsgLeiosBlock` as raw
+   opaque CBOR (`decode_raw_bounded`), so definite-vs-indefinite is moot — no bug.
+4. **`MsgLeiosBlockAnnouncement` payload type** is a polymorphic codec parameter
+   (`announcement`) — net-node decodes it as the full RB header (`wrapped_header`,
+   §6.7); confirm against the prototype's node-wiring instantiation and a live
+   capture (none seen in-window).
+5. **Certificate encoding (§5) is unvalidated.** The *vote* is confirmed (source
+   + capture), but the `leios_certificate` (`signers` bitfield +
+   `aggregated_signature`) is an RB-body field absent from the consensus Leios
+   network source — it lives in cardano-ledger (pin `4bf2edca`). Validate there,
+   and/or capture a certifying RB.
 
 ---
 
