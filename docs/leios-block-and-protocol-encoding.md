@@ -250,16 +250,16 @@ Vote: `shared-rs/consensus/src/types.rs:141-163` + `leios_notify/codec.rs:60-65`
 Cert: embedded in `ranking_block` (`block.rs`).
 
 ```cddl
-; prototype
+; prototype — vote CONFIRMED on the wire (§7.2 MsgLeiosVotes capture)
 leios_vote =
   [ slot_no : uint, endorser_block_hash : hash32
-  , voter_id : uint            ; prototype encodes word16
-  , vote_signature : bytes ]   ; prototype: variable-length bytes
+  , voter_id : uint            ; small committee index (0,1,2 observed)
+  , vote_signature : bytes .size 48 ]   ; 48-B BLS MinSig confirmed on the wire
 
-leios_certificate =
+leios_certificate =                ; not yet wire-confirmed (no certifying RB captured)
   [ slot_no : uint, endorser_block_hash : hash32
   , signers : bytes            ; committee bitfield, MSB-first
-  , aggregated_signature : bytes ]   ; prototype: variable-length bytes
+  , aggregated_signature : bytes ]   ; net-node decodes variable-length; expect bytes .size 48
 ```
 
 ### 5.2 CIP v2 (#1196) and v3 (#1167) — stake-based committee / bitfield (identical)
@@ -276,9 +276,12 @@ leios_certificate =
 leios_bls_signature = bytes .size 48     ; BLS12-381 MinSig (compressed G1)
 ```
 
-> **prototype vs v2/v3:** field order and arity **match**. Only divergence: v2/v3 fix
-> signatures to `bytes .size 48` (MinSig); prototype encodes variable-length `bytes`.
-> `; TODO` confirm prototype enforces 48-byte size and the BLS scheme matches.
+> **prototype vs v2/v3: match (confirmed).** Field order and arity agree, and the
+> live `MsgLeiosVotes` capture (§7.2) shows the **vote signature is exactly 48
+> bytes** — i.e. the prototype's vote already matches v2/v3's `bytes .size 48`
+> MinSig on the wire. (net-node's *decoder* is lenient about length, but the
+> relay emits 48 B.) The certificate's `aggregated_signature` size is not yet
+> wire-confirmed — needs a certifying RB (§11).
 
 ### 5.3 CIP v1 (#1078) — two-cohort (persistent / non-persistent), for reference
 
@@ -389,11 +392,13 @@ peer_address =
 leiosNotifyMessage =
     [ 0 ]                         ; MsgLeiosNotificationRequestNext   (no N arg)
   / [ 1, wrapped_header ]         ; MsgLeiosBlockAnnouncement
-  / [ 2, point, eb_size : uint ]  ; MsgLeiosBlockOffer  (eb_size = word32)
-  / [ 3, point ]                  ; MsgLeiosBlockTxsOffer
-  / [ 4, [* leios_vote] ]         ; MsgLeiosVotes  (votes PUSHED directly; definite)
+  / [ 2, point, eb_size : uint ]  ; MsgLeiosBlockOffer  (eb_size = word32)   ✓ live §7.2
+  / [ 3, point ]                  ; MsgLeiosBlockTxsOffer                     ✓ live §7.2
+  / [ 4, [* leios_vote] ]         ; MsgLeiosVotes  (pushed directly; definite) ✓ live §7.2
   / [ 5 ]                         ; MsgDone
 ; decoder skips trailing unrecognized fields (forward-compat)
+; ✓ = exact encoding confirmed against live relay capture (§7.2);
+;     MsgLeiosBlockAnnouncement (tag 1) not captured in-window.
 ```
 
 **CIP v1 (#1078) & v2 (#1196) — `LeiosNotify`, single protocol (IER, identical):**
@@ -576,20 +581,48 @@ Two blocks decoded (CBOR skeleton):
 > (era_block = array(7), aux map, indefinite tx arrays, always-present
 > `eb_certificate`/`peras_cert` null slots).
 
-**Still uncaptured** (see §11): a **non-null `leios_certificate`** (needs the RB
-that *certifies* an announced EB), and the **EB body / votes** carried by
-LeiosNotify (18) / LeiosFetch (19). In this session `multi-follow --leios`
-followed the Praos chain but surfaced no EB/vote payloads, and `net-cli` has no
-hex dump for the Leios mini-protocol messages. To pin §5 (cert) and §6.7–§6.8:
-- fetch the specific RB that carries a certificate (scan headers for
-  `certified_eb` / non-null `eb_certificate`), and
-- add ingress hex tracing to `multi-follow --leios`, or a small
-  `minicbor::to_vec` encoder harness for each Leios message/type.
+**LeiosNotify messages (proto 18)** — real bytes captured via
+`multi-follow --leios --wire-hex` against `34.251.133.12:3001`, slot ~2118596:
 
-- LeiosNotify MsgLeiosBlockAnnouncement (18): _TODO_
-- LeiosNotify MsgLeiosVotes (18): _TODO_
-- LeiosFetch MsgLeiosBlock (19): _TODO_
-- LeiosFetch MsgLeiosBlockTxs (19): _TODO_
+```
+; MsgLeiosBlockOffer  (45 B)
+8302821a002053c45820 b073ce6d…07555 194533
+  83 02                       ; array(3), 2 = MsgLeiosBlockOffer
+     82 1a 002053c4 5820 b073…07555   ; point = [slot 2118596, eb_hash(32)]
+     19 4533                  ; eb_size = 17715 (word32)
+
+; MsgLeiosBlockTxsOffer  (42 B)
+8203821a002053c45820 b073ce6d…07555
+  82 03                       ; array(2), 3 = MsgLeiosBlockTxsOffer
+     82 1a 002053c4 5820 b073…07555   ; point = [slot 2118596, eb_hash(32)]
+
+; MsgLeiosVotes  (94 B) — one vote
+820481 841a002053c45820 b073ce6d…07555 00 5830 ab067bad…0d88f
+  82 04                       ; array(2), 4 = MsgLeiosVotes
+     81                       ; array(1) — vote list (definite)
+        84                    ; array(4) vote
+           1a 002053c4        ; slot_no 2118596
+           5820 b073…07555    ; endorser_block_hash(32)
+           00                 ; voter_id 0   (observed 0,1,2 — small committee index)
+           5830 ab06…0d88f    ; vote_signature = bytes(48)  ← BLS MinSig
+```
+
+> ✓ Validates §6.7 (`MsgLeiosBlockOffer` = `[2, point, eb_size]`,
+> `MsgLeiosBlockTxsOffer` = `[3, point]`, `MsgLeiosVotes` = `[4, [* vote]]`),
+> §4.1 (`point` = `[slot, hash32]`), and §5.1/§5.2 — **vote signatures are
+> exactly 48 bytes** (resolves the §10 reconcile in the prototype's favour: the
+> wire uses fixed 48-B MinSig). The `eb_size` in an offer matches the
+> `announced_eb_size` carried in the RB header (§4.2).
+
+**Still uncaptured** (see §11):
+- **`MsgLeiosBlockAnnouncement`** (proto 18, tag 1 — the RB header): not seen in
+  this window (the relay pushes offers + votes; announcements piggyback on
+  ChainSync here).
+- **LeiosFetch messages** (proto 19: `MsgLeiosBlock`, `MsgLeiosBlockTxs`):
+  net-node only sends `MsgLeiosBlockRequest` when it decides to fetch; no fetch
+  was issued in this window, so no proto-19 bytes were captured.
+- **Non-null `leios_certificate`**: needs the RB that *certifies* an announced
+  EB; every sampled block had `eb_certificate = null`.
 
 ---
 
@@ -648,30 +681,42 @@ running implementation. These are independent of the v3 protocol restructuring.
 | 6 | `MsgLeiosBlockTxs` reply **echoes `point` + `bitmap`** before the tx list | `[3, point, bitmap, [*tx]]` | reply carries only the tx list | §6.8 |
 | 7 | Record the **mini-protocol number registry** (`LeiosNotify`=18, `LeiosFetch`=19) | IDs 18 / 19 | no numbers assigned | §3 |
 
-**Reconcile (direction TBD):** vote/cert signatures are encoded as
-**variable-length `bytes`** by the prototype, while the CIP fixes `bytes .size 48`
-(BLS12-381 MinSig). Likely a *prototype* fix (enforce 48 B) rather than a CIP
-change, but it is a real wire discrepancy — see §11.3. (§5)
+**Resolved by capture:** vote signatures are **48 bytes on the wire** (§7.2), so
+the prototype's vote already matches the CIP's `bytes .size 48` MinSig — the
+earlier "variable-length" note reflected only net-node's lenient *decoder*. The
+certificate's `aggregated_signature` size remains unconfirmed (no certifying RB
+captured; §11.1).
 
 ## 11. Open questions / TODO
 
 Resolved by live capture (§7.2): `announced_eb` is a grouped `[hash32, uint32]`
 array; `auxiliary_data_set` is a map; `era_block` is array(7) with always-present
-`eb_certificate`/`peras_cert` null slots; vrf/op-cert/protocol-version/KES shapes.
+`eb_certificate`/`peras_cert` null slots; vrf/op-cert/protocol-version/KES shapes;
+**LeiosNotify `MsgLeiosBlockOffer` / `MsgLeiosBlockTxsOffer` / `MsgLeiosVotes`
+encodings and the 48-byte vote signature.**
 
 Remaining:
 
 1. Capture a **non-null `leios_certificate`** from the RB that certifies an
    announced EB (scan headers for `certified_eb` / non-null `eb_certificate`) and
-   pin §5's cert layout against the wire. (§5, §7.2)
-2. Capture real **LeiosNotify/LeiosFetch message bytes** (vote / offer / EB /
-   block-txs) via `multi-follow --leios --wire-hex` against a relay actively
-   producing EBs, and `cddl validate` the prototype CDDL against §7. (§6.7-6.8)
-3. Confirm whether signature sizes (48-byte MinSig) are enforced and the BLS
-   scheme matches v2/v3 — the §10 "reconcile" item. (§5.2)
+   pin §5's cert layout — incl. `aggregated_signature` size — against the wire.
+2. Capture the still-unseen messages: **`MsgLeiosBlockAnnouncement`** (proto 18,
+   tag 1) and the **LeiosFetch** replies (proto 19: `MsgLeiosBlock`,
+   `MsgLeiosBlockTxs` — trigger a fetch). (§6.7-6.8)
+3. **Cross-check against the Haskell source.** The deployed prototype's wire
+   format (validated above) matches net-node's `leios_notify`/`leios_fetch`.
+   Note that the `ouroboros-network` **`leios-prototype` branch HEAD** has since
+   refactored Leios diffusion into a single generic **`ObjectDiffusion`**
+   mini-protocol (TxSubmission-shaped: `MsgRequestObjectIds` / `MsgReplyObjectIds`
+   / `MsgRequestObjects` / `MsgReplyObjects`, keys 0–5), which does **not** match
+   the deployed two-protocol design. cardano-node `leios-prototype` pins
+   `ouroboros-network` commit `ff3e39af` — diff the Leios codecs at that exact
+   commit (not branch HEAD) to confirm the deployed encoding, and track
+   `ObjectDiffusion` as the likely next protocol revision.
 
 ---
 
 *Generated against `leios-tools` @ `net-rs` `4c799c1`; CIP-0164 v1 @ `630bda34`
-(#1078), v2 @ `5690adca` (#1196), v3 @ `master`/`bc28ab90` (#1167). Re-verify
+(#1078), v2 @ `5690adca` (#1196), v3 @ `master`/`bc28ab90` (#1167); wire captures
+from the prototype devnet relays (port 3001, magic 164) on 2026-06-22. Re-verify
 file:line references after rebasing any repo.*
