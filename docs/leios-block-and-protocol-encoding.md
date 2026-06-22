@@ -36,8 +36,13 @@ prototype → CIP gap in §9.
 
 So the prototype = #1196's design: two protocols, no-arg `RequestNext`,
 single-block fetch, map tx-bitmap, and #1196's `voter_id` vote (the certificate
-from #1196 is specified but the prototype only mocks it, §5.1). The current CIP
-(#1167) moved ahead on protocol shape; §9 is exactly that delta.
+from #1196 is specified but the prototype only mocks it, §5.1) — **with one
+deliberate departure: it sends votes *directly* via `MsgLeiosVotes` in LeiosNotify
+rather than #1196's offer→fetch loop** (`MsgLeiosVotesOffer`, then
+`MsgLeiosVotesRequest` / `MsgLeiosVoteDelivery` over LeiosFetch). That direct push
+anticipates #1167's direction, though #1167 puts it in a dedicated LeiosVotes
+protocol (§6.7). The current CIP (#1167) moved ahead on the rest of the protocol
+shape; §9 is that delta.
 
 [pr1078]: https://github.com/cardano-foundation/CIPs/pull/1078
 [pr1196]: https://github.com/cardano-foundation/CIPs/pull/1196
