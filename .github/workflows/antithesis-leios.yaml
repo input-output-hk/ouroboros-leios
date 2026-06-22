@@ -273,9 +273,10 @@ jobs:
 
       - name: Download and install Moog
         run: |
+          VERSION="${MOOG_TAG#v}"
           gh release download "$MOOG_TAG" \
             -R cardano-foundation/moog \
-            -p "moog-*-linux64.tar.gz" -O moog.tar.gz
+            -p "moog-${VERSION}-x86_64-linux-musl.tar.gz" -O moog.tar.gz
           tar xzf moog.tar.gz
           sudo mv moog /usr/local/bin/
           moog --version
