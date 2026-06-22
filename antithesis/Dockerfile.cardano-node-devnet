@@ -33,7 +33,8 @@ RUN apt-get update -y && \
       procps \
       socat \
       sqlite3 \
-      wget && \
+      wget \
+      yq && \
     rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /app/config /app/genesis /app/scripts /app/pools-keys /app/utxo-keys /data /logs
