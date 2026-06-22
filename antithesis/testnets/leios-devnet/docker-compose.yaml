@@ -86,6 +86,9 @@ services:
   init-dingo1:
     # NOTE: we reuse the cardano-node image for convenience when doing the init
     <<: *node-image
+    container_name: init-dingo1
+    hostname: init-dingo1
+    init: true
     command: ["/app/scripts/init-dingo-node.sh", "1"]
     depends_on:
       init-pool1:
