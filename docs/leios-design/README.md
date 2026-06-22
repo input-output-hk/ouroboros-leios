@@ -400,9 +400,9 @@ The [prototyping and adversarial testing](#prototyping-and-adversarial-testing) 
 >         Tx cache
 >       High-throughput mempool
 >       Forging updates
->       Vote creation (voting)
+>       Vote creation / voting
 >       Vote validation
->       Certifcate (vote) aggregation
+>       Certifcate / vote aggregation
 >       NTC chain sync server inlined blocks
 >       New LocalStateQuery queries
 >       Prioritize Praos threads?
