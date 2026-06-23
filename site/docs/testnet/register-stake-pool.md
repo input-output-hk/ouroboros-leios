@@ -7,7 +7,7 @@ description: Register a Leios stake pool (block producer) on the public testnet,
 # Register a stake pool
 
 This is the second of two guides. It assumes you have already
-[installed and synced a relay](./install-and-run.md).
+[installed and synced a relay](./getting-started.md).
 
 This is the adventurous path. Running a relay confirms your node can
 follow the chain; registering a **stake pool** lets it forge blocks —
