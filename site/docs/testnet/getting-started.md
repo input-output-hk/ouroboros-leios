@@ -103,55 +103,46 @@ experience](https://discord.gg/Bx2qvsjCte) running it on your individual
 hardware or cloud provider.
 :::
 
-## Two ways to run a relay
+## Run a relay
 
 You need a `cardano-node` (the Leios prototype) following the testnet as a
 **relay**: a node that syncs the chain but does not produce blocks. Get
 this stable before adding block-producer credentials in the
 [next guide](./register-stake-pool.md).
 
-There are two ways to get there, and each takes you from nothing to a
-synced relay:
+A few ways to start one — pick whichever fits your setup:
 
-- **Option 1 — Nix (recommended).** A few minutes of one-time setup, then
-  a *single command* builds, installs, and runs the node together with a
-  Grafana + Loki + Prometheus dashboard. Every dependency is provided.
-- **Option 2 — without Nix.** Download the prebuilt binaries and run them
-  with the repository's launch script.
+- **Nix** — one command builds, installs, and runs the node together
+  with a Grafana + Loki + Prometheus stack. Every dependency is
+  provided.
+- **Prebuilt binaries** — download the statically linked binaries and
+  run them with the repository's launch script. Compatible with the
+  same observability stack if you install the extra tooling, or run
+  the node on its own and bring your own tools.
+- **Docker** — the same binaries packaged as a container image, for
+  setups that already orchestrate nodes that way. No observability
+  stack included.
 
-Pick one, then continue to [Confirm you are syncing](#confirm-you-are-syncing).
+Then continue to [Confirm you are syncing](#confirm-you-are-syncing).
 
-## Option 1 — Nix (recommended)
+### Nix
 
 [Nix](https://nixos.org/download/) installs the node and all of its
-dependencies reproducibly, and is the smoothest path on any platform.
+dependencies reproducibly.
 
-**1. Install Nix and enable flakes.** Follow the
-[official installer](https://nixos.org/download/), then add this line to
-`/etc/nix/nix.conf` (or `~/.config/nix/nix.conf`):
+**1. Install Nix with flake support.** Any recent installer will do —
+the [official installer](https://nixos.org/download/) or
+[Determinate Systems'](https://determinate.systems/posts/determinate-nix-installer/)
+both enable flakes out of the box. The first time you run a flake-based
+command Nix will ask whether to accept its substituter settings — say
+yes so the IOG binary cache from our flake kicks in. To skip the prompt
+once and for all, add this to your nix.conf:
 
 ```
-experimental-features = nix-command flakes
+accept-flake-config = true
 ```
 
-**2. Trust the IOG binary cache — do this before anything else.** This is
-the step people most often miss. Without it, Nix tries to *compile*
-`cardano-node` from source — a multi-hour build — instead of downloading
-the prebuilt artifacts. On a multi-user install, add the cache's signing
-key and restart the daemon:
-
-```shell
-echo "extra-trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=" | sudo tee -a /etc/nix/nix.conf
-sudo systemctl restart nix-daemon
-```
-
-Make sure `https://cache.iog.io` is also listed under `substituters` in
-`/etc/nix/nix.conf`. The
-[IOG Nix setup guide](https://github.com/input-output-hk/iogx/blob/main/doc/nix-setup-guide.md)
-walks through the full configuration — without the cache, builds take
-ages.
-
-**3. Run the relay.** A single command runs a fully provisioned relay —
+**2. Run the relay.** A single command runs a fully provisioned relay —
 the node, a live tip-watcher, and the observability stack — with no clone
 required:
 
@@ -159,11 +150,33 @@ required:
 nix run github:input-output-hk/ouroboros-leios#leios-testnet-relay
 ```
 
-The node binds to `0.0.0.0:3010` and keeps its database, socket, and log
-under `./tmp-testnet`. **Grafana opens at `http://localhost:3000`**, and
-the process dashboard shows the node and the tip-watcher (live sync
-progress) side by side — so you can watch the chain advance straight
-away. Head to [Confirm you are syncing](#confirm-you-are-syncing).
+With the cache in play this should be **a few minutes** of downloads,
+not hours of compilation.
+
+<details>
+<summary>If it starts compiling `cardano-node` from source</summary>
+
+The flake-config trust didn't apply — usually because your user isn't
+in `trusted-users` on a multi-user install, so the daemon ignores the
+flake's substituter settings and falls back to no cache. Add the cache
+to your global config and restart the daemon:
+
+```shell
+echo "extra-substituters = https://cache.iog.io" | sudo tee -a /etc/nix/nix.conf
+echo "extra-trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=" | sudo tee -a /etc/nix/nix.conf
+sudo systemctl restart nix-daemon
+```
+
+The [IOG Nix setup guide](https://github.com/input-output-hk/iogx/blob/main/doc/nix-setup-guide.md)
+covers the full configuration.
+
+</details>
+
+The node binds to `0.0.0.0:3010` and keeps its database, socket, and
+log under `./tmp-testnet`. A Grafana dashboard opens at
+`http://localhost:3000` — see
+[Out-of-the-box observability](#out-of-the-box-observability) for what
+it gives you. Head to [Confirm you are syncing](#confirm-you-are-syncing).
 
 :::tip Want the CLI on your PATH?
 To use `cardano-node` and `cardano-cli` directly (for example, to register a
