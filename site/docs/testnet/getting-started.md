@@ -64,6 +64,11 @@ A rough picture of the early days:
   Dijkstra era and the Leios testnet — start whenever you see fit. Early
   feedback is exactly what this phase is for.
 
+![](./testnet-initial-throughput.png)
+<center>
+Screenshot of the IO nodes processing an intermittent load
+</center>
+
 :::tip Watch the chain
 **[KleioScan](https://kleioscan.com/#/leios)** — an early Leios testnet
 explorer built by [Kostas Dermentzis](https://github.com/kderme) — lets you watch blocks, including
@@ -103,55 +108,46 @@ experience](https://discord.gg/Bx2qvsjCte) running it on your individual
 hardware or cloud provider.
 :::
 
-## Two ways to run a relay
+## Run a relay
 
 You need a `cardano-node` (the Leios prototype) following the testnet as a
 **relay**: a node that syncs the chain but does not produce blocks. Get
 this stable before adding block-producer credentials in the
 [next guide](./register-stake-pool.md).
 
-There are two ways to get there, and each takes you from nothing to a
-synced relay:
+A few ways to start one — pick whichever fits your setup:
 
-- **Option 1 — Nix (recommended).** A few minutes of one-time setup, then
-  a *single command* builds, installs, and runs the node together with a
-  Grafana + Loki + Prometheus dashboard. Every dependency is provided.
-- **Option 2 — without Nix.** Download the prebuilt binaries and run them
-  with the repository's launch script.
+- **Nix** — one command builds, installs, and runs the node together
+  with a Grafana + Loki + Prometheus stack. Every dependency is
+  provided.
+- **Prebuilt binaries** — download the statically linked binaries and
+  run them with the repository's launch script. Compatible with the
+  same observability stack if you install the extra tooling, or run
+  the node on its own and bring your own tools.
+- **Docker** — the same binaries packaged as a container image, for
+  setups that already orchestrate nodes that way. No observability
+  stack included.
 
-Pick one, then continue to [Confirm you are syncing](#confirm-you-are-syncing).
+Then continue to [Confirm you are syncing](#confirm-you-are-syncing).
 
-## Option 1 — Nix (recommended)
+### Nix
 
 [Nix](https://nixos.org/download/) installs the node and all of its
-dependencies reproducibly, and is the smoothest path on any platform.
+dependencies reproducibly.
 
-**1. Install Nix and enable flakes.** Follow the
-[official installer](https://nixos.org/download/), then add this line to
-`/etc/nix/nix.conf` (or `~/.config/nix/nix.conf`):
+**1. Install Nix with flake support.** Any recent installer will do —
+the [official installer](https://nixos.org/download/) or
+[Determinate Systems'](https://determinate.systems/posts/determinate-nix-installer/)
+both enable flakes out of the box. The first time you run a flake-based
+command Nix will ask whether to accept its substituter settings — say
+yes so the IOG binary cache from our flake kicks in. To skip the prompt
+once and for all, add this to your nix.conf:
 
 ```
-experimental-features = nix-command flakes
+accept-flake-config = true
 ```
 
-**2. Trust the IOG binary cache — do this before anything else.** This is
-the step people most often miss. Without it, Nix tries to *compile*
-`cardano-node` from source — a multi-hour build — instead of downloading
-the prebuilt artifacts. On a multi-user install, add the cache's signing
-key and restart the daemon:
-
-```shell
-echo "extra-trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=" | sudo tee -a /etc/nix/nix.conf
-sudo systemctl restart nix-daemon
-```
-
-Make sure `https://cache.iog.io` is also listed under `substituters` in
-`/etc/nix/nix.conf`. The
-[IOG Nix setup guide](https://github.com/input-output-hk/iogx/blob/main/doc/nix-setup-guide.md)
-walks through the full configuration — without the cache, builds take
-ages.
-
-**3. Run the relay.** A single command runs a fully provisioned relay —
+**2. Run the relay.** A single command runs a fully provisioned relay —
 the node, a live tip-watcher, and the observability stack — with no clone
 required:
 
@@ -159,11 +155,39 @@ required:
 nix run github:input-output-hk/ouroboros-leios#leios-testnet-relay
 ```
 
-The node binds to `0.0.0.0:3010` and keeps its database, socket, and log
-under `./tmp-testnet`. **Grafana opens at `http://localhost:3000`**, and
-the process dashboard shows the node and the tip-watcher (live sync
-progress) side by side — so you can watch the chain advance straight
-away. Head to [Confirm you are syncing](#confirm-you-are-syncing).
+With the cache in play this should be **a few minutes** of downloads,
+not hours of compilation.
+
+<details>
+<summary>If it starts compiling `cardano-node` from source</summary>
+
+The flake-config trust didn't apply — usually because your user isn't
+in `trusted-users` on a multi-user install, so the daemon ignores the
+flake's substituter settings and falls back to no cache. Add the cache
+to your global config and restart the daemon:
+
+```shell
+echo "extra-substituters = https://cache.iog.io" | sudo tee -a /etc/nix/nix.conf
+echo "extra-trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=" | sudo tee -a /etc/nix/nix.conf
+sudo systemctl restart nix-daemon
+```
+
+The [IOG Nix setup guide](https://github.com/input-output-hk/iogx/blob/main/doc/nix-setup-guide.md)
+covers the full configuration.
+
+</details>
+
+The node binds to `0.0.0.0:3010` and keeps its database, socket, and
+log under `./tmp-testnet` in whatever directory you ran the command
+from. Export that so the rest of this guide can refer to it generically:
+
+```shell
+export WORKING_DIR="$PWD/tmp-testnet"
+```
+
+A Grafana dashboard also opens at `http://localhost:3000` — see
+[Out-of-the-box observability](#out-of-the-box-observability) for what
+it gives you. Head to [Confirm you are syncing](#confirm-you-are-syncing).
 
 :::tip Want the CLI on your PATH?
 To use `cardano-node` and `cardano-cli` directly (for example, to register a
@@ -175,60 +199,51 @@ cardano-node --version   # expect: cardano-node x.y.z.164
 ```
 :::
 
-## Option 2 — Without Nix: prebuilt binaries
+### Prebuilt binaries
 
 The release ships statically linked binaries for **Linux x86-64** — they
 carry all their dependencies inside, so there is nothing else to install
 to run them.
 
-**1. Install the tools to download and verify them.**
+**1. Pick a working directory.** Everything for this relay — binaries,
+config, database, socket, log — lives here.
 
 ```shell
-sudo apt update
-sudo apt install -y curl jq git
+export WORKING_DIR=~/leios-testnet
+mkdir -p "$WORKING_DIR/bin"
 ```
 
-`curl` downloads files, `jq` reads the JSON output used throughout these
-guides, and `git` fetches the testnet configuration below.
-
-**2. Download the node, the CLI, and the checksums.**
+**2. Download the node and CLI, and verify the checksums.**
 
 ```shell
-mkdir -p ~/leios && cd ~/leios
+cd "$WORKING_DIR/bin"
 
 BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w25
 curl -L -O "$BASE/cardano-node"
 curl -L -O "$BASE/cardano-cli"
 curl -L -O "$BASE/SHA256SUMS"
-```
-
-**3. Verify the download.** Confirm the files arrived intact before you
-run them:
-
-```shell
 sha256sum -c SHA256SUMS
 ```
 
 You should see `cardano-node: OK` and `cardano-cli: OK`. If you see
 `FAILED`, delete the files and download them again.
 
-**4. Install them onto your `PATH`.**
+**3. Put the binaries on your `PATH`.**
 
 ```shell
 chmod +x cardano-node cardano-cli
-sudo install -m 755 cardano-node cardano-cli /usr/local/bin/
+export PATH="$WORKING_DIR/bin:$PATH"
 ```
 
-Confirm `cardano-node --version` reports
-`cardano-node 11.0.1.164 - linux-x86_64 - ghc-9.6`. The `.164` marks the
-Leios prototype build.
+Confirm `cardano-node --version` reports a version with `.164` suffix - this
+marks the Leios prototype build.
 
-**5. Get the testnet configuration.** Clone the repository for the pinned
+**4. Get the testnet configuration.** Clone the repository for the pinned
 config and the launch script:
 
 ```shell
-cd ~/leios
-git clone https://github.com/input-output-hk/ouroboros-leios
+cd "$WORKING_DIR"
+git clone --depth 1 https://github.com/input-output-hk/ouroboros-leios
 cd ouroboros-leios/testnet
 ```
 
@@ -237,48 +252,72 @@ trust the network: the genesis files, the node configuration
 (`config.json`), and the topology (`topology.json`) that points at the
 public bootstrap relays.
 
-**6. Start the relay.** `run-node.sh` launches a single `cardano-node` as
-a non-producing relay, bound to `0.0.0.0:3010`. Give it a working
-directory for its database, socket, and log:
+**5. Start the relay.** `run-node.sh` launches a single `cardano-node` as
+a non-producing relay, bound to `0.0.0.0:3010`, picking up `$WORKING_DIR`
+for its database, socket, and log:
 
 ```shell
-WORKING_DIR=~/leios/relay ./run-node.sh
+./run-node.sh
 ```
 
 Within a few seconds you will see the node connect to peers and begin
 adding blocks (`AddedToCurrentChain`). The socket lands at
-`~/leios/relay/node.socket` and the log at `~/leios/relay/node.log`.
+`$WORKING_DIR/node.socket` and the log at `$WORKING_DIR/node.log`.
 
 :::tip Keep it running in the background
-This runs in the foreground and streams log lines. To leave it running
-while you work in the same terminal, start it under a terminal
-multiplexer such as `tmux` (`sudo apt install -y tmux`, then `tmux`, then
-run the command). Detach with `Ctrl-b d`.
+This runs in the foreground and streams log lines. To leave it running while you
+work in the same terminal, start it under a terminal multiplexer such as `tmux`
+or wrap it into a systemd service.
 :::
 
-:::note Want the dashboards too?
-The Grafana + Loki + Prometheus stack is exactly what **Option 1**
-provides out of the box. You can also get it on this path by running
-`./run.sh` instead of `./run-node.sh`, but it needs extra tools on your
-`PATH` (`process-compose`, `envsubst`, and the observability stack) — the
-Nix dev shell from Option 1 supplies them all. A prebuilt **Docker**
-image carrying both binaries is also published:
-`ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:latest`.
-:::
+### Docker
+
+A prebuilt image carrying both `cardano-node` and `cardano-cli` is published for
+each leios prototype release at
+`ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w25`
+— useful if you already orchestrate nodes with containers. The image runs as a
+non-block-producing relay out of the box; no observability stack is included.
+
+Pick a host working directory, grab the pinned config from the repo, and run:
+
+```shell
+export WORKING_DIR=~/leios-testnet
+mkdir -p "$WORKING_DIR"
+
+git clone --depth 1 https://github.com/input-output-hk/ouroboros-leios
+cd ouroboros-leios/testnet
+
+docker run -d --name leios-relay \
+  -p 3010:3010 \
+  -v "$WORKING_DIR:/data" \
+  -v "$PWD/config:/app/config:ro" \
+  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w25
+```
+
+The `$WORKING_DIR` mount keeps the database, socket (`$WORKING_DIR/node.socket`),
+and log on the host across container restarts. The image also ships the same
+config inside, so the `-v $PWD/config:/app/config:ro` mount is optional — drop it
+to pin to the in-image version.
+
+Follow the running container with `docker logs -f leios-relay`.
 
 ## Confirm you are syncing
 
-If you used **Option 1**, the relay's process dashboard already shows live
-sync in its tip-watcher pane — you can watch it there. To query the node
-yourself (or if you used **Option 2**), open a **second terminal** with
-`cardano-cli` available, point it at the node's socket, and ask for the
-chain tip:
+On the **Nix** path the relay's process dashboard already shows live sync in its
+tip-watcher pane:
+
+![](./testnet-relay-out-of-the-box.png)
+<center>
+A leios-enabled cardano-node syncing the Musashi network
+</center>
+
+To query the node yourself, open a **second terminal** with `cardano-cli` and
+`$WORKING_DIR` available, point it at the node's socket, and ask for the chain
+tip:
 
 ```shell
 export CARDANO_NODE_NETWORK_ID=164
-# Option 2: the WORKING_DIR you chose (e.g. ~/leios/relay/node.socket).
-# Option 1: ./tmp-testnet/node.socket (from the nix develop shell).
-export CARDANO_NODE_SOCKET_PATH=~/leios/relay/node.socket
+export CARDANO_NODE_SOCKET_PATH="$WORKING_DIR/node.socket"
 cardano-cli query tip
 ```
 
@@ -312,15 +351,35 @@ genuine hang from a pause, watch over a few minutes: if the block height
 eventually jumps, it is working.
 :::
 
-## Watch Leios at work (optional)
+## Out-of-the-box observability
+
+The Nix path boots a Grafana + Loki + Prometheus stack alongside the
+node, so you can watch sync progress, peer activity, and Leios events
+without setting anything up. Grafana opens at `http://localhost:3000`
+and gives you:
+
+- a process dashboard showing the node and the tip-watcher (live sync
+  progress) side by side
+- Loki-backed log search, so you can filter for Leios events through
+  the UI rather than tailing files
+- Prometheus metrics for resource usage, mempool depth, and chain tip
+
+To get the same on the **Prebuilt binaries** path, run `./run.sh`
+instead of `./run-node.sh` — it needs extra tools on your `PATH`
+(`process-compose`, `envsubst`, Grafana, Loki, Prometheus); the
+`dev-testnet` Nix dev shell supplies them all. The Docker image
+carries only the binaries; observability there is whatever you wire
+up around it.
+
+## What to look for
 
 The pinned configuration turns on debug tracing for the Leios
-subsystems, so you can watch endorser blocks move through your node. Tail
-the log and filter for the Leios events (Option 2 path shown; on Option 1
-the log is at `./tmp-testnet/node.log`, or use the Loki/Grafana view):
+subsystems, so you can watch endorser blocks move through your node —
+either through Loki/Grafana, or by tailing `$WORKING_DIR/node.log`
+directly:
 
 ```shell
-tail -f ~/leios/relay/node.log | grep -E 'Leios|CertRB'
+tail -f "$WORKING_DIR/node.log" | grep -E 'Leios|CertRB'
 ```
 
 Greppable highlights:
@@ -336,7 +395,3 @@ Greppable highlights:
 
 Seeing these flow through a relay you stood up yourself is the protocol
 behaving in public exactly as the design intends.
-
----
-
-**Next:** [Register a stake pool →](./register-stake-pool.md)
