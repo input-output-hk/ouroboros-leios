@@ -4,7 +4,7 @@ import { themes as prismThemes } from "prism-react-renderer";
 
 const config: Config = {
   title: "Ouroboros Leios",
-  tagline: "Musashi Dojo is now open for testing",
+  tagline: "Musashi Dojo is open for testing",
   favicon: "img/favicon.ico",
 
   // Set the production url of your site here
