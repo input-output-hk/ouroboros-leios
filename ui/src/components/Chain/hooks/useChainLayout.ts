@@ -11,10 +11,14 @@ export const RB_HEIGHT = 50;
 export const EB_WIDTH = 90;
 export const EB_HEIGHT = 52;
 export const MIN_CARD_GAP = 5;
-export const ROW_SPACING = 80;
+// Within a row, the EB lane sits just below the RB lane. ROW_SPACING is the
+// vertical distance between rows (chain candidates); ROW_INTRA_GAP is the
+// gap between an RB and "its" EB on the same row, sized to give the
+// "announces"/"certifies" edge label room between them.
+export const ROW_INTRA_GAP = 32;
+export const ROW_SPACING = RB_HEIGHT + ROW_INTRA_GAP + EB_HEIGHT + 24;
 export const RB_BASELINE_Y = 0;
-// Reserve room for a few RB rows before EB stripe even if there are fewer.
-export const EB_STRIPE_GAP = 120;
+export const EB_LANE_OFFSET = RB_HEIGHT + ROW_INTRA_GAP;
 
 export type BlockRef =
   | { kind: "rb"; rb: IChainRB }
@@ -145,9 +149,6 @@ export const computeChainLayout = (chain: IChainState): IChainLayout => {
   }
 
   const rowOf = assignRows(rbs);
-  const maxRow = rowOf.size
-    ? Math.max(...Array.from(rowOf.values()))
-    : 0;
 
   const rbBoxesById = new Map<string, IBlockBox>();
   const rbBoxes: IBlockBox[] = [];
@@ -164,18 +165,35 @@ export const computeChainLayout = (chain: IChainState): IChainLayout => {
     rbBoxesById.set(rb.id, box);
   });
 
-  // EB stripe below all RB rows. If multiple EBs share a slot, stack them.
-  const ebStripeY =
-    RB_BASELINE_Y + (maxRow + 1) * ROW_SPACING + EB_STRIPE_GAP - ROW_SPACING;
-  const perSlotCounts = new Map<number, number>();
+  // Place each EB on the row of the candidate chain it belongs to: pick the
+  // row of the RB that announces or certifies it. Orphans (no referencing RB
+  // in window) fall back to row 0. Multiple EBs on the same row at the same
+  // slot are stacked vertically within the EB lane.
+  const ebRowOf = (eb: IChainEB): number => {
+    let best: number | undefined;
+    rbs.forEach((rb) => {
+      if (rb.announcesEbId === eb.id || rb.certifiesEbId === eb.id) {
+        const r = rowOf.get(rb.id);
+        if (r !== undefined && (best === undefined || r < best)) best = r;
+      }
+    });
+    return best ?? 0;
+  };
+  const perRowSlotCounts = new Map<string, number>();
   const ebBoxesById = new Map<string, IBlockBox>();
   const ebBoxes: IBlockBox[] = [];
   ebs.forEach((eb) => {
-    const stackIdx = perSlotCounts.get(eb.slot) ?? 0;
-    perSlotCounts.set(eb.slot, stackIdx + 1);
+    const row = ebRowOf(eb);
+    const key = `${row}:${eb.slot}`;
+    const stackIdx = perRowSlotCounts.get(key) ?? 0;
+    perRowSlotCounts.set(key, stackIdx + 1);
     const box: IBlockBox = {
       x: slotX.get(eb.slot)!,
-      y: ebStripeY + stackIdx * (EB_HEIGHT + 12),
+      y:
+        RB_BASELINE_Y +
+        row * ROW_SPACING +
+        EB_LANE_OFFSET +
+        stackIdx * (EB_HEIGHT + 8),
       width: EB_WIDTH,
       height: EB_HEIGHT,
       ref: { kind: "eb", eb },
@@ -201,11 +219,11 @@ export const computeChainLayout = (chain: IChainState): IChainLayout => {
     }
   });
 
-  // Invert vertically: the longest chain (row 0) and the EB stripe were built
-  // with positive y going down, longest at top. Mirror around the maximum y
-  // so the longest chain sits at the BOTTOM and shorter forks / EB stripe
-  // rise above it. The Global Stats overlay hangs from the upper-left, so
-  // keeping the main chain low keeps it out from under the panel.
+  // Invert vertically: rows were built with positive y going down, longest
+  // chain at row 0 (top). Mirror around the maximum y so the longest chain
+  // sits at the BOTTOM and shorter forks rise above it. The Global Stats
+  // overlay hangs from the upper-left, so keeping the main chain low keeps
+  // it out from under the panel.
   let preFlipMaxY = 0;
   for (const box of [...rbBoxes, ...ebBoxes]) {
     if (box.y + box.height > preFlipMaxY) preFlipMaxY = box.y + box.height;

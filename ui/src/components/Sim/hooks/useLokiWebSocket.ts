@@ -48,20 +48,29 @@ const getNodesFromConnection = (connectionId: string): [string, string] => {
   return ["UNKNOWN", "UNKNOWN"];
 };
 
-// Per-RB info accumulated across three correlated tracer events on the
-// producer, consumed when the producer adopts the block. Sized to a small
-// cap as a memory bound; in practice an entry lives only ~ms before being
-// consumed and deleted. Order on a producer for the same RB:
+// Per-RB info accumulated across correlated tracer events on the producer,
+// consumed when the producer adopts the block. Sized to a small cap as a
+// memory bound; in practice an entry lives only ~ms before being consumed
+// and deleted. Events for the same RB on the producer:
 //
-//   1. Consensus.LeiosKernel.TraceLeiosKernel { kind: TraceLeiosBlockCertified,
-//                                               atSlot, ebHash }
-//   2. Forge.Loop.ForgedBlock                 { block, blockNo, blockPrev, slot }
-//   3. Forge.Loop.AdoptedBlock                { blockHash, blockSize, slot }
+//   - Consensus.LeiosKernel.LeiosBlockCertified { kind: LeiosBlockCertified,
+//                                                  atSlot, ebHash }
+//     (only when this RB certifies an earlier EB; slot-keyed because the RB
+//     hash isn't known yet)
 //
-// Step 1 is slot-keyed because the RB hash isn't known yet; step 2
-// promotes it to a hash-keyed entry; step 3 consumes.
+//   - Consensus.LeiosKernel.LeiosBlockAnnounced { kind: LeiosBlockAnnounced,
+//                                                  rbHash, ebHash, ebSlot }
+//     (only when this RB announces a fresh EB; rb-hash-keyed)
+//
+//   - Forge.Loop.ForgedBlock { block, blockNo, blockPrev, slot }
+//     promotes the slot-keyed cert (if any) to a hash-keyed entry alongside
+//     parent and block-number info
+//
+//   - Forge.Loop.AdoptedBlock { blockHash, blockSize, slot }
+//     emits the final RBGenerated, draining the hash-keyed entries
 const PENDING_CAP = 256;
 const pendingCerts = new Map<string, string>(); // `${producer}:${slot}` → ebHash
+const pendingAnnouncements = new Map<string, string>(); // rbHash → ebHash
 const pendingForges = new Map<
   string,
   { blockNo: number; blockPrev?: string; certifiesEbId?: string }
@@ -102,13 +111,24 @@ const parseRankingBlockGenerated = (
 
     // Step 1: cert. The RB hash isn't known yet — stash by producer:slot.
     if (
-      streamLabels.ns === "Consensus.LeiosKernel.TraceLeiosKernel" &&
-      log.kind === "TraceLeiosBlockCertified" &&
+      log.kind === "LeiosBlockCertified" &&
       log.ebHash !== undefined &&
       log.atSlot !== undefined
     ) {
       evictOldest(pendingCerts, PENDING_CAP);
       pendingCerts.set(`${streamLabels.process}:${log.atSlot}`, log.ebHash);
+      return null;
+    }
+
+    // Step 1b: announcement. Direct rb-hash → eb-hash mapping; the trace
+    // carries both so no slot-keyed indirection is needed.
+    if (
+      log.kind === "LeiosBlockAnnounced" &&
+      log.rbHash !== undefined &&
+      log.ebHash !== undefined
+    ) {
+      evictOldest(pendingAnnouncements, PENDING_CAP);
+      pendingAnnouncements.set(log.rbHash, log.ebHash);
       return null;
     }
 
@@ -130,6 +150,8 @@ const parseRankingBlockGenerated = (
     if (streamLabels.ns === "Forge.Loop.AdoptedBlock" && log.blockHash) {
       const forged = pendingForges.get(log.blockHash);
       pendingForges.delete(log.blockHash);
+      const announcedEbId = pendingAnnouncements.get(log.blockHash);
+      pendingAnnouncements.delete(log.blockHash);
       const message: IRankingBlockGenerated = {
         type: EServerMessageType.RBGenerated,
         id: log.blockHash,
@@ -141,6 +163,7 @@ const parseRankingBlockGenerated = (
           : null,
         block_number: forged?.blockNo,
         parent: forged?.blockPrev ? { id: forged.blockPrev } : null,
+        announces: announcedEbId ? { id: announcedEbId } : null,
       };
       return {
         time_s: timestamp,
@@ -581,7 +604,7 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
   // 3. Loki naturally returns results in chronological order within a single stream
   // 4. Sorting large event arrays in the reducer is too expensive for dense simulation data
   const query =
-    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|TraceAdoptedBlock|TraceLeiosBlockCertified|MsgLeiosVotes|LeiosVoted"';
+    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|TraceAdoptedBlock|LeiosBlockAnnounced|LeiosBlockCertified|MsgLeiosVotes|LeiosVoted"';
   const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${encodeURIComponent(query)}&limit=5000`;
 
   let hasAutoStartedPlayback = false;
