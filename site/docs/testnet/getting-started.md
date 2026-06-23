@@ -350,7 +350,7 @@ instead of `./run-node.sh` — it needs extra tools on your `PATH`
 carries only the binaries; observability there is whatever you wire
 up around it.
 
-### What to look for
+## What to look for
 
 The pinned configuration turns on debug tracing for the Leios
 subsystems, so you can watch endorser blocks move through your node —
@@ -374,7 +374,3 @@ Greppable highlights:
 
 Seeing these flow through a relay you stood up yourself is the protocol
 behaving in public exactly as the design intends.
-
----
-
-**Next:** [Register a stake pool →](./register-stake-pool.md)
