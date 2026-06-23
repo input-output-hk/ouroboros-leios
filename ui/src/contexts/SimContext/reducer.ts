@@ -222,12 +222,19 @@ export const reducer = (
         speedMultiplier: 1,
         aggregatedData: defaultAggregatedData,
         selectedBlock: undefined,
+        lokiDroppedEntries: 0,
       };
 
     case "SET_LOKI_CONNECTION_STATE":
       return {
         ...state,
         lokiConnectionState: action.payload,
+      };
+
+    case "ADD_LOKI_DROPPED_ENTRIES":
+      return {
+        ...state,
+        lokiDroppedEntries: state.lokiDroppedEntries + action.payload,
       };
 
     case "SET_LAYOUT_MODE":

@@ -39,6 +39,7 @@ export const defaultState: ISimContextState = {
   tracePath: "",
   lokiHost: undefined,
   lokiConnectionState: EConnectionState.NotConnected,
+  lokiDroppedEntries: 0,
   topography: { links: new Map(), nodes: new Map() },
   topologyPath: "",
   topologyLoaded: false,
