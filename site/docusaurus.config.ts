@@ -119,8 +119,8 @@ const config: Config = {
               label: "Musashi Dōjō",
             },
             {
-              to: "/docs/testnet/install-and-run",
-              label: "Run the Leios node",
+              to: "/docs/testnet/getting-started",
+              label: "Getting started",
             },
           ],
         },

@@ -1,6 +1,5 @@
 ---
 sidebar_position: 1
-title: Install and run a node
 description: Install the Leios node, run a relay, and sync it against the public testnet.
 ---
 
