@@ -393,5 +393,12 @@ Greppable highlights:
   held back until its endorser-block closure is local, then released
   once it arrives.
 
-Seeing these flow through a relay you stood up yourself is the protocol
-behaving in public exactly as the design intends.
+If you have the [out-of-the-box grafana dashboard](http://localhost:3000/d/gg7w7r/proto-devnet-throughput?orgId=1&from=now-5m&to=now&timezone=browser&refresh=5s&viewPanel=panel-1) or other means to watch the current mempool size, you can see Leios in action:
+
+![](./testnet-relay-mempool.png)
+<center>
+Mempool depleting under load: small spikes down = normal Praos blocks, bigger spikes = Leios EBs via RBs
+</center>
+
+Seeing these flow through a node you stood up yourself is the protocol behaving
+in public exactly as the design intends.
