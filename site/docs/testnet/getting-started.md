@@ -282,10 +282,17 @@ the same testnet `config/` directory and `WORKING_DIR` as the
 
 ## Confirm you are syncing
 
-On the **Nix** path the relay's process dashboard already shows live
-sync in its tip-watcher pane. To query the node yourself, open a
-**second terminal** with `cardano-cli` and `$WORKING_DIR` available,
-point it at the node's socket, and ask for the chain tip:
+On the **Nix** path the relay's process dashboard already shows live sync in its
+tip-watcher pane:
+
+![](./testnet-relay-out-of-the-box.png)
+<center>
+A leios-enabled cardano-node syncing the Musashi network
+</center>
+
+To query the node yourself, open a **second terminal** with `cardano-cli` and
+`$WORKING_DIR` available, point it at the node's socket, and ask for the chain
+tip:
 
 ```shell
 export CARDANO_NODE_NETWORK_ID=164
