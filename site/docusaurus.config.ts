@@ -4,8 +4,7 @@ import { themes as prismThemes } from "prism-react-renderer";
 
 const config: Config = {
   title: "Ouroboros Leios",
-  tagline:
-    "A high throughput protocol for Cardano. Designed to increase transaction capacity while preserving security and ecosystem compatibility.",
+  tagline: "Cardano's throughput upgrade is now ready for testing. Enter Dojo.",
   favicon: "img/favicon.ico",
 
   // Set the production url of your site here
@@ -97,6 +96,13 @@ const config: Config = {
         srcDark: "img/logo-dark.svg",
       },
       items: [
+        {
+          type: "docSidebar",
+          sidebarId: "documentationSidebar",
+          position: "right",
+          label: "Join the testnet",
+          href: "https://musashi.network",
+        },
         {
           type: "docSidebar",
           sidebarId: "documentationSidebar",

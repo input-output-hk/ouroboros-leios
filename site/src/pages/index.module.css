@@ -1,3 +1,8 @@
+.devTrackerContainer {
+  position: relative;
+  background-color: #200830;
+}
+
 .devTracker {
   width: 100%;
   border: none;
@@ -7,6 +12,26 @@
   backface-visibility: hidden;
 
   background-color: #200830;
+}
+
+.devTrackerOverlayTop,
+.devTrackerOverlayBottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.devTrackerOverlayTop {
+  top: 0;
+  background: linear-gradient(to bottom, #200830, transparent);
+}
+
+.devTrackerOverlayBottom {
+  bottom: 0;
+  background: linear-gradient(to top, #200830, transparent);
 }
 
 .heroBanner {
@@ -31,13 +56,24 @@
   font-size: 1.375rem;
   font-weight: var(--font-weight-regular);
   line-height: 1.4;
-  max-width: 28.0625rem;
-  margin-bottom: 3rem !important;
+  margin-bottom: 2.5rem !important;
 }
 
 .heroTitle {
   margin-bottom: 2.5rem !important;
   font-weight: 500;
+}
+
+.heroSubtitle {
+  font-size: 1.875rem !important;
+  line-height: 1.3;
+  font-weight: 500;
+  margin-bottom: 2.5rem !important;
+}
+
+.heroExplainer {
+  margin-top: 2.5rem !important;
+  margin-bottom: 0 !important;
 }
 
 .heroButtonsContainer {
