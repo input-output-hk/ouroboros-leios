@@ -66,7 +66,7 @@ A rough picture of the early days:
 
 ![](./testnet-initial-throughput.png)
 <center>
-Screenshot of the IO nodes processing an intermittent load
+Screenshot of the IO nodes processing an intermittent load. The initial load is ~2x of Praos capacity on a ~1 hour duty cycle.
 </center>
 
 :::tip Watch the chain
