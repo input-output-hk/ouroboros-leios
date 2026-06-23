@@ -166,6 +166,10 @@ export interface ISimContextState {
   tracePath: string;
   lokiHost?: string;
   lokiConnectionState: EConnectionState;
+  // Cumulative count of entries Loki's tail handler dropped due to
+  // consumer backpressure; sourced from the `dropped_entries` field on
+  // each WS payload. Reset alongside RESET_TIMELINE.
+  lokiDroppedEntries: number;
   topography: ITransformedNodeMap;
   topologyPath: string;
   topologyLoaded: boolean;
@@ -205,6 +209,7 @@ export type TSimContextActions =
   | { type: "SET_TIMELINE_SPEED"; payload: number }
   | { type: "RESET_TIMELINE" }
   | { type: "SET_LOKI_CONNECTION_STATE"; payload: EConnectionState }
+  | { type: "ADD_LOKI_DROPPED_ENTRIES"; payload: number }
   | { type: "SET_LAYOUT_MODE"; payload: LayoutMode }
   | { type: "SET_NODE_POSITIONS"; payload: Map<string, { fx: number; fy: number }> }
   | { type: "SET_MERCATOR_PARAMS"; payload: MercatorParams | null }
