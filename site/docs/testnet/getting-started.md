@@ -173,8 +173,14 @@ covers the full configuration.
 </details>
 
 The node binds to `0.0.0.0:3010` and keeps its database, socket, and
-log under `./tmp-testnet`. A Grafana dashboard opens at
-`http://localhost:3000` — see
+log under `./tmp-testnet` in whatever directory you ran the command
+from. Export that so the rest of this guide can refer to it generically:
+
+```shell
+export WORKING_DIR="$PWD/tmp-testnet"
+```
+
+A Grafana dashboard also opens at `http://localhost:3000` — see
 [Out-of-the-box observability](#out-of-the-box-observability) for what
 it gives you. Head to [Confirm you are syncing](#confirm-you-are-syncing).
 
@@ -188,59 +194,50 @@ cardano-node --version   # expect: cardano-node x.y.z.164
 ```
 :::
 
-## Option 2 — Without Nix: prebuilt binaries
+### Prebuilt binaries
 
 The release ships statically linked binaries for **Linux x86-64** — they
 carry all their dependencies inside, so there is nothing else to install
 to run them.
 
-**1. Install the tools to download and verify them.**
+**1. Pick a working directory.** Everything for this relay — binaries,
+config, database, socket, log — lives here.
 
 ```shell
-sudo apt update
-sudo apt install -y curl jq git
+export WORKING_DIR=~/leios-testnet
+mkdir -p "$WORKING_DIR/bin"
 ```
 
-`curl` downloads files, `jq` reads the JSON output used throughout these
-guides, and `git` fetches the testnet configuration below.
-
-**2. Download the node, the CLI, and the checksums.**
+**2. Download the node and CLI, and verify the checksums.**
 
 ```shell
-mkdir -p ~/leios && cd ~/leios
+cd "$WORKING_DIR/bin"
 
 BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w25
 curl -L -O "$BASE/cardano-node"
 curl -L -O "$BASE/cardano-cli"
 curl -L -O "$BASE/SHA256SUMS"
-```
-
-**3. Verify the download.** Confirm the files arrived intact before you
-run them:
-
-```shell
 sha256sum -c SHA256SUMS
 ```
 
 You should see `cardano-node: OK` and `cardano-cli: OK`. If you see
 `FAILED`, delete the files and download them again.
 
-**4. Install them onto your `PATH`.**
+**3. Put the binaries on your `PATH`.**
 
 ```shell
 chmod +x cardano-node cardano-cli
-sudo install -m 755 cardano-node cardano-cli /usr/local/bin/
+export PATH="$WORKING_DIR/bin:$PATH"
 ```
 
-Confirm `cardano-node --version` reports
-`cardano-node 11.0.1.164 - linux-x86_64 - ghc-9.6`. The `.164` marks the
-Leios prototype build.
+Confirm `cardano-node --version` reports a version with `.164` suffix - this
+marks the Leios prototype build.
 
-**5. Get the testnet configuration.** Clone the repository for the pinned
+**4. Get the testnet configuration.** Clone the repository for the pinned
 config and the launch script:
 
 ```shell
-cd ~/leios
+cd "$WORKING_DIR"
 git clone https://github.com/input-output-hk/ouroboros-leios
 cd ouroboros-leios/testnet
 ```
@@ -250,17 +247,17 @@ trust the network: the genesis files, the node configuration
 (`config.json`), and the topology (`topology.json`) that points at the
 public bootstrap relays.
 
-**6. Start the relay.** `run-node.sh` launches a single `cardano-node` as
-a non-producing relay, bound to `0.0.0.0:3010`. Give it a working
-directory for its database, socket, and log:
+**5. Start the relay.** `run-node.sh` launches a single `cardano-node` as
+a non-producing relay, bound to `0.0.0.0:3010`, picking up `$WORKING_DIR`
+for its database, socket, and log:
 
 ```shell
-WORKING_DIR=~/leios/relay ./run-node.sh
+./run-node.sh
 ```
 
 Within a few seconds you will see the node connect to peers and begin
 adding blocks (`AddedToCurrentChain`). The socket lands at
-`~/leios/relay/node.socket` and the log at `~/leios/relay/node.log`.
+`$WORKING_DIR/node.socket` and the log at `$WORKING_DIR/node.log`.
 
 :::tip Keep it running in the background
 This runs in the foreground and streams log lines. To leave it running
@@ -269,29 +266,25 @@ multiplexer such as `tmux` (`sudo apt install -y tmux`, then `tmux`, then
 run the command). Detach with `Ctrl-b d`.
 :::
 
-:::note Want the dashboards too?
-The Grafana + Loki + Prometheus stack is exactly what **Option 1**
-provides out of the box. You can also get it on this path by running
-`./run.sh` instead of `./run-node.sh`, but it needs extra tools on your
-`PATH` (`process-compose`, `envsubst`, and the observability stack) — the
-Nix dev shell from Option 1 supplies them all. A prebuilt **Docker**
-image carrying both binaries is also published:
-`ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:latest`.
-:::
+### Docker
+
+A prebuilt image carrying both `cardano-node` and `cardano-cli` is
+published at
+`ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:latest`
+— useful if you already orchestrate nodes with containers. It expects
+the same testnet `config/` directory and `WORKING_DIR` as the
+**Prebuilt binaries** path; no observability stack is included.
 
 ## Confirm you are syncing
 
-If you used **Option 1**, the relay's process dashboard already shows live
-sync in its tip-watcher pane — you can watch it there. To query the node
-yourself (or if you used **Option 2**), open a **second terminal** with
-`cardano-cli` available, point it at the node's socket, and ask for the
-chain tip:
+On the **Nix** path the relay's process dashboard already shows live
+sync in its tip-watcher pane. To query the node yourself, open a
+**second terminal** with `cardano-cli` and `$WORKING_DIR` available,
+point it at the node's socket, and ask for the chain tip:
 
 ```shell
 export CARDANO_NODE_NETWORK_ID=164
-# Option 2: the WORKING_DIR you chose (e.g. ~/leios/relay/node.socket).
-# Option 1: ./tmp-testnet/node.socket (from the nix develop shell).
-export CARDANO_NODE_SOCKET_PATH=~/leios/relay/node.socket
+export CARDANO_NODE_SOCKET_PATH="$WORKING_DIR/node.socket"
 cardano-cli query tip
 ```
 
@@ -325,15 +318,35 @@ genuine hang from a pause, watch over a few minutes: if the block height
 eventually jumps, it is working.
 :::
 
-## Watch Leios at work (optional)
+## Out-of-the-box observability
+
+The Nix path boots a Grafana + Loki + Prometheus stack alongside the
+node, so you can watch sync progress, peer activity, and Leios events
+without setting anything up. Grafana opens at `http://localhost:3000`
+and gives you:
+
+- a process dashboard showing the node and the tip-watcher (live sync
+  progress) side by side
+- Loki-backed log search, so you can filter for Leios events through
+  the UI rather than tailing files
+- Prometheus metrics for resource usage, mempool depth, and chain tip
+
+To get the same on the **Prebuilt binaries** path, run `./run.sh`
+instead of `./run-node.sh` — it needs extra tools on your `PATH`
+(`process-compose`, `envsubst`, Grafana, Loki, Prometheus); the
+`dev-testnet` Nix dev shell supplies them all. The Docker image
+carries only the binaries; observability there is whatever you wire
+up around it.
+
+### What to look for
 
 The pinned configuration turns on debug tracing for the Leios
-subsystems, so you can watch endorser blocks move through your node. Tail
-the log and filter for the Leios events (Option 2 path shown; on Option 1
-the log is at `./tmp-testnet/node.log`, or use the Loki/Grafana view):
+subsystems, so you can watch endorser blocks move through your node —
+either through Loki/Grafana, or by tailing `$WORKING_DIR/node.log`
+directly:
 
 ```shell
-tail -f ~/leios/relay/node.log | grep -E 'Leios|CertRB'
+tail -f "$WORKING_DIR/node.log" | grep -E 'Leios|CertRB'
 ```
 
 Greppable highlights:
