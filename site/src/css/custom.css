@@ -433,10 +433,6 @@ a {
   padding: 3.125rem 2.438rem 10rem 3.4375rem;
 }
 
-.row > .col {
-  max-width: 100% !important;
-}
-
 .footer__col {
   padding: 0;
 }
