@@ -166,14 +166,12 @@ progress) side by side — so you can watch the chain advance straight
 away. Head to [Confirm you are syncing](#confirm-you-are-syncing).
 
 :::tip Want the CLI on your PATH?
-To use `cardano-node` and `cardano-cli` directly (for example, to
-register a pool later), enter the project's dev shell:
+To use `cardano-node` and `cardano-cli` directly (for example, to register a
+pool later), you may want to use this nix dev shell:
 
 ```shell
-git clone https://github.com/input-output-hk/ouroboros-leios
-cd ouroboros-leios
-nix develop          # or `direnv allow` if you use direnv
-cardano-node --version   # expect: cardano-node 11.0.1.164 - linux-x86_64 - ghc-9.6
+nix develop github:input-output-hk/ouroboros-leios#dev-testnet
+cardano-node --version   # expect: cardano-node x.y.z.164
 ```
 :::
 
