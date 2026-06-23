@@ -1,7 +1,7 @@
 ---
 sidebar_position: 1
 title: Install and run a node
-description: Install the Leios node with Nix (recommended) or prebuilt binaries, run a relay, and sync it against the public testnet.
+description: Install the Leios node, run a relay, and sync it against the public testnet.
 ---
 
 # Install and run a node
@@ -73,25 +73,36 @@ endorser blocks, as they land.
 
 ## The network at a glance
 
-| | |
-| --- | --- |
-| **Network** | Ouroboros Leios public prototype testnet |
-| **Bootstrap relay** | `leios-node.play.dev.cardano.org:3001` |
-| **Network magic** | `164` |
-| **Faucet** | [faucet.leios.play.dev.cardano.org](https://faucet.leios.play.dev.cardano.org/basic-faucet) |
-| **Node release** | [`prototype-2026w25`](https://github.com/input-output-hk/ouroboros-leios/releases/tag/prototype-2026w25) |
-| **Node version** | reports `cardano-node 11.0.1.164` |
+|                     |                                                                                                          |
+|---------------------|----------------------------------------------------------------------------------------------------------|
+| **Network**         | Ouroboros Leios public prototype testnet                                                                 |
+| **Bootstrap relay** | `leios-node.play.dev.cardano.org:3001`                                                                   |
+| **Network magic**   | `164`                                                                                                    |
+| **Faucet**          | [faucet.leios.play.dev.cardano.org](https://faucet.leios.play.dev.cardano.org/basic-faucet)              |
+| **Node release**    | [`prototype-2026w25`](https://github.com/input-output-hk/ouroboros-leios/releases/tag/prototype-2026w25) |
+| **Node version**    | reports `cardano-node 11.0.1.164`                                                                        |
 
 ## System requirements
 
-The node is light by testnet standards — a small machine is plenty:
+The network is fresh and will be respun every couple of weeks. Thus, the load on
+validating nodes is light by testnet standards — a small machine is plenty, but
+requires a reasonably fast disk:
 
-| | |
-| --- | --- |
-| **OS / arch** | Linux **x86-64** (the prebuilt binaries are static — no libraries to install) |
-| **CPU** | 2 cores is fine; more only speeds the initial sync |
-| **RAM** | 4 GB comfortable (the node uses ~2–2.5 GB) |
-| **Disk** | SSD, ~25 GB — the chain database is well under 1 GB today |
+|               |                                                    |
+|---------------|----------------------------------------------------|
+| **OS / arch** | Linux **x86-64** (to use the prebuilt binaries)    |
+| **CPU**       | 2 cores is fine; more only speeds the initial sync |
+| **RAM**       | 4 GB comfortable (the node uses ~2–2.5 GB)         |
+| **Disk**      | SSD, ~25 GB                                        |
+
+
+:::info Requirements will change
+Keep an eye out for these system requirements changing, especially the later
+phases which will have more load and parameter exploration, which requires more
+resources. In any case, we would like to [hear from your
+experience](https://discord.gg/Bx2qvsjCte) running it on your individual
+hardware or cloud provider.
+:::
 
 ## Two ways to run a relay
 
