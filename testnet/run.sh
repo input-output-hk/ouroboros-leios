@@ -62,12 +62,11 @@ echo "  metrics:    127.0.0.1:$METRICS_PORT"
 XRAY_COMPOSE=()
 if [ "$XRAY" = "1" ]; then
   set -a
+  # Reuse the proto-devnet dashboards until we ship testnet-specific ones.
+  : "${DEMO_DASHBOARDS_DIR:=${SOURCE_DIR}/../demo/proto-devnet/config/dashboards}"
   # shellcheck source=/dev/null
   source "${XRAY_SOURCE_DIR}/env.sh"
   set +a
-  # Grafana provisioning expects this directory to exist even if we ship
-  # no testnet-specific dashboards.
-  mkdir -p "$DEMO_DASHBOARDS_DIR"
   XRAY_COMPOSE=(-f "${XRAY_SOURCE_DIR}/process-compose.yaml")
   echo "  X-ray:      enabled XRAY=${XRAY} (Grafana at http://localhost:3000)"
 else
