@@ -111,6 +111,21 @@ const config: Config = {
         },
         {
           type: "dropdown",
+          label: "Testnet",
+          position: "right",
+          items: [
+            {
+              href: "https://musashi.network",
+              label: "Musashi Dōjō",
+            },
+            {
+              to: "/docs/testnet/install-and-run",
+              label: "Run the Leios node",
+            },
+          ],
+        },
+        {
+          type: "dropdown",
           label: "Tools",
           position: "right",
           items: [

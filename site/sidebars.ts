@@ -32,6 +32,17 @@ const sidebars: SidebarsConfig = {
       ],
     },
   ],
+  testnetSidebar: [
+    {
+      type: "category",
+      label: "Testnet",
+      collapsed: false,
+      items: [
+        "testnet/install-and-run",
+        "testnet/register-stake-pool",
+      ],
+    },
+  ],
 };
 
 export default sidebars;
