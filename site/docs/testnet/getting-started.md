@@ -243,7 +243,7 @@ config and the launch script:
 
 ```shell
 cd "$WORKING_DIR"
-git clone https://github.com/input-output-hk/ouroboros-leios
+git clone --depth 1 https://github.com/input-output-hk/ouroboros-leios
 cd ouroboros-leios/testnet
 ```
 
@@ -265,20 +265,41 @@ adding blocks (`AddedToCurrentChain`). The socket lands at
 `$WORKING_DIR/node.socket` and the log at `$WORKING_DIR/node.log`.
 
 :::tip Keep it running in the background
-This runs in the foreground and streams log lines. To leave it running
-while you work in the same terminal, start it under a terminal
-multiplexer such as `tmux` (`sudo apt install -y tmux`, then `tmux`, then
-run the command). Detach with `Ctrl-b d`.
+This runs in the foreground and streams log lines. To leave it running while you
+work in the same terminal, start it under a terminal multiplexer such as `tmux`
+or wrap it into a systemd service.
 :::
 
 ### Docker
 
-A prebuilt image carrying both `cardano-node` and `cardano-cli` is
-published at
-`ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:latest`
-— useful if you already orchestrate nodes with containers. It expects
-the same testnet `config/` directory and `WORKING_DIR` as the
-**Prebuilt binaries** path; no observability stack is included.
+A prebuilt image carrying both `cardano-node` and `cardano-cli` is published for
+each leios prototype release at
+`ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w25`
+— useful if you already orchestrate nodes with containers. The image runs as a
+non-block-producing relay out of the box; no observability stack is included.
+
+Pick a host working directory, grab the pinned config from the repo, and run:
+
+```shell
+export WORKING_DIR=~/leios-testnet
+mkdir -p "$WORKING_DIR"
+
+git clone --depth 1 https://github.com/input-output-hk/ouroboros-leios
+cd ouroboros-leios/testnet
+
+docker run -d --name leios-relay \
+  -p 3010:3010 \
+  -v "$WORKING_DIR:/data" \
+  -v "$PWD/config:/app/config:ro" \
+  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w25
+```
+
+The `$WORKING_DIR` mount keeps the database, socket (`$WORKING_DIR/node.socket`),
+and log on the host across container restarts. The image also ships the same
+config inside, so the `-v $PWD/config:/app/config:ro` mount is optional — drop it
+to pin to the in-image version.
+
+Follow the running container with `docker logs -f leios-relay`.
 
 ## Confirm you are syncing
 
