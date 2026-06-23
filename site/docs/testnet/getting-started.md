@@ -64,6 +64,11 @@ A rough picture of the early days:
   Dijkstra era and the Leios testnet — start whenever you see fit. Early
   feedback is exactly what this phase is for.
 
+![](./testnet-initial-throughput.png)
+<center>
+Screenshot of the IO nodes processing an intermittent load
+</center>
+
 :::tip Watch the chain
 **[KleioScan](https://kleioscan.com/#/leios)** — an early Leios testnet
 explorer built by [Kostas Dermentzis](https://github.com/kderme) — lets you watch blocks, including
