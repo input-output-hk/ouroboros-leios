@@ -31,16 +31,14 @@ function HomepageHeader() {
           <div className={clsx("container-padding")}>
             <div className={styles.heroBanner}>
               <h1 className={styles.heroTitle}>{siteConfig.title}</h1>
-              <h2 className={styles.heroSubtitle}>
-                Dojo is now open for testing
-              </h2>
-              <p className={styles.heroStandfirst}>{siteConfig.tagline}</p>
+              <h2 className={styles.heroSubtitle}>{siteConfig.tagline}</h2>
               <div className={styles.heroButtonsContainer}>
                 <a
                   className={clsx("primary-button homepage-button")}
                   href="https://musashi.network"
                 >
-                  Join the testnet <ArrowRightIcon height={12} width={12} />
+                  Go to musashi.network{" "}
+                  <ArrowRightIcon height={12} width={12} />
                 </a>
                 <a
                   className={clsx("secondary-button homepage-button")}
@@ -51,7 +49,8 @@ function HomepageHeader() {
                 </a>
               </div>
               <p className={styles.heroExplainer}>
-                The testnet, named the Musashi Dojo (武蔵道場), is a tribute to
+                Cardano's throughput upgrade is now ready for testing. The
+                testnet, named the Musashi Dojo (武蔵道場), is a tribute to
                 Cardano's Japanese community and to the philosophy of Miyamoto
                 Musashi.
               </p>
