@@ -10,6 +10,11 @@ set -eo pipefail
 # Override by exporting before invoking this script.
 set -a
 : "${WORKING_DIR:=$(pwd)/tmp-testnet}"
+# Normalize to absolute. Subprocesses (Grafana, Prometheus, ...) run with
+# different cwds; a relative WORKING_DIR resolves differently in each and
+# silently writes/reads from the wrong place — e.g. Grafana tries to mkdir
+# under its --homepath inside the read-only /nix/store.
+WORKING_DIR="$(realpath -m "$WORKING_DIR")"
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 : "${PORT:=3010}"
 : "${HOST_ADDR:=0.0.0.0}"
