@@ -66,7 +66,7 @@ A rough picture of the early days:
 
 ![](./testnet-initial-throughput.png)
 <center>
-Screenshot of the IO nodes processing an intermittent load
+Screenshot of the IO nodes processing an intermittent load. The initial load is ~2x of Praos capacity on a ~1 hour duty cycle.
 </center>
 
 :::tip Watch the chain
@@ -337,18 +337,27 @@ Run it again every minute — `block`, `slot`, and `syncProgress` should
 climb. When `syncProgress` reads `100.00`, your node is fully caught up
 and following the testnet.
 
-:::warning Syncing happens in bursts, not a smooth climb. Don't restart.
-As your node catches up through the transaction-heavy part of the chain,
-it fetches large endorser blocks and their full transaction closures from
-a handful of peers. This makes sync **lurch**: `syncProgress` and the
-block height sit still for thirty seconds to a couple of minutes, then
-jump forward in a burst. If you run `query tip` during a pause it looks
-frozen even though the node is healthy and working.
+:::warning Sync is slow in the early days — be patient
+Catching up through the transaction-heavy part of the chain is slow
+right now. Two things make it worse in this phase of the testnet:
 
-**Resist the urge to restart** during a pause — a restart throws away
-catch-up progress. Leave the node running and let it ride. To tell a
-genuine hang from a pause, watch over a few minutes: if the block height
-eventually jumps, it is working.
+- **Few relays serving blocks.** The network is small and sync depends
+  on a handful of peers having the blocks you need. If none of your
+  upstreams have them, the node will sit and wait — sometimes for many
+  minutes — before progress resumes.
+- **Catch-up isn't optimized yet.** A more efficient catch-up path is
+  on the roadmap; until it lands, expect long pauses and bursty
+  progress where `syncProgress` and the block height sit still, then
+  jump forward.
+
+Your node may also get **genuinely stuck**. If that happens, give it a
+while, then try again later when more relays are around. Restarting is
+fine — it costs the small amount of unwritten state, not the synced
+chain on disk.
+
+If you keep hitting a wall, please reach out on the
+**[Musashi Dōjō Discord](https://discord.gg/Bx2qvsjCte)** — that's
+exactly the feedback the onboarding phase is here to surface.
 :::
 
 ## Out-of-the-box observability
@@ -393,5 +402,12 @@ Greppable highlights:
   held back until its endorser-block closure is local, then released
   once it arrives.
 
-Seeing these flow through a relay you stood up yourself is the protocol
-behaving in public exactly as the design intends.
+If you have the [out-of-the-box grafana dashboard](http://localhost:3000/d/gg7w7r/proto-devnet-throughput?orgId=1&from=now-5m&to=now&timezone=browser&refresh=5s&viewPanel=panel-1) or other means to watch the current mempool size, you can see Leios in action:
+
+![](./testnet-relay-mempool.png)
+<center>
+Mempool depleting under load: small spikes down = normal Praos blocks, bigger spikes = Leios EBs via RBs
+</center>
+
+Seeing these flow through a node you stood up yourself is the protocol behaving
+in public exactly as the design intends.

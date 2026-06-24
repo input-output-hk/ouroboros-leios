@@ -19,7 +19,11 @@
     "QueryBatchSize": 100000,
     "SnapshotInterval": 864
   },
-  "MempoolCapacityBytesOverride": 5000000,
+  "LeiosDbConfig": {
+    "Backend": "SQLite",
+    "Filepath": "leios.db"
+  },
+  "MempoolCapacityBytesOverride": 500000,
   "MinNodeVersion": "11.0.1-leios-prototype",
   "Protocol": "Cardano",
   "RequiresNetworkMagic": "RequiresMagic",
