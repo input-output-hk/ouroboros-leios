@@ -110,54 +110,151 @@ section as the primary reference.
 
 ### Praos-over-Leios prioritization
 
-**Status** — requirements captured; design maturing; implementation early.
+**Status** — requirements captured; prototype available; design maturing.
 
-> _Draft. The node must prioritize Praos over all Leios traffic and computation,
-> and younger EBs over older ones (Praos > fresh Leios > stale Leios). Candidate
-> mechanisms: a multiplexer bias (`NEW-LeiosPraosMuxBias`) to keep Praos traffic
-> ahead, and TCP bearer management (e.g. `TCP_NOTSENT_LOWAT`, though not portable)
-> to avoid head-of-line blocking that would slow apparent Praos block
-> propagation. The harder questions — GC pressure and disk-bandwidth contention
-> during a worst-case protocol burst — are judgeable only by prototype, not by
-> the simulations that drove the first CIP._
->
-> Primary sources: [design doc §Resource management](./leios-design/README.md#resource-management), [§Traffic prioritization](./leios-design/README.md#traffic-prioritization), [§Message latencies](./leios-design/README.md#message-latencies).
-> Pointers to fold in: whether the existing fair multiplexer already suffices; prototype/measurement results on the contention risks.
+Keeping Praos ahead of Leios was the immediate focus at the project's start and
+the first thing to spark network-level investigation, since Leios may only use
+the resources Praos leaves idle — the requirement is Praos > fresh Leios > stale
+Leios. Turning the opening question (does EB traffic actually disrupt Praos?)
+into an [experiment][oc-1701] — a small prototype relaying a Praos block while a
+large EB crosses the same link — first pointed at buffer bloat, a multi-megabyte
+EB delaying the small Praos block stuck behind it in an over-full buffer. That
+proved something of a red herring: it depends on misconfigured, consumer-grade
+equipment rather than the well-provisioned hosts most stake runs on, and the
+isolation mechanisms below contain it. More striking was the opposite result —
+over a single hop, heavy Leios traffic has been observed to _reduce_ Praos block
+latency, because the steady stream holds the TCP congestion window open and
+spares the connection the slow-start an idle link would otherwise suffer.
+
+The current understanding is that two mechanisms together give sufficient
+isolation between the Praos and Leios mini-protocols. The node's multiplexer is
+already intentionally fair across mini-protocols, and because Praos and Leios
+ride different ones, that fairness alone may keep Praos timely (a [mux
+demo][on-5261] and [egress-fairness work][on-5271] are sharpening it); separately,
+bounding the kernel-level send buffer — for example via `TCP_NOTSENT_LOWAT` —
+stops a large Leios write from queueing ahead of a Praos message. Explicitly
+weighing Praos over Leios with a multiplexer bias remains an option for a
+stronger guarantee, but it carries risks — over-biasing wastes the idle capacity
+Leios exists to use — and may be unnecessary, so prototypes should measure first.
+The harder contention risks, GC pressure and disk bandwidth under a worst-case
+burst, resisted the simulations behind the CIP and remain judgeable only by
+prototype.
+
+Open question: how much explicit prioritization, if any, is needed beyond a fair
+multiplexer and bounded kernel buffers — with the minor wrinkle that the
+send-buffer socket option (`TCP_NOTSENT_LOWAT`) is not universally portable;
+freshest-first delivery (younger EBs before older) is harder still and likely
+needs server-side request reordering.
+
+Primary sources: [design doc §Resource management](./leios-design/README.md#resource-management), [§Traffic prioritization](./leios-design/README.md#traffic-prioritization), [§Message latencies](./leios-design/README.md#message-latencies).
+Monthly reviews: the networking investigation ran through the autumn — [October 2025][mr-2025-10] demoed the first prototype measuring EB-traffic impact on Praos, and [November 2025][mr-2025-11] dug into the EB-versus-Praos latency interaction (the Toxiproxy-to-Linux-traffic-control switch and the buffer-bloat analysis). The measurements matured past that early noise in spring: [April 2026][mr-2026-04] ran a proper Linux-traffic-control test bed (netem/fq_codel) probing single-hop TCP behaviour, and [May 2026][mr-2026-05] reported the corrected DeltaQ congestion-control analysis — Cubic meeting the latency target across high-latency links where the conservative Reno falls short.
 
 ### High-throughput transaction submission
 
-**Status** — implementation maturing (delivered via `ouroboros-network` v2, off the CIP track).
+**Status** — implementation maturing; delivered via `ouroboros-network` v2, off the CIP track.
 
-> _Draft. Leios raises the target consensus data rate well above Praos, so the
-> transaction-submission layer between mempools must sustain a rate exceeding it
-> or endorser blocks starve. The "v2 undecision" variant shows the highest
-> sustained data rates and is the candidate that best fits this requirement._
->
-> Primary source: [design doc §High-throughput transaction submission](./leios-design/README.md#high-throughput-transaction-submission).
-> Pointers to fold in: latest v2 throughput figures ([ouroboros-network#5336][on-5336], [#5337][on-5337]).
+Leios raises the target consensus data rate well above Praos, and the available
+transaction volume always exceeds what consensus can include, so the
+transaction-submission layer that replicates mempools between nodes must sustain
+a rate exceeding the target Leios rate — otherwise the
+[high-throughput mempool](#high-throughput-mempool) starves and EBs never fill.
+This is a Praos-era component pushed well past its original operating point
+rather than a new Leios protocol.
+
+Today's node uses the legacy protocol, which fetches every offered transaction
+from every peer that announces it. That is simple and robust but duplicates a
+great deal of traffic, and the wasted CPU, memory, and bandwidth is exactly the
+headroom Leios needs. A [version-2 protocol][on-5336] is being rolled out to cut
+that waste; of its variants, the ["undecision" variant][on-5337] — which makes
+per-peer fetch decisions through shared STM state rather than routing everything
+through a central coordination thread — sustains the highest data rates across
+realistic peer valencies and is the candidate that best fits the requirement.
+Because the savings help Praos too, none of this is Leios-specific.
+
+The headline measurement is stark. Replicating a 900 kB backlog of 500
+transactions over a bandwidth-shaped link, the legacy protocol took around nine
+seconds with only about a tenth of the bytes on the wire useful (the rest
+duplicate fetches); the undecision variant completed the same transfer in
+roughly 1.6 seconds with about three-quarters of the bytes useful — nearly six
+times faster. Widening the in-flight window helped only when paired with the
+per-peer decision logic: the central-coordination variant got faster but stayed
+just as wasteful.
+
+Open question: whether the chosen variant sustains the required rate across
+realistic peer valencies and geographies — separate stress testing has already
+shown throughput falling short in high-latency regions, though there the
+bottleneck pointed at the mempool rather than at submission.
+
+Primary source: [design doc §High-throughput transaction submission](./leios-design/README.md#high-throughput-transaction-submission).
+Monthly reviews: [April 2026][mr-2026-04] presented the v2 margin simulations (legacy ~9 s at ~9% efficiency versus the undecision variant ~1.6 s at ~78%); [May 2026][mr-2026-05] stress-tested submission and the mempool over a realistic, less-connected topology, where high-latency regions could not saturate despite spare CPU.
 
 ### High-throughput mempool
 
-**Status** — requirements maturing; prototype maturing; design maturing; implementation early.
+**Status** — need confirmed; design ideas only, no prototype yet.
 
-> _Draft. Re-applying thousands of transactions can block transaction submission
-> and forging; the design decouples transaction diffusion from mempool syncing
-> and keeps a block-producer view of transactions for forging. A DAG-style
-> mempool is a mid-term direction. Originally out of scope, now identified as
-> essential._
->
-> Primary source: [design doc §High-throughput mempool](./leios-design/README.md#high-throughput-mempool).
-> Pointers to fold in: the `reapplyTx`-cost problem statement; monthly review or Slack thread on the mempool redesign.
+The mempool is the component under the most revalidation pressure in Leios, and
+it is the least settled: the need is clear, but there is no prototype yet — only
+competing design ideas. Two things make it hard. First, today's mempool
+revalidates its whole contents against the currently selected ledger state
+whenever chain selection changes, and in the current node everything else —
+transaction diffusion, block forging, adding transactions — waits while it does;
+at Leios load (a mempool measured in tens of megabytes against a sustained
+high-transaction-rate stream) a single resync can take on the order of tens of
+seconds. Second, Leios adds a double-ledger-state problem: certifying an EB
+induces a new ledger state, so a transaction valid against the base state may be
+invalid once the EB is applied, and a mempool built on the base state can be
+largely irrelevant to the very block that certifies an EB.
+
+The need itself is not in doubt — it surfaced in stress testing, where
+high-latency regions could not saturate their mempools despite ample spare CPU,
+and it was discussed with other implementers at the node-diversity workshop. The
+response splits into two tiers. An immediate, fairly well-understood improvement
+keeps the existing mempool but decouples transaction diffusion from
+revalidation (so diffusion no longer stalls during a resync) and enlarges the
+mempool to at least twice an EB's capacity so a certificate-bearing RB can still
+carry a full fresh EB. Beyond that, a mid- to long-term redesign toward a DAG-based
+ledger and mempool — potentially maintaining two mempool views, one per ledger
+state — could handle the throughput far more cleanly, but it is a deeper,
+higher-risk and higher-reward change whose shape is still open.
+
+Open question: whether the incremental improvement suffices for the testnet and
+early mainnet, or whether the DAG-based redesign proves necessary — and which of
+the redesign ideas survive contact with a prototype.
+
+Primary sources: [design doc §High-throughput mempool](./leios-design/README.md#high-throughput-mempool), [§Block production](./leios-design/README.md#block-production).
+Monthly review: [May 2026][mr-2026-05] laid out the mempool redesign problem — the revalidation overhead, the double-ledger-state complication, and the two-mempool / DAG-ledger ideas — alongside a stress test showing high-latency regions unable to saturate the mempool despite spare CPU.
 
 ### Block production
 
-**Status** — requirements captured; prototype available; design maturing.
+**Status** — well understood; basic operation in the prototype; EB announcement and pre-application still to cover.
 
-> _Draft. The block-production thread is extended to forge an EB alongside each
-> RB (unless empty), with a new EB capacity measure; a later version
-> pre-computes the EB transaction chunk to avoid delaying a CertRB._
->
-> Primary source: [design doc §Block production](./leios-design/README.md#block-production).
+The forge thread now issues an EB alongside each RB unless the EB would be empty;
+because the EB hash sits in the RB header, the RB payload, the EB, and the RB
+header are decided together in one thread. Basic operation is demonstrated in the
+[prototype][ol-690] — EBs are forged and diffused — and the mempool must hold at
+least twice an EB so a certificate-bearing RB can still carry a full fresh EB.
+
+Two things are deliberately short-cut for now. The prototype either certifies an
+EB or announces a new one in a given opportunity, not both, forgoing roughly half
+the block opportunities; [pre-application][ol-838] closes this by rebasing the
+mempool onto the ledger state induced by the certified EB before selecting the
+next EB's transactions, at the cost of a heavier forge loop. EB announcement is
+the part with the most design choice still open ([prototype issue][ol-772]): two
+block structures are on the table — an enhanced Praos header carrying the
+KES-signed EB hash (CIP-164's approach), or dedicated EB headers if that proves
+simpler — while the surrounding rules are settled (forward one announcement plus
+one equivocation proof per block opportunity, and drop announcements older than
+3·L_hdr). Announcement is where EB equivocation detection lives, and since that
+defeats most stake-based threats it makes a natural early red-team/blue-team
+exercise on the testnet.
+
+Open question: which block structure carries EB announcements (enhanced Praos
+header vs dedicated EB headers) — the report has no dedicated section for it and
+it needs more coverage — and whether pre-application closes the CertRB forge-time
+gap within the slot.
+
+Primary source: [design doc §Block production](./leios-design/README.md#block-production).
+Monthly reviews: [February][mr-2026-02] and [March 2026][mr-2026-03] demoed EB production and inclusion (with announcement still in the block body), and [April 2026][mr-2026-04] moved announcements into the header per the SIP.
 
 ### Endorser block diffusion and storage
 
@@ -166,18 +263,19 @@ section as the primary reference.
 Acquiring endorser blocks has been the central design effort of recent months:
 the prototype's fetch logic is adequate for demos but has poor worst-case
 resource bounds, and CIP-164's message-delay limits were derived from an
-over-abstracted network stack. The aim of the current design is timely,
-verifiable EB availability with bounded resource usage and bounded tail latency,
-robust to message bursts and protocol storms. Freshest-first fetching is the
-burst-robust baseline; the refinements below make delivery predictable enough to
-keep certified EBs within the protocol's diffusion budget.
+over-abstracted network stack. The [fetch-logic redesign][ol-853] therefore aims
+for timely, verifiable EB availability with bounded resource usage and bounded
+tail latency, robust to bursts and storms. A [baseline LeiosFetch
+design][fetchlogic] keeps freshest-first fetching as the starting point; the
+refinements below make delivery predictable enough to keep certified EBs within
+the protocol's diffusion budget.
 
 Two ideas carry the fetching design, set out in an [EB-availability
 analysis][eb-avail]. First, each node keeps a small stake-sampled
-set of big-ledger peers (currently three); once an EB's voting window closes, it
+set of big-ledger peers; once an EB's voting window closes, it
 fetches the full certified EB from whichever of those peers advertise it. Because
 certification implies that a large share of stake has already seen the EB, this
-places certified EBs within roughly two hops of almost all honest nodes. Second,
+places certified EBs within a small number of hops of almost all honest nodes. Second,
 everything else is fetched fine-grained: the producer splits the EB into
 Merkle-tree parts and a node requests different parts from different peers, each
 validated by its inclusion proof. Spreading requests across all peers is what
@@ -186,43 +284,76 @@ while keeping worst-case waste to a small multiple of one EB. Equivocation is
 contained by fetching only one body per block-production opportunity, the first
 header seen.
 
-Protocol storms — many honest EBs produced close together, or an adversary
-releasing withheld EBs at the worst moment — are handled by reversing the
-download order to oldest-first within the critical diffusion window, so a storm
-becomes observable before voting, then returning to freshest-first afterwards; a
-voting rule abstains during a detected storm, and late-released EBs are
-deprioritized. Together these bound the higher-priority traffic that can compete
-with a certified EB during its window. This is closely intertwined with the
-network-delay analysis: the header-, voting-, and diffusion-window budgets the
-design relies on are being put on a mainnet-realistic footing through improved
-DeltaQ analysis and new topology simulations, since the worst cases are hard to
-exercise any other way.
+Two distinct threats motivate the storm-handling rules: a protocol storm is a
+by-chance clustering of honest block-production opportunities, while a protocol
+burst is an adversary withholding EBs and releasing them together at the worst
+moment. Both are countered by reversing the download order to oldest-first
+within the critical diffusion window, so the clustering becomes observable before
+voting, then returning to freshest-first afterwards — paired with a voting rule
+that abstains when too many headers appear in a short window (the chance storm)
+and a rule that deprioritizes EBs whose headers arrive suspiciously late (the
+adversarial burst). Together these bound the higher-priority traffic that can
+compete with a certified EB during its window. The work is closely intertwined
+with the network-delay analysis: the header-, voting-, and diffusion-window
+budgets it relies on are being put on a mainnet-realistic footing through
+[improved DeltaQ analysis][ol-889] and new topology simulations, since the worst
+cases are hard to exercise any other way.
 
 For storage, a node retains EB closures up to the immutable tip and indefinitely
 once the immutable chain certifies them — closures are large and long-lived
-because of possible deep Praos forks. A baseline redesign bounds memory, CPU, and
-disk by managing a fixed budget of work-in-progress EBs on disk, tracking
-in-flight requests within hard limits, and reusing the
-[transaction cache](#transaction-cache); whether to keep this bespoke or delegate
-to an embedded store such as SQLite is still being assessed by microbenchmark.
+because of possible deep Praos forks. The defining challenge is the sheer count:
+in the worst case a node must hold on the order of ten thousand work-in-progress
+EB closures at once, bounded by the densest run of Praos elections still inside
+the immutable window. A baseline redesign therefore bounds memory, CPU, and disk
+with a fixed on-disk budget for these work-in-progress EBs, hard limits on
+in-flight requests, and reuse of the [transaction cache](#transaction-cache);
+whether to keep this bespoke or delegate to an embedded store such as SQLite is
+still being assessed by microbenchmark.
 
 Open question: the storage-backend choice, and — more fundamentally — whether
-realistic-topology behavior matches the simulated behavior the CIP parameters
-assume.
+realistic-topology behavior matches the simulation and DeltaQ modeling the CIP
+parameters rest on.
 
 Primary sources: [design doc §Endorser block diffusion](./leios-design/README.md#endorser-block-diffusion), [§Endorser block storage](./leios-design/README.md#endorser-block-storage).
-Supporting: [baseline LeiosFetch design][fetchlogic]; [EB-availability analysis][eb-avail]; [fetch-logic design issue][ol-853]; [improved DeltaQ analysis][ol-889].
+Monthly reviews: Nick Frisby presented EB fetching across three consecutive sessions — [February][mr-2026-02] (prototype demo, plus retention and transaction-cache sizing), [March][mr-2026-03] (SQLite benchmarks, bounded-resource fetch, and the first protocol-storm realization), and [April][mr-2026-04] (the fetch decision logic — tail-latency prior art and a TCP/BBR test bed); Yves Hauser's DeltaQ EB-diffusion model also featured in [March][mr-2026-03].
 
 ### Transaction cache
 
-**Status** — requirements captured; design maturing.
+**Status** — design understood; not yet in the prototype (a known gap).
 
-> _Draft. A unidimensional LRU cache of recently-seen transactions (EB closures
-> plus mempool), sized to roughly an hour of traffic, designed to avoid GC
-> pressure under adversarial load (~131k tx/h)._
->
-> Primary source: [design doc §Transaction cache](./leios-design/README.md#transaction-cache).
-> Pointers to fold in: the decision on a Haskell vs Rust/FFI implementation.
+In Leios as designed in CIP-164, EBs reference transactions by hash rather than
+carrying them, so a transaction is transmitted once — as it diffuses between
+mempools — and not again inside every EB that references it. Avoiding that
+re-transmission is essential to high throughput: re-sending transactions would
+consume the very bandwidth the protocol needs to raise its data rate. The
+transaction cache is what makes the by-hash scheme work in practice, and it also
+conserves the validation work: it retains transactions seen via EB diffusion or
+through the mempool, so an EB referencing a fee-paying transaction the node has
+already transferred and validated costs neither a re-fetch nor a re-validation,
+even once the transaction has left the mempool. This matters most under load, as
+mempools start to fragment — nodes drifting toward different transaction sets —
+and a node can no longer assume an EB's transactions are still to hand. It is also
+what keeps a skipped EB useful: an EB not certified in its round is not lost,
+since its cached closure can be re-endorsed and certified later rather than
+reassembled from scratch. The cache thus underpins the diffusion timeliness the
+protocol's safety argument relies on, yet it is absent from the prototype — an
+inconvenient gap given that role.
+
+Sizing is settled. A "perfect" 36-hour cache would index ~165 million
+transactions (several GB) and is excessive; a Markov-model analysis shows EBs are
+still certified at a high rate even at modest hit rates, so a 15-minute retention
+window suffices — bounding the cache to roughly 100 EBs, about 1.5 million
+transaction names, near 200 MB of RAM. Unlike the mempool (small, multidimensional capacity,
+block-production-driven eviction), the cache is a large single-dimension store
+with simple LRU eviction, best held off the GHC heap (fixed-size bytearrays
+backed by an mmapped file) to avoid GC pressure under adversarial load.
+
+Open question: closing the implementation gap, and confirming the 15-minute /
+~200 MB sizing holds against realistic fragmentation rather than the modelled
+worst case.
+
+Primary source: [design doc §Transaction cache](./leios-design/README.md#transaction-cache).
+Monthly review: [February 2026][mr-2026-02] presented the sizing — rejecting the 36-hour cache and deriving the ~1.5 M-name, ~200 MB bound from the mempool-fragmentation/Markov analysis.
 
 ### Voting and certification
 
@@ -243,11 +374,11 @@ aggregation and verification are prototyped against CIP-164 (see
 [Cryptographic primitives](#cryptographic-primitives)).
 
 The principal unknown is the voting mini-protocol's behavior at scale.
-[Network simulations][sims-2026w18] on 750- and 1,500-node topologies —
+[Network simulations][sims-2026w18] on large topologies —
 including an "everyone votes" mode that maximizes committee size — found
 throughput and EB certification essentially unaffected by committee size at the
 tested loads, which substantially reduces but does not eliminate the concern.
-These topologies are still smaller than mainnet's ~3,000 SPOs, so high
+These topologies are still smaller than mainnet, so high
 confidence is reachable only through large-scale load testing. Should the
 dedicated mini-protocol prove inadequate, Peras' `ObjectDiffusion` is a less
 efficient but workable fallback. The reassuring corollary is that this is a
@@ -269,17 +400,17 @@ is met; every member then votes on every EB in the epoch, with no per-EB
 elections, non-persistent voters, or sortition proofs. The certificate collapses
 to a bitfield over the known committee plus one aggregated BLS signature, and
 quorum becomes a minimum fraction of total active stake rather than a head-count.
-BLS12-381, the 75% quorum, certificate timing, the mini-protocols, and the
+BLS12-381, the quorum threshold, certificate timing, the mini-protocols, and the
 threat model are all unchanged.
 
 The motivation is certificate size and verification cost on the critical path,
 which wFA^LS dominated through non-persistent voters' eligibility proofs.
 Benchmarked against mainnet stake with [leios-wfa-ls-demo][wfa-ls-demo] at
-coverage equivalent to the wFA^LS reference (a ~916-voter, 99%-cumulative-stake
-committee at epoch 612), the certificate shrinks from ~6.8 kB to a few hundred
-bytes — over a 30× reduction — and worst-case verification from ~10 ms to ~2 ms;
-the coverage threshold is stable and gently decreasing across recent epochs.
-These figures are being firmed up with measured values from the demo.
+coverage equivalent to the wFA^LS reference, the certificate shrinks by more
+than an order of magnitude and worst-case verification falls severalfold, while
+the committee still covers nearly all active stake; the coverage threshold is
+stable and gently decreasing across recent epochs. The exact figures live in the
+demo and the CIP.
 
 The prototype ([ouroboros-consensus#2068][oc-2068]) performs certificate
 aggregation and validation per CIP-164 but still selects committees with an
@@ -293,14 +424,36 @@ Supporting: [CIPs#1196][cip-1196]; [leios-wfa-ls-demo][wfa-ls-demo]; [ouroboros-
 
 ### Key registration and rotation
 
-**Status** — requirements maturing; prototype maturing; design maturing; CLI implementation early.
+**Status** — requirements captured; key-generation tooling implemented; registration design maturing.
 
-> _Draft. SPOs register and rotate BLS voting keys; the key-generation commands
-> already exist ([cardano-cli#1355][cli-1355], [#1356][cli-1356]), ahead of the
-> written design._
->
-> Primary source: [design doc §Key registration and rotation](./leios-design/README.md#key-registration-and-rotation).
-> Pointers to fold in: the assumed registration mechanism (PoolReg cert / dedicated cert / in-header via KES).
+To take part in Leios voting, an SPO registers a BLS key alongside its existing
+VRF and KES keys; the committee is drawn from the registered keys. `cardano-cli`
+can already generate a BLS key, hash it, and issue its proof of possession
+([#1355][cli-1355], [#1356][cli-1356]), which guards against rogue-key attacks —
+but that is the extent of it: only generation exists today, with no registration
+or rotation yet. The prototype has moved to the Dijkstra era so the on-chain
+registration path can be built, and the concrete design for how to register BLS
+keys in Cardano is being written up now, with the [ARC voting-crypto
+review][arc-voting] as the key reference. The concrete design for how
+to register BLS keys in Cardano is being written up now, with the
+[ARC voting-crypto review][arc-voting] as the key reference.
+
+The baseline — the least the protocol needs — follows the VRF precedent: carry
+the BLS key and its proof of possession in the pool parameters via the
+pool-registration certificate (existing pools re-register with the new fields, no
+second deposit), pending Dijkstra ledger support. The need for rotation arose
+when committee selection was refined, where adaptive security wants the voting
+key rotated rather than fixed for a pool's lifetime. A more desirable mechanism
+is being sketched: registering and rotating BLS keys via produced blocks,
+analogous to the KES operational certificate — it needs no transaction sent to
+the network and allows more frequent rotation.
+
+Open question: which rotation mechanism to adopt (pool-certificate re-registration
+versus a block-carried, opcert-style key) and the cadence the crypto review calls
+for.
+
+Primary sources: [roadmap issue][ol-776], [design doc §Key registration and rotation](./leios-design/README.md#key-registration-and-rotation).
+Monthly reviews: [April 2026][mr-2026-04] demoed BLS key generation and proof of possession in `cardano-cli`; [May 2026][mr-2026-05] moved the prototype to the Dijkstra era to unblock on-chain registration.
 
 ### Cryptographic primitives
 
@@ -336,17 +489,35 @@ Supporting: [cardano-base#670][base-670]; [Rust reference][crypto-rs].
 
 **Status** — requirements captured; prototype available; design maturing.
 
-> _Draft. How a certified ranking block is verified and adopted, as one flow: a
-> CertRB is buffered in a staging area until its closure arrives (the volatile DB
-> only holds RBs ready for chain selection); its certificate is verified against
-> the voting committee held in the ledger state during block-body (BBODY)
-> validation; the certified EB's transactions are applied via a new third
-> validation level (`notValidateTx`, cheaper than today's `reapplyTx`, itself
-> ~10× cheaper than `applyTx`); transactions are not inlined into the block for
-> the ledger but resolved and passed to it separately._
->
-> Primary sources: [design doc §Chain selection](./leios-design/README.md#chain-selection), [§Block validation](./leios-design/README.md#block-validation), [§Certificate verification](./leios-design/README.md#certificate-verification), [§Transaction validation levels](./leios-design/README.md#transaction-validation-levels).
-> Pointers to fold in: staging-area vs enhanced chain selection; BBODY-rule update status ([cardano-ledger#5872][ledger-5872]).
+Adopting a certified block means resolving its EB and applying that EB's
+transactions to the ledger ([#774][ol-774]). The prototype first inlined those
+transactions before handing them to the ledger; the current design follows the
+ledger's own path more faithfully — verify the certificate (against the voting
+committee held in the ledger state, during block-body validation), resolve the EB
+closure and read the disk-backed (UTxO-HD) state, re-apply the already-validated
+transactions, then apply the full block. Applying an EB's transactions without
+re-validating them — they were validated as they diffused — is what keeps
+adoption affordable, and that path already exists in the ledger; what is missing
+is performance benchmarking, especially against a disk-backed ledger state. Early
+ledger benchmarks put the no-validation speed-up at roughly 5× for value
+transactions and 50× for script transactions.
+
+A certified RB cannot be adopted until the certified EB's closure is available,
+and that gap must be detected rather than silently stalling. A first "staging
+area" design ([#890][ol-890]) held such a block aside until its closure arrived;
+it is being refined into a more holistic chain-selection extension
+([#2076][oc-2076]) that treats a missing EB closure like a missing or
+out-of-order block body — filtering those candidates, fetching the closure, and
+re-triggering selection. Beyond these two threads, the work is largely an
+internal reshuffle of responsibilities across the consensus/ledger API, including
+the block-body rule update that carries certificate verification
+([cardano-ledger#5872][ledger-5872]).
+
+Open question: completing validation benchmarking on a disk-backed ledger, and
+finalizing the chain-selection treatment of missing EB closures.
+
+Primary sources: [design doc §Chain selection](./leios-design/README.md#chain-selection), [§Block validation](./leios-design/README.md#block-validation).
+Monthly reviews: [April 2026][mr-2026-04] presented the ledger validation benchmarks; [May 2026][mr-2026-05] demoed the late-joiner fix, replacing the staging area with chain-selection filtering for missing EB closures.
 
 ### Catching up
 
@@ -425,8 +596,13 @@ Supporting: [cardano-base#670][base-670]; [Rust reference][crypto-rs].
 [musashi]: https://musashi.network
 [base-670]: https://github.com/IntersectMBO/cardano-base/pull/670
 [ledger-5872]: https://github.com/IntersectMBO/cardano-ledger/pull/5872
+[ol-774]: https://github.com/input-output-hk/ouroboros-leios/issues/774
+[ol-890]: https://github.com/input-output-hk/ouroboros-leios/issues/890
+[oc-2076]: https://github.com/IntersectMBO/ouroboros-consensus/pull/2076
 [cli-1355]: https://github.com/IntersectMBO/cardano-cli/pull/1355
 [cli-1356]: https://github.com/IntersectMBO/cardano-cli/pull/1356
+[ol-776]: https://github.com/input-output-hk/ouroboros-leios/issues/776
+[arc-voting]: https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/arc-voting-crypto-review.pdf
 [on-5336]: https://github.com/IntersectMBO/ouroboros-network/issues/5336
 [on-5337]: https://github.com/IntersectMBO/ouroboros-network/issues/5337
 [wfa-ls-demo]: https://github.com/cardano-scaling/leios-wfa-ls-demo
@@ -434,8 +610,20 @@ Supporting: [cardano-base#670][base-670]; [Rust reference][crypto-rs].
 [cip-1196]: https://github.com/cardano-foundation/CIPs/pull/1196
 [oc-2068]: https://github.com/IntersectMBO/ouroboros-consensus/pull/2068
 [ol-790]: https://github.com/input-output-hk/ouroboros-leios/issues/790
+[ol-690]: https://github.com/input-output-hk/ouroboros-leios/issues/690
+[ol-772]: https://github.com/input-output-hk/ouroboros-leios/issues/772
+[ol-838]: https://github.com/input-output-hk/ouroboros-leios/issues/838
 [sims-2026w18]: https://github.com/input-output-hk/ouroboros-leios/tree/main/analysis/sims/2026w18
 [fetchlogic]: https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/targeted-design-investigations/a-baseline-LeiosFetch-design/LeiosFetchLogic.md
 [ol-853]: https://github.com/input-output-hk/ouroboros-leios/issues/853
 [ol-889]: https://github.com/input-output-hk/ouroboros-leios/pull/889
 [eb-avail]: https://docs.google.com/document/d/1L2sWKqk96XfHToWXBcz82Tey69lFnsdGBlvEDNLw0HM/edit
+[mr-2026-02]: https://youtube.com/live/5uAJ-XBAysY
+[mr-2026-03]: https://www.youtube.com/live/_FkCLJLTNco
+[mr-2026-04]: https://www.youtube.com/live/IYDMqkEPLDs
+[mr-2025-10]: https://www.youtube.com/watch?v=5baqGY7WXAc
+[mr-2025-11]: https://youtube.com/live/rraKzt-JIqM
+[mr-2026-05]: https://www.youtube.com/live/Z4uA9tRGS7g
+[oc-1701]: https://github.com/IntersectMBO/ouroboros-consensus/issues/1701
+[on-5261]: https://github.com/IntersectMBO/ouroboros-network/issues/5261
+[on-5271]: https://github.com/IntersectMBO/ouroboros-network/issues/5271
