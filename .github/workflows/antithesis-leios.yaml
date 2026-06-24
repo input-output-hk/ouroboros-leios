@@ -262,14 +262,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
-      - name: Get latest Moog release tag
+      - name: Pin Moog release tag
         id: moog-release
         run: |
-          TAG=$(gh api repos/cardano-foundation/moog/releases/latest --jq '.tag_name')
+          # Pin the Moog requester CLI to the v0.5.x line so it matches the
+          # deployed MPFS/agent/oracle stack at MOOG_MPFS_HOST. Do NOT track
+          # the "latest" release: moog v2.x (the moog-v2 MPFS cutover) is
+          # incompatible with the deployed v0.5.x MPFS — its `facts test-runs`
+          # queries a /status endpoint that 404s and returns an error envelope
+          # instead of the array the jq below expects, which breaks submission
+          # with `jq: Cannot index string with string "key"`. Bump this tag
+          # only once the whole stack has migrated to v2.
+          TAG=v0.5.1.5
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Moog release: $TAG"
-        env:
-          GH_TOKEN: ${{ secrets.MOOG_GITHUB_PAT }}
 
       - name: Download and install Moog
         run: |
