@@ -102,36 +102,38 @@
               # the expression (rather than a separate top-level optionalAttrs
               # block per system, which would have to merge `packages` attrsets
               # at the parent level and silently drop entries).
+              #
+              # Strip upstream's binary-release.nix tarball down to just the
+              # two binaries we actually ship. `cardano-node-linux` (musl, on
+              # x86_64-linux) and `cardano-node-macos` (native, on
+              # aarch64-darwin) come from the same upstream builder, both
+              # tarballs hold bin/ + share/ at the root (no wrapper dir).
+              # bin/ carries the full `releaseBins` set (cardano-node,
+              # cardano-cli, submit-api, bech32, db-analyser, kes-agent, …)
+              # and share/ holds bundled mainnet/preprod/preview configs.
+              # Binaries are already path-clean (static musl on linux, dylib
+              # paths rewritten by `rewrite-libs` on macOS); we just drop
+              # the extras and re-tar with bin/ at the root so consumers can
+              # extract straight into a working dir.
               cardano-node-release =
-                if system == "x86_64-linux" then
-                  # Static musl binaries: no /nix/store references, just bundle.
-                  pkgs.runCommand "${releaseName}.tar.gz" { } ''
-                    mkdir -p "${releaseName}/bin"
-                    cp ${muslJobs.cardano-node}/bin/cardano-node "${releaseName}/bin/"
-                    cp ${muslJobs.cardano-cli}/bin/cardano-cli   "${releaseName}/bin/"
-                    chmod +x "${releaseName}/bin"/*
-                    mkdir -p $out
-                    tar -czf "$out/${releaseName}.tar.gz" "${releaseName}"
-                  ''
-                else
-                  # aarch64-darwin: repackage upstream's cardano-node-macos
-                  # tarball under our naming scheme. Upstream runs `rewrite-libs`
-                  # over the dylib paths so the binaries don't reference
-                  # /nix/store; we only extract, rename the wrapper directory,
-                  # and re-tar (the binaries themselves are untouched, so the
-                  # patching is preserved).
-                  let
-                    upstream = inputs.cardano-node-leios.hydraJobs.${system}.native.cardano-node-macos;
-                  in
-                  pkgs.runCommand "${releaseName}.tar.gz" { } ''
-                    tmp=$(mktemp -d)
-                    tar -xzf ${upstream}/*.tar.gz -C "$tmp"
-                    # Upstream uses cardano-node-<ver>-macos/ as the wrapper dir.
-                    upstream_dir=$(ls "$tmp")
-                    mv "$tmp/$upstream_dir" "$tmp/${releaseName}"
-                    mkdir -p $out
-                    tar -czf "$out/${releaseName}.tar.gz" -C "$tmp" "${releaseName}"
-                  '';
+                let
+                  upstream =
+                    if system == "x86_64-linux" then
+                      inputs.cardano-node-leios.hydraJobs.${system}.musl.cardano-node-linux
+                    else
+                      inputs.cardano-node-leios.hydraJobs.${system}.native.cardano-node-macos;
+                in
+                pkgs.runCommand "${releaseName}.tar.gz" { } ''
+                  mkdir -p work $out
+                  tar -xzf ${upstream}/*.tar.gz -C work
+
+                  rm -rf work/share
+                  find work/bin -mindepth 1 -maxdepth 1 \
+                    ! -name cardano-node ! -name cardano-cli \
+                    -exec rm {} +
+
+                  tar -czf "$out/${releaseName}.tar.gz" -C work bin
+                '';
             };
     };
 }
