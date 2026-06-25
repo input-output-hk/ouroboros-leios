@@ -205,9 +205,10 @@ cardano-node --version   # expect: cardano-node x.y.z.164
 ### Prebuilt binaries
 
 The release ships a tarball per platform with `cardano-node` and
-`cardano-cli` inside. On Linux x86-64 the binaries are statically linked;
-on macOS aarch64 the dylib paths are pre-rewritten so they run on a
-stock macOS host. Either way, nothing else needs installing.
+`cardano-cli` under `bin/`. On Linux x86-64 the binaries are
+statically linked; on macOS aarch64 the dylib paths are pre-rewritten
+so they run on a stock macOS host. Either way, nothing else needs
+installing.
 
 **1. Pick a working directory.** Everything for this relay — binaries,
 config, database, socket, log — lives here.
@@ -251,12 +252,11 @@ shasum -a 256 -c "$ARCHIVE.sha256"
 You should see `cardano-node-leios-…tar.gz: OK`. If you see `FAILED`,
 delete the files and download them again.
 
-**3. Extract and put the binaries on your `PATH`.** Strip the
-platform-named wrapper so the binaries land directly in `bin/`,
-regardless of which platform's tarball you grabbed.
+**3. Extract and put the binaries on your `PATH`.** The tarball
+unpacks straight into `bin/`.
 
 ```shell
-tar -xzf "$ARCHIVE" --strip-components=1
+tar -xzf "$ARCHIVE"
 export PATH="$WORKING_DIR/bin:$PATH"
 ```
 

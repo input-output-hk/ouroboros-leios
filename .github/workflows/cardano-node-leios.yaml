@@ -90,11 +90,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # ----------------------------------------------------------------
-      # x86_64-linux release tarball — nix packages the static musl
-      # binaries into cardano-node-leios-x86_64-linux.tar.gz. Building
-      # this also realises cardano-node-static / cardano-cli-static in
-      # the store, so the docker image below reuses the exact same
-      # paths without rebuilding.
+      # x86_64-linux release tarball — `cardano-node-release` already
+      # strips upstream's cardano-node-linux to just cardano-node and
+      # cardano-cli and drops bundled configs (see nix/release.nix), so
+      # CI just publishes whatever nix produced. Building this also
+      # realises cardano-node-static / cardano-cli-static in the store,
+      # so the docker image below reuses those exact paths without
+      # rebuilding.
       # ----------------------------------------------------------------
       - name: Build x86_64-linux release tarball
         run: |
@@ -218,8 +220,9 @@ jobs:
             substituters = https://cache.nixos.org https://cache.iog.io
             trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
 
-      # cardano-node-release repackages upstream's cardano-node-macos
-      # (binaries with rewritten dylib paths) under our naming scheme.
+      # `cardano-node-release` strips upstream's cardano-node-macos down
+      # to the same set as the linux side (see nix/release.nix); CI just
+      # publishes what nix produces.
       - name: Build aarch64-darwin release tarball
         run: |
           set -euo pipefail
