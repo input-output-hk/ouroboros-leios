@@ -60,7 +60,7 @@ Two documents remain authoritative and living and own the specification role:
 [CIP-164][cip-164] for the protocol, and the node-level
 [`leios-design`](./leios-design/README.md) document for the implementation
 design. This report points to these documents, and other notable materials,
-throughout.
+throughout. It is provided in support of a project milestone.
 
 ### Scope
 
@@ -73,27 +73,34 @@ components that support them — committee selection, key registration, and
 cryptographic primitives; and finally serialization, protocol parameters, and the
 node API.
 
-Each topic states its status and highlights rather than its full
-design, and the selection deliberately does not mirror the [technical design
+Each topic states its status and highlights rather than its full design, and the
+selection deliberately does not mirror the [technical design
 document](./leios-design/README.md#technical-design) section-for-section. Each
-opens with a soft status line tracking how far it has come along a ladder —
-requirements captured, prototype available, design settled, implemented, and
-finally high confidence (the mainnet bar of independent audit, conformance, and
-performance) — stopping at the stage reached; the high-confidence stage is
-deliberately last and is taken up in the [Conclusion](#conclusion).
+opens with a short status line along a rough ladder — from requirements captured,
+through prototype, settled design, and implementation, to high confidence (the
+mainnet bar of audit, conformance, and performance). The ladder is
+a loose guideline only: the stages are not strictly sequential, one component
+often sits at different points for different aspects (a settled design alongside
+an early implementation, say), and the line conveys roughly how far the work has
+come rather than a precise grade. Because requirements are captured for everything, the status lines normally omit
+that baseline and begin from what is actually built or settled; the exception is a
+component whose requirements the original CIP did not capture well, where
+re-establishing them during implementation is itself a step worth noting. The
+high-confidence stage is deliberately last and is taken up in the
+[Conclusion](#conclusion).
 
 ### Audience
 
 The report is written for a technical reader: node developers and researchers
-working on or alongside Leios, stake pool operators preparing to run it, and the
-reviewers assessing milestone MS4.6. It assumes familiarity with Ouroboros Praos
+working on or alongside Leios, stake pool operators preparing to run it, and
+project milestone reviewers. It assumes familiarity with Ouroboros Praos
 and the broad shape of Leios and does not reintroduce them.
 
 ## Component status
 
 ### Praos-over-Leios prioritization
 
-**Status** — requirements captured; prototype available; design maturing.
+**Status:** prototype available; design maturing.
 
 Keeping Praos ahead of Leios was the immediate focus at the project's start and
 the first thing to spark network-level investigation, since Leios may only use
@@ -134,7 +141,7 @@ Monthly reviews: the networking investigation ran through the autumn — [Octobe
 
 ### High-throughput transaction submission
 
-**Status** — implementation maturing; delivered via `ouroboros-network` v2, off the CIP track.
+**Status:** implementation maturing; delivered via `ouroboros-network` v2, off the CIP track.
 
 Leios raises the target consensus data rate well above Praos, and the available
 transaction volume always exceeds what consensus can include, so the
@@ -173,7 +180,7 @@ Monthly reviews: [April 2026][mr-2026-04] presented the v2 margin simulations (l
 
 ### High-throughput mempool
 
-**Status** — need confirmed; design ideas only, no prototype yet.
+**Status:** need confirmed; design ideas only, no prototype yet.
 
 The mempool is the component under the most revalidation pressure in Leios, and
 it is the least settled: the need is clear, but there is no prototype yet — only
@@ -209,7 +216,7 @@ Monthly review: [May 2026][mr-2026-05] laid out the mempool redesign problem —
 
 ### Block production
 
-**Status** — well understood; basic operation in the prototype; EB announcement and pre-application still to cover.
+**Status:** well understood; basic operation in the prototype; EB announcement and pre-application still to cover.
 
 The forge thread now issues an EB alongside each RB unless the EB would be empty;
 because the EB hash sits in the RB header, the RB payload, the EB, and the RB
@@ -241,7 +248,7 @@ Monthly reviews: [February][mr-2026-02] and [March 2026][mr-2026-03] demoed EB p
 
 ### Endorser block diffusion and storage
 
-**Status** — requirements captured; prototype available; design maturing.
+**Status:** prototype available; design maturing.
 
 Acquiring endorser blocks has been the central design effort of recent months:
 the prototype's fetch logic is adequate for demos but has poor worst-case
@@ -302,7 +309,7 @@ Monthly reviews: Nick Frisby presented EB fetching across three consecutive sess
 
 ### Transaction cache
 
-**Status** — design understood; not yet in the prototype (a known gap).
+**Status:** design understood; not yet in the prototype (a known gap).
 
 In Leios as designed in CIP-164, EBs reference transactions by hash rather than
 carrying them, so a transaction is transmitted once — as it diffuses between
@@ -340,7 +347,7 @@ Monthly review: [February 2026][mr-2026-02] presented the sizing — rejecting t
 
 ### Voting and certification
 
-**Status** — requirements captured; prototype available; design settled (shared with Peras); certificate aggregation implemented (peer-reviewed).
+**Status:** prototype available; design settled (shared with Peras); certificate aggregation implemented (peer-reviewed).
 
 A dedicated Leios voting thread wakes when an EB closure becomes available and,
 if the voting rules require this pool to vote, validates the EB and issues its
@@ -373,7 +380,7 @@ Supporting: [ouroboros-leios#790][ol-790]; [cardano-base#670][base-670]; [ourobo
 
 ### Block validation and adoption
 
-**Status** — requirements captured; prototype available; design maturing.
+**Status:** prototype available; design maturing.
 
 Adopting a certified block means resolving its EB and applying that EB's
 transactions to the ledger ([#774][ol-774]). The prototype first inlined those
@@ -407,7 +414,7 @@ Monthly reviews: [April 2026][mr-2026-04] presented the ledger validation benchm
 
 ### Catching up
 
-**Status** — requirements captured; baseline syncing in the prototype; efficient design maturing.
+**Status:** baseline syncing in the prototype; efficient design maturing.
 
 A node that has fallen behind must fetch and replay historical EBs and their
 closures to rebuild ledger state. The prototype already syncs by way of the
@@ -431,7 +438,7 @@ Monthly review: [May 2026][mr-2026-05] demoed the late-joiner path that the base
 
 ### Committee selection
 
-**Status** — requirements captured; prototype available (interim all-vote); design settled (simplified, stake-based truncation).
+**Status:** prototype available (interim all-vote); design settled (simplified, stake-based truncation).
 
 The voting committee is now chosen by a stake-based truncation scheme that
 replaces the earlier wFA^LS (weighted Fait Accompli with Local Sortition)
@@ -465,7 +472,7 @@ Supporting: [CIPs#1196][cip-1196]; [leios-wfa-ls-demo][wfa-ls-demo]; [ouroboros-
 
 ### Key registration and rotation
 
-**Status** — requirements captured; key-generation tooling implemented; registration design maturing.
+**Status:** key-generation tooling implemented; registration design maturing.
 
 To take part in Leios voting, an SPO registers a BLS key alongside its existing
 VRF and KES keys; the committee is drawn from the registered keys. `cardano-cli`
@@ -496,7 +503,7 @@ Monthly reviews: [April 2026][mr-2026-04] demoed BLS key generation and proof of
 
 ### Cryptographic primitives
 
-**Status** — requirements captured; prototype available; design settled; implemented; primitives audited, certificate layer peer-reviewed.
+**Status:** prototype available; design settled; implemented; primitives audited, certificate layer peer-reviewed.
 
 This section covers the low-level signature primitives; the cryptographically
 relevant higher-level work lives in [Key registration and rotation](#key-registration-and-rotation)
@@ -526,7 +533,7 @@ Supporting: [cardano-base#670][base-670]; [Rust reference][crypto-rs].
 
 ### Serialization
 
-**Status** — requirements captured; design settled; implementation maturing.
+**Status:** design settled; implementation maturing.
 
 The prototype was first built on the Conway era — a stable, well-established
 foundation — and has recently moved to the still-draft Dijkstra era. Dijkstra is
@@ -555,7 +562,7 @@ Monthly review: [May 2026][mr-2026-05] reported the prototype's move to the Dijk
 
 ### New protocol parameters
 
-**Status** — requirements captured; placement well understood; parameter set being finalized; not implemented yet.
+**Status:** placement well understood; parameter set being finalized; not implemented yet.
 
 Adding Leios's parameters to the ledger's updatable protocol-parameter set is
 well-understood practice; the only real question is which parameters. The CIP
@@ -578,7 +585,7 @@ Supporting: [ongoing CIP discussion][cip-1213].
 
 ### Node API and configuration
 
-**Status** — requirements captured; client-facing prototype validated on the testnet; new queries still to add.
+**Status:** client-facing prototype validated on the testnet; new queries still to add.
 
 Leios features will be gated behind feature flags — a mechanism already
 bootstrapped by Peras ([cardano-peras#96][peras-96]) — once the first
