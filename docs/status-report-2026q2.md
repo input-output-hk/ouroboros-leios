@@ -6,7 +6,7 @@ author:
   - Sebastian Nagel <sebastian.nagel@iohk.io>
 ---
 
-# Leios development status report — 2026 Q2
+# Leios implementation status report — 2026 Q2
 
 > [!IMPORTANT]
 >
@@ -35,11 +35,11 @@ author:
   - [Endorser block diffusion and storage](#endorser-block-diffusion-and-storage)
   - [Transaction cache](#transaction-cache)
   - [Voting and certification](#voting-and-certification)
+  - [Block validation and adoption](#block-validation-and-adoption)
+  - [Catching up](#catching-up)
   - [Committee selection](#committee-selection)
   - [Key registration and rotation](#key-registration-and-rotation)
   - [Cryptographic primitives](#cryptographic-primitives)
-  - [Block validation and adoption](#block-validation-and-adoption)
-  - [Catching up](#catching-up)
   - [Serialization](#serialization)
   - [New protocol parameters](#new-protocol-parameters)
   - [Node API and configuration](#node-api-and-configuration)
@@ -388,6 +388,64 @@ only limit throughput, never compromise chain safety.
 Primary source: [design doc §Voting and certification](./leios-design/README.md#voting-and-certification).
 Supporting: [ouroboros-leios#790][ol-790]; [cardano-base#670][base-670]; [ouroboros-consensus#2068][oc-2068]; [network simulations (2026w18)][sims-2026w18].
 
+### Block validation and adoption
+
+**Status** — requirements captured; prototype available; design maturing.
+
+Adopting a certified block means resolving its EB and applying that EB's
+transactions to the ledger ([#774][ol-774]). The prototype first inlined those
+transactions before handing them to the ledger; the current design follows the
+ledger's own path more faithfully — verify the certificate (against the voting
+committee held in the ledger state, during block-body validation), resolve the EB
+closure and read the disk-backed (UTxO-HD) state, re-apply the already-validated
+transactions, then apply the full block. Applying an EB's transactions without
+re-validating them — they were validated as they diffused — is what keeps
+adoption affordable, and that path already exists in the ledger; what is missing
+is performance benchmarking, especially against a disk-backed ledger state. Early
+ledger benchmarks put the no-validation speed-up at roughly 5× for value
+transactions and 50× for script transactions.
+
+A certified RB cannot be adopted until the certified EB's closure is available,
+and that gap must be detected rather than silently stalling. A first "staging
+area" design ([#890][ol-890]) held such a block aside until its closure arrived;
+it is being refined into a more holistic chain-selection extension
+([#2076][oc-2076]) that treats a missing EB closure like a missing or
+out-of-order block body — filtering those candidates, fetching the closure, and
+re-triggering selection. Beyond these two threads, the work is largely an
+internal reshuffle of responsibilities across the consensus/ledger API, including
+the block-body rule update that carries certificate verification
+([cardano-ledger#5872][ledger-5872]).
+
+Open question: completing validation benchmarking on a disk-backed ledger, and
+finalizing the chain-selection treatment of missing EB closures.
+
+Primary sources: [design doc §Chain selection](./leios-design/README.md#chain-selection), [§Block validation](./leios-design/README.md#block-validation).
+Monthly reviews: [April 2026][mr-2026-04] presented the ledger validation benchmarks; [May 2026][mr-2026-05] demoed the late-joiner fix, replacing the staging area with chain-selection filtering for missing EB closures.
+
+### Catching up
+
+**Status** — requirements captured; baseline syncing in the prototype; efficient design maturing.
+
+A node that has fallen behind must fetch and replay historical EBs and their
+closures to rebuild ledger state. The prototype already syncs by way of the
+out-of-order chain selection built to handle missing EB closures (the mechanism
+described under block validation and adoption); that is the current baseline.
+
+A more efficient catch-up path is certainly wanted, and its shape has been clear
+since the CIP was drafted last summer: mirror BlockFetch's range requests into
+LeiosFetch, so a catching-up node can request spans of historical EBs the way it
+already requests spans of blocks. The mini-protocol structure was refined
+recently in the CIP following Builder Fest discussions ([CIPs#1167][cip-1167]),
+with the underlying information-flow model unchanged. None of this raises a large
+open question.
+
+Open question: whether LeiosFetch should carry catch-up directly — competing with
+serving already-synced peers — or whether a dedicated protocol keeps the concerns
+cleaner.
+
+Primary source: [design doc §Catching up](./leios-design/README.md#catching-up).
+Monthly review: [May 2026][mr-2026-05] demoed the late-joiner path that the baseline syncing rests on.
+
 ### Committee selection
 
 **Status** — requirements captured; prototype available (interim all-vote); design settled (simplified, stake-based truncation).
@@ -434,9 +492,7 @@ but that is the extent of it: only generation exists today, with no registration
 or rotation yet. The prototype has moved to the Dijkstra era so the on-chain
 registration path can be built, and the concrete design for how to register BLS
 keys in Cardano is being written up now, with the [ARC voting-crypto
-review][arc-voting] as the key reference. The concrete design for how
-to register BLS keys in Cardano is being written up now, with the
-[ARC voting-crypto review][arc-voting] as the key reference.
+review][arc-voting] as the key reference.
 
 The baseline — the least the protocol needs — follows the VRF precedent: carry
 the BLS key and its proof of possession in the pool parameters via the
@@ -485,83 +541,85 @@ verification is worth adopting — with Linear Leios it may never be needed.
 Primary source: [design doc §Cryptography](./leios-design/README.md#cryptography).
 Supporting: [cardano-base#670][base-670]; [Rust reference][crypto-rs].
 
-### Block validation and adoption
-
-**Status** — requirements captured; prototype available; design maturing.
-
-Adopting a certified block means resolving its EB and applying that EB's
-transactions to the ledger ([#774][ol-774]). The prototype first inlined those
-transactions before handing them to the ledger; the current design follows the
-ledger's own path more faithfully — verify the certificate (against the voting
-committee held in the ledger state, during block-body validation), resolve the EB
-closure and read the disk-backed (UTxO-HD) state, re-apply the already-validated
-transactions, then apply the full block. Applying an EB's transactions without
-re-validating them — they were validated as they diffused — is what keeps
-adoption affordable, and that path already exists in the ledger; what is missing
-is performance benchmarking, especially against a disk-backed ledger state. Early
-ledger benchmarks put the no-validation speed-up at roughly 5× for value
-transactions and 50× for script transactions.
-
-A certified RB cannot be adopted until the certified EB's closure is available,
-and that gap must be detected rather than silently stalling. A first "staging
-area" design ([#890][ol-890]) held such a block aside until its closure arrived;
-it is being refined into a more holistic chain-selection extension
-([#2076][oc-2076]) that treats a missing EB closure like a missing or
-out-of-order block body — filtering those candidates, fetching the closure, and
-re-triggering selection. Beyond these two threads, the work is largely an
-internal reshuffle of responsibilities across the consensus/ledger API, including
-the block-body rule update that carries certificate verification
-([cardano-ledger#5872][ledger-5872]).
-
-Open question: completing validation benchmarking on a disk-backed ledger, and
-finalizing the chain-selection treatment of missing EB closures.
-
-Primary sources: [design doc §Chain selection](./leios-design/README.md#chain-selection), [§Block validation](./leios-design/README.md#block-validation).
-Monthly reviews: [April 2026][mr-2026-04] presented the ledger validation benchmarks; [May 2026][mr-2026-05] demoed the late-joiner fix, replacing the staging area with chain-selection filtering for missing EB closures.
-
-### Catching up
-
-**Status** — requirements captured; design early.
-
-> _Draft. A catch-up path more efficient than the staging-area / out-of-order
-> chain-selection route, possibly a dedicated mini-protocol. The least-developed
-> area; originally out of scope, now identified as essential._
->
-> Primary source: [design doc §Catching up](./leios-design/README.md#catching-up).
-> Pointers to fold in: any catch-up design notes, even rough.
-
 ### Serialization
 
-**Status** — requirements captured; design maturing; implementation maturing.
+**Status** — requirements captured; design settled; implementation maturing.
 
-> _Draft. Deterministic CBOR de/serialization for the RB body, EB structure, and
-> vote structure; the `LeiosCert` is added to `Dijkstra` blocks._
->
-> Primary source: [design doc §Serialization](./leios-design/README.md#serialization).
-> Pointers to fold in: whether vote serialization is owned by the ledger or consensus. Supporting: [cardano-ledger#5872][ledger-5872].
+The prototype was first built on the Conway era — a stable, well-established
+foundation — and has recently moved to the still-draft Dijkstra era. Dijkstra is
+a faster-moving target to integrate against and to run a testnet on, but it is
+where Leios's on-chain changes will actually land, so tracking it lets the team
+mature key pieces from prototype toward a production-grade implementation rather
+than redoing Conway work later.
+
+The serialization changes themselves hold no real unknowns; the demand is driven
+by other features. The central one is the ledger change extending the block body
+to carry the certificate and EB reference ([cardano-ledger#5872][ledger-5872]);
+EB announcement in block headers, and key registration via transactions or
+headers, will likewise require encoding changes. Getting these encodings into
+Dijkstra is the minimum needed for Leios support in a hard fork — the block
+format can be present while ledger validation is withheld until a later intra-era
+hard fork enables it (see the design doc's [era and hard-fork
+coordination](./leios-design/README.md#era-and-hard-fork-coordination)).
+
+Open question: none specific to the encodings; the open items sit with the
+features that drive them — the EB-announcement block structure and the
+key-registration mechanism.
+
+Primary source: [design doc §Era and hard-fork coordination](./leios-design/README.md#era-and-hard-fork-coordination).
+Supporting: [cardano-ledger#5872][ledger-5872].
+Monthly review: [May 2026][mr-2026-05] reported the prototype's move to the Dijkstra era.
 
 ### New protocol parameters
 
-**Status** — requirements captured; design maturing; implementation maturing.
+**Status** — requirements captured; placement well understood; parameter set being finalized; not implemented yet.
 
-> _Draft. New governance-updatable parameters added to the `Dijkstra`
-> `PParams`/`PParamsUpdate`._
->
-> Primary source: [design doc §New protocol parameters](./leios-design/README.md#new-protocol-parameters).
-> Pointers to fold in: the parameter list; whether any are fixed globals.
+Adding Leios's parameters to the ledger's updatable protocol-parameter set is
+well-understood practice; the only real question is which parameters. The CIP
+already carries a good set, and the open discussion is whether to future-proof
+it — in particular, whether to allow higher per-transaction Plutus limits inside
+EBs than a Praos block permits ([ongoing CIP discussion][cip-1213]).
+
+The prototype currently hard-codes its parameters — configuration overrides and
+governance-updatable parameters are not implemented yet. That work belongs to the
+parameter-exploration phase of the testnet, and the governance-updatable
+parameters will also need guard rails added to the Cardano constitution to bound
+their permitted values.
+
+Open question: the future-proofing decision on per-transaction Plutus limits in
+EBs, and which parameters should be governance-updatable from the outset versus
+set through configuration overrides during testnet exploration.
+
+Primary source: [design doc §New protocol parameters](./leios-design/README.md#new-protocol-parameters).
+Supporting: [ongoing CIP discussion][cip-1213].
 
 ### Node API and configuration
 
-**Status** — design maturing; implementation early.
+**Status** — requirements captured; client-facing prototype validated on the testnet; new queries still to add.
 
-> _Draft. Changes to the node's external interfaces: new LocalStateQuery queries
-> for the registered BLS keys and the voting committee; node-to-client changes
-> (Mithril uses `LocalChainSync` without hash-consistency checks and stays
-> compatible); and feature flags for development phases plus new operator
-> configuration._
->
-> Primary sources: [design doc §LocalStateQuery additions](./leios-design/README.md#localstatequery-additions), [§Node-to-client](./leios-design/README.md#node-to-client), [§Feature flags and configuration](./leios-design/README.md#feature-flags-and-configuration).
-> Pointers to fold in: the new query list; the dev-phase feature-flag list.
+Leios features will be gated behind feature flags — a mechanism already
+bootstrapped by Peras ([cardano-peras#96][peras-96]) — once the first
+production-grade components are ready; that lets them ship incrementally in the
+11.x node releases ahead of activation.
+
+On the local-state-query side there is nothing ground-breaking: the existing
+queries mainly need wiring up for the new Dijkstra era (done in part for the
+testnet), and a few new queries remain to be created for the new ledger state —
+for instance the selected voting committee.
+
+The significant change is the node-to-client chainsync API. By presenting a
+certified block and its EB closure to clients as a single larger "inlined" block
+([prototype][ol-898]), most downstream infrastructure keeps working unchanged
+despite the bigger blocks, which sharply limits the blast radius of Leios across
+the ecosystem. This is being validated on the early testnet; updating `db-sync`
+proved straightforward and already backs a Leios block explorer
+([kleioscan][kleioscan]).
+
+Open question: the remaining new ledger-state queries, and confirming the inlined
+chainsync presentation holds across the breadth of existing clients.
+
+Primary sources: [design doc §Node-to-client](./leios-design/README.md#node-to-client), [§Feature flags and configuration](./leios-design/README.md#feature-flags-and-configuration).
+Supporting: [cardano-peras#96][peras-96]; [chainsync prototype][ol-898]; [kleioscan explorer][kleioscan].
 
 ## Conclusion
 
@@ -608,6 +666,11 @@ Monthly reviews: [April 2026][mr-2026-04] presented the ledger validation benchm
 [wfa-ls-demo]: https://github.com/cardano-scaling/leios-wfa-ls-demo
 [crypto-rs]: https://github.com/input-output-hk/ouroboros-leios/tree/main/crypto-benchmarks.rs
 [cip-1196]: https://github.com/cardano-foundation/CIPs/pull/1196
+[cip-1167]: https://github.com/cardano-foundation/CIPs/pull/1167
+[cip-1213]: https://github.com/cardano-foundation/CIPs/pull/1213
+[peras-96]: https://github.com/tweag/cardano-peras/issues/96
+[ol-898]: https://github.com/input-output-hk/ouroboros-leios/issues/898
+[kleioscan]: https://kleioscan.com/#/leios/leios
 [oc-2068]: https://github.com/IntersectMBO/ouroboros-consensus/pull/2068
 [ol-790]: https://github.com/input-output-hk/ouroboros-leios/issues/790
 [ol-690]: https://github.com/input-output-hk/ouroboros-leios/issues/690
