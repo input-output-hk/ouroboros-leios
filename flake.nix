@@ -62,6 +62,11 @@
       imports = [
         inputs.pre-commit-hooks.flakeModule
         ./nix/pkgs.nix
+        # Release artifacts (release tarball + docker image) live in
+        # nix/release.nix rather than a build.nix so the auto-discovery
+        # above doesn't pick them up automatically — we want this module
+        # named for its purpose, not the convention.
+        ./nix/release.nix
       ]
       ++ buildDotNixes;
 

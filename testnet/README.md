@@ -39,7 +39,7 @@ host-side; see `./run.sh` for the full setup). Built from
 [`./Dockerfile`](./Dockerfile) on top of the generic
 `cardano-node-leios` base — a minimal `dockerTools.streamLayeredImage`
 holding statically-linked `cardano-node` + `cardano-cli` from the
-`cardano-node-leios` flake input (see [`../docker/build.nix`](../docker/build.nix)).
+`cardano-node-leios` flake input (see [`../nix/release.nix`](../nix/release.nix)).
 
 
 ### Without Nix
