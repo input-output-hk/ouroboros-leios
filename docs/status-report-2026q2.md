@@ -18,7 +18,8 @@ author:
 > implementation design); where this report and those documents disagree, they
 > take precedence.
 
-## Table of contents
+<details>
+  <summary><h2>Table of contents</h2></summary>
 
 - [Introduction](#introduction)
   - [Scope](#scope)
@@ -41,6 +42,8 @@ author:
   - [Node API and configuration](#node-api-and-configuration)
 - [Conclusion](#conclusion)
 - [Other resources](#other-resources)
+
+</details>
 
 ## Introduction
 
