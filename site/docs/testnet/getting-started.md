@@ -3,6 +3,9 @@ sidebar_position: 1
 description: Install the Leios node, run a relay, and sync it against the public testnet.
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Install and run a node
 
 :::info Musashi Dōjō
@@ -94,7 +97,7 @@ requires a reasonably fast disk:
 
 |               |                                                    |
 |---------------|----------------------------------------------------|
-| **OS / arch** | Linux **x86-64** (to use the prebuilt binaries)    |
+| **OS / arch** | Linux **x86-64** or macOS **aarch64** for prebuilt binaries |
 | **CPU**       | 2 cores is fine; more only speeds the initial sync |
 | **RAM**       | 4 GB comfortable (the node uses ~2–2.5 GB)         |
 | **Disk**      | SSD, ~25 GB                                        |
@@ -120,10 +123,10 @@ A few ways to start one — pick whichever fits your setup:
 - **Nix** — one command builds, installs, and runs the node together
   with a Grafana + Loki + Prometheus stack. Every dependency is
   provided.
-- **Prebuilt binaries** — download the statically linked binaries and
-  run them with the repository's launch script. Compatible with the
-  same observability stack if you install the extra tooling, or run
-  the node on its own and bring your own tools.
+- **Prebuilt binaries** — download the release tarball (Linux x86-64
+  or macOS aarch64) and run with the repository's launch script.
+  Compatible with the same observability stack if you install the
+  extra tooling, or run the node on its own and bring your own tools.
 - **Docker** — the same binaries packaged as a container image, for
   setups that already orchestrate nodes that way. No observability
   stack included.
@@ -201,37 +204,59 @@ cardano-node --version   # expect: cardano-node x.y.z.164
 
 ### Prebuilt binaries
 
-The release ships statically linked binaries for **Linux x86-64** — they
-carry all their dependencies inside, so there is nothing else to install
-to run them.
+The release ships a tarball per platform with `cardano-node` and
+`cardano-cli` inside. On Linux x86-64 the binaries are statically linked;
+on macOS aarch64 the dylib paths are pre-rewritten so they run on a
+stock macOS host. Either way, nothing else needs installing.
 
 **1. Pick a working directory.** Everything for this relay — binaries,
 config, database, socket, log — lives here.
 
 ```shell
 export WORKING_DIR=~/leios-testnet
-mkdir -p "$WORKING_DIR/bin"
+mkdir -p "$WORKING_DIR"
 ```
 
-**2. Download the node and CLI, and verify the checksums.**
+**2. Download the release tarball and verify the checksum.**
+
+<Tabs groupId="os">
+<TabItem value="linux" label="Linux x86-64" default>
 
 ```shell
-cd "$WORKING_DIR/bin"
+cd "$WORKING_DIR"
 
 BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w25
-curl -L -O "$BASE/cardano-node"
-curl -L -O "$BASE/cardano-cli"
-curl -L -O "$BASE/SHA256SUMS"
-sha256sum -c SHA256SUMS
+ARCHIVE=cardano-node-leios-x86_64-linux.tar.gz
+curl -L -O "$BASE/$ARCHIVE"
+curl -L -O "$BASE/$ARCHIVE.sha256"
+sha256sum -c "$ARCHIVE.sha256"
 ```
 
-You should see `cardano-node: OK` and `cardano-cli: OK`. If you see
-`FAILED`, delete the files and download them again.
-
-**3. Put the binaries on your `PATH`.**
+</TabItem>
+<TabItem value="macos" label="macOS aarch64">
 
 ```shell
-chmod +x cardano-node cardano-cli
+cd "$WORKING_DIR"
+
+BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w25
+ARCHIVE=cardano-node-leios-aarch64-darwin.tar.gz
+curl -L -O "$BASE/$ARCHIVE"
+curl -L -O "$BASE/$ARCHIVE.sha256"
+shasum -a 256 -c "$ARCHIVE.sha256"
+```
+
+</TabItem>
+</Tabs>
+
+You should see `cardano-node-leios-…tar.gz: OK`. If you see `FAILED`,
+delete the files and download them again.
+
+**3. Extract and put the binaries on your `PATH`.** Strip the
+platform-named wrapper so the binaries land directly in `bin/`,
+regardless of which platform's tarball you grabbed.
+
+```shell
+tar -xzf "$ARCHIVE" --strip-components=1
 export PATH="$WORKING_DIR/bin:$PATH"
 ```
 
