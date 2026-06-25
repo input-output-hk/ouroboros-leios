@@ -1,7 +1,7 @@
 This directory contains an early Haskell simulation and visualisation code for Ouroboros Leios.
 
 > [!NOTE]
-> This simulation predates the move away from input blocks and implements Short Leios, which is no longer the current protocol design. For up-to-date simulation work see [sim-rs/](https://github.com/cardano-scaling/leios-tools/tree/main/sim-rs). The visualisations of Praos and basic network behaviour are still useful, but the Leios-specific parts are outdated.
+> This simulation predates the move away from input blocks and implements Short Leios, which is no longer the current protocol design. For up-to-date simulation work see [sim-rs/](https://github.com/input-output-hk/leios-tools/tree/main/sim-rs). The visualisations of Praos and basic network behaviour are still useful, but the Leios-specific parts are outdated.
 
 The simulations are not completely configurable from the command line.
 The code for the simulation configurations needs to be adjusted or
