@@ -20,13 +20,9 @@ author:
 
 ## Table of contents
 
-- [Executive summary](#executive-summary)
 - [Introduction](#introduction)
-  - [Purpose](#purpose)
   - [Scope](#scope)
-  - [Context](#context)
   - [Audience](#audience)
-- [How to read this report](#how-to-read-this-report)
 - [Component status](#component-status)
   - [Praos-over-Leios prioritization](#praos-over-leios-prioritization)
   - [High-throughput transaction submission](#high-throughput-transaction-submission)
@@ -46,65 +42,49 @@ author:
 - [Conclusion](#conclusion)
 - [Other resources](#other-resources)
 
-## Executive summary
-
-> _Draft. Intended content: one paragraph stating that this period achieved
-> prototype and design coverage across the full CIP-164 pipeline — committee
-> selection, block production, endorser-block creation and diffusion, vote
-> management, certificate generation, and block validation — that the public
-> [Musashi testnet][musashi] (network ID 164) was bootstrapped across three
-> independent node implementations including a deliberate red team, and that the
-> BLS12-381 cryptographic primitives have been independently audited. Closes by
-> naming the work that remains before a release candidate (transaction
-> submission, mempool performance, efficient network catch-up) and noting that
-> the high-confidence stage is deliberately last._
-
 ## Introduction
 
-### Purpose
+Leios is specified in [CIP-164][cip-164] as a linear, high-throughput extension
+of Ouroboros Praos, and is being implemented in `cardano-node` against the
+still-draft `Dijkstra` ledger era and exercised on an early public testnet. This
+report is a status overview of that implementation: the key components, the
+workflows that connect them, and the notable highlights and open questions across
+the design landscape as of 2026 Q2. It is intentionally anecdotal rather than
+exhaustive — a snapshot of where things stand and what was learned, not a
+specification.
 
-This report is a status overview of the Leios implementation: the key
-components, the workflows that connect them, and the notable highlights and open
-questions across the design landscape as of 2026 Q2. It is intentionally
-anecdotal rather than exhaustive — a snapshot of where things stand and what was
-learned, not a specification. The specification role belongs to [CIP-164][cip-164]
-and the node-level [`leios-design`](./leios-design/README.md) document, which
-this report points to throughout. It is provided in support of milestone MS4.6.
+Two documents remain authoritative and living and own the specification role:
+[CIP-164][cip-164] for the protocol, and the node-level
+[`leios-design`](./leios-design/README.md) document for the implementation
+design. This report points to these documents, and other notable materials,
+throughout.
 
 ### Scope
 
 The report spans the components and workflows of `cardano-node` touched by
 CIP-164, ordered roughly by the protocol flow: resource prioritization and
-transaction flow first, then block and endorser-block production and diffusion,
-voting and certification, and finally the supporting ledger and node-API
-changes. Each
-topic states its status and highlights rather than its full design, and the
-selection deliberately does not mirror the [technical design
-document](./leios-design/README.md#technical-design) section-for-section.
+transaction flow first; then block and endorser-block production, diffusion, and
+the transaction cache; then voting, certification, and the validation and
+adoption of certified blocks; catching up; the voting and cryptographic
+components that support them — committee selection, key registration, and
+cryptographic primitives; and finally serialization, protocol parameters, and the
+node API.
 
-### Context
-
-> _Draft. Orient the reader to the two authoritative documents — [CIP-164][cip-164]
-> as the protocol specification and the
-> [technical design document](./leios-design/README.md) as the living
-> implementation design — and state that this report is the time-stamped status
-> view over them. Note that the changes target the `Dijkstra` ledger era._
+Each topic states its status and highlights rather than its full
+design, and the selection deliberately does not mirror the [technical design
+document](./leios-design/README.md#technical-design) section-for-section. Each
+opens with a soft status line tracking how far it has come along a ladder —
+requirements captured, prototype available, design settled, implemented, and
+finally high confidence (the mainnet bar of independent audit, conformance, and
+performance) — stopping at the stage reached; the high-confidence stage is
+deliberately last and is taken up in the [Conclusion](#conclusion).
 
 ### Audience
 
-> _Draft. Technical audience: node developers, researchers, SPOs, and milestone
-> assurance reviewers._
-
-## How to read this report
-
-Each component carries a soft status line along a five-stage ladder —
-**requirements captured** (in CIP-164), **prototype available**, **design
-settled**, **implemented**, **high confidence** (the mainnet bar: independent
-audit, conformance, performance) — stopping at the stage reached. Stages not yet
-reached are left off rather than marked; open questions are discussed in prose,
-not tabulated. The high-confidence stage is implicit throughout and addressed in
-the [Conclusion](#conclusion). Each component links to its design-document
-section as the primary reference.
+The report is written for a technical reader: node developers and researchers
+working on or alongside Leios, stake pool operators preparing to run it, and the
+reviewers assessing milestone MS4.6. It assumes familiarity with Ouroboros Praos
+and the broad shape of Leios and does not reintroduce them.
 
 ## Component status
 
@@ -623,19 +603,41 @@ Supporting: [cardano-peras#96][peras-96]; [chainsync prototype][ol-898]; [kleios
 
 ## Conclusion
 
-> _Draft. Two beats merged into one closing section:_
->
-> _Deployment — the public [Musashi testnet][musashi] (network ID 164) is live,
-> running simultaneously on three independent node implementations including a
-> deliberately adversarial red team, giving real-world exposure to the current
-> Leios design and to its expected impact on SPOs and dApps._
->
-> _Outstanding work toward a release candidate — transaction submission, mempool
-> performance, and efficient network catch-up were outside the original scope but
-> are now identified as essential. The high-confidence stage (independent audit,
-> conformance vectors, and performance validation) is the mainnet gate and is
-> deliberately the last stage reached; today only the BLS12-381 primitives have
-> cleared it._
+The defining event of the period is that Leios left the drawing board for a live
+network. The public [Musashi testnet][musashi] (network ID 164) is bootstrapped,
+already hosting three independent (prototypical) node implementations alongside a
+deliberately adversarial red team. On it, the prototype produces, diffuses, votes
+on, certifies, and adopts endorser blocks end to end; downstream tooling such as
+`db-sync` and a block explorer already follows along. The prototype is
+progressing well and the design is converging.
+
+Real work remains. The central open problem is acquiring endorser blocks with
+bounded worst-case resource use and low tail latency, robust to bursts and
+storms; bound up with it is the transaction cache, essential to conserve transfer
+and validation work yet still missing from the prototype, and a high-throughput
+mempool that today exists only as competing design ideas. Even so, these are not
+leaps in the dark: the designs are compelling, and independent experiments
+suggest they are feasible even in adversarial settings. Beyond closing these
+gaps, the bar for mainnet — the deliberately-last "high confidence" stage — is
+the most demanding of all: independent audit of the certificate layer,
+conformance across implementations, performance benchmarking against a
+disk-backed ledger, and empirical validation of the security assumptions under
+adversarial, realistic-topology load. None of that is quick.
+
+Even so, the shape of the effort is encouraging. The changes a node actually
+needs are comparatively few and contained — many are Praos-era components pushed
+past their old operating points rather than new subsystems, the serialization
+required to enable Leios in a hard fork is minimal, and the node-to-client
+"inlined block" lets most of the ecosystem keep working unchanged. Much of this work has precedent and prior art to build
+on, and Leios's overlap with Peras — in key registration, voting,
+certificate verification, and shared BLS cryptography — opens real synergies (see the design doc's
+[synergies with Peras](./leios-design/README.md#synergies-with-peras)). Building
+production-grade components is demanding but feasible, the more so at the modest
+parameter targets mainnet will naturally start from. And the quarter's progress
+on threat modeling, simulation, analytical (DeltaQ) modeling, and adversarial
+testing is exactly the shared evidence base from which the Cardano community can
+collectively establish high confidence — in the protocol and in a diversity of
+independent node implementations.
 
 ## Other resources
 
