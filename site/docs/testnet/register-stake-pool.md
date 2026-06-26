@@ -4,6 +4,9 @@ title: Register a stake pool
 description: Register a Leios stake pool (block producer) on the public testnet, magic 164.
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Register a stake pool
 
 This is the second of two guides. It assumes you have already
@@ -268,34 +271,50 @@ cardano-cli dijkstra stake-pool id --output-bech32 --cold-verification-key-file 
 
 ## Verify registration
 
-Find your **pool id**, then confirm the pool is on-chain and your stake is
-delegated to it:
+Capture your **pool id** (from the cold key) and your **stake address**:
 
 ```shell
-# Capture your pool id (from the cold key) and stake address
 POOL_ID=$(cardano-cli dijkstra stake-pool id --cold-verification-key-file cold.vkey --output-format hex)
 STAKE_ADDR=$(cardano-cli dijkstra stake-address build --stake-verification-key-file stake.vkey)
 echo "pool id: $POOL_ID"
 echo "stake address: $STAKE_ADDR"
+```
 
-# Is the pool registered on-chain?
+Check the pool is registered on-chain — this should print your pool's
+parameters (pledge, cost, margin, VRF):
+
+```shell
 cardano-cli dijkstra query pool-state --stake-pool-id "$POOL_ID"
+```
 
-# Did the delegation take effect?
+Check the delegation took effect — `stakeDelegation` should point at
+your pool id:
+
+```shell
 cardano-cli dijkstra query stake-address-info --address "$STAKE_ADDR"
 ```
 
-`query pool-state` should return your pool's parameters (pledge, cost,
-margin, VRF). `query stake-address-info` should show a `stakeDelegation`
-pointing at your pool id. If both look right, your pool is registered.
+If both look right, your pool is registered.
 
 ## Restart as block producer
 
 Stop the relay and restart it with the KES key, VRF key, and operational
 certificate so it can forge — this time launching `cardano-node`
 directly (the `nix run` / `run-node.sh` wrappers run a non-producing
-relay only). Run it from `$WORKING_DIR`, which holds the config and
-database:
+relay only).
+
+:::tip Keep it up
+By now you should have settled on a way to keep the node running in the
+background and watch its uptime — `tmux`/`screen`, a `systemd` unit, or
+the Docker invocation below. A block producer that drifts offline
+silently mints no blocks and earns no rewards, so make sure something is
+watching it.
+:::
+
+Run it from `$WORKING_DIR`, which holds the config and database:
+
+<Tabs groupId="runtime">
+<TabItem value="binary" label="cardano-node" default>
 
 ```shell
 cd "$WORKING_DIR"
@@ -310,6 +329,39 @@ cardano-node run \
   --shelley-vrf-key keys/vrf.skey \
   --shelley-operational-certificate keys/opcert.cert
 ```
+
+</TabItem>
+<TabItem value="docker" label="Docker">
+
+Stop the relay container from the previous guide and start a producer
+that mounts the same `$WORKING_DIR` (so it reuses the synced database
+and the pinned config copied into it on first start) and the keys
+underneath it:
+
+```shell
+docker rm -f leios-relay
+
+docker run -d --name leios-producer \
+  -p 3010:3010 \
+  -v "$WORKING_DIR:/data" \
+  -w /data \
+  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w25 \
+  cardano-node run \
+    --config config.json \
+    --topology topology.json \
+    --database-path db \
+    --socket-path node.socket \
+    --host-addr 0.0.0.0 \
+    --port 3010 \
+    --shelley-kes-key keys/kes.skey \
+    --shelley-vrf-key keys/vrf.skey \
+    --shelley-operational-certificate keys/opcert.cert
+```
+
+Follow it with `docker logs -f leios-producer`.
+
+</TabItem>
+</Tabs>
 
 Once your pool is registered and your node is forging, you are a block
 producer on the testnet. Block production begins after the stake snapshot
