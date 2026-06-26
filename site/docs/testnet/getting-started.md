@@ -86,7 +86,7 @@ endorser blocks, as they land.
 | **Bootstrap relay** | `leios-node.play.dev.cardano.org:3001`                                                                   |
 | **Network magic**   | `164`                                                                                                    |
 | **Faucet**          | [faucet.leios.play.dev.cardano.org](https://faucet.leios.play.dev.cardano.org/basic-faucet)              |
-| **Node release**    | [`prototype-2026w25`](https://github.com/input-output-hk/ouroboros-leios/releases/tag/prototype-2026w25) |
+| **Node release**    | [`prototype-2026w26`](https://github.com/input-output-hk/ouroboros-leios/releases/tag/prototype-2026w26) |
 | **Node version**    | reports `cardano-node 11.0.1.164`                                                                        |
 
 ## System requirements
@@ -226,7 +226,7 @@ mkdir -p "$WORKING_DIR"
 ```shell
 cd "$WORKING_DIR"
 
-BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w25
+BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w26
 ARCHIVE=cardano-node-leios-x86_64-linux.tar.gz
 curl -L -O "$BASE/$ARCHIVE"
 curl -L -O "$BASE/$ARCHIVE.sha256"
@@ -239,7 +239,7 @@ sha256sum -c "$ARCHIVE.sha256"
 ```shell
 cd "$WORKING_DIR"
 
-BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w25
+BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w26
 ARCHIVE=cardano-node-leios-aarch64-darwin.tar.gz
 curl -L -O "$BASE/$ARCHIVE"
 curl -L -O "$BASE/$ARCHIVE.sha256"
@@ -299,7 +299,7 @@ or wrap it into a systemd service.
 
 A prebuilt image carrying both `cardano-node` and `cardano-cli` is published for
 each leios prototype release at
-`ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w25`
+`ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w26`
 — useful if you already orchestrate nodes with containers. The image runs as a
 non-block-producing relay out of the box; no observability stack is included.
 
@@ -316,7 +316,7 @@ docker run -d --name leios-relay \
   -p 3010:3010 \
   -v "$WORKING_DIR:/data" \
   -v "$PWD/config:/app/config:ro" \
-  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w25
+  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w26
 ```
 
 The `$WORKING_DIR` mount keeps the database, socket (`$WORKING_DIR/node.socket`),
