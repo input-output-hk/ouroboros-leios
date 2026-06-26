@@ -3,21 +3,27 @@ name: "cardano-node-leios"
 # Build and publish the patched cardano-node + cardano-cli (from the
 # `cardano-node-leios` flake input) as:
 #
-#   1. A workflow artifact of statically-linked x86_64-linux binaries.
+#   1. Release tarballs `cardano-node-leios-<platform>.tar.gz` for
+#      x86_64-linux (static musl) and aarch64-darwin (upstream macOS
+#      release tarball with dylib paths rewritten).
 #   2. A minimal `cardano-node-leios` docker image on GHCR.
 #   3. A derived `cardano-node-testnet` image (pinned testnet configs).
-#   4. A draft GitHub release (on tag pushes only) with the static
-#      binaries attached and the annotated tag's body as release notes.
+#   4. A draft GitHub release (on tag pushes, or on a workflow_dispatch
+#      that supplies a tag ref — skipped if a release for that tag
+#      already exists) with the tarballs attached and the annotated
+#      tag's body as release notes.
 #
 # Runs on every PR + push to main so the artifacts are fresh and the
-# nix build keeps working as the flake inputs evolve. The
-# Antithesis-specific images and test submission live in their own
-# workflow (antithesis-leios.yaml), which pulls this base from GHCR.
+# nix build keeps working as the flake inputs evolve. Can also be
+# triggered manually with a `ref` input to rebuild a specific tag/sha
+# without creating a duplicate release. The Antithesis-specific images
+# and test submission live in their own workflow (antithesis-leios.yaml),
+# which pulls this base from GHCR.
 
 on:
   pull_request:
     paths:
-      - "docker/**"
+      - "nix/release.nix"
       - "testnet/**"
       - ".github/workflows/cardano-node-leios.yaml"
       - "flake.nix"
@@ -26,7 +32,7 @@ on:
     branches:
       - main
     paths:
-      - "docker/**"
+      - "nix/release.nix"
       - "testnet/**"
       - ".github/workflows/cardano-node-leios.yaml"
       - "flake.nix"
@@ -35,6 +41,11 @@ on:
       - "*"
   workflow_dispatch:
     inputs:
+      ref:
+        description: 'Ref to checkout and build (branch, tag, or sha). Defaults to the workflow ref.'
+        required: false
+        default: ''
+        type: string
       push_images:
         description: 'Push images to GHCR (even from a PR-style run)'
         required: false
@@ -56,6 +67,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
 
       - name: Install nix
         uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
@@ -77,27 +90,28 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # ----------------------------------------------------------------
-      # Static binaries — musl-linked cardano-node + cardano-cli.
-      # Built first because they're a strict sub-derivation of the
-      # docker image below: nix will reuse the exact same store paths
-      # when assembling the image.
+      # x86_64-linux release tarball — `cardano-node-release` already
+      # strips upstream's cardano-node-linux to just cardano-node and
+      # cardano-cli and drops bundled configs (see nix/release.nix), so
+      # CI just publishes whatever nix produced. Building this also
+      # realises cardano-node-static / cardano-cli-static in the store,
+      # so the docker image below reuses those exact paths without
+      # rebuilding.
       # ----------------------------------------------------------------
-      - name: Build static binaries (cardano-node, cardano-cli)
+      - name: Build x86_64-linux release tarball
         run: |
           set -euo pipefail
-          nix build .#cardano-node-static -o result-cardano-node
-          nix build .#cardano-cli-static  -o result-cardano-cli
+          nix build .#cardano-node-release -o result-release
 
           mkdir -p artifacts
-          cp -v result-cardano-node/bin/cardano-node artifacts/
-          cp -v result-cardano-cli/bin/cardano-cli  artifacts/
-          chmod +x artifacts/*
-          (cd artifacts && sha256sum cardano-node cardano-cli > SHA256SUMS)
+          cp -v result-release/cardano-node-leios-x86_64-linux.tar.gz artifacts/
+          (cd artifacts && sha256sum cardano-node-leios-x86_64-linux.tar.gz \
+            > cardano-node-leios-x86_64-linux.sha256)
 
-      - name: Upload static binaries as workflow artifact
+      - name: Upload x86_64-linux tarball as workflow artifact
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
         with:
-          name: cardano-node-leios-static-linux-x86_64-${{ github.sha }}
+          name: cardano-node-leios-x86_64-linux-${{ github.run_id }}
           path: artifacts/
           if-no-files-found: error
 
@@ -185,10 +199,55 @@ jobs:
           cache-from: type=gha,scope=cardano-node-testnet
           cache-to: type=gha,mode=max,scope=cardano-node-testnet
 
+  build-macos:
+    name: "Build aarch64-darwin binaries"
+    # macos-14 = Apple Silicon (aarch64-darwin). macos-13 is Intel.
+    runs-on: macos-14
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Install nix
+        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+            substituters = https://cache.nixos.org https://cache.iog.io
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
+
+      # `cardano-node-release` strips upstream's cardano-node-macos down
+      # to the same set as the linux side (see nix/release.nix); CI just
+      # publishes what nix produces.
+      - name: Build aarch64-darwin release tarball
+        run: |
+          set -euo pipefail
+          nix build .#cardano-node-release -o result-release
+
+          mkdir -p artifacts
+          cp -v result-release/cardano-node-leios-aarch64-darwin.tar.gz artifacts/
+          (cd artifacts && shasum -a 256 cardano-node-leios-aarch64-darwin.tar.gz \
+            > cardano-node-leios-aarch64-darwin.sha256)
+
+      - name: Upload aarch64-darwin tarball as workflow artifact
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        with:
+          name: cardano-node-leios-aarch64-darwin-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error
+
   draft-release:
     name: "Draft GitHub release"
-    needs: build
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: [build, build-macos]
+    # Trigger on tag pushes, or on a workflow_dispatch that asks for a
+    # specific ref (which may or may not be a tag — the job verifies).
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.ref != '')
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -198,26 +257,64 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: 0
+          ref: ${{ github.event.inputs.ref || github.ref }}
 
-      # actions/checkout writes the triggering tag as a *lightweight* ref
-      # pointing at the commit, so %(contents:body) falls through to the
-      # commit message. Delete the local ref and refetch the real tag
-      # object so the annotation is available.
-      - name: Refetch annotated tag object
+      # Resolve the tag name and confirm it points at an annotated tag.
+      # On a tag push, GITHUB_REF_NAME is the tag. On dispatch, the user
+      # supplied a ref via inputs.ref — it may be a tag, a branch, or a
+      # sha; if it isn't a tag, we skip the release entirely.
+      - name: Resolve tag and check whether release already exists
+        id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git tag -d "${GITHUB_REF_NAME}" || true
-          git fetch origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}" --no-tags
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="${{ github.event.inputs.ref }}"
+          fi
 
-      - name: Download static binaries artifact
+          # actions/checkout writes the triggering tag as a lightweight
+          # ref pointing at the commit, so %(contents:body) falls through
+          # to the commit message. Re-fetch the real tag object so the
+          # annotation is available — and so we can detect non-tag refs
+          # (branches, raw shas) and bail out gracefully.
+          git tag -d "$tag" 2>/dev/null || true
+          if ! git fetch origin "refs/tags/${tag}:refs/tags/${tag}" --no-tags 2>/dev/null; then
+            echo "ref '$tag' is not a tag — skipping release."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release for tag '$tag' already exists — skipping creation."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag"   >> "$GITHUB_OUTPUT"
+
+      - name: Download x86_64-linux artifact
+        if: steps.tag.outputs.skip != 'true'
         uses: actions/download-artifact@v4
         with:
-          name: cardano-node-leios-static-linux-x86_64-${{ github.sha }}
+          name: cardano-node-leios-x86_64-linux-${{ github.run_id }}
+          path: artifacts/
+
+      - name: Download aarch64-darwin artifact
+        if: steps.tag.outputs.skip != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: cardano-node-leios-aarch64-darwin-${{ github.run_id }}
           path: artifacts/
 
       - name: Extract tag annotation body
+        if: steps.tag.outputs.skip != 'true'
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
+          tag='${{ steps.tag.outputs.tag }}'
           # %(contents:body) yields the annotation body (subject + blank
           # line stripped, PGP signature excluded). Fall back to the
           # whole contents for lightweight or subject-only tags.
@@ -229,11 +326,12 @@ jobs:
           cat release-notes.md
 
       - name: Draft release
+        if: steps.tag.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
+          tag='${{ steps.tag.outputs.tag }}'
           # Prettify the tag name for the release title:
           # `prototype-2026w24` → `Prototype 2026w24`.
           title="${tag//-/ }"
@@ -242,6 +340,7 @@ jobs:
             --draft \
             --title "$title" \
             --notes-file release-notes.md \
-            artifacts/cardano-node \
-            artifacts/cardano-cli \
-            artifacts/SHA256SUMS
+            artifacts/cardano-node-leios-x86_64-linux.tar.gz \
+            artifacts/cardano-node-leios-x86_64-linux.sha256 \
+            artifacts/cardano-node-leios-aarch64-darwin.tar.gz \
+            artifacts/cardano-node-leios-aarch64-darwin.sha256

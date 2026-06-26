@@ -5,6 +5,10 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w26 - UNRELEASED
+
+- Build and add macos (arm64) to the release.
+
 ## prototype-2026w25 - 2026-06-19
 
 Stabilization release on EB fetching / staging plus the two Dijkstra-era query
