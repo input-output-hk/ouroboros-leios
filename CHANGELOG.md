@@ -5,9 +5,12 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
-## prototype-2026w26 - UNRELEASED
+## prototype-2026w26 - 2026-06-26
 
-- Build and add macos (arm64) to the release.
+Minor fixes to the Dijkstra era cli plumbing. No node updates in this release
+
+- Fix `cardano-cli dijkstra transaction build` commands and improve stake pool instructions with it.
+- Build and add macos (arm64) binaries to the release.
 
 ## prototype-2026w25 - 2026-06-19
 

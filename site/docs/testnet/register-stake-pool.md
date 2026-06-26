@@ -345,7 +345,7 @@ docker run -d --name leios-producer \
   -p 3010:3010 \
   -v "$WORKING_DIR:/data" \
   -w /data \
-  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w25 \
+  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w26 \
   cardano-node run \
     --config config.json \
     --topology topology.json \
