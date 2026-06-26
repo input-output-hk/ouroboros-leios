@@ -161,15 +161,6 @@ Two things go on-chain together: your **stake address** (a 2 ada deposit)
 and your **pool** (a 500 ada deposit). Build both certificates, then
 submit them in a single transaction.
 
-:::warning Why `build-raw` and not `build`?
-Normally `transaction build` balances the transaction (fee and change) for
-you. In the **current release** it does *not* support certificate
-transactions in the Dijkstra era — it fails with `Dijkstra cert path not
-yet implemented`. The fix is expected in the next node release, after which
-you can use the simpler `transaction build`. Until then, the steps below
-use `transaction build-raw`, where you set the fee and change yourself.
-:::
-
 Stake-address registration certificate:
 
 ```shell
@@ -203,40 +194,19 @@ typical values; adjust to taste. `--pool-relay-port` must match the port
 your node listens on (`3010` by default in this guide).
 :::
 
-Submit both certificates in one transaction. With `build-raw` you choose
-the input, fee, and change yourself. Pull your funded input straight from
-`query utxo` (this assumes a single UTxO at the address — true right after
-the faucet payment):
+Submit both certificates in one transaction. `transaction build` queries
+the node for protocol parameters and your UTxOs to balance the fee and
+return the change automatically — you just pick an input and a change
+address. Pull your funded input straight from `query utxo` (this assumes
+a single UTxO at the address — true right after the faucet payment),
+then sign with three keys (payment, stake, cold) and submit:
 
 ```shell
-UTXO=$(cardano-cli dijkstra query utxo --address "$(cat payment.addr)")
-TXIN=$(echo "$UTXO" | jq -r 'keys[0]')
-FUNDS=$(echo "$UTXO" | jq -r '.[keys[0]].value.lovelace')
+TXIN=$(cardano-cli dijkstra query utxo --address "$(cat payment.addr)" | jq -r 'keys[0]')
 
-FEE=200000             # flat 0.2 ada — ample for this small cert tx
-DEPOSITS=502000000     # 500 ada pool + 2 ada stake
-CHANGE=$(( FUNDS - DEPOSITS - FEE ))
-echo "TXIN=$TXIN  CHANGE=$CHANGE"
-```
-
-:::note Why a flat fee?
-`build-raw` doesn't auto-balance, so you supply the fee yourself. A
-certificate transaction this size needs ~0.18 ada, so a flat **0.2 ada
-(`200000`)** always clears it — you overpay a negligible ~0.02 ada.
-(Computing it with `transaction calculate-min-fee` against a draft tends to
-come out a few hundred lovelace short here, and the node rejects it with
-`FeeTooSmallUTxO`.) Once the next release fixes `transaction build`, it
-computes the exact fee for you.
-:::
-
-Build the transaction, then sign with three keys (payment, stake, cold)
-and submit:
-
-```shell
-cardano-cli dijkstra transaction build-raw \
+cardano-cli dijkstra transaction build \
   --tx-in "$TXIN" \
-  --tx-out "$(cat payment.addr)+$CHANGE" \
-  --fee "$FEE" \
+  --change-address "$(cat payment.addr)" \
   --certificate-file stake-reg.cert \
   --certificate-file pool-reg.cert \
   --out-file pool-reg-tx.raw
@@ -255,11 +225,9 @@ cardano-cli dijkstra transaction submit \
 ## Delegate stake to your pool
 
 Your pledge only counts once your own stake is delegated to your pool.
-Build a delegation certificate and submit it in its own transaction. Your
-UTxO set changed in the previous step, so the snippet re-queries it for the current
-input. This transaction is signed by two keys (payment, stake) and pays no
-deposit, so the change is simply `funds - fee` — using the same flat
-`FEE=200000`:
+Build a delegation certificate and submit it in its own transaction.
+Your UTxO set changed in the previous step, so the snippet re-queries it
+for the current input. Two signatures here — payment and stake:
 
 ```shell
 cardano-cli dijkstra stake-address stake-delegation-certificate \
@@ -267,17 +235,11 @@ cardano-cli dijkstra stake-address stake-delegation-certificate \
   --cold-verification-key-file cold.vkey \
   --out-file delegation.cert
 
-UTXO=$(cardano-cli dijkstra query utxo --address "$(cat payment.addr)")
-TXIN=$(echo "$UTXO" | jq -r 'keys[0]')
-FUNDS=$(echo "$UTXO" | jq -r '.[keys[0]].value.lovelace')
+TXIN=$(cardano-cli dijkstra query utxo --address "$(cat payment.addr)" | jq -r 'keys[0]')
 
-FEE=200000
-CHANGE=$(( FUNDS - FEE ))
-
-cardano-cli dijkstra transaction build-raw \
+cardano-cli dijkstra transaction build \
   --tx-in "$TXIN" \
-  --tx-out "$(cat payment.addr)+$CHANGE" \
-  --fee "$FEE" \
+  --change-address "$(cat payment.addr)" \
   --certificate-file delegation.cert \
   --out-file delegation-tx.raw
 
