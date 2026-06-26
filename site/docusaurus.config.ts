@@ -64,7 +64,7 @@ const config: Config = {
           // Join the musashi dojo link used in PR (2026-06-26)
           {
             from: "/join",
-            to: "/docs/testnet/getting-started",
+            to: "https://www.musashi.network/",
           },
         ],
       },
