@@ -1,25 +1,16 @@
-# Release artifacts: cardano-node + cardano-cli from the
-# 'cardano-node-leios' flake input (the leios-prototype branch),
-# packaged for distribution. Exposed via:
+# Release artifacts from the cardano-node-leios input. Exposed via:
 #
-#   nix build .#cardano-node-static          # x86_64-linux only
-#   nix build .#cardano-cli-static           # x86_64-linux only
-#   nix build .#cardano-node-leios-image     # x86_64-linux only; pipe into `docker load`
-#   nix build .#cardano-node-release         # x86_64-linux + aarch64-darwin
-#                                            # relocatable release tarball
+#   nix build .#cardano-node-static          # x86_64-linux
+#   nix build .#cardano-cli-static           # x86_64-linux
+#   nix build .#cardano-node-leios-image     # x86_64-linux; pipe into `docker load`
+#   nix build .#cardano-node-release         # x86_64-linux + aarch64-darwin tarball
 #
-# CI publishes the image as ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios
-# on every push to main, and uploads the release tarball as a workflow
-# artifact (attaching it to a draft GitHub release on tag pushes).
-# Scenario images (antithesis-cardano-node-burst,
-# antithesis-cardano-node-devnet, cardano-node-testnet) layer their
-# configs/scripts on top.
-# `inputs` is a top-level (not perSystem) module argument in
-# flake-parts — perSystem only sees `inputs'` (per-system flattened),
-# which auto-flattens standard outputs (packages / devShells / apps /
-# …) but NOT custom ones like `hydraJobs`. We need the raw `inputs` to
-# reach into `cardano-node-leios.hydraJobs.${system}.{musl,native}`, so
-# we accept it at the top of this module and use it inside perSystem.
+# CI publishes the image to GHCR and attaches the release tarball to
+# draft releases on tag pushes. Scenario images (antithesis-*,
+# cardano-node-testnet) layer on top of the base image.
+#
+# We take `inputs` (not `inputs'`) because flake-parts only flattens
+# standard outputs per-system, not custom ones like `hydraJobs`.
 { inputs, ... }:
 {
   perSystem =
@@ -30,24 +21,16 @@
       ...
     }:
     let
-      # Release tarball naming, used by both platforms so consumers see a
-      # consistent `cardano-node-leios-<system>.tar.gz` with the same
-      # `cardano-node-leios-<system>/bin/...` layout inside.
       releaseName = "cardano-node-leios-${system}";
 
-      # The cardano-node flake exposes its statically-linked x86_64-linux
-      # builds under hydraJobs.x86_64-linux.musl.<exe>; they come from
-      # project.projectCross.musl64 in nix/haskell.nix and are fully
-      # static (no glibc, no dynamic loader). `or null` keeps this safe
-      # to reference on other systems — Nix is lazy and only the linux
-      # branches below actually dereference muslJobs.
+      # Statically-linked x86_64-linux builds (musl, no glibc). `or null`
+      # keeps it safe to reference on other systems; Nix is lazy and only
+      # the linux branches below dereference it.
       muslJobs = inputs.cardano-node-leios.hydraJobs.${system}.musl or null;
     in
     {
-      # Single packages attrset built from two optionalAttrs blocks merged
-      # AT THE LEAF level (one big attribute set), rather than two parent
-      # blocks each setting `packages = ...` (where `//` is shallow and
-      # would silently drop the earlier entries).
+      # Merge both optionalAttrs blocks at the leaf level — a single
+      # `packages = ...` so `//` can't silently drop entries.
       packages =
         lib.optionalAttrs (system == "x86_64-linux") {
           cardano-node-static = muslJobs.cardano-node;
@@ -98,23 +81,13 @@
               "aarch64-darwin"
             ])
             {
-              # Single release-tarball entry, with the per-system switch inside
-              # the expression (rather than a separate top-level optionalAttrs
-              # block per system, which would have to merge `packages` attrsets
-              # at the parent level and silently drop entries).
+              # Per-system switch inside the expression — keeps the
+              # packages attrset a single merge target so future entries
+              # can't silently drop each other.
               #
-              # Strip upstream's binary-release.nix tarball down to just the
-              # two binaries we actually ship. `cardano-node-linux` (musl, on
-              # x86_64-linux) and `cardano-node-macos` (native, on
-              # aarch64-darwin) come from the same upstream builder, both
-              # tarballs hold bin/ + share/ at the root (no wrapper dir).
-              # bin/ carries the full `releaseBins` set (cardano-node,
-              # cardano-cli, submit-api, bech32, db-analyser, kes-agent, …)
-              # and share/ holds bundled mainnet/preprod/preview configs.
-              # Binaries are already path-clean (static musl on linux, dylib
-              # paths rewritten by `rewrite-libs` on macOS); we just drop
-              # the extras and re-tar with bin/ at the root so consumers can
-              # extract straight into a working dir.
+              # Both upstream tarballs have bin/ + share/ at the root and
+              # ship the full releaseBins set; we strip down to the two
+              # binaries we care about, drop share/, re-tar.
               cardano-node-release =
                 let
                   upstream =
@@ -128,8 +101,14 @@
                   tar -xzf ${upstream}/*.tar.gz -C work
 
                   rm -rf work/share
+                  # Keep the two binaries and every *.dylib — on macOS the
+                  # dylibs live next to the executables (referenced as
+                  # @executable_path/libfoo) and are shared across release
+                  # bins, so we keep them all rather than computing the
+                  # exact closure. On linux this matches nothing.
                   find work/bin -mindepth 1 -maxdepth 1 \
                     ! -name cardano-node ! -name cardano-cli \
+                    ! -name '*.dylib' \
                     -exec rm {} +
 
                   tar -czf "$out/${releaseName}.tar.gz" -C work bin
