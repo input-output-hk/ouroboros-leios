@@ -29,11 +29,10 @@ on this page is all you need.
 Every command in this guide uses `cardano-cli`, and the final step runs
 `cardano-node` directly — so you need both available.
 
-- **Installed with Nix?** Run everything below from the project's dev
-  shell, which puts the tools on your `PATH`:
+- **Installed with Nix?** Drop into the `dev-testnet` shell, which puts
+  the tools on your `PATH`:
   ```shell
-  cd ~/leios/ouroboros-leios     # the repo you cloned
-  nix develop                    # or `direnv allow`
+  nix develop github:input-output-hk/ouroboros-leios#dev-testnet
   ```
 - **Installed the prebuilt binaries?** They are already on your `PATH` —
   nothing extra to do.
@@ -56,25 +55,22 @@ Every command in this guide uses `cardano-cli`, and the final step runs
   sudo systemctl enable --now chrony
   ```
 
-Keep the environment from the previous guide set in your shell. With
-`CARDANO_NODE_NETWORK_ID` exported, every `cardano-cli` command targets
-magic `164` automatically — no `--testnet-magic` flag needed:
+Keep the environment from the previous guide set in your shell —
+`$WORKING_DIR` points at the relay's working directory, and with
+`CARDANO_NODE_NETWORK_ID` exported every `cardano-cli` command targets
+magic `164` automatically (no `--testnet-magic` flag needed):
 
 ```shell
+export WORKING_DIR=~/leios-testnet         # or wherever you put the relay
 export CARDANO_NODE_NETWORK_ID=164
-export CARDANO_NODE_SOCKET_PATH=~/leios/relay/node.socket
+export CARDANO_NODE_SOCKET_PATH="$WORKING_DIR/node.socket"
 ```
 
-The paths in this guide assume the prebuilt-binary layout from the
-previous guide (socket and config under `~/leios/relay`). If you ran the
-**Nix** relay instead, point `CARDANO_NODE_SOCKET_PATH` — and the genesis
-path in Step 4 — at your `./tmp-testnet` working directory.
-
-Work in a dedicated keys folder and **back it up** — these keys control
-your pool:
+Work in a dedicated keys folder under `$WORKING_DIR` and **back it up** —
+these keys control your pool:
 
 ```shell
-mkdir -p ~/leios/keys && cd ~/leios/keys
+mkdir -p "$WORKING_DIR/keys" && cd "$WORKING_DIR/keys"
 ```
 
 :::note Era command group
@@ -147,7 +143,7 @@ parameter, then issue the certificate that binds your KES key to your
 cold key:
 
 ```shell
-slotsPerKESPeriod=$(jq -r '.slotsPerKESPeriod' ~/leios/relay/shelley-genesis.json)
+slotsPerKESPeriod=$(jq -r '.slotsPerKESPeriod' "$WORKING_DIR/shelley-genesis.json")
 slotNo=$(cardano-cli query tip | jq -r '.slot')
 kesPeriod=$(( slotNo / slotsPerKESPeriod ))
 
@@ -336,11 +332,11 @@ pointing at your pool id. If both look right, your pool is registered.
 Stop the relay and restart it with the KES key, VRF key, and operational
 certificate so it can forge — this time launching `cardano-node`
 directly (the `nix run` / `run-node.sh` wrappers run a non-producing
-relay only). Run it from your relay's working directory, which holds the
-config and database — `~/leios/relay` if you used the prebuilt binaries,
-or `./tmp-testnet` if you used the Nix relay:
+relay only). Run it from `$WORKING_DIR`, which holds the config and
+database:
 
 ```shell
+cd "$WORKING_DIR"
 cardano-node run \
   --config config.json \
   --topology topology.json \
@@ -348,9 +344,9 @@ cardano-node run \
   --socket-path node.socket \
   --host-addr 0.0.0.0 \
   --port 3010 \
-  --shelley-kes-key ~/leios/keys/kes.skey \
-  --shelley-vrf-key ~/leios/keys/vrf.skey \
-  --shelley-operational-certificate ~/leios/keys/opcert.cert
+  --shelley-kes-key keys/kes.skey \
+  --shelley-vrf-key keys/vrf.skey \
+  --shelley-operational-certificate keys/opcert.cert
 ```
 
 Once your pool is registered and your node is forging, you are a block
