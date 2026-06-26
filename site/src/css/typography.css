@@ -34,38 +34,59 @@
   font-style: italic;
 }
 
-/* Lexend font family */
+/* Spectral font family */
 @font-face {
-  font-family: "Lexend";
-  src: url("/fonts/Lexend/Lexend-Regular.ttf") format("truetype");
+  font-family: "Spectral";
+  src: url("/fonts/Spectral/Spectral-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Spectral";
+  src: url("/fonts/Spectral/Spectral-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
 }
 
 @font-face {
-  font-family: "Lexend";
-  src: url("/fonts/Lexend/Lexend-Medium.ttf") format("truetype");
+  font-family: "Spectral";
+  src: url("/fonts/Spectral/Spectral-Medium.ttf") format("truetype");
   font-weight: 500;
   font-style: normal;
 }
 
 @font-face {
-  font-family: "Lexend";
-  src: url("/fonts/Lexend/Lexend-SemiBold.ttf") format("truetype");
+  font-family: "Spectral";
+  src: url("/fonts/Spectral/Spectral-SemiBold.ttf") format("truetype");
   font-weight: 600;
   font-style: normal;
 }
 
 @font-face {
-  font-family: "Lexend";
-  src: url("/fonts/Lexend/Lexend-Bold.ttf") format("truetype");
+  font-family: "Spectral";
+  src: url("/fonts/Spectral/Spectral-Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
 }
 
+@font-face {
+  font-family: "Spectral";
+  src: url("/fonts/Spectral/Spectral-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Spectral";
+  src: url("/fonts/Spectral/Spectral-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+}
+
 :root {
   --font-base: "Poppins", sans-serif;
-  --font-lexend: "Lexend", sans-serif;
+  --font-spectral: "Spectral", serif;
 
   --font-weight-light: 300;
   --font-weight-regular: 400;
@@ -79,7 +100,7 @@
   --text-lg: 1.125rem;
   --text-xl: 1.375rem;
   --text-2xl: 1.5rem;
-  --text-3xl: 1.875rem;
+  --text-3xl: 1.75rem;
   --text-4xl: 2rem;
   --text-5xl: 2.25rem;
   --text-6xl: 2.75rem;

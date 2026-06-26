@@ -324,7 +324,12 @@ function MonthlyReviewsSection() {
         <div className="container-padding padding-section">
           <div className={styles.contentWrapper}>
             <div className={styles.stayUpToDateContent}>
-              <h2 style={{ marginBottom: "1.25rem" }}>Stay up to date</h2>
+              <h2
+                className={styles.stayUpdToDateHeading}
+                style={{ marginBottom: "1.25rem" }}
+              >
+                Stay up to date
+              </h2>
               <p>
                 Catch up on the latest Leios progress, key decisions, and Q&A in
                 our monthly review videos
