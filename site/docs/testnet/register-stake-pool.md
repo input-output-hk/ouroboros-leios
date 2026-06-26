@@ -81,7 +81,7 @@ The commands below use the `dijkstra` era command group
 word in these commands to match.
 :::
 
-## Step 1 — Generate payment and stake keys
+## Payment and stake keys
 
 ```shell
 # Payment key pair (holds funds)
@@ -95,7 +95,7 @@ cardano-cli dijkstra stake-address key-gen \
   --signing-key-file stake.skey
 ```
 
-## Step 2 — Build your payment address and fund it
+## Fund a payment address
 
 ```shell
 cardano-cli dijkstra address build \
@@ -116,7 +116,7 @@ cardano-cli dijkstra query utxo --address "$(cat payment.addr)"
 
 You should see one or more UTxO entries (a `TxHash#TxIx` and an amount).
 
-## Step 3 — Generate the node's operational keys
+## Node operational keys
 
 ```shell
 # Cold keys (your pool's identity — keep offline / backed up)
@@ -136,7 +136,7 @@ cardano-cli dijkstra node key-gen-VRF \
   --signing-key-file vrf.skey
 ```
 
-## Step 4 — Issue the operational certificate
+## Operational certificate
 
 Compute the current KES period from the chain tip and the genesis
 parameter, then issue the certificate that binds your KES key to your
@@ -155,7 +155,7 @@ cardano-cli dijkstra node issue-op-cert \
   --out-file opcert.cert
 ```
 
-## Step 5 — Register your stake address and pool
+## Register stake address and pool
 
 Two things go on-chain together: your **stake address** (a 2 ada deposit)
 and your **pool** (a 500 ada deposit). Build both certificates, then
@@ -252,11 +252,11 @@ cardano-cli dijkstra transaction submit \
   --tx-file pool-reg-tx.signed
 ```
 
-## Step 6 — Delegate your stake to your pool
+## Delegate stake to your pool
 
 Your pledge only counts once your own stake is delegated to your pool.
 Build a delegation certificate and submit it in its own transaction. Your
-UTxO set changed in Step 5, so the snippet re-queries it for the current
+UTxO set changed in the previous step, so the snippet re-queries it for the current
 input. This transaction is signed by two keys (payment, stake) and pays no
 deposit, so the change is simply `funds - fee` — using the same flat
 `FEE=200000`:
@@ -304,7 +304,7 @@ cardano-cli dijkstra stake-pool id --output-bech32 --cold-verification-key-file 
 ```
 :::
 
-## Step 7 — Verify your registration
+## Verify registration
 
 Find your **pool id**, then confirm the pool is on-chain and your stake is
 delegated to it:
@@ -327,7 +327,7 @@ cardano-cli dijkstra query stake-address-info --address "$STAKE_ADDR"
 margin, VRF). `query stake-address-info` should show a `stakeDelegation`
 pointing at your pool id. If both look right, your pool is registered.
 
-## Step 8 — Restart your node as a block producer
+## Restart as block producer
 
 Stop the relay and restart it with the KES key, VRF key, and operational
 certificate so it can forge — this time launching `cardano-node`
