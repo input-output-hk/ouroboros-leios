@@ -25,6 +25,7 @@ import System.IO (BufferMode (LineBuffering), hPutStrLn, hSetBuffering, stderr, 
 import qualified Cardano.Api as Api
 import qualified Data.ByteString as BS (ByteString, readFile)
 import qualified Data.ByteString.Char8 as BSC (pack)
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T (Text, pack, unpack)
 
@@ -34,12 +35,12 @@ main =
   do
     Command{..} <- execParser commandParser
 
-    -- Parameters from topology
+    -- Party count and stake distribution from the topology (the default).
     (top :: Topology COORD2D) <- decodeFileThrow topologyFile
-    let nrNodes = toInteger $ Prelude.length (elems $ nodes top)
-    let nodeNames = Prelude.map unNodeName (keys $ nodes top)
-    let stakes = Prelude.map (toInteger . stake . nodeInfo) (elems $ nodes top)
-    let stakeDistribution = Prelude.zip nodeNames stakes
+    let topoNrNodes = toInteger $ Prelude.length (elems $ nodes top)
+    let topoNodeNames = Prelude.map unNodeName (keys $ nodes top)
+    let topoStakes = Prelude.map (toInteger . stake . nodeInfo) (elems $ nodes top)
+    let topoStakeDistribution = Prelude.zip topoNodeNames topoStakes
 
     -- Parameters from config
     (config :: Config) <- decodeFileThrow configFile
@@ -48,16 +49,26 @@ main =
     let ldiff = toInteger (linearDiffuseStageLengthSlots config)
     let validityCheckTime = 3 -- TODO: read from config
 
-    -- Install the SUT's leadership schedule (winning slots) into the oracle
-    -- postulated by the Agda spec. When --socket-path is given we query a
-    -- running node through the cardano-api; otherwise the schedule stays empty
-    -- and the verifier falls back to harvesting winning slots from the trace.
-    case leadership of
-      Nothing -> pure ()
-      Just opts -> do
-        slots <- queryLeadershipSchedule opts
-        hPutStrLn stderr $ "Leadership schedule: " <> show (Prelude.length slots) <> " winning slots"
-        setLeadershipSchedule slots
+    -- When --socket-path is given we query a running node through the
+    -- cardano-api for (a) the SUT's leadership schedule, which is installed into
+    -- the oracle postulated by the Agda spec, and (b) the on-chain stake
+    -- distribution, which replaces the topology-derived party count and stakes
+    -- (parties are the chain's stake pools, indexed; the SUT is placed at
+    -- idSut). Without --socket-path the schedule stays empty (the verifier falls
+    -- back to harvesting winning slots from the trace) and the topology is used.
+    (nrNodes, stakeDistribution) <-
+      case leadership of
+        Nothing -> pure (topoNrNodes, topoStakeDistribution)
+        Just opts -> do
+          (slots, n, sd) <- queryChain opts idSut
+          hPutStrLn stderr $
+            "From chain: "
+              <> show (Prelude.length slots)
+              <> " winning slots, "
+              <> show n
+              <> " parties"
+          setLeadershipSchedule slots
+          pure (n, sd)
 
     -- A single closure capturing all parameters: it applies the (whole-list)
     -- Agda checker to a list of events, returning (#actions, (status, detail)).
@@ -138,11 +149,14 @@ data LeadershipOpts = LeadershipOpts
   }
 
 -- | Query a running node (via the cardano-api local-state-query protocol) for
---   the slots in which the given pool is an eligible leader, returning them as
---   plain naturals for the Agda oracle. Mirrors cardano-cli's
---   @runQueryLeadershipScheduleCmd@.
-queryLeadershipSchedule :: LeadershipOpts -> IO [Integer]
-queryLeadershipSchedule LeadershipOpts{..} = do
+--   the SUT's leadership schedule (the slots in which its pool is an eligible
+--   leader) and the on-chain stake distribution, over a single connection.
+--   Returns the winning slots (as plain naturals for the Agda oracle), the
+--   party count, and the stake distribution keyed by @node-i@ with the SUT's
+--   pool placed at index @idSut@. Mirrors cardano-cli's
+--   @runQueryLeadershipScheduleCmd@ / @runQueryStakeDistributionCmd@.
+queryChain :: LeadershipOpts -> Integer -> IO ([Integer], Integer, [(T.Text, Integer)])
+queryChain LeadershipOpts{..} idSut = do
   vrfSkey <-
     Api.readFileTextEnvelope @(Api.SigningKey Api.VrfKey) (Api.File loVrfSkeyFile)
       >>= orDie "reading VRF signing key"
@@ -155,7 +169,13 @@ queryLeadershipSchedule LeadershipOpts{..} = do
           , Api.localNodeNetworkId = loNetworkId
           , Api.localNodeSocketPath = Api.File loSocketPath
           }
-  (result :: Either Api.AcquiringFailure (Either Api.LeadershipError (Set.Set Api.SlotNo))) <-
+  ( result ::
+      Either
+        Api.AcquiringFailure
+        ( Either Api.LeadershipError (Set.Set Api.SlotNo)
+        , Map.Map (Api.Hash Api.StakePoolKey) Rational
+        )
+    ) <-
     Api.executeLocalStateQueryExpr connInfo Api.VolatileTip $ do
       Api.AnyCardanoEra era <- expectQuery "current era" Api.queryCurrentEra
       Api.caseByronOrShelleyBasedEra
@@ -172,19 +192,39 @@ queryLeadershipSchedule LeadershipOpts{..} = do
             serPoolDistr <-
               expectQueryEra "pool distribution"
                 (Api.queryPoolDistribution beo (Just (Set.singleton loStakePoolId)))
-            pure $
-              case loWhich of
-                CurrentEpoch ->
-                  Api.currentEpochEligibleLeadershipSlots
-                    sbe shelleyGenesis eInfo pparams ptclState loStakePoolId vrfSkey serPoolDistr currentEpoch
-                NextEpoch ->
-                  error "next-epoch schedule not yet implemented"
+            stakeDistr <- expectQueryEra "stake distribution" (Api.queryStakeDistribution sbe)
+            let schedule =
+                  case loWhich of
+                    CurrentEpoch ->
+                      Api.currentEpochEligibleLeadershipSlots
+                        sbe shelleyGenesis eInfo pparams ptclState loStakePoolId vrfSkey serPoolDistr currentEpoch
+                    NextEpoch ->
+                      error "next-epoch schedule not yet implemented"
+            pure (schedule, stakeDistr)
         )
         era
   case result of
     Left err -> die ("local state query failed: " <> show err)
-    Right (Left lerr) -> die ("leadership schedule error: " <> show lerr)
-    Right (Right slots) -> pure (Prelude.map (toInteger . Api.unSlotNo) (Set.toList slots))
+    Right (Left lerr, _) -> die ("leadership schedule error: " <> show lerr)
+    Right (Right slots, stakeDistr) ->
+      let winning = Prelude.map (toInteger . Api.unSlotNo) (Set.toList slots)
+          (n, sd) = buildStakeDistribution loStakePoolId idSut stakeDistr
+       in pure (winning, n, sd)
+
+-- | Turn the on-chain stake distribution (pool-id → relative stake) into the
+--   verifier's party stake distribution: parties are the pools, keyed @node-i@,
+--   with the SUT's pool placed at index @idSut@. Relative stakes are scaled to
+--   naturals (per billion).
+buildStakeDistribution ::
+  Api.PoolId -> Integer -> Map.Map (Api.Hash Api.StakePoolKey) Rational -> (Integer, [(T.Text, Integer)])
+buildStakeDistribution sutPool idSut m =
+  let n = Map.size m
+      others = Prelude.filter ((/= sutPool) . fst) (Map.toList m)
+      sutR = maybe (error "SUT stake pool not found in chain stake distribution") id (Map.lookup sutPool m)
+      i = fromInteger idSut :: Int
+      ordered = Prelude.take i others <> [(sutPool, sutR)] <> Prelude.drop i others
+      scaleStake r = floor (r * 1000000000) :: Integer
+   in (toInteger n, [(T.pack ("node-" <> show idx), scaleStake r) | (idx, (_, r)) <- Prelude.zip [0 :: Int ..] ordered])
 
 -- | Run a non-era-mismatch query, dying on an unsupported node-to-client version.
 expectQuery ::
