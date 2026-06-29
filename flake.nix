@@ -17,6 +17,13 @@
     nixpkgs.url = "github:NixOS/nixpkgs";
 
     iogx.url = "github:input-output-hk/iogx";
+    # Keep iogx's API (mkHaskellProject), but bump its pinned package indices
+    # forward to 2026 so cardano-api / cardano-cli (leios-prototype) resolve.
+    # Without this, plan-to-nix silently falls back to the ~2024-11 index.
+    iogx.inputs.CHaP.url = "github:intersectmbo/cardano-haskell-packages/e8a483522ee73c8c9493ea6055553e5c2532e66b";
+    # The old haskell.nix can't consume the 2026 hackage.nix; bump it too.
+    iogx.inputs.haskell-nix.url = "github:input-output-hk/haskell.nix/ef52c36b9835c77a255befe2a20075ba71e3bfab";
+    iogx.inputs.haskell-nix.inputs.hackage.url = "github:input-output-hk/hackage.nix/06fa3e96f4d7ced3496ec984c8016aad5282db67";
 
     leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=a654a1761476fcf8e6a43aeedbc1455bd7ad77db";
 

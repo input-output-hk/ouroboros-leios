@@ -10,9 +10,15 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 -- See CONTRIBUTING.md for information about when and how to update these.
+-- Aligned with cardano-node leios-prototype so that cardano-api / cardano-cli
+-- (used by the trace verifier) resolve against a mutually-compatible set.
 index-state:
-  , hackage.haskell.org 2024-10-04T11:45:34Z
-  , cardano-haskell-packages 2024-10-04T09:54:45Z
+  , hackage.haskell.org 2026-03-26T20:21:33Z
+  , cardano-haskell-packages 2026-05-02T16:21:41Z
+
+active-repositories:
+  , :rest
+  , cardano-haskell-packages:override
 
 packages:
   simulation
@@ -20,36 +26,77 @@ packages:
   analysis/sims/trace-processor
   analysis/deltaq/linear-leios
   post-cip/tx-measurements/betti0
+  leios-trace-verifier/dist/haskell
 
 tests: True
 
-source-repository-package
-    type: git
-    location: https://github.com/IntersectMBO/ouroboros-network.git
-    tag: da1de0ecd52df70508d3f0f9d298832af8392d47
-    --sha256: 9KcLfecbi5L6AHMbubFXTRDm3Yo4QjyPd93ZdpmUlQ4=
-    -- included all package subdirs for consistency
-    subdir: cardano-ping
-            monoidal-synchronisation
-            quickcheck-monoids
-            network-mux
-            ouroboros-network
-            ouroboros-network-api
-            ouroboros-network-framework
-            ouroboros-network-mock
-            ouroboros-network-protocols
-            ouroboros-network-testing
-            ntp-client
-            cardano-client
+constraints:
+  -- haskell.nix patch does not work for 1.6.8
+  , any.crypton-x509-system < 1.6.8
+  -- haskell.nix tries to use 0.7.1.5 for some reason
+  , any.proto-lens >= 0.7.1.6
+  -- plutus-core's `ral` caps QuickCheck < 2.16; pin the whole project there.
+  , any.QuickCheck < 2.16
 
+-- See https://github.com/haskell/cabal/issues/11663 ; worked around with these.
+allow-newer:
+  , io-sim:time
+  , io-classes:time
+  -- fgl-arbitrary's QuickCheck <2.15 upper bound is stale; it builds with 2.15.
+  , fgl-arbitrary:QuickCheck
+
+package cryptonite
+  -- Use /dev/urandom rather than RDRAND for entropy.
+  flags: -support_rdrand
+
+package bitvec
+  flags: -simd
+
+-- Cardano stack, pinned to the leios-prototype branches (matching the
+-- cardano-node-leios flake input).  cardano-api / cardano-cli are consumed by
+-- leios-trace-verifier.
+
+-- ouroboros-consensus/leios-prototype
 source-repository-package
-    type: git
-    location: https://github.com/Saizan/io-sim.git
-    tag: cb3926463e42d5eff98acdbdeadd4a05c7c81f90
-    --sha256: 64IWzs36fLSvf1Jb5z1ajeBppMooFynN2/lgjlu3ojo=
-    subdir:
-      io-sim
-      io-classes
+  type: git
+  location: https://github.com/IntersectMBO/ouroboros-consensus
+  tag: e3803b0c86fc0b5f0a7b8f3a977aebf5afe31b8b
+  --sha256: sha256-PxhS4cB4pnP+izLMOTfsyjrEUCsW2aSEMUKl603Bpk4=
+
+-- cardano-ledger/leios-prototype
+source-repository-package
+  type: git
+  location: https://github.com/IntersectMBO/cardano-ledger
+  tag: 4bf2edca4ccbf18d4e2574b1544a2cf7ffc992eb
+  --sha256: sha256-rFFN26bjo0Wji9htl5Bj5Et7m3FsREv72vdP91fo8+o=
+  subdir:
+    libs/cardano-ledger-core
+    eras/dijkstra/impl
+
+-- ouroboros-network/leios-prototype
+source-repository-package
+  type: git
+  location: https://github.com/IntersectMBO/ouroboros-network
+  tag: ff3e39af5aa51d4d89c23c72d67716fd9bfcc516
+  --sha256: sha256-Ctw/Vi8j9KyDtVm0NK+Jk0COtPi1kpL4lHfUF8/eCgI=
+  subdir:
+    ouroboros-network
+    cardano-diffusion
+    network-mux
+
+-- cardano-api/leios-prototype
+source-repository-package
+  type: git
+  location: https://github.com/IntersectMBO/cardano-api
+  tag: 856cb3f2aa11ca78d3fcc6bd20864075bf6e9075
+  --sha256: sha256-TqHVLjYGY73EJDtaWQUi5y6yQZSpngQV3Z+Wu5JYmII=
+  subdir:
+    cardano-api
+    cardano-api-gen
+
+-- NOTE: cardano-cli is intentionally NOT pinned: the leadership-schedule query
+-- functions we use live in cardano-api.  Pulling cardano-cli forces a newer
+-- io-classes that conflicts with cardano-diffusion (ouroboros-network).
 
 -- NOTE: This contains a workaround for the compile error with pango >=1.56.
 --       For discussion, see:
@@ -62,15 +109,6 @@ source-repository-package
     subdir:
       pango
 
--- Update this when the following PR is merged: https://github.com/well-typed/cborg/pull/345
-source-repository-package
-    type: git
-    location: https://github.com/well-typed/cborg.git
-    tag: ad4927388efab6994589384a421c96f4caeafe15
-    --sha256: YlN8RQ0iuTKiGpBQqfvsogGkgRSK6wRK3yFh3vAJdVA=
-    subdir:
-      cborg-json
-
 -- NOTE: DeltaQ source is also pinned in flake.nix (deltaq-src input) for the
 -- Jupyter kernel in analysis/deltaq/. Keep both pins in sync.
 source-repository-package
@@ -81,4 +119,3 @@ source-repository-package
     subdir:
       lib/deltaq
       lib/probability-polynomial
-

@@ -10,12 +10,19 @@ let
 
   inherit (repoRoot.nix) agda;
 
+  # Tools for the development shell (previously provided via iogx's shellArgs in
+  # ./shell.nix). They are attached to the haskell.nix project shell below.
+  emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: [
+    epkgs.agda2-mode
+    pkgs.mononoki
+  ]);
+
   sources = pkgs.stdenv.mkDerivation {
     name = "leios-hs-sources";
     src = ./..;
     patchPhase = ''
-      # Add the trace verifier package.
-      sed -i '/^packages:/a\ \ leios-trace-verifier/dist/haskell' cabal.project
+      # The trace verifier package (leios-trace-verifier/dist/haskell) is now
+      # listed directly in cabal.project, so no patching is needed here.
       # Clean up troublesome symbolic links.
       rm -r simulation/test/data
       cp -r data simulation/test/
@@ -44,21 +51,41 @@ let
 
   cabalProject' = pkgs.haskell-nix.cabalProject' {
     src = sources.out;
-    shell.withHoogle = false;
     inputMap = {
       "https://chap.intersectmbo.org/" = inputs.iogx.inputs.CHaP;
     };
     name = "ouroboros-leios";
     compiler-nix-name = lib.mkDefault "ghc9101";
+    # Development shell. Replaces iogx's mkHaskellProject + shellArgs: the modern
+    # haskell.nix flake API ('flake'' / devShells) is incompatible with the iogx
+    # version pinned here (it calls haskell.nix's mkFlake with the obsolete
+    # 'devShell' argument), so we drive haskell.nix directly.
+    shell = {
+      withHoogle = false;
+      # haskell.nix builds cabal-install against the project's GHC (iogx used to
+      # provide this; the bypassed mkHaskellProject did too).
+      tools = {
+        cabal = "latest";
+      };
+      nativeBuildInputs = [
+        agda.agdaWithDeps
+        emacsWithPackages
+        pkgs.nodePackages_latest.prettier
+        pkgs.gnuplot
+        pkgs.texliveFull
+        pkgs.python3Packages.pygments
+        pkgs.entr
+      ];
+      shellHook = ''
+        echo "Welcome to Ouroboros Leios!"
+      '';
+    };
   };
 
   cabalProject = cabalProject'.appendOverlays [ ];
 
-  # Docs for mkHaskellProject: https://github.com/input-output-hk/iogx/blob/main/doc/api.md#mkhaskellproject
-  project = lib.iogx.mkHaskellProject {
-    inherit cabalProject;
-
-    shellArgs = repoRoot.nix.shell;
+  project = {
+    flake = cabalProject.flake';
   };
 
 in

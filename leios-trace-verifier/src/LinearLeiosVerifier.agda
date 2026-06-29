@@ -25,6 +25,16 @@ module LinearLeiosVerifier where
   {-# FOREIGN GHC import Data.Text #-}
   {-# COMPILE GHC error = \ _ s -> error (unpack s) #-}
 
+  -- The SUT's leadership schedule (winning slots), supplied by the Haskell
+  -- runtime: 'Main.hs' queries it via the cardano-api and installs it through
+  -- 'LeadershipSchedule.setLeadershipSchedule' before verification.  It is
+  -- postulated here so the spec treats it as an abstract oracle rather than
+  -- threading it through as data.  An empty schedule means "not provided",
+  -- in which case the verifier falls back to harvesting from the trace.
+  postulate leadershipSchedule : List ℕ
+  {-# FOREIGN GHC import qualified LeadershipSchedule #-}
+  {-# COMPILE GHC leadershipSchedule = LeadershipSchedule.leadershipScheduleSlots #-}
+
   module _
     (numberOfParties : ℕ)
     (sutId : ℕ)
@@ -115,11 +125,22 @@ module LinearLeiosVerifier where
                 }
           }
 
+      -- Eligibility ("winning") slots for the SUT.  When a leadership schedule
+      -- is supplied (e.g. from `cardano-cli query leadership-schedule`), each
+      -- scheduled slot counts as a winning slot for both EB and VT production;
+      -- this is authoritative and non-circular.  When no schedule is given the
+      -- legacy behaviour is used: harvest the winning slots from the trace.
+      winning-slots-of : ℙ (BlockType × ℕ)
+      winning-slots-of =
+        if L.null leadershipSchedule
+          then fromList (L.catMaybes (L.map winningSlot l))
+          else fromList (L.concatMap (λ s → (EB , s) ∷ (VT , s) ∷ []) leadershipSchedule)
+
       testParams : TestParams params
       testParams =
         record
           { sutId         = SUT-id
-          ; winning-slots = fromList ∘ L.catMaybes $ L.map winningSlot l
+          ; winning-slots = winning-slots-of
           }
 
       open import Test.Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)

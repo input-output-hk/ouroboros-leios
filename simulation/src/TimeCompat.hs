@@ -36,7 +36,7 @@ import "io-classes" Control.Monad.Class.MonadTime (MonadMonotonicTimeNSec, Monad
 import qualified "io-classes" Control.Monad.Class.MonadTime as MonadTime (MonadMonotonicTimeNSec (getMonotonicTimeNSec))
 import "io-classes" Control.Monad.Class.MonadTimer (MonadDelay)
 import qualified "io-classes" Control.Monad.Class.MonadTimer as MonadTimer (MonadDelay (threadDelay))
-import qualified "si-timers" Control.Monad.Class.MonadTime.SI as SI (DiffTime, Time (Time))
+import qualified "io-classes" Control.Monad.Class.MonadTime.SI as SI (DiffTime, Time (Time))
 
 seTimeCompat :: SimEvent -> Time
 seTimeCompat = Time . realToFrac @SI.DiffTime @DiffTime . coerce @SI.Time @SI.DiffTime . IOSim.seTime

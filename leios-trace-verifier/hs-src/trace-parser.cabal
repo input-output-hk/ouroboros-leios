@@ -43,6 +43,7 @@ executable linear-leios-trace-verifier
     build-depends:
       , base
       , bytestring
+      , cardano-api
       , containers
       , leios-trace-hs
       , optparse-applicative
@@ -85,6 +86,7 @@ library
     hs-source-dirs: src
     exposed-modules:
       LinearLeiosLib
+      LeadershipSchedule
     build-depends:
       , base
       , bytestring
