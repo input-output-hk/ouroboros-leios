@@ -35,13 +35,6 @@ main =
   do
     Command{..} <- execParser commandParser
 
-    -- Party count and stake distribution from the topology (the default).
-    (top :: Topology COORD2D) <- decodeFileThrow topologyFile
-    let topoNrNodes = toInteger $ Prelude.length (elems $ nodes top)
-    let topoNodeNames = Prelude.map unNodeName (keys $ nodes top)
-    let topoStakes = Prelude.map (toInteger . stake . nodeInfo) (elems $ nodes top)
-    let topoStakeDistribution = Prelude.zip topoNodeNames topoStakes
-
     -- Parameters from config
     (config :: Config) <- decodeFileThrow configFile
     let lhdr = 1 -- TODO: read from config
@@ -52,13 +45,20 @@ main =
     -- When --socket-path is given we query a running node through the
     -- cardano-api for (a) the SUT's leadership schedule, which is installed into
     -- the oracle postulated by the Agda spec, and (b) the on-chain stake
-    -- distribution, which replaces the topology-derived party count and stakes
-    -- (parties are the chain's stake pools, indexed; the SUT is placed at
-    -- idSut). Without --socket-path the schedule stays empty (the verifier falls
-    -- back to harvesting winning slots from the trace) and the topology is used.
+    -- distribution, which provides the party count and stakes (parties are the
+    -- chain's stake pools, indexed; the SUT is placed at idSut). In that mode no
+    -- topology file is needed. Without --socket-path the schedule stays empty
+    -- (the verifier falls back to harvesting winning slots from the trace) and
+    -- the party count and stakes come from the topology file, which is then
+    -- required.
     (nrNodes, stakeDistribution) <-
       case leadership of
-        Nothing -> pure (topoNrNodes, topoStakeDistribution)
+        Nothing -> do
+          tf <- maybe (die "--topology-file is required unless --socket-path is given") pure topologyFile
+          (top :: Topology COORD2D) <- decodeFileThrow tf
+          let names = Prelude.map unNodeName (keys $ nodes top)
+              stakes = Prelude.map (toInteger . stake . nodeInfo) (elems $ nodes top)
+          pure (toInteger $ Prelude.length (elems $ nodes top), Prelude.zip names stakes)
         Just opts -> do
           (slots, n, sd) <- queryChain opts idSut
           hPutStrLn stderr $
@@ -263,7 +263,7 @@ eitherDecodeStrictText = either (Left . show) Right . decodeEither'
 data Command = Command
   { logFile :: FilePath
   , configFile :: FilePath
-  , topologyFile :: FilePath
+  , topologyFile :: Maybe FilePath
   , startingSlot :: Integer
   , idSut :: Integer
   , streaming :: Bool
@@ -282,7 +282,7 @@ commandParser =
     Command
       <$> strOption (long "trace-file" <> value "/dev/stdin" <> help "Leios simulation trace log file (batch mode)")
       <*> strOption (long "config-file" <> help "Leios configuration file")
-      <*> strOption (long "topology-file" <> help "Leios topology file")
+      <*> optional (strOption (long "topology-file" <> help "Leios topology file (required unless --socket-path is given)"))
       <*> option auto (long "starting-slot" <> value 0 <> help "Starting slot of trace-file")
       <*> option auto (long "idSut" <> help "Id of system under test (SUT)")
       <*> switch (long "streaming" <> help "Read JSONL trace events from stdin and verify incrementally")
