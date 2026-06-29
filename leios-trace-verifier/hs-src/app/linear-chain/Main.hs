@@ -17,9 +17,8 @@
 module Main where
 
 import Data.ByteString.Lazy as BSL
-import Data.Yaml (FromJSON, decodeEither', decodeFileThrow)
+import Data.Yaml (FromJSON, decodeEither')
 import LeadershipSchedule (setLeadershipSchedule)
-import LeiosConfig (Config (..))
 import LeiosEvents
 import LinearLeiosLib
 import Options.Applicative
@@ -39,11 +38,10 @@ main :: IO ()
 main = do
   ChainCommand{..} <- execParser commandParser
 
-  (config :: Config) <- decodeFileThrow configFile
-  let lhdr = 1 -- TODO: read from config
-  let lvote = toInteger (linearVoteStageLengthSlots config)
-  let ldiff = toInteger (linearDiffuseStageLengthSlots config)
-  let validityCheckTime = 3 -- TODO: read from config
+  let lhdr = 1
+  let lvote = 4
+  let ldiff = 7
+  let validityCheckTime = 3
 
   ChainData{..} <- queryChain leadershipOpts
   hPutStrLn stderr $
@@ -290,8 +288,7 @@ eitherDecodeStrictText = either (Left . show) Right . decodeEither'
 
 -- | CLI command.
 data ChainCommand = ChainCommand
-  { configFile :: FilePath
-  , startingSlot :: Integer
+  { startingSlot :: Integer
   , leadershipOpts :: LeadershipOpts
   }
 
@@ -304,8 +301,7 @@ commandParser =
  where
   com =
     ChainCommand
-      <$> strOption (long "config-file" <> help "Leios configuration file")
-      <*> option auto (long "starting-slot" <> value 0 <> help "Starting slot of the trace")
+      <$> option auto (long "starting-slot" <> value 0 <> help "Starting slot of the trace")
       <*> leadershipParser
 
 -- | Parser for the cardano-api node-query options.
