@@ -92,19 +92,19 @@ let exceptions = {
 
 function getNextMeeting(now = new Date()) {
   let nextMeeting = getLastWednesdayOfMonth(now);
-  const meetingEndTime = new Date(nextMeeting.getTime() + 60 * 60 * 1000); // 1 hour after start
-
-  // If we're past the current month's meeting end time, get next month's meeting
-  if (now >= meetingEndTime) {
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    nextMeeting = getLastWednesdayOfMonth(nextMonth);
-  }
 
   // Unless there is an exception for next meeting
   const exception =
     exceptions[`${nextMeeting.getFullYear()}-${nextMeeting.getMonth() + 1}`];
   if (exception) {
     nextMeeting = exception;
+  }
+
+  // If we're past the current month's meeting end time, get next month's meeting
+  const meetingEndTime = new Date(nextMeeting.getTime() + 60 * 60 * 1000); // 1 hour after start
+  if (now >= meetingEndTime) {
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    nextMeeting = getLastWednesdayOfMonth(nextMonth);
   }
 
   return nextMeeting;
