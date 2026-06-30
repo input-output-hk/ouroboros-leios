@@ -46,6 +46,38 @@ const getTotalActiveCount = (counts: IMessageTypeCounts): number => {
   return Object.values(counts).reduce((sum, count) => sum + count, 0);
 };
 
+// Resolve a single Vote to the EB it credits. Prototype votes target the
+// announcing RB (`rbHash`) and require the RB to be in the chain to be
+// resolvable; simulator and older prototype votes reference the EB directly.
+// Returns null when neither path resolves — the caller should defer the
+// vote until later (the missing RB/EB may show up in a later event).
+const resolveVoteEbId = (chain: IChainState, vote: IVote): string | null => {
+  const ebId =
+    vote.ebHash ??
+    (vote.rbHash ? chain.rbs.get(vote.rbHash)?.announcesEbId : undefined);
+  if (!ebId) return null;
+  if (!chain.ebs.has(ebId)) return null;
+  return ebId;
+};
+
+const creditVoteToEb = (chain: IChainState, vote: IVote, ebId: string) => {
+  const eb = chain.ebs.get(ebId);
+  if (!eb) return;
+  eb.voteCount = (eb.voteCount ?? 0) + (vote.weight ?? 1);
+  (eb.votes ??= []).push(vote);
+};
+
+// Drain pending votes whose RB/EB has since appeared in the chain.
+const drainPendingVotes = (chain: IChainState, pending: IVote[]): IVote[] => {
+  const stillPending: IVote[] = [];
+  for (const v of pending) {
+    const ebId = resolveVoteEbId(chain, v);
+    if (ebId) creditVoteToEb(chain, v, ebId);
+    else stillPending.push(v);
+  }
+  return stillPending;
+};
+
 // Helper function to update node activity state
 const updateNodeActivity = (
   nodeActivityMap: Map<string, INodeActivityState>,
@@ -352,6 +384,12 @@ export const computeAggregatedDataAtTime = (
     }
     return null; // No matching received event found within time window
   };
+
+  // Votes whose target RB / EB hadn't been observed yet when the vote was
+  // processed. Drained after the loop so out-of-order arrival (Loki tails
+  // each node's stream independently and interleaves across them) doesn't
+  // silently drop votes from a vote count.
+  const pendingVotes: IVote[] = [];
 
   for (let i = 0; i < events.length; i++) {
     const event = events[i];
@@ -677,16 +715,9 @@ export const computeAggregatedDataAtTime = (
         // `scenario.totalVotes` is set to the voter count).
         if (Array.isArray(message.votes)) {
           for (const v of message.votes) {
-            // Prototype: vote targets the announcing RB; resolve EB through it.
-            // Older prototype / simulator: vote directly references the EB.
-            const ebId =
-              v.ebHash ??
-              (v.rbHash
-                ? result.chain.rbs.get(v.rbHash)?.announcesEbId
-                : undefined);
-            if (!ebId) continue;
-            const eb = result.chain.ebs.get(ebId);
-            if (eb) eb.voteCount = (eb.voteCount ?? 0) + (v.weight ?? 1);
+            const ebId = resolveVoteEbId(result.chain, v);
+            if (ebId) creditVoteToEb(result.chain, v, ebId);
+            else pendingVotes.push(v);
           }
         } else {
           for (const [ebId, count] of Object.entries(message.votes)) {
@@ -750,6 +781,9 @@ export const computeAggregatedDataAtTime = (
     }
   }
 
+  // Resolve votes whose target RB/EB was unknown at vote-arrival time.
+  drainPendingVotes(result.chain, pendingVotes);
+
   // Set final event counts
   result.eventCounts.total = eventCount;
   result.eventCounts.byType = eventCountsByType;
@@ -778,6 +812,7 @@ export const buildChainAtTime = (
   targetTime: number,
 ): IChainState => {
   const chain: IChainState = { rbs: new Map(), ebs: new Map() };
+  const pendingVotes: IVote[] = [];
   for (const event of events) {
     if (event.time_s > targetTime) break;
     const { message } = event;
@@ -807,17 +842,11 @@ export const buildChainAtTime = (
         });
       }
     } else if (message.type === EServerMessageType.VotesGenerated) {
-      // See computeAggregatedDataAtTime. Prototype `Vote.weight` (stake
-      // fraction, flattened from {numerator,denominator}) is summed when
-      // present; otherwise fall back to 1 per vote.
       if (Array.isArray(message.votes)) {
         for (const v of message.votes) {
-          const ebId =
-            v.ebHash ??
-            (v.rbHash ? chain.rbs.get(v.rbHash)?.announcesEbId : undefined);
-          if (!ebId) continue;
-          const eb = chain.ebs.get(ebId);
-          if (eb) eb.voteCount = (eb.voteCount ?? 0) + (v.weight ?? 1);
+          const ebId = resolveVoteEbId(chain, v);
+          if (ebId) creditVoteToEb(chain, v, ebId);
+          else pendingVotes.push(v);
         }
       } else {
         for (const [ebId, count] of Object.entries(message.votes)) {
@@ -827,5 +856,6 @@ export const buildChainAtTime = (
       }
     }
   }
+  drainPendingVotes(chain, pendingVotes);
   return chain;
 };
