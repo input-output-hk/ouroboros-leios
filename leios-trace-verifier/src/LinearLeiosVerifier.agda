@@ -143,7 +143,7 @@ module LinearLeiosVerifier where
           ; winning-slots = winning-slots-of
           }
 
-      open import Test.Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)
+      open import Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
       splitTxs : List Tx → List Tx × List Tx
