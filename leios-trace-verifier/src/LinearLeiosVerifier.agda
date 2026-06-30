@@ -125,16 +125,20 @@ module LinearLeiosVerifier where
                 }
           }
 
-      -- Eligibility ("winning") slots for the SUT.  When a leadership schedule
-      -- is supplied (e.g. from `cardano-cli query leadership-schedule`), each
-      -- scheduled slot counts as a winning slot for both EB and VT production;
+      -- EB-production eligibility ("winning") slots for the SUT.  When a
+      -- leadership schedule is supplied (e.g. from `cardano-cli query
+      -- leadership-schedule`), each scheduled slot counts as an EB winning slot;
       -- this is authoritative and non-circular.  When no schedule is given the
       -- legacy behaviour is used: harvest the winning slots from the trace.
+      --
+      -- Voting (VT) eligibility is NOT taken from here: it follows the
+      -- deterministic, epoch-fixed committee of CIP-0164 (see Defaults.sortition),
+      -- computed from the stake distribution rather than a per-slot lottery.
       winning-slots-of : ℙ (BlockType × ℕ)
       winning-slots-of =
         if L.null leadershipSchedule
           then fromList (L.catMaybes (L.map winningSlot l))
-          else fromList (L.concatMap (λ s → (EB , s) ∷ (VT , s) ∷ []) leadershipSchedule)
+          else fromList (L.map (λ s → EB , s) leadershipSchedule)
 
       testParams : TestParams params
       testParams =

@@ -1,4 +1,3 @@
-{-# OPTIONS --safe #-}
 {- Module: Defaults
 
    Concrete instantiation of the Leios 'SpecStructure' obligations used by the
@@ -10,9 +9,12 @@
    '--safe', so there is no real VRF/signature/hashing), hence these instances
    are the canonical concrete choices: hashing is the identity on the relevant
    payloads, signatures/proofs are the unit type, and eligibility ('sortition')
-   is decided by the 'winning-slots' oracle supplied through 'TestParams'. The
-   base layer, key registration, FFD and voting functionalities are the minimal
-   implementations the small-step relation needs.
+   is split by role -- block production (EB) is decided by the 'winning-slots'
+   oracle (the Praos VRF leadership schedule) supplied through 'TestParams',
+   whereas voting (VT) follows the deterministic, epoch-fixed committee of
+   CIP-0164 computed from the stake distribution. The base layer, key
+   registration, FFD and voting functionalities are the minimal implementations
+   the small-step relation needs.
 -}
 
 open import Leios.Prelude
@@ -21,7 +23,9 @@ open import Leios.Config
 open import Leios.SpecStructure
 
 open import Axiom.Set.Properties th
+open import Data.Bool using (if_then_else_)
 open import Data.Nat.Show as N
+import Data.Nat as Nat
 open import Data.Integer hiding (_≟_)
 open import Data.String as S using (intersperse)
 open import Function.Related.TypeIsomorphisms
@@ -64,7 +68,56 @@ open import Leios.VRF d-Abstract public
 sutStake : ℕ
 sutStake = TotalMap.lookup stakeDistribution sutId
 
+-- Voting-committee selection (CIP-0164).
+--
+-- The Leios voting committee is NOT a per-slot VRF lottery.  It is fixed once
+-- per epoch, deterministically, from the epoch-boundary stake distribution:
+-- order pools by active stake (descending) and accumulate stake until the
+-- cumulative coverage reaches the target σc (equivalently, until the
+-- truncation error falls below εc = 1 − σc).  That prefix is the committee;
+-- every member may vote on every EB of the epoch.
+--
+-- We fix σc = 99/100 (99% cumulative active-stake coverage), expressed as a
+-- rational σc-num / σc-den so the threshold test stays all-naturals (--safe,
+-- no floats).
+σc-num σc-den : ℕ
+σc-num = 99
+σc-den = 100
+
+-- Stake of every party, paired with its index.
+partyStakes : List (Fin numberOfParties × ℕ)
+partyStakes = tabulate (λ i → i , TotalMap.lookup stakeDistribution i)
+
+totalStake : ℕ
+totalStake = foldr (λ (_ , s) acc → s Nat.+ acc) 0 partyStakes
+
+-- Stake of a pool that strictly precedes the SUT in committee order, else 0.
+-- Order is descending stake, ties broken by ascending index (deterministic),
+-- so a pool precedes the SUT iff it has more stake, or equal stake and a
+-- smaller index.
+precedingContribution : Fin numberOfParties → ℕ → ℕ
+precedingContribution i s =
+  if sutStake Nat.<ᵇ s then s
+  else if s Nat.<ᵇ sutStake then 0
+  else if toℕ i Nat.<ᵇ toℕ sutId then s
+  else 0
+
+-- Cumulative stake of all pools ahead of the SUT in committee order.
+precedingStake : ℕ
+precedingStake =
+  foldr (λ (i , s) acc → precedingContribution i s Nat.+ acc) 0 partyStakes
+
+-- The SUT is on the committee iff the pools ahead of it have not yet covered
+-- the target σc, i.e. precedingStake < σc · totalStake (in all-naturals form,
+-- precedingStake · σc-den < totalStake · σc-num).
+sut-in-committee : Bool
+sut-in-committee = (precedingStake Nat.* σc-den) Nat.<ᵇ (totalStake Nat.* σc-num)
+
+-- Eligibility.  Block production (EB) follows the Praos VRF leadership schedule
+-- supplied through the 'winning-slots' oracle.  Voting (VT) follows the
+-- deterministic committee above and is independent of the slot.
 sortition : BlockType → ℕ → ℕ
+sortition VT _ = if sut-in-committee then 0 else sutStake
 sortition b n with (b , n) ∈? winning-slots
 ... | yes _ = 0
 ... | no _ = sutStake
