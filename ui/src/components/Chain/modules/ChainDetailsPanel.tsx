@@ -112,6 +112,32 @@ export const ChainDetailsPanel: FC = () => {
           <Row label="Slot">{data.eb.slot}</Row>
           <Row label="Producer">{data.eb.producer}</Row>
           <Row label="Size">{printBytes(data.eb.sizeBytes)}</Row>
+          <Row label="Votes">{data.eb.votes?.length ?? 0}</Row>
+          <Row label="Vote weight">
+            {data.eb.voteCount !== undefined
+              ? data.eb.voteCount.toFixed(3)
+              : "—"}
+          </Row>
+          {data.eb.votes && data.eb.votes.length > 0 ? (
+            <table className="w-full text-xs mt-1">
+              <thead>
+                <tr className="text-gray-500 border-b">
+                  <th className="text-left py-0.5">Voter</th>
+                  <th className="text-right py-0.5">Weight</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.eb.votes.map((v, i) => (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-0.5">{v.voterId}</td>
+                    <td className="py-0.5 text-right font-mono">
+                      {v.weight !== undefined ? v.weight.toFixed(3) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
         </>
       )}
     </div>

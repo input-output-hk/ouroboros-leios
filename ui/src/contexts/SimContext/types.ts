@@ -49,10 +49,14 @@ export interface IChainEB {
   slot: number;
   producer: string;
   sizeBytes: number;
-  // FIXME: temporary proxy — count of `Vote` records seen targeting this EB.
-  // Replace with proper sum-of-vote-weights / total-stake once the trace
-  // carries vote weights (especially from the real cardano-node prototype).
+  /** Sum of `Vote.weight` (stake fraction) for votes credited to this EB.
+   *  For sources without per-vote weight, contributions are 1 per vote. */
   voteCount?: number;
+  /** Per-vote records that fed `voteCount`, as carried in the prototype's
+   *  `LeiosVoted` traces. Used to surface a per-voter breakdown in the
+   *  details panel. Empty / absent for simulator traces that aggregate
+   *  votes by EB without preserving individual records. */
+  votes?: IVote[];
 }
 
 export interface IChainState {
