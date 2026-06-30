@@ -298,7 +298,7 @@ This demonstrates how modest adversarial stake combined with strategic network p
 
 **Attack on safety.** While throughput degradation represents the obvious impact, the most dangerous variant targets blockchain safety itself.
 The adversary can strategically delay transaction data release to create scenarios where EBs achieve certification but cannot be processed by honest nodes within the required timeframe.
-Just before the voting deadline, they release data to a subset of voting committee members—enough to achieve certification, but not to all network participants.
+Just before the voting deadline, they release data to a subset of voting committee members (who are approximately colocated in the worst case)—enough to achieve certification, but not to all network participants.
 The resulting certificate gets included in a subsequent RB, but honest block producers cannot acquire the certified EB's transaction closure within $L_\text{diff}$.
 
 By reducing the number of honest nodes that received the EB data in time for certification, the adversary also impairs subsequent diffusion.
