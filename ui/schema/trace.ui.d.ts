@@ -21,10 +21,15 @@
 /** A single vote as carried in the prototype's `MsgLeiosVotes` payloads. */
 export interface Vote {
   voterId: number;
-  ebHash: string;
-  /** Slot of the EB being voted on (current prototype trace format). */
+  /** Hash of the announcing RB the vote targets. Current prototype shape:
+   *  votes are cast on the RB that announced the EB, not on the EB itself. */
+  rbHash?: string;
+  /** EB hash, carried by simulator traces and by older prototype traces
+   *  (pre-"vote on the announcing RbHash" change). */
+  ebHash?: string;
+  /** Slot of the EB being voted on (older prototype trace format). */
   slot?: number;
-  /** Legacy field name for `slot`, kept for older prototype traces. */
+  /** Legacy field name for `slot`, kept for very old prototype traces. */
   electionId?: number;
   voteSignature?: boolean;
   /** Stake-weighted vote weight, as a fraction of total stake in [0,1].

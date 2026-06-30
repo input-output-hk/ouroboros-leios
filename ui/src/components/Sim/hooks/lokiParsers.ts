@@ -441,22 +441,26 @@ const parseVotesGenerated = (
   try {
     const log = JSON.parse(logLine);
 
-    // `weight` is a stake fraction in [0,1]. The network-side
-    // `MsgLeiosVotes` still doesn't carry weight; only the producer's
-    // `LeiosVoted` does. See aggregator for how it's summed per EB.
-    if (log.kind === "LeiosVoted") {
+    // {"kind":"LeiosVoted","vote":{"rbHash":"...","voterId":228},"weight":0.333}
+    //
+    // Votes target the announcing RB's hash (the EB is resolved indirectly
+    // via the RB's `announces` relation). `weight` is a stake fraction in
+    // [0,1]; the network-side `MsgLeiosVotes` still doesn't carry weight,
+    // only the producer's `LeiosVoted` does.
+    if (log.kind === "LeiosVoted" && log.vote) {
       const weight = typeof log.weight === "number" ? log.weight : undefined;
+      const rbHash: string | undefined = log.vote.rbHash;
+      const voterId: number | undefined = log.vote.voterId;
       const message: IVotesGenerated = {
         type: EServerMessageType.VotesGenerated,
-        id: `vote-${log.vote.slot}-${log.vote.voterId}-${log.vote.ebHash}`,
-        slot: log.vote.slot,
+        id: `vote-${rbHash}-${voterId}`,
+        slot: 0,
         producer: streamLabels.process,
         size_bytes: 100,
         votes: [
           {
-            voterId: log.vote.voterId,
-            ebHash: log.vote.ebHash,
-            slot: log.vote.slot,
+            voterId: voterId as number,
+            rbHash,
             weight,
           },
         ],
@@ -478,7 +482,8 @@ const parseVotesSent = (
   try {
     const log = JSON.parse(logLine);
 
-    // Old (pre-rename): votes carried `electionId` instead of `slot`.
+    // {"kind":"Send","msg":{"kind":"MsgLeiosVotes","votes":[{"rbHash":"...","voterId":228}]},"peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"}}
+    // Votes target the announcing RB's hash; EB is resolved indirectly.
     if (
       (log.direction || log.kind) === "Send" &&
       log.msg &&
@@ -490,15 +495,14 @@ const parseVotesSent = (
 
       const votes = (log.msg.votes || []).map((v: any) => ({
         voterId: v.voterId,
-        ebHash: v.ebHash,
-        slot: v.slot ?? v.electionId,
+        rbHash: v.rbHash,
       }));
       const firstVote = votes[0] || {};
-      const voteId = `vote-${firstVote.slot}-${firstVote.voterId}-${firstVote.ebHash}`;
+      const voteId = `vote-${firstVote.rbHash}-${firstVote.voterId}`;
 
       const message: IVotesSent = {
         type: EServerMessageType.VotesSent,
-        slot: firstVote.slot || 0,
+        slot: 0,
         id: voteId,
         sender,
         recipient,
@@ -521,6 +525,7 @@ const parseVotesReceived = (
   try {
     const log = JSON.parse(logLine);
 
+    // {"kind":"Recv","msg":{"kind":"MsgLeiosVotes","votes":[{"voterId":228,"rbHash":"..."}]},"peer":{"connectionId":"127.0.0.1:3001 127.0.0.1:3002"}}
     if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosVotes") {
       const [recipient, sender] = getNodesFromConnection(
         log.peer?.connectionId || log.connectionId,
@@ -528,15 +533,14 @@ const parseVotesReceived = (
 
       const votes = (log.msg.votes || []).map((v: any) => ({
         voterId: v.voterId,
-        ebHash: v.ebHash,
-        slot: v.slot ?? v.electionId,
+        rbHash: v.rbHash,
       }));
       const firstVote = votes[0] || {};
-      const voteId = `vote-${firstVote.slot}-${firstVote.voterId}-${firstVote.ebHash}`;
+      const voteId = `vote-${firstVote.rbHash}-${firstVote.voterId}`;
 
       const message: IVotesReceived = {
         type: EServerMessageType.VotesReceived,
-        slot: firstVote.slot || 0,
+        slot: 0,
         id: voteId,
         sender,
         recipient,

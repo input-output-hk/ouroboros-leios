@@ -523,14 +523,19 @@
       "description": "A single vote as carried in the prototype's `MsgLeiosVotes` payloads.",
       "properties": {
         "ebHash": {
+          "description": "EB hash, carried by simulator traces and by older prototype traces\n(pre-\"vote on the announcing RbHash\" change).",
           "type": "string"
         },
         "electionId": {
-          "description": "Legacy field name for `slot`, kept for older prototype traces.",
+          "description": "Legacy field name for `slot`, kept for very old prototype traces.",
           "type": "number"
         },
+        "rbHash": {
+          "description": "Hash of the announcing RB the vote targets. Current prototype shape:\nvotes are cast on the RB that announced the EB, not on the EB itself.",
+          "type": "string"
+        },
         "slot": {
-          "description": "Slot of the EB being voted on (current prototype trace format).",
+          "description": "Slot of the EB being voted on (older prototype trace format).",
           "type": "number"
         },
         "voteSignature": {
@@ -544,7 +549,7 @@
           "type": "number"
         }
       },
-      "required": ["ebHash", "voterId"],
+      "required": ["voterId"],
       "type": "object"
     }
   },

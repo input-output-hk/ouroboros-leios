@@ -54,13 +54,29 @@ const MessageDetail: FC<{
     details.push({ label: "Slot", value: String(animation.slot) });
   }
 
-  // Vote-specific details
+  // Vote-specific details. Prototype votes target the announcing RB
+  // (`rbHash`); older prototype / simulator votes carry `ebHash` and `slot`.
   if (animation.votes && animation.votes.length > 0) {
-    const rounds = [...new Set(animation.votes.map((v) => v.slot))];
-    details.push({ label: "Round", value: rounds.join(", ") });
+    const rounds = [
+      ...new Set(animation.votes.map((v) => v.slot).filter((s) => s != null)),
+    ];
+    if (rounds.length > 0) {
+      details.push({ label: "Round", value: rounds.join(", ") });
+    }
 
-    const ebHashes = [...new Set(animation.votes.map((v) => v.ebHash))];
-    details.push({ label: "EB hash", value: ebHashes.join(", ") });
+    const rbHashes = [
+      ...new Set(animation.votes.map((v) => v.rbHash).filter((h): h is string => !!h)),
+    ];
+    if (rbHashes.length > 0) {
+      details.push({ label: "RB hash", value: rbHashes.join(", ") });
+    }
+
+    const ebHashes = [
+      ...new Set(animation.votes.map((v) => v.ebHash).filter((h): h is string => !!h)),
+    ];
+    if (ebHashes.length > 0) {
+      details.push({ label: "EB hash", value: ebHashes.join(", ") });
+    }
 
     const voterIds = [...new Set(animation.votes.map((v) => v.voterId))];
     details.push({ label: "Voter", value: voterIds.join(", ") });

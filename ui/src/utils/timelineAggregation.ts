@@ -677,7 +677,15 @@ export const computeAggregatedDataAtTime = (
         // `scenario.totalVotes` is set to the voter count).
         if (Array.isArray(message.votes)) {
           for (const v of message.votes) {
-            const eb = result.chain.ebs.get(v.ebHash);
+            // Prototype: vote targets the announcing RB; resolve EB through it.
+            // Older prototype / simulator: vote directly references the EB.
+            const ebId =
+              v.ebHash ??
+              (v.rbHash
+                ? result.chain.rbs.get(v.rbHash)?.announcesEbId
+                : undefined);
+            if (!ebId) continue;
+            const eb = result.chain.ebs.get(ebId);
             if (eb) eb.voteCount = (eb.voteCount ?? 0) + (v.weight ?? 1);
           }
         } else {
@@ -804,7 +812,11 @@ export const buildChainAtTime = (
       // present; otherwise fall back to 1 per vote.
       if (Array.isArray(message.votes)) {
         for (const v of message.votes) {
-          const eb = chain.ebs.get(v.ebHash);
+          const ebId =
+            v.ebHash ??
+            (v.rbHash ? chain.rbs.get(v.rbHash)?.announcesEbId : undefined);
+          if (!ebId) continue;
+          const eb = chain.ebs.get(ebId);
           if (eb) eb.voteCount = (eb.voteCount ?? 0) + (v.weight ?? 1);
         }
       } else {
