@@ -307,9 +307,8 @@ eitherDecodeStrictText :: FromJSON a => BS.ByteString -> Either String a
 eitherDecodeStrictText = either (Left . show) Right . decodeEither'
 
 -- | CLI command.
-data ChainCommand = ChainCommand
-  { startingSlot :: Integer
-  , leadershipOpts :: LeadershipOpts
+newtype ChainCommand = ChainCommand
+  { leadershipOpts :: LeadershipOpts
   }
 
 commandParser :: ParserInfo ChainCommand
@@ -319,10 +318,7 @@ commandParser =
       <> progDesc "Linear Leios streaming trace verifier (reads schedule and stake distribution from a node via cardano-api)"
       <> header "Leios trace verifier (chain)"
  where
-  com =
-    ChainCommand
-      <$> option auto (long "starting-slot" <> value 0 <> help "Starting slot of the trace")
-      <*> leadershipParser
+  com = ChainCommand <$> leadershipParser
 
 -- | Parser for the cardano-api node-query options.
 leadershipParser :: Parser LeadershipOpts
