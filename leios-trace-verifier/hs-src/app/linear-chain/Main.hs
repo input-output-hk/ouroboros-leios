@@ -18,7 +18,7 @@ module Main where
 import ChainEvents (ChainEvent (..), parseNodeLog)
 import Control.Monad (when)
 import Data.ByteString.Lazy as BSL
-import Data.Yaml (FromJSON, decodeEither')
+import Data.Yaml (FromJSON (..), decodeEither', withObject, (.:))
 import LeadershipSchedule (setLeadershipSchedule)
 import LinearLeiosLib
 import Options.Applicative
@@ -33,99 +33,117 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T (Text, drop, dropWhile, isInfixOf, pack, takeWhile, unpack)
 
--- | Run the CLI: query the chain, then stream-verify the trace from stdin.
+-- | Run the CLI: stream-verify the node.log from stdin, re-querying the node's
+--   leadership schedule and stake distribution at each epoch boundary.
 main :: IO ()
 main = do
   ChainCommand{..} <- execParser commandParser
 
   let lhdr = 1
-  let lvote = 4
-  let ldiff = 7
-  let validityCheckTime = 3
+      lvote = 4
+      ldiff = 7
+      validityCheckTime = 3
 
-  ChainData{..} <- queryChain leadershipOpts
+  hSetBuffering stdout LineBuffering
+  evs <- parseNodeLog <$> BSL.getContents
+  -- A fresh node.log begins with a long sync/replay phase whose Leios events
+  -- (vote/block acquisitions for the chain history) precede the node's first
+  -- leadership-check slot; skip them rather than flooding output.
+  let (preSlot, rest) = Prelude.break isCSlot evs
   hPutStrLn stderr $
-    "From chain: "
-      <> show (Prelude.length cdWinningSlots)
-      <> " winning slots "
-      <> show cdWinningSlots
-      <> ", "
-      <> show cdNumParties
-      <> " parties, SUT at index "
-      <> show cdSutIndex
-  setLeadershipSchedule cdWinningSlots
+    "skipped " <> show (Prelude.length preSlot)
+      <> " pre-slot events (node sync/replay backlog, before the first leadership-check slot)"
+  runSegmented leadershipOpts (lhdr, lvote, ldiff, validityCheckTime) rest
 
-  let verify evs =
-        verifyChainTraceFromSlot cdNumParties cdSutIndex cdStakeDistribution
-          lhdr lvote ldiff validityCheckTime evs startingSlot
-  runStreaming verify
+-- | A verification segment: the part of the trace within one epoch, verified
+--   against the schedule and stake distribution queried for that epoch.
+data Segment = Segment
+  { segEpoch :: Integer
+  , segStart :: Integer -- ^ first leadership-check slot of the segment
+  , segCD :: ChainData
+  }
 
--- | Consume the node.log lazily from stdin, parse it into Leios 'ChainEvent's,
---   and re-verify the accumulated prefix at every slot boundary (each
---   'CSlot'), stopping at the first prefix the formal spec rejects.
-runStreaming :: ([ChainEvent] -> ([T.Text], (T.Text, T.Text))) -> IO ()
-runStreaming verify =
-  do
-    hSetBuffering stdout LineBuffering
-    evs <- parseNodeLog <$> BSL.getContents
-    -- A fresh node.log begins with a long sync/replay phase whose Leios events
-    -- (vote/block acquisitions for the chain history) precede the node's first
-    -- leadership-check slot. They are not part of live per-slot behaviour, so
-    -- skip everything up to the first slot tick rather than flooding output.
-    let (preSlot, rest) = Prelude.break isCSlot evs
-    hPutStrLn stderr $
-      "skipped "
-        <> show (Prelude.length preSlot)
-        <> " pre-slot events (node sync/replay backlog, before the first leadership-check slot)"
-    case rest of
-      [] -> hPutStrLn stderr "no leadership-check slot found in input — nothing to verify"
-      (CSlot s : _) -> hPutStrLn stderr $ "verifying from first leadership-check slot " <> show s
-      (ev : _) -> hPutStrLn stderr $ "verifying from " <> show ev
-    go [] rest
+-- | Verify the node.log stream one epoch-segment at a time. At each epoch
+--   boundary the node is re-queried for that epoch's leadership schedule and
+--   stake distribution, and a fresh segment is started from the boundary slot —
+--   so no process restart is needed and re-verification cost stays bounded per
+--   epoch rather than growing over the whole run. This assumes the verifier
+--   roughly keeps up with the live node, since a node reports only the current
+--   epoch's schedule. Votes that straddle a boundary (an EB from the previous
+--   epoch voted in the next) are a known limitation of the hard reset.
+runSegmented ::
+  LeadershipOpts ->
+  (Integer, Integer, Integer, Integer) ->
+  [ChainEvent] ->
+  IO ()
+runSegmented opts (lhdr, lvote, ldiff, validityCheckTime) = loop Nothing []
  where
-  go :: [ChainEvent] -> [ChainEvent] -> IO ()
-  go seen [] = finish (Prelude.reverse seen)
-  go seen (ev : rest) =
-    do
-      hPutStrLn stderr $ "event: " <> show ev
-      if isCSlot ev
-        then checkpoint (Prelude.reverse seen') >> go seen' rest
-        else go seen' rest
-   where
-    seen' = ev : seen
-  checkpoint prefix =
-    let (acts, (status, detail)) = verify prefix
+  loop :: Maybe Segment -> [ChainEvent] -> [ChainEvent] -> IO ()
+  loop mseg seen [] = finishSeg mseg (Prelude.reverse seen)
+  loop mseg seen (ev : rest) = do
+    hPutStrLn stderr $ "event: " <> show ev
+    case ev of
+      CSlot s -> case mseg of
+        Just seg | toInteger s `div` cdEpochLength (segCD seg) == segEpoch seg -> do
+          -- same epoch: extend and re-check the current segment
+          let seen' = ev : seen
+          checkSeg seg (Prelude.reverse seen')
+          loop mseg seen' rest
+        _ -> do
+          -- first segment, or an epoch boundary: (re-)query and start fresh
+          seg <- newSegment (toInteger s)
+          checkSeg seg [ev]
+          loop (Just seg) [ev] rest
+      _ -> loop mseg (ev : seen) rest
+
+  newSegment :: Integer -> IO Segment
+  newSegment s = do
+    cd <- queryChain opts
+    setLeadershipSchedule (cdWinningSlots cd)
+    let ep = s `div` cdEpochLength cd
+    hPutStrLn stderr $
+      "epoch " <> show ep <> " (from slot " <> show s <> "): "
+        <> show (Prelude.length (cdWinningSlots cd)) <> " winning slots "
+        <> show (cdWinningSlots cd) <> ", " <> show (cdNumParties cd)
+        <> " parties, SUT at index " <> show (cdSutIndex cd)
+    pure Segment{segEpoch = ep, segStart = s, segCD = cd}
+
+  verifySeg :: Segment -> [ChainEvent] -> ([T.Text], (T.Text, T.Text))
+  verifySeg seg prefix =
+    let cd = segCD seg
+     in verifyChainTraceFromSlot (cdNumParties cd) (cdSutIndex cd) (cdStakeDistribution cd)
+          lhdr lvote ldiff validityCheckTime prefix (segStart seg)
+
+  checkSeg :: Segment -> [ChainEvent] -> IO ()
+  checkSeg seg prefix =
+    let (acts, (status, detail)) = verifySeg seg prefix
      in if status == "ok"
-          then
-            hPutStrLn stderr $
-              "ok @ " <> show (Prelude.length prefix) <> " events, " <> show (Prelude.length acts) <> " actions"
+          then hPutStrLn stderr $ "ok @ " <> show (Prelude.length prefix) <> " events, " <> show (Prelude.length acts) <> " actions"
           else failOut prefix acts status detail
-  finish prefix =
-    let (acts, (status, detail)) = verify prefix
+
+  finishSeg :: Maybe Segment -> [ChainEvent] -> IO ()
+  finishSeg Nothing _ = hPutStrLn stderr "no leadership-check slot found in input — nothing to verify"
+  finishSeg (Just seg) prefix =
+    let (acts, (status, detail)) = verifySeg seg prefix
      in if status == "ok"
           then hPutStrLn stderr "stream ended: ok" >> printActions acts
           else failOut prefix acts status detail
+
   printActions = mapM_ (\a -> hPutStrLn stderr ("  action: " <> T.unpack a))
-  -- The slot an action or error status belongs to: the leading token of the
-  -- status ("<slot> : Err-…"), or the token after the first '@' of an action
-  -- ("VT-Role@<slot> …").
+  -- The slot an action or error status belongs to.
   slotOfAction a = T.takeWhile (/= ' ') (T.drop 1 (T.dropWhile (/= '@') a))
-  failOut prefix acts status detail =
-    do
+  failOut prefix acts status detail = do
+    hPutStrLn stderr $
+      "VIOLATION after " <> show (Prelude.length prefix) <> " events: " <> T.unpack status
+    hPutStrLn stderr $ T.unpack detail
+    when ("Err-Invalid" `T.isInfixOf` status) $
       hPutStrLn stderr $
-        "VIOLATION after " <> show (Prelude.length prefix) <> " events: " <> T.unpack status
-      hPutStrLn stderr $ T.unpack detail
-      -- Err-Invalid is the spec's generic catch-all with no detail; explain it.
-      when ("Err-Invalid" `T.isInfixOf` status) $
-        hPutStrLn stderr $
-          "  (Err-Invalid: a No-EB-Role/No-VT-Role abstention was rejected — the spec "
-            <> "permits abstaining only when the role cannot be performed this slot. "
-            <> "Under the exact-offset spec a vote is mandated at slotNumber(eb) + "
-            <> "validityCheckTime; the vote-window spec relaxes this.)"
-      -- Only the actions in the failing slot.
-      let failSlot = T.takeWhile (/= ' ') status
-      printActions (Prelude.filter ((== failSlot) . slotOfAction) acts)
-      exitFailure
+        "  (Err-Invalid: a No-EB-Role/No-VT-Role abstention was rejected — the spec "
+          <> "permits abstaining only when the role cannot be performed this slot.)"
+    -- Only the actions in the failing slot.
+    let failSlot = T.takeWhile (/= ' ') status
+    printActions (Prelude.filter ((== failSlot) . slotOfAction) acts)
+    exitFailure
 
 -- | True iff the event is a slot tick (used as a re-verification checkpoint).
 isCSlot :: ChainEvent -> Bool
@@ -133,6 +151,12 @@ isCSlot (CSlot _) = True
 isCSlot _ = False
 
 -- * Reading from the chain via cardano-api
+
+-- | Minimal view of the Shelley genesis: just the epoch length (slots/epoch).
+newtype GenesisEL = GenesisEL Integer
+
+instance FromJSON GenesisEL where
+  parseJSON = withObject "ShelleyGenesis" $ \o -> GenesisEL <$> o .: "epochLength"
 
 -- | Which epoch's leadership schedule to query.
 data WhichEpoch = CurrentEpoch | NextEpoch
@@ -159,6 +183,9 @@ data ChainData = ChainData
   -- ^ Per-party stake, keyed @node-i@ (pool i in chain order).
   , cdSutIndex :: Integer
   -- ^ The SUT's party index (position of --stake-pool-id in chain order).
+  , cdEpochLength :: Integer
+  -- ^ Slots per epoch (from the Shelley genesis), used to detect epoch
+  --   boundaries so the schedule and stake distribution can be re-queried.
   }
 
 -- | Query a running node (via the cardano-api local-state-query protocol) for
@@ -171,9 +198,11 @@ queryChain LeadershipOpts{..} = do
   vrfSkey <-
     Api.readFileTextEnvelope @(Api.SigningKey Api.VrfKey) (Api.File loVrfSkeyFile)
       >>= orDie "reading VRF signing key"
+  genesisBytes <- BS.readFile loGenesisFile
   (shelleyGenesis :: Api.ShelleyGenesis) <-
-    BS.readFile loGenesisFile
-      >>= orDie "decoding Shelley genesis" . eitherDecodeStrictText
+    orDie "decoding Shelley genesis" (eitherDecodeStrictText genesisBytes)
+  GenesisEL epochLength <-
+    orDie "reading epochLength from Shelley genesis" (eitherDecodeStrictText genesisBytes)
   let connInfo =
         Api.LocalNodeConnectInfo
           { Api.localConsensusModeParams = Api.CardanoModeParams (Api.EpochSlots 21600)
@@ -218,7 +247,7 @@ queryChain LeadershipOpts{..} = do
     Left err -> die ("local state query failed: " <> show err)
     Right (Left lerr, _) -> die ("leadership schedule error: " <> show lerr)
     Right (Right slots, stakeDistr) ->
-      pure $ buildChainData loStakePoolId (Prelude.map (toInteger . Api.unSlotNo) (Set.toList slots)) stakeDistr
+      pure $ buildChainData loStakePoolId epochLength (Prelude.map (toInteger . Api.unSlotNo) (Set.toList slots)) stakeDistr
 
 -- | Turn the on-chain stake distribution (pool-id → relative stake) into the
 --   verifier's view: parties are the pools in chain (Map) order, keyed
@@ -226,10 +255,11 @@ queryChain LeadershipOpts{..} = do
 --   index. Relative stakes are scaled to naturals (per billion).
 buildChainData ::
   Api.PoolId ->
+  Integer ->
   [Integer] ->
   Map.Map (Api.Hash Api.StakePoolKey) Rational ->
   ChainData
-buildChainData sutPool winning m =
+buildChainData sutPool epochLength winning m =
   let pairs = Map.toList m -- sorted by pool-id, deterministic
       nodeName i = T.pack ("node-" <> show (i :: Int))
       scaleStake r = floor (r * 1000000000) :: Integer
@@ -242,6 +272,7 @@ buildChainData sutPool winning m =
         , cdNumParties = toInteger (Prelude.length pairs)
         , cdStakeDistribution = stakeDist
         , cdSutIndex = sutIdx
+        , cdEpochLength = epochLength
         }
 
 expectQuery ::
