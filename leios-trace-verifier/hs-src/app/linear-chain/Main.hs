@@ -5,21 +5,20 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
--- The record-wildcard relabelling below binds fields such as 'id', which would
--- otherwise shadow Prelude names.
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
--- | Streaming trace verification of Linear Leios that sources the SUT's
---   leadership schedule and the stake distribution from a running node via the
---   cardano-api. The trace is read incrementally from stdin; the SUT is the
---   pool given by --stake-pool-id and trace producers (pool-ids) are relabelled
---   to the verifier's @node-i@ party identities.
+-- | Streaming trace verification of Linear Leios against a running node. The
+--   SUT's leadership schedule and the on-chain stake distribution are sourced
+--   from the node via the cardano-api; the trace itself is read incrementally
+--   from stdin as the node's own tracing log (node.log), parsed natively into
+--   Leios 'ChainEvent's (keyed by EB hash). The SUT is the pool given by
+--   --stake-pool-id and is the sole node the log describes, so no relabelling
+--   is needed.
 module Main where
 
+import ChainEvents (ChainEvent (..), parseNodeLog)
 import Data.ByteString.Lazy as BSL
 import Data.Yaml (FromJSON, decodeEither')
 import LeadershipSchedule (setLeadershipSchedule)
-import LeiosEvents
 import LinearLeiosLib
 import Options.Applicative
 import System.Exit (exitFailure)
@@ -53,26 +52,25 @@ main = do
       <> show cdSutIndex
   setLeadershipSchedule cdWinningSlots
 
-  let relabel = relabelTraceEvent (\t -> Map.findWithDefault t t cdRelabel)
-      verify evs =
-        verifyTraceFromSlot cdNumParties cdSutIndex cdStakeDistribution
+  let verify evs =
+        verifyChainTraceFromSlot cdNumParties cdSutIndex cdStakeDistribution
           lhdr lvote ldiff validityCheckTime evs startingSlot
-  runStreaming relabel verify
+  runStreaming verify
 
--- | Consume JSONL trace events lazily from stdin, relabel pool-ids to @node-i@,
---   and re-verify the accumulated prefix at every slot boundary, stopping at
---   the first prefix the formal spec rejects.
-runStreaming :: (TraceEvent -> TraceEvent) -> ([TraceEvent] -> (Integer, (T.Text, T.Text))) -> IO ()
-runStreaming relabel verify =
+-- | Consume the node.log lazily from stdin, parse it into Leios 'ChainEvent's,
+--   and re-verify the accumulated prefix at every slot boundary (each
+--   'CSlot'), stopping at the first prefix the formal spec rejects.
+runStreaming :: ([ChainEvent] -> (Integer, (T.Text, T.Text))) -> IO ()
+runStreaming verify =
   do
     hSetBuffering stdout LineBuffering
-    evs <- Prelude.map relabel . decodeJSONL <$> BSL.getContents
+    evs <- parseNodeLog <$> BSL.getContents
     go [] evs
  where
-  go :: [TraceEvent] -> [TraceEvent] -> IO ()
+  go :: [ChainEvent] -> [ChainEvent] -> IO ()
   go seen [] = finish (Prelude.reverse seen)
   go seen (ev : rest)
-    | isSlot ev = checkpoint (Prelude.reverse seen') >> go seen' rest
+    | isCSlot ev = checkpoint (Prelude.reverse seen') >> go seen' rest
     | otherwise = go seen' rest
    where
     seen' = ev : seen
@@ -96,10 +94,9 @@ runStreaming relabel verify =
       exitFailure
 
 -- | True iff the event is a slot tick (used as a re-verification checkpoint).
-isSlot :: TraceEvent -> Bool
-isSlot TraceEvent{message = m} = case m of
-  Slot{} -> True
-  _ -> False
+isCSlot :: ChainEvent -> Bool
+isCSlot (CSlot _) = True
+isCSlot _ = False
 
 -- * Reading from the chain via cardano-api
 
@@ -128,9 +125,6 @@ data ChainData = ChainData
   -- ^ Per-party stake, keyed @node-i@ (pool i in chain order).
   , cdSutIndex :: Integer
   -- ^ The SUT's party index (position of --stake-pool-id in chain order).
-  , cdRelabel :: Map.Map T.Text T.Text
-  -- ^ Maps each pool-id (bech32 and hex forms) to its @node-i@ identity, so
-  --   trace producers can be relabelled to what the verifier expects.
   }
 
 -- | Query a running node (via the cardano-api local-state-query protocol) for
@@ -209,51 +203,12 @@ buildChainData sutPool winning m =
       sutIdx =
         maybe (error "SUT stake pool not found in chain stake distribution") toInteger $
           List.findIndex ((== sutPool) . fst) pairs
-      relabelMap =
-        Map.fromList $
-          Prelude.concat
-            [ [(Api.serialiseToBech32 pid, nodeName i), (Api.serialiseToRawBytesHexText pid, nodeName i)]
-            | (i, (pid, _)) <- Prelude.zip [0 ..] pairs
-            ]
    in ChainData
         { cdWinningSlots = winning
         , cdNumParties = toInteger (Prelude.length pairs)
         , cdStakeDistribution = stakeDist
         , cdSutIndex = sutIdx
-        , cdRelabel = relabelMap
         }
-
--- | Rewrite the node-identity fields (producer / node / sender / recipient /
---   publisher) of a trace event through the given relabelling, leaving all
---   other fields untouched. Used to map chain pool-ids to @node-i@ identities.
-relabelTraceEvent :: (T.Text -> T.Text) -> TraceEvent -> TraceEvent
-relabelTraceEvent f TraceEvent{..} = TraceEvent{message = relabelEvent f message, ..}
-
-relabelEvent :: (T.Text -> T.Text) -> Event -> Event
-relabelEvent f = \case
-  Slot{..} -> Slot{node = f node, ..}
-  Cpu{..} -> Cpu{node = f node, ..}
-  NoIBGenerated{..} -> NoIBGenerated{node = f node, ..}
-  NoEBGenerated{..} -> NoEBGenerated{node = f node, ..}
-  NoVTBundleGenerated{..} -> NoVTBundleGenerated{node = f node, ..}
-  IBSent{..} -> IBSent{sender = f <$> sender, recipient = f recipient, ..}
-  EBSent{..} -> EBSent{sender = f <$> sender, recipient = f recipient, ..}
-  VTBundleSent{..} -> VTBundleSent{sender = f <$> sender, recipient = f recipient, ..}
-  RBSent{..} -> RBSent{sender = f <$> sender, recipient = f recipient, ..}
-  IBReceived{..} -> IBReceived{sender = f <$> sender, recipient = f recipient, ..}
-  EBReceived{..} -> EBReceived{sender = f <$> sender, recipient = f recipient, ..}
-  VTBundleReceived{..} -> VTBundleReceived{sender = f <$> sender, recipient = f recipient, ..}
-  RBReceived{..} -> RBReceived{sender = f <$> sender, recipient = f recipient, ..}
-  TXReceived{..} -> TXReceived{sender = f <$> sender, recipient = f recipient, ..}
-  IBEnteredState{..} -> IBEnteredState{node = f node, ..}
-  EBEnteredState{..} -> EBEnteredState{node = f node, ..}
-  VTBundleEnteredState{..} -> VTBundleEnteredState{node = f node, ..}
-  RBEnteredState{..} -> RBEnteredState{node = f node, ..}
-  IBGenerated{..} -> IBGenerated{producer = f producer, ..}
-  EBGenerated{..} -> EBGenerated{producer = f producer, ..}
-  RBGenerated{..} -> RBGenerated{producer = f producer, ..}
-  VTBundleGenerated{..} -> VTBundleGenerated{producer = f producer, ..}
-  TXGenerated{..} -> TXGenerated{publisher = f publisher, ..}
 
 expectQuery ::
   Show e =>
