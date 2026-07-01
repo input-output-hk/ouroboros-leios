@@ -135,11 +135,11 @@
     "abstract-set-theory": {
       "flake": false,
       "locked": {
-        "lastModified": 1763124721,
-        "narHash": "sha256-m+1qltoHALohYnPeQPWie93gewuv3NuUByZ0+HN+Qc0=",
+        "lastModified": 1771423838,
+        "narHash": "sha256-IFTHS6C44PHdwYQVWNW/0WZf+3fWtzSfR21c3UmihLU=",
         "owner": "input-output-hk",
         "repo": "agda-sets",
-        "rev": "bc721845dba3208ce0aca59b09242f06d659fd97",
+        "rev": "2253231ad856b9b95f32d6b06709748e59bdbb3e",
         "type": "github"
       },
       "original": {
@@ -151,6 +151,7 @@
     "agda-nix": {
       "inputs": {
         "abstract-set-theory": "abstract-set-theory",
+        "categorical-crypto": "categorical-crypto",
         "flake-utils": "flake-utils_7",
         "iog-prelude": "iog-prelude",
         "nixpkgs": [
@@ -161,11 +162,11 @@
         "standard-library-meta": "standard-library-meta"
       },
       "locked": {
-        "lastModified": 1764061971,
-        "narHash": "sha256-Fmr1f7SEySDRZ9vQa5lzDZOPQj8I+XzYMW2vLxhw9bI=",
+        "lastModified": 1774867665,
+        "narHash": "sha256-gyw9Eu1alpRcG6cMnsZBVKVRjYWQWeILH9S7Qgx5akM=",
         "owner": "input-output-hk",
         "repo": "agda.nix",
-        "rev": "bab6d761051211b8fdb4ee8cd9a0b8369fb0a11d",
+        "rev": "2fc7a81e385d01b30a5df57902f93c46d7d21bff",
         "type": "github"
       },
       "original": {
@@ -660,6 +661,22 @@
       "original": {
         "owner": "input-output-hk",
         "repo": "cardano-shell",
+        "type": "github"
+      }
+    },
+    "categorical-crypto": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1774441400,
+        "narHash": "sha256-t0HXmhW3C4VPkl1IMiwa16lgZVomxuu74O30qwoEeNU=",
+        "owner": "input-output-hk",
+        "repo": "categorical-crypto",
+        "rev": "6cdf63785fb39f5e340240667e7a0c5aed473d90",
+        "type": "github"
+      },
+      "original": {
+        "owner": "input-output-hk",
+        "repo": "categorical-crypto",
         "type": "github"
       }
     },
@@ -2752,11 +2769,11 @@
     "iog-prelude": {
       "flake": false,
       "locked": {
-        "lastModified": 1760101570,
-        "narHash": "sha256-1WS4cx9Qo73rJ4mJxIJ0RFoxQQrvto8kRyC/zrLmFVo=",
+        "lastModified": 1765201741,
+        "narHash": "sha256-xTivBEzcpJBqzdjj+gJqJ7wrEMmh/ZwXRi8h575XPFs=",
         "owner": "input-output-hk",
         "repo": "iog-agda-prelude",
-        "rev": "c6d5b0a46c60680e1ac11cec8b3a7749e9943839",
+        "rev": "e12e69e8cc76cd41d19d0e38a44afa4358969a47",
         "type": "github"
       },
       "original": {
@@ -2998,17 +3015,17 @@
         "nixpkgs": "nixpkgs_5"
       },
       "locked": {
-        "lastModified": 1766065805,
-        "narHash": "sha256-ITk6cNexwieBlDKxbASK4UEKGKfK+xYAOdeytu1G9yA=",
+        "lastModified": 1782914223,
+        "narHash": "sha256-YPcGENKa+b81cXWlLqOc8ik0RkFgA/HtztGTPaVX/zc=",
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "a654a1761476fcf8e6a43aeedbc1455bd7ad77db",
+        "rev": "1f8afb1276183d2cb19bb88e31d0d593dee1ab82",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "a654a1761476fcf8e6a43aeedbc1455bd7ad77db",
+        "rev": "1f8afb1276183d2cb19bb88e31d0d593dee1ab82",
         "type": "github"
       }
     },

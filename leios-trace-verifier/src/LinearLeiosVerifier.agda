@@ -123,6 +123,9 @@ module LinearLeiosVerifier where
                 { numberOfParties   = numberOfParties
                 ; stakeDistribution = exampleDistr
                 }
+          ; Lhdr  = Lhdr
+          ; Lvote = Lvote
+          ; Ldiff = Ldiff
           }
 
       -- EB-production eligibility ("winning") slots for the SUT.  When a
@@ -150,13 +153,7 @@ module LinearLeiosVerifier where
       open import Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
-      splitTxs : List Tx → List Tx × List Tx
-      splitTxs l = [] , l
-
-      validityCheckTime : EndorserBlock → ℕ
-      validityCheckTime eb = validityCheckTimeValue
-
-      open import Leios.Linear.Trace.Verifier d-SpecStructure params Lhdr Lvote Ldiff splitTxs validityCheckTime renaming (verifyTrace to checkTrace)
+      open import Leios.Linear.Trace.Verifier d-SpecStructure params renaming (verifyTrace to checkTrace)
 
       open Params params
       open Types params
@@ -229,19 +226,19 @@ module LinearLeiosVerifier where
         test₁ = refl
 
       -- Negative {EB,VT} event, if there is no {EB,VT}Generated event
-      negative-events-EB : List Blk → Word64 → List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
+      negative-events-EB : List Blk → Word64 → List (Action × (FFDT Out ⊎ BaseAbstract.BaseIOF B' In ⊎ IOT In))
       negative-events-EB l s
         with Any.any? isEB? l
       ... | yes _ = []
       ... | no  _ = (No-EB-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
 
-      negative-events-VT : List Blk → Word64 → List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
+      negative-events-VT : List Blk → Word64 → List (Action × (FFDT Out ⊎ BaseAbstract.BaseIOF B' In ⊎ IOT In))
       negative-events-VT l s
         with Any.any? isVT? l
       ... | yes _ = []
       ... | no  _ = (No-VT-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
 
-      traceEvent→action : Accumulator → TraceEvent → Accumulator × List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
+      traceEvent→action : Accumulator → TraceEvent → Accumulator × List (Action × (FFDT Out ⊎ BaseAbstract.BaseIOF B' In ⊎ IOT In))
       traceEvent→action l record { message = Slot p s }
         with p ≟ SUT
       ... | yes _ =
@@ -289,12 +286,13 @@ module LinearLeiosVerifier where
                    { txs = map primWord64ToNat txs
                    ; announcedEB = nothing -- this is set in EBReceived
                    ; ebCert = unwrap eb >>= λ b → EB-refs l ⁉ BlockRef.id (Endorsement.eb b) >>= λ eb' → return (hash eb')
+                   ; slot = primWord64ToNat s
                    }
         in record l { RB-refs = (i , rb) ∷ RB-refs l } , []
 
       traceEvent→action l record { message = RBReceived s p _ _ i _ }
         with p ≟ SUT | RB-refs l ⁉ i
-      ... | yes _ | just rb = l , (Slot₂-Action (currentSlot l) , inj₂ (inj₁ (BaseT.BASE-LDG (rb ∷ [])))) ∷ []
+      ... | yes _ | just rb = l , (Slot₂-Action (currentSlot l) , inj₂ (inj₁ (BaseAbstract.BASE-LDG (rb ∷ [])))) ∷ []
       ... | _ | _ = l , []
 
       -- TXs

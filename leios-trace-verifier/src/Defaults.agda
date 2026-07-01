@@ -1,26 +1,25 @@
+{-# OPTIONS --safe #-}
 {- Module: Defaults
 
    Concrete instantiation of the Leios 'SpecStructure' obligations used by the
-   trace verifier. Previously the verifier borrowed these from the spec's
-   testing module 'Test.Defaults'; they are provided here directly so the
-   verifier does not depend on a testing module.
+   trace verifier. It mirrors the spec's own 'Test.Defaults' (so the verifier
+   does not depend on a testing module), with one deliberate difference: voting
+   (VT) eligibility follows the deterministic, epoch-fixed committee of CIP-0164
+   computed from the stake distribution, whereas block production (EB) is
+   decided by the 'winning-slots' oracle (the Praos VRF leadership schedule)
+   supplied through 'TestParams'. See 'sortition' below.
 
-   The Leios specification keeps the cryptographic components abstract (it is
-   '--safe', so there is no real VRF/signature/hashing), hence these instances
-   are the canonical concrete choices: hashing is the identity on the relevant
-   payloads, signatures/proofs are the unit type, and eligibility ('sortition')
-   is split by role -- block production (EB) is decided by the 'winning-slots'
-   oracle (the Praos VRF leadership schedule) supplied through 'TestParams',
-   whereas voting (VT) follows the deterministic, epoch-fixed committee of
-   CIP-0164 computed from the stake distribution. The base layer, key
-   registration, FFD and voting functionalities are the minimal implementations
-   the small-step relation needs.
+   The cryptographic components stay abstract (this is '--safe'): hashing is the
+   identity on the relevant payloads, signatures/proofs are the unit type. The
+   base layer is the spec's simple single-producer blockchain machine.
 -}
 
-open import Leios.Prelude
+open import Leios.Prelude hiding (_⊗_)
 open import Leios.Abstract
 open import Leios.Config
 open import Leios.SpecStructure
+open import Blockchain.Safety
+import Blockchain.IsBlockchain
 
 open import Axiom.Set.Properties th
 open import Data.Bool using (if_then_else_)
@@ -33,6 +32,12 @@ open import Relation.Binary.Structures
 
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
+
+open import LibExt
+
+open import CategoricalCrypto using (I ; Machine ; machine-type ; Channel ; _⊗ᵀ_)
+open import CategoricalCrypto.Channel.Core
+open import CategoricalCrypto.Channel.Selection
 
 open Equivalence
 
@@ -59,6 +64,7 @@ d-Abstract =
     ; Vote              = ⊤
     ; vote              = λ _ _ → tt
     ; sign              = λ _ _ → tt
+    ; splitTxs          = λ l → [] , l
     }
 
 open LeiosAbstract d-Abstract public
@@ -68,18 +74,11 @@ open import Leios.VRF d-Abstract public
 sutStake : ℕ
 sutStake = TotalMap.lookup stakeDistribution sutId
 
--- Voting-committee selection (CIP-0164).
---
--- The Leios voting committee is NOT a per-slot VRF lottery.  It is fixed once
--- per epoch, deterministically, from the epoch-boundary stake distribution:
--- order pools by active stake (descending) and accumulate stake until the
--- cumulative coverage reaches the target σc (equivalently, until the
--- truncation error falls below εc = 1 − σc).  That prefix is the committee;
--- every member may vote on every EB of the epoch.
---
--- We fix σc = 99/100 (99% cumulative active-stake coverage), expressed as a
--- rational σc-num / σc-den so the threshold test stays all-naturals (--safe,
--- no floats).
+-- Voting-committee selection (CIP-0164): the committee is fixed once per epoch,
+-- deterministically, from the epoch-boundary stake distribution — order pools
+-- by active stake (descending) and accumulate until the cumulative coverage
+-- reaches the target σc. It is NOT a per-slot VRF lottery. We fix σc = 99/100,
+-- expressed as a rational σc-num / σc-den so the test stays all-naturals.
 σc-num σc-den : ℕ
 σc-num = 99
 σc-den = 100
@@ -92,9 +91,7 @@ totalStake : ℕ
 totalStake = foldr (λ (_ , s) acc → s Nat.+ acc) 0 partyStakes
 
 -- Stake of a pool that strictly precedes the SUT in committee order, else 0.
--- Order is descending stake, ties broken by ascending index (deterministic),
--- so a pool precedes the SUT iff it has more stake, or equal stake and a
--- smaller index.
+-- Order is descending stake, ties broken by ascending index.
 precedingContribution : Fin numberOfParties → ℕ → ℕ
 precedingContribution i s =
   if sutStake Nat.<ᵇ s then s
@@ -108,13 +105,12 @@ precedingStake =
   foldr (λ (i , s) acc → precedingContribution i s Nat.+ acc) 0 partyStakes
 
 -- The SUT is on the committee iff the pools ahead of it have not yet covered
--- the target σc, i.e. precedingStake < σc · totalStake (in all-naturals form,
--- precedingStake · σc-den < totalStake · σc-num).
+-- the target σc, i.e. precedingStake · σc-den < totalStake · σc-num.
 sut-in-committee : Bool
 sut-in-committee = (precedingStake Nat.* σc-den) Nat.<ᵇ (totalStake Nat.* σc-num)
 
--- Eligibility.  Block production (EB) follows the Praos VRF leadership schedule
--- supplied through the 'winning-slots' oracle.  Voting (VT) follows the
+-- Eligibility. Block production (EB) follows the Praos VRF leadership schedule
+-- supplied through the 'winning-slots' oracle. Voting (VT) follows the
 -- deterministic committee above and is independent of the slot.
 sortition : BlockType → ℕ → ℕ
 sortition VT _ = if sut-in-committee then 0 else sutStake
@@ -163,19 +159,102 @@ open import Leios.Base d-Abstract d-VRF public
 d-Base : BaseAbstract
 d-Base =
   record
-    { Cert       = ⊤
-    ; VTy        = ⊤
-    ; initSlot   = λ _ → 0
-    ; V-chkCerts = λ _ _ → true
+    { Cert        = ⊤
+    ; VTy         = ⊤
+    ; initSlot    = λ _ → 0
+    ; V-chkCerts  = λ _ _ → true
+    ; BaseAdv     = I
+    ; BaseMsg     = ⊤
     }
 
-d-BaseFunctionality : BaseAbstract.Functionality d-Base
+d-BaseState : Type
+d-BaseState = List RankingBlock × ℕ
+
+d-BaseChannel : Channel
+d-BaseChannel = BaseNetwork ⊗ᵀ (BaseIO ⊗₀ BaseAdv)
+  where open BaseAbstract d-Base
+
+data d-BaseRel : machine-type d-BaseState d-BaseChannel where
+
+  fetch-blocks :
+    ∀ blocks slot →
+      d-BaseRel
+        (blocks , slot)
+        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-LDG)
+        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks))
+        (blocks , slot)
+
+  fetch-slot :
+    ∀ blocks slot →
+      d-BaseRel
+        (blocks , slot)
+        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-SLOT)
+        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot))
+        (blocks , slot)
+
+open Blockchain.IsBlockchain (Fin 1)
+
+helper : BlockChainInfo RankingBlock → BaseAbstract.BaseIOF d-Base CategoricalCrypto.Out
+helper = let open BaseAbstract.BaseIOF in λ where
+  Chain → FTCH-LDG
+  Slot  → FTCH-SLOT
+
+private
+  open BaseAbstract.BaseIOF
+
+  opaque
+    unfolding _⊗₀_
+
+    correctness-chain : ∀ {s response' s'}
+      → d-BaseRel s (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG) response' s'
+      → ∃ λ response → response' ≡ just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BASE-LDG response)
+    correctness-chain (fetch-blocks blocks _) = blocks , refl
+
+    correctness-slot : ∀ {s response' s'}
+      → d-BaseRel s (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-SLOT) response' s'
+      → ∃ λ response → response' ≡ just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ SLOT response)
+    correctness-slot (fetch-slot _ slot) = slot , refl
+
+    isPure-chain : ∀ {s response' s'}
+      → d-BaseRel s (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG) response' s'
+      → s ≡ s'
+    isPure-chain (fetch-blocks _ _) = refl
+
+    isPure-slot : ∀ {s response' s'}
+      → d-BaseRel s (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-SLOT) response' s'
+      → s ≡ s'
+    isPure-slot (fetch-slot _ _) = refl
+
+d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
 d-BaseFunctionality =
   record
-    { State         = ⊤
-    ; _-⟦_/_⟧⇀_     = λ _ _ _ _ → ⊤
-    ; SUBMIT-total  = tt , tt
-    ; FTCH-total    = [] , tt , tt
+    { n = 1
+    ; m =
+        record
+          { State = (List RankingBlock × ℕ)
+          ; stepRel = d-BaseRel
+          }
+    ; is-blockchain = let open BaseAbstract.BaseIOF in
+        record
+          { isConstrained =
+              record
+                { queryI = (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ_) ∘ helper
+                ; queryO = λ where
+                    {Chain} rankingBlocks → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BASE-LDG rankingBlocks
+                    {Slot}  slot          → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ SLOT slot
+                ; correctness = λ where
+                    {Chain} → correctness-chain
+                    {Slot}  → correctness-slot
+                ; completeness = λ where
+                    {Chain} {blocks , slot} → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks , (blocks , slot) , fetch-blocks blocks slot
+                    {Slot}  {blocks , slot} → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT     slot   , (blocks , slot) , fetch-slot   blocks slot
+                }
+          ; isPure = λ where
+              Chain → isPure-chain
+              Slot  → isPure-slot
+          ; producer = λ _ → Fin.zero
+          ; slotOf   = λ _ → 0
+          }
     }
 
 open import Leios.FFD public
@@ -283,10 +362,10 @@ d-SpecStructure = record
       ; pk-EB                     = sutId , tt
       ; pk-VT                     = sutId , tt
       ; B'                        = d-Base
-      ; BF                        = d-BaseFunctionality
-      ; initBaseState             = tt
+      ; BM                        = d-BaseFunctionality
       ; K'                        = d-KeyRegistration
       ; KF                        = d-KeyRegistrationFunctionality
       ; va                        = d-VotingAbstract
       ; getEBCert                 = λ _ → []
+      ; validityCheckTime         = λ _ → 4
       }

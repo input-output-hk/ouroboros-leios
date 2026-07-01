@@ -16,6 +16,7 @@
 module Main where
 
 import ChainEvents (ChainEvent (..), parseNodeLog)
+import Control.Monad (when)
 import Data.ByteString.Lazy as BSL
 import Data.Yaml (FromJSON, decodeEither')
 import LeadershipSchedule (setLeadershipSchedule)
@@ -30,7 +31,7 @@ import qualified Data.ByteString.Char8 as BSC (pack)
 import qualified Data.List as List (findIndex)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified Data.Text as T (Text, pack, unpack)
+import qualified Data.Text as T (Text, drop, dropWhile, isInfixOf, pack, takeWhile, unpack)
 
 -- | Run the CLI: query the chain, then stream-verify the trace from stdin.
 main :: IO ()
@@ -46,7 +47,9 @@ main = do
   hPutStrLn stderr $
     "From chain: "
       <> show (Prelude.length cdWinningSlots)
-      <> " winning slots, "
+      <> " winning slots "
+      <> show cdWinningSlots
+      <> ", "
       <> show cdNumParties
       <> " parties, SUT at index "
       <> show cdSutIndex
@@ -60,37 +63,68 @@ main = do
 -- | Consume the node.log lazily from stdin, parse it into Leios 'ChainEvent's,
 --   and re-verify the accumulated prefix at every slot boundary (each
 --   'CSlot'), stopping at the first prefix the formal spec rejects.
-runStreaming :: ([ChainEvent] -> (Integer, (T.Text, T.Text))) -> IO ()
+runStreaming :: ([ChainEvent] -> ([T.Text], (T.Text, T.Text))) -> IO ()
 runStreaming verify =
   do
     hSetBuffering stdout LineBuffering
     evs <- parseNodeLog <$> BSL.getContents
-    go [] evs
+    -- A fresh node.log begins with a long sync/replay phase whose Leios events
+    -- (vote/block acquisitions for the chain history) precede the node's first
+    -- leadership-check slot. They are not part of live per-slot behaviour, so
+    -- skip everything up to the first slot tick rather than flooding output.
+    let (preSlot, rest) = Prelude.break isCSlot evs
+    hPutStrLn stderr $
+      "skipped "
+        <> show (Prelude.length preSlot)
+        <> " pre-slot events (node sync/replay backlog, before the first leadership-check slot)"
+    case rest of
+      [] -> hPutStrLn stderr "no leadership-check slot found in input — nothing to verify"
+      (CSlot s : _) -> hPutStrLn stderr $ "verifying from first leadership-check slot " <> show s
+      (ev : _) -> hPutStrLn stderr $ "verifying from " <> show ev
+    go [] rest
  where
   go :: [ChainEvent] -> [ChainEvent] -> IO ()
   go seen [] = finish (Prelude.reverse seen)
-  go seen (ev : rest)
-    | isCSlot ev = checkpoint (Prelude.reverse seen') >> go seen' rest
-    | otherwise = go seen' rest
+  go seen (ev : rest) =
+    do
+      hPutStrLn stderr $ "event: " <> show ev
+      if isCSlot ev
+        then checkpoint (Prelude.reverse seen') >> go seen' rest
+        else go seen' rest
    where
     seen' = ev : seen
   checkpoint prefix =
-    let (nActs, (status, detail)) = verify prefix
+    let (acts, (status, detail)) = verify prefix
      in if status == "ok"
           then
             hPutStrLn stderr $
-              "ok @ " <> show (Prelude.length prefix) <> " events, " <> show nActs <> " actions"
-          else failOut prefix status detail
+              "ok @ " <> show (Prelude.length prefix) <> " events, " <> show (Prelude.length acts) <> " actions"
+          else failOut prefix acts status detail
   finish prefix =
-    let (_, (status, detail)) = verify prefix
+    let (acts, (status, detail)) = verify prefix
      in if status == "ok"
-          then hPutStrLn stderr "stream ended: ok"
-          else failOut prefix status detail
-  failOut prefix status detail =
+          then hPutStrLn stderr "stream ended: ok" >> printActions acts
+          else failOut prefix acts status detail
+  printActions = mapM_ (\a -> hPutStrLn stderr ("  action: " <> T.unpack a))
+  -- The slot an action or error status belongs to: the leading token of the
+  -- status ("<slot> : Err-…"), or the token after the first '@' of an action
+  -- ("VT-Role@<slot> …").
+  slotOfAction a = T.takeWhile (/= ' ') (T.drop 1 (T.dropWhile (/= '@') a))
+  failOut prefix acts status detail =
     do
       hPutStrLn stderr $
         "VIOLATION after " <> show (Prelude.length prefix) <> " events: " <> T.unpack status
       hPutStrLn stderr $ T.unpack detail
+      -- Err-Invalid is the spec's generic catch-all with no detail; explain it.
+      when ("Err-Invalid" `T.isInfixOf` status) $
+        hPutStrLn stderr $
+          "  (Err-Invalid: a No-EB-Role/No-VT-Role abstention was rejected — the spec "
+            <> "permits abstaining only when the role cannot be performed this slot. "
+            <> "Under the exact-offset spec a vote is mandated at slotNumber(eb) + "
+            <> "validityCheckTime; the vote-window spec relaxes this.)"
+      -- Only the actions in the failing slot.
+      let failSlot = T.takeWhile (/= ' ') status
+      printActions (Prelude.filter ((== failSlot) . slotOfAction) acts)
       exitFailure
 
 -- | True iff the event is a slot tick (used as a re-verification checkpoint).

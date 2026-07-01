@@ -25,7 +25,7 @@
     iogx.inputs.haskell-nix.url = "github:input-output-hk/haskell.nix/ef52c36b9835c77a255befe2a20075ba71e3bfab";
     iogx.inputs.haskell-nix.inputs.hackage.url = "github:input-output-hk/hackage.nix/06fa3e96f4d7ced3496ec984c8016aad5282db67";
 
-    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=a654a1761476fcf8e6a43aeedbc1455bd7ad77db";
+    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=1f8afb1276183d2cb19bb88e31d0d593dee1ab82";
 
     flake-parts.url = "github:hercules-ci/flake-parts";
 

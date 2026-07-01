@@ -97,6 +97,9 @@ module LinearLeiosVerifierChain where
                 { numberOfParties   = numberOfParties
                 ; stakeDistribution = exampleDistr
                 }
+          ; Lhdr  = Lhdr
+          ; Lvote = Lvote
+          ; Ldiff = Ldiff
           }
 
       -- EB-production eligibility comes from the leadership schedule (queried from
@@ -114,13 +117,7 @@ module LinearLeiosVerifierChain where
       open import Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
-      splitTxs : List Tx → List Tx × List Tx
-      splitTxs l = [] , l
-
-      validityCheckTime : EndorserBlock → ℕ
-      validityCheckTime eb = validityCheckTimeValue
-
-      open import Leios.Linear.Trace.Verifier d-SpecStructure params Lhdr Lvote Ldiff splitTxs validityCheckTime renaming (verifyTrace to checkTrace)
+      open import Leios.Linear.Trace.Verifier d-SpecStructure params renaming (verifyTrace to checkTrace)
 
       open Params params
       open Types params
@@ -179,7 +176,7 @@ module LinearLeiosVerifierChain where
       blksToHeaderAndBodyList (VT-Blk vt ∷ l) = inj₁ (GenFFD.vtHeader vt) ∷ blksToHeaderAndBodyList l
       blksToHeaderAndBodyList (RB-Blk _ ∷ l)  = blksToHeaderAndBodyList l
 
-      Step = Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In)
+      Step = Action × (FFDT Out ⊎ BaseAbstract.BaseIOF B' In ⊎ IOT In)
 
       -- Hash of the EB registered under a given hash-string (identity on payload,
       -- see Defaults); [] if unknown.
@@ -196,8 +193,8 @@ module LinearLeiosVerifierChain where
             annRB = case curEB a of λ where
               nothing  → []
               (just h) →
-                (Slot₂-Action s , inj₂ (inj₁ (BaseT.BASE-LDG
-                  (record { txs = [] ; announcedEB = just (hashOf a h) ; ebCert = nothing } ∷ [])))) ∷ []
+                (Slot₂-Action s , inj₂ (inj₁ (BaseAbstract.BASE-LDG
+                  (record { txs = [] ; announcedEB = just (hashOf a h) ; ebCert = nothing ; slot = s } ∷ [])))) ∷ []
             ebRole : List Step
             ebRole = case forgedEB a of λ where
               (just eb) → (EB-Role-Action s eb , inj₁ FFDT.SLOT) ∷ []
@@ -247,6 +244,17 @@ module LinearLeiosVerifierChain where
       format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
       format-error x = errorMsg x , "error verifyChainTrace"
 
+      showAction : Action → String
+      showAction (EB-Role-Action n _)     = "EB-Role@"    ◇ show n
+      showAction (VT-Role-Action n eb s') = "VT-Role@"    ◇ show n ◇ " eb@" ◇ show (slotNumber eb) ◇ " recv@" ◇ show s'
+      showAction (No-EB-Role-Action n)    = "No-EB-Role@" ◇ show n
+      showAction (No-VT-Role-Action n)    = "No-VT-Role@" ◇ show n
+      showAction (Slot₁-Action n)         = "Slot1@"      ◇ show n
+      showAction (Slot₂-Action n)         = "Slot2@"      ◇ show n
+      showAction (Base₁-Action n)         = "Base1@"      ◇ show n
+      showAction (Base₂-Action n)         = "Base2@"      ◇ show n
+      showAction (Ftch-Action n)          = "Ftch@"       ◇ show n
+
       n₀ : ℕ → Accumulator
       n₀ st = record
         { EB-refs = [] ; EB-received = [] ; FFD-blks = [] ; curSlot = st
@@ -255,13 +263,15 @@ module LinearLeiosVerifierChain where
       opaque
         unfolding List-Model
 
-        verifyChainTrace' : LeiosState → Pair ℕ (Pair String String)
+        verifyChainTrace' : LeiosState → Pair (List String) (Pair String String)
         verifyChainTrace' s =
           let (aFinal , l') = mapAccuml traceEvent→action (n₀ (LeiosState.slot s)) l
               final = if started aFinal then closeSlot aFinal else []
-              αs = L.reverse (L.concat l' ++ final)
+              chron = L.concat l' ++ final
+              αs = L.reverse chron
               tr = checkTrace αs s
-          in L.length αs , result (λ _ → ("ok" , "")) format-error tr
+              acts = L.map (λ a → showAction (proj₁ a)) chron
+          in acts , result (λ _ → ("ok" , "")) format-error tr
           where
             mapAccuml : {A B St : Set} → (St → A → St × B) → St → List A → St × List B
             mapAccuml f st []       = st , []
@@ -274,6 +284,6 @@ module LinearLeiosVerifierChain where
             result f g (Ok x) = f x
             result f g (Err x) = g x
 
-        verifyChainTraceFromSlot : ℕ → Pair ℕ (Pair String String)
+        verifyChainTraceFromSlot : ℕ → Pair (List String) (Pair String String)
         verifyChainTraceFromSlot n = verifyChainTrace' (record s₀ { slot = n })
         {-# COMPILE GHC verifyChainTraceFromSlot as verifyChainTraceFromSlot #-}
