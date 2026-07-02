@@ -552,31 +552,50 @@ The first version of the Mempool can be naive, with the block production thread 
 
 > [!WARNING]
 >
-> TODO: Write about announcements and equivocation detection (here or dedicated section?)
->  - announcement = signed (praos or eb?) headers, either way must include praos header hash (anchor to the chain)
->  - how to do EB equivocation detection
->
-> FIXME: write about offering and fetching of bodies and txs
 > FIXME: what kind of validation while diffusing (only size and hash checks)
->
-> TODO: write about "which EB to prioritize" -> freshest first (protocol burst) vs. oldest (protocol storm) etc.
-> TODO: write about "which peer to fetch from" -> everything from one big ledger peer, round robin from all peers? 
->
-> FIXME: at least put a naiive design (fetch freshest from everyone that offers) - safe but wasteful
 
 - **REQ-DiffuseLeiosBlocks** The node must acquire and diffuse EBs and their closures (via the Network layer's new mini-protocols, see below).
 
-To satisfy **REQ-PrioritizeFreshOverStaleLeios** (freshest-first delivery), the Consensus layer must implement fetch decision logic (**NEW-LeiosFetchDecisionLogic**) that prioritizes younger EBs over older ones. This logic determines which EBs to request from which peers.
+#### The crucial attack vector
+
+[Threat vector #22](../threat-model.md#data-withholding) forces this decision logic to aggressively issue hedge requests.
+The T22 attack is only mitigated if the network reliably diffuses the EB from the ~25% of stake that is honest, already has the EB, and might be geographically concentrated (for example, in Europe) to the rest of the honest stake spread around the globe in less than approximately $L_\text{diff}+\Delta$. With typical parameter values, that's 7 + 5 = 12 seconds.
+Because of the unavoidably high RTTs across the global spans, the widespread convention of packet loss as a congestion signal, and the severe consequences of loss in the prevailing TCP's CUBIC/etc congestion avoidance algorithms, that 12 seconds does not include much slack for transporting payloads upwards of 12 MB over public Internet infrastructure while tolerating a large number (but < 100%) of potentially adversarial peers.
+Moreover, Leios traffic is inherently bursty, so the common convention of resetting the congestion window during idle periods additionally reduces goodput.
+(BBR might outperform CUBIC/etc, but not by a whole order of magnitude, and BBR also carries its own risks.)
+
+Because the deadline is tight and adversarial peers can appear to be strong honest peers before an abrupt betrayal, timeouts are insufficient.
+No timeout will both robustly prevent a _slow loris_ attacker from wasting a problematic portion of the $L_\text{diff}+\Delta$ budget and also robustly avoid false alarms: over the public Internet, distant peers, even if honest, will exhibit unpredictable changes in RTT and/or goodput performance.
+For similar reasons, any fetching policy that relies on _promptly_ reacting to peer responsiveness is inapplicable.
+
+The only robust mechanism is to leverage multiple peers simultaneously, akin to _hedge requests_, popularized by _The Tail at Scale_ (CACM 2013), but maybe even issuing the hedge requests without waiting for a (robust) signal that they're actually necessary.
+Timeouts alone are insufficient but still worthwhile, only for the sake of reclaiming resources from an entirely unresponsive peer on a reasonable time scale---not as a means to reactively minimize the latency of an inflight payload.
+
+In particular, the fetch decision logic will leverage the fact that each of its stake-sampled peers has a ≥25% probability of having T22's EB no later than the start of the $L_\text{diff}+\Delta$ duration.
+Each Cardano node maintains 5 stake-sampled upstream peers (a.k.a. "big ledger peers") (TODO confirm).
+These peers are subject to churn, which means the peers that have survived churn are not _independent_ samples of the pools.
+However, at least one of them is independent: the one sampled at the latest churn.
+A pool's block-producing node (which is also where Leios votes originate) should be running behind _at least_ 3 relays (TODO confirm).
+So, in total, a block-producing node is effectively one hop away from 15 stake-sampled peers and at least 3 of those samples are independent.
+Thus, each honest pool endangered by a T22 attack has _at least_ a 1 - (1 - 25%)^3 = 57.8% probability of being just one hop away from the certified EB at the start of the $L_\text{diff}+\Delta$ duration.
+(TODO the Fetch logic can and should give special treatment to a block-producer's own relays: they'll have a good connection and they're _trustworthy_.
+Also, the relay can start serving downstream peers even before its block-producer finishes downloading.
+Together, these justify not counting it as a "hop".)
+
+- Because the maximum pool size is 0.2% stake (i.e. `nOpt` is 500), all of those requests will be spread across more than a hundred pools (i.e. many hundreds of relays) rather than bottlenecking.
+- After that one hop, the probability of being merely one more hop away compounds; that snowball effect lets the EB diffuse within a few hops, which makes it plausible for the EB to reliably diffuse before $L_\text{diff}+\Delta$.
+
+For the sake of the LeiosFetch decision logic, the key observation is that having connections to those upstream peers is only useful if the logic actually utilizes them.
+The LeiosFetch decision logic thus requests all desired data from every stake-sampled peer that offers it, with no effort at avoiding redundant downloads among them.
+This is the only way to robustly prevent a slow loris attacker from wasting some of the precious latency budget.
+
+FIXME-NEXT spell out the downside of the above: redundant fetches. Mention best-effort cancels as
+
+FIXME-NEXT and then explain how peersharing-sampled peers are treated (bounded outstanding bytes ~1 MB with request priority = rarest-first); the segue way is that _within a continent/neighboorhood_ one fast peer might enable a lot of intercontinental cancels to land.
+
+----- END OF REWRITE SO FAR -----
 
 Even the first version of LeiosFetch decision logic should consider EBs that are certified on peers' ChainSync candidates as available for request, as if that peer had sent both MsgLeiosBlockOffer and MsgLeiosBlockTxsOffer. A MsgRollForward implies the peer has selected the block, and the peer couldn't do that for a CertRB if it didn't already have its closure. (TODO: link to chain selection where this is relied upon)
-
-> [!WARNING]
->
-> TODO: Discuss fetch decision logic for caught-up vs bulk syncing nodes, conservative pipelining depths, server-side reordering options.
->  - fetch range via points -> refer to catching up section
-> TODO: what about newly synced nodes that need to acquire all EBs up to the immutable tip, how?
->  - might demand a different mini-protocol design
->  - query points of volatile suffix and request missing subset of it (like tx submission for the mempool)
 
 The first version of LeiosFetch client can assemble the EB closure entirely on disk, one transaction at a time. A second version might want to batch the writes in a pinned mutable `ByteArray` and use `withMutableByteArrayContents` and `hPutBuf` to flush each batch. Again, the possible benefit of this low-level shape would be to avoid useless GC pressure. The first version can wait for all transactions before starting to validate any. A later version could eagerly validate as the prefix arrives—comparable to eliminating one hop in the topology, in the worst-case scenario.
 
