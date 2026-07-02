@@ -185,9 +185,9 @@ For an EB with $n$ transaction refereneces, the node fetches all missing transac
 
 Each transaction is a cache hit with rate $p$, or a miss in the TxCache with probability $1 - p$. Again using a mixture model, the CDF for a single transaction is:
 
-$$F_{\text{single}}(t) = \omega_1 \cdot F_{\text{hit}}(t) + \omega_2 \cdot F_{\text{miss}}(t)$$
+$$F_{\text{single}}(t) = \pi_2 \cdot F_{\text{hit}}(t) + \pi_1 \cdot F_{\text{miss}}(t)$$
 
-Here $F_{\text{hit}}(t)$ models a cache lookup as a small constant delay, and $F_{\text{miss}}(t)$ models a network fetch using the Praos diffusion model. The weights $\omega_1$ and $\omega_2$ are steady-state hit and miss rates from a Markov chain, so that the mixture reflects the long-run fraction of transactions handled by each path.
+Here $F_{\text{hit}}(t)$ models a cache lookup as a small constant delay, and $F_{\text{miss}}(t)$ models a network fetch using the Praos diffusion model. The weights $\pi_2$ and $\pi_1$ are steady-state hit and miss rates from a Markov chain, so that the mixture reflects the long-run fraction of transactions handled by each path.
 
 When an EB carries $n$ transactions fetched in parallel, the batch completes when the last one finishes. Since all $n$ transactions must complete by time $t$, the batch CDF is:
 
