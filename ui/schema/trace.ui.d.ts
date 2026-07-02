@@ -84,7 +84,14 @@ export interface UIEBGenerated {
   id: string;
   slot: number;
   producer: string;
+  /** On-wire size of the EB body — the (txHash, txSize) table peers pull
+   *  before fetching the referenced txs. Prototype 'ebSize' on
+   *  `LeiosBlockForged`. */
   size_bytes: number;
+  /** Sum of the referenced txs' byte sizes — how much a peer has to
+   *  download to reconstruct the EB's tx closure. Prototype
+   *  'closureSize' on `LeiosBlockForged`; absent on simulator traces. */
+  closure_size_bytes?: number;
 }
 
 /** Vote-generation event. `VTBundleGenerated` is the simulator name;

@@ -112,6 +112,11 @@ export const ChainDetailsPanel: FC = () => {
           <Row label="Slot">{data.eb.slot}</Row>
           <Row label="Producer">{data.eb.producer}</Row>
           <Row label="Size">{printBytes(data.eb.sizeBytes)}</Row>
+          {data.eb.closureSizeBytes !== undefined ? (
+            <Row label="Closure size">
+              {printBytes(data.eb.closureSizeBytes)}
+            </Row>
+          ) : null}
           <Row label="Votes">{data.eb.votes?.length ?? 0}</Row>
           <Row label="Vote weight">
             {data.eb.voteCount !== undefined

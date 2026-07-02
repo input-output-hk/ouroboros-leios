@@ -283,6 +283,7 @@ const parseEndorserBlockGenerated = (
         slot: log.slot,
         producer: streamLabels.process,
         size_bytes: log.ebSize,
+        closure_size_bytes: log.closureSize,
       };
 
       return { time_s: timestamp, message };
