@@ -429,17 +429,17 @@ The [prototyping and adversarial testing](#prototyping-and-adversarial-testing) 
 
 ## Architecture
 
-While being a significant change to the consensus protocol, Leios does not require fundamental changes to the overall architecture of the `cardano-node`. Several new components will be needed for the new responsibilities related to producing and relaying Endorser Blocks (EBs) and voting on them, as well as changes to existing components to support higher throughput and freshest-first-delivery. The following diagram illustrates the key components of a relay node where new and updated components are marked in purple:
+While being a significant change to the consensus protocol, Leios does not require fundamental changes to the overall architecture of the `cardano-node`. Several new components will be needed for the new responsibilities related to producing and relaying Endorser Blocks (EBs) and voting on them, as well as changes to existing components to support higher throughput and freshest-first-delivery. The following diagram illustrates the key components where new and updated components are marked in purple:
 
 > [!WARNING]
 >
 > TODO: Should consider adding Leios prefixes to VoteStore (to not confuse with PerasVoteDB), i.e. LeiosVoteDB?
 
-![](./relay-leios-component-diagram.svg)
+![](./leios-changes-component-diagram.svg)
 
 > [!WARNING]
 >
-> TODO: Explain why focus on relay node (upstream/downstream relationship); briefly mention block producer node differences; Add similar diagram for block producer? block and vote production not shown in relay diagram
+> TODO: Give an overview of the diagram and link to later sections for details
 
 ## Resource management
 
