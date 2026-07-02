@@ -37,12 +37,34 @@ common globalOptions
         -Wno-overlapping-patterns
         -Wunused-packages
 
+-- File-based verifier: reads topology, config and trace from files. No
+-- cardano-api dependency.
 executable linear-leios-trace-verifier
     import: globalOptions
     main-is: app/linear/Main.hs
     build-depends:
       , base
       , bytestring
+      , containers
+      , leios-trace-hs
+      , optparse-applicative
+      , text
+      , trace-parser
+      , yaml
+
+    default-language: Haskell2010
+    ghc-options:      -Wall -Werror -rtsopts
+
+-- Chain-based verifier: streams the trace from stdin and sources the SUT's
+-- leadership schedule and the stake distribution from a running node via the
+-- cardano-api.
+executable linear-leios-trace-verifier-chain
+    import: globalOptions
+    main-is: app/linear-chain/Main.hs
+    build-depends:
+      , base
+      , bytestring
+      , cardano-api
       , containers
       , leios-trace-hs
       , optparse-applicative
@@ -85,6 +107,7 @@ library
     hs-source-dirs: src
     exposed-modules:
       LinearLeiosLib
+      LeadershipSchedule
     build-depends:
       , base
       , bytestring
