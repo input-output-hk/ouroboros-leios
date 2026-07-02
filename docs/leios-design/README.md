@@ -550,10 +550,6 @@ The first version of the Mempool can be naive, with the block production thread 
 
 ![](./fetching-chain-selection-component-diagram.svg)
 
-> [!WARNING]
->
-> FIXME: what kind of validation while diffusing (only size and hash checks)
-
 - **REQ-DiffuseLeiosBlocks** The node must acquire and diffuse EBs and their closures (via the Network layer's new mini-protocols, see below).
 
 #### The crucial attack vector
@@ -694,6 +690,53 @@ TODO
 - > The first version of LeiosFetch server simply pulls serialized transactions from the LeiosEbStore, and only sends notifications to peers that are already expecting them when the noteworthy event happens. If notification requests and responses are decoupled in a separate mini protocol _or else_ requests can be reordered (TODO or every other request supports a "MsgOutOfOrderNotificationX" loopback alternative?), then it'll be trivial for the client to always maintain a significant buffer of outstanding notification requests.
 - That's only true if there is never _any budget whatsoever_ on outstanding requests.
   Otherwise, merely relaying the announcement would cause the upstream peer to consume some of its budget even for EBs it can't serve (since we send requests without waiting for offers).
+
+#### Bounding incoming messages
+
+As mentioned for offers in the previous section, the node must be able to detect junk/excessive messages from its peers (**NEW-LeiosIncomingMessageBounds**).
+Otherwise, there would be trivial Denial-of-Service attack vectors.
+
+In the current design, upstream peers send the following messages for EB diffusion.
+
+- An _announcement_ from this peer causes disconnection when any of the following hold.
+    - This peer has already sent an announcement for this election (even if it's the same announcement).
+      Call this trigger AnnDup for reference below.
+    - The announcement has an invalid signature (TODO the dangling opcert challenge).
+    - The announcement has an invalid election proof (i.e. VRF proof).
+    - The contained Praos header doesn't actually announce an EB.
+    - The announcement's EB size and/or EB closure size is too great.
+    - The announcement's election is more than 5 minutes old; honest servers will skip relaying announcements older than 4 minutes and the extra 1 minute accommodates clock skew.
+- An _equivocation proof with one announcement_ from this peer causes disconnection when any of the following hold.
+    - This peer has not already sent a different announcement for this same election.
+    - The announcement is invalid (see first list item above, except for AnnDup).
+- An _equivocation proof with two announcements_ from this peer causes disconnection when any of the following hold.
+    - This peer has already sent an announcement for this election (even if it's the same as one of these two announcements).
+    - These two announcements are for different elections.
+    - Either announcement is invalid (see first list item above, except for AnnDup).
+- An _offer_ from this peer causes disconnection when any of the following hold.
+    - The same content has already been offered by this peer.
+    - The offered EB has not already been announced by this peer.
+    - The offered EB has been announced by this peer but its (youngest) announcement is more than 10 minutes older than the local immutable tip; honest servers won't offer anything older than their immutable tip, and 10 minutes accommodates potential disagreements on what's immutable---unless the upstream is a syncing node, which also justifies a disconnect.
+      (A syncing honest node won't request notifications until its caught-up; see "Catching up" below.)
+- An _EB body_ from this peer causes disconnection when any of the following hold.
+    - The node didn't send a request for (this copy of) it from this peer.
+    - Its contents do not match the hash and size listed in the announcement.
+- An _EB closure portion_ from this peer causes disconnection when any of the following hold.
+    - The node didn't send a request for (this copy of) it from this peer.
+    - Its contents do not match the full hashes and sizes listed in the EB body for the transactions we requested.
+
+In the current design, downstream peers send the following messages for EB diffusion.
+
+- A _notification request_ causes disconnection when any of the following hold.
+    - 300 < RN - SN, where RN is the number of notification requests we've received from this peer and SN is the number of notifications (announcements/equivocation proofs/offers) we've sent this peer.
+- An _EB body request_ causes disconnection when any of the following hold.
+    - The node doesn't currently have that EB body in our Leios storage.
+    - (Rate-limit is handled outside the node, e.g. `fail2ban`.)
+- An _EB closure portion request_ causes disconnection when any of the following hold.
+    - The node doesn't currently have that EB closure portion in our Leios storage.
+    - (Rate-limit is handled outside the node, e.g. `fail2ban`.)
+- TODO how would cancellations be handled?
+  Especially since they could arrive after we sent our reply :grimace:
 
 ### Endorser block storage
 
