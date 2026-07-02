@@ -548,6 +548,8 @@ The first version of the Mempool can be naive, with the block production thread 
 
 ### Endorser block diffusion
 
+![](./fetching-chain-selection-component-diagram.svg)
+
 > [!WARNING]
 >
 > TODO: Write about announcements and equivocation detection (here or dedicated section?)
