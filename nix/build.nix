@@ -1,14 +1,24 @@
-# NOTE(bladyjoker): Removing the hydraJobs from iogx to produce it generically for the entire flake after
-{ inputs, config, ... }:
+{ inputs, ... }:
 {
-  flake = builtins.removeAttrs (inputs.iogx.lib.mkFlake {
-
-    inherit inputs;
-
-    repoRoot = ./..;
-
-    outputs = import ./outputs.nix;
-
-    inherit (config) systems;
-  }) [ "hydraJobs" ];
+  perSystem =
+    {
+      pkgs,
+      system,
+      lib,
+      ...
+    }:
+    let
+      agda = import ./agda.nix {
+        inherit
+          pkgs
+          inputs
+          system
+          lib
+          ;
+      };
+      artifacts = import ./artifacts.nix { inherit pkgs; };
+    in
+    {
+      packages = agda // artifacts;
+    };
 }
