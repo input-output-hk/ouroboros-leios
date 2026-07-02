@@ -48,7 +48,12 @@ export interface IChainEB {
   id: string;
   slot: number;
   producer: string;
+  /** On-wire size of the EB body (hash + size table). */
   sizeBytes: number;
+  /** Sum of the referenced txs' bytes — the full tx closure a peer must
+   *  fetch to reconstruct the EB. Prototype only; absent for simulator
+   *  traces. */
+  closureSizeBytes?: number;
   /** Sum of `Vote.weight` (stake fraction) for votes credited to this EB.
    *  For sources without per-vote weight, contributions are 1 per vote. */
   voteCount?: number;

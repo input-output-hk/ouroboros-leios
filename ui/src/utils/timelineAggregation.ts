@@ -495,6 +495,7 @@ export const computeAggregatedDataAtTime = (
             slot: message.slot,
             producer: message.producer,
             sizeBytes: message.size_bytes,
+            closureSizeBytes: message.closure_size_bytes,
           });
         }
 
@@ -839,6 +840,7 @@ export const buildChainAtTime = (
           slot: message.slot,
           producer: message.producer,
           sizeBytes: message.size_bytes,
+          closureSizeBytes: message.closure_size_bytes,
         });
       }
     } else if (message.type === EServerMessageType.VotesGenerated) {
