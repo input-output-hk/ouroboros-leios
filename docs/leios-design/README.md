@@ -625,6 +625,8 @@ The first version of LeiosTxCache should reliably cache all relevant transaction
 
 ### Voting and certification
 
+![](./voting-component-diagram.svg)
+
 > [!WARNING]
 >
 > FIXME: Discuss which committee to determine eligibility and validity of votes? refer to commitee selection in ledger chapter
