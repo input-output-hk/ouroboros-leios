@@ -1,0 +1,3091 @@
+{
+  "domains": {
+    "vbWxN6NHOo2Qzqa6rako": {
+      "id": "vbWxN6NHOo2Qzqa6rako",
+      "name": "Cardano"
+    }
+  },
+  "flows": {},
+  "modelConnections": {
+    "dJxmKrkZH6unIIufGPrH": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "dJxmKrkZH6unIIufGPrH",
+      "name": "Stores non equivocated points",
+      "originId": "ZGkE9sAjiE09XNPkmrgY",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "l0PPEfAEatdPsLrpbhDV",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "L6TxsRkJ6qpRPsmHYksq": {
+      "description": "**Not individually, but in batches / for certain voting rounds.**",
+      "direction": "outgoing",
+      "id": "L6TxsRkJ6qpRPsmHYksq",
+      "name": "Requests votes",
+      "originId": "zRLK7VIQ23TwXHETr4k0",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "ohcJKX2gLrEIfngEFzQw",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "4DYtgBglkqPS1rR8AJJr": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "4DYtgBglkqPS1rR8AJJr",
+      "name": "Reads blocks from",
+      "originId": "TfoJOGd1uAiaVbF4iQMY",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ayWS3CpGe5RwcIJavTia",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "nZZ5O5695djV6D5l2svo": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "nZZ5O5695djV6D5l2svo",
+      "name": "UTXO-RPC",
+      "originId": "9CSxr9Zaild1dCBxv4Rp",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "qViLKe2NHItbco4rSe5u",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "wxzwtfhtu8LnatOuPGDB": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "wxzwtfhtu8LnatOuPGDB",
+      "name": "Connects To",
+      "originId": "qViLKe2NHItbco4rSe5u",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ohcJKX2gLrEIfngEFzQw",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "TsjALdrkTucXEJwz4UYv": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "TsjALdrkTucXEJwz4UYv",
+      "name": "Sets peer targets",
+      "originId": "mj9n1n0FPKRq4Un4mf7v",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "2GVjNOnyqUvHs0u5d57s",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "GeDnhiXHal08JSQQjE6m": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "GeDnhiXHal08JSQQjE6m",
+      "name": "N2C",
+      "originId": "8RL1VwYMmOuQuoU3dnVC",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "qViLKe2NHItbco4rSe5u",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "bmNXgbwgtJEl6DPGWItn": {
+      "description": "Via ChainDbView",
+      "direction": "outgoing",
+      "id": "bmNXgbwgtJEl6DPGWItn",
+      "name": "Gets current chain and block header history",
+      "originId": "EFYoz6hCZ7dA7f3w6OUM",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ayWS3CpGe5RwcIJavTia",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "3FQvNuobjt5DfjdvH76L": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "3FQvNuobjt5DfjdvH76L",
+      "name": "Requests transactions",
+      "originId": "ohcJKX2gLrEIfngEFzQw",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "0OZMOOyLNG8ZQkWrO4Ly",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "vVnuEdVicB9x4i6yfRp4": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "vVnuEdVicB9x4i6yfRp4",
+      "name": "Creates",
+      "originId": "oac5wrjb77AGN453UM2A",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "FeNmZ1wD2JAmnFyAnIkQ",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "NgB8r1wg1PEL3ml5AKS1": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "NgB8r1wg1PEL3ml5AKS1",
+      "name": "Determines missing txs",
+      "originId": "l0PPEfAEatdPsLrpbhDV",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "Wo9BsprB6z2shiZE3rmw",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "0cW4CbmS7JjnQtJEdi7c": {
+      "description": "Via ChainDB / Follower interface",
+      "direction": "outgoing",
+      "id": "0cW4CbmS7JjnQtJEdi7c",
+      "name": "Registers follower, gets current tip and follower instructions",
+      "originId": "tzx0lY0K9KXuvDnEw0kJ",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ayWS3CpGe5RwcIJavTia",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "0R6x6sxBaTEe1JaTSEaF": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "0R6x6sxBaTEe1JaTSEaF",
+      "name": "Subscribes to completed EB closures",
+      "originId": "qTqOC4BMbC0ZuVFTxIak",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "l0PPEfAEatdPsLrpbhDV",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "21Rk3wfUjbicMe0t3DYa": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "21Rk3wfUjbicMe0t3DYa",
+      "name": "Uses",
+      "originId": "oac5wrjb77AGN453UM2A",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "sgxpR7CaEpbwNPaK9ikV",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "bvZxAiaAYgr2eemsCUTQ": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "bvZxAiaAYgr2eemsCUTQ",
+      "name": "Reads",
+      "originId": "l1uc9yBg2XQpiBD2bgiw",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "RyPTueHfAC1hajnCcrVq",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "zI57hpwmAKPtvYOB6bD6": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "zI57hpwmAKPtvYOB6bD6",
+      "name": "Deploys",
+      "originId": "oac5wrjb77AGN453UM2A",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "vRlYODitHkoLysPyMgFE",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "WLK80DySnFgoBbSDj0V9": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "WLK80DySnFgoBbSDj0V9",
+      "name": "Reports announcements",
+      "originId": "ZGkE9sAjiE09XNPkmrgY",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "n99MMNwhJkoZoe7XXahx",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "nsYf9nXSmB9CXxFP3aey": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "nsYf9nXSmB9CXxFP3aey",
+      "name": "Requests blocks",
+      "originId": "y8SaV3Sdx1w2Kx2FOVRP",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ohcJKX2gLrEIfngEFzQw",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "CfilITNP115mZiyMioxI": {
+      "description": "This results in the block being added to the chain selection queue.",
+      "direction": "outgoing",
+      "id": "CfilITNP115mZiyMioxI",
+      "name": "Adds new block",
+      "originId": "oCRw6Sausdv5NGiluCA4",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "ayWS3CpGe5RwcIJavTia",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "bstk3fSNv6U42VgXeP9p": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "bstk3fSNv6U42VgXeP9p",
+      "name": "Connects To",
+      "originId": "3WbVs7xr57ifUvZUKpg4",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "8FagNabdvRt5eGx7fz3W",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "DzGjrVTpI99i5LE6XBkt": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "DzGjrVTpI99i5LE6XBkt",
+      "name": "Gets current committee",
+      "originId": "ayWS3CpGe5RwcIJavTia",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "qTqOC4BMbC0ZuVFTxIak",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "vAolIci7p0G65iDn5TVw": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "vAolIci7p0G65iDn5TVw",
+      "name": "sends data to",
+      "originId": "fktgmA01gAr0eeX01kK8",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "n99MMNwhJkoZoe7XXahx",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "AttS9heA3z2Yrb9f1POJ": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "AttS9heA3z2Yrb9f1POJ",
+      "name": "Requests announcements and offers",
+      "originId": "3WbVs7xr57ifUvZUKpg4",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "n99MMNwhJkoZoe7XXahx",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "wZDLonLKJGMGDKKfWjFB": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "wZDLonLKJGMGDKKfWjFB",
+      "name": "Notifies on added EB bodies and txs",
+      "originId": "l0PPEfAEatdPsLrpbhDV",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "n99MMNwhJkoZoe7XXahx",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "uRR4hevNNaRSLSiLTeu9": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "uRR4hevNNaRSLSiLTeu9",
+      "name": "Sends Transactions",
+      "originId": "FeNmZ1wD2JAmnFyAnIkQ",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "sgxpR7CaEpbwNPaK9ikV",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "Fp7C3Pe2rDLgybp4MvKr": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "Fp7C3Pe2rDLgybp4MvKr",
+      "name": "Gets current chain and ledger",
+      "originId": "jazbab7eAF8TIRdsHctS",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ayWS3CpGe5RwcIJavTia",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "mLPA45dtLtI2pc5I6duD": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "mLPA45dtLtI2pc5I6duD",
+      "name": "Adds vote",
+      "originId": "qTqOC4BMbC0ZuVFTxIak",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "5e0srrOlYmEL5NqimSGq",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "8KGhHv28wNzY3A3G9Vxz": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "8KGhHv28wNzY3A3G9Vxz",
+      "name": "Updates missing bodies/txs",
+      "originId": "VCRRfVLbYR2Y0DOR0mRz",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "Wo9BsprB6z2shiZE3rmw",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "pc1QMjEZVcYntgwHlzAl": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "pc1QMjEZVcYntgwHlzAl",
+      "name": "Manages",
+      "originId": "ayWS3CpGe5RwcIJavTia",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "4cAkrSLKAJST6Nm1XIUv",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "Ut4LO4jWIn0mE2H5XQxk": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "Ut4LO4jWIn0mE2H5XQxk",
+      "name": "Blocks or unblocks chain selection",
+      "originId": "mj9n1n0FPKRq4Un4mf7v",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ayWS3CpGe5RwcIJavTia",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "pcZ7u1Bk6W4CoCzs7F6q": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "pcZ7u1Bk6W4CoCzs7F6q",
+      "name": "Loads EB bodies and txs from",
+      "originId": "PplvL0lnrhKMGariSuFN",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "l0PPEfAEatdPsLrpbhDV",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "8rwK7lJaG0TQ89XpWxr2": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "8rwK7lJaG0TQ89XpWxr2",
+      "name": "Stores bodies and txs",
+      "originId": "VCRRfVLbYR2Y0DOR0mRz",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "l0PPEfAEatdPsLrpbhDV",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "avszkQJPTimBxtI6jehS": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "avszkQJPTimBxtI6jehS",
+      "name": "Uses",
+      "originId": "8Nt0GpVABJvZSyg6z3JF",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "qViLKe2NHItbco4rSe5u",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "YmjPeA9FAFOvScCIEgjs": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "YmjPeA9FAFOvScCIEgjs",
+      "name": "Uses",
+      "originId": "Yq1kqR70Zmg30KUXMPHV",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "8Nt0GpVABJvZSyg6z3JF",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "EYDxBPEo6VcOxDGkzvj9": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "EYDxBPEo6VcOxDGkzvj9",
+      "name": "Requests peers",
+      "originId": "ACGDdEPs0wHG1AswXwih",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ohcJKX2gLrEIfngEFzQw",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "6an5c0UIa0n9JzmoW0mi": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "6an5c0UIa0n9JzmoW0mi",
+      "name": "Owns and rotates",
+      "originId": "O9KAupVBMeymDr4eocDM",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "RyPTueHfAC1hajnCcrVq",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "F0IksOxVkaYr3O4Dsl5h": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "F0IksOxVkaYr3O4Dsl5h",
+      "name": "Uses",
+      "originId": "sgxpR7CaEpbwNPaK9ikV",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "qViLKe2NHItbco4rSe5u",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "70pXNV5rJUG908sro09L": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "70pXNV5rJUG908sro09L",
+      "name": "Gets selected chain",
+      "originId": "ayWS3CpGe5RwcIJavTia",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "tzx0lY0K9KXuvDnEw0kJ",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "Ul2sxRYN4PBxoNQubsrG": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "Ul2sxRYN4PBxoNQubsrG",
+      "name": "Gets completed EBs to ignore incomplete CertRBs",
+      "originId": "aIGCrJeKi3BRWdlV3hxv",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "okQuQZIGYqZ3AiFo1mlL",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "b8Rjyt8lSzXoNXgpf3Hu": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "b8Rjyt8lSzXoNXgpf3Hu",
+      "name": "Triggers chain selection",
+      "originId": "4cAkrSLKAJST6Nm1XIUv",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "okQuQZIGYqZ3AiFo1mlL",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "MWn5Tvqz2XnMSR8L1baB": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "MWn5Tvqz2XnMSR8L1baB",
+      "name": "Applies mempool diffs",
+      "originId": "iISTq038AWRJGcHZuZvh",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "Sy0ZXae83F3CpDhLD7Ug",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "VxKsuYQ5w2198gUaogux": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "VxKsuYQ5w2198gUaogux",
+      "name": "Requests block headers",
+      "originId": "EFYoz6hCZ7dA7f3w6OUM",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ohcJKX2gLrEIfngEFzQw",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "tebfDfGx2ZLdCMXHKbBo": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "tebfDfGx2ZLdCMXHKbBo",
+      "name": "Operates",
+      "originId": "O9KAupVBMeymDr4eocDM",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "8FagNabdvRt5eGx7fz3W",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "o2oBx8441oTJoWTszYzc": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "o2oBx8441oTJoWTszYzc",
+      "name": "Registers new follower",
+      "originId": "tzx0lY0K9KXuvDnEw0kJ",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ayWS3CpGe5RwcIJavTia",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "QpLRkd80kUIOfLf4JnAS": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "QpLRkd80kUIOfLf4JnAS",
+      "name": "Requests peers",
+      "originId": "3WbVs7xr57ifUvZUKpg4",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "XGJmR1ZcSS7hDumvVWAV",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "X1AHAuESmkzTgPlHJkcJ": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "X1AHAuESmkzTgPlHJkcJ",
+      "name": "Promotes, demotes and releases connections",
+      "originId": "8vI81YaFoHl86zXTW1pE",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "RrTcN3yLZQ0T42VkSdC7",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "CUAdQAPwqxeAiV6mfLEV": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "CUAdQAPwqxeAiV6mfLEV",
+      "name": "Notifies on completed EB closure",
+      "originId": "l0PPEfAEatdPsLrpbhDV",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "aIGCrJeKi3BRWdlV3hxv",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "FA23NIwOBoxqKpRGhEIQ": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "FA23NIwOBoxqKpRGhEIQ",
+      "name": "Connects To",
+      "originId": "qViLKe2NHItbco4rSe5u",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "8FagNabdvRt5eGx7fz3W",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "KCNvypHDHrQ3vtCn72d6": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "KCNvypHDHrQ3vtCn72d6",
+      "name": "Gets read-only forker / ledger state",
+      "originId": "ayWS3CpGe5RwcIJavTia",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "oCRw6Sausdv5NGiluCA4",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "d49FwYiHv0XHKVgcQlal": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "d49FwYiHv0XHKVgcQlal",
+      "name": "Runs",
+      "originId": "0fVeMht7VD1YW50boGqP",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "dFyinaNx7efXrjUt2HoF",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "tj5dyRPXbWfszgJnQrjJ": {
+      "description": "Using the TxSubmissionMempoolReader interface",
+      "direction": "outgoing",
+      "id": "tj5dyRPXbWfszgJnQrjJ",
+      "name": "Gets snapshot",
+      "originId": "0OZMOOyLNG8ZQkWrO4Ly",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "iISTq038AWRJGcHZuZvh",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "Owvdd16DgHfSAWu5D75I": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "Owvdd16DgHfSAWu5D75I",
+      "name": "Schedules fetch requests",
+      "originId": "jazbab7eAF8TIRdsHctS",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "y8SaV3Sdx1w2Kx2FOVRP",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "2qXfLLZYpjK4qhih4Ruy": {
+      "description": "Via PeerSelectionApi in computePeerSharingPeers",
+      "direction": "outgoing",
+      "id": "2qXfLLZYpjK4qhih4Ruy",
+      "name": "Accesses peer selection state",
+      "originId": "XGJmR1ZcSS7hDumvVWAV",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "2GVjNOnyqUvHs0u5d57s",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "7Bx2SIlr8uu8I6riZBWq": {
+      "description": "Via TxSubmissionMempoolWriter interface",
+      "direction": "outgoing",
+      "id": "7Bx2SIlr8uu8I6riZBWq",
+      "name": "Adds transactions",
+      "originId": "RyV50cJoKAPfr5CAG5uC",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "iISTq038AWRJGcHZuZvh",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "6kBP4EI9l5foHKSRTsUM": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "6kBP4EI9l5foHKSRTsUM",
+      "name": "Schedules fetch requests",
+      "originId": "Wo9BsprB6z2shiZE3rmw",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "VCRRfVLbYR2Y0DOR0mRz",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "iX4jUoybpERKIsuqm4CP": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "iX4jUoybpERKIsuqm4CP",
+      "name": "Requests EB bodies and txs",
+      "originId": "3WbVs7xr57ifUvZUKpg4",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "PplvL0lnrhKMGariSuFN",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "hY5MxHrQFDi5U7hkOkTi": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "hY5MxHrQFDi5U7hkOkTi",
+      "name": "Stores blocks in",
+      "originId": "ayWS3CpGe5RwcIJavTia",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "r9UdtGG1wjd5NWg9rrcu",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "DbICVGhCd4FgKUgVn9Pg": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "DbICVGhCd4FgKUgVn9Pg",
+      "name": "Uses manually",
+      "originId": "oac5wrjb77AGN453UM2A",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "8RL1VwYMmOuQuoU3dnVC",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "ryJfMhbt5i9XetBTviXJ": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "ryJfMhbt5i9XetBTviXJ",
+      "name": "Operates",
+      "originId": "O9KAupVBMeymDr4eocDM",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "l1uc9yBg2XQpiBD2bgiw",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "HcKgNjuuvLSOq0GbDmx4": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "HcKgNjuuvLSOq0GbDmx4",
+      "name": "Manages",
+      "originId": "ayWS3CpGe5RwcIJavTia",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "lDwHlGYJ6SeVaJActW58",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "glEsUTesDKcngoBOJfHi": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "glEsUTesDKcngoBOJfHi",
+      "name": "N2C",
+      "originId": "vRlYODitHkoLysPyMgFE",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "qViLKe2NHItbco4rSe5u",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "lBrToDfKRQCureZeyNi8": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "lBrToDfKRQCureZeyNi8",
+      "name": "Gets current committee and threshold param",
+      "originId": "ayWS3CpGe5RwcIJavTia",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "5e0srrOlYmEL5NqimSGq",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "VOi0q92oziER8NrKo6qa": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "VOi0q92oziER8NrKo6qa",
+      "name": "",
+      "originId": "FeNmZ1wD2JAmnFyAnIkQ",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "8Nt0GpVABJvZSyg6z3JF",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "fAz5zARNgmHCFq3IV2ig": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "fAz5zARNgmHCFq3IV2ig",
+      "name": "Reads",
+      "originId": "1QVQUO2S1zCCvZAa2J1s",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "RyPTueHfAC1hajnCcrVq",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "UKwQTB8HievZoKP8wKCH": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "UKwQTB8HievZoKP8wKCH",
+      "name": "Gets # of connections and adds new ones",
+      "originId": "8vI81YaFoHl86zXTW1pE",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "RrTcN3yLZQ0T42VkSdC7",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "6rxxQqac03G5nh3QeXtv": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "6rxxQqac03G5nh3QeXtv",
+      "name": "Gets tip and ledger state",
+      "originId": "ayWS3CpGe5RwcIJavTia",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "iISTq038AWRJGcHZuZvh",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "EteCcxgQNT0qkTWtSpP3": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "EteCcxgQNT0qkTWtSpP3",
+      "name": "Gets snapshot",
+      "originId": "oCRw6Sausdv5NGiluCA4",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "iISTq038AWRJGcHZuZvh",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "zg7xtnMEDKGB8bb8VxFn": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "zg7xtnMEDKGB8bb8VxFn",
+      "name": "Connects To",
+      "originId": "8FagNabdvRt5eGx7fz3W",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "3WbVs7xr57ifUvZUKpg4",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "WgD4jxnezIF9z3B4yQy2": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "WgD4jxnezIF9z3B4yQy2",
+      "name": "Gets selected committee from ledger state",
+      "originId": "zRLK7VIQ23TwXHETr4k0",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "ayWS3CpGe5RwcIJavTia",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "J8PBxBm0WPAFFbR02XFF": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "J8PBxBm0WPAFFbR02XFF",
+      "name": "Synthesizes offers from CertRB headers",
+      "originId": "EFYoz6hCZ7dA7f3w6OUM",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "Wo9BsprB6z2shiZE3rmw",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "1Ax2jd6YZwrDDXUgZauc": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "1Ax2jd6YZwrDDXUgZauc",
+      "name": "Operates for L2",
+      "originId": "uPmlSaASXtoPnzsxrpMd",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "9CSxr9Zaild1dCBxv4Rp",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "kfO0bnvA4FHFoFXgTsqM": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "kfO0bnvA4FHFoFXgTsqM",
+      "name": "Uses",
+      "originId": "Yq1kqR70Zmg30KUXMPHV",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "FeNmZ1wD2JAmnFyAnIkQ",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "hY07fuAqNUwcSOwBj08U": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "hY07fuAqNUwcSOwBj08U",
+      "name": "Re-applies transactions using",
+      "originId": "iISTq038AWRJGcHZuZvh",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "Sy0ZXae83F3CpDhLD7Ug",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "Uzc1DxydfIMaU4KpW7UC": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "Uzc1DxydfIMaU4KpW7UC",
+      "name": "Has access to",
+      "originId": "oCRw6Sausdv5NGiluCA4",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "RyPTueHfAC1hajnCcrVq",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "5s2051RL2E6ZxWSmKg0Y": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "5s2051RL2E6ZxWSmKg0Y",
+      "name": "Subscribes to announced EB points",
+      "originId": "l0PPEfAEatdPsLrpbhDV",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "zRLK7VIQ23TwXHETr4k0",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "MCxs1HOHWIPSuJbhsp0N": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "MCxs1HOHWIPSuJbhsp0N",
+      "name": "Fill in any gaps",
+      "originId": "iISTq038AWRJGcHZuZvh",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "l0PPEfAEatdPsLrpbhDV",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "tBxDrVKxUtUyODGQa5nE": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "tBxDrVKxUtUyODGQa5nE",
+      "name": "Requests blocks",
+      "originId": "3WbVs7xr57ifUvZUKpg4",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "r6RQkLiEwB4gxHw6Lwn1",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "Iub8u6REDlvUxbC3SkyN": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "Iub8u6REDlvUxbC3SkyN",
+      "name": "Uses",
+      "originId": "oac5wrjb77AGN453UM2A",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "1QVQUO2S1zCCvZAa2J1s",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "TiBFakhWKMBrnkJgWBP8": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "TiBFakhWKMBrnkJgWBP8",
+      "name": "Gets snapshot",
+      "originId": "RyV50cJoKAPfr5CAG5uC",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "iISTq038AWRJGcHZuZvh",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "MVPQhn1SU0OBiWZHj4zC": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "MVPQhn1SU0OBiWZHj4zC",
+      "name": "Sends data to",
+      "originId": "ayWS3CpGe5RwcIJavTia",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "4cAkrSLKAJST6Nm1XIUv",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "ZZnFb0sSbftYr6cd8Ep6": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "ZZnFb0sSbftYr6cd8Ep6",
+      "name": "Reports announced points",
+      "originId": "j2dWLSrOHsRc6rAmzCRq",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "ZGkE9sAjiE09XNPkmrgY",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "27ltYqkzvqkJJYl9QiZr": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "27ltYqkzvqkJJYl9QiZr",
+      "name": "Request peers",
+      "originId": "2GVjNOnyqUvHs0u5d57s",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ACGDdEPs0wHG1AswXwih",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "KCBXkgNQKCiIlRcSq2wo": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "KCBXkgNQKCiIlRcSq2wo",
+      "name": "Requests announcements and offers",
+      "originId": "j2dWLSrOHsRc6rAmzCRq",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "ohcJKX2gLrEIfngEFzQw",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "rFuAjXC2BKOlqnHr60pw": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "rFuAjXC2BKOlqnHr60pw",
+      "name": "Stores EB body and txs",
+      "originId": "oCRw6Sausdv5NGiluCA4",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "l0PPEfAEatdPsLrpbhDV",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "HgOF9PQE3mZ4dF2FdwUj": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "HgOF9PQE3mZ4dF2FdwUj",
+      "name": "Runs",
+      "originId": "0fVeMht7VD1YW50boGqP",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "czzINgGe9Ca7MmLBHiwz",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "TUKDmUlOUxN36Ewx57cj": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "TUKDmUlOUxN36Ewx57cj",
+      "name": "Validates mempool txs using",
+      "originId": "iISTq038AWRJGcHZuZvh",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "Sy0ZXae83F3CpDhLD7Ug",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "ToPdDVvqW6HiWdCoczZc": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "ToPdDVvqW6HiWdCoczZc",
+      "name": "Adds block with punishment",
+      "originId": "y8SaV3Sdx1w2Kx2FOVRP",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ayWS3CpGe5RwcIJavTia",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "lyBsOiel2QNRFUqJ90Gr": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "lyBsOiel2QNRFUqJ90Gr",
+      "name": "Requests block headers",
+      "originId": "3WbVs7xr57ifUvZUKpg4",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "tzx0lY0K9KXuvDnEw0kJ",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "ODQxnwQM4Db4y21saEk8": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "ODQxnwQM4Db4y21saEk8",
+      "name": "Resolves certified EB closure",
+      "originId": "ayWS3CpGe5RwcIJavTia",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "l0PPEfAEatdPsLrpbhDV",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "P1Ta0vlIFSm5jvH45a9m": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "P1Ta0vlIFSm5jvH45a9m",
+      "name": "Queries Chain",
+      "originId": "FeNmZ1wD2JAmnFyAnIkQ",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "sgxpR7CaEpbwNPaK9ikV",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "eDiQR2GZ7xoWCfwSlSiP": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "eDiQR2GZ7xoWCfwSlSiP",
+      "name": "Gets certificate for point",
+      "originId": "5e0srrOlYmEL5NqimSGq",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "oCRw6Sausdv5NGiluCA4",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "2DEX7aY4NoOP4D9Uoyok": {
+      "description": "Via ChainDB / Iterator interface",
+      "direction": "outgoing",
+      "id": "2DEX7aY4NoOP4D9Uoyok",
+      "name": "Gets stream of blocks",
+      "originId": "ayWS3CpGe5RwcIJavTia",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "r6RQkLiEwB4gxHw6Lwn1",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "e7QQyHpIYNMfRBt7bEnB": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "e7QQyHpIYNMfRBt7bEnB",
+      "name": "Establishes, monitors and closes connections",
+      "originId": "2GVjNOnyqUvHs0u5d57s",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "RrTcN3yLZQ0T42VkSdC7",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "QEeas7jasbfLMeaU1TYA": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "QEeas7jasbfLMeaU1TYA",
+      "name": "Validates blocks using",
+      "originId": "ayWS3CpGe5RwcIJavTia",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "Sy0ZXae83F3CpDhLD7Ug",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "WiS3pmgDCvauxPLaqijL": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "WiS3pmgDCvauxPLaqijL",
+      "name": "Certifies",
+      "originId": "1QVQUO2S1zCCvZAa2J1s",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "DVxSPsgsdqVlhmVqUx3n",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "SIZsULCAbGWhKkE45FGU": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "SIZsULCAbGWhKkE45FGU",
+      "name": "Starts one per connection",
+      "originId": "RrTcN3yLZQ0T42VkSdC7",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "0fVeMht7VD1YW50boGqP",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "xRfIEmYueYx0MzIgz62L": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "xRfIEmYueYx0MzIgz62L",
+      "name": "Requests EB bodies and txs",
+      "originId": "VCRRfVLbYR2Y0DOR0mRz",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "ohcJKX2gLrEIfngEFzQw",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "gTWtTpWkwv8LwklZlsmq": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "gTWtTpWkwv8LwklZlsmq",
+      "name": "Re-trigger chain selection for completed CertRBs",
+      "originId": "aIGCrJeKi3BRWdlV3hxv",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "okQuQZIGYqZ3AiFo1mlL",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "kAzM10tsoNYmUqnqd7yc": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "kAzM10tsoNYmUqnqd7yc",
+      "name": "Connects via CIP-30",
+      "originId": "FeNmZ1wD2JAmnFyAnIkQ",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "8Nt0GpVABJvZSyg6z3JF",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "3NmQXrWyfrbrVCnB82cb": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "3NmQXrWyfrbrVCnB82cb",
+      "name": "Requests block headers",
+      "originId": "3WbVs7xr57ifUvZUKpg4",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "tzx0lY0K9KXuvDnEw0kJ",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "U7AxjCSPys2cCY5eMTqr": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "U7AxjCSPys2cCY5eMTqr",
+      "name": "Requests transactions",
+      "originId": "RyV50cJoKAPfr5CAG5uC",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "3WbVs7xr57ifUvZUKpg4",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "FojPSMAS39JFej3aiRQw": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "FojPSMAS39JFej3aiRQw",
+      "name": "Connects To",
+      "originId": "qViLKe2NHItbco4rSe5u",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "3WbVs7xr57ifUvZUKpg4",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "DrkeO1ljrUl3uhQ2Wm9r": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "DrkeO1ljrUl3uhQ2Wm9r",
+      "name": "Updates offers",
+      "originId": "j2dWLSrOHsRc6rAmzCRq",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "Wo9BsprB6z2shiZE3rmw",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "kkkbsyVW2pvPPQaTCVpR": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "kkkbsyVW2pvPPQaTCVpR",
+      "name": "Validates EB txs using",
+      "originId": "qTqOC4BMbC0ZuVFTxIak",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "Sy0ZXae83F3CpDhLD7Ug",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "chjqfPNk6ffP42iEohBj": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "chjqfPNk6ffP42iEohBj",
+      "name": "Gets candidates",
+      "originId": "EFYoz6hCZ7dA7f3w6OUM",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "jazbab7eAF8TIRdsHctS",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "0UXk2yqV40u5zrqtCYfd": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "0UXk2yqV40u5zrqtCYfd",
+      "name": "Reads blocks from",
+      "originId": "r9UdtGG1wjd5NWg9rrcu",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ayWS3CpGe5RwcIJavTia",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "rlTTx83ePPrTXapFIqvM": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "rlTTx83ePPrTXapFIqvM",
+      "name": "Gets votes",
+      "originId": "fktgmA01gAr0eeX01kK8",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "5e0srrOlYmEL5NqimSGq",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "SX6XgwElXJKAHxtp8mTo": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "SX6XgwElXJKAHxtp8mTo",
+      "name": "Validates blocks",
+      "originId": "okQuQZIGYqZ3AiFo1mlL",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "lDwHlGYJ6SeVaJActW58",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "noiQs0rOSgvvJLHtbgMI": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "noiQs0rOSgvvJLHtbgMI",
+      "name": "Connects to",
+      "originId": "8FagNabdvRt5eGx7fz3W",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ohcJKX2gLrEIfngEFzQw",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "u5G0wQuWTW8kXUvnZMT8": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "u5G0wQuWTW8kXUvnZMT8",
+      "name": "Adds and validate vote",
+      "originId": "j2dWLSrOHsRc6rAmzCRq",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "5e0srrOlYmEL5NqimSGq",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "0Q1h6cXilKPkcfHuD611": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "0Q1h6cXilKPkcfHuD611",
+      "name": "Gets current tip",
+      "originId": "tzx0lY0K9KXuvDnEw0kJ",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "ayWS3CpGe5RwcIJavTia",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "xFF6eMawkW4eZeYdpn0M": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "xFF6eMawkW4eZeYdpn0M",
+      "name": "Notifies on added votes",
+      "originId": "5e0srrOlYmEL5NqimSGq",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "n99MMNwhJkoZoe7XXahx",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "nfxKq5mc2AiXsTsclQxd": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "nfxKq5mc2AiXsTsclQxd",
+      "name": "Gets EB announcing blocks",
+      "originId": "okQuQZIGYqZ3AiFo1mlL",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "4cAkrSLKAJST6Nm1XIUv",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "ebpnzTdyYtSP4lDy9ksb": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "ebpnzTdyYtSP4lDy9ksb",
+      "name": "N2C",
+      "originId": "9CSxr9Zaild1dCBxv4Rp",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "qViLKe2NHItbco4rSe5u",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "3OkEUl3wOePm2tTjEKmh": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "3OkEUl3wOePm2tTjEKmh",
+      "name": "Removes txs if new bock was invald",
+      "originId": "oCRw6Sausdv5NGiluCA4",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "iISTq038AWRJGcHZuZvh",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "awZ7UU23JzYnngtZz5HB": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "awZ7UU23JzYnngtZz5HB",
+      "name": "Adds block",
+      "originId": "oCRw6Sausdv5NGiluCA4",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "ayWS3CpGe5RwcIJavTia",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "WMYD5qXl9uUYxrtb347O": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "WMYD5qXl9uUYxrtb347O",
+      "name": "N2C",
+      "originId": "8RL1VwYMmOuQuoU3dnVC",
+      "status": "live",
+      "tagIds": [],
+      "targetId": "8FagNabdvRt5eGx7fz3W",
+      "technologyIds": [],
+      "viaId": null
+    },
+    "bRX9pwxpUdKXKN4Xwfz7": {
+      "description": "",
+      "direction": "outgoing",
+      "id": "bRX9pwxpUdKXKN4Xwfz7",
+      "name": "Requests votes",
+      "originId": "3WbVs7xr57ifUvZUKpg4",
+      "status": "future",
+      "tagIds": [],
+      "targetId": "fktgmA01gAr0eeX01kK8",
+      "technologyIds": [],
+      "viaId": null
+    }
+  },
+  "modelObjects": {
+    "fktgmA01gAr0eeX01kK8": {
+      "caption": "Serves votes of multiple voting rounds",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "dFyinaNx7efXrjUt2HoF"
+      ],
+      "icon": null,
+      "id": "fktgmA01gAr0eeX01kK8",
+      "links": {},
+      "name": "Leios votes servers",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "future",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "3ZjJWrOd4BFzr6UswjzM": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "3ZjJWrOd4BFzr6UswjzM",
+      "links": {},
+      "name": "Consensus",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "EFYoz6hCZ7dA7f3w6OUM": {
+      "caption": "Clients that share state to find chain candidates by following the chain of peers",
+      "description": "Also watches for invalid blocks (headers)",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "czzINgGe9Ca7MmLBHiwz"
+      ],
+      "icon": null,
+      "id": "EFYoz6hCZ7dA7f3w6OUM",
+      "links": {
+        "a01ba0cb77bd3dcb54e609f535f47cd307b910db": {
+          "name": "ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-MiniProtocol-ChainSync-Client.html",
+          "type": "url",
+          "url": "https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-MiniProtocol-ChainSync-Client.html",
+          "id": "a01ba0cb77bd3dcb54e609f535f47cd307b910db",
+          "index": 0,
+          "customName": "Ouroboros.Consensus.MiniProtocol.ChainSync.Client"
+        }
+      },
+      "name": "Chain sync clients",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "8FagNabdvRt5eGx7fz3W": {
+      "caption": "Generic node with outbound + inbound components, including optional block forging.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "8FagNabdvRt5eGx7fz3W",
+      "links": {
+        "4557bbce7ad9b66174d3164fc5eb5306825bd011": {
+          "name": "github.com/intersectmbo/cardano-node/tree/dd8fc729502476d8e974dfc5c42aab8f77aa0762/cardano-node/src/Cardano/Node/Run.hs",
+          "type": "url",
+          "url": "https://github.com/intersectmbo/cardano-node/tree/dd8fc729502476d8e974dfc5c42aab8f77aa0762/cardano-node/src/Cardano/Node/Run.hs",
+          "id": "4557bbce7ad9b66174d3164fc5eb5306825bd011",
+          "customName": "Main entry point in cardano-node",
+          "index": 0
+        },
+        "b8be7349d94d4aab11c35fa1dd4007555ea497ec": {
+          "name": "ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus-diffusion/Ouroboros-Consensus-Node.html",
+          "type": "url",
+          "url": "https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus-diffusion/Ouroboros-Consensus-Node.html",
+          "id": "b8be7349d94d4aab11c35fa1dd4007555ea497ec",
+          "customName": "Main entry point in ouroboros-consensus",
+          "index": 1
+        }
+      },
+      "name": "Cardano Node",
+      "parentId": "DVxSPsgsdqVlhmVqUx3n",
+      "parentIds": [
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "app"
+    },
+    "5e0srrOlYmEL5NqimSGq": {
+      "caption": "Keeps track of valid votes. Upon meeting the threshold, it aggregates votes and holds on to a certificate.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "5e0srrOlYmEL5NqimSGq",
+      "links": {},
+      "name": "VoteState",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "future",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "J4ZEw4Iqx6NZTksp8Rug": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "J4ZEw4Iqx6NZTksp8Rug",
+      "links": {},
+      "name": "Candidate chains",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "Yq1kqR70Zmg30KUXMPHV": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "Yq1kqR70Zmg30KUXMPHV",
+      "links": {},
+      "name": "End User",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "actor"
+    },
+    "oac5wrjb77AGN453UM2A": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "oac5wrjb77AGN453UM2A",
+      "links": {},
+      "name": "dDapp Developer",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "actor"
+    },
+    "KZyNbEHvPltIlkXN8DqQ": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "KZyNbEHvPltIlkXN8DqQ",
+      "links": {},
+      "name": "Storage",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "group"
+    },
+    "8vI81YaFoHl86zXTW1pE": {
+      "caption": "Runs inbound governor and accept loop(s) to respond to protocol initiation requests.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "8vI81YaFoHl86zXTW1pE",
+      "links": {
+        "3f8894b42daf1925ac618b0a5dbd336096da0777": {
+          "name": "ouroboros-network.cardano.intersectmbo.org/ouroboros-network-framework/Ouroboros-Network-Server.html",
+          "type": "url",
+          "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network-framework/Ouroboros-Network-Server.html",
+          "id": "3f8894b42daf1925ac618b0a5dbd336096da0777",
+          "customName": "Ouroboros.Network.Server",
+          "index": 0
+        },
+        "b6b4608e4942aa121e70dc51283fc005ad9140dc": {
+          "name": "ouroboros-network.cardano.intersectmbo.org/ouroboros-network-framework/Ouroboros-Network-InboundGovernor.html",
+          "type": "url",
+          "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network-framework/Ouroboros-Network-InboundGovernor.html",
+          "id": "b6b4608e4942aa121e70dc51283fc005ad9140dc",
+          "customName": "Ouroboros.Network.InboundGovernor",
+          "index": 1
+        }
+      },
+      "name": "Server",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "3WbVs7xr57ifUvZUKpg4": {
+      "caption": "Isolated role of a Cardano node being a downstream peer.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "3WbVs7xr57ifUvZUKpg4",
+      "links": {},
+      "name": "Downstream Node",
+      "parentId": "DVxSPsgsdqVlhmVqUx3n",
+      "parentIds": [
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "app"
+    },
+    "Sy0ZXae83F3CpDhLD7Ug": {
+      "caption": "Validates blocks & transactions and evolves a given ledger state.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "Sy0ZXae83F3CpDhLD7Ug",
+      "links": {},
+      "name": "Ledger",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "r9UdtGG1wjd5NWg9rrcu": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "r9UdtGG1wjd5NWg9rrcu",
+      "links": {},
+      "name": "Volatile blocks",
+      "parentId": "DVxSPsgsdqVlhmVqUx3n",
+      "parentIds": [
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "store"
+    },
+    "aIGCrJeKi3BRWdlV3hxv": {
+      "caption": "Background thread managed by ChainDB",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "KZyNbEHvPltIlkXN8DqQ"
+      ],
+      "icon": null,
+      "id": "aIGCrJeKi3BRWdlV3hxv",
+      "links": {},
+      "name": "Acquired EBs runner",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "future",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "czzINgGe9Ca7MmLBHiwz": {
+      "caption": "Protocols run as an Initiator",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "czzINgGe9Ca7MmLBHiwz",
+      "links": {
+        "45162eea03e449ba6ae075ab7efbb901885cbcd7": {
+          "name": "ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus-diffusion/Ouroboros-Consensus-Network-NodeToNode.html",
+          "type": "url",
+          "id": "45162eea03e449ba6ae075ab7efbb901885cbcd7",
+          "url": "https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus-diffusion/Ouroboros-Consensus-Network-NodeToNode.html",
+          "index": 0,
+          "customName": "Ouroboros.Consensus.Network.NodeToNode"
+        }
+      },
+      "name": "Outbound mini-protocols",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "group"
+    },
+    "DqZrDJlXT31f8BdXhXkB": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "DqZrDJlXT31f8BdXhXkB",
+      "links": {},
+      "name": "Node kernel",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "j2dWLSrOHsRc6rAmzCRq": {
+      "caption": "Clients that get notified about block announcements and offers.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "czzINgGe9Ca7MmLBHiwz"
+      ],
+      "icon": null,
+      "id": "j2dWLSrOHsRc6rAmzCRq",
+      "links": {},
+      "name": "Leios notify clients",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "future",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "8Nt0GpVABJvZSyg6z3JF": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "8Nt0GpVABJvZSyg6z3JF",
+      "links": {},
+      "name": "Lace Wallet",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "system"
+    },
+    "l1uc9yBg2XQpiBD2bgiw": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "l1uc9yBg2XQpiBD2bgiw",
+      "links": {},
+      "name": "Mithril Signer",
+      "parentId": "DVxSPsgsdqVlhmVqUx3n",
+      "parentIds": [
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "app"
+    },
+    "Wo9BsprB6z2shiZE3rmw": {
+      "caption": "Fetch Leios EBs, transactions and votes following a freshest first policy.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "Wo9BsprB6z2shiZE3rmw",
+      "links": {},
+      "name": "Leios fetching",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "future",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "y8SaV3Sdx1w2Kx2FOVRP": {
+      "caption": "Clients that fetch blocks as determined by the block fetching decision logic.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "czzINgGe9Ca7MmLBHiwz"
+      ],
+      "icon": null,
+      "id": "y8SaV3Sdx1w2Kx2FOVRP",
+      "links": {
+        "c4d962c6f21362beb8665a33c3ada1d8acb83897": {
+          "name": "ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-BlockFetch-Client.html",
+          "type": "url",
+          "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-BlockFetch-Client.html",
+          "id": "c4d962c6f21362beb8665a33c3ada1d8acb83897",
+          "customName": "Ouroboros.Network.BlockFetch.Client",
+          "index": 0
+        }
+      },
+      "name": "Block fetch clients",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "jazbab7eAF8TIRdsHctS": {
+      "caption": "Fetches blocks continuously by scheduling fetch requests across multiple N2N block fetch clients.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "jazbab7eAF8TIRdsHctS",
+      "links": {
+        "263e0c43bd0116c209177b6b7f9f8338a06e5012": {
+          "name": "ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-BlockFetch.html",
+          "type": "url",
+          "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-BlockFetch.html",
+          "id": "263e0c43bd0116c209177b6b7f9f8338a06e5012",
+          "customName": "Ouroboros.Network.BlockFetch",
+          "index": 0
+        }
+      },
+      "name": "Block fetching",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "n99MMNwhJkoZoe7XXahx": {
+      "caption": "Serves notifications about new blocks an offers to serve blocks.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "dFyinaNx7efXrjUt2HoF"
+      ],
+      "icon": null,
+      "id": "n99MMNwhJkoZoe7XXahx",
+      "links": {},
+      "name": "Leios notify servers",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "future",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "l0PPEfAEatdPsLrpbhDV": {
+      "caption": "Stores all known EBs in the immutable and volatile chains, as well as their transactions.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "KZyNbEHvPltIlkXN8DqQ"
+      ],
+      "icon": null,
+      "id": "l0PPEfAEatdPsLrpbhDV",
+      "links": {},
+      "name": "EBStore",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "future",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "0fVeMht7VD1YW50boGqP": {
+      "caption": "Multiplexes mini-protocols over one bearer in Initiator, Responder or InitiatorAndResponder mode.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "0fVeMht7VD1YW50boGqP",
+      "links": {
+        "fee43ed4604fc8be50e25c2d7dd65bb75fe256ff": {
+          "name": "ouroboros-network.cardano.intersectmbo.org/network-mux/Network-Mux.html",
+          "type": "url",
+          "url": "https://ouroboros-network.cardano.intersectmbo.org/network-mux/Network-Mux.html",
+          "id": "fee43ed4604fc8be50e25c2d7dd65bb75fe256ff",
+          "customName": "Network.Mux",
+          "index": 0
+        }
+      },
+      "name": "Mux",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "oCRw6Sausdv5NGiluCA4": {
+      "caption": "Determines whether node is leader and once active creates blocks from mempool transactions.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "oCRw6Sausdv5NGiluCA4",
+      "links": {
+        "0e0a7a3889e59ff99f9ec872ece1598afb8e9b76": {
+          "name": "github.com/IntersectMBO/ouroboros-consensus/blob/8e3afe103e49c0b1ba66ce0ece5a24dc87e34e26/ouroboros-consensus-diffusion/src/ouroboros-consensus-diffusion/Ouroboros/Consensus/NodeKernel.hs",
+          "type": "url",
+          "url": "https://github.com/IntersectMBO/ouroboros-consensus/blob/8e3afe103e49c0b1ba66ce0ece5a24dc87e34e26/ouroboros-consensus-diffusion/src/ouroboros-consensus-diffusion/Ouroboros/Consensus/NodeKernel.hs#L456",
+          "id": "0e0a7a3889e59ff99f9ec872ece1598afb8e9b76",
+          "index": 0
+        }
+      },
+      "name": "Block forging",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "future",
+      "tagIds": [],
+      "teamIds": [
+        "Yu2tmNCufyF7DYnUgdiN"
+      ],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "h3RlmAPTGfBVrVrNyvwA": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "h3RlmAPTGfBVrVrNyvwA",
+      "links": {},
+      "name": "Immutable DB",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "ACGDdEPs0wHG1AswXwih": {
+      "caption": "Can ask a peer for a sample of known peers.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "czzINgGe9Ca7MmLBHiwz"
+      ],
+      "icon": null,
+      "id": "ACGDdEPs0wHG1AswXwih",
+      "links": {
+        "2d831af5fb883182a09ed226795f760226e28ba3": {
+          "name": "ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-PeerSharing.html",
+          "type": "url",
+          "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-PeerSharing.html",
+          "id": "2d831af5fb883182a09ed226795f760226e28ba3",
+          "customName": "Ouroboros.Network.PeerSharing",
+          "index": 0
+        }
+      },
+      "name": "Peer sharing clients",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "0OZMOOyLNG8ZQkWrO4Ly": {
+      "caption": "Serves transactions by keeping state for each peer and delivers indexed txs from a mempool snapshot.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "czzINgGe9Ca7MmLBHiwz"
+      ],
+      "icon": null,
+      "id": "0OZMOOyLNG8ZQkWrO4Ly",
+      "links": {
+        "9255a065fcd73e03285df802b7fd1a2624ecc134": {
+          "name": "ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-TxSubmission-Outbound.html",
+          "type": "url",
+          "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-TxSubmission-Outbound.html",
+          "id": "9255a065fcd73e03285df802b7fd1a2624ecc134",
+          "customName": "Ouroboros.Network.TxSubmission.Outbound",
+          "index": 0
+        }
+      },
+      "name": "Tx submission clients",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "ZGkE9sAjiE09XNPkmrgY": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "ZGkE9sAjiE09XNPkmrgY",
+      "links": {},
+      "name": "Equivocation detection",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "future",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "RrTcN3yLZQ0T42VkSdC7": {
+      "caption": "Pools connections such that they can be re-used for protocol initiation by running handshake protocol",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "RrTcN3yLZQ0T42VkSdC7",
+      "links": {
+        "888f1802dfa60ea2da9188b205e20e8b992d4ee5": {
+          "name": "ouroboros-network.cardano.intersectmbo.org/ouroboros-network-framework/Ouroboros-Network-ConnectionManager-Types.html",
+          "type": "url",
+          "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network-framework/Ouroboros-Network-ConnectionManager-Types.html",
+          "id": "888f1802dfa60ea2da9188b205e20e8b992d4ee5",
+          "customName": "Ouroboros.Network.ConnectionManager",
+          "index": 0
+        }
+      },
+      "name": "Connection manager",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "lDwHlGYJ6SeVaJActW58": {
+      "caption": "Stores the ledger states of the currently selected chain until the immutable tip.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "KZyNbEHvPltIlkXN8DqQ"
+      ],
+      "icon": null,
+      "id": "lDwHlGYJ6SeVaJActW58",
+      "links": {},
+      "name": "LedgerDB",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "9CSxr9Zaild1dCBxv4Rp": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "9CSxr9Zaild1dCBxv4Rp",
+      "links": {},
+      "name": "hydra-node",
+      "parentId": "DVxSPsgsdqVlhmVqUx3n",
+      "parentIds": [
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "app"
+    },
+    "DVxSPsgsdqVlhmVqUx3n": {
+      "caption": "The whole Cardano P2P network as a system with a few key infrastructure containers.",
+      "description": "Some information on topology and P2P (specific to cardano-node): [https://developers.cardano.org/docs/get-started/cardano-node/topology](https://developers.cardano.org/docs/get-started/cardano-node/topology)",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "DVxSPsgsdqVlhmVqUx3n",
+      "links": {},
+      "name": "Cardano Network",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "system"
+    },
+    "2GVjNOnyqUvHs0u5d57s": {
+      "caption": "Establishes and manages outbound peer connections; a.k.a outbound governor.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "2GVjNOnyqUvHs0u5d57s",
+      "links": {
+        "ce642eab951457837674973ef2bbc1e07eac9d4a": {
+          "name": "ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-PeerSelection-Governor.html",
+          "type": "url",
+          "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-PeerSelection-Governor.html",
+          "id": "ce642eab951457837674973ef2bbc1e07eac9d4a",
+          "customName": "Ouroboros.Network.PeerSelection.Governor",
+          "index": 0
+        }
+      },
+      "name": "Peer selection",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "mj9n1n0FPKRq4Un4mf7v": {
+      "caption": "State machine that constrains chain selection",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "mj9n1n0FPKRq4Un4mf7v",
+      "links": {},
+      "name": "Genesis",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [
+        "Yu2tmNCufyF7DYnUgdiN"
+      ],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "RyV50cJoKAPfr5CAG5uC": {
+      "caption": "Request new transactions and fetches missing ones.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "dFyinaNx7efXrjUt2HoF"
+      ],
+      "icon": null,
+      "id": "RyV50cJoKAPfr5CAG5uC",
+      "links": {
+        "f248e8fae6e07712175a1f27edd965337bed15df": {
+          "name": "ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-TxSubmission-Inbound.html",
+          "type": "url",
+          "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-TxSubmission-Inbound-V2.html",
+          "id": "f248e8fae6e07712175a1f27edd965337bed15df",
+          "customName": "Ouroboros.Network.TxSubmission.Inbound.V2",
+          "index": 0
+        }
+      },
+      "name": "Tx submission servers",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "xuHwoJLiozcLrg0USqXR": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "xuHwoJLiozcLrg0USqXR",
+      "links": {},
+      "name": "N2C Chain sync server",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "okQuQZIGYqZ3AiFo1mlL": {
+      "caption": "A thread that checks what chains could be selected. Ignores incomplete CertRBs",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "KZyNbEHvPltIlkXN8DqQ"
+      ],
+      "icon": null,
+      "id": "okQuQZIGYqZ3AiFo1mlL",
+      "links": {},
+      "name": "Chain Selection",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "qTqOC4BMbC0ZuVFTxIak": {
+      "caption": "Thread that issues votes on valid EBs on time",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "qTqOC4BMbC0ZuVFTxIak",
+      "links": {},
+      "name": "Leios voting",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "future",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "8RL1VwYMmOuQuoU3dnVC": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "8RL1VwYMmOuQuoU3dnVC",
+      "links": {},
+      "name": "cardano-cli",
+      "parentId": "DVxSPsgsdqVlhmVqUx3n",
+      "parentIds": [
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "app"
+    },
+    "4cAkrSLKAJST6Nm1XIUv": {
+      "caption": "Hot, efficient rollback storage of blocks in multiple chains. Keeps a LeiosAnnouncer index",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "KZyNbEHvPltIlkXN8DqQ"
+      ],
+      "icon": null,
+      "id": "4cAkrSLKAJST6Nm1XIUv",
+      "links": {},
+      "name": "VolatileDB",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "qViLKe2NHItbco4rSe5u": {
+      "caption": "Client node that only acts as a downstream peer.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "qViLKe2NHItbco4rSe5u",
+      "links": {},
+      "name": "Data Node",
+      "parentId": "DVxSPsgsdqVlhmVqUx3n",
+      "parentIds": [
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "app"
+    },
+    "PplvL0lnrhKMGariSuFN": {
+      "caption": "Serves EBs, transactions and votes.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "dFyinaNx7efXrjUt2HoF"
+      ],
+      "icon": null,
+      "id": "PplvL0lnrhKMGariSuFN",
+      "links": {},
+      "name": "Leios fetch servers",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "future",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "dFyinaNx7efXrjUt2HoF": {
+      "caption": "Protocols run as a Responder",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "dFyinaNx7efXrjUt2HoF",
+      "links": {
+        "45162eea03e449ba6ae075ab7efbb901885cbcd7": {
+          "name": "ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus-diffusion/Ouroboros-Consensus-Network-NodeToNode.html",
+          "customName": "Ouroboros.Consensu.Network.NodeToNode",
+          "url": "https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus-diffusion/Ouroboros-Consensus-Network-NodeToNode.html",
+          "id": "45162eea03e449ba6ae075ab7efbb901885cbcd7",
+          "index": 0,
+          "type": "url"
+        }
+      },
+      "name": "Inbound mini-protocols",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "group"
+    },
+    "ohcJKX2gLrEIfngEFzQw": {
+      "caption": "Isolated role of a Cardano node being an upstream peer.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "ohcJKX2gLrEIfngEFzQw",
+      "links": {},
+      "name": "Upstream Node",
+      "parentId": "DVxSPsgsdqVlhmVqUx3n",
+      "parentIds": [
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "app"
+    },
+    "r6RQkLiEwB4gxHw6Lwn1": {
+      "caption": "Serves block of the current chain.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "dFyinaNx7efXrjUt2HoF"
+      ],
+      "icon": null,
+      "id": "r6RQkLiEwB4gxHw6Lwn1",
+      "links": {
+        "7417e32afa1a966ea142f69e959ac71e26ec5e73": {
+          "name": "ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-MiniProtocol-BlockFetch-Server.html",
+          "type": "url",
+          "url": "https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-MiniProtocol-BlockFetch-Server.html",
+          "id": "7417e32afa1a966ea142f69e959ac71e26ec5e73",
+          "customName": "Ouroboros.Consensus.MiniProtocol.BlockFetch.Server",
+          "index": 0
+        }
+      },
+      "name": "Block fetch servers",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "XGJmR1ZcSS7hDumvVWAV": {
+      "caption": "Serves a random subset of known peers.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "dFyinaNx7efXrjUt2HoF"
+      ],
+      "icon": null,
+      "id": "XGJmR1ZcSS7hDumvVWAV",
+      "links": {
+        "2d831af5fb883182a09ed226795f760226e28ba3": {
+          "name": "ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-PeerSharing.html",
+          "type": "url",
+          "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-PeerSharing.html",
+          "id": "2d831af5fb883182a09ed226795f760226e28ba3",
+          "customName": "Ouroboros.Network.PeerSharing",
+          "index": 0
+        }
+      },
+      "name": "Peer sharing servers",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "TfoJOGd1uAiaVbF4iQMY": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "TfoJOGd1uAiaVbF4iQMY",
+      "links": {},
+      "name": "Immutable blocks",
+      "parentId": "DVxSPsgsdqVlhmVqUx3n",
+      "parentIds": [
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "store"
+    },
+    "O9KAupVBMeymDr4eocDM": {
+      "caption": "Stake pool operator",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "O9KAupVBMeymDr4eocDM",
+      "links": {},
+      "name": "SPO",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "actor"
+    },
+    "5C7JsC9iIIL7mAJUO4MO": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "5C7JsC9iIIL7mAJUO4MO",
+      "links": {},
+      "name": "kes",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "system"
+    },
+    "FeNmZ1wD2JAmnFyAnIkQ": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "FeNmZ1wD2JAmnFyAnIkQ",
+      "links": {},
+      "name": "dApp",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "system"
+    },
+    "zRLK7VIQ23TwXHETr4k0": {
+      "caption": "Fetches and validates votes against current committee",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "czzINgGe9Ca7MmLBHiwz"
+      ],
+      "icon": null,
+      "id": "zRLK7VIQ23TwXHETr4k0",
+      "links": {},
+      "name": "Leios votes clients",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "future",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "sgxpR7CaEpbwNPaK9ikV": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "sgxpR7CaEpbwNPaK9ikV",
+      "links": {},
+      "name": "Blockfrost",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "system"
+    },
+    "tzx0lY0K9KXuvDnEw0kJ": {
+      "caption": "Serves block headers of the tentative chain statefully through RollForward and RollBackward instructions.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "dFyinaNx7efXrjUt2HoF"
+      ],
+      "icon": null,
+      "id": "tzx0lY0K9KXuvDnEw0kJ",
+      "links": {
+        "2aa757de03e427b1f17193f3435be04dc9631759": {
+          "name": "ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-MiniProtocol-ChainSync-Server.html",
+          "type": "url",
+          "url": "https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-MiniProtocol-ChainSync-Server.html",
+          "id": "2aa757de03e427b1f17193f3435be04dc9631759",
+          "customName": "Ouroboros.Consensus.MiniProtocol.ChainSync.Server",
+          "index": 0
+        }
+      },
+      "name": "Chain sync servers",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "yEnXjcSF2Ng4uiGXW9js": {
+      "caption": "Cold, efficient storage of blocks past the immutable tip.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "KZyNbEHvPltIlkXN8DqQ"
+      ],
+      "icon": null,
+      "id": "yEnXjcSF2Ng4uiGXW9js",
+      "links": {},
+      "name": "ImmutableDB",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "1QVQUO2S1zCCvZAa2J1s": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "1QVQUO2S1zCCvZAa2J1s",
+      "links": {},
+      "name": "Mithril",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "system"
+    },
+    "iISTq038AWRJGcHZuZvh": {
+      "caption": "Keeps valid transactions up to some capacity. A sync thread will re-validate transactions on ledger state changes.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "iISTq038AWRJGcHZuZvh",
+      "links": {
+        "751ffa52cda55cd7296bd2089b3b9e3abae0ad14": {
+          "name": "ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-Mempool-API.html",
+          "type": "url",
+          "url": "https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-Mempool-API.html",
+          "id": "751ffa52cda55cd7296bd2089b3b9e3abae0ad14",
+          "customName": "Ouroboros.Consensus.Mempool.API",
+          "index": 0
+        }
+      },
+      "name": "Mempool",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "RyPTueHfAC1hajnCcrVq": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "RyPTueHfAC1hajnCcrVq",
+      "links": {},
+      "name": "KES keys",
+      "parentId": "DVxSPsgsdqVlhmVqUx3n",
+      "parentIds": [
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "store"
+    },
+    "HaVnhyry7S5THRGMIk59": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "HaVnhyry7S5THRGMIk59",
+      "links": {},
+      "name": "Outbound",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "group"
+    },
+    "1xbZRh0Tb2J4Ihk6Lrlq": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "1xbZRh0Tb2J4Ihk6Lrlq",
+      "links": {},
+      "name": "mithril-client",
+      "parentId": "DVxSPsgsdqVlhmVqUx3n",
+      "parentIds": [
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "app"
+    },
+    "uPmlSaASXtoPnzsxrpMd": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "uPmlSaASXtoPnzsxrpMd",
+      "links": {},
+      "name": "Hydra operator",
+      "parentId": "K03v6Jfo0bXiPBjQ4ACs",
+      "parentIds": [
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "actor"
+    },
+    "rR4uk2hxqj9ScQOdzsdQ": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "rR4uk2hxqj9ScQOdzsdQ",
+      "links": {},
+      "name": "N2C Tx submission server",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "K03v6Jfo0bXiPBjQ4ACs": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "K03v6Jfo0bXiPBjQ4ACs",
+      "links": {},
+      "name": "",
+      "parentId": null,
+      "parentIds": [],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "root"
+    },
+    "ayWS3CpGe5RwcIJavTia": {
+      "caption": "Facade for immutable, volatile and ledger DBs; keeps a current chain and runs chain selection.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "KZyNbEHvPltIlkXN8DqQ"
+      ],
+      "icon": null,
+      "id": "ayWS3CpGe5RwcIJavTia",
+      "links": {},
+      "name": "Chain DB",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    },
+    "vRlYODitHkoLysPyMgFE": {
+      "caption": "",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [],
+      "icon": null,
+      "id": "vRlYODitHkoLysPyMgFE",
+      "links": {},
+      "name": "dbSync",
+      "parentId": "DVxSPsgsdqVlhmVqUx3n",
+      "parentIds": [
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "live",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "app"
+    },
+    "VCRRfVLbYR2Y0DOR0mRz": {
+      "caption": "Clients that fetch Leios data as decided by the Leios fetching decision logic.",
+      "description": "",
+      "domainId": "vbWxN6NHOo2Qzqa6rako",
+      "external": false,
+      "groupIds": [
+        "czzINgGe9Ca7MmLBHiwz"
+      ],
+      "icon": null,
+      "id": "VCRRfVLbYR2Y0DOR0mRz",
+      "links": {},
+      "name": "Leios fetch clients",
+      "parentId": "8FagNabdvRt5eGx7fz3W",
+      "parentIds": [
+        "8FagNabdvRt5eGx7fz3W",
+        "DVxSPsgsdqVlhmVqUx3n",
+        "K03v6Jfo0bXiPBjQ4ACs"
+      ],
+      "status": "future",
+      "tagIds": [],
+      "teamIds": [],
+      "technologyIds": [],
+      "type": "component"
+    }
+  },
+  "tagGroups": {},
+  "tags": {},
+  "teams": {
+    "Yu2tmNCufyF7DYnUgdiN": {
+      "id": "Yu2tmNCufyF7DYnUgdiN",
+      "name": "Consensus"
+    }
+  },
+  "technologies": {}
+}
