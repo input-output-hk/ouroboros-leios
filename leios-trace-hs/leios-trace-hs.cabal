@@ -18,6 +18,7 @@ common warnings
 library
     import:           warnings
     exposed-modules:
+        ChainEvents
         LeiosConfig
         LeiosEvents
         LeiosTopology

@@ -136,7 +136,7 @@ library
     , gtk3
     , hashable
     , IntervalMap
-    , io-classes
+    , io-classes:{io-classes, si-timers}
     , io-sim
     , kdt
     , lens
@@ -144,15 +144,13 @@ library
     , linear
     , mtl
     , nothunks
-    , ouroboros-network-api
-    , ouroboros-network-mock
+    , ouroboros-network:{api, api-tests-lib, protocols-tests-lib}
     , pango
     , pqueue
     , quiet
     , random
     , scientific
     , serialise
-    , si-timers
     , singletons
     , sqlite-simple              >=0.4
     , statistics
