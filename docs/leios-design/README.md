@@ -744,6 +744,57 @@ In the current design, downstream peers send the following messages for EB diffu
 - TODO how would cancellations be handled?
   Especially since they could arrive after we sent our reply :grimace:
 
+#### Bounding in-memory state
+
+All of the new Leios state must require only bounded memory usage (**NEW-LeiosBoundedMemory**).
+The previous section bounds the number of incoming messages in terms of the number of upstream/downstream peers and (multiplicatively) the number of sufficiently young elections in the Praos leader schedule (which is reused as the Leios leader schedule), and the node's memory usage must also be bounded.
+
+The above requirements for detecting junk messages from upstream peers force the node to maintain state that summarizes which announcements/equivocation proofs/offers each upstream peer has already sent.
+The similar requirements for messages from downstream peers seem to only require much simpler state (merely a counter and a buffer size limit), which would be appealing because there are so many more downstream peers than upstream peers.
+Surprisingly, because of symmetry, the node must unfortunately keep some similar state for downstream peers so that it can avoid sending messages that they would consider junk.
+For example, if a downstream peer connects after some announcement becomes too old to relay but before the node acquires the EB body, the node must not offer that body to that peer, since the node never sent the corresponding announcement to that peer.
+(It may be tempting to suggest that the node could send the announcement along with the offer in this case, but the announcement might be too old for the peer to accept it and whether the announcement has already been sent is the very state in question.)
+
+Because the required state is not obvious, this subsection explicitly lists which in-memory state the above design requires.
+It also makes it obvious that this state can be trimmed as the immutable tip advances, by explicitly limiting itself to _volatile_ elections, which are the elections that are not older than the current immutable tip.
+
+- For EB diffusion, for each downstream peer, the node must track:
+    - The difference between the number of notifications sent (SN) and number of notifications requested (RN).
+      (If it's too great, the node disconnects, so this isn't unbounded.)
+    - Which volatile announcements---i.e. announcements for a volatile election---the node has relayed to this peer.
+      This varies per peer for two reasons: peers connect at different times and even a connected peer might not have had sent an unconsumed notification request when this node relayed the announcement.
+
+- For EB diffusion, for each upstream peer, the node must track:
+    - Which requests the node has sent to this peer.
+    - Which announcement this peer first sent for each volatile election.
+    - Which volatile equivocation proofs---i.e. proofs of equivocation of a volatile election---this peer has sent.
+    - Which volatile EBs'---i.e. EBs announced by at least one volatile announcement---bodies and/or closures this peer has offered.
+
+The node does not need to track which equivocation proofs or offers it has relayed to each peer, because the node only sends notifications when it first acquires the equivocation proof/body/closure, which fundamentally only happens once.
+The node does, however, need to track which equivocation proofs/bodies/closures have not yet arrived centrally for that reason---and more state as well for other behaviors specified above.
+
+- For EB diffusion, the node centrally tracks:
+    - The first announcement it saw for each volatile election.
+    - The second announcement (a.k.a. equivocation proof), if any, it saw (soon enough to matter) for each volatile election.
+    - Which volatile-announced EB bodies it has already acquired, so that it does not re-request bodies it already has.
+    - Which portions of volatile-announced EB closures it still needs to request, so that it does not re-request portions it already has.
+    - Which volatile-announced EB closures it has already acquired (see Chain selection below).
+    - Which RBs in the VolDB are CertRBs (see Chain selection below).
+    - Which EB, if any, each RB in the VolDB announces (see Chain selection below).
+    - Which announcement, if any, has been certified for each volatile election (see Block validation below), since that might cause this node to fetch a second EB (the certified announcement's) for an election.
+      (There cannot be more than one certified announcement per election unless the adversary controls >50% of the committee, which is already a disaster.)
+
+All of this state is obviously bounded (e.g. the difference of SN and RN) or else ultimately traceable to the set of volatile elections.
+With some care (e.g. race conditions, accounting for transport time/clock skew, etc), that makes it trivial to bound this state as time passes: whenever the immutable tip advances, drop state that's only relevant to elections older (or, e.g., at least 10 minutes older) than the new immutable tip.
+
+The number of volatile elections is stochastically bounded, so the above discharges the requirement.
+In practice, the number of such elections depends on the protocol parameters and the applicable risk tolerance.
+For Cardano mainnet, a sufficient quantity is 10,000 elections---that incurs an error probability below $10^{-30}$ even assuming a maximally old immutable tip (36 hr), a grinding adversary, a perfectly uniform infinite stake distribution, and multiple decades' worth of slots.
+
+TODO what would happen if there's 10,001 elections?
+
+TODO other non-diffusion components, such as voting, should also contribute to this list/have their own
+
 ### Endorser block storage
 
 Unlike votes, a node should retain the closures of older EBs (**NEW-LeiosEbStore**), because Praos allows for occasional deep forks, the most extreme of which could require the closure of an EB that was announced by the youngest block in the Praos Common Prefix. On Cardano mainnet, that RB is usually 12 hours old, but could be up to 36 hours old before [CIP-0135 Disaster Recovery Plan](https://cips.cardano.org/cip/CIP-0135) is triggered. Thus, EB closures are not only large but also have a prohibitively long lifetime even when they're ultimately not immortalized by the historical chain.
