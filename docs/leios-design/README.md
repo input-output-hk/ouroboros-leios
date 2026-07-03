@@ -720,21 +720,27 @@ In the current design, upstream peers send the following messages for EB diffusi
       (A syncing honest node won't request notifications until its caught-up; see "Catching up" below.)
 - An _EB body_ from this peer causes disconnection when any of the following hold.
     - The node didn't send a request for (this copy of) it from this peer.
+      For this revision, the corresponding request must in fact be the oldest body-or-closure request the node sent to this peer.
+      (TODO a later revision might allow the peer to send replies to out-of-order higher priority requests first, when possible.)
     - Its contents do not match the hash and size listed in the announcement.
 - An _EB closure portion_ from this peer causes disconnection when any of the following hold.
     - The node didn't send a request for (this copy of) it from this peer.
-    - Its contents do not match the full hashes and sizes listed in the EB body for the transactions we requested.
+      For this revision, the corresponding request must in fact be the oldest body-or-closure request the node has sent to this peer.
+      (TODO a later revision might allow the peer to send replies to out-of-order higher priority requests first, when possible.)
+    - Its contents do not match the full hashes and sizes listed in the EB body for the transactions in the corresponding request.
 
 In the current design, downstream peers send the following messages for EB diffusion.
 
 - A _notification request_ causes disconnection when any of the following hold.
-    - 300 < RN - SN, where RN is the number of notification requests we've received from this peer and SN is the number of notifications (announcements/equivocation proofs/offers) we've sent this peer.
+    - SN + 300 ≤ RN, where RN is the number of notification requests the node has received from this peer and SN is the number of notifications (announcements/equivocation proofs/offers) the node has sent this peer.
 - An _EB body request_ causes disconnection when any of the following hold.
+    - This peer has sent body-or-closure requests whose cumulative own size (as opposed to the size of the corresponding replies) is obviously greater than it would ever need to be (2 MB buffer?) before this node has processed even one of them.
     - The node doesn't currently have that EB body in our Leios storage.
     - (Rate-limit is handled outside the node, e.g. `fail2ban`.)
 - An _EB closure portion request_ causes disconnection when any of the following hold.
+    - This peer has sent body-or-closure requests whose cumulative own size (as opposed to the size of the corresponding replies) is obviously greater than it would ever need to be (2 MB buffer?) before this node has processed even one of them.
     - The node doesn't currently have that EB closure portion in our Leios storage.
-    - (Rate-limit is handled outside the node, e.g. `fail2ban`.)
+    - (Rate-limit is handled outside the node, e.g. `fail2ban`.
 - TODO how would cancellations be handled?
   Especially since they could arrive after we sent our reply :grimace:
 
