@@ -677,7 +677,7 @@ Additionally, the current design includes a new bit in the Praos header allowing
 Together, this information is sufficient to enable the recovery path for the occasional node that needs to offer and/or fetch a second EB for some election.
 (TODO If we change the design so that RbHeaders are no longer announcements, then the cert bit could be expanded to include the certified announcement, in which case all the necessary values are still in MsgRollForward.)
 
-If the certified EB on a desirable Praos chain is different than the first announcement seen for that same election, then the cert-carrying Praos block (a.k.a. CertRB) will arrive before the certified EB (TODO this belongs in the later subsections?).
+If the certified EB on a desirable Praos chain is different than the first announcement seen for that same election, then the cert-carrying Praos block (a.k.a. CertRB) will arrive before the certified EB.
 Once the node validates the certificate, it can then do the second round of fetching.
 Some of its peers may have originally offered the certified announcement's EB.
 Any peer that instead relayed a wrong announcement for this election could also offer the certified announcment's EB simply by sending the two MsgRollForwards (which it will already do for the sake of ChainSync): the first announces the EB and the second claims to have selected the CertRB, which is impossible unless the peer also has both the EB body and EB closure.
@@ -808,15 +808,43 @@ Once enough votes have been collected for an EB, a certificate can be formed and
 
 ### Chain selection
 
-> [!WARNING]
->
-> FIXME: describe at least one approach on preventing selectin of incomplete blocks + interaction with fetching logic
->
-> TODO: Discuss two alternatives: staging area vs. enhancing chain selection
+Leios does not change which chain the node prefers; it still must select the best chain it has acquired for the same definition of _best_ as today.
+Leios does, on the other hand, change the definition of whether a chain is _acquired_, because a chain that includes CertRBs is not acquired before those certified EBs are acquired.
+The existing ChainSel logic already includes a similar corner-case, because RBs might arrive out of order (at least when syncing).
+Not being able to select a CertRB because its certified EB is still missing is directly comparable to not being able to select an RB because its predecessor RB is still missing.
+That same ChainSel mechanism will be enriched to also understand EB dependencies (**UPD-LeiosChainSelAndVolDB**).
 
-Each CertRB must be buffered in a staging area (**NEW-LeiosCertRbStagingArea**) until its closure arrives, since the VolDB only contains RBs that are ready for ChainSel. (Note that a CertRB's closure will usually have arrived before it did.) (TODO Any disadvantages? For example, would it be beneficial to detect an invalid certificate before the closure arrives?) (TODO a more surgical alternative: the VolDB index could be aware of which EB closures have arrived, and the path-finding algorithm could incorporate that information. However, this means each EB arrival may need to re-trigger ChainSel.) The BlockFetch client (**UPD-LeiosRbBlockFetchClient**) must only directly insert a CertRB into the VolDB if its closure has already arrived (which should be common due to L_diff). Otherwise, the CertRB must be deposited in the CertRB staging area instead.
+- The VolDB in-memory index will also record for each RB in the VolDB whether that RB contains a Leios certificate.
+- ChainSel/VolDB will be provided access to an in-memory index of which EB closures have been acquired.
+- When ChainSel queries the VolDB for the set of candidate chains to consider for immediate selection, the VolDB will exclude CertRBs that certify an EB whose closure has not yet been acquired.
+  That filter also requires an in-memory index of which EB closure is announced by each RB in the VolDB.
+  (Note that that set of RBs might include some that were not (TODO yet?) processed as announcements by this node's Leios logic, since the Leios logic does bounded work per election.
+  Hence it seems reasonable for the VolDB itself to own and maintain that index.)
+- A new ChainSel trigger will allow the arrival of an EB closure to retrigger ChainSel for CertRBs that are unblocked by that arrival.
+  (The similar trigger for when the Genesis implementation's Limit on Eagerness (LoE) advances is a precedent.)
+
+In Block Diffusion Pipelining via Deferred Validation, the node sometimes sends the MsgRollForward for an RB's header when ChainSel begins to fully process the RB.
+In the case of a CertRB, the downstream ChainSync peers will interpret that MsgRollForward as an offer of its predecessor's EB closure.
+Note that that is safe only because ChainSel does not attempt to fully process the CertRB before it has the EB closure.
+Were that not true, then this MsgRollForward might cause an honest downstream peer to request a closure this node doesn't have, which would cause this node to disconnect from that honest peer.
 
 ### Block validation
+
+#### Prompt validation of CertRBs
+
+Because a CertRB is nothing more than the RB header paired with a certificate, that CertRB is valid if and only if its header and certificate are valid.
+The node only fetches an RB if it has already validated its header, and validating the header requires the forecasted LedgerView, so if the RB is present, then it must be within the node's LedgerView forecast range.
+(TODO that's also true for an RB the node itself issued.)
+The forecasted LedgerView is also sufficient for the validation of the certificate, since the corresponding Leios committee is fixed by one of the Ledger's `mark` or `set` snapshots.
+Thus, when a CertRB arrives, the node can immediately validate it even if the node has not yet downloaded all of the predecessor RBs and certified EBs that would be necessary to construct the CertRB's ledger state.
+
+ChainSel cannot _completely process_ the CertRB before those blocks arrive, because ChainSel must also produce the CertRB's resulting ledger state, which requires its preceding ledger state, which requires those blocks.
+But whether or not the certificate is valid can be immediately judged.
+That's useful to do as soon as possible, because it may be the first and possibly even the only indication that allows the LeiosFetch logic to recover from having seen the wrong announcement first due to a violation of $L_\text{hdr}$ or even having seen no timely announcement at all.
+Since this validated-certificate signal can be the only thing that triggers LeiosFetch to fetch the certified EB, if the signal could not arise until that EB were already fetched, the EB would never be fetched at all.
+Validating the certificate without the EB is precisely what breaks that circularity.
+
+#### Proper application of CertRBs
 
 > [!WARNING]
 >
@@ -824,7 +852,7 @@ Each CertRB must be buffered in a staging area (**NEW-LeiosCertRbStagingArea**) 
 >
 > FIXME: Don't inline transactions into the block for the ledger, but instead propose a design that invokes ledger (via `ApplyTx`) separately in block validation. Alternative: new ledger rule for EBBODY validation (see note below). Moved here from the former Ledger / "New block structure" section.
 
-The LedgerDB (**UPD-LeiosLedgerDb**) will need to retrieve the certified EB's closure from the LeiosEbStore when applying a CertRB. Due to **NEW-LeiosCertRbStagingArea**, it should be impossible for that retrieval to fail.
+The LedgerDB (**UPD-LeiosLedgerDb**) will need to retrieve the certified EB's closure from the LeiosEbStore when applying a CertRB. Due to **UPD-LeiosChainSelAndVolDB**, it should be impossible for that retrieval to fail.
 
 In Praos, all transactions to be verified and applied to the ledger state are included directly in the block body. In Leios, ranking blocks (RB) may not include transactions directly, but instead certificate and reference to an endorsement block (EB) that further references the actual transactions. This gives rise to the following requirements:
 
@@ -848,7 +876,7 @@ For the first version of the LedgerDB, it need not explicitly store EB's ledger 
 
 > [!WARNING]
 >
-> TODO: Write about a more efficient way to catch up than to deal with staging area / out of order chain selection
+> TODO: Write about a more efficient way to catch up than to deal with out of order chain selection
 
 ## Ledger
 
