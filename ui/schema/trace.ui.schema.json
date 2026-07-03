@@ -23,6 +23,10 @@
     },
     "UIEBGenerated": {
       "properties": {
+        "closure_size_bytes": {
+          "description": "Sum of the referenced txs' byte sizes — how much a peer has to\ndownload to reconstruct the EB's tx closure. Prototype\n'closureSize' on `LeiosBlockForged`; absent on simulator traces.",
+          "type": "number"
+        },
         "id": {
           "type": "string"
         },
@@ -30,6 +34,7 @@
           "type": "string"
         },
         "size_bytes": {
+          "description": "On-wire size of the EB body — the (txHash, txSize) table peers pull\nbefore fetching the referenced txs. Prototype 'ebSize' on\n`LeiosBlockForged`.",
           "type": "number"
         },
         "slot": {
