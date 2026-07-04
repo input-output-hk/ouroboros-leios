@@ -3,31 +3,30 @@ name: "simulation"
 on:
   pull_request:
     paths:
-      - "cabal.project"
-      - "data/**"
       - "simulation/**"
       - "leios-trace-hs/**"
-      - "analysis/sims/trace-processor/**"
+      - "data/**"
   push:
     branches:
       - main
     paths:
-      - "cabal.project"
-      - "data/**"
       - "simulation/**"
       - "leios-trace-hs/**"
-      - "analysis/sims/trace-processor/**"
+      - "data/**"
 
 jobs:
   simulation-test:
     name:
       "simulation: Test on ${{ matrix.os }} with GHC ${{ matrix.ghc-version }}"
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: simulation
     strategy:
       fail-fast: false
       matrix:
         os: [macos-14, ubuntu-22.04]
-        ghc-version: ["9.10.1"]
+        ghc-version: ["9.10.3"]
 
     steps:
       - name: 📥 Checkout repository
@@ -66,7 +65,7 @@ jobs:
         with:
           path: ${{ steps.setup.outputs.cabal-store }}
           key:
-            ${{ env.key }}-plan-${{ hashFiles('dist-newstyle/cache/plan.json')
+            ${{ env.key }}-plan-${{ hashFiles('simulation/dist-newstyle/cache/plan.json')
             }}
           restore-keys: ${{ env.key }}-
 

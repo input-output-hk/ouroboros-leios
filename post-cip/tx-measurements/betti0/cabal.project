@@ -1,0 +1,6 @@
+index-state:
+  , hackage.haskell.org 2024-10-04T11:45:34Z
+
+packages: .
+
+tests: True
