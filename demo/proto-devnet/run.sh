@@ -145,11 +145,9 @@ for i in "${nodes[@]}"; do
   chmod 400 "$NODE_DIR/keys"/*.skey
 done
 
-# Copy utxo-keys for tx-firehose and set permissions
-echo "Setting up utxo-keys for tx-firehose"
-cp -r "$CONFIG_DIR/utxo-keys" "$WORKING_DIR/utxo-keys"
-find "$WORKING_DIR/utxo-keys" -name "*.skey" -exec chmod 400 {} \;
-envsubst <"${CONFIG_DIR}/firehose.template.json" >"${WORKING_DIR}/firehose.json"
+# tx-firehose reads its delegator payment/staking .skey files directly from
+# $SOURCE_DIR/config/stake-delegators/delegator1/ (see process-compose.yaml).
+# No copy or config-file generation needed.
 
 # Configure alloy for x-ray observability (named config.alloy to avoid conflict with alloy/ storage dir)
 export ALLOY_CONFIG="${WORKING_DIR}/config.alloy"

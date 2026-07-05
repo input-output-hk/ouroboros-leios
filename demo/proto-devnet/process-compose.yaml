@@ -46,11 +46,20 @@ processes:
 
   TxFirehose:
     working_dir: ${WORKING_DIR}
-    command: tx-firehose firehose.json
+    command: >
+      tx-firehose
+      --socket-path node1/node.socket
+      --testnet-magic 164
+      --signing-key-file ${SOURCE_DIR}/config/stake-delegators/delegator1/payment.skey
+      --staking-key-file ${SOURCE_DIR}/config/stake-delegators/delegator1/staking.skey
+      --tps 100
+      --fee 1000000
     log_location: "${WORKING_DIR}/tx-firehose.log"
     depends_on:
       Node1:
         condition: process_healthy
+    availability:
+      restart: on_failure
 
   ObserveTip:
     environment:
