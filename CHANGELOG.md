@@ -5,6 +5,27 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w27 - 2026-07-05
+
+**BREAKING** changes to block serialization as we added proper Leios certificates and also changed how EB announcements are encoded in block headers.
+
+**Requires respin:** Delete your local state and use the new `musashi` network config from https://book.play.dev.cardano.org/adv-musashi.html
+
+- Resolve `LeiosDbConfig` relative to `--database-path` [#959](https://github.com/input-output-hk/ouroboros-leios/issues/959)
+  - This will put `leios.db` next to `volatile/` storage by default. Can be overridden using relative or absolute paths in `LeiosDbConfig.Filepath` .
+
+- Replace staging area with out of order processing of EBs in chain selection [consensus#2076](https://github.com/IntersectMBO/ouroboros-consensus/pull/2076)
+  - Should result in (slightly) faster catch-up and less/no timeouts of the block fetch protocol.
+  - No API changes, but different error calls if things go bad.
+
+- Aggregate and verify proper Leios certificates in block bodies [#790](https://github.com/input-output-hk/ouroboros-leios/issues/790), [ledger#5872](https://github.com/IntersectMBO/cardano-ledger/pull/5872) and [consensus#2102](https://github.com/IntersectMBO/ouroboros-consensus/pull/2102)
+  - The last big part of the voting and certification pipeline will require enough votes (75% of stake) before endorsed transactions can get applied and contribute to the throughput.
+  - Still basic committee selection of "everyone votes".
+  - No equivocation detection or EB tx validation (yet).
+  - L_hdr = 1, L_vote = 4, L_diff = 3 (implicitly via min cert age >= 10 slots)
+
+- More changes to the block header encoding of announcements [ledger#5889](https://github.com/IntersectMBO/cardano-ledger/pull/5889).
+
 ## prototype-2026w26 - 2026-06-26
 
 Minor fixes to the Dijkstra era cli plumbing. No node updates in this release
