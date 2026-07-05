@@ -44,16 +44,12 @@ processes:
       period_seconds: 2
       failure_threshold: 60
 
-  TxCentrifuge:
+  TxFirehose:
     working_dir: ${WORKING_DIR}
-    command: tx-centrifuge centrifuge.json
-    log_location: "${WORKING_DIR}/tx-centrifuge.log"
+    command: tx-firehose firehose.json
+    log_location: "${WORKING_DIR}/tx-firehose.log"
     depends_on:
       Node1:
-        condition: process_healthy
-      Node2:
-        condition: process_healthy
-      Node3:
         condition: process_healthy
 
   ObserveTip:

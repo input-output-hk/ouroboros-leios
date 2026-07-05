@@ -36,9 +36,9 @@
     # Patched cardano-node — source of cardano-node and cardano-cli
     # across the repo.
     cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
-    # tx-centrifuge only. TODO: track latest bench/leios once that
-    # branch is rebased onto something with no cooldown.
-    cardano-node-tx-centrifuge.url = "github:intersectmbo/cardano-node?rev=0ab6523057298eae80cb1aa1b23f4472480084be";
+    # tx-firehose only. Points at the ch1bo/tx-firehose branch, which adds
+    # a push-based single-node N2C load generator alongside tx-centrifuge.
+    cardano-node-tx-firehose.url = "github:intersectmbo/cardano-node?ref=ch1bo/tx-firehose";
   };
 
   outputs =

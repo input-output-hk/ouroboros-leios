@@ -22,8 +22,8 @@
           pkgs.jq
           pkgs.yq
           pkgs.envsubst
-          # tx-centrifuge from its own pinned input (bench/leios branch).
-          inputs'.cardano-node-tx-centrifuge.packages.tx-centrifuge
+          # tx-firehose: push-based N2C load generator targeting node1.
+          inputs'.cardano-node-tx-firehose.packages.tx-firehose
           # Patched cardano-node + matching CLI from the
           # leios-prototype branch.
           inputs'.cardano-node-leios.packages.cardano-node

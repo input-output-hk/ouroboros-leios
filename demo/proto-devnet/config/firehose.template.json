@@ -1,0 +1,10 @@
+{
+  "socketPath": "node1/node.socket",
+  "networkMagic": 164,
+  "signingKeyFile": "utxo-keys/utxo1/utxo.skey",
+  "tps": 100,
+  "inputsPerTx": 1,
+  "outputsPerTx": 1,
+  "fee": 1000000,
+  "reconcileEvery": 60
+}

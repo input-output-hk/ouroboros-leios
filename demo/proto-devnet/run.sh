@@ -50,7 +50,7 @@ REQUIRED_COMMANDS=(
   "envsubst"
   "cardano-node"
   "cardano-cli"
-  "tx-centrifuge"
+  "tx-firehose"
 )
 
 MISSING_COMMANDS=()
@@ -145,12 +145,11 @@ for i in "${nodes[@]}"; do
   chmod 400 "$NODE_DIR/keys"/*.skey
 done
 
-# Copy utxo-keys for tx-centrifuge and set permissions
-echo "Setting up utxo-keys for tx-centrifuge"
+# Copy utxo-keys for tx-firehose and set permissions
+echo "Setting up utxo-keys for tx-firehose"
 cp -r "$CONFIG_DIR/utxo-keys" "$WORKING_DIR/utxo-keys"
 find "$WORKING_DIR/utxo-keys" -name "*.skey" -exec chmod 400 {} \;
-cp -r "$CONFIG_DIR/funds.json" "$WORKING_DIR/funds.json"
-envsubst <"${CONFIG_DIR}/centrifuge.template.json" >"${WORKING_DIR}/centrifuge.json"
+envsubst <"${CONFIG_DIR}/firehose.template.json" >"${WORKING_DIR}/firehose.json"
 
 # Configure alloy for x-ray observability (named config.alloy to avoid conflict with alloy/ storage dir)
 export ALLOY_CONFIG="${WORKING_DIR}/config.alloy"
