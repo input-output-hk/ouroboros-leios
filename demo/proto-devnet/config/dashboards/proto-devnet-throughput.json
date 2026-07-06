@@ -118,7 +118,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Load (assumed 204B per tx)"
+              "options": "Load"
             },
             "properties": [
               {
