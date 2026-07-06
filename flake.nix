@@ -37,7 +37,9 @@
     # across the repo.
     cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
     # tx-firehose only. Points at the ch1bo/tx-firehose branch, which adds
-    # a push-based single-node N2C load generator alongside tx-centrifuge.
+    # a push-based single-node N2C load generator (spends via LocalTxSubmission,
+    # reacts to reject reasons, exits after a configurable run of consecutive
+    # rejects so a supervisor can restart-and-requery).
     cardano-node-tx-firehose.url = "github:intersectmbo/cardano-node?ref=ch1bo/tx-firehose";
   };
 
