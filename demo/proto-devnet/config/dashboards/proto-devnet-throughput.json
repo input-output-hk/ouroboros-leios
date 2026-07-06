@@ -187,10 +187,10 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "rate({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"}[30s]) * 204 / 1000",
+          "expr": "sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"} | json | unwrap size [30s]) / 30 / 1000",
           "hide": false,
           "instant": false,
-          "legendFormat": "Load (assumed 204B per tx)",
+          "legendFormat": "Load",
           "queryType": "range",
           "range": true,
           "refId": "Load"
