@@ -253,7 +253,7 @@
               }
             ]
           },
-          "unit": "reqps"
+          "unit": "TxkB/s"
         },
         "overrides": []
       },
@@ -289,7 +289,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "rate({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"}[30s])",
+          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"} | json size=\"size\" | unwrap size [30s])) / 30 / 1000",
           "legendFormat": "accepted",
           "queryType": "range",
           "refId": "A"
@@ -301,7 +301,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "rate({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Reject\"}[30s])",
+          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Reject\"} | json size=\"size\" | unwrap size [30s])) / 30 / 1000",
           "legendFormat": "rejected",
           "queryType": "range",
           "refId": "B"
@@ -368,7 +368,7 @@
               }
             ]
           },
-          "unit": "Bps"
+          "unit": "TxkB/s"
         },
         "overrides": []
       },
