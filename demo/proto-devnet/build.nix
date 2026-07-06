@@ -22,12 +22,11 @@
           pkgs.jq
           pkgs.yq
           pkgs.envsubst
-          # tx-firehose: push-based N2C load generator targeting node1.
-          inputs'.cardano-node-tx-firehose.packages.tx-firehose
-          # Patched cardano-node + matching CLI from the
-          # leios-prototype branch.
+          # Patched cardano-node, matching CLI, and tx-firehose (push-based
+          # N2C load generator targeting node1) — all from leios-prototype.
           inputs'.cardano-node-leios.packages.cardano-node
           inputs'.cardano-node-leios.packages.cardano-cli
+          inputs'.cardano-node-leios.packages.tx-firehose
         ];
         # To easily interact with node1 on the devnet from within the demo dir
         CARDANO_NODE_NETWORK_ID = 164;
