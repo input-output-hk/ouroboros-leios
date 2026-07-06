@@ -187,7 +187,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "rate({service=\"tx-firehose\"} |~ \"submitted\" [30s]) * 204 / 1000",
+          "expr": "rate({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"}[30s]) * 204 / 1000",
           "hide": false,
           "instant": false,
           "legendFormat": "Load (assumed 204B per tx)",
@@ -289,10 +289,22 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "rate({service=\"tx-firehose\"} |~ \"submitted\" [30s])",
-          "legendFormat": "tx/s",
+          "expr": "rate({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"}[30s])",
+          "legendFormat": "accepted",
           "queryType": "range",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "rate({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Reject\"}[30s])",
+          "legendFormat": "rejected",
+          "queryType": "range",
+          "refId": "B"
         }
       ],
       "title": "Submission load",
