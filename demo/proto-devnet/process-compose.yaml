@@ -60,6 +60,11 @@ processes:
         condition: process_healthy
     availability:
       restart: on_failure
+      # Wait between restarts so the mempool has time to clear a
+      # descendant tx from a prior tx-firehose incarnation that would
+      # otherwise cause every fresh submit to be rejected as
+      # AllInputsAreSpent against the same head UTxO.
+      backoff_seconds: 30
 
   ObserveTip:
     environment:
