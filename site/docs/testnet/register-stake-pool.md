@@ -299,9 +299,10 @@ If both look right, your pool is registered.
 ## Restart as block producer
 
 Stop the relay and restart it with the KES key, VRF key, and operational
-certificate so it can forge — this time launching `cardano-node`
-directly (the `nix run` / `run-node.sh` wrappers run a non-producing
-relay only).
+certificate so it can forge — extending the `cardano-node run`
+invocation from the previous guide (or, on the Nix path, replacing
+`nix run …#leios-testnet-relay` since that wrapper only runs a
+non-producing relay).
 
 :::tip Keep it up
 By now you should have settled on a way to keep the node running in the
@@ -345,7 +346,7 @@ docker run -d --name leios-producer \
   -p 3010:3010 \
   -v "$WORKING_DIR:/data" \
   -w /data \
-  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w26 \
+  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w27 \
   cardano-node run \
     --config config.json \
     --topology topology.json \

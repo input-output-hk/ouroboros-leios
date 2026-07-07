@@ -2,10 +2,10 @@
   "AlonzoGenesisFile": "alonzo-genesis.json",
   "AlonzoGenesisHash": "387a7c4880477ce7b128566fa7f9f9ed99ee04476084e9f6332b6d42d907faab",
   "ByronGenesisFile": "byron-genesis.json",
-  "ByronGenesisHash": "73522baa9b5c2afecb8794a17a5fc0650ba6621c0d96d0a18d514d94d3755efe",
+  "ByronGenesisHash": "6dcd75ebc4806830f911fe9ea52134730fee55963d2164725b70a288ab0b4d93",
   "ConsensusMode": "PraosMode",
   "ConwayGenesisFile": "conway-genesis.json",
-  "ConwayGenesisHash": "7b465adc9d084af42e3f7685e561e974e0804b7efeaed12cf2f1ee409e91cc99",
+  "ConwayGenesisHash": "be1957c0cd07a6e004ac139749ceccdf5adb510da804947d9da06f536646a259",
   "DijkstraGenesisFile": "dijkstra-genesis.json",
   "DijkstraGenesisHash": "c6afe2641a407ee17f3625ed304571c3762e3123d38f4d8ae663f765f6c2bcb6",
   "ExperimentalHardForksEnabled": true,
@@ -15,20 +15,25 @@
   "LastKnownBlockVersion-Minor": 1,
   "LedgerDB": {
     "Backend": "V2InMemory",
-    "NumOfDiskSnapshots": 2,
     "QueryBatchSize": 100000,
-    "SnapshotInterval": 864
+    "Snapshots": {
+      "MaxDelay": 600,
+      "MinDelay": 300,
+      "NumOfDiskSnapshots": 2,
+      "RateLimit": 600,
+      "SnapshotInterval": 864
+    }
   },
   "LeiosDbConfig": {
     "Backend": "SQLite",
     "Filepath": "leios.db"
   },
   "MempoolCapacityBytesOverride": 500000,
-  "MinNodeVersion": "11.0.1-leios-prototype",
+  "MinNodeVersion": "11.1.0-prototype-2026w27",
   "Protocol": "Cardano",
   "RequiresNetworkMagic": "RequiresMagic",
   "ShelleyGenesisFile": "shelley-genesis.json",
-  "ShelleyGenesisHash": "35381da1578c03d357599dce448cc6f3dddd5ae1020145b7c1cbd607607500e0",
+  "ShelleyGenesisHash": "e533fe77127432e7a96adc36af78250bf7cfd67fefba6bfd28e8667e8513911f",
   "TestAllegraHardForkAtEpoch": 0,
   "TestAlonzoHardForkAtEpoch": 0,
   "TestBabbageHardForkAtEpoch": 0,
@@ -135,14 +140,5 @@
     "Startup.DiffusionInit": {
       "severity": "Info"
     }
-  },
-  "TurnOnLogMetrics": true,
-  "TurnOnLogging": true,
-  "UseTraceDispatcher": true,
-  "defaultBackends": [],
-  "defaultScribes": [],
-  "minSeverity": "Critical",
-  "options": {},
-  "setupBackends": [],
-  "setupScribes": []
+  }
 }
