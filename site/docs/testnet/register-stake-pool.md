@@ -225,6 +225,16 @@ cardano-cli dijkstra transaction submit \
   --tx-file pool-reg-tx.signed
 ```
 
+:::warning `transaction build` broken in prototype-2026w27
+The `cardano-cli dijkstra transaction build` command above currently
+fails with the `prototype-2026w27` release. As a workaround, use the
+`cardano-cli` from the previous release
+([`prototype-2026w26`](https://github.com/input-output-hk/ouroboros-leios/releases/tag/prototype-2026w26))
+to build the transaction — signing and submission with the
+`prototype-2026w27` binary still work. Fix is being tracked; check the
+[Musashi Dōjō Discord](https://discord.gg/Bx2qvsjCte) for the latest.
+:::
+
 ## Delegate stake to your pool
 
 Your pledge only counts once your own stake is delegated to your pool.
