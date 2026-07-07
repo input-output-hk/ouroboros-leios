@@ -10,15 +10,15 @@ echo "Working directory created for upstream-node: $UPSTREAM_NODE_DIR"
 
 echo "Generate the Leios DB and the schedules"
 
-leiosdemo202510 generate \
+leios-schedule-gen \
   "$UPSTREAM_NODE_DIR/leios.db" \
   "$LEIOS_MANIFEST" \
   "$UPSTREAM_NODE_DIR/base-schedule.json"
 
 if [[ ! -v LEIOS_SCHEDULE ]]; then
-  # FIXME: Make this release time configurable
-  jq "map(.[0] = 128.9)" "$UPSTREAM_NODE_DIR/base-schedule.json" >"$UPSTREAM_NODE_DIR/schedule.json"
-  echo "LEIOS_SCHEDULE not set, using default"
+  : "${BURST_SLOT:=219.9}"
+  jq "map(.[0] = $BURST_SLOT)" "$UPSTREAM_NODE_DIR/base-schedule.json" >"$UPSTREAM_NODE_DIR/schedule.json"
+  echo "LEIOS_SCHEDULE not set, bursting all EBs at slot $BURST_SLOT"
 else
   cp -f "$LEIOS_SCHEDULE" "$UPSTREAM_NODE_DIR/schedule.json"
 fi

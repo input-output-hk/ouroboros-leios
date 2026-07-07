@@ -14,8 +14,21 @@ def log_message(message, time):
     print(json.dumps({"message": message, "time_s": time.total_seconds()}))
 
 
-fmt = "%Y-%m-%dT%H:%M:%S.%fZ"
-last_at = None
+def parse_at(at):
+    # Timestamps end in "Z" (UTC) and may carry sub-microsecond precision
+    # (the cardano-node log uses nanoseconds). strptime's %f handles at most
+    # 6 fractional digits, so truncate any excess.
+    at = at.rstrip("Z")
+    if "." in at:
+        head, frac = at.split(".", 1)
+        at = f"{head}.{frac[:6]}"
+        fmt = "%Y-%m-%dT%H:%M:%S.%f"
+    else:
+        fmt = "%Y-%m-%dT%H:%M:%S"
+    return datetime.strptime(at, fmt).replace(tzinfo=timezone.utc)
+
+
+last_dt = None
 last_SLC_slot = None
 
 for line in sys.stdin:
@@ -25,14 +38,23 @@ for line in sys.stdin:
         print(f"Error decoding JSON: {e}")
         exit(127)
 
-    if last_at is None:
-        last_at = obj["at"]
+    # The cardano-node log wraps each trace as a JSON-encoded string in the
+    # "message" field of an envelope object. Unwrap it. Lines whose message is
+    # not a trace (e.g. the plain-text startup banner) are skipped. The legacy
+    # un-wrapped format (trace object directly) is still accepted as-is.
+    if "ns" not in obj and isinstance(obj.get("message"), str):
+        try:
+            obj = json.loads(obj["message"])
+        except json.JSONDecodeError:
+            continue
+    if "ns" not in obj:
+        continue
 
-    curr_at = obj["at"]
-    time = datetime.strptime(curr_at, fmt).replace(
-        tzinfo=timezone.utc
-    ) - datetime.strptime(last_at, fmt).replace(tzinfo=timezone.utc)
-    last_at = curr_at
+    curr_dt = parse_at(obj["at"])
+    if last_dt is None:
+        last_dt = curr_dt
+    time = curr_dt - last_dt
+    last_dt = curr_dt
 
     if obj["ns"] == "Forge.Loop.AdoptedBlock":
         message = {
@@ -50,6 +72,32 @@ for line in sys.stdin:
             "type": "RBReceived",
             "recipient": obj["host"],
             "id": obj["data"]["block"],
+        }
+    elif (
+        obj["ns"] == "Consensus.LeiosKernel.TraceLeiosKernel"
+        and obj["data"].get("kind") == "LeiosBlockForged"
+    ):
+        message = {
+            "type": "EBGenerated",
+            "id": obj["data"]["hash"],
+            "slot": obj["data"]["slot"],
+            "pipeline": None,
+            "producer": obj["host"],
+            "size_bytes": obj["data"]["ebSize"],
+            "input_blocks": None,
+            "endorser_blocks": None,
+        }
+    elif obj["ns"] == "LeiosFetch.Remote.Receive.Block":
+        # The node received an endorser block (EB). The receive message carries
+        # only the EB hash, so slot/producer/sender are not available here.
+        message = {
+            "type": "EBReceived",
+            "id": obj["data"]["msg"]["ebHash"],
+            "slot": None,
+            "pipeline": None,
+            "producer": None,
+            "sender": None,
+            "recipient": obj["host"],
         }
     else:
         if obj["ns"] == "Forge.Loop.StartLeadershipCheck":

@@ -19,33 +19,26 @@ function HomepageHeader() {
   return (
     <>
       <header className={clsx("hero hero--primary")}>
-        <video className="hero-video-desktop" autoPlay muted loop playsInline>
-          <source
-            src="/homepage/hero-background-desktop.mp4"
-            type="video/mp4"
-          />
+        <video className="hero-video" autoPlay muted loop playsInline>
+          <source src="/homepage/masashi-hero-video.mp4" type="video/mp4" />
         </video>
-        <video className="hero-video-mobile" autoPlay muted loop playsInline>
-          <source src="/homepage/hero-background-mobile.mp4" type="video/mp4" />
-        </video>
-        <div className="hero-overlay" />
+
+        <div aria-hidden className="hero-overlay-top" />
+        <div aria-hidden className="hero-overlay-side" />
+        <div aria-hidden className="hero-overlay-bottom" />
 
         <div className={clsx("container hero-content")}>
           <div className={clsx("container-padding")}>
             <div className={styles.heroBanner}>
               <h1 className={styles.heroTitle}>{siteConfig.title}</h1>
-              <p className={styles.heroStandfirst}>{siteConfig.tagline}</p>
+              <h2 className={styles.heroSubtitle}>{siteConfig.tagline}</h2>
               <div className={styles.heroButtonsContainer}>
                 <a
                   className={clsx("primary-button homepage-button")}
-                  href="#dev-dashboard"
+                  href="https://musashi.network"
                 >
-                  View live development{" "}
-                  <ArrowRightIcon
-                    style={{ rotate: "90deg" }}
-                    height={12}
-                    width={12}
-                  />
+                  Go to musashi.network{" "}
+                  <ArrowRightIcon height={12} width={12} />
                 </a>
                 <a
                   className={clsx("secondary-button homepage-button")}
@@ -55,6 +48,12 @@ function HomepageHeader() {
                   Explore how it works <ArrowRightIcon height={12} width={12} />
                 </a>
               </div>
+              <p className={styles.heroExplainer}>
+                Cardano's throughput upgrade is now ready for testing. The
+                testnet, named the Musashi Dojo (武蔵道場), is a tribute to
+                Cardano's Japanese community and to the philosophy of Miyamoto
+                Musashi.
+              </p>
             </div>
           </div>
         </div>
@@ -88,23 +87,24 @@ function UTCDateTime(year, month, day, hour, minute = 0, second = 0) {
 let exceptions = {
   "2025-9": UTCDateTime(2025, 9, 1, 14),
   "2025-12": UTCDateTime(2025, 11, 17, 14),
+  "2026-6": UTCDateTime(2026, 6, 1, 14),
 };
 
 function getNextMeeting(now = new Date()) {
   let nextMeeting = getLastWednesdayOfMonth(now);
-  const meetingEndTime = new Date(nextMeeting.getTime() + 60 * 60 * 1000); // 1 hour after start
-
-  // If we're past the current month's meeting end time, get next month's meeting
-  if (now >= meetingEndTime) {
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    nextMeeting = getLastWednesdayOfMonth(nextMonth);
-  }
 
   // Unless there is an exception for next meeting
   const exception =
     exceptions[`${nextMeeting.getFullYear()}-${nextMeeting.getMonth() + 1}`];
   if (exception) {
     nextMeeting = exception;
+  }
+
+  // If we're past the current month's meeting end time, get next month's meeting
+  const meetingEndTime = new Date(nextMeeting.getTime() + 60 * 60 * 1000); // 1 hour after start
+  if (now >= meetingEndTime) {
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    nextMeeting = getLastWednesdayOfMonth(nextMonth);
   }
 
   return nextMeeting;
@@ -324,7 +324,12 @@ function MonthlyReviewsSection() {
         <div className="container-padding padding-section">
           <div className={styles.contentWrapper}>
             <div className={styles.stayUpToDateContent}>
-              <h2 style={{ marginBottom: "1.25rem" }}>Stay up to date</h2>
+              <h2
+                className={styles.stayUpdToDateHeading}
+                style={{ marginBottom: "1.25rem" }}
+              >
+                Stay up to date
+              </h2>
               <p>
                 Catch up on the latest Leios progress, key decisions, and Q&A in
                 our monthly review videos
@@ -344,7 +349,7 @@ function MonthlyReviewsSection() {
               <div className={styles.countdownContainer}>
                 <Link
                   className={styles.countdown}
-                  to="https://youtube.com/live/Z4uA9tRGS7g"
+                  to="https://youtube.com/live/85pYDGXU0r4"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -511,14 +516,17 @@ export default function Home(): React.ReactElement {
           <LeiosSpecificationSection />
           <HowLeiosWorksSection />
         </div> */}
-        <iframe
-          ref={iframeRef}
-          src="https://engineering.iog.io/documentation-dashboard"
-          title="Leios"
-          className={styles.devTracker}
-          id="dev-dashboard"
-        />
-
+        <div className={styles.devTrackerContainer}>
+          <iframe
+            ref={iframeRef}
+            src="https://engineering.iog.io/documentation-dashboard"
+            title="Leios"
+            className={styles.devTracker}
+            id="dev-dashboard"
+          />
+          <div aria-hidden className={styles.devTrackerOverlayTop} />
+          <div aria-hidden className={styles.devTrackerOverlayBottom} />
+        </div>
         <MonthlyReviewsSection />
 
         {/* <LeiosSpecificationSection />

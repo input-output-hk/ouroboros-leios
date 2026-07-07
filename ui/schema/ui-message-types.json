@@ -1,0 +1,20 @@
+[
+  "EBGenerated",
+  "EBReceived",
+  "EBSent",
+  "RBGenerated",
+  "RBReceived",
+  "RBSent",
+  "TXGenerated",
+  "TXReceived",
+  "TXSent",
+  "TxsGenerated",
+  "TxsReceived",
+  "TxsSent",
+  "VTBundleGenerated",
+  "VTBundleReceived",
+  "VTBundleSent",
+  "VotesGenerated",
+  "VotesReceived",
+  "VotesSent"
+]

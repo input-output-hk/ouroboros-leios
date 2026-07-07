@@ -1,0 +1,2 @@
+> [!NOTE]
+> This directory contained preliminary CDDL drafts that were prepared for the [Leios CIP-164](https://cips.cardano.org/cip/CIP-0164). As this is published now, we removed the original drafts here to avoid any confusion. Find them back before commit [52f416a272f51dd550bccc0b476785108a11f84c](https://github.com/input-output-hk/ouroboros-leios/tree/52f416a272f51dd550bccc0b476785108a11f84c/docs/cddl)

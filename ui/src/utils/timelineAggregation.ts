@@ -2,12 +2,14 @@ import {
   IServerMessage,
   EServerMessageType,
   ITransformedNodeMap,
+  IVote,
 } from "@/components/Sim/types";
 import {
   ISimulationAggregatedData,
   ISimulationAggregatedDataState,
   EMessageType,
   ActivityAction,
+  IChainState,
   IMessageTypeCounts,
   INodeActivityState,
 } from "@/contexts/SimContext/types";
@@ -19,7 +21,7 @@ const MESSAGE_PRIORITY_ORDER = [
   EMessageType.RB, // Highest priority
   EMessageType.EB,
   EMessageType.Votes,
-  EMessageType.TX, // Lowest priority
+  EMessageType.Txs, // Lowest priority
 ];
 
 export const getHighestPriorityMessageType = (
@@ -37,11 +39,43 @@ const createEmptyMessageTypeCounts = (): IMessageTypeCounts => ({
   [EMessageType.RB]: 0,
   [EMessageType.EB]: 0,
   [EMessageType.Votes]: 0,
-  [EMessageType.TX]: 0,
+  [EMessageType.Txs]: 0,
 });
 
 const getTotalActiveCount = (counts: IMessageTypeCounts): number => {
   return Object.values(counts).reduce((sum, count) => sum + count, 0);
+};
+
+// Resolve a single Vote to the EB it credits. Prototype votes target the
+// announcing RB (`rbHash`) and require the RB to be in the chain to be
+// resolvable; simulator and older prototype votes reference the EB directly.
+// Returns null when neither path resolves — the caller should defer the
+// vote until later (the missing RB/EB may show up in a later event).
+const resolveVoteEbId = (chain: IChainState, vote: IVote): string | null => {
+  const ebId =
+    vote.ebHash ??
+    (vote.rbHash ? chain.rbs.get(vote.rbHash)?.announcesEbId : undefined);
+  if (!ebId) return null;
+  if (!chain.ebs.has(ebId)) return null;
+  return ebId;
+};
+
+const creditVoteToEb = (chain: IChainState, vote: IVote, ebId: string) => {
+  const eb = chain.ebs.get(ebId);
+  if (!eb) return;
+  eb.voteCount = (eb.voteCount ?? 0) + (vote.weight ?? 1);
+  (eb.votes ??= []).push(vote);
+};
+
+// Drain pending votes whose RB/EB has since appeared in the chain.
+const drainPendingVotes = (chain: IChainState, pending: IVote[]): IVote[] => {
+  const stillPending: IVote[] = [];
+  for (const v of pending) {
+    const ebId = resolveVoteEbId(chain, v);
+    if (ebId) creditVoteToEb(chain, v, ebId);
+    else stillPending.push(v);
+  }
+  return stillPending;
 };
 
 // Helper function to update node activity state
@@ -142,6 +176,7 @@ const createMessageAnimation = (
   targetTime: number,
   travelTime: number,
   sizeBytes: number,
+  extra?: { slot?: number; votes?: IVote[]; numTxs?: number },
 ) => {
   const estimatedReceiveTime = sentTime + travelTime;
 
@@ -190,6 +225,7 @@ const createMessageAnimation = (
       receivedTime: estimatedReceiveTime,
       progress,
       sizeBytes,
+      ...extra,
     });
   }
   // Note: We don't handle the "completed" case here since we need to process
@@ -254,6 +290,7 @@ export const computeAggregatedDataAtTime = (
       byType: {},
     },
     lastAggregatedTime: targetTime,
+    chain: { rbs: new Map(), ebs: new Map() },
   };
 
   // Process timeline events up to target time with early termination
@@ -266,10 +303,10 @@ export const computeAggregatedDataAtTime = (
   ): { sender: string; recipient: string } => {
     const { message } = event;
     switch (message.type) {
-      case EServerMessageType.TransactionSent:
+      case EServerMessageType.TxsSent:
       case EServerMessageType.EBSent:
       case EServerMessageType.RBSent:
-      case EServerMessageType.VTBundleSent:
+      case EServerMessageType.VotesSent:
         return {
           sender: (message as any).sender,
           recipient: (message as any).recipient,
@@ -311,7 +348,7 @@ export const computeAggregatedDataAtTime = (
     startIndex: number,
   ): number | null => {
     const messageType = sentEvent.message.type;
-    const { recipient } = getMessageParticipants(sentEvent);
+    const { sender, recipient } = getMessageParticipants(sentEvent);
     const sentTime = sentEvent.time_s;
     const messageId = (sentEvent.message as any).id;
 
@@ -325,19 +362,20 @@ export const computeAggregatedDataAtTime = (
 
       // Check if this is a matching received event
       const isMatchingReceived =
-        (messageType === EServerMessageType.TransactionSent &&
+        (messageType === EServerMessageType.TxsSent &&
           futureEvent.message.type ===
-            EServerMessageType.TransactionReceived) ||
+            EServerMessageType.TxsReceived) ||
         (messageType === EServerMessageType.EBSent &&
           futureEvent.message.type === EServerMessageType.EBReceived) ||
         (messageType === EServerMessageType.RBSent &&
           futureEvent.message.type === EServerMessageType.RBReceived) ||
-        (messageType === EServerMessageType.VTBundleSent &&
-          futureEvent.message.type === EServerMessageType.VTBundleReceived);
+        (messageType === EServerMessageType.VotesSent &&
+          futureEvent.message.type === EServerMessageType.VotesReceived);
 
       if (
         isMatchingReceived &&
         (futureEvent.message as any).id === messageId &&
+        (futureEvent.message as any).sender === sender &&
         (futureEvent.message as any).recipient === recipient &&
         futureEvent.time_s >= sentTime
       ) {
@@ -346,6 +384,12 @@ export const computeAggregatedDataAtTime = (
     }
     return null; // No matching received event found within time window
   };
+
+  // Votes whose target RB / EB hadn't been observed yet when the vote was
+  // processed. Drained after the loop so out-of-order arrival (Loki tails
+  // each node's stream independently and interleaves across them) doesn't
+  // silently drop votes from a vote count.
+  const pendingVotes: IVote[] = [];
 
   for (let i = 0; i < events.length; i++) {
     const event = events[i];
@@ -356,35 +400,42 @@ export const computeAggregatedDataAtTime = (
 
     const { message } = event;
 
-    // Accumulate event counts
-    eventCount++;
+    // Accumulate event counts (use num_txs for txs messages)
     const type = message.type;
-    eventCountsByType[type] = (eventCountsByType[type] || 0) + 1;
+    const eventWeight =
+      (type === EServerMessageType.TxsSent ||
+        type === EServerMessageType.TxsReceived) &&
+      "num_txs" in message
+        ? (message as any).num_txs || 1
+        : 1;
+    eventCount += eventWeight;
+    eventCountsByType[type] = (eventCountsByType[type] || 0) + eventWeight;
 
     switch (message.type) {
-      case EServerMessageType.TransactionGenerated: {
-        setMessageBytes(EMessageType.TX, message.id, message.size_bytes);
+      case EServerMessageType.TxsGenerated: {
+        setMessageBytes(EMessageType.Txs, message.id, message.size_bytes);
         const stats = nodeStats.get(message.publisher);
         if (stats) {
           stats.generated.set(
-            EMessageType.TX,
-            (stats.generated.get(EMessageType.TX) || 0) + 1,
+            EMessageType.Txs,
+            (stats.generated.get(EMessageType.Txs) || 0) + 1,
           );
         }
         break;
       }
 
-      case EServerMessageType.TransactionSent: {
+      case EServerMessageType.TxsSent: {
         const msgBytes = message.msg_size_bytes;
-        // XXX: needed because TransactionReceived does not have a size
-        setMessageBytes(EMessageType.TX, message.id, msgBytes);
+        const numTxs = message.num_txs || 1;
+        // Also set on sent so size is available when processing received events
+        setMessageBytes(EMessageType.Txs, message.id, msgBytes);
         const stats = nodeStats.get(message.sender);
         if (stats) {
-          if (!stats.sent.has(EMessageType.TX)) {
-            stats.sent.set(EMessageType.TX, { count: 0, bytes: 0 });
+          if (!stats.sent.has(EMessageType.Txs)) {
+            stats.sent.set(EMessageType.Txs, { count: 0, bytes: 0 });
           }
-          const sentStats = stats.sent.get(EMessageType.TX)!;
-          sentStats.count += 1;
+          const sentStats = stats.sent.get(EMessageType.Txs)!;
+          sentStats.count += numTxs;
           sentStats.bytes += msgBytes;
           stats.bytesSent += msgBytes;
         }
@@ -399,7 +450,7 @@ export const computeAggregatedDataAtTime = (
         // Create transaction animation with calculated travel time
         createMessageAnimation(
           result,
-          EMessageType.TX,
+          EMessageType.Txs,
           message.id,
           message.sender,
           message.recipient,
@@ -407,19 +458,21 @@ export const computeAggregatedDataAtTime = (
           targetTime,
           travelTime,
           msgBytes,
+          { numTxs },
         );
         break;
       }
 
-      case EServerMessageType.TransactionReceived: {
+      case EServerMessageType.TxsReceived: {
+        const numTxs = message.num_txs || 1;
         const stats = nodeStats.get(message.recipient);
         if (stats) {
-          const msgBytes = getMessageBytes(EMessageType.TX, message.id);
-          if (!stats.received.has(EMessageType.TX)) {
-            stats.received.set(EMessageType.TX, { count: 0, bytes: 0 });
+          const msgBytes = getMessageBytes(EMessageType.Txs, message.id);
+          if (!stats.received.has(EMessageType.Txs)) {
+            stats.received.set(EMessageType.Txs, { count: 0, bytes: 0 });
           }
-          const receivedStats = stats.received.get(EMessageType.TX)!;
-          receivedStats.count += 1;
+          const receivedStats = stats.received.get(EMessageType.Txs)!;
+          receivedStats.count += numTxs;
           receivedStats.bytes += msgBytes;
           stats.bytesReceived += msgBytes;
         }
@@ -434,6 +487,16 @@ export const computeAggregatedDataAtTime = (
             (stats.generated.get(EMessageType.EB) || 0) + 1,
           );
           setMessageBytes(EMessageType.EB, message.id, message.size_bytes);
+        }
+
+        if (!result.chain.ebs.has(message.id)) {
+          result.chain.ebs.set(message.id, {
+            id: message.id,
+            slot: message.slot,
+            producer: message.producer,
+            sizeBytes: message.size_bytes,
+            closureSizeBytes: message.closure_size_bytes,
+          });
         }
 
         // Track last activity for node coloring
@@ -487,6 +550,7 @@ export const computeAggregatedDataAtTime = (
           targetTime,
           travelTime,
           msgBytes,
+          { slot: message.slot },
         );
         break;
       }
@@ -523,6 +587,22 @@ export const computeAggregatedDataAtTime = (
             EMessageType.RB,
             (stats.generated.get(EMessageType.RB) || 0) + 1,
           );
+        }
+
+        if (!result.chain.rbs.has(message.id)) {
+          result.chain.rbs.set(message.id, {
+            id: message.id,
+            slot: message.slot,
+            blockNumber: message.block_number,
+            producer: message.producer,
+            sizeBytes: message.size_bytes,
+            parentId: message.parent?.id,
+            certifiesEbId: message.endorsement?.eb.id,
+            announcesEbId: message.announces?.id,
+          });
+          if (result.chain.slotZeroTime === undefined) {
+            result.chain.slotZeroTime = event.time_s - message.slot;
+          }
         }
 
         // Track last activity for node coloring
@@ -577,6 +657,7 @@ export const computeAggregatedDataAtTime = (
           targetTime,
           travelTime,
           msgBytes,
+          { slot: message.slot },
         );
         break;
       }
@@ -605,7 +686,7 @@ export const computeAggregatedDataAtTime = (
         break;
       }
 
-      case EServerMessageType.VTBundleGenerated: {
+      case EServerMessageType.VotesGenerated: {
         setMessageBytes(EMessageType.Votes, message.id, message.size_bytes);
         const stats = nodeStats.get(message.producer);
         if (stats) {
@@ -614,10 +695,41 @@ export const computeAggregatedDataAtTime = (
             (stats.generated.get(EMessageType.Votes) || 0) + 1,
           );
         }
+        // Accumulate vote "weight" per EB. The values mean different
+        // things across sources but are summed identically; the scenario's
+        // `totalVotes` (used in the renderer) normalises to [0,1].
+        //
+        // Simulator (`{ebId: lottery-hit-count}`): treat lottery hit
+        // counts as stake-like weights. For sim-rs defaults the total is
+        // 500 (persistent 400 + non-persistent 100).
+        //
+        // Prototype (`Vote[]`): no per-vote weight today, so each Vote
+        // contributes 1. Once the prototype exposes per-vote stake
+        // fractions, sum those instead (`totalVotes` would then be 1.0
+        // and is the default when the scenario omits it).
+        //
+        // Prototype `Vote[]` may carry `weight` (stake-weighted fraction in
+        // [0,1], flattened from a `{numerator,denominator}` rational by the
+        // Loki parser — TODO: stabilise the encoding upstream). When
+        // present, accumulate the weight; otherwise fall back to 1 per vote
+        // (the pre-weights behaviour, which makes sense only if
+        // `scenario.totalVotes` is set to the voter count).
+        if (Array.isArray(message.votes)) {
+          for (const v of message.votes) {
+            const ebId = resolveVoteEbId(result.chain, v);
+            if (ebId) creditVoteToEb(result.chain, v, ebId);
+            else pendingVotes.push(v);
+          }
+        } else {
+          for (const [ebId, count] of Object.entries(message.votes)) {
+            const eb = result.chain.ebs.get(ebId);
+            if (eb) eb.voteCount = (eb.voteCount ?? 0) + count;
+          }
+        }
         break;
       }
 
-      case EServerMessageType.VTBundleSent: {
+      case EServerMessageType.VotesSent: {
         const msgBytes = getMessageBytes(EMessageType.Votes, message.id);
         const stats = nodeStats.get(message.sender);
         if (stats) {
@@ -648,11 +760,12 @@ export const computeAggregatedDataAtTime = (
           targetTime,
           travelTime,
           msgBytes,
+          { slot: message.slot, votes: message.votes },
         );
         break;
       }
 
-      case EServerMessageType.VTBundleReceived: {
+      case EServerMessageType.VotesReceived: {
         const msgBytes = getMessageBytes(EMessageType.Votes, message.id);
         const stats = nodeStats.get(message.recipient);
         if (stats) {
@@ -668,6 +781,9 @@ export const computeAggregatedDataAtTime = (
       }
     }
   }
+
+  // Resolve votes whose target RB/EB was unknown at vote-arrival time.
+  drainPendingVotes(result.chain, pendingVotes);
 
   // Set final event counts
   result.eventCounts.total = eventCount;
@@ -688,4 +804,60 @@ export const computeAggregatedDataAtTime = (
   });
 
   return result;
+};
+
+// Standalone chain builder for cases where we don't need to recompute the full
+// aggregated state (e.g. event-batch ingestion between playback ticks).
+export const buildChainAtTime = (
+  events: IServerMessage[],
+  targetTime: number,
+): IChainState => {
+  const chain: IChainState = { rbs: new Map(), ebs: new Map() };
+  const pendingVotes: IVote[] = [];
+  for (const event of events) {
+    if (event.time_s > targetTime) break;
+    const { message } = event;
+    if (message.type === EServerMessageType.RBGenerated) {
+      if (!chain.rbs.has(message.id)) {
+        chain.rbs.set(message.id, {
+          id: message.id,
+          slot: message.slot,
+          blockNumber: message.block_number,
+          producer: message.producer,
+          sizeBytes: message.size_bytes,
+          parentId: message.parent?.id,
+          certifiesEbId: message.endorsement?.eb.id,
+          announcesEbId: message.announces?.id,
+        });
+        if (chain.slotZeroTime === undefined) {
+          chain.slotZeroTime = event.time_s - message.slot;
+        }
+      }
+    } else if (message.type === EServerMessageType.EBGenerated) {
+      if (!chain.ebs.has(message.id)) {
+        chain.ebs.set(message.id, {
+          id: message.id,
+          slot: message.slot,
+          producer: message.producer,
+          sizeBytes: message.size_bytes,
+          closureSizeBytes: message.closure_size_bytes,
+        });
+      }
+    } else if (message.type === EServerMessageType.VotesGenerated) {
+      if (Array.isArray(message.votes)) {
+        for (const v of message.votes) {
+          const ebId = resolveVoteEbId(chain, v);
+          if (ebId) creditVoteToEb(chain, v, ebId);
+          else pendingVotes.push(v);
+        }
+      } else {
+        for (const [ebId, count] of Object.entries(message.votes)) {
+          const eb = chain.ebs.get(ebId);
+          if (eb) eb.voteCount = (eb.voteCount ?? 0) + count;
+        }
+      }
+    }
+  }
+  drainPendingVotes(chain, pendingVotes);
+  return chain;
 };

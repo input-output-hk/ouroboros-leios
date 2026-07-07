@@ -4,7 +4,7 @@ import { useSimContext } from "@/contexts/SimContext/context";
 import debounce from "debounce";
 import { FC, useCallback, useEffect, useRef } from "react";
 import { useHandlers } from "../hooks/useHandlers";
-import { getOffsetCoordinates, isClickOnNode } from "../utils";
+import { getOffsetCoordinates, findClickTarget } from "../utils";
 
 export const Canvas: FC = () => {
   const { drawTopography } = useHandlers();
@@ -16,6 +16,7 @@ export const Canvas: FC = () => {
         canvasRef,
         canvasScale,
         currentNode,
+        currentEdge,
       },
       topography,
       layoutMode,
@@ -73,7 +74,7 @@ export const Canvas: FC = () => {
       const rect = canvas.getBoundingClientRect();
       const x = ev.clientX - rect.left;
       const y = ev.clientY - rect.top;
-      const { node, clicked } = isClickOnNode(
+      const target = findClickTarget(
         x,
         y,
         topography,
@@ -82,21 +83,25 @@ export const Canvas: FC = () => {
         canvasOffsetY,
         canvasScale,
       );
-
-      if (clicked && node) {
-        dispatch({
-          type: "SET_CURRENT_NODE",
-          payload: currentNode === node ? undefined : node,
-        });
-      } else {
-        // Click on background - unset current node
-        dispatch({
-          type: "SET_CURRENT_NODE",
-          payload: undefined,
-        });
+      switch (target.kind) {
+        case "node":
+          dispatch({
+            type: "SET_CURRENT_NODE",
+            payload: currentNode === target.id ? undefined : target.id,
+          });
+          break;
+        case "edge":
+          dispatch({
+            type: "SET_CURRENT_EDGE",
+            payload: currentEdge === target.id ? undefined : target.id,
+          });
+          break;
+        case "background":
+          dispatch({ type: "SET_CURRENT_NODE", payload: undefined });
+          break;
       }
     },
-    [canvasScale, currentNode, canvasOffsetX, canvasOffsetY],
+    [canvasScale, currentNode, currentEdge, canvasOffsetX, canvasOffsetY],
   );
 
   const handleWheel = useCallback(

@@ -9,6 +9,12 @@ processes:
       PORT="${PORT_NODE1}" \
       bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node1/node.log"
+    readiness_probe:
+      exec:
+        command: "bash -c ': </dev/tcp/${IP_NODE1}/${PORT_NODE1}'"
+      initial_delay_seconds: 5
+      period_seconds: 2
+      failure_threshold: 60
 
   Node2:
     command: |
@@ -17,6 +23,12 @@ processes:
       PORT="${PORT_NODE2}" \
       bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node2/node.log"
+    readiness_probe:
+      exec:
+        command: "bash -c ': </dev/tcp/${IP_NODE2}/${PORT_NODE2}'"
+      initial_delay_seconds: 5
+      period_seconds: 2
+      failure_threshold: 60
 
   Node3:
     command: |
@@ -25,6 +37,12 @@ processes:
       PORT="${PORT_NODE3}" \
       bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node3/node.log"
+    readiness_probe:
+      exec:
+        command: "bash -c ': </dev/tcp/${IP_NODE3}/${PORT_NODE3}'"
+      initial_delay_seconds: 5
+      period_seconds: 2
+      failure_threshold: 60
 
   TxCentrifuge:
     working_dir: ${WORKING_DIR}
@@ -32,11 +50,11 @@ processes:
     log_location: "${WORKING_DIR}/tx-centrifuge.log"
     depends_on:
       Node1:
-        condition: process_started
+        condition: process_healthy
       Node2:
-        condition: process_started
+        condition: process_healthy
       Node3:
-        condition: process_started
+        condition: process_healthy
 
   ObserveTip:
     environment:
@@ -46,4 +64,24 @@ processes:
     is_interactive: true
     depends_on:
       Node1:
+        condition: process_started
+
+  ObserveTip2:
+    environment:
+      - CARDANO_NODE_NETWORK_ID=164
+      - CARDANO_NODE_SOCKET_PATH=${WORKING_DIR}/node2/node.socket
+    command: watch -n10 "cardano-cli query tip && cardano-cli query tx-mempool info"
+    is_interactive: true
+    depends_on:
+      Node2:
+        condition: process_started
+
+  ObserveTip3:
+    environment:
+      - CARDANO_NODE_NETWORK_ID=164
+      - CARDANO_NODE_SOCKET_PATH=${WORKING_DIR}/node3/node.socket
+    command: watch -n10 "cardano-cli query tip && cardano-cli query tx-mempool info"
+    is_interactive: true
+    depends_on:
+      Node3:
         condition: process_started

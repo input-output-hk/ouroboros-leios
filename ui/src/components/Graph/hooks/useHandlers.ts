@@ -12,7 +12,7 @@ const getHighestPriorityMessageType = (counts: {
     EMessageType.RB, // Highest priority
     EMessageType.EB,
     EMessageType.Votes,
-    EMessageType.TX, // Lowest priority
+    EMessageType.Txs, // Lowest priority
   ];
 
   for (const messageType of MESSAGE_PRIORITY_ORDER) {
@@ -73,6 +73,7 @@ export const useHandlers = () => {
         canvasRef,
         canvasScale,
         currentNode,
+        currentEdge,
       },
       maxTime,
       topography,
@@ -125,8 +126,11 @@ export const useHandlers = () => {
       const edgeKey = `${edgeIds[0]}|${edgeIds[1]}`;
       const edgeState = aggregatedData.edges.get(edgeKey);
 
-      // Set edge color based on highest priority message type or default
-      if (link.source === currentNode || link.target === currentNode) {
+      // Set edge color based on selection, highest priority message type, or default
+      if (edgeKey === currentEdge) {
+        context.strokeStyle = ELinkColor.LINK_SELECTED;
+        context.lineWidth = Math.min((0.5 / canvasScale) * 6, 0.5);
+      } else if (link.source === currentNode || link.target === currentNode) {
         context.strokeStyle = ELinkColor.LINK_SELECTED;
       } else if (edgeState) {
         // Get highest priority message type currently traveling
@@ -135,8 +139,8 @@ export const useHandlers = () => {
         );
         if (highestPriorityType) {
           switch (highestPriorityType) {
-            case EMessageType.TX:
-              context.strokeStyle = EMessageColor.TX;
+            case EMessageType.Txs:
+              context.strokeStyle = EMessageColor.TXS;
               break;
             case EMessageType.EB:
               context.strokeStyle = EMessageColor.EB;
@@ -190,8 +194,8 @@ export const useHandlers = () => {
         if (highestPriorityType) {
           // Node has active messages - color by highest priority
           switch (highestPriorityType) {
-            case EMessageType.TX:
-              context.fillStyle = EMessageColor.TX;
+            case EMessageType.Txs:
+              context.fillStyle = EMessageColor.TXS;
               break;
             case EMessageType.EB:
               context.fillStyle = EMessageColor.EB;
@@ -232,7 +236,31 @@ export const useHandlers = () => {
       const y =
         senderNode.fy + (recipientNode.fy - senderNode.fy) * message.progress;
 
-      // Draw colored rectangle based on message type (consistent with pie chart colors)
+      switch (message.type) {
+        case EMessageType.Txs:
+          context.fillStyle = EMessageColor.TXS;
+          break;
+        case EMessageType.EB:
+          context.fillStyle = EMessageColor.EB;
+          break;
+        case EMessageType.Votes:
+          context.fillStyle = EMessageColor.VOTES;
+          break;
+        case EMessageType.RB:
+          context.fillStyle = EMessageColor.RB;
+          break;
+      }
+
+      // Votes: draw as small circles (fixed size, no bandwidth scaling)
+      if (message.type === EMessageType.Votes) {
+        const radius = Math.min((0.4 / canvasScale) * 6, 0.4);
+        context.beginPath();
+        context.arc(x, y, radius, 0, 2 * Math.PI);
+        context.fill();
+        return;
+      }
+
+      // Other message types: draw as oriented rectangles scaled by bandwidth
       const rectHeight = Math.min((0.8 / canvasScale) * 6, 0.8);
 
       // Scale length by transmission time relative to travel time:
@@ -252,21 +280,6 @@ export const useHandlers = () => {
       if (message.sizeBytes > 0 && bandwidth && bandwidth > 0 && travelTime > 0) {
         const transmissionFraction = message.sizeBytes / bandwidth / travelTime;
         rectLength = Math.max(rectHeight, edgeLength * transmissionFraction);
-      }
-
-      switch (message.type) {
-        case EMessageType.TX:
-          context.fillStyle = EMessageColor.TX;
-          break;
-        case EMessageType.EB:
-          context.fillStyle = EMessageColor.EB;
-          break;
-        case EMessageType.Votes:
-          context.fillStyle = EMessageColor.VOTES;
-          break;
-        case EMessageType.RB:
-          context.fillStyle = EMessageColor.RB;
-          break;
       }
 
       // Orient rectangle along travel direction, clipped to edge bounds
@@ -289,6 +302,7 @@ export const useHandlers = () => {
     topography.nodes,
     topography.links,
     currentNode,
+    currentEdge,
     canvasOffsetX,
     canvasOffsetY,
     canvasScale,

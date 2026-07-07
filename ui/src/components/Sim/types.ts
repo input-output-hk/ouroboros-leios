@@ -1,3 +1,5 @@
+// UI-only topology and rendering types -----------------------------------
+
 export interface INode {
   id: string;
   location: number[];
@@ -56,165 +58,58 @@ export interface ITransformedNodeMap {
   >;
 }
 
+// Message types — thin wrapper over @/schema/trace.ui ---------------------
+
+import type {
+  Vote,
+  UIRBGenerated,
+  UIRBSent,
+  UIRBReceived,
+  UIEBGenerated,
+  UIEBSent,
+  UIEBReceived,
+  UIVotesGenerated,
+  UIVotesSent,
+  UIVotesReceived,
+  UITxsGenerated,
+  UITxsSent,
+  UITxsReceived,
+  UIMessage,
+  UITraceEvent,
+} from "@/schema/trace.ui";
+
+/** Type literals branched on at runtime — mirrors `UIMessageType`. */
 export enum EServerMessageType {
-  TransactionGenerated = "TXGenerated",
-  TransactionReceived = "TXReceived",
-  TransactionSent = "TXSent",
+  TxsGenerated = "TxsGenerated",
+  TxsReceived = "TxsReceived",
+  TxsSent = "TxsSent",
   EBGenerated = "EBGenerated",
   EBReceived = "EBReceived",
   EBSent = "EBSent",
-  VTBundleGenerated = "VTBundleGenerated",
-  VTBundleReceived = "VTBundleReceived",
-  VTBundleSent = "VTBundleSent",
+  VotesGenerated = "VotesGenerated",
+  VotesReceived = "VotesReceived",
+  VotesSent = "VotesSent",
   RBGenerated = "RBGenerated",
   RBReceived = "RBReceived",
   RBSent = "RBSent",
 }
 
-export interface ITransactionGenerated {
-  type: EServerMessageType.TransactionGenerated;
-  id: string;
-  publisher: string;
-  size_bytes: number;
-}
+export type IVote = Vote;
+export type ITxsGenerated = UITxsGenerated;
+export type ITxsReceived = UITxsReceived;
+export type ITxsSent = UITxsSent;
+export type IRankingBlockGenerated = UIRBGenerated;
+export type IRankingBlockReceived = UIRBReceived;
+export type IRankingBlockSent = UIRBSent;
+export type IEndorserBlockGenerated = UIEBGenerated;
+export type IEndorserBlockReceived = UIEBReceived;
+export type IEndorserBlockSent = UIEBSent;
+export type IVotesGenerated = UIVotesGenerated;
+export type IVotesReceived = UIVotesReceived;
+export type IVotesSent = UIVotesSent;
 
-export interface ITransactionReceived {
-  type: EServerMessageType.TransactionReceived;
-  id: string;
-  sender: string;
-  recipient: string;
-}
+export type TServerMessageType = UIMessage;
 
-export interface ITransactionSent {
-  type: EServerMessageType.TransactionSent;
-  id: string;
-  sender: string;
-  recipient: string;
-  msg_size_bytes: number;
-}
-
-export interface IRankingBlockGenerated {
-  type: EServerMessageType.RBGenerated;
-  id: string;
-  slot: number;
-  producer: string;
-  header_bytes: number;
-  size_bytes: number;
-  endorsement: IEndorsement | null;
-  transactions: number[];
-}
-
-export interface IEndorsement {
-  eb: { id: string };
-  size_bytes: number;
-  votes: {};
-}
-
-export interface IRankingBlockReceived {
-  type: EServerMessageType.RBReceived;
-  id: string;
-  slot: number;
-  sender: string;
-  recipient: string;
-}
-
-export interface IRankingBlockSent {
-  type: EServerMessageType.RBSent;
-  slot: number;
-  id: string;
-  sender: string;
-  recipient: string;
-}
-
-export interface IEndorserBlockGenerated {
-  type: EServerMessageType.EBGenerated;
-  id: string;
-  slot: number;
-  pipeline: number;
-  producer: string;
-  size_bytes: number;
-  transactions: ITransaction[];
-  endorser_blocks: IEndorserBlock[];
-}
-
-export interface ITransaction {
-  id: string;
-}
-
-export interface IEndorserBlock {
-  id: string;
-}
-
-export interface IEndorserBlockReceived {
-  type: EServerMessageType.EBReceived;
-  id: string;
-  slot: number;
-  sender: string;
-  recipient: string;
-}
-
-export interface IEndorserBlockSent {
-  type: EServerMessageType.EBSent;
-  slot: number;
-  id: string;
-  sender: string;
-  recipient: string;
-}
-
-export interface IVotesGenerated {
-  type: EServerMessageType.VTBundleGenerated;
-  id: string;
-  slot: number;
-  producer: string;
-  size_bytes: number;
-  votes: any[]; // @todo
-}
-
-export interface IVotesReceived {
-  type: EServerMessageType.VTBundleReceived;
-  id: string;
-  slot: number;
-  sender: string;
-  recipient: string;
-}
-
-export interface IVotesSent {
-  type: EServerMessageType.VTBundleSent;
-  slot: number;
-  id: string;
-  sender: string;
-  recipient: string;
-}
-
-export interface IUnknown {
-  type: "__unknown";
-}
-
-export type TServerMessageType =
-  | IRankingBlockGenerated
-  | IRankingBlockReceived
-  | IRankingBlockSent
-  | IEndorserBlockGenerated
-  | IEndorserBlockReceived
-  | IEndorserBlockSent
-  | IVotesGenerated
-  | IVotesReceived
-  | IVotesSent
-  | ITransactionGenerated
-  | ITransactionReceived
-  | ITransactionSent
-  | IUnknown;
-
-export interface IServerMessage<T = TServerMessageType> {
-  time_s: number;
+export type IServerMessage<T = TServerMessageType> = Omit<UITraceEvent, "message"> & {
   message: T;
-}
-
-export interface ITransactionMessage {
-  id: string;
-  generated: number;
-  duration: number;
-  sentTime: number;
-  source: number;
-  target: number;
-}
+};

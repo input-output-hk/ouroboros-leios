@@ -1,0 +1,20 @@
+version: "0.5"
+is_strict: true
+
+processes:
+  Node:
+    command: bash "${SOURCE_DIR}/run-node.sh"
+    # process-compose's process-level capture goes to a separate
+    # rotation file; the authoritative node.log is written by tee -a
+    # inside run-node.sh so the format stays consistent across restarts.
+    log_location: "${WORKING_DIR}/process-compose-node.log"
+
+  ObserveTip:
+    environment:
+      - CARDANO_NODE_NETWORK_ID=164
+      - CARDANO_NODE_SOCKET_PATH=${WORKING_DIR}/node.socket
+    command: watch -n0.5 "cardano-cli query tip"
+    is_interactive: true
+    depends_on:
+      Node:
+        condition: process_started

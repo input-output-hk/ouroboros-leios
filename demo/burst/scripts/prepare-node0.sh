@@ -15,3 +15,11 @@ jq \
   "$DATA_DIR/topology.template.json" >"$NODE0_DIR/topology.json"
 
 cp -f "$DATA_DIR/node0/config.json" "$NODE0_DIR/config.json"
+
+# Pre-seed the Leios DB so node0 can resolve EBs that the recorded
+# Praos chain announces / certifies. Otherwise the ledger panics at
+# Ledger.hs:1002 the moment it applies a cert block whose EB body
+# hasn't yet been LeiosFetched.
+if [ -f "$CLUSTER_RUN/leios.db" ]; then
+  cp -f "$CLUSTER_RUN/leios.db" "$NODE0_DIR/leios.db"
+fi

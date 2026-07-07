@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 5,
   "links": [],
   "panels": [
     {
@@ -309,7 +309,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -349,7 +349,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"cardano_node_metrics\"}[30s]) / 1000",
+          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"cardano_node_metrics\"}[300s]) / 1000",
           "legendFormat": "{{alias}} txkB/s",
           "range": true,
           "refId": "A"

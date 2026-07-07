@@ -26,20 +26,22 @@ nix run .#ui-live
 
 ## Add a scenario from sim-rs
 
-To prepare a scenario to visualize, find or add the topology to the public directory, for example:
+The Rust Leios simulator (`sim-rs`) and a few baseline topologies (`small.yaml`,
+`thousand.yaml`) now live in [input-output-hk/leios-tools](https://github.com/input-output-hk/leios-tools).
+Bundled topologies in `public/topologies/` are kept here directly.
 
-```sh
-mkdir -p public/topologies
-ln -sr ../sim-rs/test_data/small.yaml public/topologies/small.yaml
-```
-
-And generate a trace to visualize using the built `sim-rs`, for example using the CIP scenario:
+To add a new topology, drop the YAML file in `public/topologies/`. Then generate
+a trace to visualize with a build of `sim-rs` from the leios-tools repo, for
+example using the CIP scenario:
 
 ```bash
 mkdir -p public/traces
 cat ../analysis/sims/cip/experiments/NA,0.200/config.yaml \
   | jq '."tx-start-time" = 20' > public/traces/config-200txkbs.json
-../sim-rs/target/release/sim-cli -p public/traces/config-200txkbs.json public/topologies/small.yaml public/traces/small-200txkbs.jsonl -s 120
+/path/to/leios-tools/sim-rs/target/release/sim-cli \
+  -p public/traces/config-200txkbs.json \
+  public/topologies/small.yaml \
+  public/traces/small-200txkbs.jsonl -s 120
 ```
 
 You might want to filter out `Cpu` events (not visualized) and compress the trace:
@@ -108,3 +110,35 @@ Where `<index>` is the zero-based index of the scenario in the scenarios.json ar
 - `?scenario=2` - Auto-connects to the third scenario (e.g., "Leios Demo 202511")
 
 This is useful for direct links, bookmarking, or embedding specific scenarios.
+
+### Selecting the network layout
+
+The network view defaults to the `auto` layout (a d3-force simulation seeded
+from the topology's `location` field). A different layout can be picked via the
+`layout` query parameter:
+
+```
+?layout=<mode>
+```
+
+Supported modes:
+
+- `auto` (default) - force-directed simulation
+- `circular` - evenly spaces nodes on a circle
+- `mercator` - projects `location` as `[lat, lon]` onto a Mercator world map
+- `none` - uses each node's `location` as raw canvas coordinates
+
+The parameter combines with `scenario`, e.g. `?scenario=2&layout=mercator`.
+
+### Selecting the view
+
+The visualizer opens on the network view by default. Add `?view=chain` to
+jump straight into the blockchain visualisation:
+
+```
+?view=<network|chain>
+```
+
+Combines with the other parameters, e.g.
+`?scenario=4&view=chain` opens the proto-devnet scenario directly in the
+chain view.

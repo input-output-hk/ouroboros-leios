@@ -1,0 +1,55 @@
+# Antithesis-flavoured cardano-node image. Copies the statically-linked
+# binaries from the cardano-node-leios base, layers Antithesis-specific
+# tools (jq, sqlite3, iproute2, …) on a slim Debian runtime, and adds
+# the proto-devnet configs / per-role init scripts.
+#
+# Build args:
+#   BASE_IMAGE  Fully-qualified base image reference (ghcr.io/.../
+#               cardano-node-leios:<tag>). CI passes the SHA-tagged
+#               base built earlier in the same workflow run.
+
+ARG BASE_IMAGE=ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:latest
+
+FROM ${BASE_IMAGE} AS leios
+
+FROM debian:bookworm-slim
+
+COPY --from=leios /bin/cardano-node /usr/local/bin/cardano-node
+COPY --from=leios /bin/cardano-cli  /usr/local/bin/cardano-cli
+
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+      bc \
+      ca-certificates \
+      curl \
+      iproute2 \
+      jq \
+      lsof \
+      netbase \
+      procps \
+      socat \
+      sqlite3 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Directories Antithesis scripts expect.
+RUN mkdir -p /app/config /app/genesis /app/scripts /data /logs
+
+# Genesis (baked in)
+COPY demo/burst/data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup/genesis/*.json /app/genesis/
+
+# Node configs
+COPY demo/burst/data/node0/config.json /app/config/node0-config.json
+COPY demo/burst/data/downstream-node/config.json /app/config/downstream-config.json
+COPY demo/burst/data/topology.template.json /app/config/topology.template.json
+
+# Per-role init/run + WAN emulation scripts
+COPY antithesis/scripts/init-node0.sh /app/scripts/
+COPY antithesis/scripts/init-downstream.sh /app/scripts/
+COPY antithesis/scripts/run-cardano-node.sh /app/scripts/
+COPY antithesis/scripts/setup-wan-emulation.sh /app/scripts/
+
+RUN chmod +x /app/scripts/*.sh
+
+WORKDIR /data
+
+CMD ["/app/scripts/run-cardano-node.sh", "node0"]

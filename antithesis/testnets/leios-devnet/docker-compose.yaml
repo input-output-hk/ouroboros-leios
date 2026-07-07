@@ -23,7 +23,7 @@ x-node-hosts: &node-hosts
   PORT_DINGO: "3001"
 
 x-node-image: &node-image
-  image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${IMAGE_TAG:-latest}
+  image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-devnet:${IMAGE_TAG:-latest}
 
 x-dingo-image: &dingo-image
   image: ghcr.io/blinklabs-io/dingo:main-antithesis
@@ -86,6 +86,9 @@ services:
   init-dingo1:
     # NOTE: we reuse the cardano-node image for convenience when doing the init
     <<: *node-image
+    container_name: init-dingo1
+    hostname: init-dingo1
+    init: true
     command: ["/app/scripts/init-dingo-node.sh", "1"]
     depends_on:
       init-pool1:
@@ -244,7 +247,7 @@ services:
   # Analysis Container (Antithesis assertions)
   # ==========================================================================
   analysis:
-    image: ghcr.io/input-output-hk/ouroboros-leios/leios-analysis:${IMAGE_TAG:-latest}
+    image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-analysis:${IMAGE_TAG:-latest}
     container_name: analysis
     hostname: analysis
     init: true

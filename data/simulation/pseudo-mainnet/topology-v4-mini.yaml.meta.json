@@ -1,0 +1,2502 @@
+{
+ "node-0": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1gaztx97t53k47fr7282d70tje8323vvzx8pshgts30t9krw62tm",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "TW001",
+  "tier": "commodity-vps"
+ },
+ "node-1": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1ra2su7cvnmr83pu9nvvz4a9carsgc9egc3e5fuk7h9pycyp5ela",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "LBF4",
+  "tier": "unresolved"
+ },
+ "node-10": {
+  "asn": 16509,
+  "cc": "AU",
+  "kind": "bp",
+  "pool_id": "pool1kmmahq4upmm5j8fkh3xa9vd7gdffkp8pd4axucfh4w4dw549yqe",
+  "provider": "AWS",
+  "region": "aws:ap-southeast-2",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-100": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1wvaj307ee8jfewv9qjtgk0q3elmpe5lz4n2dec2303062f7dc4c",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-101": {
+  "asn": 8881,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1z5uqdk7dzdxaae5633fqfcu2eqzy3a3rgtuvy087fdld7yws0xt",
+  "provider": "Other / on-prem",
+  "region": "cc:DE",
+  "ticker": "OCTAS",
+  "tier": "other-or-onprem"
+ },
+ "node-102": {
+  "asn": 262287,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1jakl9kqhx87ywc7fcxweaxvna9khxhzyh6v8j70u6zpaxa45ghh",
+  "provider": "Other / on-prem",
+  "region": "cc:US",
+  "ticker": "THNDR",
+  "tier": "other-or-onprem"
+ },
+ "node-103": {
+  "asn": 15169,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool1f9934hk9awd25mmxl0dd2haqvda9nlquwnh5pv64hs42znl07zj",
+  "provider": "GCP",
+  "region": "gcp:europe-west4",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-104": {
+  "asn": 24940,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool19pyfv4xnln8x4l7auw0n0skk3hd97shun707hrw5d4s553ys74x",
+  "provider": "Hetzner",
+  "region": "hetzner:falkenstein",
+  "ticker": "TITAN",
+  "tier": "commodity-vps"
+ },
+ "node-105": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1aqg8vxzv75zhjzjjd9s20fu6r0xz70yl8lk3teacwy7qyc2p2j7",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "KILN7",
+  "tier": "commodity-vps"
+ },
+ "node-106": {
+  "asn": 16276,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1sysgx87cwxnqy0pqn8g97gdhd0dmre9rw3jvpn2k7apuwa7cgkn",
+  "provider": "OVH",
+  "region": "ovh:de:frankfurt_am_main",
+  "ticker": "EVE6",
+  "tier": "commodity-vps"
+ },
+ "node-107": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1u2fuz3fn5dfphf0cu0sewm4rnera445avenggle9sl4hy7rjzgv",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-108": {
+  "asn": 3301,
+  "cc": "SE",
+  "kind": "bp",
+  "pool_id": "pool1k633phcvz2hjhj45evwwau4w576jpq83acg5h84w23jauqu56cw",
+  "provider": "Other / on-prem",
+  "region": "cc:SE",
+  "ticker": "NORTH",
+  "tier": "other-or-onprem"
+ },
+ "node-109": {
+  "asn": 399804,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool17ahr5ygy48vpdfnatqn2z4wfu2te4quapk2yx3k50ce6kd7feg0",
+  "provider": "Other / on-prem",
+  "region": "cc:US",
+  "ticker": "ST3AK",
+  "tier": "other-or-onprem"
+ },
+ "node-11": {
+  "asn": 13037,
+  "cc": "GB",
+  "kind": "bp",
+  "pool_id": "pool1xytvsd9qnvqxpthh9p8k85e823trvn3npxeur8kr9zhkqz5uls9",
+  "provider": "Other / on-prem",
+  "region": "cc:GB",
+  "ticker": "ADV",
+  "tier": "other-or-onprem"
+ },
+ "node-110": {
+  "asn": 16276,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1n0uxgs5qfk5n9xl7qvq9jt8zuu02cntrsjnjayjlqtejyffnemj",
+  "provider": "OVH",
+  "region": "ovh:de:frankfurt_am_main",
+  "ticker": "EVE7",
+  "tier": "commodity-vps"
+ },
+ "node-111": {
+  "asn": 852,
+  "cc": "CA",
+  "kind": "bp",
+  "pool_id": "pool173mzegwuu0pjcrt60ekelzj5haqr8r5e4e0n45qh9jdz7xm5kh8",
+  "provider": "Other / on-prem",
+  "region": "cc:CA",
+  "ticker": "ROCKY",
+  "tier": "other-or-onprem"
+ },
+ "node-112": {
+  "asn": 16276,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1rvng7n968748udkc5rxy4h9zp9hms4s3jsfwuues76ft28uc056",
+  "provider": "OVH",
+  "region": "ovh:us:virginia",
+  "ticker": "DIGI",
+  "tier": "commodity-vps"
+ },
+ "node-113": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1j6xfryctrxm4aplw3vnrtgfsvqdr35exenxqse5kzxmfue7qqmr",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-114": {
+  "asn": 47447,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool19w5khsnmu27au0kprw0kjm8jr7knneysj7lfkqvnu66hyz0jxsx",
+  "provider": "Other / on-prem",
+  "region": "cc:DE",
+  "ticker": "ATAD2",
+  "tier": "other-or-onprem"
+ },
+ "node-115": {
+  "asn": 16276,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1m0drnjxsvnlesq0rwmur2rh6lenuql57jfzd6cf6aegj2cv7ugy",
+  "provider": "OVH",
+  "region": "ovh:de:frankfurt_am_main",
+  "ticker": "EMUR1",
+  "tier": "commodity-vps"
+ },
+ "node-116": {
+  "asn": 63949,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1vev8z03vh7jwx3mfrgzrt9fltt97nupaxv8ffj4r5r8mgwts5ze",
+  "provider": "Akamai/Linode",
+  "region": "cc:US",
+  "ticker": "ADAOZ",
+  "tier": "commodity-vps"
+ },
+ "node-117": {
+  "asn": 31898,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1fd0q9h8974y6psejmzczlywy8fgxxy07rn2ynrwu734aqwq540p",
+  "provider": "Oracle Cloud",
+  "region": "cc:US",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-118": {
+  "asn": 16276,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1zgxvcqf0dvh0ze56ev2ayjvuex3zdd3hgxzdrcezkx497mv3l7s",
+  "provider": "OVH",
+  "region": "ovh:de:frankfurt_am_main",
+  "ticker": "RSTK",
+  "tier": "commodity-vps"
+ },
+ "node-119": {
+  "asn": 3301,
+  "cc": "SE",
+  "kind": "bp",
+  "pool_id": "pool1nz9h4raywm6mu2v8l7htuaqvmn06l3mepuaxynpzlwljsf8txhy",
+  "provider": "Other / on-prem",
+  "region": "cc:SE",
+  "ticker": "NORTH",
+  "tier": "other-or-onprem"
+ },
+ "node-12": {
+  "asn": 1836,
+  "cc": "CH",
+  "kind": "bp",
+  "pool_id": "pool1nqheyct9a0mxn80cwp9pd5guncfu3rzwqtmru0l94accz7gjcgl",
+  "provider": "Green.ch",
+  "region": "cc:CH",
+  "ticker": "CAG",
+  "tier": "residential/satellite"
+ },
+ "node-120": {
+  "asn": 16509,
+  "cc": "IE",
+  "kind": "bp",
+  "pool_id": "pool1095d0cr8yp0selmnrst5hnuf8jcl6vlkxlr2j6kq4x6qs4yxuwt",
+  "provider": "AWS",
+  "region": "aws:eu-west-1",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-121": {
+  "asn": 16509,
+  "cc": "IE",
+  "kind": "bp",
+  "pool_id": "pool1y6gnk7t3n6rvpr67f68mehxgqs5x24n0esz9l5j7m4aqzn4e0qw",
+  "provider": "AWS",
+  "region": "aws:eu-west-1",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-122": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1gtphgrdj8sluxm9e7ca2spcwcq2p0dxj9zf5v0yv3gsagzq704n",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "ADAFR",
+  "tier": "commodity-vps"
+ },
+ "node-123": {
+  "asn": 24940,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1xs34q2z06a46nk7hl48d27dj5gzc6hh9trugw2ehs9ajsevqffx",
+  "provider": "Hetzner",
+  "region": "hetzner:falkenstein",
+  "ticker": "SNAKE",
+  "tier": "commodity-vps"
+ },
+ "node-124": {
+  "asn": 16276,
+  "cc": "IN",
+  "kind": "bp",
+  "pool_id": "pool103455uc7a3477q8pdmzvny884qtlv9vhm2csxvqx2cadwuk36sq",
+  "provider": "OVH",
+  "region": "ovh:in:mumbai",
+  "ticker": "EDEN",
+  "tier": "commodity-vps"
+ },
+ "node-125": {
+  "asn": 8075,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1s6se64qce5rjjjhh6ufcdnc54p8qg78mlhjm38lymx99sqysvzx",
+  "provider": "Azure",
+  "region": "azure:eastus2",
+  "ticker": "PAUL1",
+  "tier": "hyperscaler"
+ },
+ "node-126": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool192pfftt48zc4x5aellvpufk6l6zxllpldw0rx82vrhqrqfhhqs2",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "EMUR5",
+  "tier": "commodity-vps"
+ },
+ "node-127": {
+  "asn": 16509,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1xjhzgchsl2ccvc5pj3aqytv9hh0jnaz63wtfnw4th07tjypm46x",
+  "provider": "AWS",
+  "region": "aws:eu-central-1",
+  "ticker": "SECUR",
+  "tier": "hyperscaler"
+ },
+ "node-128": {
+  "asn": 14618,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1vkc0dvuf8rxrch87umfayacgglrh8f88ef0f64xrdue5u2xjwfm",
+  "provider": "AWS",
+  "region": "cc:US",
+  "ticker": "IFS1",
+  "tier": "hyperscaler"
+ },
+ "node-129": {
+  "asn": 8075,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool1xt7mjrtnsew3v33lu8sf93upf20sxhmcrfnpm82ra46yxk7uy45",
+  "provider": "Azure",
+  "region": "azure:westeurope",
+  "ticker": "ETO3",
+  "tier": "hyperscaler"
+ },
+ "node-13": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1uy07qyf0gzzua2glqspyvyevwpe8tamajnqj6c7mjzy4v3m4kne",
+  "provider": "Other / on-prem",
+  "region": "cc:??",
+  "ticker": "",
+  "tier": "other-or-onprem"
+ },
+ "node-130": {
+  "asn": 8560,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool12z39rkzfylvn9wfe8j6x9ucq6g2l4mw4azj70y0gd8ejczznyj3",
+  "provider": "IONOS",
+  "region": "cc:DE",
+  "ticker": "BRAVO",
+  "tier": "commodity-vps"
+ },
+ "node-131": {
+  "asn": 47447,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1qqqqdktl6pq46td0mwut0qn30g7nlue0sete9wxl0hwsq37wrw8",
+  "provider": "Other / on-prem",
+  "region": "cc:DE",
+  "ticker": "STR8",
+  "tier": "other-or-onprem"
+ },
+ "node-132": {
+  "asn": 29802,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1ft4xjlz9uw0r0ewcgtkgeakqrfc5azxmxwsm5pt94dv67mw4rgd",
+  "provider": "HiVelocity",
+  "region": "cc:US",
+  "ticker": "1LOVE",
+  "tier": "other-or-onprem"
+ },
+ "node-133": {
+  "asn": 51167,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool16f95up5u5lyqne5mnxmlhe0rgdgmya27mph288r6gw0ukegjffa",
+  "provider": "Contabo",
+  "region": "contabo:lauterbourg",
+  "ticker": "MARAC",
+  "tier": "commodity-vps"
+ },
+ "node-134": {
+  "asn": 40021,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1cf7mqj0xd8z4jqhr7nf565mxuvepk8euv5t6ehmuwe49kfz9llr",
+  "provider": "Contabo",
+  "region": "contabo:seattle",
+  "ticker": "TOKAI",
+  "tier": "commodity-vps"
+ },
+ "node-135": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1cunvnkjkzh2lna593sjmkylcr3r5rmxdpr8r9u6pfuer72p24x4",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "",
+  "tier": "unresolved"
+ },
+ "node-136": {
+  "asn": 24940,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1k0ucs0fau2vhr3p7qh7mnpfgrllwwda7petxjz2gzzaxkyp8f88",
+  "provider": "Hetzner",
+  "region": "hetzner:falkenstein",
+  "ticker": "POLY",
+  "tier": "commodity-vps"
+ },
+ "node-137": {
+  "asn": 8075,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool16eua0zalaln7q0s9u7jzlyygqad0pu2l2qdxx8r8ueqrw2jdhqf",
+  "provider": "Azure",
+  "region": "azure:westeurope",
+  "ticker": "ETO9",
+  "tier": "hyperscaler"
+ },
+ "node-138": {
+  "asn": 396982,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool14mhf0xtx45a8979mcnad8upas8apwal4nfqd95arv4wlsuk6m9q",
+  "provider": "GCP",
+  "region": "gcp:us-east4",
+  "ticker": "GMO2",
+  "tier": "hyperscaler"
+ },
+ "node-139": {
+  "asn": 16276,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1uj4u73qgtprqre78q75fq2vkcrpfrcdreqcqkvn6u0m2k6nk2yp",
+  "provider": "OVH",
+  "region": "ovh:de:frankfurt_am_main",
+  "ticker": "EVE1",
+  "tier": "commodity-vps"
+ },
+ "node-14": {
+  "asn": 16509,
+  "cc": "SE",
+  "kind": "bp",
+  "pool_id": "pool1r99a6puhdv2xzcfw05jjqvks3xhmy2l4wsndx9hmhudvu4yevz5",
+  "provider": "AWS",
+  "region": "aws:eu-north-1",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-140": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1ksrg8a964464las0ymw88slrwxkychjz9lh09lqltu5m7nw3pq0",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "QUEEN",
+  "tier": "unresolved"
+ },
+ "node-141": {
+  "asn": 24940,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1w7c2j0px43jmudhf48ezp7dy8j7904c9l3wc7809lhh2z026hch",
+  "provider": "Hetzner",
+  "region": "hetzner:falkenstein",
+  "ticker": "STAT",
+  "tier": "commodity-vps"
+ },
+ "node-142": {
+  "asn": 29695,
+  "cc": "NO",
+  "kind": "bp",
+  "pool_id": "pool1qqq0c53vaf5ju0n3fvujmyxwca0yhp65930evw9lngmr5705csz",
+  "provider": "Other / on-prem",
+  "region": "cc:NO",
+  "ticker": "ANP",
+  "tier": "other-or-onprem"
+ },
+ "node-143": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1q5q3rld4nll02w8sqhf9582jcf22t99yt27z0pqksvpnv4rdra9",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-144": {
+  "asn": 14618,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1tdvqgy6mq7lx7d345e276xmgmhh3s4zj8dzu6xzq5m7rx4tzkg2",
+  "provider": "AWS",
+  "region": "cc:US",
+  "ticker": "ONYX",
+  "tier": "hyperscaler"
+ },
+ "node-145": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1v96277f457qtwhuq3ma9yjlacq4mjw9h4j3jfy5rjgjru5lyxea",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "FGMT8",
+  "tier": "unresolved"
+ },
+ "node-146": {
+  "asn": 16509,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1qfxukshs4fkcrflzdnxa2fdza5lfvew3y6echg8ckaa4q8m5hyf",
+  "provider": "AWS",
+  "region": "aws:us-east-2",
+  "ticker": "NEDS1",
+  "tier": "hyperscaler"
+ },
+ "node-147": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1up53z2kadt6l5xs359ckx477rpyvyg3favh25qrhqt2ujclpq3h",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "",
+  "tier": "commodity-vps"
+ },
+ "node-148": {
+  "asn": 20473,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1pshqcksxywy68lt04lw6uf35f4yssekh5dx2mxqmyrukke2z5y3",
+  "provider": "Vultr / Choopa",
+  "region": "cc:US",
+  "ticker": "ACL",
+  "tier": "commodity-vps"
+ },
+ "node-149": {
+  "asn": 5769,
+  "cc": "CA",
+  "kind": "bp",
+  "pool_id": "pool1mt8sdg37f2h3rypyuc77k7vxrjshtvjw04zdjlae9vdzyt9uu34",
+  "provider": "Other / on-prem",
+  "region": "cc:CA",
+  "ticker": "ABLE",
+  "tier": "other-or-onprem"
+ },
+ "node-15": {
+  "asn": 1836,
+  "cc": "CH",
+  "kind": "bp",
+  "pool_id": "pool18rjrygm3knlt67n3r3prlhnzcjxun7wa8d3l8w9nmlpasquv4au",
+  "provider": "Green.ch",
+  "region": "cc:CH",
+  "ticker": "CF1",
+  "tier": "residential/satellite"
+ },
+ "node-150": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1z7n2ruhmxmv77f6cqhd3wsy6774h2wuay77agxuf2y9mj8q55vw",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "1PCT2",
+  "tier": "commodity-vps"
+ },
+ "node-151": {
+  "asn": 16276,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool14skj6e4rpjanzclx3fc880xnl8xafgg63tmw93t9xspvwx985qu",
+  "provider": "OVH",
+  "region": "ovh:de:frankfurt_am_main",
+  "ticker": "EVRST",
+  "tier": "commodity-vps"
+ },
+ "node-152": {
+  "asn": 16509,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1dxwgzj66pual956mnv9delkelg873yvgr2dd8s279m0hxqvr475",
+  "provider": "AWS",
+  "region": "aws:eu-central-1",
+  "ticker": "APOP",
+  "tier": "hyperscaler"
+ },
+ "node-153": {
+  "asn": 213230,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1pp7tn2w6ken4rpfcjwcdup3g4m5gcdhc9lgvrm3mnxz5stmrhq2",
+  "provider": "Hetzner",
+  "region": "hetzner:ashburn",
+  "ticker": "CROW",
+  "tier": "commodity-vps"
+ },
+ "node-154": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1wm5pnu72efdcvjm34r7ykkxx2h549swddjrn6r2aqy3tvjc4l57",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "FGMT6",
+  "tier": "unresolved"
+ },
+ "node-155": {
+  "asn": 197540,
+  "cc": "AT",
+  "kind": "bp",
+  "pool_id": "pool1rmpv0h0pecysach8tj06vxx9wku2pdm74mk9cunx759v58q0hu2",
+  "provider": "Other / on-prem",
+  "region": "cc:AT",
+  "ticker": "SASA",
+  "tier": "other-or-onprem"
+ },
+ "node-156": {
+  "asn": 7992,
+  "cc": "CA",
+  "kind": "bp",
+  "pool_id": "pool1a0kp4vl4fh0p0rs8s08rm7qq3vkj3epwraayk3sdgm8sz0zwt7t",
+  "provider": "Cogeco (CA cable ISP)",
+  "region": "cc:CA",
+  "ticker": "",
+  "tier": "residential/satellite"
+ },
+ "node-157": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1krznhwu3h5pu2stuslr53z5rme50t6384macsmylcnljwc7yjky",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "LEAF",
+  "tier": "commodity-vps"
+ },
+ "node-158": {
+  "asn": 16276,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1ng3vqzrhn3z45yjdscv3q37n26g2pj3vp99rfkgv6225y8lqg8j",
+  "provider": "OVH",
+  "region": "ovh:de:frankfurt_am_main",
+  "ticker": "EVE2",
+  "tier": "commodity-vps"
+ },
+ "node-159": {
+  "asn": 8075,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool19l206haluae6wyzm7tjpt3gln9paa5m9s4fedec2u09fqz300ht",
+  "provider": "Azure",
+  "region": "azure:westeurope",
+  "ticker": "ETO10",
+  "tier": "hyperscaler"
+ },
+ "node-16": {
+  "asn": 1836,
+  "cc": "CH",
+  "kind": "bp",
+  "pool_id": "pool1luhm55xxqp0cv7a43rcfrr8m6m74kfe7wdvqdgfzt483x29lr0t",
+  "provider": "Green.ch",
+  "region": "cc:CH",
+  "ticker": "CF5",
+  "tier": "residential/satellite"
+ },
+ "node-160": {
+  "asn": 8075,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool1wdujj7tmux5nuwnpeksgncendr3mj8ecsjcddpzx9gewc3flp4r",
+  "provider": "Azure",
+  "region": "azure:westeurope",
+  "ticker": "ETO6",
+  "tier": "hyperscaler"
+ },
+ "node-161": {
+  "asn": 8075,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool1jzk8rwf2fs5l02dmm6pm5tnw9stmd8jpmvsy54085vu2u2656re",
+  "provider": "Azure",
+  "region": "azure:westeurope",
+  "ticker": "ETO11",
+  "tier": "hyperscaler"
+ },
+ "node-162": {
+  "asn": 8075,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool1dzdxps32uqhva9q9urx4lm7m0nhlczjjccwy9kv4t2d3krsn4m7",
+  "provider": "Azure",
+  "region": "azure:westeurope",
+  "ticker": "ETO5",
+  "tier": "hyperscaler"
+ },
+ "node-163": {
+  "asn": 8075,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool1fvgmxt3688a5zl6amhvaqk9tmvk3lhxkgdsta6yj3czuy5hjwfy",
+  "provider": "Azure",
+  "region": "azure:westeurope",
+  "ticker": "ETO12",
+  "tier": "hyperscaler"
+ },
+ "node-164": {
+  "asn": 8075,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool1swuyjknhewtqcmh583jjpvlcl0p9h9hrt5l2f3v2hl6gchqrn40",
+  "provider": "Azure",
+  "region": "azure:westeurope",
+  "ticker": "ETO4",
+  "tier": "hyperscaler"
+ },
+ "node-165": {
+  "asn": 14618,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1a23gmvalpdams9d42t7fur8vmknzjv7wd3nsvuvrc7dv66lnau0",
+  "provider": "AWS",
+  "region": "cc:US",
+  "ticker": "AOS",
+  "tier": "hyperscaler"
+ },
+ "node-166": {
+  "asn": 31898,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1w6l6rvhxtym5psec3mvgrjlg28d6hrv8g9jjexadzmxfgndfg2f",
+  "provider": "Oracle Cloud",
+  "region": "cc:US",
+  "ticker": "SIPO",
+  "tier": "hyperscaler"
+ },
+ "node-167": {
+  "asn": 51167,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1rct5guwnp6nk9f4ldn5tr3s42j0nm5rxeayv56lxua5ck47ex39",
+  "provider": "Contabo",
+  "region": "contabo:lauterbourg",
+  "ticker": "FIMI",
+  "tier": "commodity-vps"
+ },
+ "node-168": {
+  "asn": 16509,
+  "cc": "JP",
+  "kind": "bp",
+  "pool_id": "pool1qc05c76autq4235sq20zu4vjwtl5m0xn4mxq9kg6e66uwz95kd4",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-1",
+  "ticker": "EGH",
+  "tier": "hyperscaler"
+ },
+ "node-169": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool15v22rpfg6qx9l0gx0m955gfv7tes0jpa9sy0gjs3a04lv6x9jdr",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "",
+  "tier": "unresolved"
+ },
+ "node-17": {
+  "asn": 1836,
+  "cc": "CH",
+  "kind": "bp",
+  "pool_id": "pool1n6erydn8x79sa3fmrqmj7mcyqa9em5fppr447j6d9k0xwfl7sc5",
+  "provider": "Green.ch",
+  "region": "cc:CH",
+  "ticker": "CF4",
+  "tier": "residential/satellite"
+ },
+ "node-170": {
+  "asn": 24940,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1wt0pf4u2xktp0f7apveu242w6nkm4ltk3m8g039lvuhwq4zdtf3",
+  "provider": "Hetzner",
+  "region": "hetzner:helsinki",
+  "ticker": "ECO",
+  "tier": "commodity-vps"
+ },
+ "node-171": {
+  "asn": 8075,
+  "cc": "IE",
+  "kind": "bp",
+  "pool_id": "pool108zdflss3ayqlm5c7vr6mtqj2uwl99vk28ur8dv4zswdzt6yauc",
+  "provider": "Azure",
+  "region": "azure:northeurope",
+  "ticker": "AZUR",
+  "tier": "hyperscaler"
+ },
+ "node-172": {
+  "asn": 15169,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1fpu5xurq3jx5rn626ejcx0dzzzk5lmtvdl2qkj9l4kw2sjp50dz",
+  "provider": "GCP",
+  "region": "gcp:us-east1",
+  "ticker": "MS6",
+  "tier": "hyperscaler"
+ },
+ "node-173": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool147tju4482jtl253lgqq88fkefdugcuhaumf8m0rcj8uzxu846qm",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-174": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1p70svj9zrg7lgzkdn8udlslry0t27qs8r9tz9lr955v2yfna2rl",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "BTV1",
+  "tier": "unresolved"
+ },
+ "node-175": {
+  "asn": 395201,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1du3r4a7xq60hg2x0wcz7lw5ya3qs74rk258c8kanp93rsqdqu45",
+  "provider": "Other / on-prem",
+  "region": "cc:US",
+  "ticker": "",
+  "tier": "other-or-onprem"
+ },
+ "node-176": {
+  "asn": 1136,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool1tpr44v3pxth9j0ff246dvsryxpanxwx52f024ws3ecvn72sgv55",
+  "provider": "Other / on-prem",
+  "region": "cc:NL",
+  "ticker": "",
+  "tier": "other-or-onprem"
+ },
+ "node-177": {
+  "asn": 40021,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1qa6lqyu67ghpa0evxfu9nzqkj3h82qpfku82ec79zdwru4pd25m",
+  "provider": "Contabo",
+  "region": "contabo:orangeburg",
+  "ticker": "CNODE",
+  "tier": "commodity-vps"
+ },
+ "node-178": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool13z5t8wlhtf7ccc0hud8pnvpjeekjdsyn7sq69fcxf3k6kpnlm74",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "BTV2",
+  "tier": "unresolved"
+ },
+ "node-179": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1pmm654jfx088td54ekkkd0j28x6r5gnjdhnutzggursrxjnpk2y",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "EMUR4",
+  "tier": "commodity-vps"
+ },
+ "node-18": {
+  "asn": 1836,
+  "cc": "CH",
+  "kind": "bp",
+  "pool_id": "pool1xmlq3sgssww6kwu8dupgxukzhlk77j40p9c4r3qux3j5z2ysk2c",
+  "provider": "Green.ch",
+  "region": "cc:CH",
+  "ticker": "CF2",
+  "tier": "residential/satellite"
+ },
+ "node-180": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1myvgx4ef424e6nw2strqq7dxcepav52plyyhxrk0avaw7y098l2",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "COOL2",
+  "tier": "commodity-vps"
+ },
+ "node-181": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1cpwymxe2fjr20u34f874e2q6za3razk0rttslrxqhc4tu3zxau8",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "BTV3",
+  "tier": "unresolved"
+ },
+ "node-182": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool193uec04jldvah7r52q86wl033g4v42x0aste8jfg9999qepaxfp",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "0AAAA",
+  "tier": "commodity-vps"
+ },
+ "node-183": {
+  "asn": 15169,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1wpmjtfqcwvtcs9znpuulk99yk2zz6pfh0c4k9f2xlcspgqjndk2",
+  "provider": "GCP",
+  "region": "gcp:us-east1",
+  "ticker": "MS4",
+  "tier": "hyperscaler"
+ },
+ "node-184": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool13h08lf24fjmxxg0mmuattjv8dvy0r6fc4hrqg4qmj38xsweexrv",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "qzsbu",
+  "tier": "unresolved"
+ },
+ "node-185": {
+  "asn": 141995,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool136q98jnwt093qle4ph86vdpuwplg7gyvt20h2nq4m6ksv8xjcuj",
+  "provider": "Contabo",
+  "region": "contabo:tokyo",
+  "ticker": "PNR39",
+  "tier": "commodity-vps"
+ },
+ "node-186": {
+  "asn": 8560,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1ell3xjtspzzz4vtsatscan6rheltf7j3hh2s8qsam2h3jvcxzm9",
+  "provider": "IONOS",
+  "region": "cc:DE",
+  "ticker": "OCEA4",
+  "tier": "commodity-vps"
+ },
+ "node-187": {
+  "asn": 16509,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1u6kpt8hgqcm596kukj97ghefmxn8ks2cgwg8qqe0gtgscnufk5p",
+  "provider": "AWS",
+  "region": "aws:eu-central-1",
+  "ticker": "ATLAS",
+  "tier": "hyperscaler"
+ },
+ "node-188": {
+  "asn": 16276,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1ynxx88cq0y8vg8yrq3jrw6epm7rq9a8859v34sq9lzjy7ztg90u",
+  "provider": "OVH",
+  "region": "ovh:de:frankfurt_am_main",
+  "ticker": "EVE",
+  "tier": "commodity-vps"
+ },
+ "node-189": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool16fyda57p3c8gp5r6gmcq5tvqsp6mnzwvkxswgznkuh8wztrp6vv",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "HRMS",
+  "tier": "commodity-vps"
+ },
+ "node-19": {
+  "asn": 1836,
+  "cc": "CH",
+  "kind": "bp",
+  "pool_id": "pool1l0erdjregched3dj828q93rfa2f4w4p62nr248xshj5huq6zuvp",
+  "provider": "Green.ch",
+  "region": "cc:CH",
+  "ticker": "CF3",
+  "tier": "residential/satellite"
+ },
+ "node-190": {
+  "asn": 8075,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool1qakys0fxx5p2fxcnsc2tyjpqa88q7qgtdh5t3a32hplv6fg25r9",
+  "provider": "Azure",
+  "region": "azure:westeurope",
+  "ticker": "DAPP",
+  "tier": "hyperscaler"
+ },
+ "node-191": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool189lsf6c2upyhmrzddyvyfjxxkqnte9pw8aqx7f4cuf85sjxlm02",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "",
+  "tier": "commodity-vps"
+ },
+ "node-192": {
+  "asn": 8560,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool14fjmlppz76667ws3jl5luejf2wgztuhpsftulvh3ucc65anqgve",
+  "provider": "IONOS",
+  "region": "cc:US",
+  "ticker": "XSP2",
+  "tier": "commodity-vps"
+ },
+ "node-193": {
+  "asn": 51167,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool15d62znf04qymt6ve536tt5y9ky979ly4um5zmgz9m850vu7wuv7",
+  "provider": "Contabo",
+  "region": "contabo:lauterbourg",
+  "ticker": "NUFID",
+  "tier": "commodity-vps"
+ },
+ "node-194": {
+  "asn": 16125,
+  "cc": "LT",
+  "kind": "bp",
+  "pool_id": "pool1qvudfuw9ar47up5fugs53s2g84q3c4v86z4es6uwsfzzs89rwha",
+  "provider": "Other / on-prem",
+  "region": "cc:LT",
+  "ticker": "LGNS1",
+  "tier": "other-or-onprem"
+ },
+ "node-195": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1qtscx3ge0rgmpffgqen5uup8r8tnav7a2veduweskqx7gf8gjec",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-196": {
+  "asn": 24940,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool16pv24th2tzy8k70vk4ms35tff0fjxfm2dd2psk7cvs27wnjvlgh",
+  "provider": "Hetzner",
+  "region": "hetzner:falkenstein",
+  "ticker": "SDG13",
+  "tier": "commodity-vps"
+ },
+ "node-197": {
+  "asn": 16276,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1g3ssnndd8e7lcmstkjl9ane9mup0eshv3aklg63u5tznwl4ch87",
+  "provider": "OVH",
+  "region": "ovh:de:frankfurt_am_main",
+  "ticker": "VRSTK",
+  "tier": "commodity-vps"
+ },
+ "node-198": {
+  "asn": 13037,
+  "cc": "GB",
+  "kind": "bp",
+  "pool_id": "pool19k9grwq9cdswn4k7vxzmwcls24jj3466g4s4xr5vucehcqpslfy",
+  "provider": "Other / on-prem",
+  "region": "cc:GB",
+  "ticker": "ADV4",
+  "tier": "other-or-onprem"
+ },
+ "node-199": {
+  "asn": 8075,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool19066qvd5dv6vq7fh5a5l7muzk6nc5fw8zq3w4tclyrhvjvlyeuc",
+  "provider": "Azure",
+  "region": "azure:westeurope",
+  "ticker": "ETO2",
+  "tier": "hyperscaler"
+ },
+ "node-2": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1f2wfjqkf2wx6jq93pdck6hgmy9zgw32lmvrq9zejl7scqxjqfze",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "",
+  "tier": "unresolved"
+ },
+ "node-20": {
+  "asn": 16509,
+  "cc": "SE",
+  "kind": "bp",
+  "pool_id": "pool1yafxktvszg85t5m20l8q8sufgcae6cxlk8cx96wrt8cdva7aknf",
+  "provider": "AWS",
+  "region": "aws:eu-north-1",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-200": {
+  "asn": 6939,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1v5u6wzakuc25q3zpx04t8gjz3rgu60wuxkv2mh5nga23xjkc86s",
+  "provider": "Other / on-prem",
+  "region": "cc:US",
+  "ticker": "MOKSH",
+  "tier": "other-or-onprem"
+ },
+ "node-201": {
+  "asn": 24940,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1ases3nklh6gyjf74r7dqm89exjfd520z9cefqru959wcccmrdlk",
+  "provider": "Hetzner",
+  "region": "hetzner:helsinki",
+  "ticker": "MIN",
+  "tier": "commodity-vps"
+ },
+ "node-202": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool15zrkyr0f80hxlt4scv72tej8l8zwrcphmrega9wutqchjekceal",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "ZETE",
+  "tier": "commodity-vps"
+ },
+ "node-203": {
+  "asn": 14061,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool13crd2ljx87988umk22er6ynwadfwdqupdpcq6prc6v59z62kxse",
+  "provider": "DigitalOcean",
+  "region": "cc:US",
+  "ticker": "BLOOM",
+  "tier": "commodity-vps"
+ },
+ "node-204": {
+  "asn": 14061,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool12vs4c3cm0tr49c7alrevfs0xa5g3s4al4fn46h33e69uusat04v",
+  "provider": "DigitalOcean",
+  "region": "cc:US",
+  "ticker": "BLOOM",
+  "tier": "commodity-vps"
+ },
+ "node-205": {
+  "asn": 24940,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool166dkk9kx5y6ug9tnvh0dnvxhwt2yca3g5pd5jaqa8t39cgyqqlr",
+  "provider": "Hetzner",
+  "region": "hetzner:falkenstein",
+  "ticker": "VIPER",
+  "tier": "commodity-vps"
+ },
+ "node-206": {
+  "asn": 8560,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1vc8jp7uagxgh8trzx7r260ndcydz89ges8sws05cyv7jj8q8gqs",
+  "provider": "IONOS",
+  "region": "cc:DE",
+  "ticker": "OCEA3",
+  "tier": "commodity-vps"
+ },
+ "node-207": {
+  "asn": 16276,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1ywpt43nttzjd7883wafg255mh0hmjypwe65ercw6p2sxg5lt7ez",
+  "provider": "OVH",
+  "region": "ovh:de:frankfurt_am_main",
+  "ticker": "EVE4",
+  "tier": "commodity-vps"
+ },
+ "node-208": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool13mas2wthxs28zftxskcsd8t87jk2w9ntc0u5uflt45sh7lcvs8h",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "EMUR3",
+  "tier": "commodity-vps"
+ },
+ "node-209": {
+  "asn": 63949,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1uthdnav2zc2hxpg2hyeyy545lnxtl8lqdcdqxjm0j8t5srmyvzj",
+  "provider": "Akamai/Linode",
+  "region": "cc:US",
+  "ticker": "ADAST",
+  "tier": "commodity-vps"
+ },
+ "node-21": {
+  "asn": 31898,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool16ajaae2n5lsyr4f9k9uz5y8tpf0996tw640dzu7chwp2wdrnz6a",
+  "provider": "Oracle Cloud",
+  "region": "cc:US",
+  "ticker": "BLADE",
+  "tier": "hyperscaler"
+ },
+ "node-210": {
+  "asn": 16509,
+  "cc": "IN",
+  "kind": "bp",
+  "pool_id": "pool1pvu2zdexh8wr4ggmuz90jvqrua6an43qj9m9urs785p8kwjzqwl",
+  "provider": "AWS",
+  "region": "aws:ap-south-1",
+  "ticker": "KTN3",
+  "tier": "hyperscaler"
+ },
+ "node-211": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1ukeqarukv9gxwy9pt8jkr4qvad2yf87758g3xzemmvmtk8lrynp",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "",
+  "tier": "commodity-vps"
+ },
+ "node-212": {
+  "asn": 16509,
+  "cc": "KR",
+  "kind": "bp",
+  "pool_id": "pool19zkd9hmkgdjmx2xr0psuat88uuw25wsrktr2qe69v2uzqldfnmj",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-2",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-213": {
+  "asn": 16509,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool13qdkwy5y88ncr5qpjrh8hgtf94d0zw4wuhgezjg3hvlyyrh37c7",
+  "provider": "AWS",
+  "region": "aws:eu-central-1",
+  "ticker": "SECUR",
+  "tier": "hyperscaler"
+ },
+ "node-214": {
+  "asn": 8560,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1a2nh3ktswllhwf07fjahpdg5mpqyq7j950pyftq9765r6t4cefl",
+  "provider": "IONOS",
+  "region": "cc:DE",
+  "ticker": "OCEAN",
+  "tier": "commodity-vps"
+ },
+ "node-215": {
+  "asn": 16276,
+  "cc": "GB",
+  "kind": "bp",
+  "pool_id": "pool1nudasuv0lljpe0tswcverqvlh0v4226vgnpsuxn0e9nkvnvcvne",
+  "provider": "OVH",
+  "region": "ovh:gb:bexley",
+  "ticker": "STI",
+  "tier": "commodity-vps"
+ },
+ "node-216": {
+  "asn": 14618,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1k0xrqp03mn9u3q3sadndd6vu9udl5v38xpzyw0shm8sskuxw2av",
+  "provider": "AWS",
+  "region": "cc:US",
+  "ticker": "JP2",
+  "tier": "hyperscaler"
+ },
+ "node-217": {
+  "asn": 51167,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1f8erepj5w5nth5xfxgxnwpz59jzywt6zdwfr50jzjwfwksmg9ek",
+  "provider": "Contabo",
+  "region": "contabo:lauterbourg",
+  "ticker": "NUFIE",
+  "tier": "commodity-vps"
+ },
+ "node-218": {
+  "asn": 8560,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1ctzja2cdwyeqnvehmrlclc5wrn9w9acwklk3acn73jrx56d66vs",
+  "provider": "IONOS",
+  "region": "cc:DE",
+  "ticker": "OCEA2",
+  "tier": "commodity-vps"
+ },
+ "node-219": {
+  "asn": 16509,
+  "cc": "KR",
+  "kind": "bp",
+  "pool_id": "pool1ua5exfeju4jc95yy595cykjh4x46998g8hrrvw2v5h9k7987a44",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-2",
+  "ticker": "UPBIT",
+  "tier": "hyperscaler"
+ },
+ "node-22": {
+  "asn": 62240,
+  "cc": "GB",
+  "kind": "bp",
+  "pool_id": "pool1ekcsyzwexl7p2kwxxh34hy28l6772vrmff7jwmuxsa6u6fzty9z",
+  "provider": "Clouvider",
+  "region": "cc:GB",
+  "ticker": "ADALO",
+  "tier": "other-or-onprem"
+ },
+ "node-220": {
+  "asn": 16509,
+  "cc": "KR",
+  "kind": "bp",
+  "pool_id": "pool1sjnh0ymk9fhhnusm7uksux5yhpfyhjfmseq5nuupsj6ezskc0pj",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-2",
+  "ticker": "UPBIT",
+  "tier": "hyperscaler"
+ },
+ "node-221": {
+  "asn": 16509,
+  "cc": "KR",
+  "kind": "bp",
+  "pool_id": "pool1r9kse9x8ja0ajkyw8w96zw5c2aqeey6j85nmyqxhwt0rs090fu4",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-2",
+  "ticker": "UPBIT",
+  "tier": "hyperscaler"
+ },
+ "node-222": {
+  "asn": 16509,
+  "cc": "KR",
+  "kind": "bp",
+  "pool_id": "pool1cp4q7w2jvlthul9mlskj6xutx9rdr7n4vruqqe09pfg5ywmzdzq",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-2",
+  "ticker": "UPBIT",
+  "tier": "hyperscaler"
+ },
+ "node-223": {
+  "asn": 16509,
+  "cc": "KR",
+  "kind": "bp",
+  "pool_id": "pool1ek9pyk0xwjelrw7uqktvjwqj8wlcqqftjxqeq3t2vffw7qm8efs",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-2",
+  "ticker": "UPBIT",
+  "tier": "hyperscaler"
+ },
+ "node-224": {
+  "asn": 16509,
+  "cc": "KR",
+  "kind": "bp",
+  "pool_id": "pool1k2224hj6uhdgkflj6ncqvmfhqvhlhj0t8crhqux5mphwwumupec",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-2",
+  "ticker": "UPBIT",
+  "tier": "hyperscaler"
+ },
+ "node-225": {
+  "asn": 16509,
+  "cc": "KR",
+  "kind": "bp",
+  "pool_id": "pool13t8yafhx3mfnxs8nnkvgqnm9v5gspk7cdjc5dmpzpt0a6h294yn",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-2",
+  "ticker": "UPBIT",
+  "tier": "hyperscaler"
+ },
+ "node-226": {
+  "asn": 396982,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1cyq3v3v43hu7spwlfxdm6vq9djpsjjueerhlu5qr2rvd57vqk84",
+  "provider": "GCP",
+  "region": "gcp:us-east4",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-227": {
+  "asn": 16509,
+  "cc": "KR",
+  "kind": "bp",
+  "pool_id": "pool1jldj0znj8rltkuj4sumqq5z6p8sdt3yk4qde90q42daru5kgfl6",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-2",
+  "ticker": "UPBIT",
+  "tier": "hyperscaler"
+ },
+ "node-228": {
+  "asn": 16509,
+  "cc": "KR",
+  "kind": "bp",
+  "pool_id": "pool1hnaps49hfe3uljp4cleu4amhes6wvatufyvgt2tjdtj3xjrgknk",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-2",
+  "ticker": "UPBIT",
+  "tier": "hyperscaler"
+ },
+ "node-229": {
+  "asn": 16509,
+  "cc": "KR",
+  "kind": "bp",
+  "pool_id": "pool1wthsvhhxueqfd9eqjdj8pgyprhr4gptn5g63z9rdrtelcfumnvg",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-2",
+  "ticker": "UPBIT",
+  "tier": "hyperscaler"
+ },
+ "node-23": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1v62c7d92xv6gyh4x9rhfpkwzlpw2ypxk92xvzavakg3xypatklv",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "KILN2",
+  "tier": "commodity-vps"
+ },
+ "node-230": {
+  "asn": 8075,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool14zdcvdec8qmqzsat5wg3a2h9f0u5yzrgjew534z8u3gs5durnjz",
+  "provider": "Azure",
+  "region": "azure:eastus2",
+  "ticker": "PAUL",
+  "tier": "hyperscaler"
+ },
+ "node-231": {
+  "asn": 16509,
+  "cc": "JP",
+  "kind": "bp",
+  "pool_id": "pool1hyqdlnuff3rnvg9lx70ccca2xqxcezzz4998tp6chhxnx2st257",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-1",
+  "ticker": "FCS",
+  "tier": "hyperscaler"
+ },
+ "node-232": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool19zz6frugmvm82ecgl5hh5vq3093d4kzr4h2r5vfmt6la7trk929",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-233": {
+  "asn": 16509,
+  "cc": "JP",
+  "kind": "bp",
+  "pool_id": "pool15kek228mhvnsncdjn77u8qtrn8hjh5wfzmh6g942xf0353yc77j",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-1",
+  "ticker": "TIA",
+  "tier": "hyperscaler"
+ },
+ "node-234": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1fxra32qureulvqrhrdpnrl5yechhqreg2khrghv3tkl4z66t0rm",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-235": {
+  "asn": 16509,
+  "cc": "IE",
+  "kind": "bp",
+  "pool_id": "pool1kcvaxe4q4npwt28qlr3h84htjf4qrqglqk3cr2484ptycr0ldut",
+  "provider": "AWS",
+  "region": "aws:eu-west-1",
+  "ticker": "RRC",
+  "tier": "hyperscaler"
+ },
+ "node-236": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool18gsrasdghtjsnzlf20pht85l4epwag74w9pfx5qvdvcpxw68sl6",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-237": {
+  "asn": 16509,
+  "cc": "JP",
+  "kind": "bp",
+  "pool_id": "pool1gk20vlqg7qq868avysckjcjtwyphtjurfwlgra45670ny6r4fww",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-1",
+  "ticker": "GCN",
+  "tier": "hyperscaler"
+ },
+ "node-238": {
+  "asn": 16276,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1xmsdhync6k6grkkj7tuycskjpseykpr24luhlazl5nsngsy87gm",
+  "provider": "OVH",
+  "region": "ovh:de:frankfurt_am_main",
+  "ticker": "EVE3",
+  "tier": "commodity-vps"
+ },
+ "node-239": {
+  "asn": 16509,
+  "cc": "IN",
+  "kind": "bp",
+  "pool_id": "pool1xlfty06hg6q23qvcaxwv3p9ke7ff9n34qpr8tpxt2zflyq20ceh",
+  "provider": "AWS",
+  "region": "aws:ap-south-1",
+  "ticker": "SAKE",
+  "tier": "hyperscaler"
+ },
+ "node-24": {
+  "asn": 13037,
+  "cc": "GB",
+  "kind": "bp",
+  "pool_id": "pool1ahazpr2yz5gljk2m4q8g7wnmq7m2sr9unhdfmr5arhqrjnntwdz",
+  "provider": "Other / on-prem",
+  "region": "cc:GB",
+  "ticker": "ADV3",
+  "tier": "other-or-onprem"
+ },
+ "node-240": {
+  "asn": 31898,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool18rhzlrv83a7ygj7cp5uv8dx07qkn5drhe8nh6f3qvhv66xcyj2m",
+  "provider": "Oracle Cloud",
+  "region": "cc:US",
+  "ticker": "SIPO2",
+  "tier": "hyperscaler"
+ },
+ "node-241": {
+  "asn": 14618,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1lnr8t7pxvq3vfg8c5lc7yjcq39haws4ntu28xpxzx4zyya9ntny",
+  "provider": "AWS",
+  "region": "cc:US",
+  "ticker": "KKS",
+  "tier": "hyperscaler"
+ },
+ "node-242": {
+  "asn": 396982,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1axzm26vduyuxgw0x9ddh4vkvn7q5hyd558l0t9c08p556lf2zaj",
+  "provider": "GCP",
+  "region": "gcp:us-east4",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-243": {
+  "asn": 24940,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1ewrm7y47s9hv6hxku9n5gfnsuspymp0qqpwgvgm9rvm37cek2h6",
+  "provider": "Hetzner",
+  "region": "hetzner:nuremberg",
+  "ticker": "A4G",
+  "tier": "commodity-vps"
+ },
+ "node-244": {
+  "asn": 396982,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1fza7ms33y7mnq63etrgz0caqhaw2tsxme0gp52ltv9wwgwurged",
+  "provider": "GCP",
+  "region": "gcp:us-east4",
+  "ticker": "WPBJ5",
+  "tier": "hyperscaler"
+ },
+ "node-245": {
+  "asn": 8075,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool138m7hevnvp664cmtralju857t5k7e4frpnaevtgpuykggr50kne",
+  "provider": "Azure",
+  "region": "azure:eastus2",
+  "ticker": "ITC",
+  "tier": "hyperscaler"
+ },
+ "node-246": {
+  "asn": 16276,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1lvsa8e0dw6z8g2fkw7prnfa7627wuy5jjexaadck6w5sxw5xkvm",
+  "provider": "OVH",
+  "region": "ovh:us:virginia",
+  "ticker": "DIGI2",
+  "tier": "commodity-vps"
+ },
+ "node-247": {
+  "asn": 16276,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool12l453n0jtxqq88cgwgr67z06ldyhqqvwxgkn0sgungjfvhtp2el",
+  "provider": "OVH",
+  "region": "ovh:de:frankfurt_am_main",
+  "ticker": "EVERS",
+  "tier": "commodity-vps"
+ },
+ "node-248": {
+  "asn": 20473,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1cmdq8atcy8x7lfhh09vdumveuh0ywsx0269ur774nvzkyhma37d",
+  "provider": "Vultr / Choopa",
+  "region": "cc:US",
+  "ticker": "MOMO",
+  "tier": "commodity-vps"
+ },
+ "node-249": {
+  "asn": 16276,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1jz5ljsnj4fzmk84j0wcw9ldy866dn07nzqg2ktyuyjvfvr3jgtq",
+  "provider": "OVH",
+  "region": "ovh:us:virginia",
+  "ticker": "DIGI4",
+  "tier": "commodity-vps"
+ },
+ "node-25": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool18sk7mn0r0cyujft352lwkzg5pz7e67ve3ps2sryrwacd2r5zhp6",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "",
+  "tier": "unresolved"
+ },
+ "node-26": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1mtuhuh8hkf8am0qzx45y58kll8q83sjh6pwljrflcmw970d82f3",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "KILN6",
+  "tier": "commodity-vps"
+ },
+ "node-27": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool13l9qxpuzd70h7hkjr4ec3pf50w4x6tst5pxc7w33l5lyj4lpmtv",
+  "provider": "Other / on-prem",
+  "region": "cc:??",
+  "ticker": "",
+  "tier": "other-or-onprem"
+ },
+ "node-28": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1rkm8rplkafvllxjuddrkqc3u3lgd9uf327tvmvfdyygsv7lkhm8",
+  "provider": "Other / on-prem",
+  "region": "cc:??",
+  "ticker": "",
+  "tier": "other-or-onprem"
+ },
+ "node-29": {
+  "asn": 396982,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1ljqjqskd4f4zekzddw204u5xtzhyz2cllq5v5dmn27zdwf9c70f",
+  "provider": "GCP",
+  "region": "gcp:us-east4",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-3": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1k3nkfa5ugavrpd9nwd3s6yyx454qxnquxwmux4rzfunl7q0z38t",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "KILN9",
+  "tier": "commodity-vps"
+ },
+ "node-30": {
+  "asn": 396982,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1w4cetqsly2cz9fq2te95tnk2r56mh6ew6dmpyfctv2ldv8xuj9g",
+  "provider": "GCP",
+  "region": "gcp:us-east4",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-31": {
+  "asn": 396982,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1l0m820vyqh5pp2yzpw973qzz23neqqd977u0uczh9fs9zqvg0je",
+  "provider": "GCP",
+  "region": "gcp:us-east4",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-32": {
+  "asn": 396982,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool155p7g23vdme50kp5lfqylfx5h7ndldyz2mletvr8fqucqzyrk44",
+  "provider": "GCP",
+  "region": "gcp:us-east4",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-33": {
+  "asn": 15169,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool1xsj9s3mfpztls97x7jjql0msmeh5v3wa5vyqhmmmsx8jzsqxrsv",
+  "provider": "GCP",
+  "region": "gcp:europe-west4",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-34": {
+  "asn": 16509,
+  "cc": "SE",
+  "kind": "bp",
+  "pool_id": "pool1hv59awqky90plv68xun2k3rd7jqfe5y2c4ry8f7p0x9pxhd7wqr",
+  "provider": "AWS",
+  "region": "aws:eu-north-1",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-35": {
+  "asn": 16509,
+  "cc": "SE",
+  "kind": "bp",
+  "pool_id": "pool1ntlyr9hrrdg3gpdkmr267hq46ys2rlj5y25dzx3reuecgd7p5sh",
+  "provider": "AWS",
+  "region": "aws:eu-north-1",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-36": {
+  "asn": 16509,
+  "cc": "SE",
+  "kind": "bp",
+  "pool_id": "pool1a5ld0eulnjxwpg6qyjs6hxzqwj0esft7k0qsf6nj8pkfxy5lml3",
+  "provider": "AWS",
+  "region": "aws:eu-north-1",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-37": {
+  "asn": 16509,
+  "cc": "SE",
+  "kind": "bp",
+  "pool_id": "pool1cxjqg6nn588ura2rx4uptwprgzw82j89j2gjguwhtun4ypw2sh4",
+  "provider": "AWS",
+  "region": "aws:eu-north-1",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-38": {
+  "asn": 16509,
+  "cc": "SE",
+  "kind": "bp",
+  "pool_id": "pool1yyar66t9fw9dscj8huhredgwplcnf22zq7q7vugur0t5c9nzt97",
+  "provider": "AWS",
+  "region": "aws:eu-north-1",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-39": {
+  "asn": 16509,
+  "cc": "SE",
+  "kind": "bp",
+  "pool_id": "pool1kphkk90f2mculhcndpdd3a7ukvptzqrgyr9jtuvw6c5z2dptuph",
+  "provider": "AWS",
+  "region": "aws:eu-north-1",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-4": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool10d6mmw3mn9ku3r7uqqye672dz3sv76lh5kvh5rdpr9l5ug5yknr",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "KILN4",
+  "tier": "commodity-vps"
+ },
+ "node-40": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool19kfm6lz5uw7nylq27swr367mqdycmug7tve94l6h3xsz64seqtc",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "KILN8",
+  "tier": "commodity-vps"
+ },
+ "node-41": {
+  "asn": 24940,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1qqqqpanw9zc0rzh0yp247nzf2s35uvnsm7aaesfl2nnejaev0uc",
+  "provider": "Hetzner",
+  "region": "hetzner:falkenstein",
+  "ticker": "TITAN",
+  "tier": "commodity-vps"
+ },
+ "node-42": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool19yzqr3meksnvzdxh5xf6aknfhldyqdj7eaquxgcjva4mzt5kg3v",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "gjp7a",
+  "tier": "unresolved"
+ },
+ "node-43": {
+  "asn": 15169,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool1zgjk3dzwcwd02juqntuzknr368hvxjxy8l8uzkxvgu4252d7ekf",
+  "provider": "GCP",
+  "region": "gcp:europe-west4",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-44": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1fuge4duc9hfgm9xvu33llsntmnfcumsyw2d0away49v8gmphfzs",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "FGMTK",
+  "tier": "unresolved"
+ },
+ "node-45": {
+  "asn": 14061,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1eqa7kxx4xg35cu4rqj4exkvzhenscgh8wxez0gl7hsagygp79kr",
+  "provider": "DigitalOcean",
+  "region": "cc:US",
+  "ticker": "PILOT",
+  "tier": "commodity-vps"
+ },
+ "node-46": {
+  "asn": 396982,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1457cnl7qu568h98xrw8krfnjkhf05mfhaq2l50epwy36yuln20q",
+  "provider": "GCP",
+  "region": "gcp:us-east4",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-47": {
+  "asn": 4764,
+  "cc": "AU",
+  "kind": "bp",
+  "pool_id": "pool1prc9hna2mgamtspchrygc66s9n4tlkvh39e3t9zccef4kzc3ns2",
+  "provider": "Other / on-prem",
+  "region": "cc:AU",
+  "ticker": "TERM",
+  "tier": "other-or-onprem"
+ },
+ "node-48": {
+  "asn": 201814,
+  "cc": "PL",
+  "kind": "bp",
+  "pool_id": "pool1zz7x8ergn02chznayj9fjds2gk5q6prmpdr49faspd65kzqsrjs",
+  "provider": "MEVspace",
+  "region": "cc:PL",
+  "ticker": "AUTO",
+  "tier": "commodity-vps"
+ },
+ "node-49": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool197na7w0h8hjc8wdvwys7nsalhtpctefa3m23udeqxpfk6nzq8l9",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-5": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool10rdglgh4pzvkf936p2m669qzarr9dusrhmmz9nultm3uvq4eh5k",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "KILN0",
+  "tier": "commodity-vps"
+ },
+ "node-50": {
+  "asn": 7992,
+  "cc": "CA",
+  "kind": "bp",
+  "pool_id": "pool13k6tphjfsgqdq7h27p4x86ruchcdg2x073luw8pndh3ajxvwvja",
+  "provider": "Cogeco (CA cable ISP)",
+  "region": "cc:CA",
+  "ticker": "BLC",
+  "tier": "residential/satellite"
+ },
+ "node-51": {
+  "asn": 16509,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1lhz4gsk5ezdl5s4mv2kxgrkhzzhad6me2v0xmwuyt845vensdlc",
+  "provider": "AWS",
+  "region": "aws:eu-central-1",
+  "ticker": "SECUR",
+  "tier": "hyperscaler"
+ },
+ "node-52": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool17s3mr9c4ejjfq20dz0ls9ggskc770kt267s9xmw93payzdswwgg",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "FIKA",
+  "tier": "unresolved"
+ },
+ "node-53": {
+  "asn": 14061,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool13c9mnvfx4nvwvkszxcprwlv60fh3tteef50hhhv9yxptsua2v70",
+  "provider": "DigitalOcean",
+  "region": "cc:US",
+  "ticker": "DARK",
+  "tier": "commodity-vps"
+ },
+ "node-54": {
+  "asn": 20860,
+  "cc": "GB",
+  "kind": "bp",
+  "pool_id": "pool18ufrgfgmslekdxnk9v9345qvhrr7vfgzkvneqtwm7unnwaht6ww",
+  "provider": "Other / on-prem",
+  "region": "cc:GB",
+  "ticker": "OGAM",
+  "tier": "other-or-onprem"
+ },
+ "node-55": {
+  "asn": 16509,
+  "cc": "JP",
+  "kind": "bp",
+  "pool_id": "pool1fl20ddkpvnstlx63fal6e3ku46r76nk2s4mqtk5jnyxn2vt7hg6",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-1",
+  "ticker": "KOH",
+  "tier": "hyperscaler"
+ },
+ "node-56": {
+  "asn": 16509,
+  "cc": "JP",
+  "kind": "bp",
+  "pool_id": "pool1xed948ze4guhrkt9zxjmecjvgkvgf8gd8skkzgtacz6gsyk9m5c",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-1",
+  "ticker": "WGM",
+  "tier": "hyperscaler"
+ },
+ "node-57": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1j276s043qh2knv3ukmap6sra6sk7p5khuetzwx9h43wqydzsx8c",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-58": {
+  "asn": 3301,
+  "cc": "SE",
+  "kind": "bp",
+  "pool_id": "pool12t3zmafwjqms7cuun86uwc8se4na07r3e5xswe86u37djr5f0lx",
+  "provider": "Other / on-prem",
+  "region": "cc:SE",
+  "ticker": "NORTH",
+  "tier": "other-or-onprem"
+ },
+ "node-59": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1vx9tzlkgafernd9vpjpxkenutx2gncj4yn88fpq69823qlwcqrt",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "",
+  "tier": "commodity-vps"
+ },
+ "node-6": {
+  "asn": 7979,
+  "cc": "NL",
+  "kind": "bp",
+  "pool_id": "pool1lu2luhmkyayq9njh848kfknn6evwzmn3gzsxar7z3sttg7grxcm",
+  "provider": "Servers.com",
+  "region": "cc:NL",
+  "ticker": "",
+  "tier": "commodity-vps"
+ },
+ "node-60": {
+  "asn": 2116,
+  "cc": "NO",
+  "kind": "bp",
+  "pool_id": "pool15cy4p3axu0m6sfrmxsp46z5cevx3ruksfwjl48730cgx24j4ydz",
+  "provider": "Other / on-prem",
+  "region": "cc:NO",
+  "ticker": "TECH",
+  "tier": "other-or-onprem"
+ },
+ "node-61": {
+  "asn": 16509,
+  "cc": "JP",
+  "kind": "bp",
+  "pool_id": "pool1edqwpnln3zr9gj9sfsmyl72pen6hdwev07xgqj7uz5mkjrgfj6h",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-1",
+  "ticker": "TBG",
+  "tier": "hyperscaler"
+ },
+ "node-62": {
+  "asn": 396982,
+  "cc": "HK",
+  "kind": "bp",
+  "pool_id": "pool14xq8v9s80ut6vmwp93tzhlydhsdqhxk3e9jerl2kl7hm2dq6pru",
+  "provider": "GCP",
+  "region": "gcp:asia-east2",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-63": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1vcwsfldh4gkzga4mc6p86y0vytkqfm9e2dy44hs00v34yeqnfaf",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-64": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1kl2vuauwfc5k0avf874ym5tcm04ywa22frleszhujeccj4va3lt",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-65": {
+  "asn": 16509,
+  "cc": "JP",
+  "kind": "bp",
+  "pool_id": "pool18gk8kvd9qf829nldqus92q9y640e6u0jdyfz04mmktwxvglgt06",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-1",
+  "ticker": "SBP1",
+  "tier": "hyperscaler"
+ },
+ "node-66": {
+  "asn": 16509,
+  "cc": "IE",
+  "kind": "bp",
+  "pool_id": "pool1fqas6yd8n3fdpz8e869qjvyensdmzletqjexcut8mxasu2sk72r",
+  "provider": "AWS",
+  "region": "aws:eu-west-1",
+  "ticker": "LAG",
+  "tier": "hyperscaler"
+ },
+ "node-67": {
+  "asn": 16509,
+  "cc": "IE",
+  "kind": "bp",
+  "pool_id": "pool1sdare7xfd6tmak8ghek7kwgpgj6xzu0reppmw4t46rmcs0h6vr2",
+  "provider": "AWS",
+  "region": "aws:eu-west-1",
+  "ticker": "UTA",
+  "tier": "hyperscaler"
+ },
+ "node-68": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1s8347yjgmfguf0ynj69euw7r75w7usdrfheckpcrjrk2yfvnpwq",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-69": {
+  "asn": 16509,
+  "cc": "JP",
+  "kind": "bp",
+  "pool_id": "pool1lev7ygxcqd4aw5em7wf7y64au4hv04yl5cew27lkjmgngj46vqk",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-1",
+  "ticker": "TLK",
+  "tier": "hyperscaler"
+ },
+ "node-7": {
+  "asn": 61174,
+  "cc": "CH",
+  "kind": "bp",
+  "pool_id": "pool14cq4fchmmqjygwjw4zexmqqd6a7caxptjnvseyu6wanjuppv4vk",
+  "provider": "Other / on-prem",
+  "region": "cc:CH",
+  "ticker": "CH1",
+  "tier": "other-or-onprem"
+ },
+ "node-70": {
+  "asn": 16509,
+  "cc": "IE",
+  "kind": "bp",
+  "pool_id": "pool17arsgklktp9sayk5kzaakwvl3jwyczp07guux2yd0upgqh04qjl",
+  "provider": "AWS",
+  "region": "aws:eu-west-1",
+  "ticker": "RMH",
+  "tier": "hyperscaler"
+ },
+ "node-71": {
+  "asn": 16509,
+  "cc": "IE",
+  "kind": "bp",
+  "pool_id": "pool1xucruwwxsym3u9v0m4ex3az5d4vpz9xu877vsl9udpt0q237e9m",
+  "provider": "AWS",
+  "region": "aws:eu-west-1",
+  "ticker": "KLF",
+  "tier": "hyperscaler"
+ },
+ "node-72": {
+  "asn": 16509,
+  "cc": "JP",
+  "kind": "bp",
+  "pool_id": "pool1njjr0zn7uvydjy8067nprgwlyxqnznp9wgllfnag24nycgkda25",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-1",
+  "ticker": "FMD",
+  "tier": "hyperscaler"
+ },
+ "node-73": {
+  "asn": 16509,
+  "cc": "JP",
+  "kind": "bp",
+  "pool_id": "pool13s5faca3kkg6jhqcll8xd9tarur3zkhalyuu92d5g87zyj4wrrc",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-1",
+  "ticker": "TZD",
+  "tier": "hyperscaler"
+ },
+ "node-74": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1qlps2dwr0qd0a7pjqr47apewf2lq42xv03zgentgwv9mspeh57g",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "",
+  "tier": "unresolved"
+ },
+ "node-75": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1tn7rcvc5lln8frln5n9rfd9cg8kcrj4vlm3ycdquyx5s2mlhmtk",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-76": {
+  "asn": 396982,
+  "cc": "HK",
+  "kind": "bp",
+  "pool_id": "pool1w7dk7rn0cflzzfr4fqvjpapn0rkz5ksmerx5tgwpm2gtj2gly97",
+  "provider": "GCP",
+  "region": "gcp:asia-east2",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-77": {
+  "asn": 16509,
+  "cc": "IE",
+  "kind": "bp",
+  "pool_id": "pool104z3yr7faqhck6wcsczhmqrrpdeparcr8juw8unxy8tm6xp447d",
+  "provider": "AWS",
+  "region": "aws:eu-west-1",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-78": {
+  "asn": 16509,
+  "cc": "JP",
+  "kind": "bp",
+  "pool_id": "pool16e43yxx4djcvnsunwgrm8tnph0ljrt3p9tnezu3qvtcwzh4zwwa",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-1",
+  "ticker": "FBA",
+  "tier": "hyperscaler"
+ },
+ "node-79": {
+  "asn": 16509,
+  "cc": "IE",
+  "kind": "bp",
+  "pool_id": "pool143d6z506u6yfufgzrtx8ywcwx3j4s29lxv5tdugcpcwk2l83gck",
+  "provider": "AWS",
+  "region": "aws:eu-west-1",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-8": {
+  "asn": 16509,
+  "cc": "AU",
+  "kind": "bp",
+  "pool_id": "pool1r9fpxs4kcn80kylsjxs8tg3p50nk2s66qerfqtw4x70n5740nj9",
+  "provider": "AWS",
+  "region": "aws:ap-southeast-2",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-80": {
+  "asn": 16509,
+  "cc": "JP",
+  "kind": "bp",
+  "pool_id": "pool1fpvs8h5q5kwpz4k2yd0vw90dgdxacr3ef508tzzewm0kysdt4eq",
+  "provider": "AWS",
+  "region": "aws:ap-northeast-1",
+  "ticker": "SBP2",
+  "tier": "hyperscaler"
+ },
+ "node-81": {
+  "asn": 3301,
+  "cc": "SE",
+  "kind": "bp",
+  "pool_id": "pool17rjst78s67lvellg8s586rf076jxa3wnsdz730f4xk2zwuhrtej",
+  "provider": "Other / on-prem",
+  "region": "cc:SE",
+  "ticker": "NORTH",
+  "tier": "other-or-onprem"
+ },
+ "node-82": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1l92vxagssugcsu4wyhvnjd0t6dlqjjfrxkt8v4qaucgmq8t3j3s",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "FGMTI",
+  "tier": "unresolved"
+ },
+ "node-83": {
+  "asn": 47447,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1qqqqqdk4zhsjuxxd8jyvwncf5eucfskz0xjjj64fdmlgj735lr9",
+  "provider": "Other / on-prem",
+  "region": "cc:DE",
+  "ticker": "ATADA",
+  "tier": "other-or-onprem"
+ },
+ "node-84": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1gclysx2h7fndj0jdajlmwvqr8q9tzu3rurjknacu0ff954fsg9a",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "1PCT0",
+  "tier": "commodity-vps"
+ },
+ "node-85": {
+  "asn": 47377,
+  "cc": "BE",
+  "kind": "bp",
+  "pool_id": "pool13hxlxd6qa68fmfhrvvmasa0mjg30tj9p5v2lmgmgsmrp2rgzkfp",
+  "provider": "Other / on-prem",
+  "region": "cc:BE",
+  "ticker": "dtDn",
+  "tier": "other-or-onprem"
+ },
+ "node-86": {
+  "asn": 16276,
+  "cc": "CA",
+  "kind": "bp",
+  "pool_id": "pool1hnp560z9e5acwux8tjguxq36j9r255zuf02u7z2d46dvcf5zhns",
+  "provider": "OVH",
+  "region": "cc:CA",
+  "ticker": "LCP",
+  "tier": "commodity-vps"
+ },
+ "node-87": {
+  "asn": 3301,
+  "cc": "SE",
+  "kind": "bp",
+  "pool_id": "pool1lfvzgsrghmugvpym868mh29288ez0nncz680mamzjygu2jpuwcd",
+  "provider": "Other / on-prem",
+  "region": "cc:SE",
+  "ticker": "NORTH",
+  "tier": "other-or-onprem"
+ },
+ "node-88": {
+  "asn": 33185,
+  "cc": "CA",
+  "kind": "bp",
+  "pool_id": "pool1a8n7f97dmgtgrnl53exccknjdchqxrr9508hlxlgqp6xvjmzhej",
+  "provider": "Other / on-prem",
+  "region": "cc:CA",
+  "ticker": "HAPPY",
+  "tier": "other-or-onprem"
+ },
+ "node-89": {
+  "asn": null,
+  "cc": null,
+  "kind": "bp",
+  "pool_id": "pool1cauj94scz5wp58defdxqqgnujaalvxe388peyv2gx79y6suzl55",
+  "provider": "Unresolved",
+  "region": "cc:??",
+  "ticker": "FGMTA",
+  "tier": "unresolved"
+ },
+ "node-9": {
+  "asn": 24940,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool16agnvfan65ypnswgg6rml52lqtcqe5guxltexkn82sqgj2crqtx",
+  "provider": "Hetzner",
+  "region": "hetzner:falkenstein",
+  "ticker": "SPIRE",
+  "tier": "commodity-vps"
+ },
+ "node-90": {
+  "asn": 13037,
+  "cc": "GB",
+  "kind": "bp",
+  "pool_id": "pool18vej0s9gska8c847aj95g9v24duuxg2g63d5cuqngnxew643jw9",
+  "provider": "Other / on-prem",
+  "region": "cc:GB",
+  "ticker": "ADV2",
+  "tier": "other-or-onprem"
+ },
+ "node-91": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1yh7ksvg54nger73ldnf22cgwyh0dnm4aerahdd0kdukjqeacy32",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-92": {
+  "asn": 197540,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1tdsrw0n33gmy0mzh7cgtn9p0jy5xwjxaa2s26gn2ewf8kg4nrzx",
+  "provider": "Other / on-prem",
+  "region": "cc:DE",
+  "ticker": "CAFE",
+  "tier": "other-or-onprem"
+ },
+ "node-93": {
+  "asn": 40021,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool1ju8f57hyvaa32tp85r468kuedvmjmcy56f8u9968drea57p50l5",
+  "provider": "Contabo",
+  "region": "contabo:seattle",
+  "ticker": "AICHI",
+  "tier": "commodity-vps"
+ },
+ "node-94": {
+  "asn": 7922,
+  "cc": "US",
+  "kind": "bp",
+  "pool_id": "pool15s7w4spg5ee7n7rprhs0dq78plw2mhjkpu5v97uvl27gz2way7z",
+  "provider": "Other / on-prem",
+  "region": "cc:US",
+  "ticker": "BALNC",
+  "tier": "other-or-onprem"
+ },
+ "node-95": {
+  "asn": 16276,
+  "cc": "FR",
+  "kind": "bp",
+  "pool_id": "pool1zkdc6ve9nndk7vxnjlalhqt4hr5h8auz5qzjk7lrjrqtv23yuy5",
+  "provider": "OVH",
+  "region": "cc:FR",
+  "ticker": "CLOVR",
+  "tier": "commodity-vps"
+ },
+ "node-96": {
+  "asn": 396982,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool12m7z9p7jqymxrvvp6z7vmfdu6j6u6y43p0m6y4xalz43sc8s4t9",
+  "provider": "GCP",
+  "region": "gcp:europe-west3",
+  "ticker": "",
+  "tier": "hyperscaler"
+ },
+ "node-97": {
+  "asn": 16509,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool15yyxtkhz64p7a8cnax9l7u82s9t9hdhyxsa3tdm977qhgpnsuhq",
+  "provider": "AWS",
+  "region": "aws:eu-central-1",
+  "ticker": "SECUR",
+  "tier": "hyperscaler"
+ },
+ "node-98": {
+  "asn": 197540,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1ddg6t2h9kj6lqlec4ncjs945lzj43m3ggrgdhf5sgzhtygpkznz",
+  "provider": "Other / on-prem",
+  "region": "cc:DE",
+  "ticker": "FAIR",
+  "tier": "other-or-onprem"
+ },
+ "node-99": {
+  "asn": 51167,
+  "cc": "DE",
+  "kind": "bp",
+  "pool_id": "pool1whmm0hkxunyhxsr6dfjpx2tpvd05qhev820lx9vcmvqa5wjc6nh",
+  "provider": "Contabo",
+  "region": "contabo:lauterbourg",
+  "ticker": "1COMM",
+  "tier": "commodity-vps"
+ }
+}

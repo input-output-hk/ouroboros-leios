@@ -1,0 +1,201 @@
+---
+title: Protocol status
+---
+
+import ProtocolStatus from '@site/src/components/ProtocolStatus';
+
+export const stages = [
+  'Requirements',
+  'Prototype',
+  'Design',
+  'Implementation',
+  'Confidence',
+];
+
+{/* Marks: 'done' (✓) · 'ongoing' (~) · 'open' (?) · 'empty' (blank).
+    Optional `note` overrides the default label in the tooltip.
+    `anchor` pins the badge to a position in the SVG viewBox (1120.77 × 471.62);
+    rows without an anchor render as cross-cutting cards under the diagram. */}
+
+export const rows = [
+  {
+    id: 'praos-leios-prioritization',
+    name: 'Praos > Leios prioritization',
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'done' },
+      Design: { mark: 'ongoing' },
+    },
+  },
+  {
+    id: 'ht-tx-submission',
+    name: 'High-throughput Tx submission',
+    anchor: { x: 160, y: 25 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Implementation: { mark: 'ongoing', note: 'V2-undecision' },
+    },
+  },
+  {
+    id: 'ht-mempool',
+    name: 'High-throughput mempool',
+    anchor: { x: 460, y: 25 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Design: { mark: 'ongoing', note: 'Design ideas only' },
+    },
+  },
+  {
+    id: 'block-production',
+    name: 'Block production',
+    anchor: { x: 430, y: 160 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'done' },
+      Design: { mark: 'open', note: 'Announcement & pre-application' },
+    },
+  },
+  {
+    id: 'eb-diffusion-storage',
+    name: 'EB diffusion & storage',
+    anchor: { x: 470, y: 280 },
+    cells: {
+      'Requirements': { mark: 'open', note: 'Delay bounds' },
+      Prototype: { mark: 'done' },
+      Design: { mark: 'ongoing' },
+    },
+  },
+  {
+    id: 'tx-cache',
+    name: 'Transaction cache',
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'open', note: 'Not yet implemented' },
+      Design: { mark: 'done', note: 'Sizing settled' },
+    },
+  },
+  {
+    id: 'voting-certification',
+    name: 'Voting & certification',
+    anchor: { x: 500, y: 410 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'done' },
+      Design: { mark: 'done', note: 'Shared with Peras' },
+      Implementation: { mark: 'ongoing', note: 'Cert agg, peer-reviewed' },
+    },
+  },
+  {
+    id: 'block-validation-adoption',
+    name: 'Block validation & adoption',
+    anchor: { x: 985, y: 70 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'done' },
+      Design: { mark: 'ongoing' },
+    },
+  },
+  {
+    id: 'catching-up',
+    name: 'Catching up',
+    anchor: { x: 980, y: 400 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'ongoing', note: 'Baseline via chain selection' },
+      Design: { mark: 'ongoing', note: 'Efficient path' },
+    },
+  },
+  {
+    id: 'committee-selection',
+    name: 'Committee selection',
+    anchor: { x: 230, y: 320 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'ongoing', note: 'Interim all-vote' },
+      Design: { mark: 'done', note: 'Simplified truncation' },
+    },
+  },
+  {
+    id: 'key-registration',
+    name: 'Key registration & rotation',
+    anchor: { x: 120, y: 200 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Design: { mark: 'ongoing' },
+      Implementation: { mark: 'ongoing', note: 'Key-gen CLI only' },
+    },
+  },
+  {
+    id: 'crypto',
+    name: 'Cryptographic primitives',
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'done' },
+      Design: { mark: 'done' },
+      Implementation: { mark: 'done' },
+      Confidence: { mark: 'ongoing', note: 'Primitives audited; cert layer peer-reviewed' },
+    },
+  },
+  {
+    id: 'serialization',
+    name: 'Serialization',
+    cells: {
+      'Requirements': { mark: 'done' },
+      Design: { mark: 'done' },
+      Implementation: { mark: 'ongoing' },
+    },
+  },
+  {
+    id: 'protocol-parameters',
+    name: 'New protocol parameters',
+    cells: {
+      'Requirements': { mark: 'done' },
+      Design: { mark: 'ongoing', note: 'Set being finalized' },
+      Implementation: { mark: 'open', note: 'Not implemented yet' },
+    },
+  },
+  {
+    id: 'node-api-config',
+    name: 'Node API & configuration',
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'done', note: 'Inlined-block N2C, on testnet' },
+      Design: { mark: 'ongoing', note: 'New queries to add' },
+    },
+  },
+];
+
+# Protocol status
+
+The diagram below sketches the Leios protocol flow. Each badge marks a
+component of the protocol and summarises its progress across the stages.
+Click or hover a badge for the full breakdown.
+
+<ProtocolStatus stages={stages} rows={rows} />
+
+## Full matrix
+
+| Component                     | Requirements         | Prototype                      | Design                              | Implementation              | Confidence                                       |
+|-------------------------------|----------------------|--------------------------------|-------------------------------------|-----------------------------|--------------------------------------------------|
+| Praos > Leios prioritization  | ✓                    | ✓                              | ~                                   |                             |                                                  |
+| High-throughput Tx submission | ✓                    |                                |                                     | ~ V2-undecision             |                                                  |
+| High-throughput mempool       | ✓                    |                                | ~ Design ideas only                 |                             |                                                  |
+| Block production              | ✓                    | ✓                              | ? Announcement & pre-application    |                             |                                                  |
+| EB diffusion & storage        | ? Delay bounds       | ✓                              | ~                                   |                             |                                                  |
+| Transaction cache             | ✓                    | ? Not yet implemented          | ✓ Sizing settled                    |                             |                                                  |
+| Voting & certification        | ✓                    | ✓                              | ✓ Shared with Peras                 | ~ Cert agg, peer-reviewed   |                                                  |
+| Block validation & adoption   | ✓                    | ✓                              | ~                                   |                             |                                                  |
+| Catching up                   | ✓                    | ~ Baseline via chain selection | ~ Efficient path                    |                             |                                                  |
+| Committee selection           | ✓                    | ~ Interim all-vote             | ✓ Simplified truncation             |                             |                                                  |
+| Key registration & rotation   | ✓                    |                                | ~                                   | ~ Key-gen CLI only          |                                                  |
+| Cryptographic primitives      | ✓                    | ✓                              | ✓                                   | ✓                           | ~ Primitives audited; cert layer peer-reviewed   |
+| Serialization                 | ✓                    |                                | ✓                                   | ~                           |                                                  |
+| New protocol parameters       | ✓                    |                                | ~ Set being finalized               | ? Not implemented yet       |                                                  |
+| Node API & configuration      | ✓                    | ✓ Inlined-block N2C, on testnet| ~ New queries to add                |                             |                                                  |
+
+| Symbol | Meaning         |
+|--------|-----------------|
+| ✓      | Done / OK       |
+| ~      | Vague / Ongoing |
+| ?      | Open questions  |
+|        | Not started     |

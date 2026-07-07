@@ -1,13 +1,14 @@
 ---
 title: Leios technical design and implementation plan
 status: Draft
-version: 0.7
+version: 0.10
 author:
   - Sebastian Nagel <sebastian.nagel@iohk.io>
   - Nicolas Frisby <nick.frisby@iohk.io>
   - Thomas Vellekoop <thomas.vellekoop@iohk.io>
   - Michael Karg <michael.karg@iohk.io>
   - Martin Kourim <martin.kourim@iohk.io>
+  - Marcin Wójtowicz <marcin.wojtowicz@iohk.io>
 ---
 
 # Introduction
@@ -23,7 +24,9 @@ Besides collecting node-specific details in this document, we intend to contribu
 This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
 
 | Version | Date       | Changes                                                            |
-| ------- | ---------- | ------------------------------------------------------------------ |
+|---------|------------|--------------------------------------------------------------------|
+| 0.10    | 2026-06-19 | Significantly extend technical design chapter                      |
+| 0.9     | 2026-03-19 | Expand network sections                                            |
 | 0.8     | 2026-03-02 | Performance and quality assurance strategy                         |
 | 0.7     | 2026-02-13 | Re-order technical design and add notes from prototyping           |
 | 0.6     | 2025-11-25 | Risks and mitigations with key threats                             |
@@ -380,12 +383,12 @@ The [prototyping and adversarial testing](#prototyping-and-adversarial-testing) 
 >       Serialization
 >         Certs in RB bodies<br>- akin to Peras
 >         Cert codecs/CDDL
->       New protocol parameters
->       New pool voting keys<br>- akin to Peras
 >       Cert validation
->       New LocalStateQuery queries?
->       Tune EB limits
->     ((Consensus---easier))
+>       Voting key registration/rotation via tx certs<br>- akin to Peras
+>       Commitee selection 
+>       Registered keys / selected committee queries
+>       New protocol parameters
+>     ((Consensus))
 >       Serialization
 >         New fields in RB header
 >         EB codecs/CDDL
@@ -393,19 +396,17 @@ The [prototyping and adversarial testing](#prototyping-and-adversarial-testing) 
 >       Storage
 >         EBs - imm and vol
 >         Txs of EBs - imm and vol
->         Votes - only vol
+>         Votes - only vol (or only in-mem)
 >         Tx cache
+>       High-throughput mempool
+>       Forging updates
+>       Vote creation / voting
 >       Vote validation
->       Mempool
->          Increase size
->          Slurp from EBs
->       New Tracer events
->       New LocalStateQuery queries?
->       Add included EBs to NodeToClient ChainSync
->     ((Consensus---harder))
->       Prioritize Praos threads
->       Vote decision logic
->       Genesis State Machine transition predicates
+>       Certifcate / vote aggregation
+>       NTC chain sync server inlined blocks
+>       New LocalStateQuery queries
+>       Prioritize Praos threads?
+>       Genesis State Machine transition predicates?
 >     ((Network))
 >       Prioritize Praos traffic
 >       Prioritize Praos threads
@@ -414,17 +415,16 @@ The [prototyping and adversarial testing](#prototyping-and-adversarial-testing) 
 >         Message codecs/CDDL
 >         Tune size and time limits
 >         Tune pipelining depth
->       Fetch decision logic
->         Caught up
->         Bulk syncing
->       Freshest first delivery
->         either: conservative pipelining depths
->         and/or else: server-side reordering
->     ((Node))
->       New config data    
+>       EB fetching logic
+>         Freshest first / oldest first policy
+>           either: conservative pipelining depths
+>           and/or else: server-side reordering
+>       Vote fetching logic
+>     ((Node&CLI))
 >       Feature flags for dev phases
->       New CLI queries?
->       New pool voting keys<br>- akin to Peras
+>       New CLI queries
+>       Key registration/rotation
+>       New config data
 > ```
 
 ## Architecture
@@ -462,21 +462,73 @@ Contention for the following primary node resources might unacceptably degrade t
 
 Both GC pressure and disk bandwidth are notoriously difficult to model and so were not amenable to the simulations that drove the first version of the CIP. Prototypes rather than simulations will be necessary to assess these risks with high confidence.
 
-The same risks can also be viewed from a different perspective, which is more actionable in terms of planning prototypes/experiments/etc: per major component of the node.
+The per-component view of these risks (latency overheads in the Ledger, Network, and Mempool components) is treated in the respective sections below.
 
-- **RSK-LeiosLedgerOverheadLatency**: Parsing a transaction, checking it for validity, and updating the ledger state accordingly all utilize CPU and heap (and also disk bandwidth with UTxO/Ledger HD). Frequent bursts of that resource consumption proportional to 15000% of a full Praos block might disrupt the caught-up node in heretofore unnoticed ways. Only syncing nodes have processed so many/much transactions in a short duration, and latency has never been a fundamental priority for a syncing node. Disruption of the RTS is the main concern here, since there is plenty of CPU available—the ledger is not internally parallelized, and only ChainSel and the Mempool could invoke it simultaneously.
-- **RSK-LeiosNetworkingOverheadLatency**: Same as RSK-LeiosLedgerOverheadLatency, but for the Diffusion Layer components handling frequent 15000% bursts in a caught-up node.
-- **RSK-LeiosMempoolOverheadLatency**: Same as RSK-LeiosLedgerOverheadLatency, but for the Mempool frequently revalidating 15000% load in a caught-up node during congestion (ie 30000% the capacity of a Praos block, since the Leios Mempool capacity is now two EBs instead of two Praos blocks).
+## Network
+
+The Network layer implements the mini-protocols that enable the Consensus layer to satisfy its diffusion requirements (**REQ-DiffuseLeiosBlocks**, **REQ-DiffuseLeiosVotes**) and prioritization requirements (**REQ-PrioritizePraosOverLeios**, **REQ-PrioritizeFreshOverStaleLeios**) defined in the [Resource management](#resource-management) section. While Consensus drives the scheduling logic for when to diffuse blocks and votes, Network provides the protocol mechanisms to actually transmit them over the peer-to-peer network.
 
 > [!WARNING]
 >
-> TBD: Is this motivating to _not_ implement high churn components like the transaction cache in a garbage collected language and instead rely on implementations with more control over memory allocations? For example using an off-the-shelf key-value store for the transaction cache, or implementing a custom one in Rust and exposing it via FFI?
+> TODO: Write out the actual risk and requirements from above, and what it means on the network layer
+
+- **RSK-LeiosNetworkingOverheadLatency**: Same as RSK-LeiosLedgerOverheadLatency, but for the Diffusion Layer components handling frequent 15000% bursts in a caught-up node.
+
+### Message latencies
+
+Due to extra volume that Leios imposes on the protocol, it is imperative that the underlying TCP bearer is managed such that arbitrary amount of data does not accrue in the host OS kernel buffers. Such a design is necessary to mitigate head-of-line blocking effects which would adversely affect network latencies, and in particular apparent ranking (Praos) block propagation times. For example, Linux and macOS support TCP socket option TCP_NOTSENT_LOWAT which allows to limit the volume of data written to the socket and that which cannot be yet sent out. This is very useful when we know what we want to diffuse, but also change our mind in terms of message ordering at the last moment, and do in the a way which doesn't artificially limit our throughput. Crucially, this option allow us to satisfy ranking block delivery timeliness guarantees which simultaneously gives us the means to manage the memory footprint of a running node. Sadly, this option is not universally supported and alternatives themselves are not portable, while manual transmission pacing is onerous so we postpone the investigation of the latter.
+
+> [!WARNING]
+>
+> TODO: investigate possibility to use TCP_NOTSENT_LOWAT on cardano network despite its non-portability.
+
+### Traffic prioritization
+
+The existing multiplexer is intentionally fair amongst the different mini-protocols. In the current CIP, the Praos traffic and Leios traffic are carried by different mini-protocols. Therefore, introducing a simple bias in the multiplexer (**NEW-LeiosPraosMuxBias**) to prefer sending messages from Praos mini protocols over messages from Leios mini protocols would directly enable the Consensus layer to satisfy **REQ-PrioritizePraosOverLeios** and mitigate **RSK-LeiosPraosContentionNetworkBandwidth**. This multiplexer bias is the primary candidate mechanism to ensure that Praos traffic and computation are prioritized over Leios, so that the diffusion and adoption of any RB is only negligibly slower.
+
+> [!WARNING]
+>
+> TODO: How much prioritization is actually needed? The existing fair multiplexer may already be sufficient to keep Praos > Leios in practice, in which case **NEW-LeiosPraosMuxBias** can be skipped or weakened. Prototypes should measure this before committing to a strong (or full) Praos-over-Leios bias.
+
+It is not yet clear how best to mitigate **RSK-LeiosLeiosContentionNetworkBandwidth** or, more generally, how to enable the Consensus layer to satisfy **REQ-PrioritizeFreshOverStaleLeios** (aka freshest first delivery) in the Network Layer. One notable option is to "rotate" the two proposed Leios mini-protocols into a less natural pair: one would send all requests and only requests and the other would send all replies and only replies. In that way, the server can—when it has received multiple outstanding requests, which seems likelying during ATK-LeiosProtocolBurst—reply to requests in a different order than the client sent them, which is inevitable since the client will commonly request an EB as soon it's offered, which means the client will request maximally fresh EBs after having requesting less fresh EBs. If the client were to avoid sending any request that requires a massive atomic reply (eg a MsgLeiosBlockTxsRequest for 10 megabytes), then the server can prioritize effectively even without needing to implement any kind of preemption mechanism. This option can be formulated in the existing mini protocol infrastructure, but another option would be to instead enrich the mini-protocol infrastructure to somehow directly allow for server-side reordering. Whether any of this is needed requires further investigation through prototypes (EXP-LeiosDiffusionOnly).
+
+### High-throughput transaction submission
+
+Leios raises the protocol's target consensus data rate well above Praos. Since the available transaction volume always exceeds what consensus can include, the transaction submission layer between mempools must sustain throughput that exceeds the target consensus data rate — otherwise the [high-throughput mempool](#high-throughput-mempool) will starve and EBs will not fill.
+
+- **REQ-LeiosTxSubmissionThroughput** The transaction submission protocol must sustain a data rate exceeding the target Leios consensus data rate across realistic peer valencies.
+
+Current cardano-node (10.7, at the time of this writing) is by default using the legacy transaction submission protocol which fetches all transactions from every peer that offers them, even if some of those transactions are repeated. This scheme is found to be effective and robust in the current protocol implementation, but it necessarily leads to higher bandwidth consumption. A new protocol version v2 is being rolled out and tested, which is expected to bring cpu, memory and bandwidth use down, which in turn frees those resources for other tasks, and Leios in particular. Of the v2 variants, the "v2 undecision" variant has shown the highest sustained data rates across realistic peer valencies and is therefore the candidate that best fits **REQ-LeiosTxSubmissionThroughput**.
+
+### New mini-protocols
+
+The node must include new mini-protocols (**NEW-LeiosMiniProtocols**) to diffuse EB announcements, EBs themselves, EBs' transactions, and votes for EBs. These protocols enable the Consensus layer to satisfy **REQ-DiffuseLeiosBlocks** and **REQ-DiffuseLeiosVotes**. The Leios mini-protocols will require new fetch decision logic (**NEW-LeiosFetchDecisionLogic**), since the node should not necessarily simply download every such object from every peer that offers it. Such fetch decision logic is also required for TxSubmission and for Peras votes; the Leios logic will likely be similar but not equivalent.
+
+> [!WARNING]
+>
+> TODO: anything generic to add on top of what is in the CIP? if not -> no point having this section and instead describe the network protocols (and how they make sense for our node) in the respective consensus sections
 
 ## Consensus
 
 CIP-0164 implies functional requirements for the node to issue EBs alongside RBs, vote for EBs according to the rules from the CIP, include certificates when enough votes are seen, diffuse EBs and votes through the network layer, and retain EB closures indefinitely when certified. The Consensus layer is responsible for driving these operations and coordinating with the Network layer (which implements the actual mini-protocols) to ensure proper diffusion.
+    
+### High-throughput mempool
+
+> [!WARNING]
+>
+> FIXME: write up problem statement: reapplyTx on thousands of txs taking too long to block tx submission (link to other section?) and also recomputing the mempool snapshot in/for block forging is insufficient too.
+> FIXME: Write about two concrete consequences:
+>     - decouple tx diffusion from mempool syncing -> need to re-apply txs added while syncing
+>     - only block producers: keep a view (or two for Leios in Dijkstra) of txs to put into blocks -> only do slot dependent checks in ledger?
+> TODO: More advanced DAG-style mempool model?
+
+- **RSK-LeiosMempoolOverheadLatency**: Same as RSK-LeiosLedgerOverheadLatency, but for the Mempool frequently revalidating 15000% load in a caught-up node during congestion (ie 30000% the capacity of a Praos block, since the Leios Mempool capacity is now two EBs instead of two Praos blocks).
 
 ### Block production
+
+> [!WARNING]
+>
+> FIXME: Move mempool size discussion into section above. Interface between Mempool / BlockForging needs to change -> forge loop needs quick or at least time bound access to txs to be put into a block (+EB in dijkstra)
 
 The existing block production thread must be updated to generate an EB at the same time it generates an RB (**UPD-LeiosAwareBlockProductionThread**). In particular, the hash of the EB is a field in the RB header, and so the RB header can only be decided after the EB is decided, and that can only be after the RB payload is decided. Moreover, the RB payload is either a certificate or transactions, and that must also be decided by this thread, making it intertwined enough to justify doing it in a single thread.
 
@@ -490,29 +542,43 @@ Furthermore, the existing `forgeBlock` method and/or the `BlockForging` interfac
 
 > [!WARNING]
 >
-> TBD: Separate, new method or extending forgeBlock in `BlockForging`?
+> FIXME: also write about including certificates in blocks when available, also link to certification and subsequent sections on chain selection/block validation
+
+The first version of the Mempool can be naive, with the block production thread handling everything. A second version can try to pre-compute in order to avoid delays (ie discarding the certified EB's chunk of transactions) when issuing a CertRB and its announced EB.
 
 ### Endorser block diffusion
 
 > [!WARNING]
 >
-> TODO: announcements; announcement = signed (praos or eb?) headers; how to do EB equivocation detection
-> TODO: offering bodies and txs
-> TODO: what kind of validation while diffusing (only size and hash checks)
+> TODO: Write about announcements and equivocation detection (here or dedicated section?)
+>  - announcement = signed (praos or eb?) headers, either way must include praos header hash (anchor to the chain)
+>  - how to do EB equivocation detection
+>
+> FIXME: write about offering and fetching of bodies and txs
+> FIXME: what kind of validation while diffusing (only size and hash checks)
+>
+> TODO: write about "which EB to prioritize" -> freshest first (protocol burst) vs. oldest (protocol storm) etc.
+> TODO: write about "which peer to fetch from" -> everything from one big ledger peer, round robin from all peers? 
+>
+> FIXME: at least put a naiive design (fetch freshest from everyone that offers) - safe but wasteful
 
 - **REQ-DiffuseLeiosBlocks** The node must acquire and diffuse EBs and their closures (via the Network layer's new mini-protocols, see below).
 
 To satisfy **REQ-PrioritizeFreshOverStaleLeios** (freshest-first delivery), the Consensus layer must implement fetch decision logic (**NEW-LeiosFetchDecisionLogic**) that prioritizes younger EBs over older ones. This logic determines which EBs to request from which peers.
 
-Even the first version of LeiosFetch decision logic should consider EBs that are certified on peers' ChainSync candidates as available for request, as if that peer had sent both MsgLeiosBlockOffer and MsgLeiosBlockTxsOffer. A MsgRollForward implies the peer has selected the block, and the peer couldn't do that for a CertRB if it didn't already have its closure.
+Even the first version of LeiosFetch decision logic should consider EBs that are certified on peers' ChainSync candidates as available for request, as if that peer had sent both MsgLeiosBlockOffer and MsgLeiosBlockTxsOffer. A MsgRollForward implies the peer has selected the block, and the peer couldn't do that for a CertRB if it didn't already have its closure. (TODO: link to chain selection where this is relied upon)
 
 > [!WARNING]
 >
 > TODO: Discuss fetch decision logic for caught-up vs bulk syncing nodes, conservative pipelining depths, server-side reordering options.
->  - fetch range via points
+>  - fetch range via points -> refer to catching up section
 > TODO: what about newly synced nodes that need to acquire all EBs up to the immutable tip, how?
 >  - might demand a different mini-protocol design
 >  - query points of volatile suffix and request missing subset of it (like tx submission for the mempool)
+
+The first version of LeiosFetch client can assemble the EB closure entirely on disk, one transaction at a time. A second version might want to batch the writes in a pinned mutable `ByteArray` and use `withMutableByteArrayContents` and `hPutBuf` to flush each batch. Again, the possible benefit of this low-level shape would be to avoid useless GC pressure. The first version can wait for all transactions before starting to validate any. A later version could eagerly validate as the prefix arrives—comparable to eliminating one hop in the topology, in the worst-case scenario.
+
+The first version of LeiosFetch server simply pulls serialized transactions from the LeiosEbStore, and only sends notifications to peers that are already expecting them when the noteworthy event happens. If notification requests and responses are decoupled in a separate mini protocol _or else_ requests can be reordered (TODO or every other request supports a "MsgOutOfOrderNotificationX" loopback alternative?), then it'll be trivial for the client to always maintain a significant buffer of outstanding notification requests.
 
 ### Endorser block storage
 
@@ -533,28 +599,13 @@ This component therefore stores EBs on disk just as the ChainDB already does for
 >    is desirable)
 > TODO: interaction with mempool (here or above) 
 
-### Voting
-
-A new thread dedicated to Leios vote production (**NEW-LeiosVoteProductionThread**) will wake up when the closure of an EB is newly available. If the voting rules would require the stake pool to vote (now or soon) for this EB if it's valid, then this thread will begin validating it. Note if multiple closures arrive simultaneously, at most one of them could be eligible for a vote, since the voting rules require the EB to be announced by the tip of the node's current selection. If the validation succeeds while the voting rules still require the stake pool to vote for this EB (TODO even if it has since switched its selection?), the thread will issue that vote.
-
-- **REQ-IssueLeiosVotes** The node must vote for EBs exactly according to the rules from the CIP.
-- **REQ-DiffuseLeiosVotes** The node must diffuse votes (via the Network layer's mini-protocols) at least until they're old enough that there remains only a negligible probability they could still enable an RB that was issued on-time to include a certificate for the EB they support.
-
-### Vote storage
-
-A new storage component (**NEW-LeiosVoteStorage**) will store all votes received by a node, up to some conservative age (eg ten minutes). As votes arrive, they will be grouped according to the RB they support. When enough votes have arrived for some RB, the certificate can be generated immediately, which can avoid delaying the potential subsequent issuance of a CertRB by this node. A vote for the EB announced by an RB is irrelevant once all nodes will never switch their selection away from some block that is not older than that RB. This condition is very likely to be satisfied relatively soon on Cardano mainnet, unless its Praos growth is being disrupted. Therefore, the vote storage component can simply discard votes above some conservative age, which determines a stochastic upper bound the heap size of all sufficiently-young votes.
-
-### Certification
-
-Once enough votes have been collected for an EB, a certificate can be formed and included in a ranking block:
-
-- **REQ-IncludeLeiosCertificates** The node must include a certificate in each RB it issues if it has seen enough votes supporting the EB announced by the preceding RB. (TODO excluding empty or very nearly empty EBs?)
-
-Each CertRB must be buffered in a staging area (**NEW-LeiosCertRbStagingArea**) until its closure arrives, since the VolDB only contains RBs that are ready for ChainSel. (Note that a CertRB's closure will usually have arrived before it did.) (TODO Any disadvantages? For example, would it be beneficial to detect an invalid certificate before the closure arrives?) (TODO a more surgical alternative: the VolDB index could be aware of which EB closures have arrived, and the path-finding algorithm could incorporate that information. However, this means each EB arrival may need to re-trigger ChainSel.) The BlockFetch client (**UPD-LeiosRbBlockFetchClient**) must only directly insert a CertRB into the VolDB if its closure has already arrived (which should be common due to L_diff). Otherwise, the CertRB must be deposited in the CertRB staging area instead.
-
-The LedgerDB (**UPD-LeiosLedgerDb**) will need to retrieve the certified EB's closure from the LeiosEbStore when applying a CertRB. Due to **NEW-LeiosCertRbStagingArea**, it should be impossible for that retrieval to fail.
+The first version of LeiosEbStore can just be two bog standard key-value stores, one for immutable and one for volatile. A second version maybe instead integrates certified EBs into the existing ImmDB? That integration seems like a good fit. It has other benefits (eg saves a disk roundtrip and exhibits linear disk reads for driver prefetching/etc), but those seem unimportant so far.
 
 ### Transaction cache
+
+> [!WARNING]
+>
+> FIXME: Moved here, make sure it has good context. Keep it here before voting as we need it to determine (efficiently) whether to vote or not (an EB closure applies or not)
 
 A new storage component (**NEW-LeiosTxCache**) will store all transactions received when diffusing EBs as well as all transactions that successfully enter the Mempool, up to some conservative age (eg one hour). The fundamental reason that EBs refer to transactions by hash instead of including them directly is that, for honest EBs, the node will likely have already received most of the referenced transactions when they recently diffused amongst the Mempools. That's not guaranteed, though, so the node must be able to fetch whichever transactions are missing, but in the absence of an attack that ought to be minimal.
 
@@ -562,54 +613,76 @@ The Mempool is the natural inspiration for this optimization, but it's inappropr
 
 Note: if all possibly-relevant EBs needed to fit in the LeiosTxCache, its worst case size would approach 500 million transactions. Even the index would be tens of gigabytes. This is excessive, since almost all honest traffic will be younger than an hour—assuming FFD is actually enforced.
 
-### Implementation notes
-
-> [!CAUTION]
+> [!WARNING]
 >
-> FIXME: Integrate these notes into the respective sections above (or create new ones)
-
-For the first version of the LedgerDB, it need not explicitly store EB's ledger state; the CertRB's result ledger state will reflect the EB's contents. A second version could thunk the EB's reapplication alongside the announcing RB, which would only avoid reapplication of one EB on a chain switch (might be worth it for supporting tiebreakers?). The first version of LedgerDB can simply reapply the EB's transactions before tick-then-applying a CertRB. A second version should pass the EB's transactions to the ledger function (or instead the thunk of reapplying the EB)?
-
-The first version of the Mempool can be naive, with the block production thread handling everything. A second version can try to pre-compute in order to avoid delays (ie discarding the certified EB's chunk of transactions) when issuing a CertRB and its announced EB.
+> FIXME: The following paragraph (moved from the former "Implementation notes" section) overlaps with the prose above and should be deduped in the next pass.
 
 The first version of LeiosTxCache should reliably cache all relevant transactions that are less than an hour or so old—that age spans 180 active slots on average. A transaction is born when its oldest containing EB was announced or when it _entered_ the Mempool (if it hasn't yet been observed in an EB). (Note that that means some tx's age in the LeiosTxCache can increase when an older EB that contains it arrives.) Simple index maintained as a pair of priority queues (index and age) in manually managed fixed size bytearrays, backed by a double-buffered mmapped file for the transactions' serializations. Those implementation choices prevent the sheer number of transactions from increasing GC pressure (adversarial load might lead to a ballpark number of 131000 transactions per hour), and persistence's only benefit here would be to slightly increase parallelism/simplify synchronization, since persistence would let readers release the lock before finishing their search.
 
-The first version of LeiosFetch client can assemble the EB closure entirely on disk, one transaction at a time. A second version might want to batch the writes in a pinned mutable `ByteArray` and use `withMutableByteArrayContents` and `hPutBuf` to flush each batch. Again, the possible benefit of this low-level shape would be to avoid useless GC pressure. The first version can wait for all transactions before starting to validate any. A later version could eagerly validate as the prefix arrives—comparable to eliminating one hop in the topology, in the worst-case scenario.
+> [!WARNING]
+>
+> TBD: Is this motivating to _not_ implement high churn components like the transaction cache in a garbage collected language and instead rely on implementations with more control over memory allocations? For example using an off-the-shelf key-value store for the transaction cache, or implementing a custom one in Rust and exposing it via FFI?
 
-The first version of LeiosFetch server simply pulls serialized transactions from the LeiosEbStore, and only sends notifications to peers that are already expecting them when the noteworthy event happens. If notification requests and responses are decoupled in a separate mini protocol _or else_ requests can be reordered (TODO or every other request supports a "MsgOutOfOrderNotificationX" loopback alternative?), then it'll be trivial for the client to always maintain a significant buffer of outstanding notification requests.
-
-Even the first version of LeiosFetch decision logic should consider EBs that are certified on peers' ChainSync candidates as available for request, as if that peer had sent both MsgLeiosBlockOffer and MsgLeiosBlockTxsOffer. A MsgRollForward implies the peer has selected the block, and the peer couldn't do that for a CertRB if it didn't already have its closure.
-
-The first version of LeiosEbStore can just be two bog standard key-value stores, one for immutable and one for volatile. A second version maybe instead integrates certified EBs into the existing ImmDB? That integration seems like a good fit. It has other benefits (eg saves a disk roundtrip and exhibits linear disk reads for driver prefetching/etc), but those seem unimportant so far.
-
-## Network
-
-The Network layer implements the mini-protocols that enable the Consensus layer to satisfy its diffusion requirements (**REQ-DiffuseLeiosBlocks**, **REQ-DiffuseLeiosVotes**) and prioritization requirements (**REQ-PrioritizePraosOverLeios**, **REQ-PrioritizeFreshOverStaleLeios**) defined in the [Resource management](#resource-management) section. While Consensus drives the scheduling logic for when to diffuse blocks and votes, Network provides the protocol mechanisms to actually transmit them over the peer-to-peer network.
-
-Similar resource contention risks apply to the Network layer, including network bandwidth contention between Praos and Leios, networking overhead latency, and contention between fresh and stale Leios traffic.
-
-### Message latencies
-
-Due to extra volume that Leios imposes on the protocol, it is imperative that the underlying TCP bearer is managed such that arbitrary amount of data does not accrue in the host OS kernel buffers. Such a design is necessary to mitigate head-of-line blocking effects which would adversely affect network latencies, and in particular apparent ranking (Praos) block propagation times. For example, Linux and macOS support TCP socket option TCP_NOTSENT_LOWAT which allows to limit the volume of data written to the socket and that which cannot be yet sent out. This is very useful when we know what we want to diffuse, but also change our mind in terms of message ordering at the last moment, and do in the a way which doesn't artificially limit our throughput. Crucially, this option allow us to satisfy ranking block delivery timeliness guarantees which simultaneously gives us the means to manage the memory footprint of a running node. Sadly, this option is not universally supported and alternatives themselves are not portable, while manual transmission pacing is onerous so we postpone the investigation of the latter.
+### Voting and certification
 
 > [!WARNING]
 >
-> TODO: investigate possibility to use TCP_NOTSENT_LOWAT on cardano network despite its non-portability.
+> FIXME: Discuss which committee to determine eligibility and validity of votes? refer to commitee selection in ledger chapter
 
-### Transaction submission
+A new thread dedicated to Leios vote production (**NEW-LeiosVoteProductionThread**) will wake up when the closure of an EB is newly available. If the voting rules would require the stake pool to vote (now or soon) for this EB if it's valid, then this thread will begin validating it. Note if multiple closures arrive simultaneously, at most one of them could be eligible for a vote, since the voting rules require the EB to be announced by the tip of the node's current selection. If the validation succeeds while the voting rules still require the stake pool to vote for this EB (TODO even if it has since switched its selection?), the thread will issue that vote.
 
-Current cardano-node (10.7, at the time of this writing) is by default using the legacy transaction submission protocol which fetches all transactions from every peer that offers them, even if some of those transactions are repeated. This scheme is found to be effective and robust in the current protocol implementation, but it necessarily leads to higher bandwidth consumption. A new protocol version v2 is being rolled out and tested, which is expected to bring cpu, memory and bandwidth use down, which in turn frees those resources for other tasks, and Leios in particular.
+- **REQ-IssueLeiosVotes** The node must vote for EBs exactly according to the rules from the CIP.
+- **REQ-DiffuseLeiosVotes** The node must diffuse votes (via the Network layer's mini-protocols) at least until they're old enough that there remains only a negligible probability they could still enable an RB that was issued on-time to include a certificate for the EB they support.
 
-### New mini-protocols
+A new storage component (**NEW-LeiosVoteStorage**) will store all votes received by a node, up to some conservative age (eg ten minutes). As votes arrive, they will be grouped according to the RB they support. When enough votes have arrived for some RB, the certificate can be generated immediately, which can avoid delaying the potential subsequent issuance of a CertRB by this node. A vote for the EB announced by an RB is irrelevant once all nodes will never switch their selection away from some block that is not older than that RB. This condition is very likely to be satisfied relatively soon on Cardano mainnet, unless its Praos growth is being disrupted. Therefore, the vote storage component can simply discard votes above some conservative age, which determines a stochastic upper bound the heap size of all sufficiently-young votes.
 
-The node must include new mini-protocols (**NEW-LeiosMiniProtocols**) to diffuse EB announcements, EBs themselves, EBs' transactions, and votes for EBs. These protocols enable the Consensus layer to satisfy **REQ-DiffuseLeiosBlocks** and **REQ-DiffuseLeiosVotes**. The Leios mini-protocols will require new fetch decision logic (**NEW-LeiosFetchDecisionLogic**), since the node should not necessarily simply download every such object from every peer that offers it. Such fetch decision logic is also required for TxSubmission and for Peras votes; the Leios logic will likely be similar but not equivalent.
+Once enough votes have been collected for an EB, a certificate can be formed and included in a ranking block:
 
-### Traffic prioritization
+- **REQ-IncludeLeiosCertificates** The node must include a certificate in each RB it issues if it has seen enough votes supporting the EB announced by the preceding RB. (TODO excluding empty or very nearly empty EBs?)
 
-The existing multiplexer is intentionally fair amongst the different mini-protocols. In the current CIP, the Praos traffic and Leios traffic are carried by different mini-protocols. Therefore, introducing a simple bias in the multiplexer (**NEW-LeiosPraosMuxBias**) to strongly (TODO fully?) prefer sending messages from Praos mini protocols over messages from Leios mini protocols would directly enable the Consensus layer to satisfy **REQ-PrioritizePraosOverLeios** and mitigate **RSK-LeiosPraosContentionNetworkBandwidth**. This multiplexer bias is the primary mechanism to ensure that Praos traffic and computation are prioritized over Leios, so that the diffusion and adoption of any RB is only negligibly slower.
+### Chain selection
 
-It is not yet clear how best to mitigate **RSK-LeiosLeiosContentionNetworkBandwidth** or, more generally, how to enable the Consensus layer to satisfy **REQ-PrioritizeFreshOverStaleLeios** (aka freshest first delivery) in the Network Layer. One notable option is to "rotate" the two proposed Leios mini-protocols into a less natural pair: one would send all requests and only requests and the other would send all replies and only replies. In that way, the server can—when it has received multiple outstanding requests, which seems likelying during ATK-LeiosProtocolBurst—reply to requests in a different order than the client sent them, which is inevitable since the client will commonly request an EB as soon it's offered, which means the client will request maximally fresh EBs after having requesting less fresh EBs. If the client were to avoid sending any request that requires a massive atomic reply (eg a MsgLeiosBlockTxsRequest for 10 megabytes), then the server can prioritize effectively even without needing to implement any kind of preemption mechanism. This option can be formulated in the existing mini protocol infrastructure, but another option would be to instead enrich the mini-protocol infrastructure to somehow directly allow for server-side reordering. Whether any of this is needed requires further investigation through prototypes (EXP-LeiosDiffusionOnly).
+> [!WARNING]
+>
+> FIXME: describe at least one approach on preventing selectin of incomplete blocks + interaction with fetching logic
+>
+> TODO: Discuss two alternatives: staging area vs. enhancing chain selection
 
+Each CertRB must be buffered in a staging area (**NEW-LeiosCertRbStagingArea**) until its closure arrives, since the VolDB only contains RBs that are ready for ChainSel. (Note that a CertRB's closure will usually have arrived before it did.) (TODO Any disadvantages? For example, would it be beneficial to detect an invalid certificate before the closure arrives?) (TODO a more surgical alternative: the VolDB index could be aware of which EB closures have arrived, and the path-finding algorithm could incorporate that information. However, this means each EB arrival may need to re-trigger ChainSel.) The BlockFetch client (**UPD-LeiosRbBlockFetchClient**) must only directly insert a CertRB into the VolDB if its closure has already arrived (which should be common due to L_diff). Otherwise, the CertRB must be deposited in the CertRB staging area instead.
+
+### Block validation
+
+> [!WARNING]
+>
+> FIXME: CertRB validity = process of cert verification, resolving the closure, applying all the transactions (UTxO-HD!) and then only validating the CertRB block itself
+>
+> FIXME: Don't inline transactions into the block for the ledger, but instead propose a design that invokes ledger (via `ApplyTx`) separately in block validation. Alternative: new ledger rule for EBBODY validation (see note below). Moved here from the former Ledger / "New block structure" section.
+
+The LedgerDB (**UPD-LeiosLedgerDb**) will need to retrieve the certified EB's closure from the LeiosEbStore when applying a CertRB. Due to **NEW-LeiosCertRbStagingArea**, it should be impossible for that retrieval to fail.
+
+In Praos, all transactions to be verified and applied to the ledger state are included directly in the block body. In Leios, ranking blocks (RB) may not include transactions directly, but instead certificate and reference to an endorsement block (EB) that further references the actual transactions. This gives rise to the following requirements:
+
+- **REQ-LedgerResolvedBlockValidation** When validating a ranking block body, the ledger must be provided with all endorsed transactions resolved.
+- **REQ-LedgerUntickedEBValidation** When validating a ranking block body, the ledger must validate endorsed transactions against the ledger state before updating it with the new ranking block.
+- **REQ-LedgerTxValidationUnchanged** The actual transaction validation logic should remain unchanged, i.e. the ledger must validate each transaction as it does today.
+
+The endorsement block itself does not contain any additional information besides a list of transaction identifiers (hashes of the full transaction bytes). Hence, the list of transactions is sufficient to reconstruct the EB body and verify the certificate contained in the RB. The actual transactions to be applied to the ledger state must be provided by the caller of the ledger interface, typically the storage layer.
+
+> ![NOTE]
+>
+> The EB actually contains transaction hashes + validity information. This is because block producers must be able to endorse / include transactions that fail phase-2 validation and consume collateral (thus be rewarded for this work without spending the input). This is consistent with what is stored in a Praos block today and the consensus/ledger interface should cover this already.
+
+> ![WARNING]
+>
+> TODO: update the EB CDDL in the CIP with this fact about the tx validity information
+
+For the first version of the LedgerDB, it need not explicitly store EB's ledger state; the CertRB's result ledger state will reflect the EB's contents. A second version could thunk the EB's reapplication alongside the announcing RB, which would only avoid reapplication of one EB on a chain switch (might be worth it for supporting tiebreakers?). The first version of LedgerDB can simply reapply the EB's transactions before tick-then-applying a CertRB. A second version should pass the EB's transactions to the ledger function (or instead the thunk of reapplying the EB)?
+
+### Catching up
+
+> [!WARNING]
+>
+> TODO: Write about a more efficient way to catch up than to deal with staging area / out of order chain selection
 
 ## Ledger
 
@@ -629,6 +702,8 @@ The first will not need to change functionally, while the latter two will need t
 
 See [Era and hard-fork coordination](#era-and-hard-fork-coordination) for a discussion on which era to target. For the remainder of this document, let's assume the changes will go into the `Dijkstra` era.
 
+- **RSK-LeiosLedgerOverheadLatency**: Parsing a transaction, checking it for validity, and updating the ledger state accordingly all utilize CPU and heap (and also disk bandwidth with UTxO/Ledger HD). Frequent bursts of that resource consumption proportional to 15000% of a full Praos block might disrupt the caught-up node in heretofore unnoticed ways. Only syncing nodes have processed so many/much transactions in a short duration, and latency has never been a fundamental priority for a syncing node. Disruption of the RTS is the main concern here, since there is plenty of CPU available—the ledger is not internally parallelized, and only ChainSel and the Mempool could invoke it simultaneously.
+
 ### Transaction validation levels
 
 Validating individual transactions is currently done either via `applyTx` or `reapplyTx` functions. This corresponds to two levels of validation:
@@ -646,25 +721,40 @@ This third way of updating a ledger state would be used when we have a valid cer
 
 Note that this already anticipates that the new, third level `notValidateTx` will be even cheaper than `reapplyTx`. [Existing benchmarks](https://github.com/IntersectMBO/cardano-ledger/tree/master/libs/ledger-state) indicate that `reapplyTx` is already at least one order of magnitude cheaper than `applyTx` for transactions.
 
-### New block structure
+### New protocol parameters
 
-In Praos, all transactions to be verified and applied to the ledger state are included directly in the block body. In Leios, ranking blocks (RB) may not include transactions directly, but instead certificate and reference to an endorsement block (EB) that further references the actual transactions. This gives rise to the following requirements:
+CIP-164 introduces several new protocol parameters that may be updated via on-chain governance. The ledger component is responsible for storing, providing access and updating any protocol parameters. Unless some of the new parameters will be deemed constant (a.k.a globals to the ledger), the following requirements must be satisfied for all new parameters:
 
-- **REQ-LedgerResolvedBlockValidation** When validating a ranking block body, the ledger must be provided with all endorsed transactions resolved.
-- **REQ-LedgerUntickedEBValidation** When validating a ranking block body, the ledger must validate endorsed transactions against the ledger state before updating it with the new ranking block.
-- **REQ-LedgerTxValidationUnchanged** The actual transaction validation logic should remain unchanged, i.e. the ledger must validate each transaction as it does today.
+- **REQ-LedgerProtocolParameterAccess** The ledger must provide access to all new protocol parameters via existing interfaces.
+- **REQ-LedgerProtocolParameterUpdate** The ledger must be able to update all new protocol parameters via on-chain governance.
 
-The endorsement block itself does not contain any additional information besides a list of transaction identifiers (hashes of the full transaction bytes). Hence, the list of transactions is sufficient to reconstruct the EB body and verify the certificate contained in the RB. The actual transactions to be applied to the ledger state must be provided by the caller of the ledger interface, typically the storage layer.
+Concretely, this means defining the `PParams` and `PParamsUpdate` types for the `Dijkstra` era to include the new parameters, as well as providing access via the `DijkstraPParams` and other type classes.
 
-> ![NOTE]
+### Key registration and rotation
+
+> [!WARNING]
 >
-> The EB actually contains transaction hashes + validity information. This is because block producers must be able to endorse / include transactions that fail phase-2 validation and consume collateral (thus be rewarded for this work without spending the input). This is consistent with what is stored in a Praos block today and the consensus/ledger interface should cover this already.
+> FIXME: Write this
+> - what keys leios uses (BLS keys) and what they are used for (voting + certificates -> threshold crypto -> chain safety relevant as validation is skipped when seeing a cert)
+> - how they can be registered and rotated (for next epoch)
+>   - via tx: PoolReg cert or dedicated cert
+>   - via blocks: in header (like vrf?) signed by KES
+
+### Committee selection
+
+> [!WARNING]
+>
+> FIXME: Write about new scheme (stake-based not fait accompli) and that it needs to happen on epoch boundary. Where to keep the committee in the ledger state (or compute it on-demand?)
+
+### Certificate verification
 
 > ![WARNING]
 >
-> TODO: update the EB CDDL in the CIP with this fact about the tx validity information
-
-### Certificate verification
+> TODO: This is only easily possible as part of BBODY if we allow the consensus layer to load and process EB txs _before_ verifying the certificate, which would only happen by calling the ledger with the CertRB body after applying all EB txs.
+>
+> FIXME: translate requires into concrete design statements (e.g. BBODY ledger rule is updated to verify the cert when present against the committee in the ledger state etc.)
+>
+> FIXME: discuss here how the Dijkstra block body changes — it gets a `Maybe LeiosCert` (mirroring `Maybe PerasCert`) — and what the Leios cert actually holds (serialization). Moved from the former "New block structure" section.
 
 In order to verify certificates contained in ranking blocks, the ledger must be aware of the voting committee and able to access their public keys. As defined by **REQ-RegisterBLSKeys**, SPOs must be able to register their BLS keys to become part of the voting committee. The ledger will need to be able to keep track of the registered keys and use them to do certificate verification. Besides verifying certificates, individual votes must also be verifiable by other components (e.g. to avoid diffusing invalid votes).
 
@@ -685,15 +775,6 @@ Finally, block validation of the ledger can use the voting committee state to ve
 
 - **REQ-LedgerCertificateVerification** The ledger must verify certificates contained in ranking blocks using the voting committee state.
 
-### New protocol parameters
-
-CIP-164 introduces several new protocol parameters that may be updated via on-chain governance. The ledger component is responsible for storing, providing access and updating any protocol parameters. Unless some of the new parameters will be deemed constant (a.k.a globals to the ledger), the following requirements must be satisfied for all new parameters:
-
-- **REQ-LedgerProtocolParameterAccess** The ledger must provide access to all new protocol parameters via existing interfaces.
-- **REQ-LedgerProtocolParameterUpdate** The ledger must be able to update all new protocol parameters via on-chain governance.
-
-Concretely, this means defining the `PParams` and `PParamsUpdate` types for the `Dijkstra` era to include the new parameters, as well as providing access via the `DijkstraPParams` and other type classes.
-
 ### Serialization
 
 Traditionally, the ledger component defines the serialization format of blocks and transactions. CIP-164 introduces three new types that need to be serialized and deserialized:
@@ -701,6 +782,8 @@ Traditionally, the ledger component defines the serialization format of blocks a
 > [!WARNING]
 >
 > TODO: Serialization of votes a consensus component responsibility?
+>
+> FIXME: out of these, only the RB / block body is currently in the realm of ledger.
 
 - **REQ-LedgerSerializationRB** The ranking block body contents must be deterministically de-/serializable from/to bytes using CBOR encoding.
 - **REQ-LedgerSerializationEB** The endorsement block structure must be deterministically de-/serializable from/to bytes using CBOR encoding.
@@ -708,9 +791,11 @@ Traditionally, the ledger component defines the serialization format of blocks a
 
 Corresponding types with instances of `EncCBOR` and `DecCBOR` must be provided in the ledger component. The `cardano-ledger` package is a dependency to most of the Haskell codebase, hence these new types can be used in most other components.
 
-## Cryptography
+### Cryptography
 
 > [!WARNING]
+>
+> FIXME: The last three sections in ledger about key registration / rotation, committee selection and certificate verification are very crypto heavy and arguing for one or the other scheme in this document is wrong. It would need to be in the CIP-164 anyways. Thus, revamp the whole section and/or merge it with the above sections. Keep only interesting / relevant bits like: a new package `cardano-crypto-leios` is added to `cardano-base` to implement the cryptographic operations on certificates (aggregate + verify) following the CIP.
 >
 > TODO: Mostly content directly taken from [impact analysis](../ImpactAnalysis.md). Expand on motivation and concreteness of changes.
 
@@ -720,7 +805,7 @@ This section derives requirements for adding BLS signatures to `cardano-base` an
 
 > Note that with the implementation of [CIP-0381](https://cips.cardano.org/cip/CIP-0381) `cardano-base` already contains basic utility functions needed to create these bindings; the work below is thus expanding on that. The impact of the below requirements thus only extends to [this](https://github.com/IntersectMBO/cardano-base/blob/82e09945726a7650540e0656f01331d09018ac97/cardano-crypto-class/src/Cardano/Crypto/EllipticCurve/BLS12_381/Internal.hs) module and probably [this](https://github.com/IntersectMBO/cardano-base/blob/82e09945726a7650540e0656f01331d09018ac97/cardano-crypto-class/src/Cardano/Crypto/DSIGN/Class.hs) outward facing class.
 
-### Core functionality
+#### Core functionality
 
 The following functional requirements define the core BLS signature functionality needed:
 
@@ -736,7 +821,7 @@ The following functional requirements define the core BLS signature functionalit
 - **REQ-BlsSerialisation** Deterministic serialisation: `ToCBOR`/`FromCBOR` and raw-bytes for keys/signatures; strict length/subgroup/infinity checks; canonical compressed encodings as per the [Zcash](https://github.com/zcash/librustzcash/blob/6e0364cd42a2b3d2b958a54771ef51a8db79dd29/pairing/src/bls12_381/README.md#serialization) standard for BLS points.
 - **REQ-BlsConformanceVectors** Add conformance tests using test vectors from the [initial](https://github.com/input-output-hk/ouroboros-leios/tree/main/crypto-benchmarks.rs) Rust implementation to ensure cross-impl compatibility.
 
-### Performance and quality
+#### Performance and quality
 
 > [!WARNING]
 >
@@ -749,13 +834,42 @@ The following non-functional requirements ensure the implementation meets perfor
 - **REQ-BlsDeterminismPortability** Deterministic results across platforms/architectures; outputs independent of CPU feature detection.
 - **REQ-BlsDocumentation** Document the outward facing API in cardano-base and provide example usages. Additionally add a section on do's and don'ts with regards to security of this scheme outside the context of Leios.
 
-### Implementation notes
+#### Implementation notes
 
 Note that the PoP checks probably are done at the certificate level, and that the above-described API should not be responsible for this. The current code on BLS12-381 already abstracts over both curves `G1`/`G2`, we should maintain this. The `BLST` package also exposes fast verification over many messages and signatures + public keys by doing a combined pairing check. This might be helpful, though it's currently unclear if we can use this speedup. It might be the case, since we have linear Leios, that this is never needed.
 
-## End-to-end testing
+## Node API
 
 > [!WARNING]
+>
+> FIXME: Groups changes to the node's external interfaces (N2C, queries, configuration) that don't fit neatly into the protocol-flow spine.
+
+### LocalStateQuery additions
+
+> [!WARNING]
+>
+> FIXME: Write this. New queries for registered BLS keys, the voting committee, and any other Leios-related ledger state exposed to clients.
+
+### Node-to-client
+
+> [!WARNING]
+>
+> TODO: concrete discussion on how the `cardano-node` will need to change on the N2C interface, based on [client interfaces](#client-interfaces)
+>
+> - Mithril, for example, does use N2C `LocalChainSync`, but does not check hash consistency and thus would be compatible with our plans.
+
+### Feature flags and configuration
+
+> [!WARNING]
+>
+> FIXME: Write this. Feature flags for dev phases and new configuration data exposed to operators.
+
+
+# End-to-end testing
+
+> [!WARNING]
+>
+> FIXME: Moved out of "Technical design" pending a decision on its final home (candidates: under "Performance and quality assurance strategy", or its own chapter).
 >
 > TODO: Mostly content directly taken from [impact analysis](../ImpactAnalysis.md). Expand on motivation and concreteness of changes. This also feels a bit ouf of touch with the [implementation plan](#implementation-plan); to be integrated better for a more holistic quality and performance strategy.
 
@@ -765,14 +879,14 @@ The end-to-end functional test suite checks existing functionalities. It operate
 
 Linear Leios primarily impacts the consensus component of `cardano-node`, leaving end-user experience and existing functionalities unchanged. Consequently, the current test suite can largely be used to verify `cardano-node`'s operation after the Leios upgrade, requiring only minor adjustments.
 
-### New end-to-end tests for Leios
+## New end-to-end tests for Leios
 
 New end-to-end tests for Leios will focus on two areas:
 
 - Hard-fork testing from the latest mainnet era to Leios
 - Upgrading from the latest mainnet `cardano-node` release to a Leios-enabled release
 
-### New automated upgrade testing test suite
+## New automated upgrade testing test suite
 
 The suite will perform the following actions:
 
@@ -786,17 +900,12 @@ The suite will perform the following actions:
 8. **Post-Hard-Fork Functional Tests** - Run a final subset of the functional tests.
 
 
-## Node-to-client
+# Performance and quality assurance strategy
 
 > [!WARNING]
 >
-> TODO: concrete discussion on how the `cardano-node` will need to change on the N2C interface, based on [client interfaces](#client-interfaces)
->
-> - Mithril, for example, does use N2C `LocalChainSync`, but does not check hash consistency and thus would be compatible with our plans.
-
-
-# Performance and quality assurance strategy
-
+> FIXME: Integrate this with the implementation plan
+    
 ## Observability as a first-class citizen
 
 By implementing evidence of code execution, a well-founded tracing system is the prime provider of observability for a system.

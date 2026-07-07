@@ -242,7 +242,6 @@
         "producer",
         "size_bytes",
         "slot",
-        "tx_payload_bytes",
         "type"
       ],
       "type": "object"
@@ -321,6 +320,9 @@
         "sender": {
           "type": "string"
         },
+        "slot": {
+          "type": "number"
+        },
         "type": {
           "enum": [
             "EBReceived",
@@ -355,6 +357,9 @@
           "type": "string"
         },
         "sending_s": {
+          "type": "number"
+        },
+        "slot": {
           "type": "number"
         },
         "type": {

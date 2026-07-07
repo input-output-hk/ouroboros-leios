@@ -1,5 +1,0 @@
-leios-variant: full-without-ibs
-leios-mempool-strategy: random
-leios-late-ib-inclusion: true
-praos-chain-quality: 100
-ib-shard-group-count: 1

@@ -18,16 +18,23 @@ set -a
 # Traffic control (on by default, disable with TC=0)
 : "${TC:=1}"
 if [ "$TC" = "1" ]; then
-  : "${RATE:=10Mbps}"
-  : "${DELAY:=200ms}"
+  : "${RATE:=50Mbps}"
+  : "${DELAY:=100ms}"
   : "${IP_HOST:=172.28.0.1}"
   : "${IP_NODE1:=172.28.0.10}"
   : "${IP_NODE2:=172.28.0.20}"
   : "${IP_NODE3:=172.28.0.30}"
 else
-  IP_NODE1=127.0.0.1
-  IP_NODE2=127.0.0.1
-  IP_NODE3=127.0.0.1
+  # Use distinct loopback aliases so each node's --host-addr (which
+  # ouroboros-network also uses as the source IP for outbound sockets) does
+  # not collide with another node's listening 4-tuple. With all three nodes
+  # sharing 127.0.0.1, outbound connect() can return EADDRNOTAVAIL because
+  # the kernel cannot assign (127.0.0.1:listener_port, 127.0.0.1:peer_port)
+  # for the new socket while the listener still owns that port. Splitting
+  # across the 127/8 range avoids the collision entirely.
+  : "${IP_NODE1:=127.2.0.1}"
+  : "${IP_NODE2:=127.2.0.2}"
+  : "${IP_NODE3:=127.2.0.3}"
 fi
 # X-ray observability (on by default, disable with XRAY=0)
 : "${XRAY:=1}"

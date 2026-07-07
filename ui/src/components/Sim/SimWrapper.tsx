@@ -1,10 +1,11 @@
 "use client";
 
 import { useSimContext } from "@/contexts/SimContext/context";
-import { FC, useEffect } from "react";
+import { FC, useEffect, useState } from "react";
 import { parse } from "yaml";
 import { Coord2D, Node } from "./topology";
 import { GraphWrapper } from "../Graph/GraphWrapper";
+import { ChainWrapper } from "../Chain/ChainWrapper";
 import { Scenario } from "./modules/Scenario";
 import { TimelineSlider } from "./modules/TimelineSlider";
 import { Playback } from "./modules/Playback";
@@ -13,11 +14,52 @@ import { LayoutSelector } from "./modules/LayoutSelector";
 import { ITransformedNode } from "./types";
 import { useGraphLayout } from "@/hooks/useGraphLayout";
 
+type View = "network" | "chain";
+
+const ViewToggle: FC<{ view: View; setView: (v: View) => void }> = ({
+  view,
+  setView,
+}) => (
+  <div className="flex items-center justify-start gap-3 border-2 rounded-md p-4 border-gray-200 bg-white/80 backdrop-blur-xs">
+    <span className="text-gray-900">View</span>
+    <div
+      role="tablist"
+      className="inline-flex rounded-md border border-gray-300 overflow-hidden"
+    >
+      {(["network", "chain"] as const).map((v) => (
+        <button
+          key={v}
+          type="button"
+          role="tab"
+          aria-selected={view === v}
+          onClick={() => setView(v)}
+          className={`text-lg font-medium px-3 py-2 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+            view === v
+              ? "bg-gray-800 text-white"
+              : "bg-transparent text-gray-900 hover:bg-gray-100"
+          }`}
+        >
+          {v === "network" ? "Network" : "Chain"}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
 export const SimWrapper: FC = () => {
   const {
     state: { topologyPath, topologyLoaded },
     dispatch,
   } = useSimContext();
+
+  // Honour `?view=chain` (or `?view=network`) on initial load so links can
+  // jump straight into the chain visualisation. See README for the param
+  // list. Validated against the literal union so a bad value falls back
+  // to the default.
+  const [view, setView] = useState<View>(() => {
+    const v = new URLSearchParams(window.location.search).get("view");
+    return v === "chain" || v === "network" ? v : "network";
+  });
 
   useGraphLayout();
 
@@ -89,13 +131,20 @@ export const SimWrapper: FC = () => {
 
   return (
     <div className="relative h-screen w-screen">
-      <div className="flex flex-col items-start gap-4 z-10 absolute left-10 top-10">
-        <Scenario />
-        <LayoutSelector />
-        <Stats />
+      <div className="flex flex-col items-start gap-4 z-10 absolute left-10 top-10 pointer-events-none">
+        <div className="flex flex-row items-stretch gap-4 pointer-events-auto">
+          <Scenario />
+          <ViewToggle view={view} setView={setView} />
+          {view === "network" ? <LayoutSelector /> : null}
+        </div>
+        <div className="pointer-events-auto"><Stats /></div>
       </div>
-      {topologyLoaded ? <GraphWrapper /> : null}
-      <div className="absolute bottom-10 left-10 right-10 z-10 border-2 rounded-md p-4 border-gray-200 bg-white/80 backdrop-blur-xs flex gap-4">
+      {view === "network"
+        ? topologyLoaded
+          ? <GraphWrapper />
+          : null
+        : <ChainWrapper />}
+      <div className="absolute bottom-10 left-10 right-10 z-10 border-2 rounded-md p-4 border-gray-200 bg-white/80 backdrop-blur-xs flex gap-4 pointer-events-auto">
         <Playback />
         <TimelineSlider />
       </div>

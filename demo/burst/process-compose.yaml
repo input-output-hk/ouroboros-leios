@@ -36,6 +36,7 @@ processes:
       UPSTREAM_NODE_DIR="${UPSTREAM_NODE_DIR}" \
       REF_SLOT="${REF_SLOT}" \
       ONSET_OF_REF_SLOT="${ONSET_OF_REF_SLOT}" \
+      IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
       PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
       ip netns exec leios-experiment:upstream bash "${SOURCE_DIR}/scripts/upstream-node.sh"
     log_location: "${WORKING_DIR}/upstream-node.log"
@@ -50,6 +51,7 @@ processes:
     command: |
       NODE0_DIR="${NODE0_DIR}" \
       DATA_DIR="${DATA_DIR}" \
+      CLUSTER_RUN="${CLUSTER_RUN}" \
       PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
       IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
       bash "${SOURCE_DIR}/scripts/prepare-node0.sh"
@@ -77,6 +79,7 @@ processes:
     command: |
       DOWNSTREAM_NODE_DIR="${DOWNSTREAM_NODE_DIR}" \
       DATA_DIR="${DATA_DIR}" \
+      CLUSTER_RUN="${CLUSTER_RUN}" \
       PORT_NODE0="${PORT_NODE0}" \
       IP_NODE0="${IP_NODE0}" \
       bash "${SOURCE_DIR}/scripts/prepare-downstream-node.sh"
@@ -139,18 +142,21 @@ processes:
     availability:
       restart: "always"
 
-  Analyze:
+  Analyse:
     command: |
-      set -exuo pipefail;
+      set -uo pipefail;
       while true; do
         sleep 1
+        # Don't let an analyse.py crash kill the loop (and trigger a
+        # process-compose hot-restart): the script is meant to be polled
+        # until enough data has accumulated to produce a clean run.
         python "${SOURCE_DIR}/analyse.py" \
           "$REF_SLOT" "$ONSET_OF_REF_SLOT" \
           "$UPSTREAM_NODE_DIR/schedule.json" \
           "$WORKING_DIR/upstream-node.log" \
           "$WORKING_DIR/node0.log" \
           "$WORKING_DIR/downstream-node.log" \
-          "$WORKING_DIR/scatter_plot.png"
+          "$WORKING_DIR/scatter_plot.png" || true
       done;
 
     log_location: "${WORKING_DIR}/analyse.log"

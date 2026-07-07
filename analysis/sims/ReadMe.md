@@ -19,7 +19,7 @@ Instructions for building the Haskell simulator `ols` are available in [/simulat
 
 ### Rust simulator
 
-Instructions for building the Rust simulator `sim-cli` are available in [/sim-rs/](../../sim-rs/README.md).
+Instructions for building the Rust simulator `sim-cli` are available in [/sim-rs/](https://github.com/input-output-hk/leios-tools/blob/main/sim-rs/README.md).
 
 
 ### Building the trace processor
@@ -245,7 +245,7 @@ These instructions are valid for the folders `2025w25/` and onwards. Earlier fol
     - *Nix:* use the default dev shell of the `sims/` flake `nix develop ..`
 3. Copy or link the Rust simulator `sim-cli` executable to that folder.
     - If you want to reproduce the study, check out the git commit listed in the `sim-cli.hash` file.
-    - Build with `cargo build --release` in the [sim-rs](../../sim-rs/) folder.
+    - Build with `cargo build --release` in the [sim-rs](https://github.com/input-output-hk/leios-tools/tree/main/sim-rs) folder.
     - Link with `ln -s ../../../sim-rs/target/release/sim-cli` from the study folder.
 4. Copy of link the Haskell `leios-trace-processor` executable to that folder.
     - *Cabal:* compile using `cabal build all`.

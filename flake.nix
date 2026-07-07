@@ -33,8 +33,12 @@
 
     # Used by demo/
     ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype";
+    # Patched cardano-node — source of cardano-node and cardano-cli
+    # across the repo.
     cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
-    cardano-node.url = "github:intersectmbo/cardano-node?ref=bench/leios"; # For latest tools
+    # tx-centrifuge only. TODO: track latest bench/leios once that
+    # branch is rebased onto something with no cooldown.
+    cardano-node-tx-centrifuge.url = "github:intersectmbo/cardano-node?rev=0ab6523057298eae80cb1aa1b23f4472480084be";
   };
 
   outputs =
@@ -58,6 +62,11 @@
       imports = [
         inputs.pre-commit-hooks.flakeModule
         ./nix/pkgs.nix
+        # Release artifacts (release tarball + docker image) live in
+        # nix/release.nix rather than a build.nix so the auto-discovery
+        # above doesn't pick them up automatically — we want this module
+        # named for its purpose, not the convention.
+        ./nix/release.nix
       ]
       ++ buildDotNixes;
 

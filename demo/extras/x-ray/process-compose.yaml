@@ -71,7 +71,18 @@ processes:
     command: |
       set -exuo pipefail;
 
-      mkdir -p "$WORKING_DIR/grafana"
+      # Grafana's INI env-var expansion is fragile (in 12.x it picked up
+      # WORKING_DIR=leios-testnet from an outer shell, treated it as relative
+      # to --homepath, and tried to mkdir inside the read-only nix store).
+      # Pin the writable paths via GF_PATHS_* env vars, which override the INI
+      # unconditionally.
+      mkdir -p "$WORKING_DIR/grafana/data" \
+               "$WORKING_DIR/grafana/logs" \
+               "$WORKING_DIR/grafana/plugins"
+      export GF_PATHS_DATA="$WORKING_DIR/grafana/data"
+      export GF_PATHS_LOGS="$WORKING_DIR/grafana/logs"
+      export GF_PATHS_PLUGINS="$WORKING_DIR/grafana/plugins"
+      export GF_PATHS_PROVISIONING="$GRAFANA_HOMEPATH/conf/provisioning"
 
       grafana server \
         --config "$GRAFANA_INI" \

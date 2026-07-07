@@ -18,7 +18,7 @@ Two technical report snapshots capture the R&D trajectory: [report 1](docs/techn
 
 The repository contains two independent simulations of the Leios protocol, each with its own README covering build instructions, configuration parameters, and Docker usage.
 
-[sim-rs/](sim-rs/) is a high-performance Rust simulation producing JSONL or CBOR traces and is the actively maintained simulation. [simulation/](simulation/) is an earlier Haskell simulation with built-in Gtk+ visualisation; it predates the move away from input blocks and is no longer up to date with the current protocol design. Both read shared topology and configuration files from [data/](data/).
+[sim-rs/](https://github.com/input-output-hk/leios-tools/tree/main/sim-rs) is a high-performance Rust simulation producing JSONL or CBOR traces and is the actively maintained simulation. [simulation/](simulation/) is an earlier Haskell simulation with built-in Gtk+ visualisation; it predates the move away from input blocks and is no longer up to date with the current protocol design. Both read shared topology and configuration files from [data/](data/).
 
 Traces from either simulation can be explored in the [web-based visualiser](ui/), which also supports live streaming from a running network via Loki. Docker images for both simulations are built from the root [Dockerfile](Dockerfile).
 

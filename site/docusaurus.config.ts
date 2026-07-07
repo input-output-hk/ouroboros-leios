@@ -4,8 +4,7 @@ import { themes as prismThemes } from "prism-react-renderer";
 
 const config: Config = {
   title: "Ouroboros Leios",
-  tagline:
-    "A high throughput protocol for Cardano. Designed to increase transaction capacity while preserving security and ecosystem compatibility.",
+  tagline: "Musashi Dojo is open for testing",
   favicon: "img/favicon.ico",
 
   // Set the production url of your site here
@@ -62,6 +61,11 @@ const config: Config = {
             from: "/docs/development/monthly-reviews",
             to: "/docs/monthly-reviews",
           },
+          // Join the musashi dojo link used in PR (2026-06-26)
+          {
+            from: "/join",
+            to: "https://www.musashi.network/",
+          },
         ],
       },
     ],
@@ -97,6 +101,13 @@ const config: Config = {
         srcDark: "img/logo-dark.svg",
       },
       items: [
+        {
+          type: "docSidebar",
+          sidebarId: "documentationSidebar",
+          position: "right",
+          label: "Join the testnet",
+          href: "https://musashi.network",
+        },
         {
           type: "docSidebar",
           sidebarId: "documentationSidebar",

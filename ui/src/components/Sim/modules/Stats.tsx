@@ -5,23 +5,23 @@ import { EServerMessageType } from "../types";
 import { EMessageColor } from "@/utils/colors";
 
 const EVENT_TYPE_COLOR: Partial<Record<EServerMessageType, string>> = {
-  [EServerMessageType.TransactionGenerated]: EMessageColor.TX,
-  [EServerMessageType.TransactionSent]: EMessageColor.TX,
-  [EServerMessageType.TransactionReceived]: EMessageColor.TX,
+  [EServerMessageType.TxsGenerated]: EMessageColor.TXS,
+  [EServerMessageType.TxsSent]: EMessageColor.TXS,
+  [EServerMessageType.TxsReceived]: EMessageColor.TXS,
   [EServerMessageType.EBGenerated]: EMessageColor.EB,
   [EServerMessageType.EBSent]: EMessageColor.EB,
   [EServerMessageType.EBReceived]: EMessageColor.EB,
   [EServerMessageType.RBGenerated]: EMessageColor.RB,
   [EServerMessageType.RBSent]: EMessageColor.RB,
   [EServerMessageType.RBReceived]: EMessageColor.RB,
-  [EServerMessageType.VTBundleGenerated]: EMessageColor.VOTES,
-  [EServerMessageType.VTBundleSent]: EMessageColor.VOTES,
-  [EServerMessageType.VTBundleReceived]: EMessageColor.VOTES,
+  [EServerMessageType.VotesGenerated]: EMessageColor.VOTES,
+  [EServerMessageType.VotesSent]: EMessageColor.VOTES,
+  [EServerMessageType.VotesReceived]: EMessageColor.VOTES,
 };
 
 export const Stats: FC = () => {
   const {
-    state: { aggregatedData, events, currentTime },
+    state: { aggregatedData, events, currentTime, lokiDroppedEntries },
   } = useSimContext();
 
   const formatTimeAsISO8601 = (timeInSeconds: number): string => {
@@ -48,6 +48,14 @@ export const Stats: FC = () => {
         <h4 className="flex items-center justify-between gap-4">
           Events at Time: <span>{aggregatedData.eventCounts.total}</span>
         </h4>
+        {lokiDroppedEntries > 0 && (
+          <h4
+            className="flex items-center justify-between gap-4 text-red-600"
+            title="Entries Loki's tail handler dropped due to consumer backpressure"
+          >
+            Loki dropped: <span>{lokiDroppedEntries}</span>
+          </h4>
+        )}
         <br />
         {aggregatedData.eventCounts.total > 0 && (
           <>
@@ -60,8 +68,6 @@ export const Stats: FC = () => {
                 })
                 .map((eventType) => {
                   const count = aggregatedData.eventCounts.byType[eventType];
-                  const isTxReceived =
-                    eventType === EServerMessageType.TransactionReceived;
 
                   return (
                     <div
@@ -76,14 +82,6 @@ export const Stats: FC = () => {
                           />
                         )}
                         {eventType}:
-                        {isTxReceived && (
-                          <span
-                            className="text-yellow-600 text-xs font-bold cursor-help"
-                            title="Transaction IDs are incomplete and may lead to inaccurate numbers and visualization"
-                          >
-                            ⚠️
-                          </span>
-                        )}
                       </span>
                       <span>{count || 0}</span>
                     </div>

@@ -5,6 +5,7 @@ import {
   EConnectionState,
 } from "./types";
 import {
+  buildChainAtTime,
   computeAggregatedDataAtTime,
   clearLatencyCache,
 } from "@/utils/timelineAggregation";
@@ -37,6 +38,7 @@ export const reducer = (
       return {
         ...state,
         aggregatedData: defaultAggregatedData,
+        selectedBlock: undefined,
         activeScenario: scenario.name,
         autoStart: action.autoStart || false,
         tracePath: scenario.trace || "",
@@ -48,13 +50,13 @@ export const reducer = (
         graph: {
           ...state.graph,
           currentNode: undefined,
+          currentEdge: undefined,
         },
         // Reset timeline when switching scenarios
         events: [],
         currentTime: 0,
         minTime: 0,
         maxTime: scenario.duration,
-        layoutMode: "original",
       };
     }
 
@@ -64,6 +66,18 @@ export const reducer = (
         graph: {
           ...state.graph,
           currentNode: action.payload,
+          currentEdge: undefined, // Clear edge selection when selecting a node
+        },
+      };
+    }
+
+    case "SET_CURRENT_EDGE": {
+      return {
+        ...state,
+        graph: {
+          ...state.graph,
+          currentEdge: action.payload,
+          currentNode: undefined, // Clear node selection when selecting an edge
         },
       };
     }
@@ -149,6 +163,10 @@ export const reducer = (
         minTime: newMinTime,
         maxTime: newMaxTime,
         currentTime: clampedCurrentTime,
+        aggregatedData: {
+          ...state.aggregatedData,
+          chain: buildChainAtTime(newEvents, clampedCurrentTime),
+        },
       };
     }
 
@@ -202,12 +220,21 @@ export const reducer = (
         maxTime: 0,
         isPlaying: false,
         speedMultiplier: 1,
+        aggregatedData: defaultAggregatedData,
+        selectedBlock: undefined,
+        lokiDroppedEntries: 0,
       };
 
     case "SET_LOKI_CONNECTION_STATE":
       return {
         ...state,
         lokiConnectionState: action.payload,
+      };
+
+    case "ADD_LOKI_DROPPED_ENTRIES":
+      return {
+        ...state,
+        lokiDroppedEntries: state.lokiDroppedEntries + action.payload,
       };
 
     case "SET_LAYOUT_MODE":
@@ -240,6 +267,12 @@ export const reducer = (
       return {
         ...state,
         mapGeoJson: action.payload,
+      };
+
+    case "SET_SELECTED_BLOCK":
+      return {
+        ...state,
+        selectedBlock: action.payload,
       };
 
     default:

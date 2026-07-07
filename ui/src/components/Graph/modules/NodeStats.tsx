@@ -44,7 +44,7 @@ export const NodeStats: FC = () => {
   }, [currentNode, topography.links]);
 
   const data = [
-    { name: "Transactions", ...getCounts(EMessageType.TX), color: EMessageColor.TX },
+    { name: "Txs", ...getCounts(EMessageType.Txs), color: EMessageColor.TXS },
     { name: "Endorser Blocks", ...getCounts(EMessageType.EB), color: EMessageColor.EB },
     { name: "Votes", ...getCounts(EMessageType.Votes), color: EMessageColor.VOTES },
     { name: "Blocks", ...getCounts(EMessageType.RB), color: EMessageColor.RB },
