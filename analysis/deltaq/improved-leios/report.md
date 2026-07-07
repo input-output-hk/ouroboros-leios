@@ -11,12 +11,13 @@
 - [4. Model Description](#model-description)
     - [4.1 Numerical Backend](#numerical-backend)
     - [4.2 Network Model](#network-model)
-    - [4.3 Transaction Timings](#transaction-timings)
-    - [4.4 Voter Validation Outcome (certRB Path)](#voter-validation-outcome-certrb-path)
-    - [4.5 Certification Probability](#certification-probability)
-        - [4.5.1 P_validating](#p-validating)
-        - [4.5.2 P_quorum](#p-quorum)
-        - [4.5.3 P_interrupted](#p-interrupted)
+    - [4.3 Mempool and TxCache](#mempool-and-txcache)
+    - [4.4 Transaction Timings](#transaction-timings)
+    - [4.5 Voter Validation Outcome (certRB Path)](#voter-validation-outcome-certrb-path)
+    - [4.6 Certification Probability](#certification-probability)
+        - [4.6.1 P_validating](#p-validating)
+        - [4.6.2 P_quorum](#p-quorum)
+        - [4.6.3 P_interrupted](#p-interrupted)
 - [5. Results](#results)
     - [5.1 Sweep over S_EB-tx](#sweep)
         - [5.1a Mathis (Reno/AIMD, conservative)](#sweep-mathis)
@@ -195,7 +196,7 @@ weight?**
 
 1. Where does $p_{\text{cert}}$ come from?  It is not a free
    parameter we choose — it is a derived quantity from the model.
-   `compute_p_certified` (defined in [§4.5](#certification-probability))
+   `compute_p_certified` (defined in [§4.6](#certification-probability))
    runs the voter pipeline, computes $P_{\text{validating}}$ against
    the 7 s voter deadline, derives $P_{\text{quorum}}$ via the
    stake-weighted Poisson sortition, multiplies by
@@ -326,7 +327,7 @@ The answer is no, for two reasons:
    $\mu_{\text{reapply}}$ while a cache miss pays $\mu_{\text{apply}}$.  This
    per-transaction randomness is captured correctly by the effective mean
    $\mu_{\text{eff}} = \pi_1 \mu_{\text{apply}} + \pi_2 \mu_{\text{reapply}}$
-   ([§4.4](#voter-validation-outcome-certrb-path)), with N fixed.
+   ([§4.5](#voter-validation-outcome-certrb-path)), with N fixed.
 
 The number of transactions *fetched* over the network does vary across
 validators (approximately $\pi_1 N$ on average), but this affects only the
@@ -434,9 +435,73 @@ Each hop's distance category (short/medium/long) is drawn with equal probability
 choice over {1, 64, 256, 512} kB).  The **missing EB closure** uses a single hop
 from the forwarding peer (per README recommendation: first-order approximation).
 
+<a id="mempool-and-txcache"></a>
+
+### 4.3 Mempool and TxCache
+
+**Mechanism.** Transactions diffuse across the network via
+tx-submission and land in the mempools of block-producing nodes.
+When an EB arrives at a voter, its referenced transactions are
+expected to already be present in the local mempool; when a
+transaction is not, because the sender's and voter's mempools have
+diverged, the voter must fetch it from a peer.  Linear Leios adds a
+per-node **transaction cache (TxCache)** that persists such
+explicitly fetched transactions, so subsequent EBs referencing them
+can be served locally.  The BAU
+[mempool-measurements](https://github.com/input-output-hk/ouroboros-leios/tree/main/post-cip/mempool-measurements)
+dataset shows that well-connected SPO mempools are highly
+synchronised, with fragmentation the exception.
+
+**Parameterisation.** We summarise the long-run per-transaction
+outcome by a single scalar $\pi_1 \in [0, 1]$ (the cache-miss rate),
+with $\pi_2 = 1 - \pi_1$ the hit rate.  It enters the model in two
+places:
+
+- *Network fetch.* A voter missing a $\pi_1$-fraction of the closure
+  fetches those transactions over its 1-hop upstream link — a fetch
+  of size $\pi_1 \cdot S_{EB-tx}$
+  ([§4.2](#network-model); [§5.3](#sensitivity-1-hop-vs-multi-hop-eb-closure-fetch-voter-path)
+  covers the multi-hop fall-back).
+- *Validation cost.* Cache-miss transactions pay the full `applyTx`
+  cost, cache-hit ones the cheaper `reapplyTx` (script results
+  cached from the first apply).  The two combine into an effective
+  per-tx mean
+  $\mu_{\text{eff}} = \pi_1 \mu_{\text{apply}} + \pi_2 \mu_{\text{reapply}}$
+  and matching effective variance $\sigma^2_{\text{eff}}$, defined in
+  [§4.4](#transaction-timings) and applied in
+  [§4.5](#voter-validation-outcome-certrb-path).
+
+**Empirical value vs prior Markov derivation.** The prior Haskell ΔQ
+model derived $\pi_1$ from a hand-tuned two-state Markov chain over
+the pair (in-mempool, in-TxCache) with $p = 0.5$, $q = 0.9$, giving
+$\pi_1 = (1-q)/(p + 1-q) = 1/6 \approx 0.17$.  We instead adopt the
+empirical miss rate measured directly from the mempool-measurements
+dataset (cross-region BAU mean $\pi_1 \approx 0.06$, worst-pair
+$\approx 0.085$; full derivation in
+[`pi1_derivation.md`](pi1_derivation.md)).  This replaces a
+hand-tuned prior with a mainnet measurement, at the cost of
+collapsing the Markov chain's autocorrelation (bursty cache-miss
+episodes) to its long-run mean;
+[§7 limitation 3](#limitations-and-assumptions) discusses that
+trade-off, and [§5.5](#pi1-sensitivity) shows the 12 MB feasibility
+verdict is robust across the empirical range and up to $\pi_1 = 0.44$
+under CUBIC.
+
+**Batch structure.** Unlike the prior model's aggregate
+$F_{\text{batch}}(t) = F_{\text{single}}(t)^n$ with
+$n \sim \mathcal{U}(1, N)$ (which combined the per-tx hit/miss
+mixture with a uniform batch size), our model uses a fixed batch
+size $N$ equal to the actual transaction count of the closure and
+expresses the mixture at the aggregate level: one missing-fraction
+network fetch of $\pi_1 \cdot S_{EB-tx}$, followed by fixed-$N$
+sequential validation with $\mu_{\text{eff}}, \sigma_{\text{eff}}$.
+[§3.3](#scale-mixture) explains why the scale-mixture aggregate is
+inappropriate here — it randomises the *count* of transactions when
+the actual randomness is in the per-tx cost.
+
 <a id="transaction-timings"></a>
 
-### 4.3 Transaction Timings
+### 4.4 Transaction Timings
 
 From `post-cip/empirical-distributions/block-edf.csv` (mainnet measurements),
 using **transaction-weighted** per-tx statistics:
@@ -485,7 +550,7 @@ and 40× (reapply).
 
 <a id="voter-validation-outcome-certrb-path"></a>
 
-### 4.4 Voter Validation Outcome (certRB Path)
+### 4.5 Voter Validation Outcome (certRB Path)
 
 ```
 VOTER PIPELINE:
@@ -582,21 +647,21 @@ cap ([§5.1](#sweep)).  See [`timing_derivation.md`](timing_derivation.md) §7 f
 
 <a id="certification-probability"></a>
 
-### 4.5 Certification Probability
+### 4.6 Certification Probability
 
 $$P_{\text{cert}} = P_{\text{quorum}} \times (1 - P_{\text{interrupted}})$$
 
-It is assembled from three independent sub-probabilities.
+It is assembled from three sub-probabilities.
 
 <a id="p-validating"></a>
 
-#### 4.5.1 $P_{\text{validating}}$
+#### 4.6.1 $P_{\text{validating}}$
 
 Run the full voter pipeline CDF through the 7-second voter deadline
 ($3 L_{\text{hdr}} + L_{\text{vote}} = 7$ slots):
 
 ```
-fetch EB body  →  fetch missing closure txs (1-hop)  →  reapply all N_txs
+fetch EB body  →  fetch missing closure txs (1-hop)  →  reapply/apply all N_txs
 ```
 
 $P_{\text{validating}} = P(\text{pipeline completes} \leq 7\,\text{s})$.
@@ -610,8 +675,9 @@ For example, at the CIP-0164 target $S_{EB-tx} = 12$ MB (12 288 txs at
 - **Missing-closure fetch (1-hop)** — single-hop transfer of
   $\pi_1 \cdot S = 2$ MB for cache-miss voters; ≈ 4.4 s under Mathis and
   ≈ 2.0 s under CUBIC.
-- **CPU reapply** — mean $N \mu_{\text{eff}} = 12{,}288 \times 0.143$ ms
-  $\approx 1.76$ s, with 99th percentile ≈ 1.85 s.
+- **CPU reapply/apply** — mixed cost per §4.5's $\mu_{\text{eff}}$; total
+  mean $N \mu_{\text{eff}} = 12{,}288 \times 0.143$ ms $\approx 1.76$ s,
+  with 99th percentile ≈ 1.85 s.
 
 The combined pipeline gives $P_{\text{validating}} \approx 0.948$ under
 Mathis and $\approx 0.992$ under CUBIC at 12 MB — both well above the
@@ -621,7 +687,7 @@ margin under both throughput models for every $S_{EB-tx} \leq 12$ MB.
 
 <a id="p-quorum"></a>
 
-#### 4.5.2 $P_{\text{quorum}}$
+#### 4.6.2 $P_{\text{quorum}}$
 
 Each of 2500 SPOs is independently elected to the 600-member committee via
 Poisson sortition: SPO $i$ with relative stake $s_i$ is elected with probability
@@ -664,7 +730,7 @@ for every CIP-target closure size; see [§5.1](#sweep) for the full per-model ta
 
 <a id="p-interrupted"></a>
 
-#### 4.5.3 $P_{\text{interrupted}}$
+#### 4.6.3 $P_{\text{interrupted}}$
 
 Regardless of voting success, a Praos block produced during the 14-slot window
 can build on the chain before all nodes have received the EB, violating the
@@ -693,21 +759,21 @@ analysis report (Section 5.2.2).
 The same per-tx timing constants are used for both runs; only the steady-state
 TCP window differs.  Results are side-by-side for direct comparison.
 
-*Column note.* $P_{\text{valid}}$ uses the 7 s voter deadline
+*Column note.* $P_{\text{validating}}$ uses the 7 s voter deadline
 ($3 L_{\text{hdr}} + L_{\text{vote}}$) — this is the *liveness* constraint
 for casting a vote within the voting window.  $P(\text{certRB} \leq 14s)$
 uses the 14 s round duration ($L_{\text{total}}$) — this is the *safety*
 constraint that every node finishes processing the certifying RB before
-the next round, and is paired with $P_{\text{interrupted}}$ ([§4.5.3](#p-interrupted)), which
+the next round, and is paired with $P_{\text{interrupted}}$ ([§4.6.3](#p-interrupted)), which
 also uses $L = 14$ s.  The two deadlines measure different things; the
-7 s constraint is already absorbed in $P_{\text{valid}}$ (and through it in
+7 s constraint is already absorbed in $P_{\text{validating}}$ (and through it in
 $P_{\text{cert}}$), so it does not appear again as a separate column.
 
 <a id="sweep-mathis"></a>
 
 #### 5.1a Mathis (Reno/AIMD, conservative)
 
-| $S_{EB-tx}$ | $P_{\text{valid}}$ | $P_{\text{quorum}}$ | $P_{\text{cert}}$ | P(certRB ≤ 14s) | P(cert × safe) |
+| $S_{EB-tx}$ | $P_{\text{validating}}$ | $P_{\text{quorum}}$ | $P_{\text{cert}}$ | P(certRB ≤ 14s) | P(cert × safe) |
 |-------------|------------------|-------------------|-----------------|-----------------|----------------|
 | 0 MB        | 0.9996           | 1.0000            | 0.4966          | 1.0000          | **0.497** ✓    |
 | 1.0 MB      | 0.9978           | 1.0000            | 0.4966          | 1.0000          | **0.497** ✓    |
@@ -720,7 +786,7 @@ The two effects that constrain $P_{\text{validating}}$ — EB-body multi-hop
 fetch and missing-closure single-hop fetch — both fit comfortably within
 the 7 s voter deadline.  The 2 MB long-haul missing-fetch at 12 MB takes
 ≈ 4.4 s under Mathis (vs the 7 s deadline), leaving margin for the EB
-body fetch and CPU reapply.  $P_{\text{validating}}$ drops only
+body fetch and CPU reapply/apply.  $P_{\text{validating}}$ drops only
 slightly with $S_{EB-tx}$ — from ≈ 1.000 at 0 MB to 0.948 at 12 MB — and stays
 well above the 0.75 quorum threshold at every tested size.  The
 $\mu_V = 0.948 \times 600 = 569$ expected votes at 12 MB is a $> 11\sigma$
@@ -732,7 +798,7 @@ Plots: `plots/mathis/`.
 
 #### 5.1b CUBIC (modern Linux default)
 
-| $S_{EB-tx}$ | $P_{\text{valid}}$ | $P_{\text{quorum}}$ | $P_{\text{cert}}$ | P(certRB ≤ 14s) | P(cert × safe) |
+| $S_{EB-tx}$ | $P_{\text{validating}}$ | $P_{\text{quorum}}$ | $P_{\text{cert}}$ | P(certRB ≤ 14s) | P(cert × safe) |
 |-------------|------------------|-------------------|-----------------|-----------------|----------------|
 | 0 MB        | 1.0000           | 1.0000            | 0.4966          | 1.0000          | **0.497** ✓    |
 | 1.0 MB      | 0.9999           | 1.0000            | 0.4966          | 1.0000          | **0.497** ✓    |
@@ -763,7 +829,7 @@ bottleneck.  Two scenarios are distinguished — both reported under each model.
 the missing fraction ($\pi_1 \cdot S_{EB-tx} \approx S_{EB-tx}/6$) from its
 upstream peer over a single hop.
 
-| $S_{EB-tx}$ | Missing ($\pi_1 \cdot S$) | $P_{\text{valid}}$ Mathis | $P_{\text{valid}}$ CUBIC |
+| $S_{EB-tx}$ | Missing ($\pi_1 \cdot S$) | $P_{\text{validating}}$ Mathis | $P_{\text{validating}}$ CUBIC |
 |-------------|--------------------------|-------------------------|------------------------|
 | 1.0 MB      | 171 kB                   | 0.998                   | 1.000                  |
 | 4.0 MB      | 683 kB                   | 0.996                   | 1.000                  |
@@ -793,7 +859,7 @@ transactions referenced by the EB body have already diffused via
 tx-submission *before* the EB is produced.  In Linear Leios (where
 transactions diffuse solely via the tx-submission miniprotocol) this
 typically holds under normal operation, but is not guaranteed under
-adversarial conditions or heavy mempool load.  The full P_cert under the full-blended worst case is derived in
+adversarial conditions or heavy mempool load.  The full $P_{\text{cert}}$ under the full-blended worst case is derived in
 [§5.3 "Full-blended worst case"](#full-blended-worst-case-catastrophic-pre-diffusion-failure)
 and is ≈ 0 under both models (the bottleneck
 shifts from network delivery to the tighter 7 s voter deadline and the 75%
@@ -815,7 +881,7 @@ prior-Haskell default; [§5.5](#pi1-sensitivity) sweeps $\pi_1$ explicitly, and 
 mean $\pi_1 \approx 0.06$ would shrink the missing fraction to 0.72 MB
 and push both rows higher):
 
-| Scenario | Mathis $P_{\text{valid}}$ | Mathis $P_{\text{cert}}$ | CUBIC $P_{\text{valid}}$ | CUBIC $P_{\text{cert}}$ |
+| Scenario | Mathis $P_{\text{validating}}$ | Mathis $P_{\text{cert}}$ | CUBIC $P_{\text{validating}}$ | CUBIC $P_{\text{cert}}$ |
 |----------|:-:|:-:|:-:|:-:|
 | 1-hop missing (default) | 0.948 | 0.497 | 0.992 | 0.497 |
 | Blended-missing | 0.854 | 0.497 | 0.942 | 0.497 |
@@ -851,7 +917,7 @@ $S_{EB-tx} = 12$ MB:
 | $P_{\text{cert}}$                                | ≈ 0    | ≈ 0   |
 
 CUBIC's 99% "delivers within 14 s" is misleading on its own — it doesn't
-carry over to P_cert, for two compounding reasons:
+carry over to $P_{\text{cert}}$, for two compounding reasons:
 
 1. **Voter deadline is 7 s, not 14 s.**  Only 65% of CUBIC blended
    12 MB transfers finish within 7 s (median ≈ 5.5 s), and the full
@@ -869,7 +935,7 @@ $$P_{\text{cert,effective}} = \alpha \cdot P_{\text{cert,1-hop}} + (1-\alpha) \c
 
 where $\alpha$ is the probability that tx-submission pre-diffusion is
 operating normally (i.e. *not* in a catastrophic-failure regime).  Since
-$P_{\text{cert,full-blended}} \approx 0$, the effective P_cert scales linearly
+$P_{\text{cert,full-blended}} \approx 0$, the effective $P_{\text{cert}}$ scales linearly
 with $\alpha$.  For CUBIC at 12 MB:
 
 | $\alpha$ | Interpretation | Effective $P_{\text{cert}}$ |
@@ -889,7 +955,7 @@ question.  It is conceptually distinct from $\pi_1$: the empirical
 $\pi_1 \approx 0.06$ measures typical per-transaction mempool divergence
 during *normal* operation, while $\alpha < 1$ would represent the rate of
 operationally-anomalous rounds where tx-submission has *failed* outright.
-Under normal operation $\alpha \to 1$ and the headline P_cert at the 1-hop
+Under normal operation $\alpha \to 1$ and the headline $P_{\text{cert}}$ at the 1-hop
 result (≈ 0.497 under either model) is the appropriate value; quantifying
 $\alpha$ during incidents requires operational data this report does not
 have.
@@ -906,7 +972,7 @@ to come through the blended multi-hop network?
 
 For each $\pi_1$ in 0.05 increments, find the largest closure $S$ such that
 the full voter pipeline (EB body blended + missing-fraction $\pi_1 \cdot S$
-blended + CPU reapply) completes within 7 s with probability ≥ 0.75
+blended + CPU reapply/apply) completes within 7 s with probability ≥ 0.75
 (matching the quorum threshold):
 
 | $\pi_1$ | Mathis $S_{\text{max}}$ | CUBIC $S_{\text{max}}$ | "naive" $S = X / \pi_1$ |
@@ -936,7 +1002,7 @@ spends:
 - ~1–3 s on the **EB body fetch** (blended multi-hop, payload up to 512 kB
   in the generic model — a fat-tailed distribution that costs several
   seconds at the 75th percentile).
-- $N \cdot \mu_{\text{eff}}$ on **CPU reapply**, where
+- $N \cdot \mu_{\text{eff}}$ on **CPU reapply/apply**, where
   $\mu_{\text{eff}}$ grows from 0.092 ms/tx at $\pi_1 = 0.05$ to 0.289 ms/tx
   at $\pi_1 = 0.50$.  At $\pi_1 = 0.50$ and $S = 4$ MB this CPU step alone
   is $\approx 1.15$ s.
@@ -1016,11 +1082,11 @@ throughput equation and may matter more than the Mathis-vs-CUBIC distinction:
 
 2. **Slow start is modeled, but real-world TCP exhibits additional effects
    this model omits.**  The diffusion-time table *does*
-   simulate slow start explicitly: cwnd starts at $\text{cwnd}_{0} = 10$ MSS
+   simulate slow start explicitly: cwnd starts at 10 MSS
    ($14{,}600$ B) and doubles each RTT until it hits the model-specific cap
    $W_{\text{ss}}$, identically under both Mathis and CUBIC.  The model choice
    therefore only changes the transfer time once the connection has *cleared*
-   slow start.  Tracing the cwnd-doubling sequence from $\text{cwnd}_{0}$
+   slow start.  Tracing the cwnd-doubling sequence from this starting point
    (values in bytes; kiB = 1024 B; "—" = same as Mathis column):
 
    | Round | Mathis cwnd | Mathis cum sent | Mathis status | CUBIC cwnd | CUBIC cum sent | CUBIC status |
@@ -1069,7 +1135,7 @@ throughput equation and may matter more than the Mathis-vs-CUBIC distinction:
    Real-world slow-start effects *not* captured by either model:
 
    - *Idle restart (RFC 5681 §4.1).*  A TCP connection idle for more than
-     one RTO resets cwnd to $\text{cwnd}_{0}$.  Between EB events, long-lived
+     one RTO resets cwnd to its initial value.  Between EB events, long-lived
      SPO connections may pay the slow-start cost each time.
    - *HyStart / HyStart++ (RFC 9406).*  Linux exits slow start before
      reaching the formal $W_{\text{ss}}$ when it detects ACK-train
@@ -1146,7 +1212,7 @@ missing fraction must traverse the full multi-hop network — that case
 is materially more restrictive (12 MB is feasible under CUBIC at the
 empirical mean $\pi_1$ but not under Mathis).
 
-**P_cert at selected $S_{EB-tx}$, per model and π₁:**
+**$P_{\text{cert}}$ at selected $S_{EB-tx}$, per model and π₁:**
 
 *Mathis*
 
@@ -1217,8 +1283,8 @@ tx-arrival autocorrelation rather than just the steady-state mean.
 
 The analytical network model in [§5.1](#sweep)–[§5.5](#pi1-sensitivity)
 treats each per-hop TCP transfer as a *deterministic* function of
-$(\text{size}, \text{RTT}, p)$: slow start from $\text{cwnd}_{0} = 10$
-MSS, cwnd doubles each RTT, capped at the model-specific steady-state
+$(\text{size}, \text{RTT}, p)$: slow start from initial cwnd = 10 MSS,
+cwnd doubles each RTT, capped at the model-specific steady-state
 window $W_{\text{ss}}$.  Real TCP transfers are stochastic: random
 packet losses can occur during the transfer, triggering CUBIC's
 multiplicative-decrease-and-reclimb cycle and adding tail latency.
@@ -1227,13 +1293,13 @@ Monte Carlo TCP CUBIC simulator (a separate companion project,
 described below) at the report's headline parameters.
 
 **Setup.**  20,000 independent MC runs per (file size, model) pair
-under: CUBIC with multiplicative-decrease $\beta = 0.3$, $C = 0.4$,
-fast convergence on; initial cwnd = 10 MSS; slow-start exits at the
-BDP (matches our model); RTT = 268 ms (long-haul, conservative end);
-Bernoulli loss at $p = 10^{-4}$; no RTT jitter.  The estimator models
-the actual CUBIC dynamics: slow-start cwnd doubling, multiplicative
-decrease on each loss event, cubic-curve climb back to the
-pre-decrease window in congestion avoidance.
+with CUBIC parameters $\beta = 0.3$, $C = 0.4$, fast convergence on;
+slow-start ssthresh = BDP (≈ 33 MB at 268 ms × 1 Gbps; the analytical
+model instead caps cwnd at the loss-rate-determined
+$W_{ss}^C \approx 1.54$ MB, but at the transfer sizes tested here
+neither cap binds before slow-start completes the transfer, so the
+difference is immaterial); RTT = 268 ms (long-haul, conservative end);
+Bernoulli loss at $p = 10^{-4}$; no RTT jitter.
 
 **Results.**  For each closure size appearing in [§5.1](#sweep) /
 [§5.3](#sensitivity-1-hop-vs-multi-hop-eb-closure-fetch-voter-path),
@@ -1406,7 +1472,7 @@ stays at the Praos cap of $\approx 0.497$.
    diffusion scenario, reducing the feasible range significantly.
 
 6. **TCP throughput model assumptions.**
-   The transfer-time model uses TCP slow start from $\text{cwnd}_{0} = 10$ MSS
+   The transfer-time model uses TCP slow start from an initial cwnd of 10 MSS
    (14 600 B), capped at a model-specific steady-state window $W_{\text{ss}}$
    (Mathis: 146 000 B; CUBIC: 1 538 590 B at $p = 10^{-4}$).  Common
    assumptions:
@@ -1455,10 +1521,10 @@ stays at the Praos cap of $\approx 0.497$.
    The model uses Normal-CDF approximations in two places: the total per-EB
    CPU validation time is treated as
    $T_{\text{CPU}} \sim \mathcal{N}(N \mu_{\text{eff}}, N \sigma^2_{\text{eff}})$
-   (Fixed-N CLT, [§4.4](#voter-validation-outcome-certrb-path)), and the
+   (Fixed-N CLT, [§4.5](#voter-validation-outcome-certrb-path)), and the
    committee vote count is treated as
    $V \sim \mathcal{N}(\mu_V, \sigma_V^2)$ (CLT over independent voters,
-   [§4.5.2](#p-quorum)).  Both rely on the underlying distributions being
+   [§4.6.2](#p-quorum)).  Both rely on the underlying distributions being
    well-behaved enough that the CLT converges well at the tested $N$.  We
    have only limited per-transaction telemetry to judge this: `block-edf.csv`
    provides per-bin *mean* apply/reapply times rather than individual tx
@@ -1481,7 +1547,7 @@ stays at the Praos cap of $\approx 0.497$.
    skewed with extreme outliers — not the symmetric tails the Normal
    CLT presumes.  The same likely applies to per-hop network delays
    (bufferbloat, retransmission storms) and per-voter pipeline
-   completion times (correlated cache states across voters).  §4.4's σ
+   completion times (correlated cache states across voters).  §4.5's σ
    sensitivity check bounds the impact on the CPU side (q99 of 1.85 s
    rises to ~3.4 s under the most pessimistic σ — still well inside the
    7 s voter deadline), so the qualitative conclusions are robust;
@@ -1626,7 +1692,7 @@ the per-model conclusion differs, both are noted.
   on log–log axes for each of the three distance categories under both Mathis
   ($T \propto p^{-1/2}$, solid) and CUBIC ($T \propto p^{-3/4}$, dashed).
   The 1 Gbit/s interface cap and the analysis default $p = 10^{-4}$ are marked.
-- *Right* — transfer time for a 2 MB long-haul (OWD = 268 ms) fetch vs $p$
+- *Right* — transfer time for a 2 MB long-haul (RTT = 268 ms) fetch vs $p$
   (semilog), with the 7 s voter deadline marked.  This is the
   missing-closure load at $S_{EB-tx} = 12$ MB.  Annotation arrows show
   approximately where each model crosses the deadline.
@@ -1676,14 +1742,26 @@ $P(\text{RB fully processed} \leq t)$:
 - *Improved, $S_{EB-tx}=12\,\text{MB}$* — improved model at the CIP target size.
 - *txRB path only* — the non-cert branch (RB carries transactions, no EB).
 
-The vertical dashed red line marks the 14-second deadline.
+The vertical dashed red line marks the 14-second deadline; the horizontal
+grey dotted line marks the 0.97 target from the prior CIP analysis.
 
-**Why it matters.** The prior model's CDF crosses the deadline at ~0.97,
-which was used to validate the CIP parameters.  Under the new model both
-the Mathis and CUBIC 12 MB CDFs plateau at $\approx 0.497$ — at the Praos
-cap, no cliff.  The chart illustrates that the model corrections change
-the interpretation fundamentally: what previously appeared to be a
-feasibility limit at 0.974 is now revealed as the Praos 50% cap.
+**Why it matters.** The prior (broken) model forced *both* the certRB
+and txRB paths to complete on every RB, which inflated the CDF: it
+only clears the 0.97 target near ≈ 5 s under either throughput model
+— read at the time as a "just-barely-feasible" ceiling at the CIP
+parameters.  With the fix — mutually exclusive path choice weighted
+by $P_{\text{cert}}$ — the three improved curves rise sharply and
+all reach ≈ 1.0 well before the 14 s deadline: the txRB-only lower
+bound by ≈ 3 s, the $S_{EB-tx}=0$ combined CDF by ≈ 7 s, and even
+the 12 MB curve by ≈ 10 s.  The apparent 0.97 ceiling was therefore
+an artifact of the double-path bug, not a real feasibility limit.
+
+*Scope of this plot.* The curves show *how quickly the RB is
+processed once a path is taken*, not *how often certification
+succeeds*.  The Praos 50% cap ($P_{\text{cert}} \approx 0.497$)
+governs whether the certRB path is chosen at all; it appears in
+`feasibility.svg` and `certification.svg` as a $P_{\text{cert}}$
+plateau versus $S_{EB-tx}$, not as a CDF plateau here.
 
 ---
 
