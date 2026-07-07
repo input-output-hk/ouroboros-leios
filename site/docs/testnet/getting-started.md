@@ -427,19 +427,20 @@ either through Loki/Grafana, or by tailing `$WORKING_DIR/node.log`
 directly:
 
 ```shell
-tail -f "$WORKING_DIR/node.log" | grep -E 'Leios|CertRB'
+tail -f "$WORKING_DIR/node.log" | grep -E 'Leios'
 ```
 
 Greppable highlights:
 
-- `"kind":"LeiosBlockForged"` / `"kind":"LeiosBlockCertified"` — an
-  endorser block being produced and certified (emitted by block
-  producers; at a relay you see the offers arrive).
+- `"kind":"LeiosBlockForged"` — an endorser block being produced
+  (block-producer side; at a relay you see the announcement propagate).
+- `"kind":"LeiosVoted"` / `"kind":"LeiosNotVoted"` — a voter deciding
+  whether to cast a vote on an endorser block.
+- `"kind":"LeiosCertified"` / `"kind":"LeiosBlockCertified"` — enough
+  votes accumulated to form a certificate for an endorser block, and
+  the certified block being adopted into chain selection.
 - `"kind":"LeiosBlockAcquired"` / `"kind":"LeiosBlockTxsAcquired"` — an
   endorser-block body or its transaction closure arriving from a peer.
-- `"kind":"CertRBStaged"` / `"kind":"CertRBReleased"` — a ranking block
-  held back until its endorser-block closure is local, then released
-  once it arrives.
 
 If you have the [out-of-the-box grafana dashboard](http://localhost:3000/d/gg7w7r/proto-devnet-throughput?orgId=1&from=now-5m&to=now&timezone=browser&refresh=5s&viewPanel=panel-1) or other means to watch the current mempool size, you can see Leios in action:
 
