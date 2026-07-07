@@ -146,7 +146,7 @@ parameter, then issue the certificate that binds your KES key to your
 cold key:
 
 ```shell
-slotsPerKESPeriod=$(jq -r '.slotsPerKESPeriod' "$WORKING_DIR/shelley-genesis.json")
+slotsPerKESPeriod=$(jq -r '.slotsPerKESPeriod' "$WORKING_DIR/config/shelley-genesis.json")
 slotNo=$(cardano-cli query tip | jq -r '.slot')
 kesPeriod=$(( slotNo / slotsPerKESPeriod ))
 
@@ -225,6 +225,16 @@ cardano-cli dijkstra transaction submit \
   --tx-file pool-reg-tx.signed
 ```
 
+:::warning `transaction build` broken in prototype-2026w27
+The `cardano-cli dijkstra transaction build` command above currently
+fails with the `prototype-2026w27` release. As a workaround, use the
+`cardano-cli` from the previous release
+([`prototype-2026w26`](https://github.com/input-output-hk/ouroboros-leios/releases/tag/prototype-2026w26))
+to build the transaction — signing and submission with the
+`prototype-2026w27` binary still work. Fix is being tracked; check the
+[Musashi Dōjō Discord](https://discord.gg/Bx2qvsjCte) for the latest.
+:::
+
 ## Delegate stake to your pool
 
 Your pledge only counts once your own stake is delegated to your pool.
@@ -299,9 +309,10 @@ If both look right, your pool is registered.
 ## Restart as block producer
 
 Stop the relay and restart it with the KES key, VRF key, and operational
-certificate so it can forge — this time launching `cardano-node`
-directly (the `nix run` / `run-node.sh` wrappers run a non-producing
-relay only).
+certificate so it can forge — extending the `cardano-node run`
+invocation from the previous guide (or, on the Nix path, replacing
+`nix run …#leios-testnet-relay` since that wrapper only runs a
+non-producing relay).
 
 :::tip Keep it up
 By now you should have settled on a way to keep the node running in the
@@ -319,8 +330,8 @@ Run it from `$WORKING_DIR`, which holds the config and database:
 ```shell
 cd "$WORKING_DIR"
 cardano-node run \
-  --config config.json \
-  --topology topology.json \
+  --config config/config.json \
+  --topology config/topology.json \
   --database-path db \
   --socket-path node.socket \
   --host-addr 0.0.0.0 \
@@ -334,9 +345,8 @@ cardano-node run \
 <TabItem value="docker" label="Docker">
 
 Stop the relay container from the previous guide and start a producer
-that mounts the same `$WORKING_DIR` (so it reuses the synced database
-and the pinned config copied into it on first start) and the keys
-underneath it:
+that mounts the same `$WORKING_DIR` — reusing the synced database and
+the pinned config under `config/` — plus the keys underneath it:
 
 ```shell
 docker rm -f leios-relay
@@ -345,10 +355,10 @@ docker run -d --name leios-producer \
   -p 3010:3010 \
   -v "$WORKING_DIR:/data" \
   -w /data \
-  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w26 \
+  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w27 \
   cardano-node run \
-    --config config.json \
-    --topology topology.json \
+    --config config/config.json \
+    --topology config/topology.json \
     --database-path db \
     --socket-path node.socket \
     --host-addr 0.0.0.0 \
