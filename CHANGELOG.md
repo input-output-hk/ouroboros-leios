@@ -5,6 +5,16 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w27a - 2026-07-08
+
+The partial fix to the previous `prototype-2026w27` release.
+Improves the overall stability of the network significantly (no forks)
+but still suffering from the stall when syncing from Genesis.
+
+- Fix SQLite segfaults due to use after free in `sqlite3_finalize`.
+- Improve SQLite LeiosDB performance that uses `JSON1` queries
+
+
 ## prototype-2026w27 - 2026-07-05
 
 **BREAKING** changes to block serialization as we added proper Leios certificates and also changed how EB announcements are encoded in block headers.
