@@ -79,6 +79,10 @@
     "ChainDB.AddBlockEvent.AddedBlockToVolatileDB": {
       "maxFrequency": 2.0
     },
+    "ChainDB.AddBlockEvent.StoreButDontChange": {
+      "maxFrequency": 0,
+      "severity": "Debug"
+    },
     "ChainDB.CopyToImmutableDBEvent.CopiedBlockToImmutableDB": {
       "maxFrequency": 2.0
     },
