@@ -931,6 +931,69 @@ For the first version of the LedgerDB, it need not explicitly store EB's ledger 
 
 ## Ledger
 
+#### Beginning of scratch pad
+
+As a first step in fleshing out this section with some good details, Frisby and Kuleshevich are going to pin down a sketch of the Consensus-Ledger interface that we're both content with.
+
+As a Consensus engineer, I'm writing `LedgerState` below, thinking of the data type that the Consensus layer uses.
+The Ledger engineers might want to interpret that type as `NewEpochState` (although `LedgerState` also contains other state as well).
+
+There are two high-level ways in which Leios interacts with the Ledger.
+
+- Fully applying a CertEB to a ledger state must incorporate that EB's transactions into the resulting ledger state.
+- The ledger state determines the Leios committee for each epoch.
+
+The following seems like a useful (roughly chronological) order in which to consider these.
+
+- When a block-producing node acquires an EB, the Leios rules sometimes require them to issue a vote for its EB announcement.
+    - If that stake pool is not on the Leios committee for that EB's epoch, then it has no voting work to do.
+      Thus, we'll need `lookupLeiosCommitteeSeatNumber :: LedgerState -> Hash LeisVoterPublicKey -> Maybe Int`.
+    - If it is on the committee, then the node must determine whether the EB announcement is voteworthy.
+      The Leios voting rules involve many conjuncts, only a few of which necessarily involve the Ledger state.
+        - Is any single tx too big? (too many bytes, or too many ExUnits, etc)
+        - Is the cumulative size of all txs in the EB too big? (too many bytes, or too many ExUnits, etc)
+        - (Other components---eg ChainSync clients, LeiosFetch decision logic, etc---may have already validated the byte sizes, but it's harmless for the Ledger to double-check those while its checking the other dimensions too.)
+        - Is the EB's sequence of txs a valid extension of the ledger state of the RB that announced it?
+    - Thus, a small set of functions suffice for the needs of the LeiosVoting thread.
+        - `initializeLeiosVotingState :: LedgerState -> LeiosVotingState` - initialize this check's state from the ledger state of the announcing RB; the multidimensional tx-size accumulators start at 0.
+        - `applyTxForLeiosVoting :: LeiosVotingState -> Tx -> Maybe IsValid -> Either Error (ValidatedTx, LeiosVotingState)` - apply this transaction to the incoming state
+            - If the `Maybe IsValid` is `Just`, then Consensus has successfully validated this tx before, so the Ledger can skip state/Phase2/etc checks.
+              (Just like the Mempool's `applyTx` versus `reapplyTx` distinction.)
+            - Should return `Left` if the tx is bigger in some dimension than the current protocol parameters' values allow.
+            - Should return `Left` if the inclusion of this tx in the EB pushes its cumulative size in some dimension(s) beyond what the current protocol parameters' values allow.
+            - (If it returns `Right`, then it has increased the accumulators by the size of this tx.)
+            - Should return `Left` if the tx is not a valid extension of the accumulated ledger state.
+            - (TODO I'm assuming the correct `IsValid` flag can be projected from `ValidatedTx`)
+        - `forgetLeiosVotingState :: LeiosVotingState -> LedgerState` - discards the accumulators.
+          Leios doesn't actually _require_ this, but it seems plausible a stake pool would want to retain and reuse this ledger state if it were to later apply an CertRB that certifies this same announcement (see below).
+    - If all of the voting rules (including the Ledger checks above) are satisfied, the node will issue a vote, offering/sending it to its downstream peers.
+- When a node receives a vote from its upstream peer, it needs to validate it.
+  The vote identifies the claimed committee member by seat number and also claimed EB announcement by the announcing RB's slot and HeaderHash.
+  Because the Leios committee is stable, the node should be able to use any LedgerState.
+  Thus, we at least need `lookupLeiosCommitteeVK :: LedgerState -> SlotNo -> Int -> Maybe LeiosVertificationKey`.
+  But maybe the Ledger could also do the crypto check, so `validateLeiosVote :: LedgerState -> SlotNo -> Int -> HeaderHash -> LeiosVoteSignatureByteString -> Either Err ()`.
+  (TODO maybe EpochNo instead of SlotNo?)
+  (TODO maybe we need the codomain to also permit forecast range exceptions?)
+- If enough votes are issued and diffuse well enough, then Leios might permit the next RB to include a certificate for the EB announcement.
+    - We anticipate that the Consensus Layer will want to validate this certficate when the CertRB arrives, even if the certified EB hasn't yet arrived.
+      Thus, we at least need `lookupLeiosCommitteeVKs :: LedgerState -> SlotNo -> IntSet -> Maybe LeiosVertificationKey`.
+      But maybe the Legder could also do the crypto check, so `validateLeiosCertificate :: LedgerState -> SlotNo -> IntSet -> HeaderHash -> LeiosCertficiateSignatureByteString -> Either Err ()`.
+      Note that the SlotNo and the HeaderHash are those of the announcing RB, not the CertRB that contains the certificate.
+      In particular, the HeaderHash is the CertRB's prevhash.
+      As with validating a vote, any LedgerState that's not older than the immutable tip should suffice.
+      (TODO use EpochNo instead of SlotNo?)
+      (TODO forecast exception?)
+- Once both the CertRB and the EB it certifies have fully arrived, the node might try to properly apply the CertRB to its predecessor chain.
+    - The first step would be to apply the EB to the ledger state of the announcing RB.
+      Thus, `applyCertifiedLeiosBlock :: LedgerState -> LedgerLeiosBlock -> LedgerState`.
+      The `LedgerLeiosBlock` type is whatever data the Ledger needs to do this; it must be entirely determined by the EbBody and the EbClosure, which is what the Leios components of the Consensus Layer have acquired from the network (or from self, if self-issued).
+      For example, maybe `LedgerLeiosBlock blk = [(GenTx blk, IsValid)]`.
+    - The contract for `applyCertifiedEb` should require that Consensus has already validated the cert (as discussed above) before calling `applyCertifiedEb`.
+      The valid cert cannot exist without at least one honest stake pool having issued a vote (as discussed above), which means the EB is known to be entirely valid against this exact same ledger state (it's the one that that pool passed to `initializeLeiosVotingState`) and therefore `appliedCertifiedEb` doesn't need to do _any_ checks at all: it merely needs to ("re")construct the resulting ledger state.
+      (If a valid cert can exist without any honest nodes voting for it, then Leios itself is unsafe.)
+
+#### End of scratch pad
+
 > [!WARNING]
 >
 > TODO: Mostly content directly taken from [impact analysis](../ImpactAnalysis.md). Expand on motivation and concreteness of changes.
