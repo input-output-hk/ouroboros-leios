@@ -991,6 +991,8 @@ The following seems like a useful (roughly chronological) order in which to cons
     - The contract for `applyCertifiedEb` should require that Consensus has already validated the cert (as discussed above) before calling `applyCertifiedEb`.
       The valid cert cannot exist without at least one honest stake pool having issued a vote (as discussed above), which means the EB is known to be entirely valid against this exact same ledger state (it's the one that that pool passed to `initializeLeiosVotingState`) and therefore `appliedCertifiedEb` doesn't need to do _any_ checks at all: it merely needs to ("re")construct the resulting ledger state.
       (If a valid cert can exist without any honest nodes voting for it, then Leios itself is unsafe.)
+    - The remainings steps are the normal ones: tick the EB's ledger state forward to the CertRB's slot and then apply the CertRB.
+      Even though the CertRB doesn't have txs in it, and Consensus has---by contract---already validated the cert it contains, it still needs to be explicitly applied, if only for maintaining the block rewards state, for example.
 
 #### End of scratch pad
 
