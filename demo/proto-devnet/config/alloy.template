@@ -105,8 +105,8 @@ loki.process "extract_cardano_node_logs" {
 	}
 
 	stage.drop {
-    source = "process"
-    value = "Analyze"
+		source = "process"
+		value  = "Analyze"
 	}
 
 	stage.timestamp {
@@ -132,6 +132,7 @@ loki.process "extract_cardano_node_logs" {
 
 	stage.match {
 		selector = `{process="TxCentrifuge"}`
+
 		stage.static_labels {
 			values = {
 				service = "tx-centrifuge",
@@ -144,5 +145,94 @@ loki.process "extract_cardano_node_logs" {
 		source = "data"
 	}
 
+	forward_to = [
+		loki.write.loki.receiver,
+		loki.process.extract_leios_vote_logs.receiver,
+	]
+}
+
+loki.process "extract_leios_vote_logs" {
+	stage.json {
+		expressions = {
+			kind = "kind",
+		}
+	}
+
+	stage.labels {
+		values = {
+			kind = "kind",
+		}
+	}
+
+	stage.match {
+		selector = `{kind=~"LeiosVoted|LeiosVoteAcquired"}`
+
+		stage.json {
+			expressions = {
+				host    = "host",
+				rbHash  = "vote.rbHash",
+				voterId = "vote.voterId",
+			}
+			drop_malformed = true
+		}
+
+		stage.static_labels {
+			values = {
+				service = "leios_voting",
+				type    = "leios_voting",
+			}
+		}
+
+		stage.labels {
+			values = {
+				rbHash  = "rbHash",
+				voterId = "voterId",
+			}
+		}
+
+		stage.match {
+			selector = `{kind="LeiosVoted"}`
+
+			stage.json {
+				expressions = {
+					weight = "weight",
+				}
+			}
+
+			stage.metrics {
+				metric.counter {
+					name              = "voted_weight_total"
+					description       = "The total accumulated voting weight"
+					prefix            = "leios_"
+					action            = "add"
+					source            = "weight"
+					max_idle_duration = "24h"
+				}
+			}
+		}
+
+		stage.match {
+			selector = `{kind="LeiosVoteAcquired"}`
+
+			stage.metrics {
+				metric.counter {
+					name              = "votes_acquired_total"
+					description       = "The total votes acquired"
+					prefix            = "leios_"
+					action            = "inc"
+					match_all         = true
+					max_idle_duration = "24h"
+				}
+			}
+		}
+	}
+
 	forward_to = [loki.write.loki.receiver]
+}
+
+prometheus.scrape "alloy_pipeline_metrics" {
+	targets         = [{"__address__" = "localhost:12345"}]
+	forward_to      = [prometheus.remote_write.prometheus.receiver]
+	scrape_timeout  = "1s"
+	scrape_interval = "1s"
 }
