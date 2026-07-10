@@ -12,10 +12,15 @@ A small network of patched cardano nodes that is loaded with synthetically creat
 Run the demo with all dependencies automatically provided using nix:
 
 ``` shell
-nix run github:input-output-hk/ouroboros-leios#demo-proto-devnet
+nix run github:input-output-hk/ouroboros-leios#dev-demo-proto-devnet
 ```
 
 Or enter the `nix develop` shell (also available via `direnv allow`) and follow [without nix instructions](#without-nix).
+
+``` shell
+cd demo/proto-devnet
+nix develop ../..#dev-demo-proto-devnet
+```
 
 ### Without Nix
 
