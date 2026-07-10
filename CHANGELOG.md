@@ -5,6 +5,14 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w28 - 2026-07-10
+
+Fixes "no such table: ebs" and block re-application and un-certified eb application
+
+- Fix [Some new nodes die with: LeiosDbException "no such table: ebs" #983](https://github.com/input-output-hk/ouroboros-leios/issues/983)
+- Fix block re-application so it uses the Leios workflow as block application
+- Fix unconditional application of uncertified EBs from the ImmDB on startup
+
 ## prototype-2026w27b - 2026-07-08
 
 Fixes permanent stalling when syncing from genesis.
