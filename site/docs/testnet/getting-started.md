@@ -86,7 +86,7 @@ endorser blocks, as they land.
 | **Bootstrap relay** | `leios-node.play.dev.cardano.org:3001`                                                                   |
 | **Network magic**   | `164`                                                                                                    |
 | **Faucet**          | [faucet.leios.play.dev.cardano.org](https://faucet.leios.play.dev.cardano.org/basic-faucet)              |
-| **Node release**    | [`prototype-2026w27`](https://github.com/input-output-hk/ouroboros-leios/releases/tag/prototype-2026w27) |
+| **Node releases**   | [https://github.com/input-output-hk/ouroboros-leios/releases](https://github.com/input-output-hk/ouroboros-leios/releases) |
 | **Node version**    | reports `cardano-node 11.1.0.164`                                                                        |
 
 ## System requirements
