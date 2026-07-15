@@ -553,11 +553,11 @@
         "utils": "utils"
       },
       "locked": {
-        "lastModified": 1784310443,
-        "narHash": "sha256-hr1EydBt3NVR0hctQaDF54IizzcanQ5Q/6oQaerAIuI=",
+        "lastModified": 1784812194,
+        "narHash": "sha256-5dygAp7Mu9twO9HSwUZFznmqx+CNq0f0TSS6houQ+gw=",
         "owner": "intersectmbo",
         "repo": "cardano-node",
-        "rev": "f7ec3592e75f0652100c7d05b8932a3a7e05e010",
+        "rev": "bdd1d3532ed7db94825ec32749c789a01a0d695f",
         "type": "github"
       },
       "original": {
@@ -1442,11 +1442,11 @@
     "hackageNix_5": {
       "flake": false,
       "locked": {
-        "lastModified": 1783064913,
-        "narHash": "sha256-VXPICk/F/MV7PygX8G4xG7SyTuooqpezQwrer2UPpT0=",
+        "lastModified": 1784626207,
+        "narHash": "sha256-1WjrU24q6MMXMABYMXoYNQaJfodxzni8XF1XGFJEHiM=",
         "owner": "input-output-hk",
         "repo": "hackage.nix",
-        "rev": "40b5e1dd5fd2a92b0d3ab01bed0ec014cf694330",
+        "rev": "770f679832f66818d1ebe410b30a7283ec10fbd6",
         "type": "github"
       },
       "original": {
@@ -4082,18 +4082,20 @@
         ]
       },
       "locked": {
-        "lastModified": 1780333389,
-        "narHash": "sha256-wPSPmyDM92iDskIA8HoY9OiKDDfn+roEDWS0P/KpCIU=",
-        "owner": "intersectmbo",
-        "repo": "ouroboros-consensus",
-        "rev": "0464cd1b8f48472bf88196eeea09c4b649fae016",
-        "type": "github"
+        "lastModified": 1784650797,
+        "narHash": "sha256-NAokIKE0yOW5EIx6zFgvuwa95iD4vzIq13CJOUUe0mA=",
+        "ref": "refs/heads/main",
+        "rev": "3511ac5ad2ded55553d821e7305a2c10e1cfbeca",
+        "revCount": 11479,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/intersectmbo/ouroboros-consensus"
       },
       "original": {
-        "owner": "intersectmbo",
-        "ref": "leios-prototype",
-        "repo": "ouroboros-consensus",
-        "type": "github"
+        "rev": "3511ac5ad2ded55553d821e7305a2c10e1cfbeca",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/intersectmbo/ouroboros-consensus"
       }
     },
     "poetry2nix": {

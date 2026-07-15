@@ -32,7 +32,7 @@
     deltaq-src.flake = false;
 
     # Used by demo/
-    ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype";
+    ouroboros-consensus.url = "git+https://github.com/intersectmbo/ouroboros-consensus?rev=3511ac5ad2ded55553d821e7305a2c10e1cfbeca&submodules=1";
     # Patched cardano-node — source of cardano-node and cardano-cli
     # across the repo.
     cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
