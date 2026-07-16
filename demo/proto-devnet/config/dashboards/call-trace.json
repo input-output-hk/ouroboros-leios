@@ -220,13 +220,13 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum by(thread, name) (\n  sum_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap allocations [5m]\n  )\n)",
+          "expr": "max by(thread, name) (\n  max_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap allocations [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{name}}",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Allocations by Thread & Call Stack [5m window]",
+      "title": "Max Allocations by Thread & Call Stack [5m window]",
       "type": "timeseries"
     },
     {
@@ -324,13 +324,13 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum by(thread, name) (\n  sum_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap duration [5m]\n  )\n)",
+          "expr": "max by(thread, name) (\n  max_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap duration [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{name}}",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Duration by Thread & Call Stack [5m window]",
+      "title": "Max Duration by Thread & Call Stack [5m window]",
       "type": "timeseries"
     },
     {
@@ -408,7 +408,12 @@
         "cellHeight": "sm",
         "enablePagination": true,
         "showHeader": true,
-        "sortBy": []
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Time"
+          }
+        ]
       },
       "pluginVersion": "12.3.1",
       "targets": [
