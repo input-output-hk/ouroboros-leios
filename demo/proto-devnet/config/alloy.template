@@ -9,21 +9,21 @@ prometheus.scrape "cardano_node_exporter" {
 		{
 			"__address__" = "${IP_NODE1}:${METRICS_PORT_NODE1}",
 			"job"         = "cardano_node_metrics",
-			"instance"    = "localhost",
+			"instance"    = "node1",
 			"alias"       = "node1",
 			"process"     = "Node1",
 		},
 		{
 			"__address__" = "${IP_NODE2}:${METRICS_PORT_NODE2}",
 			"job"         = "cardano_node_metrics",
-			"instance"    = "localhost",
+			"instance"    = "node2",
 			"alias"       = "node2",
 			"process"     = "Node2",
 		},
 		{
 			"__address__" = "${IP_NODE3}:${METRICS_PORT_NODE3}",
 			"job"         = "cardano_node_metrics",
-			"instance"    = "localhost",
+			"instance"    = "node3",
 			"alias"       = "node3",
 			"process"     = "Node3",
 		},
@@ -71,6 +71,7 @@ loki.process "extract_process_compose_logs" {
 			level   = "level",
 			process = "process",
 			replica = "replica",
+      instance = "process",
 		}
 	}
 
@@ -148,6 +149,7 @@ loki.process "extract_cardano_node_logs" {
 	forward_to = [
 		loki.write.loki.receiver,
 		loki.process.extract_leios_vote_logs.receiver,
+		loki.process.extract_call_trace_logs.receiver,
 	]
 }
 
@@ -169,7 +171,6 @@ loki.process "extract_leios_vote_logs" {
 
 		stage.json {
 			expressions = {
-				host    = "host",
 				rbHash  = "vote.rbHash",
 				voterId = "vote.voterId",
 			}
@@ -178,8 +179,8 @@ loki.process "extract_leios_vote_logs" {
 
 		stage.static_labels {
 			values = {
-				service = "leios_voting",
-				type    = "leios_voting",
+				service = "leios-voting",
+				type    = "leios-voting",
 			}
 		}
 
@@ -221,6 +222,112 @@ loki.process "extract_leios_vote_logs" {
 					prefix            = "leios_"
 					action            = "inc"
 					match_all         = true
+					max_idle_duration = "24h"
+				}
+			}
+		}
+	}
+
+	forward_to = [loki.write.loki.receiver]
+}
+
+loki.process "extract_call_trace_logs" {
+	stage.json {
+		expressions = {
+			kind = "kind",
+		}
+	}
+
+	stage.labels {
+		values = {
+			kind = "kind",
+		}
+	}
+
+	stage.match {
+		selector = `{kind="Call"}`
+
+		stage.json {
+			expressions = {
+				event      = "event",
+				argument   = "argument",
+				id         = "id",
+				local_id   = "local_id",
+				name       = "name",
+				name_stack = "name_stack",
+				thread     = "thread",
+			}
+			drop_malformed = true
+		}
+
+		stage.static_labels {
+			values = {
+				service = "call-trace",
+				type    = "call-trace",
+			}
+		}
+
+		stage.labels {
+			values = {
+				event      = "event",
+				name       = "name",
+				name_stack = "name_stack",
+				thread     = "thread",
+			}
+		}
+
+		stage.match {
+			selector = `{event="Start"}`
+
+			stage.metrics {
+				metric.counter {
+					name              = "started_total"
+					description       = "Total started calls"
+					prefix            = "call_"
+					action            = "inc"
+					match_all         = true
+					max_idle_duration = "24h"
+				}
+			}
+		}
+
+		stage.match {
+			selector = `{event="End"}`
+
+			stage.json {
+				expressions = {
+					duration    = "duration",
+					allocations = "allocations",
+					result      = "result",
+				}
+				drop_malformed = true
+			}
+
+			stage.metrics {
+				metric.counter {
+					name              = "ended_total"
+					description       = "Total ended calls"
+					prefix            = "call_"
+					action            = "inc"
+					match_all         = true
+					max_idle_duration = "24h"
+				}
+
+				metric.counter {
+					name              = "duration_total"
+					description       = "Total call duration"
+					prefix            = "call_"
+					action            = "add"
+					source            = "duration"
+					max_idle_duration = "24h"
+				}
+
+				metric.counter {
+					name              = "allocations_total"
+					description       = "Total call allocations"
+					prefix            = "call_"
+					action            = "add"
+					source            = "allocations"
 					max_idle_duration = "24h"
 				}
 			}

@@ -113,7 +113,7 @@
           },
           "direction": "backward",
           "editorMode": "builder",
-          "expr": "sum by(voterId) (count_over_time({service=\"leios_voting\", rbHash=~\"$rbHash\", voterId=~\"$voterId\"} | kind = `LeiosVoteAcquired` [5s]))",
+          "expr": "sum by(voterId) (count_over_time({service=\"leios-voting\", rbHash=~\"$rbHash\", voterId=~\"$voterId\"} | kind = `LeiosVoteAcquired` [5s]))",
           "legendFormat": "{{voterId}}",
           "queryType": "range",
           "refId": "A"
@@ -214,7 +214,7 @@
           },
           "direction": "backward",
           "editorMode": "builder",
-          "expr": "sum by(rbHash) (count_over_time({service=\"leios_voting\", rbHash=~\"$rbHash\", voterId=~\"$voterId\"} | kind = `LeiosVoteAcquired` [5s]))",
+          "expr": "sum by(rbHash) (count_over_time({service=\"leios-voting\", rbHash=~\"$rbHash\", voterId=~\"$voterId\"} | kind = `LeiosVoteAcquired` [5s]))",
           "legendFormat": "{{voterId}}",
           "queryType": "range",
           "refId": "A"
@@ -302,7 +302,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{type=\"leios_voting\", rbHash=~\"$rbHash\", voterId=~\"$voterId\"}",
+          "expr": "{type=\"leios-voting\", rbHash=~\"$rbHash\", voterId=~\"$voterId\"}",
           "queryType": "range",
           "refId": "A"
         }
@@ -404,7 +404,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Leios Voting",
+  "title": "Proto DevNet - Leios Voting",
   "uid": "gst2nk",
   "version": 1
 }
