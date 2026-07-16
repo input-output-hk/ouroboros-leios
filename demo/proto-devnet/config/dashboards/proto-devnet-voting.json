@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 7,
   "links": [],
   "panels": [
     {
@@ -94,7 +94,7 @@
           "calcs": [
             "last"
           ],
-          "displayMode": "list",
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
@@ -112,8 +112,8 @@
             "uid": "P8E80F9AEF21F6940"
           },
           "direction": "backward",
-          "editorMode": "builder",
-          "expr": "sum by(voterId) (count_over_time({service=\"leios-voting\", rbHash=~\"$rbHash\", voterId=~\"$voterId\"} | kind = `LeiosVoteAcquired` [5s]))",
+          "editorMode": "code",
+          "expr": "sum by(voterId) (count_over_time({service=\"leios-voting\", rbHash=~\"$rbHash\", voterId=~\"$voterId\", instance=~\"$instance\"} | kind = `LeiosVoteAcquired` [5s]))",
           "legendFormat": "{{voterId}}",
           "queryType": "range",
           "refId": "A"
@@ -195,7 +195,7 @@
           "calcs": [
             "last"
           ],
-          "displayMode": "list",
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
@@ -359,15 +359,20 @@
             "$__all"
           ]
         },
-        "definition": "label_values(leios_votes_acquired_total,rbHash)",
+        "datasource": {
+          "type": "loki",
+          "uid": "P8E80F9AEF21F6940"
+        },
+        "definition": "",
         "includeAll": true,
         "multi": true,
         "name": "rbHash",
         "options": [],
         "query": {
-          "qryType": 1,
-          "query": "label_values(leios_votes_acquired_total,rbHash)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+          "label": "rbHash",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "{service=\"leios-voting\"}",
+          "type": 1
         },
         "refresh": 1,
         "regex": "",
@@ -382,15 +387,48 @@
             "$__all"
           ]
         },
-        "definition": "label_values(leios_votes_acquired_total,voterId)",
+        "datasource": {
+          "type": "loki",
+          "uid": "P8E80F9AEF21F6940"
+        },
+        "definition": "",
         "includeAll": true,
         "multi": true,
         "name": "voterId",
         "options": [],
         "query": {
-          "qryType": 1,
-          "query": "label_values(leios_votes_acquired_total,voterId)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+          "label": "voterId",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "{service=\"leios-voting\"}",
+          "type": 1
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "P8E80F9AEF21F6940"
+        },
+        "definition": "",
+        "includeAll": true,
+        "multi": true,
+        "name": "instance",
+        "options": [],
+        "query": {
+          "label": "instance",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "{service=\"leios-voting\"}",
+          "type": 1
         },
         "refresh": 1,
         "regex": "",
