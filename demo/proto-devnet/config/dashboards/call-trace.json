@@ -346,7 +346,7 @@
           "custom": {
             "align": "auto",
             "cellOptions": {
-              "type": "auto"
+              "type": "color-text"
             },
             "filterable": true,
             "footer": {
@@ -696,5 +696,5 @@
   "timezone": "browser",
   "title": "Call Trace",
   "uid": "calltrace",
-  "version": 1
+  "version": 4
 }
