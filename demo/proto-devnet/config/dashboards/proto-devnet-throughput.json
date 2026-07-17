@@ -12,13 +12,47 @@
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
+      },
+      {
+        "datasource": {
+          "type": "loki",
+          "uid": "P8E80F9AEF21F6940"
+        },
+        "enable": true,
+        "expr": "{service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockCertified\"}",
+        "hide": false,
+        "iconColor": "green",
+        "name": "Show Leios certifications",
+        "queryType": "range",
+        "target": {
+          "expr": "",
+          "interval": "",
+          "refId": "Anno"
+        }
+      },
+      {
+        "datasource": {
+          "type": "loki",
+          "uid": "P8E80F9AEF21F6940"
+        },
+        "enable": true,
+        "expr": "{service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockAnnounced\"}",
+        "hide": false,
+        "iconColor": "yellow",
+        "name": "Show Leios announcements",
+        "queryType": "range",
+        "target": {
+          "expr": "",
+          "interval": "",
+          "refId": "Anno"
+        }
       }
     ]
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 5,
+  "id": 6,
   "links": [],
   "panels": [
     {
@@ -29,7 +63,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "palette-classic-by-name"
           },
           "custom": {
             "axisBorderShow": false,
@@ -93,7 +127,7 @@
               },
               {
                 "id": "unit",
-                "value": "TxkB/s"
+                "value": "Bps"
               }
             ]
           },
@@ -105,7 +139,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "deckbytes"
+                "value": "decbytes"
               }
             ]
           }
@@ -120,14 +154,16 @@
       "id": 1,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
+          "calcs": [
+            "max"
+          ],
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
@@ -138,8 +174,8 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "editorMode": "code",
-          "expr": "cardano_node_metrics_mempoolBytes_int / 1000",
+          "editorMode": "builder",
+          "expr": "cardano_node_metrics_mempoolBytes_int{process=~\"$instance\"}",
           "legendFormat": "{{process}} mempool",
           "range": true,
           "refId": "Mempool bytes"
@@ -151,7 +187,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "rate({service=\"tx-centrifuge\", ns=\"TxCentrifuge.Builder.NewTx\"}[30s]) * 204 / 1000",
+          "expr": "rate({service=\"tx-centrifuge\", ns=\"TxCentrifuge.Builder.NewTx\"}[30s]) * 204",
           "hide": false,
           "instant": false,
           "legendFormat": "Load (assumed 204B per tx)",
@@ -171,7 +207,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "continuous-GrYlRd"
           },
           "custom": {
             "axisBorderShow": false,
@@ -230,14 +266,17 @@
       "id": 2,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "max",
+            "mean"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
@@ -267,7 +306,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "palette-classic-by-name"
           },
           "custom": {
             "axisBorderShow": false,
@@ -317,7 +356,7 @@
               }
             ]
           },
-          "unit": "kBs"
+          "unit": "Bps"
         },
         "overrides": []
       },
@@ -330,14 +369,16 @@
       "id": 3,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
+          "calcs": [
+            "max"
+          ],
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
@@ -348,9 +389,9 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "editorMode": "code",
-          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"cardano_node_metrics\"}[300s]) / 1000",
-          "legendFormat": "{{alias}} txkB/s",
+          "editorMode": "builder",
+          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"cardano_node_metrics\", process=~\"$instance\"}[300s])",
+          "legendFormat": "{{process}}",
           "range": true,
           "refId": "A"
         }
@@ -366,7 +407,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "palette-classic-by-name"
           },
           "custom": {
             "axisBorderShow": false,
@@ -425,14 +466,19 @@
       "id": 4,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
+          "calcs": [
+            "min",
+            "max",
+            "mean",
+            "median"
+          ],
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
@@ -444,8 +490,8 @@
             "uid": "P8E80F9AEF21F6940"
           },
           "direction": "backward",
-          "editorMode": "code",
-          "expr": "last_over_time({service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockAnnounced\"} | label_format ts=`{{ __timestamp__.UnixMilli }}` | unwrap ts [1h])",
+          "editorMode": "builder",
+          "expr": "last_over_time({service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockAnnounced\", process=~\"$instance\"} | label_format ts=`{{ __timestamp__.UnixMilli }}` | unwrap ts [1h])",
           "hide": false,
           "instant": false,
           "legendFormat": "announced_ts",
@@ -459,8 +505,8 @@
             "uid": "P8E80F9AEF21F6940"
           },
           "direction": "backward",
-          "editorMode": "code",
-          "expr": "last_over_time({service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockCertified\"} | label_format ts=`{{ __timestamp__.UnixMilli }}` | unwrap ts [1h])",
+          "editorMode": "builder",
+          "expr": "last_over_time({service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockCertified\", process=~\"$instance\"} | label_format ts=`{{ __timestamp__.UnixMilli }}` | unwrap ts [1h])",
           "hide": false,
           "instant": false,
           "legendFormat": "certified_ts",
@@ -469,7 +515,7 @@
           "refId": "B"
         }
       ],
-      "title": "Time since last Leios EB event",
+      "title": "Time since last Leios certification or announcement",
       "transformations": [
         {
           "id": "calculateField",
@@ -518,7 +564,36 @@
   "schemaVersion": 42,
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "P8E80F9AEF21F6940"
+        },
+        "definition": "",
+        "includeAll": true,
+        "multi": true,
+        "name": "instance",
+        "options": [],
+        "query": {
+          "label": "instance",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "{service=\"cardano-node\"}",
+          "type": 1
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      }
+    ]
   },
   "time": {
     "from": "now-5m",
@@ -528,5 +603,5 @@
   "timezone": "browser",
   "title": "Proto DevNet - Throughput",
   "uid": "gg7w7r",
-  "version": 3
+  "version": 1
 }
