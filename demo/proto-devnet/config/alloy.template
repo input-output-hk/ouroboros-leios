@@ -68,10 +68,10 @@ loki.process "extract_process_compose_logs" {
 
 	stage.labels {
 		values = {
-			level   = "level",
-			process = "process",
-			replica = "replica",
-      instance = "process",
+			level    = "level",
+			process  = "process",
+			replica  = "replica",
+			instance = "process",
 		}
 	}
 
@@ -249,13 +249,14 @@ loki.process "extract_call_trace_logs" {
 
 		stage.json {
 			expressions = {
-				event      = "event",
-				argument   = "argument",
-				id         = "id",
-				local_id   = "local_id",
-				name       = "name",
-				name_stack = "name_stack",
-				thread     = "thread",
+				event     = "event",
+				argument  = "argument",
+				id        = "id",
+				child_id  = "child_id",
+				parent_id = "child_id",
+				name      = "name",
+				stack     = "stack",
+				thread    = "thread",
 			}
 			drop_malformed = true
 		}
@@ -269,10 +270,10 @@ loki.process "extract_call_trace_logs" {
 
 		stage.labels {
 			values = {
-				event      = "event",
-				name       = "name",
-				name_stack = "name_stack",
-				thread     = "thread",
+				event  = "event",
+				name   = "name",
+				stack  = "stack",
+				thread = "thread",
 			}
 		}
 

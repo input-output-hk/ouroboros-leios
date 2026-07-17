@@ -115,7 +115,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "(\n  sum by(thread, name) (\n    count_over_time({service=\"call-trace\", event=\"Start\", instance=~\"$instance\", name=~\"$name\"} [5m])\n  ) \n  - \n  sum by(thread, name) (\n    count_over_time({service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} [5m])\n  )\n) or sum by(thread, name) (\n  count_over_time({service=\"call-trace\", event=\"Start\", instance=~\"$instance\", name=~\"$name\"} [5m]) * 0\n)",
+          "expr": "(\n  sum by(thread, stack) (\n    count_over_time({service=\"call-trace\", event=\"Start\", instance=~\"$instance\", name=~\"$name\"} [5m])\n  ) \n  - \n  sum by(thread, stack) (\n    count_over_time({service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} [5m])\n  )\n) or sum by(thread, stack) (\n  count_over_time({service=\"call-trace\", event=\"Start\", instance=~\"$instance\", name=~\"$name\"} [5m]) * 0\n)",
           "hide": false,
           "legendFormat": "[{{thread}}] $ {{name}}",
           "queryType": "range",
@@ -220,7 +220,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "max by(thread, name) (\n  max_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap allocations [5m]\n  )\n)",
+          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap allocations [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{name}}",
           "queryType": "range",
           "refId": "A"
@@ -324,7 +324,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "max by(thread, name) (\n  max_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap duration [5m]\n  )\n)",
+          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap duration [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{name}}",
           "queryType": "range",
           "refId": "A"
@@ -489,23 +489,24 @@
             },
             "includeByName": {},
             "indexByName": {
-              "Line": 12,
+              "Line": 13,
               "Time": 1,
-              "allocations": 9,
+              "allocations": 8,
               "argument": 5,
-              "duration": 8,
+              "child_id": 10,
+              "duration": 7,
               "event": 2,
-              "id": 16,
-              "id 2": 10,
-              "kind": 15,
-              "labelTypes": 14,
+              "id 1": 17,
+              "id 2": 12,
+              "kind": 16,
+              "labelTypes": 15,
               "labels": 0,
-              "local_id": 11,
               "name": 4,
-              "name_stack": 6,
-              "result": 7,
+              "parent_id": 11,
+              "result": 6,
+              "stack": 9,
               "thread": 3,
-              "tsNs": 13
+              "tsNs": 14
             },
             "renameByName": {
               "Time": "",
@@ -556,7 +557,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n  | json\n  | regexp `(?P<parent_prefix>.*)\\.([0-9]+)$`\n  # Span fields\n  | label_format spanID=`{{ .id }}`\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .thread }}`\n  | label_format host=`{{ .process }}`\n  | label_format traceID=`{{ .local_id }}`\n  | label_format parentSpanID=`{{ .parent_prefix }}`\n  # Extra fields TODO: Figure out how to add this to span attributes\n  #| label_format allocations=`{{ .allocations }}`\n  #| label_format argument=`{{ .argument }}`\n  #| label_format result=`{{ .result }}`\n    \n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName, host",
+          "expr": "{service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n  | json\n    # Span fields\n  | label_format spanID=`{{ .id }}`\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .thread }}`\n  | label_format host=`{{ .process }}`\n  | label_format traceID=`{{ .child_id }}`\n  | label_format parentSpanID=`{{ .parent_id }}`\n  # Extra fields TODO: Figure out how to add this to span attributes\n  #| label_format allocations=`{{ .allocations }}`\n  #| label_format argument=`{{ .argument }}`\n  #| label_format result=`{{ .result }}`\n    \n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName, host",
           "queryType": "range",
           "refId": "A"
         }
@@ -696,5 +697,5 @@
   "timezone": "browser",
   "title": "Call Trace",
   "uid": "calltrace",
-  "version": 4
+  "version": 1
 }
