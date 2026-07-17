@@ -139,7 +139,6 @@ loki.process "extract_leios_vote_logs" {
 
 		stage.json {
 			expressions = {
-				host    = "host",
 				rbHash  = "vote.rbHash",
 				voterId = "vote.voterId",
 			}
@@ -148,8 +147,8 @@ loki.process "extract_leios_vote_logs" {
 
 		stage.static_labels {
 			values = {
-				service = "leios_voting",
-				type    = "leios_voting",
+				service = "leios-voting",
+				type    = "leios-voting",
 			}
 		}
 
