@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 6,
   "links": [],
   "panels": [
     {
@@ -557,7 +557,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n  | json\n    # Span fields\n  | label_format spanID=`{{ .id }}`\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .thread }}`\n  | label_format host=`{{ .process }}`\n  | label_format traceID=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  | label_format parentSpanID=`{{ .parent_id }}`\n  # Extra fields TODO: Figure out how to add this to span attributes, this breaks everything\n  # | label_format tags=`allocations=\"{{ .allocations }}\", argument=\"{{ .argument }}\", result=\"{{ .result }}\"`\n    \n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName, host",
+          "expr": "{service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n  | json\n    # Span fields\n  | label_format spanID=`{{ .id }}`\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .thread }}@{{ .instance }}`\n  | label_format host=`{{ .process }}`\n  | label_format traceID=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  | label_format parentSpanID=`{{ .parent_id }}`\n  # Extra fields TODO: Figure out how to add this to span attributes, this breaks everything\n  # | label_format tags=`allocations=\"{{ .allocations }}\", argument=\"{{ .argument }}\", result=\"{{ .result }}\"`\n    \n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName, host",
           "queryType": "range",
           "refId": "A"
         }
@@ -697,5 +697,5 @@
   "timezone": "browser",
   "title": "Call Trace",
   "uid": "calltrace",
-  "version": 2
+  "version": 1
 }
