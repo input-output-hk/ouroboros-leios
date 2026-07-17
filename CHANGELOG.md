@@ -5,6 +5,17 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w29 - 2026-07-17
+
+Increasing throughput by increasing certification rate and adds CallTrace instrumentation
+
+- Solves [Protoype: Pre-apply Certified EB to the Mempool (Certify & Announce) #838](https://github.com/input-output-hk/ouroboros-leios/issues/838)
+  - It's expected to see a greater throughput due to increased announce-certify rate.
+- Solves [Instrument Forge and Mempool using CallTrace #971](https://github.com/input-output-hk/ouroboros-leios/issues/971)
+  - It's possible to observe time and space costs in Forge to a great detail
+- Fixes the giant state logging (tens of MBs) in the FetchLogic by capping the printout
+  - The observability stack (Loki) was breaking due to limit breaches
+
 ## prototype-2026w28 - 2026-07-10
 
 Fixes "no such table: ebs" and block re-application and un-certified eb application
