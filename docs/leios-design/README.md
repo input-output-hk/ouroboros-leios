@@ -52,11 +52,11 @@ The Linear Leios protocol operates by allowing a second, bigger type of block to
 
 ## Cardano node as a real-time system
 
-The implementation of Leios must be understood in the context of the Cardano node as a concurrent, reactive system operating under real-time constraints in an adversarial environment. While "real-time" in this context does not refer to the millisecond-level hard deadlines found in industrial control systems, timely action at the scale of seconds nontheless remains crucial to protocol success and network security. 
+The implementation of Leios must be understood in the context of the Cardano node as a concurrent, reactive system operating under real-time constraints in an adversarial environment. While "real-time" in this context does not refer to the millisecond-level hard deadlines found in industrial control systems, timely action at the scale of seconds nontheless remains crucial to protocol success and network security.
 
 The currently deployed Praos implementation establishes clear [data diffusion targets](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf#subsection.5.1): blocks must reach 95% of nodes within the 5-second $\Delta$ parameter, with target performance at 98% and stretch goals at 99%. While these are comfortably achieved most of the time, blocks are regularly adopted within 1 second across the network, there are some situations even in the current system where the target is not reached. For example, due to reward calculations happening at the epoch boundary.
 
-Despite being hard deadlines, these targets reflect the reality that network vulnerability increases when not being met. The protocol's safety and liveness guarantees depend on honest nodes being able to propagate blocks rapidly enough to prevent adversarial forks from gaining traction. Failure to meet these timing constraints can lead to increased rates of short forks, reduced chain quality, and - if persistent - ultimately compromise the integrity of the ledger. 
+Despite being hard deadlines, these targets reflect the reality that network vulnerability increases when not being met. The protocol's safety and liveness guarantees depend on honest nodes being able to propagate blocks rapidly enough to prevent adversarial forks from gaining traction. Failure to meet these timing constraints can lead to increased rates of short forks, reduced chain quality, and - if persistent - ultimately compromise the integrity of the ledger.
 
 ## Concurrency and resource management
 
@@ -64,7 +64,7 @@ The current primary responsibilities of a Cardano node are roughly:
 
 - Block diffusion: receiving chains from upstream, validate and select the best chain, and transmit chains downstream.
 - Transaction submission: receiving, validating, and transmitting transactions to be included in blocks.
-- Block production: creating new blocks and extending current chain when selected as slot leader. 
+- Block production: creating new blocks and extending current chain when selected as slot leader.
 
 Despite this apparent simplicity, this already results in a highly concurrent system once cardinalities of upstream and downstream network peers are considered. A `cardano-node` with the default configuration maintains 20 upstream hot peers, 10 upstream warm peers and can have up to a few hundred downstream connections, each of which may be simultaneously requesting or serving data. All of these operations share critical resources, including memory, CPU, and network bandwidth, requiring careful resource management to ensure timing requirements are met even under load.
 
@@ -76,7 +76,7 @@ Concretely, in the current system there are (including protocols for supporting 
 Leios significantly expands this concurrency model by introducing new responsibilities:
 
 - Endorser block and closure diffusion: receiving, validating, and transmitting EBs and their transaction closures.
-- Voting and vote diffusion: receiving, validating, and transmitting own and foreign votes on EBs. 
+- Voting and vote diffusion: receiving, validating, and transmitting own and foreign votes on EBs.
 
 Given the [proposed Leios mini-protocols](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#leios-mini-protocols), this would result in:
 
@@ -385,7 +385,7 @@ The [prototyping and adversarial testing](#prototyping-and-adversarial-testing) 
 >         Cert codecs/CDDL
 >       Cert validation
 >       Voting key registration/rotation via tx certs<br>- akin to Peras
->       Commitee selection 
+>       Commitee selection
 >       Registered keys / selected committee queries
 >       New protocol parameters
 >     ((Consensus))
@@ -511,7 +511,7 @@ The node must include new mini-protocols (**NEW-LeiosMiniProtocols**) to diffuse
 ## Consensus
 
 CIP-0164 implies functional requirements for the node to issue EBs alongside RBs, vote for EBs according to the rules from the CIP, include certificates when enough votes are seen, diffuse EBs and votes through the network layer, and retain EB closures indefinitely when certified. The Consensus layer is responsible for driving these operations and coordinating with the Network layer (which implements the actual mini-protocols) to ensure proper diffusion.
-    
+
 ### High-throughput mempool
 
 > [!WARNING]
@@ -523,6 +523,126 @@ CIP-0164 implies functional requirements for the node to issue EBs alongside RBs
 > TODO: More advanced DAG-style mempool model?
 
 - **RSK-LeiosMempoolOverheadLatency**: Same as RSK-LeiosLedgerOverheadLatency, but for the Mempool frequently revalidating 15000% load in a caught-up node during congestion (ie 30000% the capacity of a Praos block, since the Leios Mempool capacity is now two EBs instead of two Praos blocks).
+
+### Mempool
+
+Mempool is a component in `cardano-node` that "stages" transactions submitted by users of the network that haven't yet been "committed" on-chain (i.e. haven't been included in a forged Block).
+
+Functionally, the Mempool aims to achieve three primary goals:
+
+1. **Accept** new transactions into the network from "local clients" (e.g. user wallets via LocalClient),
+2. **Diffuse** (propagate) "good" transactions across the network (e.g. peers via TxSubmission),
+3. **Pre-compute** transaction validation and application (state change) (e.g. timely inclusion in a block during block production).
+
+The reality, however, is that as of today, goals 2 and 3 aren't fully being met. While we could get away with these inefficiencies under Ouroboros Praos traffic loads, they become a massive bottleneck for the throughput targets under Ouroboros Leios.
+
+To explain the challenges and opportunities, it's useful to view the Mempool as both:
+
+1. **Concurrent state** that can be affected through **adding and removing transactions**, **rebasing to some ledger state** and **ticking time**. These actions can occur simultaneously and the existing behaviour is roughly just serializing these actions via a wait lock (mutex). Mempool's capacity is drastically increased under Leios and as a result rebasing now takes much longer which in conjunction with high transaction load increases wait times significantly.
+
+2. **Task scheduler** that is managing transaction **validation** and their **application** to one or more ledger states. This distinction is crucial in the Mempool and leveraged in the existing implementation, arguably not to its fullest potential.  **Transaction validation** (through `applyTx`) has to **only ever be performed once, can be cached and performed independently from state** (with some caveats), which is great because that is the most expensive part. **Transaction application** (through `reapplyTx`) however is inherently sequential (also with some caveats) and has to be performed on each (base) state changes.
+
+#### Transaction processing modes
+
+The distinction between the two modes, **validation** and **application**, can be loosely depicted using jigsaw puzzles. Validating a puzzle piece means checking its features are aligned with the overall puzzle (brand, color, shape, thickness, material), applying a puzzle piece means finding whether it fits somewhere in the currently assembled state.
+
+Bringing it back to transactions...
+
+Validating a transactions means checking signatures, scripts, limits, values etc. Applying a transaction however, means checking whether the state it builds upon to produce new state exists (utxos, stake pool, reward accounts, proposals, **time** etc).
+
+To hammer this down it's useful to say that a transaction can be **valid** and **applicable**. If a transaction is "valid" it can (but doesn't have to) be "applicable". On the other hand, if a transaction is "applicable" then it can (but doesn't have to) be "valid". We usually want both, but it's useful to know how they relate as it will help us define what we want to diffuse (valid? valid and applicable?) and how to organize tasks in the Mempool for optimal performance.
+
+Q: What about UTxOs during validation, don't you need to first fetch them from storage, isn't that necessarily state dependent? What if you have dependent transactions? Doesn't that dissolve the distinction with "application" and makes "validation" inherently sequential?
+A: Yes and no!
+
+  - Yes, in that UTxOs form part of the state in Cardano and need to be **resolved** before we can even start validating transactions either by querying storage or preceding transaction outputs. In other words, transactions in Cardano are **incomplete** and need a separate **resolution** step before validation that makes them **complete**.
+
+  - No, in that if a transaction validates it's valid **forever** (actually for an era), even though state it refers to might have been changed and made it **inapplicable** to some particular state. How one **resolves** transactions and makes them **complete** can be sequential, but doesn't have to.
+
+To further reinforce this argument, imagine an alternate universe in which Cardano transactions are shared in the network in a **complete** form, for example, UTxOs are content-addressed (hashed) and included in the witness part of transactions. It's clear here that **validation** is then entirely state independent.
+
+In todays' world still we can demonstrate the same, given a sequence of transactions one can perform a resolution pass on this sequence and from that point on work with complete transactions (albeit not performance ideal).
+
+#### Mempool model
+
+Explicit, well defined properties enable us to understand the bounds of a system's behavior. Cardano Mempool is fairly under-specified and because of that it's challenging to make implementation claims that improve performance without impacting correctness. What is expected of the Mempool's behavior, from the perspective of both transaction diffusion and block forging, is left implicit and up to implementor's choice.
+
+Let's attempt such a model that can make it simple to pose useful questions against the current and future implementations.
+
+```haskell
+type LedgerState = RbHash -- Ledger state is uniquely identified by the Praos (ranking) block hash
+
+data MempoolAction = AddTx Tx -- peers and local clients (1000 per s)
+  | Rebase LedgerState -- chain selection (several per 20s)
+  | Tick SlotNo -- time passing (1 per s)
+
+-- Mempool state holds the `base` ledger state,
+-- the `txs` that were resolved, validated and
+-- applied to `base` ledger state AND `slot`.
+data MempoolState = MempoolState {
+  slot :: SlotNo,
+  base :: LedgerState,
+  txs : [Tx],
+}
+```
+
+The main questions we need to answer:
+
+1. How do we decide which transactions to accept and diffuse?
+2. How do we decide which transactions are eligible to be included in the new block?
+
+##### Mempool `slot`and `Tick`
+
+`slot` is a state variable that changes on `Tick` action and can affect both transaction "validity" and "applicability".
+
+(In Cardano, time is denoted with slots, and is handled separate to `LedgerState`, not strictly necessary but it's worth mirroring that implementation choice.)
+
+It can affect **validity** because slots passing through epoch boundaries can change protocol parameters and the "ledger law". Since validity is essentially "ledger law" judgement on transactions, a transaction that was valid in one epoch is not necessarily valid in another. In other words, validity is defined per "ledger era". For example, script limits could change between eras.
+
+(Q: Is it the case that if a Cardano transaction is valid in era N it's valid in all future M > N eras? Given the transaction "forward translation" feature? If so, we don't have to re-validate transactions when crossing epochs/eras?)
+
+It can also affect **applicability** because the slot can be outside of transaction interval. Another way applicability can change is, again, when passing through epoch boundaries as certain actions are put in effect late (pool registration etc.) and some state variables are created or deleted (stake pools). For example, a transaction with "always" interval that retires a pool A can be applicable in one epoch but not another.
+
+(In the current terminology it would make sense to say transaction applicability interval, rather than validity interval)
+
+That being said, time also affects the ledger state itself, as some state variables are "internal" to it and defined in terms of time, and not observable by transactions (for example incremental rewards accounting). In Cardano, such effects are accumulated incrementally and "published" on epoch boundaries.
+
+(TODO: Include Alexey's epoch tick measurement data)
+
+In summary, the ticking pseudocode:
+
+1. on `Tick newSlot` (newSlot > slot)
+  1. update `slot` to `newSlot`
+  2. tick `base` to `newSlot`
+    1. update internal state variables
+    2. if `newSlot` in new epoch
+      1. update state variables observable to txs
+  3. if `newSlot` in new epoch
+    1. if `newSlot` in new era
+      2. re-validate `txs`
+  4. re-apply `txs`
+
+Why do we care about ticking in the Mempool? Well, that's the same as answering our two main questions wrt time...
+
+1. How do we decide which transactions to accept and diffuse?
+  - Transactions that are valid and applicable to `slot` are accepted and diffused.
+2. How do we decide which transactions are eligible to be included in the new block?
+  - Transactions that are valid and applicable to `slot` which matches the election winning slot can be included verbatim in the new block.
+
+Scenario: Bob is sending a transaction X to Alice, but they don't know what `slot` the others' Mempool has.
+
+How will Alice determine to accept or reject the transaction X (and potentially punish Bob)?
+There's no guarantee both Mempool `slot`s match!
+Perhaps in Bob's Mempool transaction X is valid and applicable, just with different `slot`.
+And there is no protocol currently with which they can share that information with.
+
+Since Bob and Alice are currently just guessing, they can't determine whether some behavior is adversarial.
+
+Even if we did have such a protocol, are we going to do this dance every second?
+
+So how do we treat time in the current Mempool implementation? On what slot are transactions validated and applied? Is it correct and safe against adversarial behavior?
+
+
 
 ### Block production
 
@@ -558,7 +678,7 @@ The first version of the Mempool can be naive, with the block production thread 
 > FIXME: what kind of validation while diffusing (only size and hash checks)
 >
 > TODO: write about "which EB to prioritize" -> freshest first (protocol burst) vs. oldest (protocol storm) etc.
-> TODO: write about "which peer to fetch from" -> everything from one big ledger peer, round robin from all peers? 
+> TODO: write about "which peer to fetch from" -> everything from one big ledger peer, round robin from all peers?
 >
 > FIXME: at least put a naiive design (fetch freshest from everyone that offers) - safe but wasteful
 
@@ -597,7 +717,7 @@ This component therefore stores EBs on disk just as the ChainDB already does for
 >  - having an immutable EBs table or database should bound access times on EBs
 >    and closures of the volatile part (which should be log n, thus bounding n
 >    is desirable)
-> TODO: interaction with mempool (here or above) 
+> TODO: interaction with mempool (here or above)
 
 The first version of LeiosEbStore can just be two bog standard key-value stores, one for immutable and one for volatile. A second version maybe instead integrates certified EBs into the existing ImmDB? That integration seems like a good fit. It has other benefits (eg saves a disk roundtrip and exhibits linear disk reads for driver prefetching/etc), but those seem unimportant so far.
 
@@ -905,11 +1025,11 @@ The suite will perform the following actions:
 > [!WARNING]
 >
 > FIXME: Integrate this with the implementation plan
-    
+
 ## Observability as a first-class citizen
 
 By implementing evidence of code execution, a well-founded tracing system is the prime provider of observability for a system.
-This observability not only forms the base for monitoring and logging, but also performance and conformance testing.  
+This observability not only forms the base for monitoring and logging, but also performance and conformance testing.
 
 For principled Leios quality assurance, a formal specification of existing and additional Leios trace semantics is being created, and will need to be maintained. This specification is language- / implementation-independent, and
 should not be automatically generated by the Node's Haskell reference implementation. It needs to be an independent source of truth for system observables.
@@ -921,7 +1041,7 @@ Last not least, the existing simulations will be maintained and kept operational
 ## Testing during development
 
 Wheras simulations operate on models and are able to falsify hypotheses or assess probability of certain outcomes, evolving
-prototypes and implementations rely on evidence to that end. A dedicated environment suitable for both performance and conformance testing will be created; primarily as feedback for development, but also to provide transparency into the ongoing process.  
+prototypes and implementations rely on evidence to that end. A dedicated environment suitable for both performance and conformance testing will be created; primarily as feedback for development, but also to provide transparency into the ongoing process.
 
 This environment serves as a host for operating small testnets. It automates deployment and configuration, and is parametrizable as far as topology, and deployed binaries are concerned. This means it needs to abstract wrt. of configuring
 a specific prototype or implementation. This enables deploying adversarial nodes for the purpose of network conformance testing, as well as performance testing at system integration level. This environment also guarantees the
