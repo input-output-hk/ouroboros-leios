@@ -591,7 +591,7 @@ The main questions we need to answer:
 1. How do we decide which transactions to accept and diffuse?
 2. How do we decide which transactions are eligible to be included in the new block?
 
-##### Mempool `slot`and `Tick`
+##### `Tick`
 
 `slot` is a state variable that changes on `Tick` action and can affect both transaction "validity" and "applicability".
 
@@ -654,7 +654,7 @@ In practice, this interval would be ~20 slots long, arguably an acceptable trade
 Why would that work?
 Ticking changes state observable to transactions and therefore can affect their validity and applicability only **on epoch boundary**.
 In other words, all ticking in between epoch bounds is not observable to transactions and can't affect their validity and applicability.
-So, ticking that stays within the bounds of the current Mempool transaction interval costs very little!
+So, ticking that stays within the bounds of the current Mempool transaction interval costs very little! Not just that, we don't really have to tick, if we do, it's just to help the internal "ledger" accounting perform smaller incremental computations.
 
 Let's update the model!
 
@@ -663,7 +663,7 @@ Let's update the model!
 -- the `txs` that were resolved, validated and
 -- applicable to `base` ledger state AND `interval`.
 data MempoolState = MempoolState {
-  interval :: (SlotNo, SlotNo),
+  interval :: (SlotNo, SlotNo), -- technically can be derived from `base`
   base :: LedgerState,
   txs : [Tx]
 }
@@ -680,9 +680,61 @@ data MempoolState = MempoolState {
 And back to the main questions:
 
 1. How do we decide which transactions to accept and diffuse?
-  - Transactions that are valid and applicable in `interval` are accepted and diffused.
+  - Transactions that are valid and applicable to `interval` are accepted and diffused.
 2. How do we decide which transactions are eligible to be included in the new block?
   - Transactions that are valid and applicable to `interval` which contains the election winning slot can be included verbatim in the new block.
+
+##### `Rebase`
+
+`base` is a state variable that should reflect the currently selected ledger state. When a selection changes, Mempool needs to rebase `txs` on top of this new `base` (and `interval`).
+
+Since there can be many transaction in `txs` it can take a long time to re-apply this sequence.
+It's noteworthy to reiterate that we only need to **apply** and not **validate** `txs` as we established before that **validation** can be cached forever (or for-era) while **application** is state dependent.
+
+(TODO: Insert some data here)
+
+(The very fact that we treat them as a sequence is unfortunate, as especially in Cardano ledger there's many opportunities to schedule this work more intelligently by treating transactions as a DAG by utilizing transaction topology. However, that's currently a research and development question that requires a non-trivial amount of effort.)
+
+1. on `Rebase newState`
+  1. Update `base` to `newState`
+  2. Update `interval` to `(max (tipSlot newState) previousEpochSlot, min nextExpectedBlockSlot nextEpochSlot)`
+  3. re-apply `txs`
+
+Scenario: Bob is sending Alice 100 txs per second, and Alice is going through a rebase, what happens?
+
+In the current implementation, we're utilizing a wait-lock, during a rebase all access to the Mempool is blocked until the rebase is done.
+If a rebase takes 1 second, Bob will queue up 100 transactions waiting on the rebase to finish, and in that time Bob's transactions aren't diffused.
+In a naive, lock-free solution, Bob might be able to add transactions to Alice's Mempool while the rebase is ongoing and diffusion would continue,
+but when the rebase is done and its work needs to be committed, we're faced with a similar problem:
+there's 100 transactions more in the Mempool than when the rebase started. What do we do with them? Drop them? Or re-apply them too?
+If we re-apply them, do we do that in some priority way? Perhaps with a lock?
+
+Sounds like this is an improvement! We're not waiting on a longer rebase but instead waiting on a shorter "merge" that reconciliates
+conflicts due to Mempool effects occurring concurrently (namely re-applying 100 surplus transactions).
+
+```haskell
+
+mergeMempoolState :: MempoolState -> MempoolState -> MempoolState
+mergeMempoolState lm rm  = -- in the case of miss matching `base`, 'select' the one with the "better" base and
+                           -- if there's any surplus transactions in "worse" mempool apply them in "better".
+                           ...
+```
+
+Let's take a step back at this point an go back to our main questions:
+
+1. How do we decide which transactions to accept and diffuse?
+  - Transactions that are valid and applicable to `base` are accepted and diffused.
+2. How do we decide which transactions are eligible to be included in the new block?
+  - Transactions that are valid and applicable to `base` can be included verbatim in the new block.
+
+Similar to the ticking scenario, since Bob and Alice don't know which `base` they see, they are guessing, and that can be abused by adversaries.
+
+##### `AddTx`
+
+`txs` is a state variable that holds a sequence of transactions received from either local clients or TxSubmission peers. Upon receival, every transaction first needs to be **resolved** against the in-memory cache or on-disk storage, **validated** and finally **applied** to `base` and `interval`.
+
+These 3 stages of transaction processing should be separately considered and measured to understand their processing bounds. What's the "worst" case scenario for resolution, is not the same as what it is for validation or application.
+
 
 ### Block production
 
