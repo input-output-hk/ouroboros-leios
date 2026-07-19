@@ -578,7 +578,7 @@ data MempoolAction = AddTx Tx -- peers and local clients (1000 per s)
 
 -- Mempool state holds the `base` ledger state,
 -- the `txs` that were resolved, validated and
--- applied to `base` ledger state AND `slot`.
+-- applicable to `base` ledger state AND `slot`.
 data MempoolState = MempoolState {
   slot :: SlotNo,
   base :: LedgerState,
@@ -607,21 +607,6 @@ It can also affect **applicability** because the slot can be outside of transact
 
 That being said, time also affects the ledger state itself, as some state variables are "internal" to it and defined in terms of time, and not observable by transactions (for example incremental rewards accounting). In Cardano, such effects are accumulated incrementally and "published" on epoch boundaries.
 
-(TODO: Include Alexey's epoch tick measurement data)
-
-In summary, the ticking pseudocode:
-
-1. on `Tick newSlot` (newSlot > slot)
-  1. update `slot` to `newSlot`
-  2. tick `base` to `newSlot`
-    1. update internal state variables
-    2. if `newSlot` in new epoch
-      1. update state variables observable to txs
-  3. if `newSlot` in new epoch
-    1. if `newSlot` in new era
-      2. re-validate `txs`
-  4. re-apply `txs`
-
 Why do we care about ticking in the Mempool? Well, that's the same as answering our two main questions wrt time...
 
 1. How do we decide which transactions to accept and diffuse?
@@ -632,17 +617,72 @@ Why do we care about ticking in the Mempool? Well, that's the same as answering 
 Scenario: Bob is sending a transaction X to Alice, but they don't know what `slot` the others' Mempool has.
 
 How will Alice determine to accept or reject the transaction X (and potentially punish Bob)?
-There's no guarantee both Mempool `slot`s match!
-Perhaps in Bob's Mempool transaction X is valid and applicable, just with different `slot`.
-And there is no protocol currently with which they can share that information with.
-
+After all, there's no guarantee both Mempool `slot`s match!
+Perhaps in Bob's Mempool transaction X is valid and applicable, just on a different `slot`.
+And there is no protocol currently with which they can share that information.
 Since Bob and Alice are currently just guessing, they can't determine whether some behavior is adversarial.
 
-Even if we did have such a protocol, are we going to do this dance every second?
+(TODO: Include Alexey's epoch tick measurement data)
 
-So how do we treat time in the current Mempool implementation? On what slot are transactions validated and applied? Is it correct and safe against adversarial behavior?
+Let's examine the ticking pseudocode:
 
+1. on `Tick newSlot` (newSlot > slot)
+  1. update `slot` to `newSlot`
+  2. tick `base` to `newSlot`
+    1. update internal state variables
+    2. if `newSlot` in new epoch
+      1. update state variables observable to `txs`
+  3. if `newSlot` in new epoch
+    1. if `newSlot` in new era
+      2. re-validate `txs`
+  4. re-apply `txs`
 
+Are we really going to do this every second?
+
+Step `1.2` can be fast, but on epoch boundary it's actually quite slow.
+Step `1.3.2` is always expensive, but re-validation only has to happen on new era.
+Step `1.4` can be made fast by using "smarter" scheduling techniques, but for now is also slow.
+
+Is there something better we can do?
+
+I propose the **Mempool transaction interval** that rejects transactions with interval that don't contain it.
+This intervals' left bound is the maximum between tip slot and last epoch boundary, and the right bound is minimum between "expected next block slot** and next epoch boundary.
+In practice, this interval would be ~20 slots long, arguably an acceptable tradeoff that gives correctness and performance but takes away transactions with an interval smaller than 20 slots.
+
+(TODO: Include Kosta's mainnet interval analysis)
+
+Why would that work?
+Ticking changes state observable to transactions and therefore can affect their validity and applicability only **on epoch boundary**.
+In other words, all ticking in between epoch bounds is not observable to transactions and can't affect their validity and applicability.
+So, ticking that stays within the bounds of the current Mempool transaction interval costs very little!
+
+Let's update the model!
+
+```haskell
+-- Mempool state holds the `base` ledger state,
+-- the `txs` that were resolved, validated and
+-- applicable to `base` ledger state AND `interval`.
+data MempoolState = MempoolState {
+  interval :: (SlotNo, SlotNo),
+  base :: LedgerState,
+  txs : [Tx]
+}
+```
+
+1. on `Tick newSlot`
+  1. if `newSlot` outside `interval` and in new epoch
+    1. tick `base` to `newSlot`
+    2. re-apply `txs` (re-validate if new era)
+  2. if `newSlot` outside `interval` and not in new epoch (TODO: We should have seen a new block by now and rebase?)
+  3. if `newSlot` inside `interval`
+    1. `tick` internal `base` state variables
+
+And back to the main questions:
+
+1. How do we decide which transactions to accept and diffuse?
+  - Transactions that are valid and applicable in `interval` are accepted and diffused.
+2. How do we decide which transactions are eligible to be included in the new block?
+  - Transactions that are valid and applicable to `interval` which contains the election winning slot can be included verbatim in the new block.
 
 ### Block production
 
