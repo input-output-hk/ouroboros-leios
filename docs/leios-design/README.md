@@ -735,6 +735,61 @@ Similar to the ticking scenario, since Bob and Alice don't know which `base` the
 
 These 3 stages of transaction processing should be separately considered and measured to understand their processing bounds. What's the "worst" case scenario for resolution, is not the same as what it is for validation or application.
 
+Let's talk about resolution first. If we have transactions that are topologically independent, we can perform resolution on them in parallel.
+However, reasoning about transaction dependencies and topologies is not currently in our tool box so we have to make do with the next best thing.
+We have to resolve transactions in sequence, in case transactions are dependent, the state they produce (UTxOs) might be needed by some following transactions.
+
+Therefore, given a sequence of transactions, we can do a resolution pass to make them complete.
+This sounds enticing, but what if those transactions turn out to be invalid? Or valid but inapplicable?
+
+One goal of the Mempool is to minimize work that an adversary can make it do "for free".
+
+Until a topology aware transaction scheduler comes about, we're seemingly stuck with processing every transaction in sequence: resolve, validate and apply.
+
+#### TODO: EB extended `base`
+
+#### Final model, concurrency and protocol changes
+
+Given the final proposed model
+
+```haskell
+type LedgerState = RbHash -- Ledger state is uniquely identified by the Praos (ranking) block hash
+
+data MempoolAction = AddTx Tx -- peers and local clients (1000 per s)
+  | Rebase LedgerState -- chain selection (several per 20s)
+  | Tick SlotNo -- time passing (1 per s)
+
+-- Mempool state holds the `base` ledger state,
+-- the `txs` that were resolved, validated and
+-- applicable to `base` ledger state AND `interval`.
+data MempoolState = MempoolState {
+  interval :: (SlotNo, SlotNo),
+  base :: LedgerState,
+  txs : [Tx]
+}
+```
+
+The concurrency problem statement is simple.
+Mempool actions happen in parallel and "propose" the new Mempool state value.
+Every such new state value races to be merged with the current one and commited as the new Mempool state which is observed by both diffusion and block production.
+All the concurrency questions, specifically performance botlenecks and correctness issues can be located in said `mergeMempoolState` function.
+
+(TODO: Write out the model procedure with mergeMempoolState)
+
+Two main questions:
+
+1. How do we decide which transactions to accept and diffuse?
+  - Transactions that are valid and applicable to `base` and `interval` are accepted and diffused.
+2. How do we decide which transactions are eligible to be included in the new block?
+  - Transactions that are valid and applicable to `base` and election slot is in `interval` can be included verbatim in the new block.
+
+However, the question of diffusion is under-specified. What ideally I would like to see to prevent adversarial behavior is to
+split TxSubmission in 2 new protocols:
+
+1. MempoolSync that syncs the `MempoolState` between peers,
+2. TxFetch that fetches transactions given some tx reference.
+
+This is key to detecting adversarial behavior.
 
 ### Block production
 
