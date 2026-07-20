@@ -553,16 +553,16 @@
         "utils": "utils"
       },
       "locked": {
-        "lastModified": 1784310443,
-        "narHash": "sha256-hr1EydBt3NVR0hctQaDF54IizzcanQ5Q/6oQaerAIuI=",
+        "lastModified": 1784580244,
+        "narHash": "sha256-ozbuT3CjCST79lVquUn0AAojs14XuGOKOAD4hg0AhDg=",
         "owner": "intersectmbo",
         "repo": "cardano-node",
-        "rev": "f7ec3592e75f0652100c7d05b8932a3a7e05e010",
+        "rev": "4482e0509a91a6d2c82473da9e39fb207e8e5855",
         "type": "github"
       },
       "original": {
         "owner": "intersectmbo",
-        "ref": "leios-prototype",
+        "ref": "nfrisby/ledger-issue-5937-quickfix",
         "repo": "cardano-node",
         "type": "github"
       }

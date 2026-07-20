@@ -35,7 +35,7 @@
     ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype";
     # Patched cardano-node — source of cardano-node and cardano-cli
     # across the repo.
-    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
+    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=nfrisby/ledger-issue-5937-quickfix";
     # tx-centrifuge only. TODO: track latest bench/leios once that
     # branch is rebased onto something with no cooldown.
     cardano-node-tx-centrifuge.url = "github:intersectmbo/cardano-node?rev=0ab6523057298eae80cb1aa1b23f4472480084be";
