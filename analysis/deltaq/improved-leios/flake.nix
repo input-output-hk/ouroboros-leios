@@ -80,6 +80,12 @@
           ((* block margins *))
           \geometry{verbose,tmargin=0.75in,bmargin=0.75in,lmargin=0.5in,rmargin=0.5in}
           \setcounter{secnumdepth}{-2}
+          % Markdown code fences (ASCII diagrams) are up to ~114 chars wide;
+          % at 11pt only ~94 monospace chars fit the line, so render verbatim
+          % blocks at \footnotesize (~114 chars).
+          \makeatletter
+          \def\verbatim@font{\normalfont\ttfamily\footnotesize}
+          \makeatother
           % H4/H5 headings (\paragraph/\subparagraph) are run-in by default;
           % give them a positive afterskip so body text starts on a new line.
           \makeatletter
@@ -93,6 +99,17 @@
             {\normalfont\normalsize\bfseries}}
           \makeatother
           ((* endblock margins *))
+
+          ((=- style_jupyter wraps stream output at charlim=80, which mangles
+              wide ASCII tables.  Emit the text unwrapped instead and shrink
+              the font to fit the widest line (11pt budgets: ~94 chars at
+              normal size, ~114 footnotesize, ~129 scriptsize, ~147 at 7pt). -=))
+          ((* block stream *))
+          ((*- set maxw = output.text.splitlines() | map('length') | max -*))
+          \begin{Verbatim}[commandchars=\\\{\}((*- if maxw > 128 -*)), fontsize=\fontsize{7}{8.5}\selectfont((*- elif maxw > 114 -*)), fontsize=\scriptsize((*- elif maxw > 90 -*)), fontsize=\footnotesize((*- endif -*))]
+          ((( output.text | escape_latex | strip_trailing_newline | ansi2latex )))
+          \end{Verbatim}
+          ((* endblock stream *))
           TEX
         '';
 
