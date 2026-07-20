@@ -63,7 +63,9 @@
         };
 
         # nbconvert template that overrides the default 1in margins of the
-        # built-in latex template (block `margins` in latex/base.tex.j2).
+        # built-in latex template (block `margins` in latex/base.tex.j2) and
+        # disables LaTeX's automatic section numbering (the notebook headings
+        # carry their own numbers).
         reportTemplate = pkgs.runCommand "nbconvert-report-template" { } ''
           mkdir -p $out/report
           cat > $out/report/conf.json <<'JSON'
@@ -77,6 +79,19 @@
 
           ((* block margins *))
           \geometry{verbose,tmargin=0.75in,bmargin=0.75in,lmargin=0.5in,rmargin=0.5in}
+          \setcounter{secnumdepth}{-2}
+          % H4/H5 headings (\paragraph/\subparagraph) are run-in by default;
+          % give them a positive afterskip so body text starts on a new line.
+          \makeatletter
+          \renewcommand\paragraph{\@startsection{paragraph}{4}{\z@}%
+            {3.25ex \@plus 1ex \@minus .2ex}%
+            {0.75ex \@plus .2ex}%
+            {\normalfont\normalsize\bfseries}}
+          \renewcommand\subparagraph{\@startsection{subparagraph}{5}{\z@}%
+            {3.25ex \@plus 1ex \@minus .2ex}%
+            {0.75ex \@plus .2ex}%
+            {\normalfont\normalsize\bfseries}}
+          \makeatother
           ((* endblock margins *))
           TEX
         '';
