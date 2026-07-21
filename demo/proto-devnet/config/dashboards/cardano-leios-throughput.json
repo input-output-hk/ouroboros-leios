@@ -175,7 +175,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "palette-classic-by-name"
           },
           "custom": {
             "axisBorderShow": false,
@@ -221,7 +221,8 @@
               }
             ]
           },
-          "unit": "TxkB/s"
+          "unit": "TxkB/s",
+          "min": -10
         },
         "overrides": []
       },
@@ -256,7 +257,7 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cardano_node_metrics_loki_txgen_bytes_total{environment=\"leios\"}[2m])) / 1000",
+          "expr": "sum(rate(cardano_node_metrics_loki_txgen_bytes_total{environment=\"leios\"}[${window}s])) / 1000",
           "legendFormat": "accepted (firehose, measured)",
           "refId": "A"
         },
@@ -266,14 +267,25 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cardano_node_metrics_loki_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[2m])) * 204 / 1000",
+          "expr": "sum(rate(cardano_node_metrics_loki_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[${window}s])) * 204 / 1000",
           "legendFormat": "accepted (centrifuge, est. 204 B/tx)",
           "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "editorMode": "code",
+          "expr": "deriv(cardano_node_metrics_mempoolBytes_int{job=\"integrations/cardano-node\", environment=\"leios\", instance=~\"$instance\"}[${window}s]) / 1000",
+          "legendFormat": "{{instance}} mempool throughput",
+          "range": true,
+          "refId": "C"
         }
       ],
-      "title": "Submitted throughput (kB/s)",
+      "title": "Submission vs. mempool (kB/s)",
       "type": "timeseries",
-      "description": "Accepted submission throughput. Firehose bytes are the measured on-wire size (txgen_bytes_total); tx-centrifuge has no on-wire size, so its bytes are ESTIMATED at 204 B/tx (submitted-rate x 204)."
+      "description": "Accepted submission throughput. Firehose bytes are the measured on-wire size (txgen_bytes_total); tx-centrifuge has no on-wire size, so its bytes are ESTIMATED at 204 B/tx (submitted-rate x 204). The mempool series is the derivative of mempoolBytes, so it goes negative whenever the mempool drains faster than it fills."
     },
     {
       "datasource": {
@@ -811,6 +823,57 @@
   "tags": [],
   "templating": {
     "list": [
+      {
+        "current": {
+          "text": "30s",
+          "value": "30"
+        },
+        "description": "Averaging window (seconds) for the submission rates and the mempool deriv",
+        "includeAll": false,
+        "label": "Rate window",
+        "multi": false,
+        "name": "window",
+        "options": [
+          {
+            "selected": false,
+            "text": "2s",
+            "value": "2"
+          },
+          {
+            "selected": false,
+            "text": "5s",
+            "value": "5"
+          },
+          {
+            "selected": false,
+            "text": "10s",
+            "value": "10"
+          },
+          {
+            "selected": true,
+            "text": "30s",
+            "value": "30"
+          },
+          {
+            "selected": false,
+            "text": "60s",
+            "value": "60"
+          },
+          {
+            "selected": false,
+            "text": "120s",
+            "value": "120"
+          },
+          {
+            "selected": false,
+            "text": "300s",
+            "value": "300"
+          }
+        ],
+        "query": "2s : 2, 5s : 5, 10s : 10, 30s : 30, 60s : 60, 120s : 120, 300s : 300",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
       {
         "current": {
           "text": [
