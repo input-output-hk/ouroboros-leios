@@ -40,6 +40,7 @@
             scheme-small
             adjustbox
             collectbox
+            dejavu
             enumitem
             environ
             etoolbox
@@ -47,6 +48,7 @@
             fontspec
             jknapltx
             lm-math
+            newunicodechar
             parskip
             pdfcol
             pgf
@@ -98,6 +100,35 @@
             {0.75ex \@plus .2ex}%
             {\normalfont\normalsize\bfseries}}
           \makeatother
+          % Latin Modern text/mono fonts lack ≤, ≈, Greek, sub/superscripts and
+          % box-drawing glyphs, so XeTeX drops them silently.  Map them: math
+          % symbol in prose, DejaVu Sans Mono in verbatim (scaled 0.872 so its
+          % 0.602em advance matches LM Mono's 0.525em and columns stay aligned).
+          \usepackage{newunicodechar}
+          \newfontfamily\ttfallback{DejaVuSansMono.ttf}[Scale=0.872]
+          \makeatletter
+          \newcommand*\symfallback[2]{%
+            \ifmmode #1\else
+              \ifdefstrequal{\f@family}{\ttdefault}%
+                {{\ttfallback\char"#2\relax}}%
+                {\ensuremath{#1}}%
+            \fi}
+          \makeatother
+          \newunicodechar{≤}{\symfallback{\leq}{2264}}
+          \newunicodechar{≥}{\symfallback{\geq}{2265}}
+          \newunicodechar{≈}{\symfallback{\approx}{2248}}
+          \newunicodechar{π}{\symfallback{\pi}{03C0}}
+          \newunicodechar{σ}{\symfallback{\sigma}{03C3}}
+          \newunicodechar{τ}{\symfallback{\tau}{03C4}}
+          \newunicodechar{⁶}{\symfallback{^{6}}{2076}}
+          \newunicodechar{₀}{\symfallback{_{0}}{2080}}
+          \newunicodechar{₁}{\symfallback{_{1}}{2081}}
+          \newunicodechar{₂}{\symfallback{_{2}}{2082}}
+          \newunicodechar{─}{{\ttfallback\char"2500\relax}}
+          \newunicodechar{│}{{\ttfallback\char"2502\relax}}
+          \newunicodechar{┌}{{\ttfallback\char"250C\relax}}
+          \newunicodechar{└}{{\ttfallback\char"2514\relax}}
+          \newunicodechar{┤}{{\ttfallback\char"2524\relax}}
           ((* endblock margins *))
 
           ((=- style_jupyter wraps stream output at charlim=80, which mangles
