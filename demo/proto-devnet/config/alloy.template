@@ -149,7 +149,7 @@ loki.process "leios_route" {
 	}
 
 	stage.match {
-		selector = `{process="TxFirehose"}`
+		selector = `{process=~"TxFirehose.*"}`
 		stage.static_labels {
 			values = {
 				service = "tx-firehose",
