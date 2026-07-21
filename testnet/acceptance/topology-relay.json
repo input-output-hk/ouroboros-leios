@@ -1,0 +1,12 @@
+{
+  "bootstrapPeers": [
+    { "address": "127.0.0.1", "port": 3010 }
+  ],
+  "localRoots": [
+    { "accessPoints": [], "advertise": false, "trustable": false, "valency": 1 }
+  ],
+  "publicRoots": [
+    { "accessPoints": [], "advertise": false }
+  ],
+  "useLedgerAfterSlot": -1
+}

@@ -38,6 +38,12 @@ cp -rf "$SOURCE_DIR/config/." "$WORKING_DIR/"
 # managed live by their own processes and racing with rotation produces
 # "No such file or directory" spam.
 find "$WORKING_DIR" -mindepth 1 -maxdepth 1 -type f -exec chmod u+w {} +
+# Optional topology override — the acceptance harness uses this to point
+# nodeA at the zw3rkpool relays and nodeB only at nodeA. Falls through to
+# the pinned config/topology.json when unset.
+if [ -n "${TOPOLOGY_SRC:-}" ]; then
+  cp -f "$TOPOLOGY_SRC" "$WORKING_DIR/topology.json"
+fi
 cd "$WORKING_DIR"
 
 mkdir -p db

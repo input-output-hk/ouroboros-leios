@@ -68,7 +68,7 @@
       "severity": "Info"
     },
     "ChainDB.AddBlockEvent.AddBlockValidation": {
-      "severity": "Silence"
+      "severity": "Debug"
     },
     "ChainDB.AddBlockEvent.AddBlockValidation.ValidCandidate": {
       "maxFrequency": 2.0
@@ -90,7 +90,25 @@
       "severity": "Silence"
     },
     "ChainSync.Client": {
-      "severity": "Warning"
+      "severity": "Info"
+    },
+    "ChainSync.Remote": {
+      "severity": "Info"
+    },
+    "BlockFetch.Client": {
+      "severity": "Info"
+    },
+    "BlockFetch.Remote": {
+      "severity": "Info"
+    },
+    "Consensus.CSJ": {
+      "severity": "Info"
+    },
+    "Consensus.GDD": {
+      "severity": "Info"
+    },
+    "Consensus.DevotedBlockFetch": {
+      "severity": "Info"
     },
     "Consensus.LeiosKernel": {
       "maxFrequency": 0,

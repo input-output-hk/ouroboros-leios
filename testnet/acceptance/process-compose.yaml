@@ -1,0 +1,83 @@
+version: "0.5"
+is_strict: true
+
+# Acceptance test for the ShelleyBlock wire-bytes memo hotfix. NodeA and
+# NodeB are each pre-seeded from a leios3-rel-c-1 snapshot, pruned below
+# the contentious block 67555, then re-sync from their upstream (NodeA
+# from the IOG Leios relay, NodeB from NodeA) past 67555 and beyond.
+#
+# PruneNodeA /    Each node's db must already be populated (extract a
+# PruneNodeB      leios3-rel-c-1 snapshot into $WORKING_DIR/nodeA/ and
+#                 $WORKING_DIR/nodeB/ before running the harness). This
+#                 step trims the highest immutable chunks until the
+#                 contentious block header hash is no longer present,
+#                 and wipes volatile — see prune-immutable.sh.
+# NodeA           Points at leios-node.play.dev.cardano.org:3001. With
+#                 the further-fixed cardano-node build, blocks served by
+#                 (re-encoding) haskell relays validate cleanly, so we
+#                 no longer need to route around them to zw3rkpool.
+# NodeB           Only upstream is NodeA on 127.0.0.1:3010.
+# AssertSync      Polls both nodes; exits 0 once NodeB has caught up to
+#                 NodeA at a block past 67555 — see assert-sync.sh.
+
+processes:
+  PruneNodeA:
+    command: bash "${ACCEPTANCE_DIR}/prune-immutable.sh"
+    environment:
+      - NODE_DIR=${WORKING_DIR}/nodeA
+    log_location: ${WORKING_DIR}/process-compose-prune-nodeA.log
+    availability:
+      restart: no
+
+  PruneNodeB:
+    command: bash "${ACCEPTANCE_DIR}/prune-immutable.sh"
+    environment:
+      - NODE_DIR=${WORKING_DIR}/nodeB
+    log_location: ${WORKING_DIR}/process-compose-prune-nodeB.log
+    availability:
+      restart: no
+
+  NodeA:
+    command: bash "${TESTNET_DIR}/run-node.sh"
+    environment:
+      # Pin SOURCE_DIR to the testnet dir so run-node.sh finds ../config/;
+      # the acceptance driver's ACCEPTANCE_DIR is a separate variable.
+      - SOURCE_DIR=${TESTNET_DIR}
+      - WORKING_DIR=${WORKING_DIR}/nodeA
+      - PORT=3010
+      - TOPOLOGY_SRC=${ACCEPTANCE_DIR}/topology-nodeA.json
+      - LOG_FILE=${WORKING_DIR}/nodeA/node.log
+    log_location: ${WORKING_DIR}/process-compose-nodeA.log
+    depends_on:
+      PruneNodeA:
+        condition: process_completed_successfully
+
+  NodeB:
+    command: bash "${TESTNET_DIR}/run-node.sh"
+    environment:
+      - SOURCE_DIR=${TESTNET_DIR}
+      - WORKING_DIR=${WORKING_DIR}/nodeB
+      - PORT=3011
+      - TOPOLOGY_SRC=${ACCEPTANCE_DIR}/topology-relay.json
+      - LOG_FILE=${WORKING_DIR}/nodeB/node.log
+    log_location: ${WORKING_DIR}/process-compose-nodeB.log
+    depends_on:
+      PruneNodeB:
+        condition: process_completed_successfully
+      NodeA:
+        condition: process_started
+
+  AssertSync:
+    command: bash "${ACCEPTANCE_DIR}/assert-sync.sh"
+    environment:
+      - SOCKET_A=${WORKING_DIR}/nodeA/node.socket
+      - SOCKET_B=${WORKING_DIR}/nodeB/node.socket
+      - NETWORK_MAGIC=164
+    availability:
+      exit_on_end: true
+      exit_on_skipped: true
+    depends_on:
+      NodeA:
+        condition: process_started
+      NodeB:
+        condition: process_started
