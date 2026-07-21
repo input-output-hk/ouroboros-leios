@@ -15,6 +15,8 @@ set -a
 : "${METRICS_PORT_NODE1:=12901}"
 : "${METRICS_PORT_NODE2:=12902}"
 : "${METRICS_PORT_NODE3:=12903}"
+# Base firehose submission rate (TxFirehose1); override with e.g. TPS=1000
+: "${TPS:=100}"
 # Traffic control (on by default, disable with TC=0)
 : "${TC:=1}"
 if [ "$TC" = "1" ]; then
