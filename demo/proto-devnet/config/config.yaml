@@ -17,7 +17,10 @@ LastKnownBlockVersion-Minor: 1
 ConsensusMode: GenesisMode
 RequiresNetworkMagic: RequiresMagic
 LedgerDB:
-  Backend: V2InMemory
+  # On-disk UTxO-HD backend (LSM-tree backing store) so UTxO reads/writes hit
+  # disk — makes ledger access demanding, as wanted for mempool throughput
+  # baselining. Switch back to V2InMemory to keep the UTxO set in RAM.
+  Backend: V2LSM
   NumOfDiskSnapshots: 2
   QueryBatchSize: 100000
   SnapshotInterval: 4230

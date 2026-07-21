@@ -52,7 +52,7 @@ processes:
       --testnet-magic 164
       --signing-key-file ${SOURCE_DIR}/config/stake-delegators/delegator1/payment.skey
       --staking-key-file ${SOURCE_DIR}/config/stake-delegators/delegator1/staking.skey
-      --tps 100
+      --tps 1000
       --fee 1000000
     log_location: "${WORKING_DIR}/tx-firehose.log"
     depends_on:
