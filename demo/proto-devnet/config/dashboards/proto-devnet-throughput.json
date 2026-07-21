@@ -18,7 +18,7 @@
           "type": "loki",
           "uid": "P8E80F9AEF21F6940"
         },
-        "enable": true,
+        "enable": false,
         "expr": "{service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockCertified\"}",
         "hide": false,
         "iconColor": "green",
@@ -35,7 +35,7 @@
           "type": "loki",
           "uid": "P8E80F9AEF21F6940"
         },
-        "enable": true,
+        "enable": false,
         "expr": "{service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockAnnounced\"}",
         "hide": false,
         "iconColor": "yellow",
@@ -128,6 +128,10 @@
               {
                 "id": "unit",
                 "value": "Bps"
+              },
+              {
+                "id": "custom.axisSoftMin",
+                "value": 0
               }
             ]
           },
@@ -187,7 +191,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"} | json size=\"size\" | unwrap size [30s])) / 30 / 1000",
+          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"} | json size=\"size\" | unwrap size [${window}s])) / ${window}",
           "hide": false,
           "instant": false,
           "legendFormat": "Load",
@@ -201,13 +205,13 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "type": "datasource",
+        "uid": "-- Mixed --"
       },
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "palette-classic-by-name"
           },
           "custom": {
             "axisBorderShow": false,
@@ -253,6 +257,8 @@
               }
             ]
           },
+          "min": -10,
+          "max": 50,
           "unit": "TxkB/s"
         },
         "overrides": []
@@ -289,7 +295,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"} | json size=\"size\" | unwrap size [30s])) / 30 / 1000",
+          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"} | json size=\"size\" | unwrap size [${window}s])) / ${window} / 1000",
           "legendFormat": "accepted",
           "queryType": "range",
           "refId": "A"
@@ -301,13 +307,24 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Reject\"} | json size=\"size\" | unwrap size [30s])) / 30 / 1000",
+          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Reject\"} | json size=\"size\" | unwrap size [${window}s])) / ${window} / 1000",
           "legendFormat": "rejected",
           "queryType": "range",
           "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "deriv(cardano_node_metrics_mempoolBytes_int{process=~\"$instance\"}[${window}s]) / 1000",
+          "legendFormat": "{{process}} mempool throughput",
+          "range": true,
+          "refId": "C"
         }
       ],
-      "title": "Submission load",
+      "title": "Submission vs. mempool",
       "type": "timeseries"
     },
     {
@@ -402,7 +419,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "builder",
-          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"cardano_node_metrics\", process=~\"$instance\"}[300s])",
+          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"cardano_node_metrics\", process=~\"$instance\"}[300s]) / 1000",
           "legendFormat": "{{process}}",
           "range": true,
           "refId": "A"
@@ -577,6 +594,29 @@
   "tags": [],
   "templating": {
     "list": [
+      {
+        "current": {
+          "text": "30s",
+          "value": "30"
+        },
+        "description": "Averaging window (seconds) for the submission-load rates and the mempool deriv",
+        "includeAll": false,
+        "label": "Rate window",
+        "multi": false,
+        "name": "window",
+        "options": [
+          { "selected": false, "text": "2s", "value": "2" },
+          { "selected": false, "text": "5s", "value": "5" },
+          { "selected": false, "text": "10s", "value": "10" },
+          { "selected": true, "text": "30s", "value": "30" },
+          { "selected": false, "text": "60s", "value": "60" },
+          { "selected": false, "text": "120s", "value": "120" },
+          { "selected": false, "text": "300s", "value": "300" }
+        ],
+        "query": "2s : 2, 5s : 5, 10s : 10, 30s : 30, 60s : 60, 120s : 120, 300s : 300",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
       {
         "current": {
           "text": [
