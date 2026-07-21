@@ -309,8 +309,7 @@
               }
             ]
           },
-          "min": -10,
-          "max": 400,
+          "max": 30,
           "unit": "TxkB/s"
         },
         "overrides": [
