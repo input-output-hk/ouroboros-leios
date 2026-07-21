@@ -379,7 +379,7 @@
             "uid": "mimir"
           },
           "editorMode": "builder",
-          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"integrations/cardano-node\", environment=\"leios\", instance=~\"$instance\"}[300s])",
+          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"integrations/cardano-node\", environment=\"leios\", instance=~\"$instance\"}[${window}s])",
           "legendFormat": "{{instance}}",
           "range": true,
           "refId": "A"
