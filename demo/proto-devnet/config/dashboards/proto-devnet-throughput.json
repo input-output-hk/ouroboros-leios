@@ -132,6 +132,13 @@
               {
                 "id": "custom.axisSoftMin",
                 "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
               }
             ]
           },
@@ -144,6 +151,51 @@
               {
                 "id": "unit",
                 "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node1 mempool"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node2 mempool"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node3 mempool"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-green",
+                  "mode": "fixed"
+                }
               }
             ]
           }
@@ -258,10 +310,86 @@
             ]
           },
           "min": -10,
-          "max": 200,
+          "max": 400,
           "unit": "TxkB/s"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Firehose submitted load"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Firehose rejected load"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node1 mempool throughput"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node2 mempool throughput"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node3 mempool throughput"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -296,7 +424,7 @@
           "direction": "backward",
           "editorMode": "code",
           "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"} | json size=\"size\" | unwrap size [${window}s])) / ${window} / 1000",
-          "legendFormat": "accepted",
+          "legendFormat": "Firehose submitted load",
           "queryType": "range",
           "refId": "A"
         },
@@ -308,7 +436,7 @@
           "direction": "backward",
           "editorMode": "code",
           "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Reject\"} | json size=\"size\" | unwrap size [${window}s])) / ${window} / 1000",
-          "legendFormat": "rejected",
+          "legendFormat": "Firehose rejected load",
           "queryType": "range",
           "refId": "B"
         },
@@ -318,7 +446,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "deriv(cardano_node_metrics_mempoolBytes_int{process=~\"$instance\"}[${window}s]) / 1000",
+          "expr": "clamp_min(deriv(cardano_node_metrics_mempoolBytes_int{process=~\"$instance\"}[${window}s]), 0) / 1000",
           "legendFormat": "{{process}} mempool throughput",
           "range": true,
           "refId": "C"
@@ -387,7 +515,53 @@
           },
           "unit": "TxkB/s"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node2"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node3"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
