@@ -44,7 +44,7 @@ processes:
       period_seconds: 2
       failure_threshold: 60
 
-  TxFirehose:
+  TxFirehose1:
     working_dir: ${WORKING_DIR}
     command: >
       tx-firehose
@@ -54,7 +54,7 @@ processes:
       --staking-key-file ${SOURCE_DIR}/config/stake-delegators/delegator1/staking.skey
       --tps 1000
       --fee 1000000
-    log_location: "${WORKING_DIR}/tx-firehose.log"
+    log_location: "${WORKING_DIR}/tx-firehose1.log"
     depends_on:
       Node1:
         condition: process_healthy
@@ -64,6 +64,32 @@ processes:
       # descendant tx from a prior tx-firehose incarnation that would
       # otherwise cause every fresh submit to be rejected as
       # AllInputsAreSpent against the same head UTxO.
+      backoff_seconds: 30
+
+  # Second, on-demand load generator. `disabled: true` means it is defined but
+  # not started automatically; start it from the process-compose TUI (select
+  # it and press F7 / "start"), or from another shell with:
+  #   process-compose process start TxFirehose2
+  # It targets node1 like TxFirehose1, but uses delegator2's key so its tx chain
+  # is independent of TxFirehose1 (delegator1) — the two never fight over the
+  # same UTxO. Running both roughly doubles the N2C submission rate into node1.
+  TxFirehose2:
+    disabled: true
+    working_dir: ${WORKING_DIR}
+    command: >
+      tx-firehose
+      --socket-path node1/node.socket
+      --testnet-magic 164
+      --signing-key-file ${SOURCE_DIR}/config/stake-delegators/delegator2/payment.skey
+      --staking-key-file ${SOURCE_DIR}/config/stake-delegators/delegator2/staking.skey
+      --tps 1000
+      --fee 1000000
+    log_location: "${WORKING_DIR}/tx-firehose2.log"
+    depends_on:
+      Node1:
+        condition: process_healthy
+    availability:
+      restart: on_failure
       backoff_seconds: 30
 
   ObserveTip:
