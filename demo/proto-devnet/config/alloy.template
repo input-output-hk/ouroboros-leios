@@ -132,7 +132,7 @@ loki.process "extract_cardano_node_logs" {
 	}
 
 	stage.match {
-		selector = `{process="TxFirehose"}`
+		selector = `{process=~"TxFirehose.*"}`
 		stage.static_labels {
 			values = {
 				service = "tx-firehose",
