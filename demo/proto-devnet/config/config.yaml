@@ -11,6 +11,11 @@ MempoolCapacityBytesOverride: 25000000
 # Needed < 10.6
 EnableP2P: true
 
+# Node-to-node tx-submission inbound logic. V2 is the newer pull/decision-based
+# logic; V1 is the legacy path. Switch to compare N2N propagation throughput
+# under real traffic delays (default is TxSubmissionLogicV1).
+TxSubmissionLogicVersion: TxSubmissionLogicV2
+
 LastKnownBlockVersion-Alt: 0
 LastKnownBlockVersion-Major: 3
 LastKnownBlockVersion-Minor: 1
@@ -121,7 +126,7 @@ TraceOptions:
   Mempool.SyncNotNeeded:
     severity: Silence
   Mempool.Synced:
-    severity: Silence
+    severity: Debug
   Net:
     severity: Notice
   Net.AcceptPolicy:
