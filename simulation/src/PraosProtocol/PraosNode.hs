@@ -84,7 +84,7 @@ addPeer f st = do
   return (PraosNodeState{..}, peerId)
 
 runPeer ::
-  (IsBody body, Show body, MonadAsync m, MonadSTM m, MonadDelay m) =>
+  (IsBody body, Show body, MonadAsync m, MonadSTM m, MonadDelay m, MonadEvaluate m) =>
   Tracer m (PraosNodeEvent body) ->
   PraosConfig body ->
   (Block body -> m () -> m ()) ->
@@ -111,7 +111,7 @@ addFollower st = atomically $ do
   return (st, followerId)
 
 runFollower ::
-  (IsBody body, MonadAsync m, MonadSTM m) =>
+  (IsBody body, MonadAsync m, MonadSTM m, MonadEvaluate m) =>
   PraosNodeState body m ->
   FollowerId ->
   Praos body (Chan m) ->
@@ -131,7 +131,7 @@ repeatM gen = go []
     | otherwise = gen st >>= \(st', x) -> go (x : acc) (n - 1) st'
 
 runPraosNode ::
-  (MonadAsync m, MonadSTM m, MonadDelay m) =>
+  (MonadAsync m, MonadSTM m, MonadDelay m, MonadEvaluate m) =>
   Tracer m (PraosNodeEvent BlockBody) ->
   PraosConfig BlockBody ->
   Chain (Block BlockBody) ->
@@ -149,7 +149,7 @@ runPraosNode tracer cfg chain followers peers = do
   concurrentlyMany xs = mapM_ wait =<< mapM async xs
 
 setupPraosThreads ::
-  (MonadAsync m, MonadSTM m, MonadDelay m) =>
+  (MonadAsync m, MonadSTM m, MonadDelay m, MonadEvaluate m) =>
   Tracer m (PraosNodeEvent BlockBody) ->
   PraosConfig BlockBody ->
   ((CPUTask, m ()) -> STM m ()) ->
@@ -168,7 +168,7 @@ setupPraosThreads tracer cfg queue st0 followers peers = do
   (map Concurrently ts ++) <$> setupPraosThreads' tracer cfg valHeader f st0 followers peers
 
 setupPraosThreads' ::
-  (IsBody body, Show body, MonadAsync m, MonadSTM m, MonadDelay m) =>
+  (IsBody body, Show body, MonadAsync m, MonadSTM m, MonadDelay m, MonadEvaluate m) =>
   Tracer m (PraosNodeEvent body) ->
   PraosConfig body ->
   (BlockHeader -> m ()) ->
@@ -199,7 +199,7 @@ newPraosNodeState :: MonadSTM m => Chain (Block body) -> m (PraosNodeState body 
 newPraosNodeState chain = PraosNodeState <$> newBlockFetchControllerState chain <*> pure Map.empty
 
 praosNode ::
-  (MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m, MonadCatch m, MonadFork m, MonadMonotonicTimeNSec m) =>
+  (MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m, MonadCatch m, MonadEvaluate m, MonadFork m, MonadMonotonicTimeNSec m) =>
   Tracer m (PraosNodeEvent BlockBody) ->
   PraosNodeConfig ->
   [Praos BlockBody (Chan m)] ->

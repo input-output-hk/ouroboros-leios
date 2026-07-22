@@ -301,7 +301,7 @@ newRelayState = do
   return $ NodeRelayState{relayBufferVar}
 
 setupRelay ::
-  (Ord id, MonadAsync m, MonadSTM m, MonadDelay m, MonadTime m) =>
+  (Ord id, MonadAsync m, MonadSTM m, MonadDelay m, MonadEvaluate m, MonadTime m) =>
   LeiosConfig ->
   RelayConsumerConfig id header body m ->
   NodeRelayState id header body m ->
@@ -539,6 +539,7 @@ leiosNode ::
   , MonadSTM m
   , MonadTime m
   , MonadDelay m
+  , MonadEvaluate m
   , MonadMonotonicTimeNSec m
   , MonadCatch m
   ) =>

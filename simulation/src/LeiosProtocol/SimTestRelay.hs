@@ -19,6 +19,7 @@ import Control.Monad.Class.MonadAsync (
   Concurrently (Concurrently, runConcurrently),
   MonadAsync (concurrently_),
  )
+import Control.Monad.Class.MonadThrow (MonadEvaluate)
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
@@ -111,7 +112,7 @@ type TestRelayBuffer m = TVar m (RelayBuffer TestBlockId (TestBlockHeader, TestB
 
 relayNode ::
   forall m.
-  (MonadAsync m, MonadDelay m, MonadTime m) =>
+  (MonadAsync m, MonadDelay m, MonadEvaluate m, MonadTime m) =>
   Tracer m (RelayNodeEvent TestBlock) ->
   RelayNodeConfig ->
   -- | incomming edges

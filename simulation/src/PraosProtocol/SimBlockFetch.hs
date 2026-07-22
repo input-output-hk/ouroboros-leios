@@ -10,6 +10,7 @@ import Control.Monad.Class.MonadAsync (
   MonadAsync (..),
   mapConcurrently_,
  )
+import Control.Monad.Class.MonadThrow (MonadEvaluate)
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
@@ -81,7 +82,7 @@ traceRelayLink1 tcpprops =
   bchain = mkChainSimple (kibibytes 1) $ [BlockBody (BS.pack [i]) (kibibytes 95) | i <- [0 .. 10]]
 
   -- Block-Fetch Controller & Consumer
-  nodeA :: (MonadAsync m, MonadDelay m, MonadSTM m) => PraosConfig BlockBody -> Chan m (ProtocolMessage (BlockFetchState BlockBody)) -> m ()
+  nodeA :: (MonadAsync m, MonadDelay m, MonadSTM m, MonadEvaluate m) => PraosConfig BlockBody -> Chan m (ProtocolMessage (BlockFetchState BlockBody)) -> m ()
   nodeA praosConfig chan = do
     peerChainVar <- newTVarIO (blockHeader <$> bchain)
     (st, peerId) <- newBlockFetchControllerState Genesis >>= addPeer (asReadOnly peerChainVar)
