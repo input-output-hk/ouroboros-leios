@@ -51,7 +51,8 @@ main = do
   -- leadership-check slot; skip them rather than flooding output.
   let (preSlot, rest) = Prelude.break isCSlot evs
   hPutStrLn stderr $
-    "skipped " <> show (Prelude.length preSlot)
+    "skipped "
+      <> show (Prelude.length preSlot)
       <> " pre-slot events (node sync/replay backlog, before the first leadership-check slot)"
   runSegmented leadershipOpts (lhdr, lvote, ldiff, validityCheckTime) rest
 
@@ -59,7 +60,8 @@ main = do
 --   against the schedule and stake distribution queried for that epoch.
 data Segment = Segment
   { segEpoch :: Integer
-  , segStart :: Integer -- ^ first leadership-check slot of the segment
+  , segStart :: Integer
+  -- ^ first leadership-check slot of the segment
   , segCD :: ChainData
   }
 
@@ -102,17 +104,33 @@ runSegmented opts (lhdr, lvote, ldiff, validityCheckTime) = loop Nothing []
     setLeadershipSchedule (cdWinningSlots cd)
     let ep = s `div` cdEpochLength cd
     hPutStrLn stderr $
-      "epoch " <> show ep <> " (from slot " <> show s <> "): "
-        <> show (Prelude.length (cdWinningSlots cd)) <> " winning slots "
-        <> show (cdWinningSlots cd) <> ", " <> show (cdNumParties cd)
-        <> " parties, SUT at index " <> show (cdSutIndex cd)
+      "epoch "
+        <> show ep
+        <> " (from slot "
+        <> show s
+        <> "): "
+        <> show (Prelude.length (cdWinningSlots cd))
+        <> " winning slots "
+        <> show (cdWinningSlots cd)
+        <> ", "
+        <> show (cdNumParties cd)
+        <> " parties, SUT at index "
+        <> show (cdSutIndex cd)
     pure Segment{segEpoch = ep, segStart = s, segCD = cd}
 
   verifySeg :: Segment -> [ChainEvent] -> ([T.Text], (T.Text, T.Text))
   verifySeg seg prefix =
     let cd = segCD seg
-     in verifyChainTraceFromSlot (cdNumParties cd) (cdSutIndex cd) (cdStakeDistribution cd)
-          lhdr lvote ldiff validityCheckTime prefix (segStart seg)
+     in verifyChainTraceFromSlot
+          (cdNumParties cd)
+          (cdSutIndex cd)
+          (cdStakeDistribution cd)
+          lhdr
+          lvote
+          ldiff
+          validityCheckTime
+          prefix
+          (segStart seg)
 
   checkSeg :: Segment -> [ChainEvent] -> IO ()
   checkSeg seg prefix =
@@ -230,14 +248,23 @@ queryChain LeadershipOpts{..} = do
               Just b -> pure b
               Nothing -> error "Era does not support the pool distribution query"
             serPoolDistr <-
-              expectQueryEra "pool distribution"
+              expectQueryEra
+                "pool distribution"
                 (Api.queryPoolDistribution beo (Just (Set.singleton loStakePoolId)))
             stakeDistr <- expectQueryEra "stake distribution" (Api.queryStakeDistribution sbe)
             let schedule =
                   case loWhich of
                     CurrentEpoch ->
                       Api.currentEpochEligibleLeadershipSlots
-                        sbe shelleyGenesis eInfo pparams ptclState loStakePoolId vrfSkey serPoolDistr currentEpoch
+                        sbe
+                        shelleyGenesis
+                        eInfo
+                        pparams
+                        ptclState
+                        loStakePoolId
+                        vrfSkey
+                        serPoolDistr
+                        currentEpoch
                     NextEpoch ->
                       error "next-epoch schedule not yet implemented"
             pure (schedule, stakeDistr)

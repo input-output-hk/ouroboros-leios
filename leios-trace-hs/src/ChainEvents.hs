@@ -22,18 +22,18 @@ import GHC.Generics (Generic)
 -- | A Leios-relevant event extracted from one node.log line. The @Text@ fields
 --   are block hashes (the @ebHash@, or the RB hash); slots are absolute.
 data ChainEvent
-  = CSlot !Word64
-  -- ^ @Forge.Loop.StartLeadershipCheck@: a per-slot tick for the SUT.
-  | CEBForged !Text !Word64
-  -- ^ @LeiosBlockForged@: the SUT forged an EB (ebHash, slot).
-  | CEBAcquired !Text !Word64
-  -- ^ @LeiosBlockAcquired@: the SUT received a peer EB (ebHash, ebSlot).
-  | CVoted !Text !Word64
-  -- ^ @LeiosVoted@: the SUT cast a vote (ebHash, EB's slot).
-  | CVoteAcquired !Text !Word64
-  -- ^ @LeiosVoteAcquired@: the SUT received a vote (ebHash, EB's slot).
-  | CRBForged !Text !Word64
-  -- ^ @Forge.Loop.ForgedBlock@: the SUT forged a ranking (Praos) block (hash, slot).
+  = -- | @Forge.Loop.StartLeadershipCheck@: a per-slot tick for the SUT.
+    CSlot !Word64
+  | -- | @LeiosBlockForged@: the SUT forged an EB (ebHash, slot).
+    CEBForged !Text !Word64
+  | -- | @LeiosBlockAcquired@: the SUT received a peer EB (ebHash, ebSlot).
+    CEBAcquired !Text !Word64
+  | -- | @LeiosVoted@: the SUT cast a vote (ebHash, EB's slot).
+    CVoted !Text !Word64
+  | -- | @LeiosVoteAcquired@: the SUT received a vote (ebHash, EB's slot).
+    CVoteAcquired !Text !Word64
+  | -- | @Forge.Loop.ForgedBlock@: the SUT forged a ranking (Praos) block (hash, slot).
+    CRBForged !Text !Word64
   deriving (Eq, Show, Generic)
 
 -- | Parse a whole node.log, keeping only the Leios events and preserving order.

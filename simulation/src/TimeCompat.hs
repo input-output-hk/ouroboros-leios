@@ -34,9 +34,9 @@ import Data.Fixed
 import Data.Word (Word64)
 import "io-classes" Control.Monad.Class.MonadTime (MonadMonotonicTimeNSec, MonadTime (getCurrentTime), NominalDiffTime, UTCTime, addUTCTime, diffUTCTime)
 import qualified "io-classes" Control.Monad.Class.MonadTime as MonadTime (MonadMonotonicTimeNSec (getMonotonicTimeNSec))
+import qualified "io-classes" Control.Monad.Class.MonadTime.SI as SI (DiffTime, Time (Time))
 import "io-classes" Control.Monad.Class.MonadTimer (MonadDelay)
 import qualified "io-classes" Control.Monad.Class.MonadTimer as MonadTimer (MonadDelay (threadDelay))
-import qualified "io-classes" Control.Monad.Class.MonadTime.SI as SI (DiffTime, Time (Time))
 
 seTimeCompat :: SimEvent -> Time
 seTimeCompat = Time . realToFrac @SI.DiffTime @DiffTime . coerce @SI.Time @SI.DiffTime . IOSim.seTime

@@ -46,8 +46,16 @@ main =
     -- A single closure capturing all parameters: it applies the (whole-list)
     -- Agda checker to a list of events, returning (#actions, (status, detail)).
     let verify evs =
-          verifyTraceFromSlot nrNodes idSut stakeDistribution
-            lhdr lvote ldiff validityCheckTime evs startingSlot
+          verifyTraceFromSlot
+            nrNodes
+            idSut
+            stakeDistribution
+            lhdr
+            lvote
+            ldiff
+            validityCheckTime
+            evs
+            startingSlot
 
     if streaming
       then runStreaming verify
