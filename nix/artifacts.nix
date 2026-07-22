@@ -1,7 +1,17 @@
-{ pkgs, ... }:
+args:
 
-with pkgs;
 let
+  # libsigsegv-2.15 (pulled in via texliveFull -> xindy -> clisp, and
+  # asymptote) fails its test suite on x86_64-darwin. Skip the tests there;
+  # on other platforms the attributes are unchanged, so derivation hashes
+  # stay the same.
+  pkgs = args.pkgs.extend (
+    _: prev: {
+      libsigsegv = prev.libsigsegv.overrideAttrs (old: {
+        doCheck = old.doCheck && !prev.stdenv.hostPlatform.isDarwin;
+      });
+    }
+  );
 
   simRealism = pkgs.stdenv.mkDerivation {
     name = "sim-realism";
