@@ -18,13 +18,12 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 6,
   "links": [],
   "panels": [
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {
@@ -111,13 +110,13 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "(\n  sum by(thread, stack) (\n    count_over_time({service=\"call-trace\", event=\"Start\", instance=~\"$instance\", name=~\"$name\"} [5m])\n  ) \n  - \n  sum by(thread, stack) (\n    count_over_time({service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} [5m])\n  )\n) or sum by(thread, stack) (\n  count_over_time({service=\"call-trace\", event=\"Start\", instance=~\"$instance\", name=~\"$name\"} [5m]) * 0\n)",
+          "expr": "(\n  sum by(thread, stack) (\n    count_over_time({service=\"leios-call-trace\", event=\"Start\", instance=~\"$instance\", name=~\"$name\"} | json [5m])\n  ) \n  - \n  sum by(thread, stack) (\n    count_over_time({service=\"leios-call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} | json [5m])\n  )\n) or sum by(thread, stack) (\n  count_over_time({service=\"leios-call-trace\", event=\"Start\", instance=~\"$instance\", name=~\"$name\"} | json [5m]) * 0\n)",
           "hide": false,
-          "legendFormat": "[{{thread}}] $ {{stack}}",
+          "legendFormat": "{{thread}}: {{stack}}",
           "queryType": "range",
           "refId": "A"
         }
@@ -128,7 +127,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {
@@ -216,12 +215,12 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap allocations [5m]\n  )\n)",
-          "legendFormat": "[{{thread}}] $ {{stack}}",
+          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"leios-call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap allocations [5m]\n  )\n)",
+          "legendFormat": "{{thread}}: {{stack}}",
           "queryType": "range",
           "refId": "A"
         }
@@ -232,7 +231,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {
@@ -320,12 +319,12 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap duration [5m]\n  )\n)",
-          "legendFormat": "[{{thread}}] $ {{stack}}",
+          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"leios-call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap duration [5m]\n  )\n)",
+          "legendFormat": "{{thread}}: {{stack}}",
           "queryType": "range",
           "refId": "A"
         }
@@ -336,7 +335,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {
@@ -420,12 +419,12 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{service=\"call-trace\", instance=~\"$instance\", name=~\"$name\"} | json",
-          "legendFormat": "{{process}}",
+          "expr": "{service=\"leios-call-trace\", instance=~\"$instance\", name=~\"$name\"} | json",
+          "legendFormat": "{{instance}}",
           "queryType": "range",
           "refId": "A"
         }
@@ -521,7 +520,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {},
@@ -553,11 +552,11 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n  | json\n    # Span fields\n  | label_format spanID=`{{ .id }}`\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .thread }}@{{ .instance }}`\n  | label_format host=`{{ .process }}`\n  | label_format traceID=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  | label_format parentSpanID=`{{ .parent_id }}`\n  # Extra fields TODO: Figure out how to add this to span attributes, this breaks everything\n  # | label_format tags=`allocations=\"{{ .allocations }}\", argument=\"{{ .argument }}\", result=\"{{ .result }}\"`\n    \n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName, host",
+          "expr": "{service=\"leios-call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n  | json\n    # Span fields\n  | label_format spanID=`{{ .id }}`\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .thread }}@{{ .instance }}`\n  | label_format traceID=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  | label_format parentSpanID=`{{ .parent_id }}`\n  # Extra fields TODO: Figure out how to add this to span attributes, this breaks everything\n  # | label_format tags=`allocations=\"{{ .allocations }}\", argument=\"{{ .argument }}\", result=\"{{ .result }}\"`\n    \n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName",
           "queryType": "range",
           "refId": "A"
         }
@@ -624,7 +623,7 @@
     }
   ],
   "preload": false,
-  "refresh": "",
+  "refresh": "1m",
   "schemaVersion": 42,
   "tags": [],
   "templating": {
@@ -640,7 +639,7 @@
         },
         "datasource": {
           "type": "loki",
-          "uid": "P8E80F9AEF21F6940"
+          "uid": "loki"
         },
         "definition": "",
         "description": "",
@@ -652,7 +651,7 @@
         "query": {
           "label": "instance",
           "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "{service=\"call-trace\"}",
+          "stream": "{service=\"leios-call-trace\"}",
           "type": 1
         },
         "refresh": 1,
@@ -670,7 +669,7 @@
         },
         "datasource": {
           "type": "loki",
-          "uid": "P8E80F9AEF21F6940"
+          "uid": "loki"
         },
         "definition": "",
         "includeAll": true,
@@ -680,7 +679,7 @@
         "query": {
           "label": "name",
           "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "{service=\"call-trace\", event=\"Start\"}",
+          "stream": "{service=\"leios-call-trace\", event=\"Start\"}",
           "type": 1
         },
         "refresh": 1,
@@ -694,8 +693,8 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
-  "title": "Call Trace",
-  "uid": "calltrace",
+  "timezone": "utc",
+  "title": "Cardano Leios - Call Trace",
+  "uid": "cardano-leios-call-trace",
   "version": 1
 }

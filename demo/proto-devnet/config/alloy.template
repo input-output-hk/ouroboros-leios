@@ -4,28 +4,32 @@ prometheus.remote_write "prometheus" {
 	}
 }
 
+// Aligned with cardano-playground's base scrape: job="integrations/cardano-node"
+// scoped by environment/instance.  Dashboards select on {job=
+// "integrations/cardano-node", environment="leios", instance=~"$instance"} so the
+// same panels work in both the x-ray stack and playground's shared Mimir.
 prometheus.scrape "cardano_node_exporter" {
 	targets = [
 		{
 			"__address__" = "${IP_NODE1}:${METRICS_PORT_NODE1}",
-			"job"         = "cardano_node_metrics",
+			"job"         = "integrations/cardano-node",
 			"instance"    = "node1",
-			"alias"       = "node1",
-			"process"     = "Node1",
+			"environment" = "leios",
+			"group"       = "proto-devnet",
 		},
 		{
 			"__address__" = "${IP_NODE2}:${METRICS_PORT_NODE2}",
-			"job"         = "cardano_node_metrics",
+			"job"         = "integrations/cardano-node",
 			"instance"    = "node2",
-			"alias"       = "node2",
-			"process"     = "Node2",
+			"environment" = "leios",
+			"group"       = "proto-devnet",
 		},
 		{
 			"__address__" = "${IP_NODE3}:${METRICS_PORT_NODE3}",
-			"job"         = "cardano_node_metrics",
+			"job"         = "integrations/cardano-node",
 			"instance"    = "node3",
-			"alias"       = "node3",
-			"process"     = "Node3",
+			"environment" = "leios",
+			"group"       = "proto-devnet",
 		},
 	]
 
@@ -55,6 +59,10 @@ loki.source.file "process_compose_log_scrape" {
 	tail_from_end = false
 }
 
+// Front-end: unwrap the process-compose JSON envelope. One raw copy is written
+// to loki.write.loki (the "process-compose" view, analogous to cardano-playground's
+// base journald write); the node/tx-centrifuge trace body is forwarded to the
+// shared enrichment pipeline below.
 loki.process "extract_process_compose_logs" {
 	stage.json {
 		expressions = {
@@ -66,12 +74,21 @@ loki.process "extract_process_compose_logs" {
 		drop_malformed = true
 	}
 
+	// Lowercase the instance label (Node1 -> node1) so it matches the instance
+	// label on the prometheus scrape targets above, mirroring how
+	// cardano-playground uses one lowercase instance label for both metrics and
+	// logs (there the journald hostname is already lowercase).
+	stage.template {
+		source   = "instance"
+		template = "{{ .process | ToLower }}"
+	}
+
 	stage.labels {
 		values = {
 			level    = "level",
 			process  = "process",
 			replica  = "replica",
-			instance = "process",
+			instance = "instance",
 		}
 	}
 
@@ -88,26 +105,44 @@ loki.process "extract_process_compose_logs" {
 
 	forward_to = [
 		loki.write.loki.receiver,
-		loki.process.extract_cardano_node_logs.receiver,
+		loki.process.leios_extract_logs.receiver,
 	]
 }
 
-loki.process "extract_cardano_node_logs" {
-	stage.json {
-		expressions = {
-			at     = "at",
-			sev    = "sev",
-			host   = "host",
-			thread = "thread",
-			ns     = "ns",
-			data   = "data",
-		}
-		drop_malformed = true
+// Single enrichment pipeline: parse once, label everything, write once.
+//
+// Kept in lockstep with cardano-playground's
+// flake/nixosModules/leios-alloy-logs.nix so the two repos share one
+// label/metric model.  Only the front-end above (process-compose file tailing)
+// and the routing key differ: here lines are routed by the `process` label the
+// front-end sets (Node1/2/3, TxCentrifuge); playground routes by systemd_unit.
+//
+// Every kept line is written once to loki.write.loki carrying kind/ns/sev/service
+// labels, so every kind is label-filterable in Explore without `| json`.  The
+// vote/call enrichment is folded in as nested stage.match blocks rather than
+// separate processors that each re-write the stream.
+//
+// Cardinality: index only bounded fields (service/type ~4, ns ~56, sev ~5, kind
+// ~50-150, voterId ~3, event 2, name/thread bounded).  The UNBOUNDED fields --
+// rbHash (voting) and stack (call-trace call path) -- are left in the line for
+// `| json` (vote_rbHash / stack), which also keeps them off the counters.
+loki.process "leios_extract_logs" {
+	// Route: keep only the node and tx-centrifuge process-compose processes.
+	stage.match {
+		selector = `{process!~"Node[0-9]+|TxCentrifuge"}`
+		action   = "drop"
 	}
 
-	stage.drop {
-		source = "process"
-		value  = "Analyze"
+	// Pull kind straight from data.kind so it can be labelled on every line.
+	stage.json {
+		expressions = {
+			at   = "at",
+			sev  = "sev",
+			ns   = "ns",
+			kind = "data.kind",
+			data = "data",
+		}
+		drop_malformed = true
 	}
 
 	stage.timestamp {
@@ -115,12 +150,14 @@ loki.process "extract_cardano_node_logs" {
 		format = "RFC3339"
 	}
 
+	// Indexed labels applied to ALL lines (bounded; drive fast Explore).
+	// `host` intentionally omitted -- it equals the `instance` label.
 	stage.labels {
 		values = {
 			level = "sev",
-			host  = "host",
 			sev   = "sev",
 			ns    = "ns",
+			kind  = "kind",
 		}
 	}
 
@@ -133,7 +170,6 @@ loki.process "extract_cardano_node_logs" {
 
 	stage.match {
 		selector = `{process="TxCentrifuge"}`
-
 		stage.static_labels {
 			values = {
 				service = "tx-centrifuge",
@@ -142,36 +178,22 @@ loki.process "extract_cardano_node_logs" {
 		}
 	}
 
+	// Emit the decoded 'data' object as the line body so query-time `| json`
+	// sees kind/vote/event/etc, at the top level (rbHash -> vote_rbHash,
+	// thread, ...).
 	stage.output {
 		source = "data"
 	}
 
-	forward_to = [
-		loki.write.loki.receiver,
-		loki.process.extract_leios_vote_logs.receiver,
-		loki.process.extract_call_trace_logs.receiver,
-	]
-}
-
-loki.process "extract_leios_vote_logs" {
-	stage.json {
-		expressions = {
-			kind = "kind",
-		}
-	}
-
-	stage.labels {
-		values = {
-			kind = "kind",
-		}
-	}
-
+	// --- Voting enrichment (inline; no extra write) ---
+	// rbHash deliberately NOT extracted/labelled -- it stays in the line for
+	// `| json` (field vote_rbHash) and off the counters, keeping them bounded.
+	// voterId (~3) is the only variable label the counters inherit.
 	stage.match {
 		selector = `{kind=~"LeiosVoted|LeiosVoteAcquired"}`
 
 		stage.json {
 			expressions = {
-				rbHash  = "vote.rbHash",
 				voterId = "vote.voterId",
 			}
 			drop_malformed = true
@@ -186,7 +208,6 @@ loki.process "extract_leios_vote_logs" {
 
 		stage.labels {
 			values = {
-				rbHash  = "rbHash",
 				voterId = "voterId",
 			}
 		}
@@ -204,7 +225,7 @@ loki.process "extract_leios_vote_logs" {
 				metric.counter {
 					name              = "voted_weight_total"
 					description       = "The total accumulated voting weight"
-					prefix            = "leios_"
+					prefix            = "cardano_node_metrics_loki_leios_"
 					action            = "add"
 					source            = "weight"
 					max_idle_duration = "24h"
@@ -219,7 +240,7 @@ loki.process "extract_leios_vote_logs" {
 				metric.counter {
 					name              = "votes_acquired_total"
 					description       = "The total votes acquired"
-					prefix            = "leios_"
+					prefix            = "cardano_node_metrics_loki_leios_"
 					action            = "inc"
 					match_all         = true
 					max_idle_duration = "24h"
@@ -228,43 +249,26 @@ loki.process "extract_leios_vote_logs" {
 		}
 	}
 
-	forward_to = [loki.write.loki.receiver]
-}
-
-loki.process "extract_call_trace_logs" {
-	stage.json {
-		expressions = {
-			kind = "kind",
-		}
-	}
-
-	stage.labels {
-		values = {
-			kind = "kind",
-		}
-	}
-
+	// --- Call-trace enrichment (inline; active in proto-devnet, coming to Musashi) ---
+	// stack deliberately NOT extracted/labelled -- it is the call path (many
+	// combinations, grows with the call graph); stays in the line for `| json`.
+	// thread is a named, low-cardinality thread, so it is indexed instead.
 	stage.match {
 		selector = `{kind="Call"}`
 
 		stage.json {
 			expressions = {
-				event     = "event",
-				argument  = "argument",
-				id        = "id",
-				child_id  = "child_id",
-				parent_id = "child_id",
-				name      = "name",
-				stack     = "stack",
-				thread    = "thread",
+				event  = "event",
+				name   = "name",
+				thread = "thread",
 			}
 			drop_malformed = true
 		}
 
 		stage.static_labels {
 			values = {
-				service = "call-trace",
-				type    = "call-trace",
+				service = "leios-call-trace",
+				type    = "leios-call-trace",
 			}
 		}
 
@@ -272,7 +276,6 @@ loki.process "extract_call_trace_logs" {
 			values = {
 				event  = "event",
 				name   = "name",
-				stack  = "stack",
 				thread = "thread",
 			}
 		}
@@ -284,7 +287,7 @@ loki.process "extract_call_trace_logs" {
 				metric.counter {
 					name              = "started_total"
 					description       = "Total started calls"
-					prefix            = "call_"
+					prefix            = "cardano_node_metrics_loki_call_"
 					action            = "inc"
 					match_all         = true
 					max_idle_duration = "24h"
@@ -308,7 +311,7 @@ loki.process "extract_call_trace_logs" {
 				metric.counter {
 					name              = "ended_total"
 					description       = "Total ended calls"
-					prefix            = "call_"
+					prefix            = "cardano_node_metrics_loki_call_"
 					action            = "inc"
 					match_all         = true
 					max_idle_duration = "24h"
@@ -317,7 +320,7 @@ loki.process "extract_call_trace_logs" {
 				metric.counter {
 					name              = "duration_total"
 					description       = "Total call duration"
-					prefix            = "call_"
+					prefix            = "cardano_node_metrics_loki_call_"
 					action            = "add"
 					source            = "duration"
 					max_idle_duration = "24h"
@@ -326,7 +329,7 @@ loki.process "extract_call_trace_logs" {
 				metric.counter {
 					name              = "allocations_total"
 					description       = "Total call allocations"
-					prefix            = "call_"
+					prefix            = "cardano_node_metrics_loki_call_"
 					action            = "add"
 					source            = "allocations"
 					max_idle_duration = "24h"
@@ -335,6 +338,7 @@ loki.process "extract_call_trace_logs" {
 		}
 	}
 
+	// The only write: one enriched copy per line.
 	forward_to = [loki.write.loki.receiver]
 }
 

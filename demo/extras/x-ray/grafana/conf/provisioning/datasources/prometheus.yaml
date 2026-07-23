@@ -1,6 +1,9 @@
 apiVersion: 1
 datasources:
   - name: Prometheus
+    # uid pinned to "mimir" to match cardano-playground's datasource uid so the
+    # leios dashboards are portable between the two stacks.
+    uid: mimir
     type: prometheus
     url: http://localhost:9090
     isDefault: true
