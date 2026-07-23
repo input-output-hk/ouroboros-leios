@@ -18,13 +18,12 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 7,
   "links": [],
   "panels": [
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {
@@ -109,11 +108,11 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum by(voterId) (count_over_time({service=\"leios-voting\", rbHash=~\"$rbHash\", voterId=~\"$voterId\", instance=~\"$instance\"} | kind = `LeiosVoteAcquired` [5s]))",
+          "expr": "sum by(voterId) (count_over_time({service=\"leios-voting\", voterId=~\"$voterId\", instance=~\"$instance\"} | json | vote_rbHash=~\"$rbHash\" | kind = `LeiosVoteAcquired` [5s]))",
           "legendFormat": "{{voterId}}",
           "queryType": "range",
           "refId": "A"
@@ -125,7 +124,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {
@@ -210,11 +209,11 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "builder",
-          "expr": "sum by(rbHash) (count_over_time({service=\"leios-voting\", rbHash=~\"$rbHash\", voterId=~\"$voterId\"} | kind = `LeiosVoteAcquired` [5s]))",
+          "expr": "sum by(vote_rbHash) (count_over_time({service=\"leios-voting\", voterId=~\"$voterId\"} | json | vote_rbHash=~\"$rbHash\" | kind = `LeiosVoteAcquired` [5s]))",
           "legendFormat": "{{voterId}}",
           "queryType": "range",
           "refId": "A"
@@ -226,7 +225,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {
@@ -298,11 +297,11 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{type=\"leios-voting\", rbHash=~\"$rbHash\", voterId=~\"$voterId\"}",
+          "expr": "{type=\"leios-voting\", voterId=~\"$voterId\"} | json | vote_rbHash=~\"$rbHash\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -354,29 +353,21 @@
     "list": [
       {
         "current": {
-          "text": "All",
-          "value": [
-            "$__all"
-          ]
+          "text": ".*",
+          "value": ".*"
         },
-        "datasource": {
-          "type": "loki",
-          "uid": "P8E80F9AEF21F6940"
-        },
-        "definition": "",
         "includeAll": true,
         "multi": true,
         "name": "rbHash",
-        "options": [],
-        "query": {
-          "label": "rbHash",
-          "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "{service=\"leios-voting\"}",
-          "type": 1
-        },
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
+        "options": [
+          {
+            "text": ".*",
+            "value": ".*",
+            "selected": true
+          }
+        ],
+        "query": "",
+        "type": "textbox"
       },
       {
         "current": {
@@ -389,7 +380,7 @@
         },
         "datasource": {
           "type": "loki",
-          "uid": "P8E80F9AEF21F6940"
+          "uid": "loki"
         },
         "definition": "",
         "includeAll": true,
@@ -417,7 +408,7 @@
         },
         "datasource": {
           "type": "loki",
-          "uid": "P8E80F9AEF21F6940"
+          "uid": "loki"
         },
         "definition": "",
         "includeAll": true,
@@ -441,8 +432,9 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
-  "title": "Proto DevNet - Leios Voting",
-  "uid": "gst2nk",
+  "refresh": "1m",
+  "timezone": "utc",
+  "title": "Cardano Leios - Voting",
+  "uid": "cardano-leios-voting",
   "version": 1
 }
