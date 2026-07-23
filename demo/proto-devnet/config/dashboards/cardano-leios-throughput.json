@@ -186,7 +186,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "rate({service=\"tx-centrifuge\", ns=\"TxCentrifuge.Builder.NewTx\"}[30s]) * 204",
+          "expr": "rate({service=\"tx-centrifuge\", ns=\"TxCentrifuge.Builder.NewTx\"}[2m]) * 204",
           "hide": false,
           "instant": false,
           "legendFormat": "Load (assumed 204B per tx)",
@@ -288,7 +288,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "rate({service=\"tx-centrifuge\", ns=\"TxCentrifuge.Builder.NewTx\"}[30s])",
+          "expr": "rate({service=\"tx-centrifuge\", ns=\"TxCentrifuge.Builder.NewTx\"}[2m])",
           "legendFormat": "tx/s",
           "queryType": "range",
           "refId": "A"

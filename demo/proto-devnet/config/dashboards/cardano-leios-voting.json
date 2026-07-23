@@ -112,14 +112,15 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum by(voterId) (count_over_time({service=\"leios-voting\", voterId=~\"$voterId\", instance=~\"$instance\"} | json | vote_rbHash=~\"$rbHash\" | kind = `LeiosVoteAcquired` [5s]))",
+          "expr": "sum by(voterId) (count_over_time({service=\"leios-voting\", voterId=~\"$voterId\", instance=~\"$instance\"} | json | vote_rbHash=~\"$rbHash\" | kind = `LeiosVoteAcquired` [1m]))",
           "legendFormat": "{{voterId}}",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Total acquired votes per voterId",
-      "type": "timeseries"
+      "title": "Acquired votes per voterId (per minute)",
+      "type": "timeseries",
+      "description": "Count of LeiosVoteAcquired events grouped by voterId, over a trailing 1-minute window."
     },
     {
       "datasource": {
@@ -213,14 +214,15 @@
           },
           "direction": "backward",
           "editorMode": "builder",
-          "expr": "sum by(vote_rbHash) (count_over_time({service=\"leios-voting\", voterId=~\"$voterId\"} | json | vote_rbHash=~\"$rbHash\" | kind = `LeiosVoteAcquired` [5s]))",
-          "legendFormat": "{{voterId}}",
+          "expr": "sum by(vote_rbHash) (count_over_time({service=\"leios-voting\", voterId=~\"$voterId\"} | json | vote_rbHash=~\"$rbHash\" | kind = `LeiosVoteAcquired` [1m]))",
+          "legendFormat": "{{vote_rbHash}}",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Total acquired votes per rbHash",
-      "type": "timeseries"
+      "title": "Acquired votes per rbHash (per minute)",
+      "type": "timeseries",
+      "description": "Count of LeiosVoteAcquired events grouped by rbHash, over a trailing 1-minute window."
     },
     {
       "datasource": {
