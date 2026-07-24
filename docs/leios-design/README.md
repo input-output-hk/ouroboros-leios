@@ -52,11 +52,11 @@ The Linear Leios protocol operates by allowing a second, bigger type of block to
 
 ## Cardano node as a real-time system
 
-The implementation of Leios must be understood in the context of the Cardano node as a concurrent, reactive system operating under real-time constraints in an adversarial environment. While "real-time" in this context does not refer to the millisecond-level hard deadlines found in industrial control systems, timely action at the scale of seconds nontheless remains crucial to protocol success and network security. 
+The implementation of Leios must be understood in the context of the Cardano node as a concurrent, reactive system operating under real-time constraints in an adversarial environment. While "real-time" in this context does not refer to the millisecond-level hard deadlines found in industrial control systems, timely action at the scale of seconds nontheless remains crucial to protocol success and network security.
 
 The currently deployed Praos implementation establishes clear [data diffusion targets](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf#subsection.5.1): blocks must reach 95% of nodes within the 5-second $\Delta$ parameter, with target performance at 98% and stretch goals at 99%. While these are comfortably achieved most of the time, blocks are regularly adopted within 1 second across the network, there are some situations even in the current system where the target is not reached. For example, due to reward calculations happening at the epoch boundary.
 
-Despite being hard deadlines, these targets reflect the reality that network vulnerability increases when not being met. The protocol's safety and liveness guarantees depend on honest nodes being able to propagate blocks rapidly enough to prevent adversarial forks from gaining traction. Failure to meet these timing constraints can lead to increased rates of short forks, reduced chain quality, and - if persistent - ultimately compromise the integrity of the ledger. 
+Despite being hard deadlines, these targets reflect the reality that network vulnerability increases when not being met. The protocol's safety and liveness guarantees depend on honest nodes being able to propagate blocks rapidly enough to prevent adversarial forks from gaining traction. Failure to meet these timing constraints can lead to increased rates of short forks, reduced chain quality, and - if persistent - ultimately compromise the integrity of the ledger.
 
 ## Concurrency and resource management
 
@@ -64,7 +64,7 @@ The current primary responsibilities of a Cardano node are roughly:
 
 - Block diffusion: receiving chains from upstream, validate and select the best chain, and transmit chains downstream.
 - Transaction submission: receiving, validating, and transmitting transactions to be included in blocks.
-- Block production: creating new blocks and extending current chain when selected as slot leader. 
+- Block production: creating new blocks and extending current chain when selected as slot leader.
 
 Despite this apparent simplicity, this already results in a highly concurrent system once cardinalities of upstream and downstream network peers are considered. A `cardano-node` with the default configuration maintains 20 upstream hot peers, 10 upstream warm peers and can have up to a few hundred downstream connections, each of which may be simultaneously requesting or serving data. All of these operations share critical resources, including memory, CPU, and network bandwidth, requiring careful resource management to ensure timing requirements are met even under load.
 
@@ -76,7 +76,7 @@ Concretely, in the current system there are (including protocols for supporting 
 Leios significantly expands this concurrency model by introducing new responsibilities:
 
 - Endorser block and closure diffusion: receiving, validating, and transmitting EBs and their transaction closures.
-- Voting and vote diffusion: receiving, validating, and transmitting own and foreign votes on EBs. 
+- Voting and vote diffusion: receiving, validating, and transmitting own and foreign votes on EBs.
 
 Given the [proposed Leios mini-protocols](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#leios-mini-protocols), this would result in:
 
@@ -385,7 +385,7 @@ The [prototyping and adversarial testing](#prototyping-and-adversarial-testing) 
 >         Cert codecs/CDDL
 >       Cert validation
 >       Voting key registration/rotation via tx certs<br>- akin to Peras
->       Commitee selection 
+>       Commitee selection
 >       Registered keys / selected committee queries
 >       New protocol parameters
 >     ((Consensus))
@@ -511,18 +511,130 @@ The node must include new mini-protocols (**NEW-LeiosMiniProtocols**) to diffuse
 ## Consensus
 
 CIP-0164 implies functional requirements for the node to issue EBs alongside RBs, vote for EBs according to the rules from the CIP, include certificates when enough votes are seen, diffuse EBs and votes through the network layer, and retain EB closures indefinitely when certified. The Consensus layer is responsible for driving these operations and coordinating with the Network layer (which implements the actual mini-protocols) to ensure proper diffusion.
-    
-### High-throughput mempool
 
-> [!WARNING]
->
-> FIXME: write up problem statement: reapplyTx on thousands of txs taking too long to block tx submission (link to other section?) and also recomputing the mempool snapshot in/for block forging is insufficient too.
-> FIXME: Write about two concrete consequences:
->     - decouple tx diffusion from mempool syncing -> need to re-apply txs added while syncing
->     - only block producers: keep a view (or two for Leios in Dijkstra) of txs to put into blocks -> only do slot dependent checks in ledger?
-> TODO: More advanced DAG-style mempool model?
+### Mempool
 
-- **RSK-LeiosMempoolOverheadLatency**: Same as RSK-LeiosLedgerOverheadLatency, but for the Mempool frequently revalidating 15000% load in a caught-up node during congestion (ie 30000% the capacity of a Praos block, since the Leios Mempool capacity is now two EBs instead of two Praos blocks).
+The Mempool stages transactions that have been submitted but not yet included in
+a block. It has three jobs: **accept** transactions from local clients,
+**diffuse** good ones to peers, and **pre-compute** their validation and
+application so a block producer can include them cheaply.
+
+Under Praos the second and third jobs are only partially met, which is
+tolerable. Under Leios it is not: the Mempool now holds roughly two endorser
+blocks' worth of transactions instead of two Praos blocks', and it is fed at up
+to ~1000 tx/s. Re-processing that many transactions whenever the chain moves,
+while serialising every Mempool operation behind a single lock, blocks
+transaction diffusion and block production for as long as the re-processing
+takes (**RSK-LeiosMempoolOverheadLatency**).
+
+#### Validation vs. application
+
+A transaction is processed in three stages, with very different costs:
+
+- **Resolve** — fetch the transaction's input UTxOs (from the cache or on-disk
+  ledger). Dependent transactions must be resolved in sequence.
+- **Validate** — check signatures, scripts, limits, values. Expensive, but once
+  a transaction is resolved this is **state-independent** and, crucially, valid
+  for the whole era: it need only be done **once** and can be cached.
+- **Apply** — check the transaction fits the current state (its inputs still
+  exist, its slot is in range). Cheap, but **must be redone every time the base
+  ledger state changes**.
+
+So a caught-up node validates each transaction once and only ever *re-applies*
+(`reapplyTx`, not `applyTx`) when the base changes. Getting the validate/apply
+split right is what makes high throughput feasible.
+
+#### Model
+
+The Mempool is concurrent state mutated by three actions:
+
+```haskell
+data MempoolAction
+  = AddTx  Tx           -- from peers and local clients (~1000/s)
+  | Rebase LedgerState  -- chain selection picked a new base (a few per 20s)
+  | Tick   SlotNo       -- time advancing (~1/s)
+
+data MempoolState = MempoolState
+  { base     :: LedgerState       -- ledger state the txs are applied on top of
+  , interval :: (SlotNo, SlotNo)  -- slot range the mempool is valid for
+  , txs      :: [Tx]              -- resolved, validated, applicable transactions
+  }
+```
+
+Two questions define correct behaviour: which transactions do we accept and
+diffuse, and which are eligible for a block? Both answer: those that are valid
+and applicable to `base` and `interval`.
+
+#### Tick
+
+Time (the slot) affects a transaction's validity (protocol parameters and the
+ledger law change at era boundaries) and its applicability (its own slot range,
+plus epoch-boundary state changes) — but **only at epoch boundaries**. We
+exploit this with the `interval`: a ~20-slot window between the current
+tip/epoch start and the next expected block/epoch end. Ticking *within* the
+interval changes nothing observable to transactions, so it costs nothing; only
+crossing an epoch boundary forces a re-apply (and a re-validate on a new era).
+The trade-off is that transactions whose validity range is narrower than the
+interval are rejected — acceptable for a large performance win.
+
+#### Rebase and concurrency
+
+`Rebase` is the hard case. When chain selection picks a new `base`, every
+transaction must be re-applied onto it — `O(|txs|)`, and under Leios `|txs|` is
+large. Serialising this under one lock is exactly the bottleneck above: while a
+rebase runs, nothing can be accepted, diffused or forged.
+
+All the performance and correctness of the concurrent case live in one
+operation — reconciling a state proposed by an action with the currently
+committed one, `mergeMempoolState`. The design:
+
+- **A single authoritative state cell** is both the state and the commit point.
+  Readers (block production, diffusion) observe it without blocking each other;
+  a writer holds it only to commit. Because there is exactly one cell, the
+  size/capacity accounting has one source of truth and cannot diverge.
+- **`AddTx`** resolves and validates off the cell (the expensive, adversary-
+  facing work), then commits by appending. Adds are serialised, so each commit
+  is cheap.
+- **`Rebase`** re-applies the transactions off the cell against the new `base`,
+  then runs a **converging loop**: read the transactions that arrived
+  meanwhile (the delta) and re-apply only those on top, repeating until the
+  delta is small. The delta shrinks each round — ingestion pays full validation
+  whereas the rebase only re-applies, which is cheaper per tx, and ingestion is
+  serialised. Only then does it take the cell, fold in a bounded residual, and
+  swap `base`. **The cell is held for a bounded time, independent of `|txs|`.**
+
+This gives `mergeMempoolState` its two required properties.
+
+**Performance:** the commit that blocks readers is bounded regardless of
+occupancy. Driving the real Mempool under concurrent load (full validation
+costed at 10× re-apply, matching proto-devnet), the maximum reader stall during
+a rebase stays roughly flat as occupancy grows, versus growing linearly when the
+whole re-apply is done under the lock:
+
+| mempool occupancy | re-apply under the lock | off-lock converging loop |
+| ----------------: | ----------------------: | -----------------------: |
+|              ~5k  |                  143 ms |                    53 ms |
+|           ~12–15k |              483–546 ms |                63–112 ms |
+|             ~56k  |                 2100 ms |                   300 ms |
+
+**Correctness:** the committed state is identical to re-applying all
+transactions against the new `base` in one pass (re-apply is an ordered fold, so
+splitting and resuming it yields the same result), and is checked by a parallel
+linearizability test. Committing through the cell — rather than an optimistic
+compare-and-swap — means a rebase always makes progress and cannot be starved by
+a stream of concurrent adds; the cost is that its final commit briefly delays
+readers, which the bounded residual keeps small.
+
+This is implemented in `ouroboros-consensus` (`Ouroboros.Consensus.Mempool`).
+
+#### Diffusion
+
+Deciding what to accept and diffuse assumes peers agree on `base` and
+`interval`, but today they do not share that state, so a node cannot distinguish
+adversarial from honest submissions. The intended direction is to split
+`TxSubmission` into two protocols — **MempoolSync**, which syncs `MempoolState`
+between peers, and **TxFetch**, which fetches a transaction by reference —
+making such behaviour detectable.
 
 ### Block production
 
@@ -558,7 +670,7 @@ The first version of the Mempool can be naive, with the block production thread 
 > FIXME: what kind of validation while diffusing (only size and hash checks)
 >
 > TODO: write about "which EB to prioritize" -> freshest first (protocol burst) vs. oldest (protocol storm) etc.
-> TODO: write about "which peer to fetch from" -> everything from one big ledger peer, round robin from all peers? 
+> TODO: write about "which peer to fetch from" -> everything from one big ledger peer, round robin from all peers?
 >
 > FIXME: at least put a naiive design (fetch freshest from everyone that offers) - safe but wasteful
 
@@ -597,7 +709,7 @@ This component therefore stores EBs on disk just as the ChainDB already does for
 >  - having an immutable EBs table or database should bound access times on EBs
 >    and closures of the volatile part (which should be log n, thus bounding n
 >    is desirable)
-> TODO: interaction with mempool (here or above) 
+> TODO: interaction with mempool (here or above)
 
 The first version of LeiosEbStore can just be two bog standard key-value stores, one for immutable and one for volatile. A second version maybe instead integrates certified EBs into the existing ImmDB? That integration seems like a good fit. It has other benefits (eg saves a disk roundtrip and exhibits linear disk reads for driver prefetching/etc), but those seem unimportant so far.
 
@@ -905,11 +1017,11 @@ The suite will perform the following actions:
 > [!WARNING]
 >
 > FIXME: Integrate this with the implementation plan
-    
+
 ## Observability as a first-class citizen
 
 By implementing evidence of code execution, a well-founded tracing system is the prime provider of observability for a system.
-This observability not only forms the base for monitoring and logging, but also performance and conformance testing.  
+This observability not only forms the base for monitoring and logging, but also performance and conformance testing.
 
 For principled Leios quality assurance, a formal specification of existing and additional Leios trace semantics is being created, and will need to be maintained. This specification is language- / implementation-independent, and
 should not be automatically generated by the Node's Haskell reference implementation. It needs to be an independent source of truth for system observables.
@@ -921,7 +1033,7 @@ Last not least, the existing simulations will be maintained and kept operational
 ## Testing during development
 
 Wheras simulations operate on models and are able to falsify hypotheses or assess probability of certain outcomes, evolving
-prototypes and implementations rely on evidence to that end. A dedicated environment suitable for both performance and conformance testing will be created; primarily as feedback for development, but also to provide transparency into the ongoing process.  
+prototypes and implementations rely on evidence to that end. A dedicated environment suitable for both performance and conformance testing will be created; primarily as feedback for development, but also to provide transparency into the ongoing process.
 
 This environment serves as a host for operating small testnets. It automates deployment and configuration, and is parametrizable as far as topology, and deployed binaries are concerned. This means it needs to abstract wrt. of configuring
 a specific prototype or implementation. This enables deploying adversarial nodes for the purpose of network conformance testing, as well as performance testing at system integration level. This environment also guarantees the
