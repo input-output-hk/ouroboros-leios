@@ -5,6 +5,37 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w30 - 2026-07-24
+
+BLS key registration in stake pool certificates, workarounds for a Dijkstra block-encoding issue in the ledger, and graceful handling of proper `MsgLeiosBlockAnnouncement` payloads.
+
+> [!IMPORTANT]
+>
+> The musashi testnet currently contains a block that was triggering a ledger issue (only Dijkstra era, expected integration pain). Do wipe your local state, and sideload from the IOG relays or sync from genesis with this release.
+
+- Register a BLS key alongside VRF/KES on stake pool registration [ledger#5940](https://github.com/IntersectMBO/cardano-ledger/pull/5940) - possible, but not utilized yet!
+  - `StakePoolParams` gains an optional `LeiosKey` (BLS12381 verification key + proof of possession); the Dijkstra `pool_registration_cert` CDDL adds the field as `opt`, so existing pool registrations remain valid.
+  - Canonical state CBOR encoding handles `leios_key` as an optional map field, gated by decoder version.
+  - `cardano-cli dijkstra stake-pool registration-certificate` now takes a required `--bls-signing-key-file`; the CLI reads the envelope and derives the pool's `LeiosKey` (verification key + PoP).
+
+- Stop mangling some Dijkstra blocks - quick fix workaround for [ledger issue #5937](https://github.com/IntersectMBO/cardano-ledger/issues/5937) [consensus#2140](https://github.com/IntersectMBO/ouroboros-consensus/pull/2140)
+  - The musashi testnet does contain a block that was triggering this. Do wipe your local state, and sideload from the IOG relays or sync from genesis.
+
+- Accept but ignore proper `MsgLeiosBlockAnnouncement` messages [consensus#2142](https://github.com/IntersectMBO/ouroboros-consensus/pull/2142)
+  - Prepares next steps on announcement pipeline.
+
+- `LeiosFetch` prioritizes the next needed EB while syncing - should improve sync times.
+  - Uses `FreshestLast` while the wall clock is beyond the forecast range, so a syncing node's reported tip advances more gradually.
+  - Interim measure; a proper Leios syncing design will supersede this.
+
+- Add `tx-firehose`: an N2C push-based tx load generator [cardano-node#6613](https://github.com/IntersectMBO/cardano-node/pull/6613)
+  - Complements `tx-generator` and `tx-centrifuge` for throughput experiments.
+  - Detects submission errors (only available over N2C) and allows to restart load generation.
+
+> [!NOTE]
+>
+> No wire-format break in `pool_registration_cert` — the new `leios_key` field is optional. While keys can be registered, the insecure key derivation short cut is still active. See [this cardano-blueprint PR](https://github.com/cardano-scaling/cardano-blueprint/pull/79) for the latest `leios-prototype` CDDL.
+
 ## prototype-2026w29 - 2026-07-17
 
 Increasing throughput by increasing certification rate and adds CallTrace instrumentation
