@@ -118,7 +118,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Load (assumed 204B per tx)"
+              "options": "Load"
             },
             "properties": [
               {
@@ -187,10 +187,10 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "rate({service=\"tx-centrifuge\", ns=\"TxCentrifuge.Builder.NewTx\"}[30s]) * 204",
+          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"} | json size=\"size\" | unwrap size [30s])) / 30 / 1000",
           "hide": false,
           "instant": false,
-          "legendFormat": "Load (assumed 204B per tx)",
+          "legendFormat": "Load",
           "queryType": "range",
           "range": true,
           "refId": "Load"
@@ -253,7 +253,7 @@
               }
             ]
           },
-          "unit": "reqps"
+          "unit": "TxkB/s"
         },
         "overrides": []
       },
@@ -289,10 +289,22 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "rate({service=\"tx-centrifuge\", ns=\"TxCentrifuge.Builder.NewTx\"}[30s])",
-          "legendFormat": "tx/s",
+          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"} | json size=\"size\" | unwrap size [30s])) / 30 / 1000",
+          "legendFormat": "accepted",
           "queryType": "range",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Reject\"} | json size=\"size\" | unwrap size [30s])) / 30 / 1000",
+          "legendFormat": "rejected",
+          "queryType": "range",
+          "refId": "B"
         }
       ],
       "title": "Submission load",
@@ -356,7 +368,7 @@
               }
             ]
           },
-          "unit": "Bps"
+          "unit": "TxkB/s"
         },
         "overrides": []
       },

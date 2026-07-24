@@ -33,12 +33,10 @@
 
     # Used by demo/
     ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype";
-    # Patched cardano-node — source of cardano-node and cardano-cli
-    # across the repo.
+    # Patched cardano-node — source of cardano-node, cardano-cli, and
+    # tx-firehose across the repo. The tx-firehose bench/ package now
+    # lives on top of leios-prototype so a single input suffices.
     cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
-    # tx-centrifuge only. TODO: track latest bench/leios once that
-    # branch is rebased onto something with no cooldown.
-    cardano-node-tx-centrifuge.url = "github:intersectmbo/cardano-node?rev=0ab6523057298eae80cb1aa1b23f4472480084be";
   };
 
   outputs =

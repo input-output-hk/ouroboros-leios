@@ -44,17 +44,27 @@ processes:
       period_seconds: 2
       failure_threshold: 60
 
-  TxCentrifuge:
+  TxFirehose:
     working_dir: ${WORKING_DIR}
-    command: tx-centrifuge centrifuge.json
-    log_location: "${WORKING_DIR}/tx-centrifuge.log"
+    command: >
+      tx-firehose
+      --socket-path node1/node.socket
+      --testnet-magic 164
+      --signing-key-file ${SOURCE_DIR}/config/stake-delegators/delegator1/payment.skey
+      --staking-key-file ${SOURCE_DIR}/config/stake-delegators/delegator1/staking.skey
+      --tps 100
+      --fee 1000000
+    log_location: "${WORKING_DIR}/tx-firehose.log"
     depends_on:
       Node1:
         condition: process_healthy
-      Node2:
-        condition: process_healthy
-      Node3:
-        condition: process_healthy
+    availability:
+      restart: on_failure
+      # Wait between restarts so the mempool has time to clear a
+      # descendant tx from a prior tx-firehose incarnation that would
+      # otherwise cause every fresh submit to be rejected as
+      # AllInputsAreSpent against the same head UTxO.
+      backoff_seconds: 30
 
   ObserveTip:
     environment:

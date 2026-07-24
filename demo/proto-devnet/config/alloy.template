@@ -132,12 +132,11 @@ loki.process "extract_cardano_node_logs" {
 	}
 
 	stage.match {
-		selector = `{process="TxCentrifuge"}`
-
+		selector = `{process="TxFirehose"}`
 		stage.static_labels {
 			values = {
-				service = "tx-centrifuge",
-				type    = "tx-centrifuge",
+				service = "tx-firehose",
+				type    = "tx-firehose",
 			}
 		}
 	}
