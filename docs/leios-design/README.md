@@ -512,284 +512,129 @@ The node must include new mini-protocols (**NEW-LeiosMiniProtocols**) to diffuse
 
 CIP-0164 implies functional requirements for the node to issue EBs alongside RBs, vote for EBs according to the rules from the CIP, include certificates when enough votes are seen, diffuse EBs and votes through the network layer, and retain EB closures indefinitely when certified. The Consensus layer is responsible for driving these operations and coordinating with the Network layer (which implements the actual mini-protocols) to ensure proper diffusion.
 
-### High-throughput mempool
-
-> [!WARNING]
->
-> FIXME: write up problem statement: reapplyTx on thousands of txs taking too long to block tx submission (link to other section?) and also recomputing the mempool snapshot in/for block forging is insufficient too.
-> FIXME: Write about two concrete consequences:
->     - decouple tx diffusion from mempool syncing -> need to re-apply txs added while syncing
->     - only block producers: keep a view (or two for Leios in Dijkstra) of txs to put into blocks -> only do slot dependent checks in ledger?
-> TODO: More advanced DAG-style mempool model?
-
-- **RSK-LeiosMempoolOverheadLatency**: Same as RSK-LeiosLedgerOverheadLatency, but for the Mempool frequently revalidating 15000% load in a caught-up node during congestion (ie 30000% the capacity of a Praos block, since the Leios Mempool capacity is now two EBs instead of two Praos blocks).
-
 ### Mempool
 
-Mempool is a component in `cardano-node` that "stages" transactions submitted by users of the network that haven't yet been "committed" on-chain (i.e. haven't been included in a forged Block).
+The Mempool stages transactions that have been submitted but not yet included in
+a block. It has three jobs: **accept** transactions from local clients,
+**diffuse** good ones to peers, and **pre-compute** their validation and
+application so a block producer can include them cheaply.
 
-Functionally, the Mempool aims to achieve three primary goals:
+Under Praos the second and third jobs are only partially met, which is
+tolerable. Under Leios it is not: the Mempool now holds roughly two endorser
+blocks' worth of transactions instead of two Praos blocks', and it is fed at up
+to ~1000 tx/s. Re-processing that many transactions whenever the chain moves,
+while serialising every Mempool operation behind a single lock, blocks
+transaction diffusion and block production for as long as the re-processing
+takes (**RSK-LeiosMempoolOverheadLatency**).
 
-1. **Accept** new transactions into the network from "local clients" (e.g. user wallets via LocalClient),
-2. **Diffuse** (propagate) "good" transactions across the network (e.g. peers via TxSubmission),
-3. **Pre-compute** transaction validation and application (state change) (e.g. timely inclusion in a block during block production).
+#### Validation vs. application
 
-The reality, however, is that as of today, goals 2 and 3 aren't fully being met. While we could get away with these inefficiencies under Ouroboros Praos traffic loads, they become a massive bottleneck for the throughput targets under Ouroboros Leios.
+A transaction is processed in three stages, with very different costs:
 
-To explain the challenges and opportunities, it's useful to view the Mempool as both:
+- **Resolve** — fetch the transaction's input UTxOs (from the cache or on-disk
+  ledger). Dependent transactions must be resolved in sequence.
+- **Validate** — check signatures, scripts, limits, values. Expensive, but once
+  a transaction is resolved this is **state-independent** and, crucially, valid
+  for the whole era: it need only be done **once** and can be cached.
+- **Apply** — check the transaction fits the current state (its inputs still
+  exist, its slot is in range). Cheap, but **must be redone every time the base
+  ledger state changes**.
 
-1. **Concurrent state** that can be affected through **adding and removing transactions**, **rebasing to some ledger state** and **ticking time**. These actions can occur simultaneously and the existing behaviour is roughly just serializing these actions via a wait lock (mutex). Mempool's capacity is drastically increased under Leios and as a result rebasing now takes much longer which in conjunction with high transaction load increases wait times significantly.
+So a caught-up node validates each transaction once and only ever *re-applies*
+(`reapplyTx`, not `applyTx`) when the base changes. Getting the validate/apply
+split right is what makes high throughput feasible.
 
-2. **Task scheduler** that is managing transaction **validation** and their **application** to one or more ledger states. This distinction is crucial in the Mempool and leveraged in the existing implementation, arguably not to its fullest potential.  **Transaction validation** (through `applyTx`) has to **only ever be performed once, can be cached and performed independently from state** (with some caveats), which is great because that is the most expensive part. **Transaction application** (through `reapplyTx`) however is inherently sequential (also with some caveats) and has to be performed on each (base) state changes.
+#### Model
 
-#### Transaction processing modes
-
-The distinction between the two modes, **validation** and **application**, can be loosely depicted using jigsaw puzzles. Validating a puzzle piece means checking its features are aligned with the overall puzzle (brand, color, shape, thickness, material), applying a puzzle piece means finding whether it fits somewhere in the currently assembled state.
-
-Bringing it back to transactions...
-
-Validating a transactions means checking signatures, scripts, limits, values etc. Applying a transaction however, means checking whether the state it builds upon to produce new state exists (utxos, stake pool, reward accounts, proposals, **time** etc).
-
-To hammer this down it's useful to say that a transaction can be **valid** and **applicable**. If a transaction is "valid" it can (but doesn't have to) be "applicable". On the other hand, if a transaction is "applicable" then it can (but doesn't have to) be "valid". We usually want both, but it's useful to know how they relate as it will help us define what we want to diffuse (valid? valid and applicable?) and how to organize tasks in the Mempool for optimal performance.
-
-Q: What about UTxOs during validation, don't you need to first fetch them from storage, isn't that necessarily state dependent? What if you have dependent transactions? Doesn't that dissolve the distinction with "application" and makes "validation" inherently sequential?
-A: Yes and no!
-
-  - Yes, in that UTxOs form part of the state in Cardano and need to be **resolved** before we can even start validating transactions either by querying storage or preceding transaction outputs. In other words, transactions in Cardano are **incomplete** and need a separate **resolution** step before validation that makes them **complete**.
-
-  - No, in that if a transaction validates it's valid **forever** (actually for an era), even though state it refers to might have been changed and made it **inapplicable** to some particular state. How one **resolves** transactions and makes them **complete** can be sequential, but doesn't have to.
-
-To further reinforce this argument, imagine an alternate universe in which Cardano transactions are shared in the network in a **complete** form, for example, UTxOs are content-addressed (hashed) and included in the witness part of transactions. It's clear here that **validation** is then entirely state independent.
-
-In todays' world still we can demonstrate the same, given a sequence of transactions one can perform a resolution pass on this sequence and from that point on work with complete transactions (albeit not performance ideal).
-
-#### Mempool model
-
-Explicit, well defined properties enable us to understand the bounds of a system's behavior. Cardano Mempool is fairly under-specified and because of that it's challenging to make implementation claims that improve performance without impacting correctness. What is expected of the Mempool's behavior, from the perspective of both transaction diffusion and block forging, is left implicit and up to implementor's choice.
-
-Let's attempt such a model that can make it simple to pose useful questions against the current and future implementations.
+The Mempool is concurrent state mutated by three actions:
 
 ```haskell
-type LedgerState = RbHash -- Ledger state is uniquely identified by the Praos (ranking) block hash
+data MempoolAction
+  = AddTx  Tx           -- from peers and local clients (~1000/s)
+  | Rebase LedgerState  -- chain selection picked a new base (a few per 20s)
+  | Tick   SlotNo       -- time advancing (~1/s)
 
-data MempoolAction = AddTx Tx -- peers and local clients (1000 per s)
-  | Rebase LedgerState -- chain selection (several per 20s)
-  | Tick SlotNo -- time passing (1 per s)
-
--- Mempool state holds the `base` ledger state,
--- the `txs` that were resolved, validated and
--- applicable to `base` ledger state AND `slot`.
-data MempoolState = MempoolState {
-  slot :: SlotNo,
-  base :: LedgerState,
-  txs : [Tx],
-}
+data MempoolState = MempoolState
+  { base     :: LedgerState       -- ledger state the txs are applied on top of
+  , interval :: (SlotNo, SlotNo)  -- slot range the mempool is valid for
+  , txs      :: [Tx]              -- resolved, validated, applicable transactions
+  }
 ```
 
-The main questions we need to answer:
+Two questions define correct behaviour: which transactions do we accept and
+diffuse, and which are eligible for a block? Both answer: those that are valid
+and applicable to `base` and `interval`.
 
-1. How do we decide which transactions to accept and diffuse?
-2. How do we decide which transactions are eligible to be included in the new block?
+#### Tick
 
-##### `Tick`
+Time (the slot) affects a transaction's validity (protocol parameters and the
+ledger law change at era boundaries) and its applicability (its own slot range,
+plus epoch-boundary state changes) — but **only at epoch boundaries**. We
+exploit this with the `interval`: a ~20-slot window between the current
+tip/epoch start and the next expected block/epoch end. Ticking *within* the
+interval changes nothing observable to transactions, so it costs nothing; only
+crossing an epoch boundary forces a re-apply (and a re-validate on a new era).
+The trade-off is that transactions whose validity range is narrower than the
+interval are rejected — acceptable for a large performance win.
 
-`slot` is a state variable that changes on `Tick` action and can affect both transaction "validity" and "applicability".
+#### Rebase and concurrency
 
-(In Cardano, time is denoted with slots, and is handled separate to `LedgerState`, not strictly necessary but it's worth mirroring that implementation choice.)
+`Rebase` is the hard case. When chain selection picks a new `base`, every
+transaction must be re-applied onto it — `O(|txs|)`, and under Leios `|txs|` is
+large. Serialising this under one lock is exactly the bottleneck above: while a
+rebase runs, nothing can be accepted, diffused or forged.
 
-It can affect **validity** because slots passing through epoch boundaries can change protocol parameters and the "ledger law". Since validity is essentially "ledger law" judgement on transactions, a transaction that was valid in one epoch is not necessarily valid in another. In other words, validity is defined per "ledger era". For example, script limits could change between eras.
+All the performance and correctness of the concurrent case live in one
+operation — reconciling a state proposed by an action with the currently
+committed one, `mergeMempoolState`. The design:
 
-(Q: Is it the case that if a Cardano transaction is valid in era N it's valid in all future M > N eras? Given the transaction "forward translation" feature? If so, we don't have to re-validate transactions when crossing epochs/eras?)
+- **A single authoritative state cell** is both the state and the commit point.
+  Readers (block production, diffusion) observe it without blocking each other;
+  a writer holds it only to commit. Because there is exactly one cell, the
+  size/capacity accounting has one source of truth and cannot diverge.
+- **`AddTx`** resolves and validates off the cell (the expensive, adversary-
+  facing work), then commits by appending. Adds are serialised, so each commit
+  is cheap.
+- **`Rebase`** re-applies the transactions off the cell against the new `base`,
+  then runs a **converging loop**: read the transactions that arrived
+  meanwhile (the delta) and re-apply only those on top, repeating until the
+  delta is small. The delta shrinks each round — ingestion pays full validation
+  whereas the rebase only re-applies, which is cheaper per tx, and ingestion is
+  serialised. Only then does it take the cell, fold in a bounded residual, and
+  swap `base`. **The cell is held for a bounded time, independent of `|txs|`.**
 
-It can also affect **applicability** because the slot can be outside of transaction interval. Another way applicability can change is, again, when passing through epoch boundaries as certain actions are put in effect late (pool registration etc.) and some state variables are created or deleted (stake pools). For example, a transaction with "always" interval that retires a pool A can be applicable in one epoch but not another.
+This gives `mergeMempoolState` its two required properties.
 
-(In the current terminology it would make sense to say transaction applicability interval, rather than validity interval)
+**Performance:** the commit that blocks readers is bounded regardless of
+occupancy. Driving the real Mempool under concurrent load (full validation
+costed at 10× re-apply, matching proto-devnet), the maximum reader stall during
+a rebase stays roughly flat as occupancy grows, versus growing linearly when the
+whole re-apply is done under the lock:
 
-That being said, time also affects the ledger state itself, as some state variables are "internal" to it and defined in terms of time, and not observable by transactions (for example incremental rewards accounting). In Cardano, such effects are accumulated incrementally and "published" on epoch boundaries.
+| mempool occupancy | re-apply under the lock | off-lock converging loop |
+| ----------------: | ----------------------: | -----------------------: |
+|              ~5k  |                  143 ms |                    53 ms |
+|           ~12–15k |              483–546 ms |                63–112 ms |
+|             ~56k  |                 2100 ms |                   300 ms |
 
-Why do we care about ticking in the Mempool? Well, that's the same as answering our two main questions wrt time...
+**Correctness:** the committed state is identical to re-applying all
+transactions against the new `base` in one pass (re-apply is an ordered fold, so
+splitting and resuming it yields the same result), and is checked by a parallel
+linearizability test. Committing through the cell — rather than an optimistic
+compare-and-swap — means a rebase always makes progress and cannot be starved by
+a stream of concurrent adds; the cost is that its final commit briefly delays
+readers, which the bounded residual keeps small.
 
-1. How do we decide which transactions to accept and diffuse?
-  - Transactions that are valid and applicable to `slot` are accepted and diffused.
-2. How do we decide which transactions are eligible to be included in the new block?
-  - Transactions that are valid and applicable to `slot` which matches the election winning slot can be included verbatim in the new block.
+This is implemented in `ouroboros-consensus` (`Ouroboros.Consensus.Mempool`).
 
-Scenario: Bob is sending a transaction X to Alice, but they don't know what `slot` the others' Mempool has.
+#### Diffusion
 
-How will Alice determine to accept or reject the transaction X (and potentially punish Bob)?
-After all, there's no guarantee both Mempool `slot`s match!
-Perhaps in Bob's Mempool transaction X is valid and applicable, just on a different `slot`.
-And there is no protocol currently with which they can share that information.
-Since Bob and Alice are currently just guessing, they can't determine whether some behavior is adversarial.
-
-(TODO: Include Alexey's epoch tick measurement data)
-
-Let's examine the ticking pseudocode:
-
-1. on `Tick newSlot` (newSlot > slot)
-  1. update `slot` to `newSlot`
-  2. tick `base` to `newSlot`
-    1. update internal state variables
-    2. if `newSlot` in new epoch
-      1. update state variables observable to `txs`
-  3. if `newSlot` in new epoch
-    1. if `newSlot` in new era
-      2. re-validate `txs`
-  4. re-apply `txs`
-
-Are we really going to do this every second?
-
-Step `1.2` can be fast, but on epoch boundary it's actually quite slow.
-Step `1.3.2` is always expensive, but re-validation only has to happen on new era.
-Step `1.4` can be made fast by using "smarter" scheduling techniques, but for now is also slow.
-
-Is there something better we can do?
-
-I propose the **Mempool transaction interval** that rejects transactions with interval that don't contain it.
-This intervals' left bound is the maximum between tip slot and last epoch boundary, and the right bound is minimum between "expected next block slot** and next epoch boundary.
-In practice, this interval would be ~20 slots long, arguably an acceptable tradeoff that gives correctness and performance but takes away transactions with an interval smaller than 20 slots.
-
-(TODO: Include Kosta's mainnet interval analysis)
-
-Why would that work?
-Ticking changes state observable to transactions and therefore can affect their validity and applicability only **on epoch boundary**.
-In other words, all ticking in between epoch bounds is not observable to transactions and can't affect their validity and applicability.
-So, ticking that stays within the bounds of the current Mempool transaction interval costs very little! Not just that, we don't really have to tick, if we do, it's just to help the internal "ledger" accounting perform smaller incremental computations.
-
-Let's update the model!
-
-```haskell
--- Mempool state holds the `base` ledger state,
--- the `txs` that were resolved, validated and
--- applicable to `base` ledger state AND `interval`.
-data MempoolState = MempoolState {
-  interval :: (SlotNo, SlotNo), -- technically can be derived from `base`
-  base :: LedgerState,
-  txs : [Tx]
-}
-```
-
-1. on `Tick newSlot`
-  1. if `newSlot` outside `interval` and in new epoch
-    1. tick `base` to `newSlot`
-    2. re-apply `txs` (re-validate if new era)
-  2. if `newSlot` outside `interval` and not in new epoch (TODO: We should have seen a new block by now and rebase?)
-  3. if `newSlot` inside `interval`
-    1. `tick` internal `base` state variables
-
-And back to the main questions:
-
-1. How do we decide which transactions to accept and diffuse?
-  - Transactions that are valid and applicable to `interval` are accepted and diffused.
-2. How do we decide which transactions are eligible to be included in the new block?
-  - Transactions that are valid and applicable to `interval` which contains the election winning slot can be included verbatim in the new block.
-
-##### `Rebase`
-
-`base` is a state variable that should reflect the currently selected ledger state. When a selection changes, Mempool needs to rebase `txs` on top of this new `base` (and `interval`).
-
-Since there can be many transaction in `txs` it can take a long time to re-apply this sequence.
-It's noteworthy to reiterate that we only need to **apply** and not **validate** `txs` as we established before that **validation** can be cached forever (or for-era) while **application** is state dependent.
-
-(TODO: Insert some data here)
-
-(The very fact that we treat them as a sequence is unfortunate, as especially in Cardano ledger there's many opportunities to schedule this work more intelligently by treating transactions as a DAG by utilizing transaction topology. However, that's currently a research and development question that requires a non-trivial amount of effort.)
-
-1. on `Rebase newState`
-  1. Update `base` to `newState`
-  2. Update `interval` to `(max (tipSlot newState) previousEpochSlot, min nextExpectedBlockSlot nextEpochSlot)`
-  3. re-apply `txs`
-
-Scenario: Bob is sending Alice 100 txs per second, and Alice is going through a rebase, what happens?
-
-In the current implementation, we're utilizing a wait-lock, during a rebase all access to the Mempool is blocked until the rebase is done.
-If a rebase takes 1 second, Bob will queue up 100 transactions waiting on the rebase to finish, and in that time Bob's transactions aren't diffused.
-In a naive, lock-free solution, Bob might be able to add transactions to Alice's Mempool while the rebase is ongoing and diffusion would continue,
-but when the rebase is done and its work needs to be committed, we're faced with a similar problem:
-there's 100 transactions more in the Mempool than when the rebase started. What do we do with them? Drop them? Or re-apply them too?
-If we re-apply them, do we do that in some priority way? Perhaps with a lock?
-
-Sounds like this is an improvement! We're not waiting on a longer rebase but instead waiting on a shorter "merge" that reconciliates
-conflicts due to Mempool effects occurring concurrently (namely re-applying 100 surplus transactions).
-
-```haskell
-
-mergeMempoolState :: MempoolState -> MempoolState -> MempoolState
-mergeMempoolState lm rm  = -- in the case of miss matching `base`, 'select' the one with the "better" base and
-                           -- if there's any surplus transactions in "worse" mempool apply them in "better".
-                           ...
-```
-
-Let's take a step back at this point an go back to our main questions:
-
-1. How do we decide which transactions to accept and diffuse?
-  - Transactions that are valid and applicable to `base` are accepted and diffused.
-2. How do we decide which transactions are eligible to be included in the new block?
-  - Transactions that are valid and applicable to `base` can be included verbatim in the new block.
-
-Similar to the ticking scenario, since Bob and Alice don't know which `base` they see, they are guessing, and that can be abused by adversaries.
-
-##### `AddTx`
-
-`txs` is a state variable that holds a sequence of transactions received from either local clients or TxSubmission peers. Upon receival, every transaction first needs to be **resolved** against the in-memory cache or on-disk storage, **validated** and finally **applied** to `base` and `interval`.
-
-These 3 stages of transaction processing should be separately considered and measured to understand their processing bounds. What's the "worst" case scenario for resolution, is not the same as what it is for validation or application.
-
-Let's talk about resolution first. If we have transactions that are topologically independent, we can perform resolution on them in parallel.
-However, reasoning about transaction dependencies and topologies is not currently in our tool box so we have to make do with the next best thing.
-We have to resolve transactions in sequence, in case transactions are dependent, the state they produce (UTxOs) might be needed by some following transactions.
-
-Therefore, given a sequence of transactions, we can do a resolution pass to make them complete.
-This sounds enticing, but what if those transactions turn out to be invalid? Or valid but inapplicable?
-
-One goal of the Mempool is to minimize work that an adversary can make it do "for free".
-
-Until a topology aware transaction scheduler comes about, we're seemingly stuck with processing every transaction in sequence: resolve, validate and apply.
-
-#### TODO: EB extended `base`
-
-#### Final model, concurrency and protocol changes
-
-Given the final proposed model
-
-```haskell
-type LedgerState = RbHash -- Ledger state is uniquely identified by the Praos (ranking) block hash
-
-data MempoolAction = AddTx Tx -- peers and local clients (1000 per s)
-  | Rebase LedgerState -- chain selection (several per 20s)
-  | Tick SlotNo -- time passing (1 per s)
-
--- Mempool state holds the `base` ledger state,
--- the `txs` that were resolved, validated and
--- applicable to `base` ledger state AND `interval`.
-data MempoolState = MempoolState {
-  interval :: (SlotNo, SlotNo),
-  base :: LedgerState,
-  txs : [Tx]
-}
-```
-
-The concurrency problem statement is simple.
-Mempool actions happen in parallel and "propose" the new Mempool state value.
-Every such new state value races to be merged with the current one and commited as the new Mempool state which is observed by both diffusion and block production.
-All the concurrency questions, specifically performance botlenecks and correctness issues can be located in said `mergeMempoolState` function.
-
-(TODO: Write out the model procedure with mergeMempoolState)
-
-Two main questions:
-
-1. How do we decide which transactions to accept and diffuse?
-  - Transactions that are valid and applicable to `base` and `interval` are accepted and diffused.
-2. How do we decide which transactions are eligible to be included in the new block?
-  - Transactions that are valid and applicable to `base` and election slot is in `interval` can be included verbatim in the new block.
-
-However, the question of diffusion is under-specified. What ideally I would like to see to prevent adversarial behavior is to
-split TxSubmission in 2 new protocols:
-
-1. MempoolSync that syncs the `MempoolState` between peers,
-2. TxFetch that fetches transactions given some tx reference.
-
-This is key to detecting adversarial behavior.
+Deciding what to accept and diffuse assumes peers agree on `base` and
+`interval`, but today they do not share that state, so a node cannot distinguish
+adversarial from honest submissions. The intended direction is to split
+`TxSubmission` into two protocols — **MempoolSync**, which syncs `MempoolState`
+between peers, and **TxFetch**, which fetches a transaction by reference —
+making such behaviour detectable.
 
 ### Block production
 
