@@ -190,6 +190,16 @@ cardano-cli dijkstra stake-pool registration-certificate \
   --out-file pool-reg.cert
 ```
 
+
+:::warning `registration-certificate` now requires a BLS key
+The `cardano-cli` command for creating a pool registration certificate now
+requires to generate and set a BLS key. The Musasho testnet does not utilize
+these yet at the time of writing, but transactions carrying them are already
+accepted. Better instructions will follow here soon. Reach out on the [Musashi
+Dōjō Discord](https://discord.gg/Bx2qvsjCte) if you need help to register a
+pool.
+:::
+
 :::tip
 `--pool-pledge 1000000000` is 1000 test ada — a reasonable pledge for a testnet
 pool. `--pool-cost 170000000` (170 ada) and `--pool-margin 0.05` (5%) are
@@ -224,16 +234,6 @@ cardano-cli dijkstra transaction sign \
 cardano-cli dijkstra transaction submit \
   --tx-file pool-reg-tx.signed
 ```
-
-:::warning `transaction build` broken in prototype-2026w27
-The `cardano-cli dijkstra transaction build` command above currently
-fails with the `prototype-2026w27` release. As a workaround, use the
-`cardano-cli` from the previous release
-([`prototype-2026w26`](https://github.com/input-output-hk/ouroboros-leios/releases/tag/prototype-2026w26))
-to build the transaction — signing and submission with the
-`prototype-2026w27` binary still work. Fix is being tracked; check the
-[Musashi Dōjō Discord](https://discord.gg/Bx2qvsjCte) for the latest.
-:::
 
 ## Delegate stake to your pool
 
