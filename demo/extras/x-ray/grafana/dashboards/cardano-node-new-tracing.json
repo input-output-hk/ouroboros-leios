@@ -1294,7 +1294,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "netdata_statsd_cardano_node_ping_latency_ms_gauge_value_average{environment=\"$environment\",instance=~\"$instance\"}",
+          "expr": "cardano_node_metrics_custom_ping_latency_ms{environment=\"$environment\",instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "{{instance}}",
           "range": true,
