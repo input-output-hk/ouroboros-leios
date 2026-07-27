@@ -31,6 +31,15 @@ let cancelled = false;
 let retryCount = 0;
 let retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
+// Loki's tail can deliver the same entry more than once — even on a single
+// connection — via backfill/live overlap and overlapping poll windows. Each
+// entry is redelivered with its original timestamp, so (raw tsNs + message
+// identity) is a stable per-entry key. Bounded because redelivery only ever
+// repeats recent entries; a generous cap covers the overlap window without
+// unbounded growth over a long run.
+const seenEntryKeys = new Set<string>();
+const SEEN_ENTRY_CAP = 200_000;
+
 const post = (msg: LokiWorkerResponse) => postMessage(msg);
 
 const closeSocket = () => {
@@ -76,7 +85,21 @@ const connect = (lokiHost: string) => {
         for (const [tsNs, logLine] of stream.values as [string, string][]) {
           const ts = parseFloat(tsNs) / 1_000_000_000;
           const parsed = parseStreamValue(stream.stream, ts, logLine);
-          if (parsed) events.push(parsed);
+          if (!parsed) continue;
+          const m = parsed.message as {
+            type: string;
+            id?: string;
+            sender?: string;
+            recipient?: string;
+          };
+          // Key on the RAW tsNs string (not the lossy float) + message identity.
+          const key = `${tsNs}|${m.type}|${m.id ?? ""}|${m.sender ?? ""}|${m.recipient ?? ""}`;
+          if (seenEntryKeys.has(key)) continue; // redelivered entry — drop
+          if (seenEntryKeys.size >= SEEN_ENTRY_CAP) {
+            seenEntryKeys.delete(seenEntryKeys.values().next().value as string);
+          }
+          seenEntryKeys.add(key);
+          events.push(parsed);
         }
       }
 
@@ -119,6 +142,7 @@ self.onmessage = (e: MessageEvent<LokiWorkerRequest>) => {
     cancelled = false;
     retryCount = 0;
     resetPendingState();
+    seenEntryKeys.clear();
     closeSocket();
     connect(req.lokiHost);
   } else if (req.type === "DISCONNECT") {
