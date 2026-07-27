@@ -131,7 +131,30 @@ export const reducer = (
       };
 
     case "ADD_TIMELINE_EVENT_BATCH": {
-      const newEvents = [...state.events, ...action.payload];
+      // Keep `events` ordered by `time_s`. The aggregator relies on this: it
+      // stops scanning at the first event past the current time, so an
+      // out-of-order event would truncate the scan and silently drop later
+      // events from every count. The live Loki path interleaves
+      // independently-delivered per-direction streams, so batches arrive out
+      // of order. Merge-insert the (small) sorted batch into the already-sorted
+      // list in O(n + m); a full re-sort each batch would be O(n log n),
+      // untenable once a demo reaches hundreds of thousands of events.
+      const incoming = [...action.payload].sort((a, b) => a.time_s - b.time_s);
+      const prev = state.events;
+      const merged: typeof prev = new Array(prev.length + incoming.length);
+      let pi = 0;
+      let ii = 0;
+      let mi = 0;
+      while (pi < prev.length && ii < incoming.length) {
+        if (prev[pi].time_s <= incoming[ii].time_s) {
+          merged[mi++] = prev[pi++];
+        } else {
+          merged[mi++] = incoming[ii++];
+        }
+      }
+      while (pi < prev.length) merged[mi++] = prev[pi++];
+      while (ii < incoming.length) merged[mi++] = incoming[ii++];
+      const newEvents = merged;
 
       if (newEvents.length === 0) {
         return {
@@ -140,10 +163,11 @@ export const reducer = (
         };
       }
 
-      // Calculate timeline bounds
-      const timestamps = newEvents.map((event) => event.time_s);
-      const minEventTime = Math.min(...timestamps);
-      const maxEventTime = Math.max(...timestamps);
+      // `newEvents` is sorted, so the bounds are its endpoints — O(1), and
+      // avoids `Math.min(...timestamps)` overflowing the call stack at large
+      // event counts.
+      const minEventTime = newEvents[0].time_s;
+      const maxEventTime = newEvents[newEvents.length - 1].time_s;
 
       // Update timeline bounds and clamp current time
       const newMinTime =
