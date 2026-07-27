@@ -7,6 +7,8 @@
 
 import {
   EServerMessageType,
+  IAnnouncementReceived,
+  IAnnouncementSent,
   IEndorserBlockGenerated,
   IEndorserBlockReceived,
   IEndorserBlockSent,
@@ -365,6 +367,81 @@ const parseEndorserBlockReceived = (
   return null;
 };
 
+const parseAnnouncementSent = (
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // {"kind":"Send","msg":{"kind":"MsgLeiosBlockAnnouncement","ebSlot":...,"ebHash":"...","ebBodySize":...},"peer":{"connectionId":"..."}}
+    // The message is an RB header; the node renders the announced EB point so
+    // the hop can be keyed by (and linked to) the endorser block.
+    if (
+      (log.direction || log.kind) === "Send" &&
+      log.msg &&
+      log.msg.kind === "MsgLeiosBlockAnnouncement"
+    ) {
+      const [sender, recipient] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
+
+      const message: IAnnouncementSent = {
+        type: EServerMessageType.AnnouncementSent,
+        slot: log.msg.ebSlot ?? 0,
+        id:
+          log.msg.ebHash ?? `announcement-${sender}-${recipient}-${timestamp}`,
+        sender,
+        recipient,
+      };
+
+      return { time_s: timestamp, message };
+    }
+  } catch (error) {
+    console.error("Failed to parse AnnouncementSent log line:", logLine, error);
+  }
+
+  return null;
+};
+
+const parseAnnouncementReceived = (
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    if (
+      log.kind === "Recv" &&
+      log.msg &&
+      log.msg.kind === "MsgLeiosBlockAnnouncement"
+    ) {
+      const [recipient, sender] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
+
+      const message: IAnnouncementReceived = {
+        type: EServerMessageType.AnnouncementReceived,
+        slot: log.msg.ebSlot ?? 0,
+        id:
+          log.msg.ebHash ?? `announcement-${sender}-${recipient}-${timestamp}`,
+        sender,
+        recipient,
+      };
+
+      return { time_s: timestamp, message };
+    }
+  } catch (error) {
+    console.warn(
+      "Failed to parse AnnouncementReceived log line:",
+      logLine,
+      error,
+    );
+  }
+
+  return null;
+};
+
 const txsId = (msg: any): string => {
   const bitmapStr = (msg.bitmaps || []).join(",");
   return `txs-${msg.ebHash}-${bitmapStr}`;
@@ -571,6 +648,8 @@ export const parseStreamValue = (
   parseEndorserBlockGenerated(streamLabels, timestamp, logLine) ||
   parseEndorserBlockSent(timestamp, logLine) ||
   parseEndorserBlockReceived(timestamp, logLine) ||
+  parseAnnouncementSent(timestamp, logLine) ||
+  parseAnnouncementReceived(timestamp, logLine) ||
   parseTxsSent(timestamp, logLine) ||
   parseTxsReceived(timestamp, logLine) ||
   parseVotesGenerated(streamLabels, timestamp, logLine) ||
