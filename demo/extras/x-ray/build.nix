@@ -15,6 +15,7 @@
           packages = [
             pkgs.nettools
             pkgs.netcat
+            pkgs.caddy
             pkgs.grafana
             pkgs.grafana-alloy
             pkgs.grafana-loki
