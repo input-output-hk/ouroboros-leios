@@ -17,17 +17,6 @@ follow the chain; registering a **stake pool** lets it forge blocks —
 both ordinary Praos ranking blocks and Leios endorser blocks — and makes
 you a full participant in the Earth-phase work.
 
-:::info About BLS keys — what changes soon
-For the first few days of the testnet, registering a stake pool uses
-**exactly the same method you use on Cardano today** — the keys and
-certificates below. In the coming days the engineering team will release
-a node version that requires stake pools to additionally register a new
-**BLS key**. BLS keys are an essential part of Leios: they are what pools
-use to vote on and certify endorser blocks. When that release lands, this
-guide will add the extra registration step. Until then, the standard flow
-on this page is all you need.
-:::
-
 :::note First, get `cardano-cli` and `cardano-node` on your PATH
 Every command in this guide uses `cardano-cli`, and the final step runs
 `cardano-node` directly — so you need both available.
@@ -139,6 +128,23 @@ cardano-cli dijkstra node key-gen-VRF \
   --signing-key-file vrf.skey
 ```
 
+## BLS keys
+
+BLS keys are keys that pools use to vote on and certify endorser blocks.
+You need them to register a Leios-enabled stake pool.
+
+```shell
+# BLS key pair (Leios voting/certification key)
+cardano-cli dijkstra node key-gen-BLS \
+  --verification-key-file bls.vkey \
+  --signing-key-file bls.skey
+
+# BLS proof-of-possession (proves you own the signing key)
+cardano-cli dijkstra node issue-pop-BLS \
+  --bls-signing-key-file bls.skey \
+  --out-file bls.pop
+```
+
 ## Operational certificate
 
 Compute the current KES period from the chain tip and the genesis
@@ -180,6 +186,7 @@ public IP (the address other nodes will use to reach it):
 cardano-cli dijkstra stake-pool registration-certificate \
   --cold-verification-key-file cold.vkey \
   --vrf-verification-key-file vrf.vkey \
+  --bls-signing-key-file bls.skey \
   --pool-pledge 1000000000 \
   --pool-cost 170000000 \
   --pool-margin 0.05 \
@@ -190,14 +197,12 @@ cardano-cli dijkstra stake-pool registration-certificate \
   --out-file pool-reg.cert
 ```
 
-
-:::warning `registration-certificate` now requires a BLS key
+:::warning BLS key included but not yet active
 The `cardano-cli` command for creating a pool registration certificate now
-requires to generate and set a BLS key. The Musasho testnet does not utilize
-these yet at the time of writing, but transactions carrying them are already
-accepted. Better instructions will follow here soon. Reach out on the [Musashi
-Dōjō Discord](https://discord.gg/Bx2qvsjCte) if you need help to register a
-pool.
+requires a BLS key. The Musasho testnet does not utilize it yet at the time of
+writing, but transactions carrying it are already accepted. Reach out on the
+[Musashi Dōjō Discord](https://discord.gg/Bx2qvsjCte) if you need help to
+register a pool.
 :::
 
 :::tip
