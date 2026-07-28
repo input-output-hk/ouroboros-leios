@@ -235,7 +235,8 @@ module LinearLeiosVerifierChain where
         with EB-refs a ⁉ h | EB-received a ⁉ h
       ... | just eb | just slot' = (record a { votedEB = just (eb , slot') ; curEB = just h } , [])
       ... | _       | _          = (a , [])
-      traceEvent→action a (CVoteAcquired h s) = (a , [])
+      traceEvent→action a (CVoteAcquired _ _) =
+        (record a { FFD-blks = VT-Blk (tt ∷ []) ∷ FFD-blks a } , [])
       traceEvent→action a (CRBForged h s) = (a , [])
 
       s₀ : LeiosState
