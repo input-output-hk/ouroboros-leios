@@ -112,7 +112,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum by(voterId) (count_over_time({service=\"leios-voting\", voterId=~\"$voterId\", instance=~\"$instance\", kind=\"LeiosVoteAcquired\"} | json | vote_rbHash=~\"$rbHash\" [1m]))",
+          "expr": "sum by(voterId) (count_over_time({service=\"cardano-node/leios-voting\", voterId=~\"$voterId\", instance=~\"$instance\", kind=\"LeiosVoteAcquired\"} | json | vote_rbHash=~\"$rbHash\" [1m]))",
           "legendFormat": "{{voterId}}",
           "queryType": "range",
           "refId": "A"
@@ -214,7 +214,7 @@
           },
           "direction": "backward",
           "editorMode": "builder",
-          "expr": "sum by(vote_rbHash) (count_over_time({service=\"leios-voting\", voterId=~\"$voterId\", instance=~\"$instance\", kind=\"LeiosVoteAcquired\"} | json | vote_rbHash=~\"$rbHash\" [1m]))",
+          "expr": "sum by(vote_rbHash) (count_over_time({service=\"cardano-node/leios-voting\", voterId=~\"$voterId\", instance=~\"$instance\", kind=\"LeiosVoteAcquired\"} | json | vote_rbHash=~\"$rbHash\" [1m]))",
           "legendFormat": "{{vote_rbHash}}",
           "queryType": "range",
           "refId": "A"
@@ -392,7 +392,7 @@
         "query": {
           "label": "voterId",
           "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "{service=\"leios-voting\"}",
+          "stream": "{service=\"cardano-node/leios-voting\"}",
           "type": 1
         },
         "refresh": 1,
@@ -420,7 +420,7 @@
         "query": {
           "label": "instance",
           "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "{service=\"leios-voting\"}",
+          "stream": "{service=\"cardano-node/leios-voting\"}",
           "type": 1
         },
         "refresh": 1,
