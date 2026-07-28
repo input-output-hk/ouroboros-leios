@@ -597,7 +597,7 @@
             }
           },
           "color": {
-            "mode": "palette-classic"
+            "mode": "palette-classic-by-name"
           },
           "unit": "s",
           "mappings": [],
