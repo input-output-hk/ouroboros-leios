@@ -15,6 +15,7 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
   },
   messages: [],
   edges: new Map(),
+  traversedEdges: new Set(),
   nodeActivity: new Map(),
   eventCounts: {
     total: 0,

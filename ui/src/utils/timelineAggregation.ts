@@ -184,6 +184,11 @@ const createMessageAnimation = (
   const edgeIds = [sender, recipient].sort();
   const edgeKey = `${edgeIds[0]}|${edgeIds[1]}`;
 
+  // Mark the edge as traversed regardless of whether the message is still in
+  // transit at targetTime: an edge that has ever carried a message is drawn
+  // solid rather than dotted.
+  result.traversedEdges.add(edgeKey);
+
   // Check if message is currently in transit
   const isInTransit =
     targetTime >= sentTime && targetTime < estimatedReceiveTime;
@@ -283,6 +288,7 @@ export const computeAggregatedDataAtTime = (
     },
     messages: [],
     edges: new Map(),
+    traversedEdges: new Set(),
     nodeActivity: new Map(),
     // Add event counts for the UI
     eventCounts: {

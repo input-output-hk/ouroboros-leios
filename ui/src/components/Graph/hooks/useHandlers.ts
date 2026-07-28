@@ -162,7 +162,14 @@ export const useHandlers = () => {
       }
 
       context.lineWidth = Math.min((0.2 / canvasScale) * 6, 0.2);
+      // Dotted until a message has crossed this edge (in either direction),
+      // solid thereafter — so links that are never used stay visibly dashed.
+      if (!aggregatedData.traversedEdges.has(edgeKey)) {
+        const dash = context.lineWidth * 3;
+        context.setLineDash([dash, dash]);
+      }
       context.stroke();
+      context.setLineDash([]);
     });
 
     // Draw the nodes
