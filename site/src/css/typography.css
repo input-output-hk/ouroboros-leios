@@ -113,40 +113,8 @@
   --line-height-normal: 1.5;
 }
 
-h1 {
-  font-size: var(--text-7xl);
-  font-weight: var(--font-weight-regular);
-  line-height: var(--line-height-xs);
-}
-
-h2 {
-  font-size: var(--text-4xl);
-  font-weight: var(--font-weight-regular);
-  letter-spacing: -0.02rem;
-  line-height: var(--line-height-sm);
-}
-
-h4 {
-  font-size: var(--text-5xl);
-  font-weight: var(--font-weight-regular);
-  line-height: var(--line-height-medium);
-}
-
-@media (max-width: 997px) {
-  h1 {
-    font-size: var(--text-6xl);
-  }
-
-  h2 {
-    font-size: var(--text-4xl);
-    font-weight: var(--font-weight-regular);
-    letter-spacing: -0.02rem;
-    line-height: var(--line-height-sm);
-  }
-
-  h4 {
-    font-size: var(--text-xl);
-    font-weight: var(--font-weight-regular);
-    line-height: var(--line-height-medium);
-  }
-}
+/*
+ * Heading sizes are left to Infima's default (monotonic) scale so custom
+ * overrides don't leak into docs markdown. Components that need a specific
+ * size set it themselves (e.g. the homepage hero title below).
+ */

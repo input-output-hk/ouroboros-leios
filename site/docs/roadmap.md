@@ -18,7 +18,6 @@ Together, these objectives and features form the product roadmap, which will be 
 
 </a>
 
-## 2025/2026 
 ### Improvement proposal 
 
 > As the Cardano community, we want to understand as early as possible what changes are being proposed, so that we can discuss them across relevant groups and committees and reference them in subsequent on-chain governance decisions.
@@ -95,9 +94,6 @@ It would enable SPOs, developers, and infrastructure providers to integrate Leio
 - Monitor infrastructure compatibility across the community
 - Run large-scale experiments under varying load conditions and parameter configurations.
 
----
-## 2026 Proposal
-
 ### High Confidence
 
 > As a Cardano community member, I want assurance that the Leios protocol is secure and performs as expected under realistic and adversarial conditions, so that I can trust it with real value on mainnet.
@@ -106,9 +102,7 @@ Systematically validate the protocol through parameter exploration, continuous l
 
 Once the Leios testnet is operational, it provides a larger-scale environment to study protocol behavior under realistic conditions. This objective runs in parallel with the Release Candidate work and is essential for building confidence among developers and the community alike. A threat model was created in the first budget cycle; this objective revisits it systematically and validates that all identified risks have effective mitigations.
 
-#### _Technical feasibility confirmed_
-
-**Scope**
+**Technical feasibility confirmed scope:**
 
 - Systematic study of timing parameters (L_hdr, L_vote, L_diff) and size limits (S_EB, S_EB-tx), including evidence that Praos is unaffected by Leios load
 - Continuous load testing under various load profiles
@@ -117,9 +111,7 @@ Once the Leios testnet is operational, it provides a larger-scale environment to
 - Develop parameter graduation plan: testnet → mainnet → gradual mainnet scale-up
 - Publish benchmark report covering every stage of the Leios transaction pipeline on reference cluster hardware
 
-#### _Risks & mitigations validated_
-
-**Scope**
+**Risks & mitigations validated scope:**
 
 - Stake-based attack testing and quantitative analysis: equivocation, vote splitting, certification threshold manipulation
 - Network-based attack testing: delayed propagation, eclipse attacks, partition scenarios
@@ -134,21 +126,16 @@ Once the Leios testnet is operational, it provides a larger-scale environment to
 
 Mature the Leios implementation from early testnet prototype to a mainnet-ready release candidate, progressing through [Software Readiness Levels](https://committees.docs.intersectmbo.org/intersect-technical-steering-committee/technical-roadmap/project-cards-explained/software-readiness-level) 5–8.
 
-This is the critical path for the entire proposal. The implementation must be substantially rewritten and refined, conformance tested against formal specifications, and integrated into the primary node used by most stake pools before it can be deployed to `preview` and `preprod` testnets and considered in the hard-fork schedule. Feature completeness is defined by CIP-164.
+This is the critical path for mainnet deployment. The implementation must be substantially rewritten and refined, conformance tested against formal specifications, and integrated into the primary node used by most stake pools before it can be deployed to `preview` and `preprod` testnets and considered in the hard-fork schedule. Feature completeness is defined by CIP-164.
 
-#### _Dijkstra era definition includes Leios_
-
-**Scope**
+**Dijkstra era definition includes Leios scope:**
 
 - Implement Leios block structure and encoding for the Dijkstra ledger era
 - Define and implement Leios protocol parameters in the ledger
 - Produce a `cardano-node` release (11.x or later) that understands Leios-era blocks
 - Coordinate with the Hard Fork Working Group (HFWG) to confirm Leios is included in the Dijkstra era scoping decision
 
-#### _Leios-enabled cardano-node_
-
-
-**Scope**
+**Leios-enabled cardano-node scope:**
 
 - Production-grade implementation of CIP-164 in cardano-node that can be configured through protocol parameters and allows enabling of Leios at a hard-fork boundary
 - Progress through SRL 5 (Initial Implementation) → SRL 6 (Main Implementation) → SRL 7 (Integration) → SRL 8 (Mainnet-ready)
@@ -163,9 +150,7 @@ This is the critical path for the entire proposal. The implementation must be su
 
 Do everything within our control to make the Leios hard fork possible: prepare the broader ecosystem and all technical and governance stakeholders for Leios mainnet activation through stable client interfaces, comprehensive integration documentation, SPO outreach, and community workshops. See through testnet hard-forks, finalize the mainnet parameter graduation plan, coordinate with relevant bodies, and document contingency procedures.
 
-#### _Constitutional updates / governance prepared_
-
-**Scope**
+**Constitutional updates / governance prepared scope:**
 
 - Prepare updated guardrails script incorporating Leios protocol parameters, ready for submission as part of a Constitution update proposal
 - Draft rationale document for the Constitution update explaining why the new parameters and guardrail changes are needed
@@ -173,10 +158,7 @@ Do everything within our control to make the Leios hard fork possible: prepare t
 - Consistency check confirming no discrepancies between the ratified CIP-164, the Agda formal specification, and the `cardano-node` implementation
 - Coordinate timing and scoping with relevant governance bodies and advocate for Leios inclusion in the hard-fork schedule
 
-#### _Hard-fork enabling Leios_
-
-
-**Scope**
+**Hard-fork enabling Leios scope:**
 
 - Node-to-Client (N2C) mini-protocol and utxo-rpc API updates and stabilization, iterating based on integrator feedback
 - Complete implementation-independent technical documentation for Leios (`cardano-blueprint`)

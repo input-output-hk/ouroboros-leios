@@ -60,9 +60,17 @@
 }
 
 .heroTitle {
+  font-size: var(--text-7xl);
+  line-height: var(--line-height-xs);
   margin-bottom: 2.5rem !important;
   font-weight: 500;
   font-family: var(--font-spectral);
+}
+
+@media (max-width: 997px) {
+  .heroTitle {
+    font-size: var(--text-6xl);
+  }
 }
 
 .heroSubtitle {
