@@ -112,7 +112,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum by(voterId) (count_over_time({service=\"leios-voting\", voterId=~\"$voterId\", instance=~\"$instance\"} | json | vote_rbHash=~\"$rbHash\" | kind = `LeiosVoteAcquired` [1m]))",
+          "expr": "sum by(voterId) (count_over_time({service=\"leios-voting\", voterId=~\"$voterId\", instance=~\"$instance\", kind=\"LeiosVoteAcquired\"} | json | vote_rbHash=~\"$rbHash\" [1m]))",
           "legendFormat": "{{voterId}}",
           "queryType": "range",
           "refId": "A"
@@ -214,7 +214,7 @@
           },
           "direction": "backward",
           "editorMode": "builder",
-          "expr": "sum by(vote_rbHash) (count_over_time({service=\"leios-voting\", voterId=~\"$voterId\"} | json | vote_rbHash=~\"$rbHash\" | kind = `LeiosVoteAcquired` [1m]))",
+          "expr": "sum by(vote_rbHash) (count_over_time({service=\"leios-voting\", voterId=~\"$voterId\", instance=~\"$instance\", kind=\"LeiosVoteAcquired\"} | json | vote_rbHash=~\"$rbHash\" [1m]))",
           "legendFormat": "{{vote_rbHash}}",
           "queryType": "range",
           "refId": "A"
