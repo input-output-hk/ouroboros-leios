@@ -28,8 +28,18 @@ export type LokiWorkerResponse =
   | { type: "EVENTS"; events: IServerMessage[] }
   | { type: "DROPPED"; count: number };
 
+// Alloy writes each cardano-node line to Loki twice: once before it promotes
+// the JSON `kind` to a stream label and once after, so every event exists in
+// both a `kind=""` stream and a `kind="..."` stream with byte-identical content.
+// The `kind=""` set is the complete one (the labelled set omits events whose
+// kind is nested, e.g. TraceSendRecv, so it never gets the label); selecting it
+// here delivers every event exactly once. That keeps the parser's stateful
+// correlation (cert -> forge -> adopt, which populates an RB's parent and
+// certified EB) from being corrupted by a duplicate forge. NB: this couples us
+// to that Alloy behaviour — if the pipeline stops emitting the pre-label copy,
+// this selector must change.
 const QUERY =
-  '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|TraceAdoptedBlock|LeiosBlockAnnounced|LeiosBlockCertified|MsgLeiosVotes|LeiosVoted"';
+  '{service="cardano-node", kind=""} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|TraceAdoptedBlock|LeiosBlockAnnounced|LeiosBlockCertified|MsgLeiosVotes|LeiosVoted"';
 
 const POLL_INTERVAL_MS = 1000;
 const MAX_ENTRIES = 5000;
@@ -41,9 +51,10 @@ const INITIAL_LOOKBACK_NS = 1800n * NS_PER_SEC;
 const OVERLAP_NS = 15n * NS_PER_SEC;
 const MAX_RETRY_DELAY_MS = 30000;
 
-// Dedup: a stable per-entry key (raw tsNs + message identity). Loki redelivers
-// (double-writes) entries with their original timestamp, and the sliding
-// window re-scans an overlap, so the same entry is seen more than once.
+// Dedup the sliding-window overlap: the same entry is re-fetched on consecutive
+// polls (with its original tsNs), so drop repeats keyed by (tsNs + message
+// identity). The Alloy double-write is handled upstream by the QUERY selector,
+// not here.
 const seenEntryKeys = new Set<string>();
 const SEEN_ENTRY_CAP = 200_000;
 
