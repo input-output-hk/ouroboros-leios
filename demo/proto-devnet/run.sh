@@ -39,6 +39,10 @@ fi
 # X-ray observability (on by default, disable with XRAY=0)
 : "${XRAY:=1}"
 : "${XRAY_SOURCE_DIR:="${SOURCE_DIR}/../extras/x-ray"}"
+# Network topology: "mesh" (default, all-to-all) or "line" (Node1-Node2-Node3
+# with no direct Node1<->Node3 edge, so Node2 is the only path between the
+# ends). Opt in with TOPOLOGY=line.
+: "${TOPOLOGY:=mesh}"
 set +a
 
 # Check for required commands
@@ -119,10 +123,16 @@ for i in "${nodes[@]}"; do
     yq ".TraceOptions.\"\".backends[1] = \"PrometheusSimple 0.0.0.0 $((12900 + "$i"))\"" \
       >"$NODE_DIR/config.yaml"
 
-  # Generate upstream endpoints to other nodes
+  # Generate upstream endpoints. "mesh": every other node. "line": only
+  # adjacent nodes (|i-j| == 1), i.e. Node1-Node2-Node3 with no Node1<->Node3.
+  # These localRoots are the whole enforcement: config.yaml sets
+  # PeerSharing: false with no public/ledger peers, so a node only ever
+  # connects to the peers listed here (re-enabling PeerSharing would let the
+  # line collapse back toward a mesh).
   accessPoints=$(for j in "${nodes[@]}"; do
-    # Except self
-    if [ "$i" -ne "$j" ]; then
+    absdiff=$((i - j)); absdiff=${absdiff#-}
+    if { [ "$TOPOLOGY" = "line" ] && [ "$absdiff" -eq 1 ]; } \
+      || { [ "$TOPOLOGY" != "line" ] && [ "$i" -ne "$j" ]; }; then
       port="PORT_NODE$j"
       address="IP_NODE$j"
       echo "{ \"port\": ${!port}, \"address\": \"${!address}\" }"
@@ -154,6 +164,7 @@ export ALLOY_CONFIG="${WORKING_DIR}/config.alloy"
 envsubst <"${CONFIG_DIR}/alloy.template" >"${ALLOY_CONFIG}"
 
 echo "Starting proto-devnet ..."
+echo "  Topology: ${TOPOLOGY}"
 # Traffic control integration
 TC_COMPOSE=()
 if [ "$TC" = "1" ]; then
