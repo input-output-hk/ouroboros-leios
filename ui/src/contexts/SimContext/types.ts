@@ -112,6 +112,7 @@ export interface ISimulationAggregatedDataState {
   global: ISimulationGlobalData;
   messages: IMessageAnimation[]; // Active messages traveling on the graph
   edges: Map<string, IEdgeState>; // Edge state for coloring based on message priority
+  traversedEdges: Set<string>; // Edge keys that have carried a message (either direction) up to currentTime
   nodeActivity: Map<string, INodeActivityState>; // Node activity state for priority-based coloring
   eventCounts: {
     total: number;
