@@ -127,7 +127,7 @@
               },
               {
                 "id": "unit",
-                "value": "Bps"
+                "value": "TxkB/s"
               }
             ]
           },
@@ -368,7 +368,7 @@
               }
             ]
           },
-          "unit": "TxkB/s"
+          "unit": "TxB/s"
         },
         "overrides": []
       },
