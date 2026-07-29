@@ -139,11 +139,6 @@ cardano-cli dijkstra node key-gen-BLS \
   --verification-key-file bls.vkey \
   --signing-key-file bls.skey
 
-# BLS proof-of-possession (proves you own the signing key)
-cardano-cli dijkstra node issue-pop-BLS \
-  --bls-signing-key-file bls.skey \
-  --out-file bls.pop
-```
 
 ## Operational certificate
 
