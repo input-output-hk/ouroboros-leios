@@ -669,7 +669,7 @@ Nothing more needs to be sent for each election.
 In the case of $L_\text{hdr}$ failure, however, the node may need to offer the EB body and closure of an announcement different from the first announcement it relayed.
 One possibility would be to allow upstream peers to send a (potentially-)third announcement and also to subsequently offer its EB body and/or EB closure.
 However, the need for those additional messages cannot be validated before the recipient has validated a certificate for that third announcement.
-This suggests an alternative to a second LeiosNotify round of announcement and offers for the purpose of recovery: recover instead via ChainSync and BlockFetch, because only in the Linear Leios design, only BlockFetch delivers certificates.
+This suggests an alternative to a second LeiosNotify round of announcement and offers for the purpose of recovery: recover instead via ChainSync and BlockFetch, because in the Linear Leios design only BlockFetch delivers certificates.
 
 In the current design, Leios announcements are Praos headers.
 Therefore, ChainSync's MsgRollForward inherently carries announcements.
@@ -784,7 +784,7 @@ The node does, however, need to track which equivocation proofs/bodies/closures 
 
 - For EB diffusion, the node centrally tracks:
     - The first announcement it saw for each volatile election.
-    - The second announcement (a.k.a. equivocation proof), if any, it saw (soon enough to matter) for each volatile election.
+    - The second announcement (a.k.a. equivocation proof), if any, it saw for each volatile election.
     - Which volatile-announced EB bodies it has already acquired, so that it does not re-request bodies it already has.
     - Which portions of volatile-announced EB closures it still needs to request, so that it does not re-request portions it already has.
     - Which volatile-announced EB closures it has already acquired (see Chain selection below).
