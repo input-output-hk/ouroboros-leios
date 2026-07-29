@@ -194,7 +194,7 @@ cardano-cli dijkstra stake-pool registration-certificate \
 
 :::warning BLS key included but not yet active
 The `cardano-cli` command for creating a pool registration certificate now
-requires a BLS key. The Musasho testnet does not utilize it yet at the time of
+requires a BLS key. The Musashi testnet does not utilize it yet at the time of
 writing, but transactions carrying it are already accepted. Reach out on the
 [Musashi Dōjō Discord](https://discord.gg/Bx2qvsjCte) if you need help to
 register a pool.
