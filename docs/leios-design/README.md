@@ -705,7 +705,7 @@ In the current design, upstream peers send the following messages for EB diffusi
     - The announcement has an invalid election proof (i.e. VRF proof).
     - The contained Praos header doesn't actually announce an EB.
     - The announcement's EB size and/or EB closure size is too great.
-    - The announcement's election is more than 5 minutes old; honest servers will skip relaying announcements older than 4 minutes and the extra 1 minute accommodates clock skew.
+    - The announcement's election is more than 10 minutes old; honest servers will skip relaying announcements older than 5 minutes and the extra 5 minutes accommodates transmission time and clock skew.
 - An _equivocation proof with one announcement_ from this peer causes disconnection when any of the following hold.
     - This peer has not already sent a different announcement for this same election.
     - The announcement is invalid (see first list item above, except for AnnDup).
