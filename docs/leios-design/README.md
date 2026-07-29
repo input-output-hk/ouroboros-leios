@@ -716,8 +716,10 @@ In the current design, upstream peers send the following messages for EB diffusi
           Perhaps the honest node accepts the revoked OCIN for, say, 1 extra minute, permitting its upstream peers' imm tips to catch up?)
     - The announcement has an invalid election proof (i.e. VRF proof).
     - The contained Praos header doesn't actually announce an EB.
-    - The announcement's EB size and/or EB closure size is too great.
+    - The announcement's EB size is too great.
     - The announcement's election is more than 10 minutes old; honest servers will skip relaying announcements older than 5 minutes and the extra 5 minutes accommodates transmission time and clock skew.
+    - The announcement's slot is more than clock skew (eg 2 seconds) from the future.
+      If less than that, just pause this peer's LeiosNotify client until the local wall clock reaches the onset of the announcement's slot.
 - An _offer_ from this peer causes disconnection when any of the following hold.
     - The same content has already been offered by this peer.
     - The offered EB has not already been announced by this peer.
