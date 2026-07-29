@@ -699,20 +699,14 @@ Otherwise, there would be trivial Denial-of-Service attack vectors.
 In the current design, upstream peers send the following messages for EB diffusion.
 
 - An _announcement_ from this peer causes disconnection when any of the following hold.
-    - This peer has already sent an announcement for this election (even if it's the same announcement).
-      Call this trigger AnnDup for reference below.
+  A second, distinct announcement for an election is how a peer proves that election's equivocation; there is no separate equivocation-proof message, so an honest node accepts at most two distinct announcements per election.
+    - This peer has already sent this same announcement.
+    - This peer has already sent two distinct announcements for this election, so this one would be a third.
     - The announcement has an invalid signature (TODO the dangling opcert challenge).
     - The announcement has an invalid election proof (i.e. VRF proof).
     - The contained Praos header doesn't actually announce an EB.
     - The announcement's EB size and/or EB closure size is too great.
     - The announcement's election is more than 10 minutes old; honest servers will skip relaying announcements older than 5 minutes and the extra 5 minutes accommodates transmission time and clock skew.
-- An _equivocation proof with one announcement_ from this peer causes disconnection when any of the following hold.
-    - This peer has not already sent a different announcement for this same election.
-    - The announcement is invalid (see first list item above, except for AnnDup).
-- An _equivocation proof with two announcements_ from this peer causes disconnection when any of the following hold.
-    - This peer has already sent an announcement for this election (even if it's the same as one of these two announcements).
-    - These two announcements are for different elections.
-    - Either announcement is invalid (see first list item above, except for AnnDup).
 - An _offer_ from this peer causes disconnection when any of the following hold.
     - The same content has already been offered by this peer.
     - The offered EB has not already been announced by this peer.
@@ -732,7 +726,7 @@ In the current design, upstream peers send the following messages for EB diffusi
 In the current design, downstream peers send the following messages for EB diffusion.
 
 - A _notification request_ causes disconnection when any of the following hold.
-    - SN + 300 ≤ RN, where RN is the number of notification requests the node has received from this peer and SN is the number of notifications (announcements/equivocation proofs/offers) the node has sent this peer.
+    - SN + 300 ≤ RN, where RN is the number of notification requests the node has received from this peer and SN is the number of notifications (announcements/offers) the node has sent this peer.
 - An _EB body request_ causes disconnection when any of the following hold.
     - This peer has sent body-or-closure requests whose cumulative own size (as opposed to the size of the corresponding replies) is obviously greater than it would ever need to be (2 MB buffer?) before this node has processed even one of them.
     - The node doesn't currently have that EB body in our Leios storage.
