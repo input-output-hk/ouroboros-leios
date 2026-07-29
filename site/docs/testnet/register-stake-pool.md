@@ -138,7 +138,7 @@ You need them to register a Leios-enabled stake pool.
 cardano-cli dijkstra node key-gen-BLS \
   --verification-key-file bls.vkey \
   --signing-key-file bls.skey
-
+```
 
 ## Operational certificate
 
