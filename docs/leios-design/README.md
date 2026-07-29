@@ -738,6 +738,7 @@ In the current design, downstream peers send the following messages for EB diffu
 
 - A _notification request_ causes disconnection when any of the following hold.
     - SN + 300 ≤ RN, where RN is the number of notification requests the node has received from this peer and SN is the number of notifications (announcements/offers) the node has sent this peer.
+    - (TODO 300 is a magic number; the "necessary" value depends on the burst size, which needs additional assessment)
 - An _EB body request_ causes disconnection when any of the following hold.
     - This peer has sent body-or-closure requests whose cumulative own size (as opposed to the size of the corresponding replies) is obviously greater than it would ever need to be (2 MB buffer?) before this node has processed even one of them.
     - The node doesn't currently have that EB body in our Leios storage.
