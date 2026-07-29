@@ -702,7 +702,18 @@ In the current design, upstream peers send the following messages for EB diffusi
   A second, distinct announcement for an election is how a peer proves that election's equivocation; there is no separate equivocation-proof message, so an honest node accepts at most two distinct announcements per election.
     - This peer has already sent this same announcement.
     - This peer has already sent two distinct announcements for this election, so this one would be a third.
-    - The announcement has an invalid signature (TODO the dangling opcert challenge).
+    - The announcement has an invalid signature.
+        - Because CIP-0164 reuses Praos headers as EB announcements, the signature involves an operational certificate (opcert) issue number (OCIN).
+          When ChainSync validates a MsgRollForward, this OCIN is upper bounded based on the preceding header chain, since headers themselves update the OCINs.
+          In LeiosNotify, announcements are not part of a chain, and so precise validation of the OCIN isn't necessarily possible; the recipient might not have yet seen the header that increments the OCIN.
+          A sufficient compromise is to reject OCINs that are less than the OCIN recorded by immutable tip's ledger state (which all nodes must agree on), but allow _any_ OCIN at least as great.
+          As a result, opcert revocation for EB announcements is delayed until the incremented OCIN becomes immutable, after ~12 hr when Chain Growth is healthy and up to ~36 hr when it isn't.
+          That's tolerable: it just means a leaked key allows the attacker to equivocate (hence mostly nullify) the victim's EB announcements until their revocation becomes immutable.
+          Crucially, ChainSync doesn't change its behavior: it still enforces the OCIN bounds on the specific header chain, which is as precise and prompt as possible.
+        - (TODO hmm.. what if the attacker sends a _fresh_ announcement that uses the revoked OCIN _just before_ it becomes immutable?
+          That might cause some honest nodes to disconnect from other honest nodes.
+          An attacker pool could arrange for this opportunity once per header they get onto the chain, since they could increment their OCIN with every header.
+          Perhaps the honest node accepts the revoked OCIN for, say, 1 extra minute, permitting its upstream peers' imm tips to catch up?)
     - The announcement has an invalid election proof (i.e. VRF proof).
     - The contained Praos header doesn't actually announce an EB.
     - The announcement's EB size and/or EB closure size is too great.
