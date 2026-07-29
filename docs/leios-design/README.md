@@ -699,9 +699,9 @@ Otherwise, there would be trivial Denial-of-Service attack vectors.
 In the current design, upstream peers send the following messages for EB diffusion.
 
 - An _announcement_ from this peer causes disconnection when any of the following hold.
-  A second, distinct announcement for an election is how a peer proves that election's equivocation; there is no separate equivocation-proof message, so an honest node accepts at most two distinct announcements per election.
     - This peer has already sent this same announcement.
     - This peer has already sent two distinct announcements for this election, so this one would be a third.
+        - Recall: a second, distinct announcement for an election is how a peer proves that election's equivocation; there is no separate equivocation-proof message, so an honest node accepts at most two distinct announcements per election.
     - The announcement has an invalid signature.
         - Because CIP-0164 reuses Praos headers as EB announcements, the signature involves an operational certificate (opcert) issue number (OCIN).
           When ChainSync validates a MsgRollForward, this OCIN is upper bounded based on the preceding header chain, since headers themselves update the OCINs.
