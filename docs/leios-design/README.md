@@ -667,7 +667,7 @@ Nothing more needs to be sent for each election.
 In the case of $L_\text{hdr}$ failure, however, the node may need to offer the EB body and closure of an announcement different from the first announcement it relayed.
 One possibility would be to allow upstream peers to send a (potentially-)third announcement and also to subsequently offer its EB body and/or EB closure.
 However, the need for those additional messages cannot be validated before the recipient has validated a certificate for that third announcement.
-This suggests an alternative to a second LeiosNotify round of announcement and offers for the purpose of recovery: recover instead via ChainSync and BlockFetch, because only in the Linear Leios design, only BlockFetch delivers certificates.
+This suggests an alternative to a second LeiosNotify round of announcement and offers for the purpose of recovery: recover instead via ChainSync and BlockFetch, because in the Linear Leios design only BlockFetch delivers certificates.
 
 In the current design, Leios announcements are Praos headers.
 Therefore, ChainSync's MsgRollForward inherently carries announcements.
@@ -697,20 +697,27 @@ Otherwise, there would be trivial Denial-of-Service attack vectors.
 In the current design, upstream peers send the following messages for EB diffusion.
 
 - An _announcement_ from this peer causes disconnection when any of the following hold.
-    - This peer has already sent an announcement for this election (even if it's the same announcement).
-      Call this trigger AnnDup for reference below.
-    - The announcement has an invalid signature (TODO the dangling opcert challenge).
+    - This peer has already sent this same announcement.
+    - This peer has already sent two distinct announcements for this election, so this one would be a third.
+        - Recall: a second, distinct announcement for an election is how a peer proves that election's equivocation; there is no separate equivocation-proof message, so an honest node accepts at most two distinct announcements per election.
+    - The announcement has an invalid signature.
+        - Because CIP-0164 reuses Praos headers as EB announcements, the signature involves an operational certificate (opcert) issue number (OCIN).
+          When ChainSync validates a MsgRollForward, this OCIN is upper bounded based on the preceding header chain, since headers themselves update the OCINs.
+          In LeiosNotify, announcements are not part of a chain, and so precise validation of the OCIN isn't necessarily possible; the recipient might not have yet seen the header that increments the OCIN.
+          A sufficient compromise is to reject OCINs that are less than the OCIN recorded by immutable tip's ledger state (which all nodes must agree on), but allow _any_ OCIN at least as great.
+          As a result, opcert revocation for EB announcements is delayed until the incremented OCIN becomes immutable, after ~12 hr when Chain Growth is healthy and up to ~36 hr when it isn't.
+          That's tolerable: it just means a leaked key allows the attacker to equivocate (hence mostly nullify) the victim's EB announcements until their revocation becomes immutable.
+          Crucially, ChainSync doesn't change its behavior: it still enforces the OCIN bounds on the specific header chain, which is as precise and prompt as possible.
+        - (TODO hmm.. what if the attacker sends a _fresh_ announcement that uses the revoked OCIN _just before_ it becomes immutable?
+          That might cause some honest nodes to disconnect from other honest nodes.
+          An attacker pool could arrange for this opportunity once per header they get onto the chain, since they could increment their OCIN with every header.
+          Perhaps the honest node accepts the revoked OCIN for, say, 1 extra minute, permitting its upstream peers' imm tips to catch up?)
     - The announcement has an invalid election proof (i.e. VRF proof).
     - The contained Praos header doesn't actually announce an EB.
-    - The announcement's EB size and/or EB closure size is too great.
-    - The announcement's election is more than 5 minutes old; honest servers will skip relaying announcements older than 4 minutes and the extra 1 minute accommodates clock skew.
-- An _equivocation proof with one announcement_ from this peer causes disconnection when any of the following hold.
-    - This peer has not already sent a different announcement for this same election.
-    - The announcement is invalid (see first list item above, except for AnnDup).
-- An _equivocation proof with two announcements_ from this peer causes disconnection when any of the following hold.
-    - This peer has already sent an announcement for this election (even if it's the same as one of these two announcements).
-    - These two announcements are for different elections.
-    - Either announcement is invalid (see first list item above, except for AnnDup).
+    - The announcement's EB size is too great.
+    - The announcement's election is more than 10 minutes old; honest servers will skip relaying announcements older than 5 minutes and the extra 5 minutes accommodates transmission time and clock skew.
+    - The announcement's slot is more than clock skew (eg 2 seconds) from the future.
+      If less than that, just pause this peer's LeiosNotify client until the local wall clock reaches the onset of the announcement's slot.
 - An _offer_ from this peer causes disconnection when any of the following hold.
     - The same content has already been offered by this peer.
     - The offered EB has not already been announced by this peer.
@@ -730,7 +737,8 @@ In the current design, upstream peers send the following messages for EB diffusi
 In the current design, downstream peers send the following messages for EB diffusion.
 
 - A _notification request_ causes disconnection when any of the following hold.
-    - SN + 300 ≤ RN, where RN is the number of notification requests the node has received from this peer and SN is the number of notifications (announcements/equivocation proofs/offers) the node has sent this peer.
+    - SN + 300 ≤ RN, where RN is the number of notification requests the node has received from this peer and SN is the number of notifications (announcements/offers) the node has sent this peer.
+    - (TODO 300 is a magic number; the "necessary" value depends on the burst size, which needs additional assessment)
 - An _EB body request_ causes disconnection when any of the following hold.
     - This peer has sent body-or-closure requests whose cumulative own size (as opposed to the size of the corresponding replies) is obviously greater than it would ever need to be (2 MB buffer?) before this node has processed even one of them.
     - The node doesn't currently have that EB body in our Leios storage.
@@ -761,6 +769,7 @@ It also makes it obvious that this state can be trimmed as the immutable tip adv
       (If it's too great, the node disconnects, so this isn't unbounded.)
     - Which volatile announcements---i.e. announcements for a volatile election---the node has relayed to this peer.
       This varies per peer for two reasons: peers connect at different times and even a connected peer might not have had sent an unconsumed notification request when this node relayed the announcement.
+      In particular, if the node was unable to send its first-seen announcement to a downstream peer, then it should also not send an equivocating announcement to that peer, since the peer would incorrectly interpret it as the node's first-seen announcement for that election.
 
 - For EB diffusion, for each upstream peer, the node must track:
     - Which requests the node has sent to this peer.
@@ -773,7 +782,7 @@ The node does, however, need to track which equivocation proofs/bodies/closures 
 
 - For EB diffusion, the node centrally tracks:
     - The first announcement it saw for each volatile election.
-    - The second announcement (a.k.a. equivocation proof), if any, it saw (soon enough to matter) for each volatile election.
+    - The second announcement (a.k.a. equivocation proof), if any, it saw for each volatile election.
     - Which volatile-announced EB bodies it has already acquired, so that it does not re-request bodies it already has.
     - Which portions of volatile-announced EB closures it still needs to request, so that it does not re-request portions it already has.
     - Which volatile-announced EB closures it has already acquired (see Chain selection below).
