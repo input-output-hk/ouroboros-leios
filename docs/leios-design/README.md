@@ -771,6 +771,7 @@ It also makes it obvious that this state can be trimmed as the immutable tip adv
       (If it's too great, the node disconnects, so this isn't unbounded.)
     - Which volatile announcements---i.e. announcements for a volatile election---the node has relayed to this peer.
       This varies per peer for two reasons: peers connect at different times and even a connected peer might not have had sent an unconsumed notification request when this node relayed the announcement.
+      In particular, if the node was unable to send its first-seen announcement to a downstream peer, then it should also not send an equivocating announcement to that peer, since the peer would incorrectly interpret it as the node's first-seen announcement for that election.
 
 - For EB diffusion, for each upstream peer, the node must track:
     - Which requests the node has sent to this peer.
