@@ -127,7 +127,7 @@
               },
               {
                 "id": "unit",
-                "value": "Bps"
+                "value": "TxkB/s"
               }
             ]
           },
@@ -368,7 +368,7 @@
               }
             ]
           },
-          "unit": "TxkB/s"
+          "unit": "TxB/s"
         },
         "overrides": []
       },
@@ -503,7 +503,7 @@
           },
           "direction": "backward",
           "editorMode": "builder",
-          "expr": "last_over_time({service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockAnnounced\", process=~\"$instance\"} | label_format ts=`{{ __timestamp__.UnixMilli }}` | unwrap ts [1h])",
+          "expr": "max(last_over_time({service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockAnnounced\"} | label_format ts=`{{ __timestamp__.UnixMilli }}` | unwrap ts [1h]))",
           "hide": false,
           "instant": false,
           "legendFormat": "announced_ts",
@@ -518,7 +518,7 @@
           },
           "direction": "backward",
           "editorMode": "builder",
-          "expr": "last_over_time({service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockCertified\", process=~\"$instance\"} | label_format ts=`{{ __timestamp__.UnixMilli }}` | unwrap ts [1h])",
+          "expr": "max(last_over_time({service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockCertified\"} | label_format ts=`{{ __timestamp__.UnixMilli }}` | unwrap ts [1h]))",
           "hide": false,
           "instant": false,
           "legendFormat": "certified_ts",
