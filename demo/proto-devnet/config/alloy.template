@@ -252,7 +252,7 @@ loki.process "extract_call_trace_logs" {
 				argument  = "argument",
 				id        = "id",
 				child_id  = "child_id",
-				parent_id = "child_id",
+				parent_id = "parent_id",
 				name      = "name",
 				stack     = "stack",
 				thread    = "thread",
@@ -271,8 +271,8 @@ loki.process "extract_call_trace_logs" {
 			values = {
 				event  = "event",
 				name   = "name",
-				stack  = "stack",
 				thread = "thread",
+				stack = "stack",
 			}
 		}
 
