@@ -22,7 +22,7 @@ class BlockEvent:
     event_type: str  # 'created', 'received', 'adopted'
     block_hash: str
     slot: int
-    block_type: str  # 'praos', 'eb', 'vote'
+    block_type: str  # 'praos', 'eb', 'vote', 'announcement', 'certification'
     tx_count: int = 0
 
 
@@ -34,6 +34,10 @@ class Metrics:
     praos_blocks_received: int = 0
     leios_ebs_created: int = 0
     leios_votes_created: int = 0
+    leios_announcements_observed: int = 0
+    leios_certifications_observed: int = 0
+    announcement_nodes: set = None
+    certification_nodes: set = None
     praos_latencies_ms: list = None
     blocks_created_by_node: dict = None
     max_slot_seen: int = 0
@@ -56,6 +60,10 @@ class Metrics:
             self.praos_latencies_ms = []
         if self.blocks_created_by_node is None:
             self.blocks_created_by_node = {}
+        if self.announcement_nodes is None:
+            self.announcement_nodes = set()
+        if self.certification_nodes is None:
+            self.certification_nodes = set()
         if self.equivocations is None:
             self.equivocations = []
         if self.duplicate_creators is None:
@@ -210,7 +218,38 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
                     block_type="tx",
                 )
 
-        # Leios events
+        # Leios announcement and certification events. These are emitted by
+        # the kernel on each node, so retain the source log file's node name
+        # for cross-node liveness assertions.
+        if "BlockAnnounced" in ns:
+            return BlockEvent(
+                timestamp=ts,
+                node=node_name,
+                event_type="observed",
+                block_hash=str(
+                    event_data.get(
+                        "blockHash", event_data.get("hash", event_data.get("id", "unknown"))
+                    )
+                ),
+                slot=event_data.get("slot", 0),
+                block_type="announcement",
+            )
+
+        if "BlockCertified" in ns:
+            return BlockEvent(
+                timestamp=ts,
+                node=node_name,
+                event_type="observed",
+                block_hash=str(
+                    event_data.get(
+                        "blockHash", event_data.get("hash", event_data.get("id", "unknown"))
+                    )
+                ),
+                slot=event_data.get("slot", 0),
+                block_type="certification",
+            )
+
+        # Other Leios events
         # ns: "Consensus.LeiosKernel" with EB/Vote in data
         if "LeiosKernel" in ns or "LeiosPeer" in ns:
             kind = event_data.get("kind", "")
@@ -380,6 +419,14 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
             elif event.block_type == "vote":
                 if event.event_type == "created":
                     metrics.leios_votes_created += 1
+
+            elif event.block_type == "announcement":
+                metrics.leios_announcements_observed += 1
+                metrics.announcement_nodes.add(event.node)
+
+            elif event.block_type == "certification":
+                metrics.leios_certifications_observed += 1
+                metrics.certification_nodes.add(event.node)
 
     # Compute Praos latencies
     for block_hash, created_time in block_created_times.items():

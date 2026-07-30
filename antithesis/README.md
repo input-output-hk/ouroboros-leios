@@ -279,6 +279,10 @@ The analysis container reports assertions to Antithesis SDK:
 - always_or_unreachable: All received blocks were created by a known node
 - always_or_unreachable: Chain tip divergence is less than k slots (common prefix)
 - sometimes: Leios endorser blocks (EBs) are created
+- sometimes: Leios block announcements are observed
+- sometimes: Leios block certifications are observed
+- sometimes: Leios announcements are observed on every pool
+- sometimes: Leios certifications are observed on every pool
 - always: No pool produces more than 60% of blocks (chain quality)
 - sometimes: Each pool produces blocks (pool1, pool2, pool3)
 - sometimes: Chain tip advances between checks
