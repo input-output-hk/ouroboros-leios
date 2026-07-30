@@ -108,6 +108,13 @@ docker compose -f docker-compose.devnet.yaml down -v
 docker compose -f docker-compose.devnet.yaml up
 ```
 
+The default topology is a full mesh. To exercise a line topology with no
+direct pool1-to-pool3 connection, use:
+
+```bash
+TOPOLOGY=line docker compose -f docker-compose.devnet.yaml up
+```
+
 ### ImmDB Mock Mode
 
 ```bash
@@ -306,6 +313,9 @@ The `testnets/` compose files are adapted for the Antithesis environment:
 | `container_name`/`hostname` | Not set | Set and matching on all services |
 | Network isolation | `bridge` | `internal: ${INTERNAL_NETWORK}` |
 | TX firehose | Continuous stream | Randomized loop (varying tps and duration) |
+
+Both Compose stacks accept `TOPOLOGY=line`. In that mode the pool nodes use
+pool2 as the bridge between pool1 and pool3; Dingo also joins through pool2.
 
 ### Randomized TX Generator
 

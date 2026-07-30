@@ -12,6 +12,7 @@
 x-common-env: &common-env
   ENABLE_WAN_EMULATION: ${ENABLE_WAN_EMULATION:-false}
   REF_SLOT: ${REF_SLOT:-11}
+  TOPOLOGY: ${TOPOLOGY:-mesh}
 
 x-node-ips: &node-ips
   IP_POOL1: "172.28.0.10"

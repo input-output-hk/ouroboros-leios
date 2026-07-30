@@ -11,6 +11,7 @@
 x-common-env: &common-env
   ENABLE_WAN_EMULATION: "false"
   REF_SLOT: ${REF_SLOT:-11}
+  TOPOLOGY: ${TOPOLOGY:-mesh}
 
 x-node-hosts: &node-hosts
   IP_POOL1: "pool1"
