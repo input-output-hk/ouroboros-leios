@@ -35,10 +35,9 @@
         lib.optionalAttrs (system == "x86_64-linux") {
           cardano-node-static = muslJobs.cardano-node;
           cardano-cli-static = muslJobs.cardano-cli;
-          # tx-centrifuge lives on a different cardano-node ref
-          # (bench/leios snapshot) than the rest of the binaries; we
-          # intentionally keep it pinned separately. Same hydraJobs shape.
-          tx-centrifuge-static = inputs.cardano-node-tx-centrifuge.hydraJobs.${system}.musl.tx-centrifuge;
+          # tx-firehose is built from the same leios-prototype input as the
+          # node and CLI, and is consumed by the Antithesis devnet image.
+          tx-firehose-static = muslJobs.tx-firehose;
 
           # Streamed layered image: `nix build .#cardano-node-leios-image`
           # produces a script that, when run, writes the image tarball to

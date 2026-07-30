@@ -1,6 +1,6 @@
 # Leios Antithesis Docker Compose Stack — Proto-Devnet
 #
-# 3 block-producing pools with tx-centrifuge and analysis.
+# 3 block-producing pools with tx-firehose and analysis.
 #
 # Usage:
 #   docker compose -f docker-compose.devnet.yaml up
@@ -225,15 +225,15 @@ services:
       start_period: 30s
 
   # ==========================================================================
-  # TX Centrifuge
+  # TX Firehose
   # ==========================================================================
-  tx-centrifuge:
+  tx-firehose:
     image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-devnet:${GIT_SHA:-latest}
     labels: *antithesis-exclude-labels
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.cardano-node-devnet
-    command: ["${TX_CENTRIFUGE_SCRIPT:-/app/scripts/run-tx-centrifuge.sh}"]
+    command: ["${TX_FIREHOSE_SCRIPT:-/app/scripts/run-tx-firehose.sh}"]
     depends_on:
       pool1:
         condition: service_healthy
@@ -245,7 +245,6 @@ services:
       <<: *node-ips
     volumes:
       - txgen-data:/data
-      - genesis-shared:/shared-genesis:ro
       - pool1-data:/pool1-data:ro
       - logs:/logs
     networks:
