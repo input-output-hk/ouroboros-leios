@@ -21,6 +21,53 @@
       "required": ["eb"],
       "type": "object"
     },
+    "UIAnnouncementReceived": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "const": "AnnouncementReceived",
+          "type": "string"
+        }
+      },
+      "required": ["id", "recipient", "slot", "type"],
+      "type": "object"
+    },
+    "UIAnnouncementSent": {
+      "description": "Sent event for a `MsgLeiosBlockAnnouncement` relay hop over LeiosNotify.\nThe message is an RB header; `id`/`slot` identify the EB it announces, so\nan announcement's diffusion can be linked to its endorser block.",
+      "properties": {
+        "id": {
+          "description": "Hash of the announced EB, extracted from the relayed RB header.",
+          "type": "string"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "slot": {
+          "description": "Slot of the announced EB.",
+          "type": "number"
+        },
+        "type": {
+          "const": "AnnouncementSent",
+          "type": "string"
+        }
+      },
+      "required": ["id", "recipient", "sender", "slot", "type"],
+      "type": "object"
+    },
     "UIEBGenerated": {
       "properties": {
         "closure_size_bytes": {
@@ -148,6 +195,12 @@
         },
         {
           "$ref": "#/definitions/UITxsReceived"
+        },
+        {
+          "$ref": "#/definitions/UIAnnouncementSent"
+        },
+        {
+          "$ref": "#/definitions/UIAnnouncementReceived"
         }
       ],
       "description": "Union of every message shape the UI renders."

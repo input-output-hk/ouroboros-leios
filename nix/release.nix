@@ -3,7 +3,7 @@
 #   nix build .#cardano-node-static          # x86_64-linux
 #   nix build .#cardano-cli-static           # x86_64-linux
 #   nix build .#cardano-node-leios-image     # x86_64-linux; pipe into `docker load`
-#   nix build .#cardano-node-release         # x86_64-linux + aarch64-darwin tarball
+#   nix build .#cardano-node-release         # x86_64-linux, aarch64-linux, or aarch64-darwin tarball
 #
 # CI publishes the image to GHCR and attaches the release tarball to
 # draft releases on tag pushes. Scenario images (antithesis-*,
@@ -23,7 +23,7 @@
     let
       releaseName = "cardano-node-leios-${system}";
 
-      # Statically-linked x86_64-linux builds (musl, no glibc). `or null`
+      # Statically-linked Linux builds (musl, no glibc). `or null`
       # keeps it safe to reference on other systems; Nix is lazy and only
       # the linux branches below dereference it.
       muslJobs = inputs.cardano-node-leios.hydraJobs.${system}.musl or null;
@@ -78,6 +78,7 @@
           lib.optionalAttrs
             (lib.elem system [
               "x86_64-linux"
+              "aarch64-linux"
               "aarch64-darwin"
             ])
             {
@@ -91,7 +92,7 @@
               cardano-node-release =
                 let
                   upstream =
-                    if system == "x86_64-linux" then
+                    if lib.elem system [ "x86_64-linux" "aarch64-linux" ] then
                       inputs.cardano-node-leios.hydraJobs.${system}.musl.cardano-node-linux
                     else
                       inputs.cardano-node-leios.hydraJobs.${system}.native.cardano-node-macos;
