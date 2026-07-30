@@ -1,0 +1,25 @@
+# CORS-adding reverse proxy in front of Loki.
+#
+# Loki (3.6.3) serves no CORS headers, so a browser cannot fetch its HTTP API
+# cross-origin. This fronts Loki on :3101 and adds permissive CORS headers so
+# the visualizer can poll query_range directly. Point the UI's `loki` host at
+# :3101 (not Loki's :3100).
+
+{
+	admin off
+}
+
+:3101 {
+	@options method OPTIONS
+	handle @options {
+		header Access-Control-Allow-Origin "*"
+		header Access-Control-Allow-Methods "GET, OPTIONS"
+		header Access-Control-Allow-Headers "*"
+		respond 204
+	}
+
+	handle {
+		header Access-Control-Allow-Origin "*"
+		reverse_proxy localhost:3100
+	}
+}
