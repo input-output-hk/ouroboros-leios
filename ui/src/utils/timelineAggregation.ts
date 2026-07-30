@@ -40,6 +40,7 @@ const createEmptyMessageTypeCounts = (): IMessageTypeCounts => ({
   [EMessageType.EB]: 0,
   [EMessageType.Votes]: 0,
   [EMessageType.Txs]: 0,
+  [EMessageType.Announcement]: 0,
 });
 
 const getTotalActiveCount = (counts: IMessageTypeCounts): number => {
@@ -313,6 +314,7 @@ export const computeAggregatedDataAtTime = (
       case EServerMessageType.EBSent:
       case EServerMessageType.RBSent:
       case EServerMessageType.VotesSent:
+      case EServerMessageType.AnnouncementSent:
         return {
           sender: (message as any).sender,
           recipient: (message as any).recipient,
@@ -376,7 +378,10 @@ export const computeAggregatedDataAtTime = (
         (messageType === EServerMessageType.RBSent &&
           futureEvent.message.type === EServerMessageType.RBReceived) ||
         (messageType === EServerMessageType.VotesSent &&
-          futureEvent.message.type === EServerMessageType.VotesReceived);
+          futureEvent.message.type === EServerMessageType.VotesReceived) ||
+        (messageType === EServerMessageType.AnnouncementSent &&
+          futureEvent.message.type ===
+            EServerMessageType.AnnouncementReceived);
 
       if (
         isMatchingReceived &&
@@ -579,6 +584,78 @@ export const computeAggregatedDataAtTime = (
           nodeStats,
           message.recipient,
           EMessageType.EB,
+          ActivityAction.Received,
+          event.time_s,
+        );
+        break;
+      }
+
+      case EServerMessageType.AnnouncementSent: {
+        const msgBytes = getMessageBytes(EMessageType.Announcement, message.id);
+        const stats = nodeStats.get(message.sender);
+        if (stats) {
+          if (!stats.sent.has(EMessageType.Announcement)) {
+            stats.sent.set(EMessageType.Announcement, { count: 0, bytes: 0 });
+          }
+          const sentStats = stats.sent.get(EMessageType.Announcement)!;
+          sentStats.count += 1;
+          sentStats.bytes += msgBytes;
+          stats.bytesSent += msgBytes;
+        }
+
+        // Track last activity for node coloring
+        updateLastActivity(
+          nodeStats,
+          message.sender,
+          EMessageType.Announcement,
+          ActivityAction.Sent,
+          event.time_s,
+        );
+
+        // Calculate travel time with 3-tier fallback
+        const travelTime = calculateTravelTime(
+          event,
+          i,
+          0.3, // fallback for a lightweight announcement
+        );
+
+        // Create animation with calculated travel time
+        createMessageAnimation(
+          result,
+          EMessageType.Announcement,
+          message.id,
+          message.sender,
+          message.recipient,
+          event.time_s,
+          targetTime,
+          travelTime,
+          msgBytes,
+          { slot: message.slot },
+        );
+        break;
+      }
+
+      case EServerMessageType.AnnouncementReceived: {
+        const msgBytes = getMessageBytes(EMessageType.Announcement, message.id);
+        const stats = nodeStats.get(message.recipient);
+        if (stats) {
+          if (!stats.received.has(EMessageType.Announcement)) {
+            stats.received.set(EMessageType.Announcement, {
+              count: 0,
+              bytes: 0,
+            });
+          }
+          const receivedStats = stats.received.get(EMessageType.Announcement)!;
+          receivedStats.count += 1;
+          receivedStats.bytes += msgBytes;
+          stats.bytesReceived += msgBytes;
+        }
+
+        // Track last activity for node coloring
+        updateLastActivity(
+          nodeStats,
+          message.recipient,
+          EMessageType.Announcement,
           ActivityAction.Received,
           event.time_s,
         );

@@ -11,6 +11,7 @@ const getHighestPriorityMessageType = (counts: {
   const MESSAGE_PRIORITY_ORDER = [
     EMessageType.RB, // Highest priority
     EMessageType.EB,
+    EMessageType.Announcement,
     EMessageType.Votes,
     EMessageType.Txs, // Lowest priority
   ];
@@ -151,6 +152,9 @@ export const useHandlers = () => {
             case EMessageType.Votes:
               context.strokeStyle = EMessageColor.VOTES;
               break;
+            case EMessageType.Announcement:
+              context.strokeStyle = EMessageColor.ANNOUNCEMENT;
+              break;
             default:
               context.strokeStyle = ELinkColor.LINK_DEFAULT;
           }
@@ -213,6 +217,9 @@ export const useHandlers = () => {
             case EMessageType.Votes:
               context.fillStyle = EMessageColor.VOTES;
               break;
+            case EMessageType.Announcement:
+              context.fillStyle = EMessageColor.ANNOUNCEMENT;
+              break;
             default:
               context.fillStyle = node.data.stake
                 ? ENodeColor.STAKE_NODE
@@ -256,10 +263,17 @@ export const useHandlers = () => {
         case EMessageType.RB:
           context.fillStyle = EMessageColor.RB;
           break;
+        case EMessageType.Announcement:
+          context.fillStyle = EMessageColor.ANNOUNCEMENT;
+          break;
       }
 
-      // Votes: draw as small circles (fixed size, no bandwidth scaling)
-      if (message.type === EMessageType.Votes) {
+      // Votes and announcements: small fixed-size circles (no bandwidth
+      // scaling) — both are lightweight control messages, not bulk data.
+      if (
+        message.type === EMessageType.Votes ||
+        message.type === EMessageType.Announcement
+      ) {
         const radius = Math.min((0.4 / canvasScale) * 6, 0.4);
         context.beginPath();
         context.arc(x, y, radius, 0, 2 * Math.PI);

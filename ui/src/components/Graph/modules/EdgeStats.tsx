@@ -8,6 +8,7 @@ const messageTypeColor: Record<EMessageType, string> = {
   [EMessageType.EB]: EMessageColor.EB,
   [EMessageType.Votes]: EMessageColor.VOTES,
   [EMessageType.RB]: EMessageColor.RB,
+  [EMessageType.Announcement]: EMessageColor.ANNOUNCEMENT,
 };
 
 const messageTypeLabel: Record<EMessageType, string> = {
@@ -15,6 +16,7 @@ const messageTypeLabel: Record<EMessageType, string> = {
   [EMessageType.EB]: "EB",
   [EMessageType.Votes]: "Vote",
   [EMessageType.RB]: "RB",
+  [EMessageType.Announcement]: "Announce",
 };
 
 const shortBits = (bytes: number): string => {

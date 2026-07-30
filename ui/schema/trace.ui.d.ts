@@ -212,6 +212,29 @@ export interface UITxsReceived {
   num_txs?: number;
 }
 
+// --- Network: EB announcements (prototype only) ---------------------------
+
+/** Sent event for a `MsgLeiosBlockAnnouncement` relay hop over LeiosNotify.
+ *  The message is an RB header; `id`/`slot` identify the EB it announces, so
+ *  an announcement's diffusion can be linked to its endorser block. */
+export interface UIAnnouncementSent {
+  type: "AnnouncementSent";
+  /** Hash of the announced EB, extracted from the relayed RB header. */
+  id: string;
+  sender: string;
+  recipient: string;
+  /** Slot of the announced EB. */
+  slot: number;
+}
+
+export interface UIAnnouncementReceived {
+  type: "AnnouncementReceived";
+  id: string;
+  recipient: string;
+  sender?: string;
+  slot: number;
+}
+
 // --- Union ----------------------------------------------------------------
 
 /** Union of every message shape the UI renders. */
@@ -227,7 +250,9 @@ export type UIMessage =
   | UIRBReceived
   | UIEBReceived
   | UIVotesReceived
-  | UITxsReceived;
+  | UITxsReceived
+  | UIAnnouncementSent
+  | UIAnnouncementReceived;
 
 /** Set of `message.type` strings the UI renders — also used by CI to filter
  *  a trace before validating it against this schema. */

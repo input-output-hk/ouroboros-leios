@@ -7,6 +7,7 @@ export enum EMessageType {
   RB = "rb",
   Txs = "txs",
   Votes = "votes",
+  Announcement = "announcement",
 }
 
 export enum ActivityAction {
@@ -95,6 +96,7 @@ export interface IMessageTypeCounts {
   [EMessageType.EB]: number;
   [EMessageType.Votes]: number;
   [EMessageType.Txs]: number;
+  [EMessageType.Announcement]: number;
 }
 
 export interface IEdgeState {
