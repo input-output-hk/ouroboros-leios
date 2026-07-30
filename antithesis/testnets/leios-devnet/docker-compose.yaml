@@ -28,6 +28,9 @@ x-node-image: &node-image
 x-dingo-image: &dingo-image
   image: ghcr.io/blinklabs-io/dingo:main-antithesis
 
+x-antithesis-exclude-labels: &antithesis-exclude-labels
+  com.antithesis.exclude_from_faults: "network,kill,pause,stop"
+
 services:
   # ==========================================================================
   # Init Containers
@@ -189,6 +192,7 @@ services:
     container_name: dingo1
     hostname: dingo1
     init: true
+    labels: *antithesis-exclude-labels
     depends_on:
       init-dingo1:
         condition: service_completed_successfully
@@ -225,6 +229,7 @@ services:
     container_name: tx-centrifuge
     hostname: tx-centrifuge
     init: true
+    labels: *antithesis-exclude-labels
     command: ["/app/scripts/run-tx-centrifuge-loop.sh"]
     depends_on:
       pool1:
@@ -251,6 +256,7 @@ services:
     container_name: analysis
     hostname: analysis
     init: true
+    labels: *antithesis-exclude-labels
     depends_on:
       pool1:
         condition: service_healthy
