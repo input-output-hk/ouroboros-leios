@@ -10,6 +10,7 @@ DATA_DIR="${DATA_DIR:-/data}"
 CONFIG_DIR="${CONFIG_DIR:-/app/config}"
 UTXO_KEYS_DIR="${UTXO_KEYS_DIR:-/app/utxo-keys}"
 SHARED_GENESIS_DIR="${SHARED_GENESIS_DIR:-/shared-genesis}"
+LOG_DIR="${LOG_DIR:-/logs}"
 
 # Node connection details
 IP_POOL1="${IP_POOL1:-172.28.0.10}"
@@ -27,6 +28,7 @@ echo "  Pool3: $IP_POOL3:$PORT_POOL3"
 
 # Create data directory
 mkdir -p "$DATA_DIR"
+mkdir -p "$LOG_DIR"
 
 # Wait for genesis files from pool1
 echo "Waiting for genesis files..."
@@ -129,4 +131,4 @@ fi
 
 echo "Starting tx-centrifuge..."
 cd "$DATA_DIR"
-exec tx-centrifuge centrifuge.json
+exec tx-centrifuge centrifuge.json >> "$LOG_DIR/tx-centrifuge.log" 2>&1

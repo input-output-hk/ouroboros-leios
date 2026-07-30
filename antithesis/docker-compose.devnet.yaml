@@ -193,6 +193,7 @@ services:
 
   dingo1:
     image: ghcr.io/blinklabs-io/dingo:main-antithesis
+    command: ["serve", "--logging-level", "warn"]
     labels: *antithesis-exclude-labels
     depends_on:
       init-dingo1:

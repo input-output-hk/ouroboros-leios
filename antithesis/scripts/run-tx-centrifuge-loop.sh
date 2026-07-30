@@ -17,6 +17,7 @@ DATA_DIR="${DATA_DIR:-/data}"
 CONFIG_DIR="${CONFIG_DIR:-/app/config}"
 UTXO_KEYS_DIR="${UTXO_KEYS_DIR:-/app/utxo-keys}"
 SHARED_GENESIS_DIR="${SHARED_GENESIS_DIR:-/shared-genesis}"
+LOG_DIR="${LOG_DIR:-/logs}"
 
 # Node connection details (hostnames in Antithesis, IPs locally)
 IP_POOL1="${IP_POOL1:-pool1}"
@@ -46,6 +47,7 @@ echo "  COOLDOWN range: ${COOLDOWN_MIN}s - ${COOLDOWN_MAX}s"
 # --- One-time initialization (same as run-tx-centrifuge.sh) ---
 
 mkdir -p "$DATA_DIR"
+mkdir -p "$LOG_DIR"
 
 # Wait for genesis files from pool1
 echo "Waiting for genesis files..."
@@ -164,7 +166,7 @@ while true; do
     # Run tx-centrifuge for the randomized duration, then stop it
     echo "  Running tx-centrifuge for ${duration}s..."
     cd "$DATA_DIR"
-    tx-centrifuge centrifuge.json &
+    tx-centrifuge centrifuge.json >> "$LOG_DIR/tx-centrifuge.log" 2>&1 &
     CENTRIFUGE_PID=$!
 
     sleep "$duration"
