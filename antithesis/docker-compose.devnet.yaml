@@ -23,6 +23,9 @@ x-node-ips: &node-ips
   PORT_POOL3: "3003"
   PORT_DINGO: "3001"
 
+x-antithesis-exclude-labels: &antithesis-exclude-labels
+  com.antithesis.exclude_from_faults: "network,kill,pause,stop"
+
 services:
   # ==========================================================================
   # Init Containers
@@ -190,6 +193,7 @@ services:
 
   dingo1:
     image: ghcr.io/blinklabs-io/dingo:main-antithesis
+    labels: *antithesis-exclude-labels
     depends_on:
       init-dingo1:
         condition: service_completed_successfully
@@ -224,6 +228,7 @@ services:
   # ==========================================================================
   tx-centrifuge:
     image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-cardano-node-devnet:${GIT_SHA:-latest}
+    labels: *antithesis-exclude-labels
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.cardano-node-devnet
@@ -250,6 +255,7 @@ services:
   # ==========================================================================
   analysis:
     image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-analysis:${GIT_SHA:-latest}
+    labels: *antithesis-exclude-labels
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.analysis

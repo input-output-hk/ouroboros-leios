@@ -5,9 +5,13 @@
 #   docker compose -f docker-compose.devnet.yaml -f docker-compose.observability.yaml up
 #   docker compose -f docker-compose.immdb.yaml -f docker-compose.observability.yaml up
 
+x-antithesis-exclude-labels: &antithesis-exclude-labels
+  com.antithesis.exclude_from_faults: "network,kill,pause,stop"
+
 services:
   prometheus:
     image: prom/prometheus:latest
+    labels: *antithesis-exclude-labels
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -22,6 +26,7 @@ services:
 
   loki:
     image: grafana/loki:latest
+    labels: *antithesis-exclude-labels
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - ./config/loki.yml:/etc/loki/local-config.yaml:ro
@@ -33,6 +38,7 @@ services:
 
   alloy:
     image: grafana/alloy:latest
+    labels: *antithesis-exclude-labels
     command:
       - run
       - /etc/alloy/config.river
@@ -46,6 +52,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
+    labels: *antithesis-exclude-labels
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
