@@ -10,21 +10,18 @@ prometheus.scrape "cardano_node_exporter" {
 			"__address__" = "${IP_NODE1}:${METRICS_PORT_NODE1}",
 			"job"         = "cardano_node_metrics",
 			"instance"    = "node1",
-			"alias"       = "node1",
 			"process"     = "Node1",
 		},
 		{
 			"__address__" = "${IP_NODE2}:${METRICS_PORT_NODE2}",
 			"job"         = "cardano_node_metrics",
 			"instance"    = "node2",
-			"alias"       = "node2",
 			"process"     = "Node2",
 		},
 		{
 			"__address__" = "${IP_NODE3}:${METRICS_PORT_NODE3}",
 			"job"         = "cardano_node_metrics",
 			"instance"    = "node3",
-			"alias"       = "node3",
 			"process"     = "Node3",
 		},
 	]
@@ -78,7 +75,6 @@ loki.process "extract_process_compose_logs" {
 	stage.static_labels {
 		values = {
 			service = "process-compose",
-			type    = "process-compose",
 		}
 	}
 
@@ -89,10 +85,16 @@ loki.process "extract_process_compose_logs" {
 	forward_to = [
 		loki.write.loki.receiver,
 		loki.process.extract_cardano_node_logs.receiver,
+		loki.process.extract_tx_firehose_logs.receiver,
 	]
 }
 
-loki.process "extract_cardano_node_logs" {
+loki.process "extract_tx_firehose_logs" {
+	stage.match {
+		selector = `{process!="TxFirehose"}`
+		action   = "drop"
+	}
+
 	stage.json {
 		expressions = {
 			at     = "at",
@@ -100,14 +102,10 @@ loki.process "extract_cardano_node_logs" {
 			host   = "host",
 			thread = "thread",
 			ns     = "ns",
+			kind   = "data.kind",
 			data   = "data",
 		}
 		drop_malformed = true
-	}
-
-	stage.drop {
-		source = "process"
-		value  = "Analyze"
 	}
 
 	stage.timestamp {
@@ -118,26 +116,62 @@ loki.process "extract_cardano_node_logs" {
 	stage.labels {
 		values = {
 			level = "sev",
-			host  = "host",
-			sev   = "sev",
-			ns    = "ns",
+		}
+	}
+
+	stage.static_labels {
+		values = {
+			service = "tx-firehose",
+		}
+	}
+
+	stage.output {
+		source = "data"
+	}
+
+	forward_to = [
+		loki.write.loki.receiver,
+	]
+}
+
+loki.process "extract_cardano_node_logs" {
+	// NOTE(bladyjoker): This is so annoying, breaking boundaries, why can't we conditionally route in extract_process_compose_logs processor???
+	stage.match {
+		selector = `{process="TxFirehose"}`
+		action   = "drop"
+	}
+
+	stage.json {
+		expressions = {
+			at     = "at",
+			sev    = "sev",
+			host   = "host",
+			thread = "thread",
+			ns     = "ns",
+			kind   = "data.kind", // TODO(bladyjoker): ns="Consensus.LeiosPeer.Msg|Reflection.TracerConfigInfo|Version.NodeVersion" don't have `kind`, otherwise it's common
+			data   = "data",
+		}
+		drop_malformed = true
+	}
+
+	stage.timestamp {
+		source = "at"
+		format = "RFC3339"
+	}
+
+	stage.labels {
+		values = {
+			level  = "sev",
+			host   = "host",
+			thread = "thread",
+			ns     = "ns",
+			kind   = "kind",
 		}
 	}
 
 	stage.static_labels {
 		values = {
 			service = "cardano-node",
-			type    = "cardano-node",
-		}
-	}
-
-	stage.match {
-		selector = `{process="TxFirehose"}`
-		stage.static_labels {
-			values = {
-				service = "tx-firehose",
-				type    = "tx-firehose",
-			}
 		}
 	}
 
@@ -153,18 +187,6 @@ loki.process "extract_cardano_node_logs" {
 }
 
 loki.process "extract_leios_vote_logs" {
-	stage.json {
-		expressions = {
-			kind = "kind",
-		}
-	}
-
-	stage.labels {
-		values = {
-			kind = "kind",
-		}
-	}
-
 	stage.match {
 		selector = `{kind=~"LeiosVoted|LeiosVoteAcquired"}`
 
@@ -178,8 +200,7 @@ loki.process "extract_leios_vote_logs" {
 
 		stage.static_labels {
 			values = {
-				service = "leios-voting",
-				type    = "leios-voting",
+				service = "cardano-node/leios-voting",
 			}
 		}
 
@@ -231,18 +252,6 @@ loki.process "extract_leios_vote_logs" {
 }
 
 loki.process "extract_call_trace_logs" {
-	stage.json {
-		expressions = {
-			kind = "kind",
-		}
-	}
-
-	stage.labels {
-		values = {
-			kind = "kind",
-		}
-	}
-
 	stage.match {
 		selector = `{kind="Call"}`
 
@@ -252,7 +261,7 @@ loki.process "extract_call_trace_logs" {
 				argument  = "argument",
 				id        = "id",
 				child_id  = "child_id",
-				parent_id = "child_id",
+				parent_id = "parent_id",
 				name      = "name",
 				stack     = "stack",
 				thread    = "thread",
@@ -262,8 +271,7 @@ loki.process "extract_call_trace_logs" {
 
 		stage.static_labels {
 			values = {
-				service = "call-trace",
-				type    = "call-trace",
+				service = "cardano-node/call-trace",
 			}
 		}
 
