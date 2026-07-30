@@ -17,7 +17,9 @@ CONFIG_DIR="${CONFIG_DIR:-/app/config}"
 GENESIS_DIR="${GENESIS_DIR:-/app/genesis}"
 SHARED_GENESIS_DIR="${SHARED_GENESIS_DIR:-/shared-genesis}"
 
-# Environment variables for peer addresses (mesh topology)
+# Environment variables for peer addresses. In line mode Dingo joins the
+# middle pool so it cannot create a pool1-pool3 shortcut.
+TOPOLOGY="${TOPOLOGY:-mesh}"
 IP_POOL1="${IP_POOL1:-172.28.0.10}"
 IP_POOL2="${IP_POOL2:-172.28.0.20}"
 IP_POOL3="${IP_POOL3:-172.28.0.30}"
@@ -30,6 +32,7 @@ echo "Configuration:"
 echo "  DINGO_NAME: $DINGO_NAME"
 echo "  DATA_DIR: $DATA_DIR"
 echo "  SHARED_GENESIS_DIR: $SHARED_GENESIS_DIR"
+echo "  TOPOLOGY: $TOPOLOGY"
 
 # Create data directory if needed
 mkdir -p "$DATA_DIR"
@@ -55,13 +58,18 @@ fi
 cp "$SHARED_GENESIS_DIR/"*-genesis.json "$DATA_DIR/"
 echo "  Genesis files copied from pool1"
 
-# Generate mesh topology (connect to other nodes)
-echo "Generating mesh topology..."
-accessPoints='[{"address": "'$IP_POOL1'", "port": '$PORT_POOL1'}, {"address": "'$IP_POOL2'", "port": '$PORT_POOL2'}, {"address": "'$IP_POOL3'", "port": '$PORT_POOL3'}]'
+# Generate topology. In line mode Dingo connects only to pool2, preserving
+# pool1-pool2-pool3 as the only path between the end pools.
+echo "Generating $TOPOLOGY topology..."
+if [ "$TOPOLOGY" = "line" ]; then
+	accessPoints='[{"address": "'$IP_POOL2'", "port": '$PORT_POOL2'}]'
+else
+	accessPoints='[{"address": "'$IP_POOL1'", "port": '$PORT_POOL1'}, {"address": "'$IP_POOL2'", "port": '$PORT_POOL2'}, {"address": "'$IP_POOL3'", "port": '$PORT_POOL3'}]'
+fi
 jq --argjson accessPoints "$accessPoints" \
 	'.localRoots[0].accessPoints = $accessPoints' \
 	"$CONFIG_DIR/topology.template.json" >"$DATA_DIR/topology.json"
-echo "  topology.json created with mesh topology"
+echo "  topology.json created with $TOPOLOGY topology"
 
 # Copy and customize config
 echo "Copying config..."

@@ -1,5 +1,5 @@
 # Devnet (proto-devnet) variant of the antithesis cardano-node image.
-# Layers proto-devnet configs, pool keys, tx-centrifuge, and pool-mode
+# Layers proto-devnet configs, pool keys, tx-firehose, and pool-mode
 # scripts on top of the cardano-node-leios base.
 #
 # Build args:
@@ -7,8 +7,8 @@
 #               (ghcr.io/.../cardano-node-leios:<tag>). CI passes the
 #               SHA-tagged base built earlier in the same workflow run.
 #
-# tx-centrifuge is built statically via nix in the workflow and placed
-# at antithesis/artifacts/tx-centrifuge in the build context — see
+# tx-firehose is built statically via nix in the workflow and placed
+# at antithesis/artifacts/tx-firehose in the build context — see
 # .github/workflows/antithesis-leios.yaml.
 
 ARG BASE_IMAGE=ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:latest
@@ -19,7 +19,7 @@ FROM debian:bookworm-slim
 
 COPY --from=leios /bin/cardano-node /usr/local/bin/cardano-node
 COPY --from=leios /bin/cardano-cli  /usr/local/bin/cardano-cli
-COPY antithesis/artifacts/tx-centrifuge /usr/local/bin/tx-centrifuge
+COPY antithesis/artifacts/tx-firehose /usr/local/bin/tx-firehose
 
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
@@ -37,7 +37,7 @@ RUN apt-get update -y && \
       yq && \
     rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /app/config /app/genesis /app/scripts /app/pools-keys /app/utxo-keys /data /logs
+RUN mkdir -p /app/config /app/genesis /app/scripts /app/pools-keys /app/stake-delegators/delegator1 /data /logs
 
 COPY demo/proto-devnet/config/genesis/*.json /app/genesis/
 COPY demo/proto-devnet/config/config.yaml /app/config/config.yaml
@@ -47,16 +47,13 @@ COPY demo/proto-devnet/config/pools-keys/pool1/ /app/pools-keys/pool1/
 COPY demo/proto-devnet/config/pools-keys/pool2/ /app/pools-keys/pool2/
 COPY demo/proto-devnet/config/pools-keys/pool3/ /app/pools-keys/pool3/
 
-COPY demo/proto-devnet/config/utxo-keys/ /app/utxo-keys/
-COPY demo/proto-devnet/config/funds.json /app/config/funds.json
-
-COPY antithesis/config/centrifuge.template.json /app/config/centrifuge.template.json
+COPY demo/proto-devnet/config/stake-delegators/delegator1/ /app/stake-delegators/delegator1/
 
 COPY antithesis/scripts/init-pool-node.sh /app/scripts/
 COPY antithesis/scripts/init-dingo-node.sh /app/scripts/
 COPY antithesis/scripts/run-pool-node.sh /app/scripts/
-COPY antithesis/scripts/run-tx-centrifuge.sh /app/scripts/
-COPY antithesis/scripts/run-tx-centrifuge-loop.sh /app/scripts/
+COPY antithesis/scripts/run-tx-firehose.sh /app/scripts/
+COPY antithesis/scripts/run-tx-firehose-loop.sh /app/scripts/
 COPY antithesis/scripts/setup-wan-emulation.sh /app/scripts/
 
 RUN chmod +x /app/scripts/*.sh /usr/local/bin/*

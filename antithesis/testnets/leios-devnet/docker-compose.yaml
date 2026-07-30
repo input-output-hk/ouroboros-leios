@@ -1,6 +1,6 @@
 # Leios Antithesis Docker Compose — Proto-Devnet (Moog-compatible)
 #
-# 3 block-producing pools with randomized tx-centrifuge and analysis.
+# 3 block-producing pools with randomized tx-firehose and analysis.
 # Designed for submission to Antithesis via Cardano Foundation Moog service.
 #
 # Requirements:
@@ -11,6 +11,7 @@
 x-common-env: &common-env
   ENABLE_WAN_EMULATION: "false"
   REF_SLOT: ${REF_SLOT:-11}
+  TOPOLOGY: ${TOPOLOGY:-mesh}
 
 x-node-hosts: &node-hosts
   IP_POOL1: "pool1"
@@ -223,15 +224,15 @@ services:
       start_period: 30s
 
   # ==========================================================================
-  # TX Centrifuge (randomized loop for Antithesis)
+  # TX Firehose (randomized loop for Antithesis)
   # ==========================================================================
-  tx-centrifuge:
+  tx-firehose:
     <<: *node-image
-    container_name: tx-centrifuge
-    hostname: tx-centrifuge
+    container_name: tx-firehose
+    hostname: tx-firehose
     init: true
     labels: *antithesis-exclude-labels
-    command: ["/app/scripts/run-tx-centrifuge-loop.sh"]
+    command: ["/app/scripts/run-tx-firehose-loop.sh"]
     depends_on:
       pool1:
         condition: service_healthy
@@ -242,8 +243,6 @@ services:
     environment:
       <<: *node-hosts
     volumes:
-      - txgen-data:/data
-      - genesis-shared:/shared-genesis:ro
       - pool1-data:/pool1-data:ro
       - logs:/logs
     networks:

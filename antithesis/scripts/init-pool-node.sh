@@ -18,7 +18,9 @@ GENESIS_DIR="${GENESIS_DIR:-/app/genesis}"
 POOLS_KEYS_DIR="${POOLS_KEYS_DIR:-/app/pools-keys}"
 SHARED_GENESIS_DIR="${SHARED_GENESIS_DIR:-/shared-genesis}"
 
-# Environment variables for peer addresses (mesh topology)
+# Environment variables for peer addresses. Set TOPOLOGY=line to create a
+# pool1-pool2-pool3 chain with no direct pool1-pool3 connection.
+TOPOLOGY="${TOPOLOGY:-mesh}"
 IP_POOL1="${IP_POOL1:-172.28.0.10}"
 IP_POOL2="${IP_POOL2:-172.28.0.20}"
 IP_POOL3="${IP_POOL3:-172.28.0.30}"
@@ -30,6 +32,7 @@ echo "Configuration:"
 echo "  POOL_NAME: $POOL_NAME"
 echo "  DATA_DIR: $DATA_DIR"
 echo "  SHARED_GENESIS_DIR: $SHARED_GENESIS_DIR"
+echo "  TOPOLOGY: $TOPOLOGY"
 
 # Create data directory if needed
 mkdir -p "$DATA_DIR"
@@ -102,17 +105,26 @@ else
 	echo "  WARNING: Pool keys not found at $POOL_KEYS_SRC"
 fi
 
-# Generate mesh topology (connect to other pools)
-echo "Generating mesh topology..."
-accessPoints="["
-case "$POOL_NUM" in
-1)
-	accessPoints='[{"address": "'$IP_POOL2'", "port": '$PORT_POOL2'}, {"address": "'$IP_POOL3'", "port": '$PORT_POOL3'}]'
+# Generate topology. With PeerSharing disabled and no public/ledger peers,
+# these local roots are the complete set of upstream peers.
+echo "Generating $TOPOLOGY topology..."
+case "$POOL_NUM:$TOPOLOGY" in
+1:line)
+	accessPoints='[{"address": "'$IP_POOL2'", "port": '$PORT_POOL2'}]'
 	;;
-2)
+2:line)
 	accessPoints='[{"address": "'$IP_POOL1'", "port": '$PORT_POOL1'}, {"address": "'$IP_POOL3'", "port": '$PORT_POOL3'}]'
 	;;
-3)
+3:line)
+	accessPoints='[{"address": "'$IP_POOL2'", "port": '$PORT_POOL2'}]'
+	;;
+1:*)
+	accessPoints='[{"address": "'$IP_POOL2'", "port": '$PORT_POOL2'}, {"address": "'$IP_POOL3'", "port": '$PORT_POOL3'}]'
+	;;
+2:*)
+	accessPoints='[{"address": "'$IP_POOL1'", "port": '$PORT_POOL1'}, {"address": "'$IP_POOL3'", "port": '$PORT_POOL3'}]'
+	;;
+3:*)
 	accessPoints='[{"address": "'$IP_POOL1'", "port": '$PORT_POOL1'}, {"address": "'$IP_POOL2'", "port": '$PORT_POOL2'}]'
 	;;
 esac
@@ -120,7 +132,7 @@ esac
 jq --argjson accessPoints "$accessPoints" \
 	'.localRoots[0].accessPoints = $accessPoints' \
 	"$CONFIG_DIR/topology.template.json" >"$DATA_DIR/topology.json"
-echo "  topology.json created with mesh topology"
+echo "  topology.json created with $TOPOLOGY topology"
 
 # Copy and customize config
 echo "Copying config..."
