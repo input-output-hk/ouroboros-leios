@@ -4,8 +4,8 @@ name: "cardano-node-leios"
 # `cardano-node-leios` flake input) as:
 #
 #   1. Release tarballs `cardano-node-leios-<platform>.tar.gz` for
-#      x86_64-linux (static musl) and aarch64-darwin (upstream macOS
-#      release tarball with dylib paths rewritten).
+#      x86_64-linux and aarch64-linux (static musl), and aarch64-darwin
+#      (upstream macOS release tarball with dylib paths rewritten).
 #   2. A minimal `cardano-node-leios` docker image on GHCR.
 #   3. A derived `cardano-node-testnet` image (pinned testnet configs).
 #   4. A draft GitHub release (on tag pushes, or on a workflow_dispatch
@@ -199,6 +199,45 @@ jobs:
           cache-from: type=gha,scope=cardano-node-testnet
           cache-to: type=gha,mode=max,scope=cardano-node-testnet
 
+  build-linux-arm64:
+    name: "Build aarch64-linux binaries"
+    # Use a native ARM64 runner so Nix evaluates and builds the
+    # aarch64-linux musl jobs from the cardano-node input directly.
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Install nix
+        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+            substituters = https://cache.nixos.org https://cache.iog.io
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
+
+      - name: Build aarch64-linux release tarball
+        run: |
+          set -euo pipefail
+          nix build .#cardano-node-release -o result-release
+
+          mkdir -p artifacts
+          cp -v result-release/cardano-node-leios-aarch64-linux.tar.gz artifacts/
+          (cd artifacts && sha256sum cardano-node-leios-aarch64-linux.tar.gz \
+            > cardano-node-leios-aarch64-linux.sha256)
+
+      - name: Upload aarch64-linux tarball as workflow artifact
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        with:
+          name: cardano-node-leios-aarch64-linux-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error
+
   build-macos:
     name: "Build aarch64-darwin binaries"
     # macos-14 = Apple Silicon (aarch64-darwin). macos-13 is Intel.
@@ -242,7 +281,7 @@ jobs:
 
   draft-release:
     name: "Draft GitHub release"
-    needs: [build, build-macos]
+    needs: [build, build-linux-arm64, build-macos]
     # Trigger on tag pushes, or on a workflow_dispatch that asks for a
     # specific ref (which may or may not be a tag — the job verifies).
     if: >-
@@ -310,6 +349,13 @@ jobs:
           name: cardano-node-leios-aarch64-darwin-${{ github.run_id }}
           path: artifacts/
 
+      - name: Download aarch64-linux artifact
+        if: steps.tag.outputs.skip != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: cardano-node-leios-aarch64-linux-${{ github.run_id }}
+          path: artifacts/
+
       - name: Extract tag annotation body
         if: steps.tag.outputs.skip != 'true'
         run: |
@@ -342,5 +388,7 @@ jobs:
             --notes-file release-notes.md \
             artifacts/cardano-node-leios-x86_64-linux.tar.gz \
             artifacts/cardano-node-leios-x86_64-linux.sha256 \
+            artifacts/cardano-node-leios-aarch64-linux.tar.gz \
+            artifacts/cardano-node-leios-aarch64-linux.sha256 \
             artifacts/cardano-node-leios-aarch64-darwin.tar.gz \
             artifacts/cardano-node-leios-aarch64-darwin.sha256

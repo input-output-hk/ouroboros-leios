@@ -97,7 +97,7 @@ requires a reasonably fast disk:
 
 |               |                                                    |
 |---------------|----------------------------------------------------|
-| **OS / arch** | Linux **x86-64** or macOS **aarch64** for prebuilt binaries |
+| **OS / arch** | Linux **x86-64**, Linux **aarch64**, or macOS **aarch64** for prebuilt binaries |
 | **CPU**       | 2 cores is fine; more only speeds the initial sync |
 | **RAM**       | 4 GB comfortable (the node uses ~2–2.5 GB)         |
 | **Disk**      | SSD, ~25 GB                                        |
@@ -123,8 +123,8 @@ A few ways to start one — pick whichever fits your setup:
 - **Nix** — one command builds, installs, and runs the node together
   with a Grafana + Loki + Prometheus stack. Every dependency is
   provided.
-- **Prebuilt binaries** — download the release tarball (Linux x86-64
-  or macOS aarch64) and run with the repository's launch script.
+- **Prebuilt binaries** — download the release tarball (Linux x86-64,
+  Linux aarch64, or macOS aarch64) and run with the repository's launch script.
   Compatible with the same observability stack if you install the
   extra tooling, or run the node on its own and bring your own tools.
 - **Docker** — the same binaries packaged as a container image, for
@@ -205,7 +205,7 @@ cardano-node --version   # expect: cardano-node x.y.z.164
 ### Prebuilt binaries
 
 The release ships a tarball per platform with `cardano-node` and
-`cardano-cli` under `bin/`. On Linux x86-64 the binaries are
+`cardano-cli` under `bin/`. On Linux x86-64 and aarch64 the binaries are
 statically linked; on macOS aarch64 the dylib paths are pre-rewritten
 so they run on a stock macOS host. Either way, nothing else needs
 installing.
@@ -226,9 +226,23 @@ mkdir -p "$WORKING_DIR"
 ```shell
 cd "$WORKING_DIR"
 
-BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w27
+BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w30
 ARCHIVE=cardano-node-leios-x86_64-linux.tar.gz
 CHECKSUM=cardano-node-leios-x86_64-linux.sha256
+curl -L -O "$BASE/$ARCHIVE"
+curl -L -O "$BASE/$CHECKSUM"
+sha256sum -c "$CHECKSUM"
+```
+
+</TabItem>
+<TabItem value="linux-arm64" label="Linux aarch64">
+
+```shell
+cd "$WORKING_DIR"
+
+BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w30
+ARCHIVE=cardano-node-leios-aarch64-linux.tar.gz
+CHECKSUM=cardano-node-leios-aarch64-linux.sha256
 curl -L -O "$BASE/$ARCHIVE"
 curl -L -O "$BASE/$CHECKSUM"
 sha256sum -c "$CHECKSUM"
@@ -240,7 +254,7 @@ sha256sum -c "$CHECKSUM"
 ```shell
 cd "$WORKING_DIR"
 
-BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w27
+BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w30
 ARCHIVE=cardano-node-leios-aarch64-darwin.tar.gz
 CHECKSUM=cardano-node-leios-aarch64-darwin.sha256
 curl -L -O "$BASE/$ARCHIVE"
@@ -309,7 +323,7 @@ or wrap it into a systemd service.
 
 A prebuilt image carrying both `cardano-node` and `cardano-cli` is published for
 each leios prototype release at
-`ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w27`
+`ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w30`
 — useful if you already orchestrate nodes with containers. The image runs as a
 non-block-producing relay out of the box; no observability stack is included.
 
@@ -327,7 +341,7 @@ docker run -d --name leios-relay \
   -p 3010:3010 \
   -v "$WORKING_DIR:/data" \
   -v "$WORKING_DIR/config:/app/config:ro" \
-  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w27
+  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w30
 ```
 
 The `$WORKING_DIR` mount keeps the database, socket (`$WORKING_DIR/node.socket`),
@@ -413,7 +427,7 @@ The **Prebuilt binaries** and **Docker** paths bring only the node
 itself; observability there is whatever you wire up around it. If you
 want the same wrapped experience without going all-in on Nix, clone the
 repository and run its
-[`testnet/run.sh`](https://github.com/input-output-hk/ouroboros-leios/blob/prototype-2026w27/testnet/run.sh)
+[`testnet/run.sh`](https://github.com/input-output-hk/ouroboros-leios/blob/prototype-2026w30/testnet/run.sh)
 — a `process-compose` script that boots the node together with Grafana
 + Loki + Prometheus. It needs `process-compose`, `envsubst`, Grafana,
 Loki, and Prometheus on your `PATH`, all of which the `dev-testnet` Nix
