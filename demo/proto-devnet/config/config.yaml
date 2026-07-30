@@ -11,13 +11,21 @@ MempoolCapacityBytesOverride: 25000000
 # Needed < 10.6
 EnableP2P: true
 
+# Node-to-node tx-submission inbound logic. V2 is the newer pull/decision-based
+# logic; V1 is the legacy path. Switch to compare N2N propagation throughput
+# under real traffic delays (default is TxSubmissionLogicV1).
+TxSubmissionLogicVersion: TxSubmissionLogicV2
+
 LastKnownBlockVersion-Alt: 0
 LastKnownBlockVersion-Major: 3
 LastKnownBlockVersion-Minor: 1
 ConsensusMode: GenesisMode
 RequiresNetworkMagic: RequiresMagic
 LedgerDB:
-  Backend: V2InMemory
+  # On-disk UTxO-HD backend (LSM-tree backing store) so UTxO reads/writes hit
+  # disk — makes ledger access demanding, as wanted for mempool throughput
+  # baselining. Switch back to V2InMemory to keep the UTxO set in RAM.
+  Backend: V2LSM
   NumOfDiskSnapshots: 2
   QueryBatchSize: 100000
   SnapshotInterval: 4230
@@ -118,7 +126,7 @@ TraceOptions:
   Mempool.SyncNotNeeded:
     severity: Silence
   Mempool.Synced:
-    severity: Silence
+    severity: Debug
   Net:
     severity: Notice
   Net.AcceptPolicy:
