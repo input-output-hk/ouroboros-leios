@@ -18,9 +18,113 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 6,
+  "id": 7,
   "links": [],
   "panels": [
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd",
+            "seriesBy": "max"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [
+            "max",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap duration [5m]\n  )\n)",
+          "legendFormat": "[{{thread}}] $ {{stack}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Max Duration by Thread & Call Stack [5m window]",
+      "type": "timeseries"
+    },
     {
       "datasource": {
         "type": "loki",
@@ -86,7 +190,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 0
       },
       "id": 8,
@@ -191,8 +295,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 0
+        "x": 0,
+        "y": 8
       },
       "id": 7,
       "options": {
@@ -227,110 +331,6 @@
         }
       ],
       "title": "Max Allocations by Thread & Call Stack [5m window]",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "continuous-GrYlRd",
-            "seriesBy": "max"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "id": 4,
-      "options": {
-        "legend": {
-          "calcs": [
-            "max",
-            "min"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
-          },
-          "direction": "backward",
-          "editorMode": "code",
-          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap duration [5m]\n  )\n)",
-          "legendFormat": "[{{thread}}] $ {{stack}}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Max Duration by Thread & Call Stack [5m window]",
       "type": "timeseries"
     },
     {
@@ -411,7 +411,7 @@
         "sortBy": [
           {
             "desc": false,
-            "displayName": "Time"
+            "displayName": "id"
           }
         ]
       },
@@ -537,7 +537,7 @@
       "options": {
         "spanFilters": {
           "criticalPathOnly": false,
-          "matchesOnly": true,
+          "matchesOnly": false,
           "serviceNameOperator": "=",
           "spanNameOperator": "=",
           "tags": [
@@ -557,7 +557,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n  | json\n    # Span fields\n  | label_format spanID=`{{ .id }}`\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .thread }}@{{ .instance }}`\n  | label_format host=`{{ .process }}`\n  | label_format traceID=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  | label_format parentSpanID=`{{ .parent_id }}`\n  # Extra fields TODO: Figure out how to add this to span attributes, this breaks everything\n  # | label_format tags=`allocations=\"{{ .allocations }}\", argument=\"{{ .argument }}\", result=\"{{ .result }}\"`\n    \n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName, host",
+          "expr": "{service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n  | json\n  | label_format root_id=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  # Span fields\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .instance }} - {{ .thread }}`\n  | label_format spanID=`{{ .instance }} - {{ .thread }} - {{ .id }}`\n  | label_format parentSpanID=`{{ .instance }} - {{ .thread }} - {{ .parent_id }}`\n  | label_format traceID=`{{ .instance }} - {{ .thread }} - {{ .root_id }}`\n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName",
           "queryType": "range",
           "refId": "A"
         }
