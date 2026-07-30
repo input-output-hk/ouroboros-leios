@@ -190,6 +190,7 @@ services:
 
   dingo1:
     image: ghcr.io/blinklabs-io/dingo:main-antithesis
+    command: ["serve", "--logging-level", "warn"]
     depends_on:
       init-dingo1:
         condition: service_completed_successfully

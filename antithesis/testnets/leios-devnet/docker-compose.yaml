@@ -27,6 +27,7 @@ x-node-image: &node-image
 
 x-dingo-image: &dingo-image
   image: ghcr.io/blinklabs-io/dingo:main-antithesis
+  command: ["serve", "--logging-level", "warn"]
 
 services:
   # ==========================================================================
