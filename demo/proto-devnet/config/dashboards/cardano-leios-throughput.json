@@ -116,22 +116,6 @@
         "overrides": [
           {
             "matcher": {
-              "id": "byName",
-              "options": "Load"
-            },
-            "properties": [
-              {
-                "id": "custom.axisPlacement",
-                "value": "right"
-              },
-              {
-                "id": "unit",
-                "value": "Bps"
-              }
-            ]
-          },
-          {
-            "matcher": {
               "id": "byFrameRefID",
               "options": "Mempool bytes"
             },
