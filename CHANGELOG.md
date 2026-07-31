@@ -11,7 +11,7 @@ Nodes now generate and diffuse EB announcements over `LeiosNotify`, and the BLS 
 
 > [!NOTE]
 >
-> No block-serialization or wire-format break this release, so **no state wipe is required** (unlike w30). EB announcement generation is compatible with w30 nodes, which already accept and ignore the messages, but updating relays together is recommended so announcements actually propagate.
+> No block-serialization or wire-format break this release, so no state wipe is required (unlike w30). EB announcement generation is compatible with w30 nodes, which already accept and ignore the messages, but updating relays together is recommended so announcements actually propagate.
 
 - Generate and diffuse EB announcements over `LeiosNotify` [consensus#2132](https://github.com/IntersectMBO/ouroboros-consensus/pull/2132), relates to [#772](https://github.com/input-output-hk/ouroboros-leios/issues/772) - diffused, but not otherwise leveraged yet!
   - Nodes now emit a `MsgLeiosBlockAnnouncement` as an EB is forged and relay it to peers, building on the "accept but ignore" handling from w30 ([consensus#2142](https://github.com/IntersectMBO/ouroboros-consensus/pull/2142)).
