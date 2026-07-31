@@ -69,7 +69,6 @@ declare "call_trace_enrich" {
           expressions = {
             duration    = "duration",
             allocations = "allocations",
-            result      = "result",
           }
           drop_malformed = true
         }
