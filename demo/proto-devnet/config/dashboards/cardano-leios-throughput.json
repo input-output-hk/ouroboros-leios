@@ -18,7 +18,7 @@
           "type": "loki",
           "uid": "loki"
         },
-        "enable": true,
+        "enable": false,
         "expr": "{service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockCertified\"}",
         "hide": false,
         "iconColor": "green",
@@ -35,7 +35,7 @@
           "type": "loki",
           "uid": "loki"
         },
-        "enable": true,
+        "enable": false,
         "expr": "{service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockAnnounced\"}",
         "hide": false,
         "iconColor": "yellow",
