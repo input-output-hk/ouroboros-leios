@@ -656,7 +656,8 @@
         },
         "refresh": 1,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "allValue": ".+"
       },
       {
         "current": {
@@ -684,7 +685,8 @@
         },
         "refresh": 1,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "allValue": ".+"
       }
     ]
   },

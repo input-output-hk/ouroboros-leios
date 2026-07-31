@@ -163,6 +163,11 @@ done
 export ALLOY_CONFIG="${WORKING_DIR}/config.alloy"
 envsubst <"${CONFIG_DIR}/alloy.template" >"${ALLOY_CONFIG}"
 
+# Shared per-service Alloy enrichment modules that config.alloy imports via
+# import.file. They carry no envsubst vars, so a plain copy suffices.
+mkdir -p "${WORKING_DIR}/alloy-modules"
+cp "${CONFIG_DIR}/alloy-modules/"*.alloy "${WORKING_DIR}/alloy-modules/"
+
 echo "Starting proto-devnet ..."
 echo "  Topology: ${TOPOLOGY}"
 # Traffic control integration

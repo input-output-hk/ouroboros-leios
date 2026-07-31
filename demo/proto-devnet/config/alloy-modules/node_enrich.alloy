@@ -1,0 +1,73 @@
+// node_enrich — cardano-node trace enrichment (stream = "node").
+//
+// A reusable Alloy module (one file, one service). It EXPECTS a certain input
+// and produces a certain output; it does not know or care who feeds it or who
+// consumes it — the downstream is injected via `argument.forward_to`.
+//
+//   Input : cardano-node trace-dispatcher JSON in the line body, with a `stream`
+//           label already stamped by the (environment-specific) front-end.
+//   Output: the decoded `data` object as the body, bounded index labels
+//           (service/type/level/sev/ns/kind), timestamp from `at`.
+//
+// Pattern B, drop-first: anything that is not the node stream is dropped up
+// front, so the rest of the module operates only on its own lines and can never
+// contaminate a sibling stream. The trace body is parsed exactly once here; the
+// vote/call facets downstream guard on the `kind` LABEL (no re-parse to route).
+//
+// Cardinality: index only bounded fields. `host` is omitted (it duplicates the
+// base `instance` label); `rbHash`/`stack` are never labelled — they stay in the
+// body (republished `data`) for query-time `| json`.
+declare "node_enrich" {
+  argument "forward_to" {}
+
+  export "receiver" {
+    value = loki.process.enrich.receiver
+  }
+
+  loki.process "enrich" {
+    stage.match {
+      selector = `{stream!="node"}`
+      action   = "drop"
+    }
+
+    stage.json {
+      expressions = {
+        at   = "at",
+        sev  = "sev",
+        ns   = "ns",
+        kind = "data.kind",
+        data = "data",
+      }
+      drop_malformed = true
+    }
+
+    stage.timestamp {
+      source = "at"
+      format = "RFC3339"
+    }
+
+    stage.labels {
+      values = {
+        level = "sev",
+        sev   = "sev",
+        ns    = "ns",
+        kind  = "kind",
+      }
+    }
+
+    stage.static_labels {
+      values = {
+        service = "cardano-node",
+        type    = "cardano-node",
+      }
+    }
+
+    // Republish the decoded `data` object as the body so the vote/call modules
+    // (and query-time `| json`) see kind/vote/event/... at the top level.
+    stage.output {
+      source = "data"
+    }
+
+    forward_to = argument.forward_to.value
+  }
+}

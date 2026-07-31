@@ -1,0 +1,84 @@
+// leios_voting_enrich — the Leios voting facet of the cardano-node stream.
+//
+// Chained AFTER node_enrich (not fanned from the front-end): votes are a sub-kind
+// of the node stream, not a separate service, so enriching them inline keeps the
+// single write. Non-vote lines pass straight through to `forward_to` untouched.
+//
+//   Input : node_enrich output — body = decoded `data`, `kind` label set.
+//   Output: same line, plus service=cardano-node/leios-voting and a bounded
+//           `voterId` label on vote lines; vote counters emitted.
+//
+// `rbHash` is deliberately NOT extracted/labelled — it is ~one value per block
+// (high cardinality). It stays in the body for `| json` (vote.rbHash), which also
+// keeps the counters bounded (voterId ~3 is the only variable label they inherit).
+declare "leios_voting_enrich" {
+  argument "forward_to" {}
+
+  export "receiver" {
+    value = loki.process.enrich.receiver
+  }
+
+  loki.process "enrich" {
+    stage.match {
+      selector = `{kind=~"LeiosVoted|LeiosVoteAcquired"}`
+
+      stage.json {
+        expressions = {
+          voterId = "vote.voterId",
+        }
+        drop_malformed = true
+      }
+
+      stage.static_labels {
+        values = {
+          service = "cardano-node/leios-voting",
+          type    = "leios-voting",
+        }
+      }
+
+      stage.labels {
+        values = {
+          voterId = "voterId",
+        }
+      }
+
+      stage.match {
+        selector = `{kind="LeiosVoted"}`
+
+        stage.json {
+          expressions = {
+            weight = "weight",
+          }
+        }
+
+        stage.metrics {
+          metric.counter {
+            name              = "voted_weight_total"
+            description       = "The total accumulated voting weight"
+            prefix            = "cardano_node_metrics_loki_leios_"
+            action            = "add"
+            source            = "weight"
+            max_idle_duration = "24h"
+          }
+        }
+      }
+
+      stage.match {
+        selector = `{kind="LeiosVoteAcquired"}`
+
+        stage.metrics {
+          metric.counter {
+            name              = "votes_acquired_total"
+            description       = "The total votes acquired"
+            prefix            = "cardano_node_metrics_loki_leios_"
+            action            = "inc"
+            match_all         = true
+            max_idle_duration = "24h"
+          }
+        }
+      }
+    }
+
+    forward_to = argument.forward_to.value
+  }
+}

@@ -1,0 +1,110 @@
+// tx_firehose_enrich — the tx-firehose load generator (stream = "tx-firehose").
+//
+// Fanned directly from the front-end (a distinct service stream, written once).
+// tx-firehose shares the cardano-node trace-dispatcher envelope but is
+// ns-discriminated (TxFirehose.Submit.Success|Reject) with no `data.kind`.
+//
+//   Input : firehose trace JSON in the body, `stream` label stamped by the
+//           front-end.
+//   Output: decoded `data` as body, service=tx-firehose, bounded ns label;
+//           canonical tx-generator counters (generator="firehose").
+//
+// The submitted `size` stays in the body for `| json size | unwrap size`
+// throughput (the query-time approach main's dashboard uses); the ingest-time
+// txgen_bytes_total counter is emitted too, so both panel styles can be compared.
+declare "tx_firehose_enrich" {
+  argument "forward_to" {}
+
+  export "receiver" {
+    value = loki.process.enrich.receiver
+  }
+
+  loki.process "enrich" {
+    stage.match {
+      selector = `{stream!="tx-firehose"}`
+      action   = "drop"
+    }
+
+    stage.json {
+      expressions = {
+        at   = "at",
+        sev  = "sev",
+        ns   = "ns",
+        data = "data",
+      }
+      drop_malformed = true
+    }
+
+    stage.timestamp {
+      source = "at"
+      format = "RFC3339"
+    }
+
+    stage.labels {
+      values = {
+        level = "sev",
+        sev   = "sev",
+        ns    = "ns",
+      }
+    }
+
+    stage.static_labels {
+      values = {
+        service   = "tx-firehose",
+        type      = "tx-firehose",
+        generator = "firehose",
+      }
+    }
+
+    stage.output {
+      source = "data"
+    }
+
+    stage.match {
+      selector = `{ns="TxFirehose.Submit.Success"}`
+
+      stage.json {
+        expressions = {
+          size = "size",
+        }
+      }
+
+      stage.metrics {
+        metric.counter {
+          name              = "txgen_submitted_total"
+          description       = "Total txs accepted on submission"
+          prefix            = "cardano_node_metrics_loki_"
+          action            = "inc"
+          match_all         = true
+          max_idle_duration = "24h"
+        }
+
+        metric.counter {
+          name              = "txgen_bytes_total"
+          description       = "Total submitted tx bytes"
+          prefix            = "cardano_node_metrics_loki_"
+          action            = "add"
+          source            = "size"
+          max_idle_duration = "24h"
+        }
+      }
+    }
+
+    stage.match {
+      selector = `{ns="TxFirehose.Submit.Reject"}`
+
+      stage.metrics {
+        metric.counter {
+          name              = "txgen_rejected_total"
+          description       = "Total txs rejected on submission"
+          prefix            = "cardano_node_metrics_loki_"
+          action            = "inc"
+          match_all         = true
+          max_idle_duration = "24h"
+        }
+      }
+    }
+
+    forward_to = argument.forward_to.value
+  }
+}

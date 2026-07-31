@@ -81,6 +81,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -190,6 +191,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -312,6 +314,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -434,6 +437,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -543,6 +547,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -652,6 +657,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -761,6 +767,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -870,6 +877,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -979,6 +987,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -1101,6 +1110,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -1210,6 +1220,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -1319,6 +1330,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -1428,6 +1440,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -1537,6 +1550,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
@@ -1646,6 +1660,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "mimir"
       },
       "fieldConfig": {
