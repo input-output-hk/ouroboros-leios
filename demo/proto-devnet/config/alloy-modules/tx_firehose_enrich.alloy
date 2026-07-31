@@ -1,10 +1,10 @@
-// tx_firehose_enrich — the tx-firehose load generator (stream = "tx-firehose").
+// tx_firehose_enrich — the tx-firehose load generator (service = "tx-firehose").
 //
 // Fanned directly from the front-end (a distinct service stream, written once).
 // tx-firehose shares the cardano-node trace-dispatcher envelope but is
 // ns-discriminated (TxFirehose.Submit.Success|Reject) with no `data.kind`.
 //
-//   Input : firehose trace JSON in the body, `stream` label stamped by the
+//   Input : firehose trace JSON in the body, `service` label stamped by the
 //           front-end.
 //   Output: decoded `data` as body, service=tx-firehose, bounded ns label;
 //           canonical tx-generator counters (generator="firehose").
@@ -21,7 +21,7 @@ declare "tx_firehose_enrich" {
 
   loki.process "enrich" {
     stage.match {
-      selector = `{stream!="tx-firehose"}`
+      selector = `{service!="tx-firehose"}`
       action   = "drop"
     }
 

@@ -1,18 +1,18 @@
-// node_enrich — cardano-node trace enrichment (stream = "node").
+// node_enrich — cardano-node trace enrichment (service = "cardano-node").
 //
 // A reusable Alloy module (one file, one service). It EXPECTS a certain input
 // and produces a certain output; it does not know or care who feeds it or who
 // consumes it — the downstream is injected via `argument.forward_to`.
 //
-//   Input : cardano-node trace-dispatcher JSON in the line body, with a `stream`
+//   Input : cardano-node trace-dispatcher JSON in the line body, with a `service`
 //           label already stamped by the (environment-specific) front-end.
 //   Output: the decoded `data` object as the body, bounded index labels
 //           (service/type/level/sev/ns/kind), timestamp from `at`.
 //
-// Pattern B, drop-first: anything that is not the node stream is dropped up
-// front, so the rest of the module operates only on its own lines and can never
-// contaminate a sibling stream. The trace body is parsed exactly once here; the
-// vote/call facets downstream guard on the `kind` LABEL (no re-parse to route).
+// Pattern B, drop-first: anything whose `service` is not cardano-node is dropped
+// up front, so the rest of the module operates only on its own lines and can
+// never contaminate a sibling stream. The trace body is parsed exactly once here;
+// the vote/call facets downstream guard on the `kind` LABEL (no re-parse to route).
 //
 // Cardinality: index only bounded fields. `host` is omitted (it duplicates the
 // base `instance` label); `rbHash`/`stack` are never labelled — they stay in the
@@ -26,7 +26,7 @@ declare "node_enrich" {
 
   loki.process "enrich" {
     stage.match {
-      selector = `{stream!="node"}`
+      selector = `{service!="cardano-node"}`
       action   = "drop"
     }
 

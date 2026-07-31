@@ -1,4 +1,4 @@
-// tx_centrifuge_enrich — the tx-centrifuge load generator (stream = "tx-centrifuge").
+// tx_centrifuge_enrich — the tx-centrifuge load generator (service = "tx-centrifuge").
 //
 // Fanned directly from the front-end, symmetric to tx_firehose_enrich. Present
 // unconditionally but DORMANT unless centrifuge is the running generator — with
@@ -6,7 +6,7 @@
 // This is what lets an environment switch centrifuge<->firehose with no Alloy
 // change: both modules are always wired in; whichever generator is absent is inert.
 //
-//   Input : centrifuge trace JSON in the body, `stream` label stamped by the
+//   Input : centrifuge trace JSON in the body, `service` label stamped by the
 //           front-end. Same trace-dispatcher envelope; ns-discriminated
 //           (TxCentrifuge.Builder.NewTx|QueueDepth), no `data.kind`.
 //   Output: decoded `data` as body, service=tx-centrifuge, bounded ns label;
@@ -24,7 +24,7 @@ declare "tx_centrifuge_enrich" {
 
   loki.process "enrich" {
     stage.match {
-      selector = `{stream!="tx-centrifuge"}`
+      selector = `{service!="tx-centrifuge"}`
       action   = "drop"
     }
 

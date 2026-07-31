@@ -2,16 +2,16 @@
 //
 // Structure (see also config/alloy-modules/*.alloy):
 //   * Environment-specific FRONT-END below unwraps the process-compose log
-//     envelope and stamps a normalized `stream` label (node | tx-firehose |
-//     tx-centrifuge) from the process name. This is the ONE piece that differs
-//     per environment (playground stamps `stream` from systemd_unit instead);
+//     envelope and stamps the routing `service` label (cardano-node | tx-firehose
+//     | tx-centrifuge) from the process name. This is the ONE piece that differs
+//     per environment (playground stamps `service` from systemd_unit instead);
 //     everything downstream is shared, reusable modules.
 //   * The shared per-service enrichment MODULES are imported via import.file and
 //     wired here. Each is a self-contained `declare` that expects a structure and
 //     forwards to an injected receiver — no module hardcodes its downstream.
 //   * Routing follows Pattern B (fan-out + drop-first) at the service boundary:
 //     the front-end forwards every line to each service module, and each module
-//     drops anything that is not its stream. The node sub-facets (voting,
+//     drops anything whose `service` is not its own. The node sub-facets (voting,
 //     call-trace) are CHAINED after node_enrich so each node line is still
 //     written exactly once, carrying whatever the facets added.
 //
@@ -77,10 +77,10 @@ loki.source.file "process_compose_log_scrape" {
 	tail_from_end = false
 }
 
-// FRONT-END (environment-specific): unwrap the process-compose envelope, write
-// one raw process-compose copy, and stamp a normalized `stream` label from the
-// process name so the shared modules can route on it. `Analyze` (and any other
-// non-matching process) gets no `stream`, so every module drops it.
+// FRONT-END (environment-specific) stage 1: unwrap the process-compose envelope
+// and write ONE raw process-compose copy (service=process-compose). This stage
+// does NOT route -- it hands each line to leios_route below, where the routing
+// `service` value is stamped, so the raw copy is never overwritten by it.
 loki.process "extract_process_compose_logs" {
 	stage.json {
 		expressions = {
@@ -119,13 +119,30 @@ loki.process "extract_process_compose_logs" {
 		}
 	}
 
-	// Normalized routing label. Modules select on `stream`, never on `process`,
-	// so they stay portable across environments.
+	// Body = the wrapped trace JSON; the raw copy goes to loki.write.loki and a
+	// copy is handed to leios_route for service stamping + fan-out.
+	stage.output {
+		source = "message"
+	}
+
+	forward_to = [
+		loki.write.loki.receiver,
+		loki.process.leios_route.receiver,
+	]
+}
+
+// FRONT-END stage 2 (the router): overwrite `service` from process-compose to the
+// normalized routing value (cardano-node | tx-firehose | tx-centrifuge) by process
+// name, then fan out to the shared modules. `service` is BOTH the routing key and
+// the final label -- there is no separate `stream`, so nothing needs dropping
+// before the write. `Analyze` (and any non-matching process) keeps
+// service=process-compose, so every module's `{service!="..."}` guard drops it.
+loki.process "leios_route" {
 	stage.match {
 		selector = `{process=~"Node[0-9]+"}`
 		stage.static_labels {
 			values = {
-				stream = "node",
+				service = "cardano-node",
 			}
 		}
 	}
@@ -134,7 +151,7 @@ loki.process "extract_process_compose_logs" {
 		selector = `{process="TxFirehose"}`
 		stage.static_labels {
 			values = {
-				stream = "tx-firehose",
+				service = "tx-firehose",
 			}
 		}
 	}
@@ -143,19 +160,12 @@ loki.process "extract_process_compose_logs" {
 		selector = `{process="TxCentrifuge"}`
 		stage.static_labels {
 			values = {
-				stream = "tx-centrifuge",
+				service = "tx-centrifuge",
 			}
 		}
 	}
 
-	// Body = the wrapped trace JSON; raw copy goes to loki.write.loki, and a copy
-	// is fanned to each service module.
-	stage.output {
-		source = "message"
-	}
-
 	forward_to = [
-		loki.write.loki.receiver,
 		mod.node_enrich.node.receiver,
 		mod.tx_firehose_enrich.firehose.receiver,
 		mod.tx_centrifuge_enrich.centrifuge.receiver,
