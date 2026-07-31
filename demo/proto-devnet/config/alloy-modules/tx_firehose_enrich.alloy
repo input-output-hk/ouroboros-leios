@@ -1,17 +1,17 @@
 // tx_firehose_enrich — the tx-firehose load generator (service = "tx-firehose").
 //
 // Fanned directly from the front-end (a distinct service stream, written once).
-// tx-firehose shares the cardano-node trace-dispatcher envelope but is
-// ns-discriminated (TxFirehose.Submit.Success|Reject) with no `data.kind`.
+// Shares the cardano-node trace envelope but is ns-discriminated
+// (TxFirehose.Submit.Success|Reject), no data.kind.
 //
-//   Input : firehose trace JSON in the body, `service` label stamped by the
-//           front-end.
-//   Output: decoded `data` as body, service=tx-firehose, bounded ns label;
-//           canonical tx-generator counters (generator="firehose").
+//   Input  : firehose trace JSON in the body, service pre-stamped by the front-end.
+//   Output : decoded `data` as the body.
+//   Labels : service=tx-firehose, generator=firehose, level, sev, ns.
+//   Metrics: txgen_submitted_total, txgen_bytes_total, txgen_rejected_total.
 //
-// The submitted `size` stays in the body for `| json size | unwrap size`
-// throughput (the query-time approach main's dashboard uses); the ingest-time
-// txgen_bytes_total counter is emitted too, so both panel styles can be compared.
+// Submitted `size` stays in the body for `| json size | unwrap size` (main's
+// query-time approach); the ingest-time txgen_bytes_total is emitted too, so both
+// panel styles can be compared.
 declare "tx_firehose_enrich" {
   argument "forward_to" {}
 

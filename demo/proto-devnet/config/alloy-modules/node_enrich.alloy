@@ -1,22 +1,17 @@
 // node_enrich — cardano-node trace enrichment (service = "cardano-node").
 //
-// A reusable Alloy module (one file, one service). It EXPECTS a certain input
-// and produces a certain output; it does not know or care who feeds it or who
-// consumes it — the downstream is injected via `argument.forward_to`.
+// Pattern B, drop-first: lines whose service is not cardano-node are dropped up
+// front, so the module only ever touches its own stream. The body is parsed
+// exactly once here; the vote/call facets chained downstream route on the `kind`
+// LABEL (no re-parse). Downstream is injected via argument.forward_to.
 //
-//   Input : cardano-node trace-dispatcher JSON in the line body, with a `service`
-//           label already stamped by the (environment-specific) front-end.
-//   Output: the decoded `data` object as the body, bounded index labels
-//           (service/level/sev/ns/kind), timestamp from `at`.
+//   Input  : cardano-node trace JSON {at, sev, ns, data{kind,...}}, service pre-stamped by the front-end.
+//   Output : decoded `data` as the body (so downstream `| json` sees kind/... at top level).
+//   Labels : service=cardano-node, level, sev, ns, kind.
+//   Metrics: none (the chained facets emit their own).
 //
-// Pattern B, drop-first: anything whose `service` is not cardano-node is dropped
-// up front, so the rest of the module operates only on its own lines and can
-// never contaminate a sibling stream. The trace body is parsed exactly once here;
-// the vote/call facets downstream guard on the `kind` LABEL (no re-parse to route).
-//
-// Cardinality: index only bounded fields. `host` is omitted (it duplicates the
-// base `instance` label); `rbHash`/`stack` are never labelled — they stay in the
-// body (republished `data`) for query-time `| json`.
+// host is omitted (== base instance); rbHash/stack are never labelled -- they stay
+// in the body for query-time `| json`.
 declare "node_enrich" {
   argument "forward_to" {}
 

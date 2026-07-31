@@ -1,16 +1,17 @@
-// leios_voting_enrich — the Leios voting facet of the cardano-node stream.
+// leios_voting_enrich — Leios voting facet of the cardano-node stream.
 //
-// Chained AFTER node_enrich (not fanned from the front-end): votes are a sub-kind
-// of the node stream, not a separate service, so enriching them inline keeps the
-// single write. Non-vote lines pass straight through to `forward_to` untouched.
+// Chained AFTER node_enrich (not fanned): votes are a sub-kind of the node stream,
+// not a separate service, so enriching inline keeps the single write. Only
+// kind=LeiosVoted|LeiosVoteAcquired are touched; every other line passes straight
+// through to forward_to untouched (still part of the one node write -- never dropped).
 //
-//   Input : node_enrich output — body = decoded `data`, `kind` label set.
-//   Output: same line, plus service=cardano-node/leios-voting and a bounded
-//           `voterId` label on vote lines; vote counters emitted.
+//   Input  : node_enrich output -- body = decoded `data`, `kind` label set.
+//   Output : same line; on vote lines the service is refined and voterId indexed.
+//   Labels : service=cardano-node/leios-voting, voterId (vote lines only).
+//   Metrics: voted_weight_total, votes_acquired_total.
 //
-// `rbHash` is deliberately NOT extracted/labelled — it is ~one value per block
-// (high cardinality). It stays in the body for `| json` (vote.rbHash), which also
-// keeps the counters bounded (voterId ~3 is the only variable label they inherit).
+// rbHash is NOT labelled (~one value per block); it stays in the body for `| json`
+// (vote.rbHash), which also keeps the counters bounded.
 declare "leios_voting_enrich" {
   argument "forward_to" {}
 

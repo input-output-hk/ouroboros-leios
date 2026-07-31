@@ -1,18 +1,18 @@
-// call_trace_enrich — the Leios call-trace facet of the cardano-node stream.
+// call_trace_enrich — Leios call-trace facet of the cardano-node stream.
 //
-// Chained after leios_voting_enrich; acts only on kind="Call". Others pass
-// through. Usually the tail of the node chain, so its `forward_to` is the
-// terminal write.
+// Chained after leios_voting_enrich; acts only on kind="Call". Every non-Call line
+// passes straight through to forward_to untouched -- this facet only ADDS to Calls,
+// it never drops (the non-Call lines are still part of the one node write). Usually
+// the tail of the node chain, so its forward_to is the terminal write.
 //
-//   Input : node_enrich output — body = decoded `data`, `kind` label set.
-//   Output: same line, plus service=cardano-node/call-trace and bounded
-//           event/name/thread labels on Call lines; call counters emitted.
+//   Input  : node_enrich output -- body = decoded `data`, `kind` label set.
+//            Call fields: event, name, thread, id, child_id, parent_id, stack, argument.
+//   Output : same line; on Call lines the service is refined and event/name/thread indexed.
+//   Labels : service=cardano-node/call-trace, event, name, thread (Call lines only).
+//   Metrics: started_total, ended_total, duration_total, allocations_total.
 //
-// The call-graph identifiers (id/child_id/parent_id/stack/argument) are left in
-// the body for query-time `| json` — `stack` is the call path (unbounded) and
-// must never be a label. Only event/name/thread (bounded) are indexed.
-// (NB: main's inline version had `parent_id = "child_id"` and labelled `stack`;
-// both are corrected here — parent_id/stack live in the body via `| json`.)
+// id/child_id/parent_id/stack/argument stay in the body for query-time `| json`;
+// stack is the unbounded call path and must never be a label.
 declare "call_trace_enrich" {
   argument "forward_to" {}
 
