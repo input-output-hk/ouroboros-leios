@@ -130,9 +130,10 @@ for i in "${nodes[@]}"; do
   # connects to the peers listed here (re-enabling PeerSharing would let the
   # line collapse back toward a mesh).
   accessPoints=$(for j in "${nodes[@]}"; do
-    absdiff=$((i - j)); absdiff=${absdiff#-}
-    if { [ "$TOPOLOGY" = "line" ] && [ "$absdiff" -eq 1 ]; } \
-      || { [ "$TOPOLOGY" != "line" ] && [ "$i" -ne "$j" ]; }; then
+    absdiff=$((i - j))
+    absdiff=${absdiff#-}
+    if { [ "$TOPOLOGY" = "line" ] && [ "$absdiff" -eq 1 ]; } ||
+      { [ "$TOPOLOGY" != "line" ] && [ "$i" -ne "$j" ]; }; then
       port="PORT_NODE$j"
       address="IP_NODE$j"
       echo "{ \"port\": ${!port}, \"address\": \"${!address}\" }"
