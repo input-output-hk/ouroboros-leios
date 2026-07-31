@@ -425,11 +425,11 @@
         "utils": "utils"
       },
       "locked": {
-        "lastModified": 1784932584,
-        "narHash": "sha256-NOV8kYPImofnkKbErAEFkigNkvXH0k66VmCG59kaupM=",
+        "lastModified": 1785513967,
+        "narHash": "sha256-PjoGAf8Bw9Kv1I9lAIowoTvCFnT/YzcNb5HW3ciqCoo=",
         "owner": "intersectmbo",
         "repo": "cardano-node",
-        "rev": "7002fd09162b438b963536b960c6cd42bef022a3",
+        "rev": "d697d3a6d091b568f203afec21d06b90fd075bfd",
         "type": "github"
       },
       "original": {
@@ -1121,11 +1121,11 @@
     "hackageNix_3": {
       "flake": false,
       "locked": {
-        "lastModified": 1783064913,
-        "narHash": "sha256-VXPICk/F/MV7PygX8G4xG7SyTuooqpezQwrer2UPpT0=",
+        "lastModified": 1784626207,
+        "narHash": "sha256-1WjrU24q6MMXMABYMXoYNQaJfodxzni8XF1XGFJEHiM=",
         "owner": "input-output-hk",
         "repo": "hackage.nix",
-        "rev": "40b5e1dd5fd2a92b0d3ab01bed0ec014cf694330",
+        "rev": "770f679832f66818d1ebe410b30a7283ec10fbd6",
         "type": "github"
       },
       "original": {
@@ -3282,18 +3282,20 @@
         ]
       },
       "locked": {
-        "lastModified": 1780333389,
-        "narHash": "sha256-wPSPmyDM92iDskIA8HoY9OiKDDfn+roEDWS0P/KpCIU=",
-        "owner": "intersectmbo",
-        "repo": "ouroboros-consensus",
-        "rev": "0464cd1b8f48472bf88196eeea09c4b649fae016",
-        "type": "github"
+        "lastModified": 1785513713,
+        "narHash": "sha256-LqUz8+YoTjS6rec/hpmg6WqXHwIEl6N8Z8JnQiVuO/0=",
+        "ref": "leios-prototype",
+        "rev": "50c97115f8bc4d11b75d3048e360f4a391aaf9b6",
+        "revCount": 11533,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/intersectmbo/ouroboros-consensus"
       },
       "original": {
-        "owner": "intersectmbo",
         "ref": "leios-prototype",
-        "repo": "ouroboros-consensus",
-        "type": "github"
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/intersectmbo/ouroboros-consensus"
       }
     },
     "poetry2nix": {

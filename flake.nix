@@ -32,7 +32,9 @@
     deltaq-src.flake = false;
 
     # Used by demo/
-    ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype";
+    # Uses git+https (not github:) because the leios-prototype branch pulls in a
+    # git submodule; the tarball-based github fetcher rejects `submodules=1`.
+    ouroboros-consensus.url = "git+https://github.com/intersectmbo/ouroboros-consensus?ref=leios-prototype&submodules=1";
     # Patched cardano-node — source of cardano-node, cardano-cli, and
     # tx-firehose across the repo. The tx-firehose bench/ package now
     # lives on top of leios-prototype so a single input suffices.

@@ -5,6 +5,29 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w31 - 2026-07-31
+
+Nodes now generate and diffuse EB announcements over `LeiosNotify`, and the BLS Leios key is available through `cardano-api`.
+
+> [!NOTE]
+>
+> No block-serialization or wire-format break this release, so **no state wipe is required** (unlike w30). EB announcement generation is compatible with w30 nodes, which already accept and ignore the messages, but updating relays together is recommended so announcements actually propagate.
+
+- Generate and diffuse EB announcements over `LeiosNotify` [consensus#2132](https://github.com/IntersectMBO/ouroboros-consensus/pull/2132), relates to [#772](https://github.com/input-output-hk/ouroboros-leios/issues/772) - diffused, but not otherwise leveraged yet!
+  - Nodes now emit a `MsgLeiosBlockAnnouncement` as an EB is forged and relay it to peers, building on the "accept but ignore" handling from w30 ([consensus#2142](https://github.com/IntersectMBO/ouroboros-consensus/pull/2142)).
+  - Incoming announcements are validated (age check, consistency against previously seen messages) before being relayed; new traces expose the flow, and `TraceLeiosAnnouncementAccepted` now records lateness.
+  - `LeiosFetch` and `LeiosVoting` do not act on announcements yet - generation and diffusion are the necessary first step before wiring them in.
+  - `LeiosNotify` server upgraded from `AntiPipelined` to `Lookahead` pipelining [typed-protocols#93](https://github.com/IntersectMBO/typed-protocols/pull/93).
+
+- Expose the BLS Leios key through `cardano-api` [cardano-api#1272](https://github.com/IntersectMBO/cardano-api/pull/1272)
+  - `sppLeiosKey` is integrated into `StakePoolParameters`, so downstream tooling can construct Dijkstra stake-pool registrations carrying a `LeiosKey`; completes the registration path added in w30.
+  - `ConwayEraOnwardsConstraints` relaxed to admit `Dijkstra`.
+  - As in w30, the key is registrable but not utilized yet, and the insecure key-derivation shortcut is still active.
+
+> [!TIP]
+>
+> Please try generating a BLS key and registering it via a stake pool registration certificate, following the testnet guide: https://leios.cardano-scaling.org/docs/testnet/register-stake-pool/#bls-keys
+
 ## prototype-2026w30 - 2026-07-24
 
 BLS key registration in stake pool certificates, workarounds for a Dijkstra block-encoding issue in the ledger, and graceful handling of proper `MsgLeiosBlockAnnouncement` payloads.
