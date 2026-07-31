@@ -1,4 +1,4 @@
-// tx_firehose_enrich — the tx-firehose load generator (service = "tx-firehose").
+// tx_firehose_process — the tx-firehose load generator (service = "tx-firehose").
 //
 // Fanned directly from the front-end (a distinct service stream, written once).
 // Shares the cardano-node trace envelope but is ns-discriminated
@@ -12,7 +12,7 @@
 // Submitted `size` stays in the body for `| json size | unwrap size` (main's
 // query-time approach); the ingest-time txgen_bytes_total is emitted too, so both
 // panel styles can be compared.
-declare "tx_firehose_enrich" {
+declare "tx_firehose_process" {
   argument "forward_to" {}
 
   export "receiver" {

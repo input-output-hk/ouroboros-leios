@@ -1,11 +1,11 @@
-// call_trace_enrich — Leios call-trace facet of the cardano-node stream.
+// call_trace_process — Leios call-trace facet of the cardano-node stream.
 //
-// Chained after leios_voting_enrich; acts only on kind="Call". Every non-Call line
+// Chained after leios_voting_process; acts only on kind="Call". Every non-Call line
 // passes straight through to forward_to untouched -- this facet only ADDS to Calls,
 // it never drops (the non-Call lines are still part of the one node write). Usually
 // the tail of the node chain, so its forward_to is the terminal write.
 //
-//   Input  : node_enrich output -- body = decoded `data`, `kind` label set.
+//   Input  : cardano_node_process output -- body = decoded `data`, `kind` label set.
 //            Call fields: event, name, thread, id, child_id, parent_id, stack, argument.
 //   Output : same line; on Call lines the service is refined and event/name/thread indexed.
 //   Labels : service=cardano-node/call-trace, event, name, thread (Call lines only).
@@ -13,7 +13,7 @@
 //
 // id/child_id/parent_id/stack/argument stay in the body for query-time `| json`;
 // stack is the unbounded call path and must never be a label.
-declare "call_trace_enrich" {
+declare "call_trace_process" {
   argument "forward_to" {}
 
   export "receiver" {

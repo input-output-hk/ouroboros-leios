@@ -1,4 +1,4 @@
-// node_enrich — cardano-node trace enrichment (service = "cardano-node").
+// cardano_node_process — cardano-node trace enrichment (service = "cardano-node").
 //
 // Pattern B, drop-first: lines whose service is not cardano-node are dropped up
 // front, so the module only ever touches its own stream. The body is parsed
@@ -12,7 +12,7 @@
 //
 // host is omitted (== base instance); rbHash/stack are never labelled -- they stay
 // in the body for query-time `| json`.
-declare "node_enrich" {
+declare "cardano_node_process" {
   argument "forward_to" {}
 
   export "receiver" {

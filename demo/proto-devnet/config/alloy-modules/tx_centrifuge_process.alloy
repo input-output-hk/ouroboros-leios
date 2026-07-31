@@ -1,6 +1,6 @@
-// tx_centrifuge_enrich — the tx-centrifuge load generator (service = "tx-centrifuge").
+// tx_centrifuge_process — the tx-centrifuge load generator (service = "tx-centrifuge").
 //
-// Fanned from the front-end, symmetric to tx_firehose_enrich. Present but DORMANT
+// Fanned from the front-end, symmetric to tx_firehose_process. Present but DORMANT
 // unless centrifuge is running -- with no TxCentrifuge lines it drops everything at
 // zero cost, which is what lets an environment switch centrifuge<->firehose with no
 // Alloy change. ns-discriminated (TxCentrifuge.Builder.NewTx|QueueDepth), no data.kind.
@@ -12,7 +12,7 @@
 //
 // Centrifuge has no real submitted-byte size (unlike firehose), so only the
 // submitted count is emitted; a bytes estimate is a dashboard concern (count x avg-size).
-declare "tx_centrifuge_enrich" {
+declare "tx_centrifuge_process" {
   argument "forward_to" {}
 
   export "receiver" {

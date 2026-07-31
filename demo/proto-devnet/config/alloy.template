@@ -14,13 +14,13 @@
 //   * Routing follows Pattern B (fan-out + drop-first) at the service boundary:
 //     leios_route forwards every line to each service module, and each module
 //     drops anything whose `service` is not its own. The node sub-facets (voting,
-//     call-trace) are CHAINED after node_enrich so each node line is still
+//     call-trace) are CHAINED after cardano_node_process so each node line is still
 //     written exactly once, carrying whatever the facets added.
 //
 //   extract ─┬─(raw process-compose)────────────────────────────────► loki.write.loki
-//            └─► leios_route ─┬─► node_enrich ─► leios_voting ─► call_trace ─► loki.write.loki
-//                             ├─► tx_firehose_enrich ───────────────────────► loki.write.loki
-//                             └─► tx_centrifuge_enrich (dormant here) ───────► loki.write.loki
+//            └─► leios_route ─┬─► cardano_node_process ─► leios_voting ─► call_trace ─► loki.write.loki
+//                             ├─► tx_firehose_process ───────────────────────► loki.write.loki
+//                             └─► tx_centrifuge_process (dormant here) ───────► loki.write.loki
 
 prometheus.remote_write "prometheus" {
 	endpoint {
@@ -168,9 +168,9 @@ loki.process "leios_route" {
 	}
 
 	forward_to = [
-		mod.node_enrich.node.receiver,
-		mod.tx_firehose_enrich.firehose.receiver,
-		mod.tx_centrifuge_enrich.centrifuge.receiver,
+		mod.cardano_node_process.node.receiver,
+		mod.tx_firehose_process.firehose.receiver,
+		mod.tx_centrifuge_process.centrifuge.receiver,
 	]
 }
 
@@ -181,26 +181,26 @@ import.file "mod" {
 	filename = "${WORKING_DIR}/alloy-modules"
 }
 
-// Node chain: node_enrich -> voting -> call-trace -> terminal write. Wiring lives
+// Node chain: cardano_node_process -> voting -> call-trace -> terminal write. Wiring lives
 // here, not inside the modules.
-mod.node_enrich "node" {
-	forward_to = [mod.leios_voting_enrich.vote.receiver]
+mod.cardano_node_process "node" {
+	forward_to = [mod.leios_voting_process.vote.receiver]
 }
 
-mod.leios_voting_enrich "vote" {
-	forward_to = [mod.call_trace_enrich.call.receiver]
+mod.leios_voting_process "vote" {
+	forward_to = [mod.call_trace_process.call.receiver]
 }
 
-mod.call_trace_enrich "call" {
+mod.call_trace_process "call" {
 	forward_to = [loki.write.loki.receiver]
 }
 
 // tx-generator services: each writes directly (single write per line).
-mod.tx_firehose_enrich "firehose" {
+mod.tx_firehose_process "firehose" {
 	forward_to = [loki.write.loki.receiver]
 }
 
-mod.tx_centrifuge_enrich "centrifuge" {
+mod.tx_centrifuge_process "centrifuge" {
 	forward_to = [loki.write.loki.receiver]
 }
 
