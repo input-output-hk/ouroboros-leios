@@ -32,7 +32,6 @@ declare "leios_voting_enrich" {
       stage.static_labels {
         values = {
           service = "cardano-node/leios-voting",
-          type    = "leios-voting",
         }
       }
 

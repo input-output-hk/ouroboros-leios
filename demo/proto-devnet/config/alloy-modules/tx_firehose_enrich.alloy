@@ -51,7 +51,6 @@ declare "tx_firehose_enrich" {
     stage.static_labels {
       values = {
         service   = "tx-firehose",
-        type      = "tx-firehose",
         generator = "firehose",
       }
     }

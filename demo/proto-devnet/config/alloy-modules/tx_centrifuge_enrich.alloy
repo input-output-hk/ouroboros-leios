@@ -54,7 +54,6 @@ declare "tx_centrifuge_enrich" {
     stage.static_labels {
       values = {
         service   = "tx-centrifuge",
-        type      = "tx-centrifuge",
         generator = "centrifuge",
       }
     }

@@ -303,7 +303,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{type=\"leios-voting\", voterId=~\"$voterId\"} | json | vote_rbHash=~\"$rbHash\"",
+          "expr": "{service=\"cardano-node/leios-voting\", voterId=~\"$voterId\"} | json | vote_rbHash=~\"$rbHash\"",
           "queryType": "range",
           "refId": "A"
         }

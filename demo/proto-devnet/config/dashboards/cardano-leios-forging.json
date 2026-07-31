@@ -58,7 +58,7 @@
           },
           "direction": "forward",
           "editorMode": "builder",
-          "expr": "{type=\"cardano-node\", ns=\"Forge.Loop.ForgedBlock\"} |= ``",
+          "expr": "{service=\"cardano-node\", ns=\"Forge.Loop.ForgedBlock\"} |= ``",
           "queryType": "range",
           "refId": "A"
         }

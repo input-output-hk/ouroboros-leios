@@ -36,7 +36,6 @@ declare "call_trace_enrich" {
       stage.static_labels {
         values = {
           service = "cardano-node/call-trace",
-          type    = "leios-call-trace",
         }
       }
 

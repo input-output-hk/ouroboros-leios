@@ -7,7 +7,7 @@
 //   Input : cardano-node trace-dispatcher JSON in the line body, with a `service`
 //           label already stamped by the (environment-specific) front-end.
 //   Output: the decoded `data` object as the body, bounded index labels
-//           (service/type/level/sev/ns/kind), timestamp from `at`.
+//           (service/level/sev/ns/kind), timestamp from `at`.
 //
 // Pattern B, drop-first: anything whose `service` is not cardano-node is dropped
 // up front, so the rest of the module operates only on its own lines and can
@@ -58,7 +58,6 @@ declare "node_enrich" {
     stage.static_labels {
       values = {
         service = "cardano-node",
-        type    = "cardano-node",
       }
     }
 
