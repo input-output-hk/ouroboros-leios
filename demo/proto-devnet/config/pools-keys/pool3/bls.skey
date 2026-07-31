@@ -1,0 +1,5 @@
+{
+    "type": "BlsSigningKey_bls12-381-BLS-Signature-Mininimal-Signature-Size",
+    "description": "BLS12-381 signing key",
+    "cborHex": "58202ebde79f560c5a86c926837ec38abeb924f36fe7efc1b5f00c8549c627495dad"
+}

@@ -95,9 +95,10 @@ POOL_KEYS_SRC="$POOLS_KEYS_DIR/$POOL_NAME"
 if [ -d "$POOL_KEYS_SRC" ]; then
 	cp "$POOL_KEYS_SRC/vrf.skey" "$DATA_DIR/keys/"
 	cp "$POOL_KEYS_SRC/kes.skey" "$DATA_DIR/keys/"
+	cp "$POOL_KEYS_SRC/bls.skey" "$DATA_DIR/keys/"
 	cp "$POOL_KEYS_SRC/opcert.cert" "$DATA_DIR/keys/"
 	chmod 400 "$DATA_DIR/keys"/*.skey
-	echo "  Keys copied: vrf.skey, kes.skey, opcert.cert"
+	echo "  Keys copied: vrf.skey, kes.skey, bls.skey, opcert.cert"
 else
 	echo "  WARNING: Pool keys not found at $POOL_KEYS_SRC"
 fi
