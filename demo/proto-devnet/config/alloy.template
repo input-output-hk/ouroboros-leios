@@ -92,12 +92,23 @@ loki.process "extract_process_compose_logs" {
 		drop_malformed = true
 	}
 
+	// Lowercase the instance label (Node1 -> node1) so it matches the instance
+	// label on the prometheus scrape targets above (node1) and playground's
+	// lowercase-hostname convention. The shared dashboards source $instance from
+	// Loki and use it in prometheus queries (instance=~"$instance", a
+	// case-sensitive match), so a casing mismatch drops the metric panels when a
+	// specific instance is selected.
+	stage.template {
+		source   = "instance"
+		template = "{{ .process | ToLower }}"
+	}
+
 	stage.labels {
 		values = {
 			level    = "level",
 			process  = "process",
 			replica  = "replica",
-			instance = "process",
+			instance = "instance",
 		}
 	}
 
