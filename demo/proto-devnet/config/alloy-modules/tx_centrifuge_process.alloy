@@ -7,7 +7,7 @@
 //
 //   Input  : centrifuge trace JSON in the body, service pre-stamped by the front-end.
 //   Output : decoded `data` as the body.
-//   Labels : service=tx-centrifuge, generator=centrifuge, level, sev, ns.
+//   Labels : service=tx-centrifuge, level, sev, ns.
 //   Metrics: txgen_submitted_total.
 //
 // Centrifuge has no real submitted-byte size (unlike firehose), so only the
@@ -50,8 +50,7 @@ declare "tx_centrifuge_process" {
 
     stage.static_labels {
       values = {
-        service   = "tx-centrifuge",
-        generator = "centrifuge",
+        service = "tx-centrifuge",
       }
     }
 

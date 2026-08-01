@@ -266,7 +266,7 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cardano_node_metrics_loki_txgen_submitted_total{environment=\"leios\", generator=\"centrifuge\"}[2m])) * 204 / 1000",
+          "expr": "sum(rate(cardano_node_metrics_loki_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[2m])) * 204 / 1000",
           "legendFormat": "accepted (centrifuge, est. 204 B/tx)",
           "refId": "B"
         }
@@ -785,8 +785,8 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum by (generator) (rate(cardano_node_metrics_loki_txgen_submitted_total{environment=\"leios\"}[2m]))",
-          "legendFormat": "accepted {{generator}}",
+          "expr": "sum by (service) (rate(cardano_node_metrics_loki_txgen_submitted_total{environment=\"leios\"}[2m]))",
+          "legendFormat": "accepted {{service}}",
           "refId": "A"
         },
         {
