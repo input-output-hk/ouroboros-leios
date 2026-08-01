@@ -228,7 +228,8 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
                 event_type="observed",
                 block_hash=str(
                     event_data.get(
-                        "blockHash", event_data.get("hash", event_data.get("id", "unknown"))
+                        "blockHash",
+                        event_data.get("hash", event_data.get("id", "unknown")),
                     )
                 ),
                 slot=event_data.get("slot", 0),
@@ -242,7 +243,8 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
                 event_type="observed",
                 block_hash=str(
                     event_data.get(
-                        "blockHash", event_data.get("hash", event_data.get("id", "unknown"))
+                        "blockHash",
+                        event_data.get("hash", event_data.get("id", "unknown")),
                     )
                 ),
                 slot=event_data.get("slot", 0),
