@@ -1,17 +1,29 @@
-// tx_firehose_process — the tx-firehose load generator (service = "tx-firehose").
+// tx_firehose_process — tx-firehose load generator, service = "tx-firehose".
 //
-// Fanned directly from the front-end (a distinct service stream, written once).
-// Shares the cardano-node trace envelope but is ns-discriminated
-// (TxFirehose.Submit.Success|Reject), no data.kind.
+// Fanned directly from the front-end, a distinct service stream written once.
+// Shares the cardano-node trace envelope but is ns-discriminated on
+// TxFirehose.Submit.Success|Reject, with no data.kind.
 //
 //   Input  : firehose trace JSON in the body, service pre-stamped by the front-end.
-//   Output : decoded `data` as the body.
+//   Output : decoded data as the body.
 //   Labels : service=tx-firehose, level, sev, ns.
 //   Metrics: txgen_submitted_total, txgen_bytes_total, txgen_rejected_total.
+//   Example input:
+//     {
+//       "at": "...",
+//       "ns": "TxFirehose.Submit.Success",
+//       "data": {
+//         "size": 228,
+//         "txId": "57db81a1..."
+//       },
+//       "sev": "Info",
+//       "thread": "main",
+//       "host": "tx-firehose"
+//     }
 //
-// Submitted `size` stays in the body for `| json size | unwrap size` (main's
-// query-time approach); the ingest-time txgen_bytes_total is emitted too, so both
-// panel styles can be compared.
+// Submitted size stays in the body for `| json size | unwrap size`, the query-time
+// approach main's dashboard uses; the ingest-time txgen_bytes_total is emitted too,
+// so both panel styles can be compared.
 declare "tx_firehose_process" {
   argument "forward_to" {}
 

@@ -1,18 +1,40 @@
 // call_trace_process — Leios call-trace facet of the cardano-node stream.
 //
-// Chained after leios_voting_process; acts only on kind="Call". Every non-Call line
-// passes straight through to forward_to untouched -- this facet only ADDS to Calls,
-// it never drops (the non-Call lines are still part of the one node write). Usually
-// the tail of the node chain, so its forward_to is the terminal write.
+// Chained after leios_voting_process; acts only on kind="Call". Every non-Call
+// line passes straight through to forward_to untouched. This facet only adds to
+// Call lines and never drops; the non-Call lines are still part of the one node
+// write. Usually the tail of the node chain, so its forward_to is the terminal write.
 //
-//   Input  : cardano_node_process output -- body = decoded `data`, `kind` label set.
+//   Input  : cardano_node_process output -- body = decoded data, kind label set.
 //            Call fields: event, name, thread, id, child_id, parent_id, stack, argument.
 //   Output : same line; on Call lines the service is refined and event/name/thread indexed.
-//   Labels : service=cardano-node/call-trace, event, name, thread (Call lines only).
+//   Labels : service=cardano-node/call-trace, plus event/name/thread on Call lines.
 //   Metrics: started_total, ended_total, duration_total, allocations_total.
+//   Example input:
+//     {
+//       "kind": "Call",
+//       "event": "Start",
+//       "name": "get-is-leader-proof",
+//       "thread": "Forge",
+//       "id": "1615.3",
+//       "parent_id": "1615",
+//       "child_id": 3,
+//       "stack": "forge -> get-is-leader-proof",
+//       "argument": 2685879
+//     }
+//     {
+//       "kind": "Call",
+//       "event": "End",
+//       "name": "forge",
+//       "thread": "Forge",
+//       "id": "1440",
+//       "duration": 0.001171324,
+//       "allocations": 353720,
+//       "result": []
+//     }
 //
-// id/child_id/parent_id/stack/argument stay in the body for query-time `| json`;
-// stack is the unbounded call path and must never be a label.
+// id, child_id, parent_id, stack and argument stay in the body for query-time
+// `| json`; stack is the unbounded call path and must never be a label.
 declare "call_trace_process" {
   argument "forward_to" {}
 
