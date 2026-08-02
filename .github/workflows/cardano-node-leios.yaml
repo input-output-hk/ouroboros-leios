@@ -123,7 +123,7 @@ jobs:
       # ----------------------------------------------------------------
       # cardano-node-leios base image — built via nix from the flake's
       # `cardano-node-leios` input. The flake exposes
-      # `packages.x86_64-linux.cardano-node-leios-image`, a streamed
+      # `packages.<system>.cardano-node-leios-image`, a streamed
       # docker tarball of the statically-linked cardano-node +
       # cardano-cli on a minimal layer (bash, coreutils, ca-certs).
       # Reuses the static binaries built above from the nix store.
@@ -157,8 +157,9 @@ jobs:
             echo "tagged $tag"
           done <<< "$tags"
 
-          # SHA-based ref for the derived (testnet) build below.
-          base_ref="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-leios:sha-$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          # Architecture-specific ref for the derived image. The final
+          # publish job combines these into the public multi-arch tags.
+          base_ref="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-leios:sha-$(echo "${GITHUB_SHA}" | cut -c1-7)-amd64"
           echo "ref=$base_ref" >> "$GITHUB_OUTPUT"
 
       - name: Push cardano-node-leios (base) image
@@ -168,7 +169,8 @@ jobs:
           tags="${{ steps.meta-base.outputs.tags }}"
           while IFS= read -r tag; do
             [ -z "$tag" ] && continue
-            docker push "$tag"
+            docker tag "$tag" "${tag}-amd64"
+            docker push "${tag}-amd64"
           done <<< "$tags"
 
       # ----------------------------------------------------------------
@@ -182,6 +184,8 @@ jobs:
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-testnet
+          flavor: |
+            suffix=-amd64
           tags: |
             type=sha
             type=ref,event=branch
@@ -197,7 +201,8 @@ jobs:
           file: ./testnet/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta-testnet.outputs.tags }}
+          tags: |
+            ${{ steps.meta-testnet.outputs.tags }}
           labels: ${{ steps.meta-testnet.outputs.labels }}
           build-args: |
             BASE_IMAGE=${{ steps.build-base.outputs.ref }}
@@ -205,12 +210,13 @@ jobs:
           cache-to: type=gha,mode=max,scope=cardano-node-testnet
 
   build-linux-arm64:
-    name: "Build aarch64-linux binaries"
+    name: "Build aarch64-linux binaries and docker images"
     # Use a native ARM64 runner so Nix evaluates and builds the
     # aarch64-linux musl jobs from the cardano-node input directly.
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
+      packages: write
 
     steps:
       - name: Checkout repository
@@ -231,6 +237,17 @@ jobs:
             substituters = https://cache.nixos.org https://cache.iog.io
             trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to Container Registry
+        if: github.event_name == 'push' || github.event.inputs.push_images == 'true'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build aarch64-linux release tarball
         run: |
           set -euo pipefail
@@ -247,6 +264,119 @@ jobs:
           name: cardano-node-leios-aarch64-linux-${{ github.run_id }}
           path: artifacts/
           if-no-files-found: error
+
+      # Build the ARM base image natively so the static ARM binaries are
+      # reused directly. It is pushed under an architecture-specific tag;
+      # publish-multiarch-images combines it with the amd64 image below.
+      - name: Extract metadata for cardano-node-leios (arm64)
+        if: github.event_name == 'push' || github.event.inputs.push_images == 'true'
+        id: meta-base-arm64
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-leios
+          flavor: |
+            suffix=-arm64
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push cardano-node-leios (arm64) base image via nix
+        if: github.event_name == 'push' || github.event.inputs.push_images == 'true'
+        run: |
+          set -euo pipefail
+          nix build .#cardano-node-leios-image -o result-image
+          ./result-image | docker load
+
+          local_ref=cardano-node-leios:latest
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            docker tag "$local_ref" "$tag"
+            docker push "$tag"
+          done <<< "${{ steps.meta-base-arm64.outputs.tags }}"
+
+      - name: Extract metadata for cardano-node-testnet (arm64)
+        if: github.event_name == 'push' || github.event.inputs.push_images == 'true'
+        id: meta-testnet-arm64
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-testnet
+          flavor: |
+            suffix=-arm64
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Resolve ARM base image reference
+        if: github.event_name == 'push' || github.event.inputs.push_images == 'true'
+        id: arm-base
+        run: echo "ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-leios:sha-${GITHUB_SHA:0:7}-arm64" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push cardano-node-testnet (arm64) image
+        if: github.event_name == 'push' || github.event.inputs.push_images == 'true'
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        with:
+          context: .
+          file: ./testnet/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta-testnet-arm64.outputs.tags }}
+          labels: ${{ steps.meta-testnet-arm64.outputs.labels }}
+          build-args: |
+            BASE_IMAGE=${{ steps.arm-base.outputs.ref }}
+          cache-from: type=gha,scope=cardano-node-testnet-arm64
+          cache-to: type=gha,mode=max,scope=cardano-node-testnet-arm64
+
+  publish-multiarch-images:
+    name: "Publish multi-arch Docker manifests"
+    needs: [build, build-linux-arm64]
+    if: github.event_name == 'push' || github.event.inputs.push_images == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      packages: write
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6 # v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for release images
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-leios
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-testnet
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Publish multi-arch manifests
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            docker buildx imagetools create \
+              --tag "$tag" \
+              "${tag}-amd64" \
+              "${tag}-arm64"
+          done <<< "$IMAGE_TAGS"
 
   build-macos:
     name: "Build aarch64-darwin binaries"
