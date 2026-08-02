@@ -2,7 +2,7 @@
 #
 #   nix build .#cardano-node-static          # x86_64-linux
 #   nix build .#cardano-cli-static           # x86_64-linux
-#   nix build .#cardano-node-leios-image     # x86_64-linux; pipe into `docker load`
+#   nix build .#cardano-node-leios-image     # x86_64-linux or aarch64-linux; pipe into `docker load`
 #   nix build .#cardano-node-release         # x86_64-linux, aarch64-linux, or aarch64-darwin tarball
 #
 # CI publishes the image to GHCR and attaches the release tarball to
@@ -38,6 +38,8 @@
           # tx-firehose is built from the same leios-prototype input as the
           # node and CLI, and is consumed by the Antithesis devnet image.
           tx-firehose-static = muslJobs.tx-firehose;
+        }
+        // lib.optionalAttrs (lib.elem system [ "x86_64-linux" "aarch64-linux" ]) {
 
           # Streamed layered image: `nix build .#cardano-node-leios-image`
           # produces a script that, when run, writes the image tarball to
