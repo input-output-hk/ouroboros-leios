@@ -482,6 +482,8 @@ Due to extra volume that Leios imposes on the protocol, it is imperative that th
 >
 > TODO: investigate possibility to use TCP_NOTSENT_LOWAT on cardano network despite its non-portability.
 
+Benchamark resutls showed that incremental decoding of a full Praos blocks can improve decoding time by serveral milliseconds (which is a minor improvement). However, more substantial gains were observed for blocks of size of several MBs, where time saved can reach several hundreds milliseconds (ref. Intersect/ouroboros-network#5367).
+
 ### Traffic prioritization
 
 The existing multiplexer is intentionally fair amongst the different mini-protocols. In the current CIP, the Praos traffic and Leios traffic are carried by different mini-protocols. Therefore, introducing a simple bias in the multiplexer (**NEW-LeiosPraosMuxBias**) to prefer sending messages from Praos mini protocols over messages from Leios mini protocols would directly enable the Consensus layer to satisfy **REQ-PrioritizePraosOverLeios** and mitigate **RSK-LeiosPraosContentionNetworkBandwidth**. This multiplexer bias is the primary candidate mechanism to ensure that Praos traffic and computation are prioritized over Leios, so that the diffusion and adoption of any RB is only negligibly slower.
