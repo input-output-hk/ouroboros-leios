@@ -133,11 +133,14 @@ jobs:
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-leios
+          # workflow_dispatch does not have event=tag, so retain the
+          # supplied prototype tag when manually rebuilding a release.
           tags: |
             type=sha
             type=ref,event=branch
             type=ref,event=pr
             type=ref,event=tag
+            type=raw,value=${{ github.event.inputs.ref }},enable=${{ github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.ref, 'prototype-') }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build cardano-node-leios (base) image via nix
@@ -191,6 +194,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=ref,event=tag
+            type=raw,value=${{ github.event.inputs.ref }},enable=${{ github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.ref, 'prototype-') }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build cardano-node-testnet image
@@ -281,6 +285,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=ref,event=tag
+            type=raw,value=${{ github.event.inputs.ref }},enable=${{ github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.ref, 'prototype-') }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push cardano-node-leios (arm64) base image via nix
@@ -310,6 +315,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=ref,event=tag
+            type=raw,value=${{ github.event.inputs.ref }},enable=${{ github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.ref, 'prototype-') }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Resolve ARM base image reference
@@ -363,6 +369,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=ref,event=tag
+            type=raw,value=${{ github.event.inputs.ref }},enable=${{ github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.ref, 'prototype-') }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Publish multi-arch manifests
@@ -370,6 +377,9 @@ jobs:
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
         run: |
           set -euo pipefail
+          # For a release tag this creates, for example,
+          # prototype-2026w31a from its architecture-specific images:
+          # prototype-2026w31a-amd64 and prototype-2026w31a-arm64.
           while IFS= read -r tag; do
             [ -z "$tag" ] && continue
             docker buildx imagetools create \
