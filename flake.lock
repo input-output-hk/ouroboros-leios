@@ -425,11 +425,11 @@
         "utils": "utils"
       },
       "locked": {
-        "lastModified": 1785513967,
-        "narHash": "sha256-PjoGAf8Bw9Kv1I9lAIowoTvCFnT/YzcNb5HW3ciqCoo=",
+        "lastModified": 1785751988,
+        "narHash": "sha256-kujdbDbxcGCE822xlbLxhZje42yrDDY6dFeK5IdgojU=",
         "owner": "intersectmbo",
         "repo": "cardano-node",
-        "rev": "d697d3a6d091b568f203afec21d06b90fd075bfd",
+        "rev": "6971bb527288d0f362147fbe318c0e9c84312ab3",
         "type": "github"
       },
       "original": {
@@ -3282,11 +3282,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1785513713,
-        "narHash": "sha256-LqUz8+YoTjS6rec/hpmg6WqXHwIEl6N8Z8JnQiVuO/0=",
+        "lastModified": 1785751934,
+        "narHash": "sha256-2GmXbmL8Mn0pwtmO7T46G6VCsQXDW88L4R+4ptjARBA=",
         "ref": "leios-prototype",
-        "rev": "50c97115f8bc4d11b75d3048e360f4a391aaf9b6",
-        "revCount": 11533,
+        "rev": "08ad5f10d4699b65a2dc47e61cf0632f2b8a32ac",
+        "revCount": 11537,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/intersectmbo/ouroboros-consensus"

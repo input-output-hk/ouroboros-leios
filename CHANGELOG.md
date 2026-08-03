@@ -5,6 +5,14 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w31a - 2026-08-03
+
+Small hotfix that tones down errors when adopting blocks (e.g. `invalid Leios cert: InvalidSignature`) to not crash the node and only result in `InvalidBlock` traces.
+
+> [!NOTE]
+>
+> If your node still crashes with these errors after updating, first try deleting the `volatile/` part of your chain only.
+
 ## prototype-2026w31 - 2026-07-31
 
 Nodes now generate and diffuse EB announcements over `LeiosNotify`, and the BLS Leios key is available through `cardano-api`.
