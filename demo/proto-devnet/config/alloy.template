@@ -78,7 +78,6 @@ loki.process "extract_process_compose_logs" {
 	stage.static_labels {
 		values = {
 			service = "process-compose",
-			type    = "process-compose",
 		}
 	}
 
@@ -100,14 +99,10 @@ loki.process "extract_cardano_node_logs" {
 			host   = "host",
 			thread = "thread",
 			ns     = "ns",
+			kind   = "data.kind",
 			data   = "data",
 		}
 		drop_malformed = true
-	}
-
-	stage.drop {
-		source = "process"
-		value  = "Analyze"
 	}
 
 	stage.timestamp {
@@ -118,25 +113,23 @@ loki.process "extract_cardano_node_logs" {
 	stage.labels {
 		values = {
 			level = "sev",
-			host  = "host",
-			sev   = "sev",
 			ns    = "ns",
+			kind  = "kind",
 		}
 	}
 
 	stage.static_labels {
 		values = {
 			service = "cardano-node",
-			type    = "cardano-node",
 		}
 	}
 
 	stage.match {
 		selector = `{process="TxFirehose"}`
+
 		stage.static_labels {
 			values = {
 				service = "tx-firehose",
-				type    = "tx-firehose",
 			}
 		}
 	}
@@ -153,18 +146,6 @@ loki.process "extract_cardano_node_logs" {
 }
 
 loki.process "extract_leios_vote_logs" {
-	stage.json {
-		expressions = {
-			kind = "kind",
-		}
-	}
-
-	stage.labels {
-		values = {
-			kind = "kind",
-		}
-	}
-
 	stage.match {
 		selector = `{kind=~"LeiosVoted|LeiosVoteAcquired"}`
 
@@ -179,13 +160,11 @@ loki.process "extract_leios_vote_logs" {
 		stage.static_labels {
 			values = {
 				service = "leios-voting",
-				type    = "leios-voting",
 			}
 		}
 
 		stage.labels {
 			values = {
-				rbHash  = "rbHash",
 				voterId = "voterId",
 			}
 		}
@@ -231,18 +210,6 @@ loki.process "extract_leios_vote_logs" {
 }
 
 loki.process "extract_call_trace_logs" {
-	stage.json {
-		expressions = {
-			kind = "kind",
-		}
-	}
-
-	stage.labels {
-		values = {
-			kind = "kind",
-		}
-	}
-
 	stage.match {
 		selector = `{kind="Call"}`
 
@@ -263,21 +230,24 @@ loki.process "extract_call_trace_logs" {
 		stage.static_labels {
 			values = {
 				service = "call-trace",
-				type    = "call-trace",
 			}
 		}
 
 		stage.labels {
 			values = {
-				event  = "event",
+        stack = "stack",
 				name   = "name",
 				thread = "thread",
-				stack = "stack",
+        event = "event",
 			}
 		}
 
 		stage.match {
-			selector = `{event="Start"}`
+			selector = `{event = "Start"}`
+
+      stage.label_drop {
+        values = [ "event" ]
+      }
 
 			stage.metrics {
 				metric.counter {
@@ -292,7 +262,11 @@ loki.process "extract_call_trace_logs" {
 		}
 
 		stage.match {
-			selector = `{event="End"}`
+			selector = `{event = "End"}`
+
+      stage.label_drop {
+        values = [ "event" ]
+      }
 
 			stage.json {
 				expressions = {
