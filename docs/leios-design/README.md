@@ -515,37 +515,21 @@ The node must include new mini-protocols (**NEW-LeiosMiniProtocols**) to diffuse
 
 CIP-0164 implies functional requirements for the node to issue EBs alongside RBs, vote for EBs according to the rules from the CIP, include certificates when enough votes are seen, diffuse EBs and votes through the network layer, and retain EB closures indefinitely when certified. The Consensus layer is responsible for driving these operations and coordinating with the Network layer (which implements the actual mini-protocols) to ensure proper diffusion.
 
-### Mempool
+### High-throughput mempool
 
-The Mempool stages transactions that have been submitted but not yet included in
-a block. It has three jobs: **accept** transactions from local clients,
-**diffuse** good ones to peers, and **pre-compute** their validation and
-application so a block producer can include them cheaply.
+The Mempool stages transactions that have been submitted but not yet included in a block. It has three jobs: **accept** transactions from local clients, **diffuse** good ones to peers, and **pre-compute** their validation and application so a block producer can include them cheaply.
 
-Under Praos the second and third jobs are only partially met, which is
-tolerable. Under Leios it is not: the Mempool now holds roughly two endorser
-blocks' worth of transactions instead of two Praos blocks', and it is fed at up
-to ~1000 tx/s. Re-processing that many transactions whenever the chain moves,
-while serialising every Mempool operation behind a single lock, blocks
-transaction diffusion and block production for as long as the re-processing
-takes (**RSK-LeiosMempoolOverheadLatency**).
+Under Praos the second and third jobs are only partially met, which is tolerable. Under Leios it is not: the Mempool now holds roughly two endorser blocks' worth of transactions instead of two Praos blocks', and it is fed at up to ~1000 tx/s. Re-processing that many transactions whenever the chain moves, while serialising every Mempool operation behind a single lock, blocks transaction diffusion and block production for as long as the re-processing takes (**RSK-LeiosMempoolOverheadLatency**).
 
 #### Validation vs. application
 
 A transaction is processed in three stages, with very different costs:
 
-- **Resolve** — fetch the transaction's input UTxOs (from the cache or on-disk
-  ledger). Dependent transactions must be resolved in sequence.
-- **Validate** — check signatures, scripts, limits, values. Expensive, but once
-  a transaction is resolved this is **state-independent** and, crucially, valid
-  for the whole era: it need only be done **once** and can be cached.
-- **Apply** — check the transaction fits the current state (its inputs still
-  exist, its slot is in range). Cheap, but **must be redone every time the base
-  ledger state changes**.
+- **Resolve** — fetch the transaction's input UTxOs (from the cache or on-disk ledger). Dependent transactions must be resolved in sequence.
+- **Validate** — check signatures, scripts, limits, values. Expensive, but once a transaction is resolved this is **state-independent** and, crucially, valid for the whole era: it need only be done **once** and can be cached.
+- **Apply** — check the transaction fits the current state (its inputs still exist, its slot is in range). Cheap, but **must be redone every time the base ledger state changes**.
 
-So a caught-up node validates each transaction once and only ever *re-applies*
-(`reapplyTx`, not `applyTx`) when the base changes. Getting the validate/apply
-split right is what makes high throughput feasible.
+So a caught-up node validates each transaction once and only ever *re-applies* (`reapplyTx`, not `applyTx`) when the base changes. Getting the validate/apply split right is what makes high throughput feasible.
 
 #### Model
 
@@ -564,80 +548,39 @@ data MempoolState = MempoolState
   }
 ```
 
-Two questions define correct behaviour: which transactions do we accept and
-diffuse, and which are eligible for a block? Both answer: those that are valid
-and applicable to `base` and `interval`.
+Two questions define correct behaviour: which transactions do we accept and diffuse, and which are eligible for a block? Both answer: those that are valid and applicable to `base` and `interval`.
 
 #### Tick
 
-Time (the slot) affects a transaction's validity (protocol parameters and the
-ledger law change at era boundaries) and its applicability (its own slot range,
-plus epoch-boundary state changes) — but **only at epoch boundaries**. We
-exploit this with the `interval`: a ~20-slot window between the current
-tip/epoch start and the next expected block/epoch end. Ticking *within* the
-interval changes nothing observable to transactions, so it costs nothing; only
-crossing an epoch boundary forces a re-apply (and a re-validate on a new era).
-The trade-off is that transactions whose validity range is narrower than the
-interval are rejected — acceptable for a large performance win.
+Time (the slot) affects a transaction's validity (protocol parameters and the ledger law change at era boundaries) and its applicability (its own slot range, plus epoch-boundary state changes) — but **only at epoch boundaries**. We exploit this with the `interval`: a ~20-slot window between the current tip/epoch start and the next expected block/epoch end. Ticking *within* the interval changes nothing observable to transactions, so it costs nothing; only crossing an epoch boundary forces a re-apply (and a re-validate on a new era). The trade-off is that transactions whose validity range is narrower than the interval are rejected — acceptable for a large performance win.
 
 #### Rebase and concurrency
 
-`Rebase` is the hard case. When chain selection picks a new `base`, every
-transaction must be re-applied onto it — `O(|txs|)`, and under Leios `|txs|` is
-large. Serialising this under one lock is exactly the bottleneck above: while a
-rebase runs, nothing can be accepted, diffused or forged.
+`Rebase` is the hard case. When chain selection picks a new `base`, every transaction must be re-applied onto it — `O(|txs|)`, and under Leios `|txs|` is large. Serialising this under one lock is exactly the bottleneck above: while a rebase runs, nothing can be accepted, diffused or forged.
 
-All the performance and correctness of the concurrent case live in one
-operation — reconciling a state proposed by an action with the currently
-committed one, `mergeMempoolState`. The design:
+All the performance and correctness of the concurrent case live in one operation — reconciling a state proposed by an action with the currently committed one, `mergeMempoolState`. The design:
 
-- **A single authoritative state cell** is both the state and the commit point.
-  Readers (block production, diffusion) observe it without blocking each other;
-  a writer holds it only to commit. Because there is exactly one cell, the
-  size/capacity accounting has one source of truth and cannot diverge.
-- **`AddTx`** resolves and validates off the cell (the expensive, adversary-
-  facing work), then commits by appending. Adds are serialised, so each commit
-  is cheap.
-- **`Rebase`** re-applies the transactions off the cell against the new `base`,
-  then runs a **converging loop**: read the transactions that arrived
-  meanwhile (the delta) and re-apply only those on top, repeating until the
-  delta is small. The delta shrinks each round — ingestion pays full validation
-  whereas the rebase only re-applies, which is cheaper per tx, and ingestion is
-  serialised. Only then does it take the cell, fold in a bounded residual, and
-  swap `base`. **The cell is held for a bounded time, independent of `|txs|`.**
+- **A single authoritative state cell** is both the state and the commit point. Readers (block production, diffusion) observe it without blocking each other; a writer holds it only to commit. Because there is exactly one cell, the size/capacity accounting has one source of truth and cannot diverge.
+- **`AddTx`** resolves and validates off the cell (the expensive, adversary- facing work), then commits by appending. Adds are serialised, so each commit is cheap.
+- **`Rebase`** re-applies the transactions off the cell against the new `base`, then runs a **converging loop**: read the transactions that arrived meanwhile (the delta) and re-apply only those on top, repeating until the delta is small. The delta shrinks each round — ingestion pays full validation whereas the rebase only re-applies, which is cheaper per tx, and ingestion is serialised. Only then does it take the cell, fold in a bounded residual, and swap `base`. **The cell is held for a bounded time, independent of `|txs|`.**
 
 This gives `mergeMempoolState` its two required properties.
 
-**Performance:** the commit that blocks readers is bounded regardless of
-occupancy. Driving the real Mempool under concurrent load (full validation
-costed at 10× re-apply, matching proto-devnet), the maximum reader stall during
-a rebase stays roughly flat as occupancy grows, versus growing linearly when the
-whole re-apply is done under the lock:
+**Performance:** the commit that blocks readers is bounded regardless of occupancy. Driving the real Mempool under concurrent load (full validation costed at 10× re-apply, matching proto-devnet), the maximum reader stall during a rebase stays roughly flat as occupancy grows, versus growing linearly when the whole re-apply is done under the lock:
 
 | mempool occupancy | re-apply under the lock | off-lock converging loop |
 | ----------------: | ----------------------: | -----------------------: |
-|              ~5k  |                  143 ms |                    53 ms |
-|           ~12–15k |              483–546 ms |                63–112 ms |
-|             ~56k  |                 2100 ms |                   300 ms |
+|              ~5k | 143 ms | 53 ms |
+|           ~12–15k | 483–546 ms | 63–112 ms |
+|             ~56k | 2100 ms | 300 ms |
 
-**Correctness:** the committed state is identical to re-applying all
-transactions against the new `base` in one pass (re-apply is an ordered fold, so
-splitting and resuming it yields the same result), and is checked by a parallel
-linearizability test. Committing through the cell — rather than an optimistic
-compare-and-swap — means a rebase always makes progress and cannot be starved by
-a stream of concurrent adds; the cost is that its final commit briefly delays
-readers, which the bounded residual keeps small.
+**Correctness:** the committed state is identical to re-applying all transactions against the new `base` in one pass (re-apply is an ordered fold, so splitting and resuming it yields the same result), and is checked by a parallel linearizability test. Committing through the cell — rather than an optimistic compare-and-swap — means a rebase always makes progress and cannot be starved by a stream of concurrent adds; the cost is that its final commit briefly delays readers, which the bounded residual keeps small.
 
 This is implemented in `ouroboros-consensus` (`Ouroboros.Consensus.Mempool`).
 
 #### Diffusion
 
-Deciding what to accept and diffuse assumes peers agree on `base` and
-`interval`, but today they do not share that state, so a node cannot distinguish
-adversarial from honest submissions. The intended direction is to split
-`TxSubmission` into two protocols — **MempoolSync**, which syncs `MempoolState`
-between peers, and **TxFetch**, which fetches a transaction by reference —
-making such behaviour detectable.
+Deciding what to accept and diffuse assumes peers agree on `base` and `interval`, but today they do not share that state, so a node cannot distinguish adversarial from honest submissions. The intended direction is to split `TxSubmission` into two protocols — **MempoolSync**, which syncs `MempoolState` between peers, and **TxFetch**, which fetches a transaction by reference — making such behaviour detectable.
 
 ### Block production
 
