@@ -227,7 +227,7 @@ The attack operates by controlling when and to whom transaction data becomes ava
 
 Advanced network-based variants can target high-stake voting nodes through eclipse attacks, where adversaries control the network connections of specific nodes to manipulate their information flow. Since voting committee membership involves some degree of public information, persistent voting members with significant stake could potentially be identified and targeted. However, eclipsing distinct nodes across a distributed network is non-trivial due to high network connectivity degrees and existing eclipse protection mechanisms.
 
-A particularly dangerous and sophisticated variant targets blockchain safety itself by allowing EBs to achieve certification while preventing timely availability to all honest nodes. The adversary releases data to just enough voting committee members to achieve certification, but not to all network participants. This can create scenarios where certified EBs cannot be processed by honest nodes within the L_diff parameter, potentially violating Praos timing assumptions.
+A particularly dangerous and sophisticated variant targets blockchain safety itself by allowing EBs to achieve certification while preventing timely availability to all honest nodes. The adversary releases data to just enough voting committee members to achieve certification, but not to all network participants. The most extreme scenario is when the adversary provides the EB to just enough colocated honest committee members just-in-time for them to vote for it. Combined with the adversary's own, those votes allow a certified EB to begin diffusing from approximately a single point on the globe, which is a profile that L_diff may not have been tuned to accommodate. This can create scenarios where certified EBs cannot be processed by honest nodes within the L_diff parameter, potentially violating Praos timing assumptions.
 
 **Impact**: Data withholding primarily reduces throughput when EBs fail certification due to unavailable data, forcing wasted voting resources and delayed transaction processing. Thereotically, there is a high impact variant that can compromise blockchain safety by creating timing violations in Praos diffusion. By reducing the number of honest nodes that receive EB data in time for certification, adversaries also impair subsequent diffusion, making peer-to-peer propagation slower and less reliable. While occasional timing misses are normal in Ouroboros, persistent violations can lead to longer forks and degraded chain quality.
 
@@ -239,11 +239,11 @@ A particularly dangerous and sophisticated variant targets blockchain safety its
 >
 > TODO: Should this be also about network delays?
 
-| #   | Method                                          | Effect                                             | Resources                              | Mitigation                                               |
-|-----|-------------------------------------------------|----------------------------------------------------|----------------------------------------|----------------------------------------------------------|
-| T20 | Withhold announced EB or endorsed transactions  | Lower throughput                                   | Stake for block production             | Connection timeouts, peer pruning                        |
-| T21 | Selectively withhold data from voting committee | Prevent honest EB certification, reduce throughput | Network position control               | Redundant peer connections, diffusion monitoring         |
-| T22 | Selectively withhold data from honest nodes     | Allow certification, delay block propagation       | Network position control, modest stake | L_diff parameter sizing, worst-case diffusion validation |
+| #   | Method                                           | Effect                                             | Resources                              | Mitigation                                               |
+|-----|--------------------------------------------------|----------------------------------------------------|----------------------------------------|----------------------------------------------------------|
+| T20 | Withhold announced EB or endorsed transactions   | Lower throughput                                   | Stake for block production             | Connection timeouts, peer pruning                        |
+| T21 | Selectively withhold data from voting committee  | Prevent honest EB certification, reduce throughput | Network position control               | Redundant peer connections, diffusion monitoring         |
+| T22 | Selectively withhold data from most honest nodes | Allow certification, delay block propagation       | Network position control, modest stake | L_diff parameter sizing, worst-case diffusion validation |
 
 ### Protocol bursts
 
