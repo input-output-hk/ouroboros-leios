@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 7,
+  "id": 4,
   "links": [],
   "panels": [
     {
@@ -29,7 +29,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd",
+            "mode": "palette-classic-by-name",
             "seriesBy": "max"
           },
           "custom": {
@@ -99,7 +99,9 @@
           ],
           "displayMode": "table",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": true,
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "hideZeros": false,
@@ -116,7 +118,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap duration [5m]\n  )\n)",
+          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\"} \n      | json\n      | event=\"End\"\n      | unwrap duration [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{stack}}",
           "queryType": "range",
           "refId": "A"
@@ -133,7 +135,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd",
+            "mode": "palette-classic-by-name",
             "seriesBy": "max"
           },
           "custom": {
@@ -202,7 +204,9 @@
           ],
           "displayMode": "table",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": true,
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "hideZeros": false,
@@ -219,7 +223,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "(\n  sum by(thread, stack) (\n    count_over_time({service=\"call-trace\", event=\"Start\", instance=~\"$instance\", name=~\"$name\"} [5m])\n  ) \n  - \n  sum by(thread, stack) (\n    count_over_time({service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} [5m])\n  )\n) or sum by(thread, stack) (\n  count_over_time({service=\"call-trace\", event=\"Start\", instance=~\"$instance\", name=~\"$name\"} [5m]) * 0\n)",
+          "expr": "(\n  sum by(thread, stack) (\n    count_over_time({service=\"call-trace\", instance=~\"$instance\", name=~\"$name\"} | json | event=\"Start\" [5m])\n  ) \n  - \n  sum by(thread, stack) (\n    count_over_time({service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} | json | event=\"End\" [5m])\n  )\n) or sum by(thread, stack) (\n  count_over_time({service=\"call-trace\", instance=~\"$instance\", name=~\"$name\"} | json | event=\"Start\" [5m]) * 0\n)",
           "hide": false,
           "legendFormat": "[{{thread}}] $ {{stack}}",
           "queryType": "range",
@@ -237,7 +241,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd",
+            "mode": "palette-classic-by-name",
             "seriesBy": "max"
           },
           "custom": {
@@ -307,7 +311,9 @@
           ],
           "displayMode": "table",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": true,
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "hideZeros": false,
@@ -324,7 +330,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap allocations [5m]\n  )\n)",
+          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\"} \n      | json\n      | event=\"End\"\n      | unwrap allocations [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{stack}}",
           "queryType": "range",
           "refId": "A"
@@ -408,12 +414,7 @@
         "cellHeight": "sm",
         "enablePagination": true,
         "showHeader": true,
-        "sortBy": [
-          {
-            "desc": false,
-            "displayName": "id"
-          }
-        ]
+        "sortBy": []
       },
       "pluginVersion": "12.3.1",
       "targets": [
@@ -557,7 +558,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n  | json\n  | label_format root_id=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  # Span fields\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .instance }} - {{ .thread }}`\n  | label_format spanID=`{{ .instance }} - {{ .thread }} - {{ .id }}`\n  | label_format parentSpanID=`{{ .instance }} - {{ .thread }} - {{ .parent_id }}`\n  | label_format traceID=`{{ .instance }} - {{ .thread }} - {{ .root_id }}`\n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName",
+          "expr": "{service=\"call-trace\", instance=~\"$instance\"} \n  | json\n  | event=\"End\"\n  | label_format root_id=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  # Span fields\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .instance }} - {{ .thread }}`\n  | label_format spanID=`{{ .instance }} - {{ .thread }} - {{ .id }}`\n  | label_format parentSpanID=`{{ .instance }} - {{ .thread }} - {{ .parent_id }}`\n  | label_format traceID=`{{ .instance }} - {{ .thread }} - {{ .root_id }}`\n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName",
           "queryType": "range",
           "refId": "A"
         }
@@ -655,7 +656,7 @@
           "stream": "{service=\"call-trace\"}",
           "type": 1
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "type": "query"
       },
@@ -680,10 +681,10 @@
         "query": {
           "label": "name",
           "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "{service=\"call-trace\", event=\"Start\"}",
+          "stream": "{service=\"call-trace\"}",
           "type": 1
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "type": "query"
       }
