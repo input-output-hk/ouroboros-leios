@@ -482,7 +482,7 @@ Due to extra volume that Leios imposes on the protocol, it is imperative that th
 >
 > TODO: investigate possibility to use TCP_NOTSENT_LOWAT on cardano network despite its non-portability.
 
-Benchamark resutls showed that incremental decoding of a full Praos blocks can improve decoding time by serveral milliseconds (which is a minor improvement). However, more substantial gains were observed for blocks of size of several MBs, where time saved can reach several hundreds milliseconds (ref. Intersect/ouroboros-network#5367).
+Benchmarks results showed that incremental decoding of a full Praos blocks can improve decoding time by several milliseconds (which is a minor improvement). However, more substantial gains were observed for blocks of size of several MBs, where time saved can reach several hundreds milliseconds (ref. Intersect/ouroboros-network#5367).
 
 ### Traffic prioritization
 
