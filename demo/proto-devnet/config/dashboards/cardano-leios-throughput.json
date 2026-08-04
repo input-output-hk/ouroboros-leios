@@ -16,9 +16,9 @@
       {
         "datasource": {
           "type": "loki",
-          "uid": "P8E80F9AEF21F6940"
+          "uid": "loki"
         },
-        "enable": true,
+        "enable": false,
         "expr": "{service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockCertified\"}",
         "hide": false,
         "iconColor": "green",
@@ -33,9 +33,9 @@
       {
         "datasource": {
           "type": "loki",
-          "uid": "P8E80F9AEF21F6940"
+          "uid": "loki"
         },
-        "enable": true,
+        "enable": false,
         "expr": "{service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockAnnounced\"}",
         "hide": false,
         "iconColor": "yellow",
@@ -52,13 +52,12 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 6,
   "links": [],
   "panels": [
     {
       "datasource": {
-        "type": "datasource",
-        "uid": "-- Mixed --"
+        "type": "prometheus",
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -117,22 +116,6 @@
         "overrides": [
           {
             "matcher": {
-              "id": "byName",
-              "options": "Load"
-            },
-            "properties": [
-              {
-                "id": "custom.axisPlacement",
-                "value": "right"
-              },
-              {
-                "id": "unit",
-                "value": "TxkB/s"
-              }
-            ]
-          },
-          {
-            "matcher": {
               "id": "byFrameRefID",
               "options": "Mempool bytes"
             },
@@ -172,28 +155,13 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "editorMode": "builder",
-          "expr": "cardano_node_metrics_mempoolBytes_int{process=~\"$instance\"}",
-          "legendFormat": "{{process}} mempool",
+          "expr": "cardano_node_metrics_mempoolBytes_int{job=\"integrations/cardano-node\", environment=\"leios\", instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} mempool",
           "range": true,
           "refId": "Mempool bytes"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
-          },
-          "direction": "backward",
-          "editorMode": "code",
-          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"} | json size=\"size\" | unwrap size [30s])) / 30 / 1000",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "Load",
-          "queryType": "range",
-          "range": true,
-          "refId": "Load"
         }
       ],
       "title": "Mempool",
@@ -201,8 +169,8 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "type": "prometheus",
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -284,36 +252,33 @@
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "type": "prometheus",
+            "uid": "mimir"
           },
-          "direction": "backward",
           "editorMode": "code",
-          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Success\"} | json size=\"size\" | unwrap size [30s])) / 30 / 1000",
-          "legendFormat": "accepted",
-          "queryType": "range",
+          "expr": "sum(rate(cardano_node_metrics_loki_txgen_bytes_total{environment=\"leios\"}[2m])) / 1000",
+          "legendFormat": "accepted (firehose, measured)",
           "refId": "A"
         },
         {
           "datasource": {
-            "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "type": "prometheus",
+            "uid": "mimir"
           },
-          "direction": "backward",
           "editorMode": "code",
-          "expr": "sum(sum_over_time({service=\"tx-firehose\", ns=\"TxFirehose.Submit.Reject\"} | json size=\"size\" | unwrap size [30s])) / 30 / 1000",
-          "legendFormat": "rejected",
-          "queryType": "range",
+          "expr": "sum(rate(cardano_node_metrics_loki_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[2m])) * 204 / 1000",
+          "legendFormat": "accepted (centrifuge, est. 204 B/tx)",
           "refId": "B"
         }
       ],
-      "title": "Submission load",
-      "type": "timeseries"
+      "title": "Submitted throughput (kB/s)",
+      "type": "timeseries",
+      "description": "Accepted submission throughput. Firehose bytes are the measured on-wire size (txgen_bytes_total); tx-centrifuge has no on-wire size, so its bytes are ESTIMATED at 204 B/tx (submitted-rate x 204)."
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -399,11 +364,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "editorMode": "builder",
-          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"cardano_node_metrics\", process=~\"$instance\"}[300s])",
-          "legendFormat": "{{process}}",
+          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"integrations/cardano-node\", environment=\"leios\", instance=~\"$instance\"}[300s])",
+          "legendFormat": "{{instance}}",
           "range": true,
           "refId": "A"
         }
@@ -414,7 +379,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {
@@ -499,7 +464,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "builder",
@@ -514,7 +479,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "builder",
@@ -703,7 +668,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -715,7 +680,7 @@
       ],
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "options": {
         "tooltip": {
@@ -730,10 +695,118 @@
           "calcs": []
         }
       }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "cps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [
+            "max",
+            "mean"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "editorMode": "code",
+          "expr": "sum by (service) (rate(cardano_node_metrics_loki_txgen_submitted_total{environment=\"leios\"}[2m]))",
+          "legendFormat": "accepted {{service}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(cardano_node_metrics_loki_txgen_rejected_total{environment=\"leios\"}[2m]))",
+          "legendFormat": "rejected",
+          "refId": "B"
+        }
+      ],
+      "title": "Submitted tx/s",
+      "type": "timeseries",
+      "description": "Submitted tx rate: accepted per generator plus rejected, from the alloy txgen_* counters. Generator-agnostic (works for firehose and centrifuge)."
     }
   ],
   "preload": false,
-  "refresh": "5s",
+  "refresh": "1m",
   "schemaVersion": 42,
   "tags": [],
   "templating": {
@@ -749,7 +822,7 @@
         },
         "datasource": {
           "type": "loki",
-          "uid": "P8E80F9AEF21F6940"
+          "uid": "loki"
         },
         "definition": "",
         "includeAll": true,
@@ -764,7 +837,8 @@
         },
         "refresh": 1,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "allValue": ".+"
       }
     ]
   },
@@ -773,8 +847,8 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
-  "title": "Proto DevNet - Throughput",
-  "uid": "gg7w7r",
+  "timezone": "utc",
+  "title": "Cardano Leios - Throughput",
+  "uid": "cardano-leios-throughput",
   "version": 1
 }

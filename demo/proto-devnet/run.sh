@@ -130,9 +130,10 @@ for i in "${nodes[@]}"; do
   # connects to the peers listed here (re-enabling PeerSharing would let the
   # line collapse back toward a mesh).
   accessPoints=$(for j in "${nodes[@]}"; do
-    absdiff=$((i - j)); absdiff=${absdiff#-}
-    if { [ "$TOPOLOGY" = "line" ] && [ "$absdiff" -eq 1 ]; } \
-      || { [ "$TOPOLOGY" != "line" ] && [ "$i" -ne "$j" ]; }; then
+    absdiff=$((i - j))
+    absdiff=${absdiff#-}
+    if { [ "$TOPOLOGY" = "line" ] && [ "$absdiff" -eq 1 ]; } ||
+      { [ "$TOPOLOGY" != "line" ] && [ "$i" -ne "$j" ]; }; then
       port="PORT_NODE$j"
       address="IP_NODE$j"
       echo "{ \"port\": ${!port}, \"address\": \"${!address}\" }"
@@ -162,6 +163,11 @@ done
 # Configure alloy for x-ray observability (named config.alloy to avoid conflict with alloy/ storage dir)
 export ALLOY_CONFIG="${WORKING_DIR}/config.alloy"
 envsubst <"${CONFIG_DIR}/alloy.template" >"${ALLOY_CONFIG}"
+
+# Shared per-service Alloy enrichment modules that config.alloy imports via
+# import.file. They carry no envsubst vars, so a plain copy suffices.
+mkdir -p "${WORKING_DIR}/alloy-modules"
+cp "${CONFIG_DIR}/alloy-modules/"*.alloy "${WORKING_DIR}/alloy-modules/"
 
 echo "Starting proto-devnet ..."
 echo "  Topology: ${TOPOLOGY}"

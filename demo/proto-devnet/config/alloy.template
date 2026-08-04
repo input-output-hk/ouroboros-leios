@@ -1,3 +1,27 @@
+// proto-devnet Alloy entrypoint.
+//
+// Structure (see also config/alloy-modules/*.alloy):
+//   * Environment-specific FRONT-END below is two stages: stage 1
+//     (extract_process_compose_logs) unwraps the process-compose envelope and
+//     writes one raw copy; stage 2 (leios_route) stamps the routing `service`
+//     label (cardano-node | tx-firehose | tx-centrifuge) from the process name and
+//     fans out. This is the ONE piece that differs per environment (playground
+//     stamps `service` from systemd_unit and needs no raw-copy split); everything
+//     downstream is shared, reusable modules.
+//   * The shared per-service enrichment MODULES are imported via import.file and
+//     wired here. Each is a self-contained `declare` that expects a structure and
+//     forwards to an injected receiver — no module hardcodes its downstream.
+//   * Routing follows Pattern B (fan-out + drop-first) at the service boundary:
+//     leios_route forwards every line to each service module, and each module
+//     drops anything whose `service` is not its own. The node sub-facets (voting,
+//     call-trace) are CHAINED after cardano_node_process so each node line is still
+//     written exactly once, carrying whatever the facets added.
+//
+//   extract ─┬─(raw process-compose)────────────────────────────────► loki.write.loki
+//            └─► leios_route ─┬─► cardano_node_process ─► leios_voting ─► call_trace ─► loki.write.loki
+//                             ├─► tx_firehose_process ───────────────────────► loki.write.loki
+//                             └─► tx_centrifuge_process (dormant here) ───────► loki.write.loki
+
 prometheus.remote_write "prometheus" {
 	endpoint {
 		url = "http://127.0.0.1:9090/api/v1/write"
@@ -8,24 +32,24 @@ prometheus.scrape "cardano_node_exporter" {
 	targets = [
 		{
 			"__address__" = "${IP_NODE1}:${METRICS_PORT_NODE1}",
-			"job"         = "cardano_node_metrics",
+			"job"         = "integrations/cardano-node",
 			"instance"    = "node1",
-			"alias"       = "node1",
-			"process"     = "Node1",
+			"environment" = "leios",
+			"group"       = "proto-devnet",
 		},
 		{
 			"__address__" = "${IP_NODE2}:${METRICS_PORT_NODE2}",
-			"job"         = "cardano_node_metrics",
+			"job"         = "integrations/cardano-node",
 			"instance"    = "node2",
-			"alias"       = "node2",
-			"process"     = "Node2",
+			"environment" = "leios",
+			"group"       = "proto-devnet",
 		},
 		{
 			"__address__" = "${IP_NODE3}:${METRICS_PORT_NODE3}",
-			"job"         = "cardano_node_metrics",
+			"job"         = "integrations/cardano-node",
 			"instance"    = "node3",
-			"alias"       = "node3",
-			"process"     = "Node3",
+			"environment" = "leios",
+			"group"       = "proto-devnet",
 		},
 	]
 
@@ -55,6 +79,10 @@ loki.source.file "process_compose_log_scrape" {
 	tail_from_end = false
 }
 
+// FRONT-END (environment-specific) stage 1: unwrap the process-compose envelope
+// and write ONE raw process-compose copy (service=process-compose). This stage
+// does NOT route -- it hands each line to leios_route below, where the routing
+// `service` value is stamped, so the raw copy is never overwritten by it.
 loki.process "extract_process_compose_logs" {
 	stage.json {
 		expressions = {
@@ -66,68 +94,57 @@ loki.process "extract_process_compose_logs" {
 		drop_malformed = true
 	}
 
+	// Lowercase the instance label (Node1 -> node1) so it matches the instance
+	// label on the prometheus scrape targets above (node1) and playground's
+	// lowercase-hostname convention. The shared dashboards source $instance from
+	// Loki and use it in prometheus queries (instance=~"$instance", a
+	// case-sensitive match), so a casing mismatch drops the metric panels when a
+	// specific instance is selected.
+	stage.template {
+		source   = "instance"
+		template = "{{ .process | ToLower }}"
+	}
+
 	stage.labels {
 		values = {
 			level    = "level",
 			process  = "process",
 			replica  = "replica",
-			instance = "process",
+			instance = "instance",
 		}
 	}
 
 	stage.static_labels {
 		values = {
 			service = "process-compose",
-			type    = "process-compose",
 		}
 	}
 
+	// Body = the wrapped trace JSON; the raw copy goes to loki.write.loki and a
+	// copy is handed to leios_route for service stamping + fan-out.
 	stage.output {
 		source = "message"
 	}
 
 	forward_to = [
 		loki.write.loki.receiver,
-		loki.process.extract_cardano_node_logs.receiver,
+		loki.process.leios_route.receiver,
 	]
 }
 
-loki.process "extract_cardano_node_logs" {
-	stage.json {
-		expressions = {
-			at     = "at",
-			sev    = "sev",
-			host   = "host",
-			thread = "thread",
-			ns     = "ns",
-			data   = "data",
-		}
-		drop_malformed = true
-	}
-
-	stage.drop {
-		source = "process"
-		value  = "Analyze"
-	}
-
-	stage.timestamp {
-		source = "at"
-		format = "RFC3339"
-	}
-
-	stage.labels {
-		values = {
-			level = "sev",
-			host  = "host",
-			sev   = "sev",
-			ns    = "ns",
-		}
-	}
-
-	stage.static_labels {
-		values = {
-			service = "cardano-node",
-			type    = "cardano-node",
+// FRONT-END stage 2 (the router): overwrite `service` from process-compose to the
+// normalized routing value (cardano-node | tx-firehose | tx-centrifuge) by process
+// name, then fan out to the shared modules. `service` is BOTH the routing key and
+// the final label -- there is no separate `stream`, so nothing needs dropping
+// before the write. `Analyze` (and any non-matching process) keeps
+// service=process-compose, so every module's `{service!="..."}` guard drops it.
+loki.process "leios_route" {
+	stage.match {
+		selector = `{process=~"Node[0-9]+"}`
+		stage.static_labels {
+			values = {
+				service = "cardano-node",
+			}
 		}
 	}
 
@@ -136,209 +153,67 @@ loki.process "extract_cardano_node_logs" {
 		stage.static_labels {
 			values = {
 				service = "tx-firehose",
-				type    = "tx-firehose",
 			}
 		}
 	}
 
-	stage.output {
-		source = "data"
+	stage.match {
+		selector = `{process="TxCentrifuge"}`
+		stage.static_labels {
+			values = {
+				service = "tx-centrifuge",
+			}
+		}
 	}
 
 	forward_to = [
-		loki.write.loki.receiver,
-		loki.process.extract_leios_vote_logs.receiver,
-		loki.process.extract_call_trace_logs.receiver,
+		mod.cardano_node_process.node.receiver,
+		mod.tx_firehose_process.firehose.receiver,
+		mod.tx_centrifuge_process.centrifuge.receiver,
 	]
 }
 
-loki.process "extract_leios_vote_logs" {
-	stage.json {
-		expressions = {
-			kind = "kind",
-		}
-	}
+// Shared per-service enrichment modules (config/alloy-modules/*.alloy), placed into
+// ${WORKING_DIR}/alloy-modules by run.sh. import.file on a directory exposes each
+// file's `declare` under this namespace.
+import.file "mod" {
+	filename = "${WORKING_DIR}/alloy-modules"
+}
 
-	stage.labels {
-		values = {
-			kind = "kind",
-		}
-	}
+// Node chain: cardano_node_process -> voting -> call-trace -> terminal write. Wiring lives
+// here, not inside the modules.
+mod.cardano_node_process "node" {
+	forward_to = [mod.leios_voting_process.vote.receiver]
+}
 
-	stage.match {
-		selector = `{kind=~"LeiosVoted|LeiosVoteAcquired"}`
+mod.leios_voting_process "vote" {
+	forward_to = [mod.call_trace_process.call.receiver]
+}
 
-		stage.json {
-			expressions = {
-				rbHash  = "vote.rbHash",
-				voterId = "vote.voterId",
-			}
-			drop_malformed = true
-		}
-
-		stage.static_labels {
-			values = {
-				service = "leios-voting",
-				type    = "leios-voting",
-			}
-		}
-
-		stage.labels {
-			values = {
-				rbHash  = "rbHash",
-				voterId = "voterId",
-			}
-		}
-
-		stage.match {
-			selector = `{kind="LeiosVoted"}`
-
-			stage.json {
-				expressions = {
-					weight = "weight",
-				}
-			}
-
-			stage.metrics {
-				metric.counter {
-					name              = "voted_weight_total"
-					description       = "The total accumulated voting weight"
-					prefix            = "leios_"
-					action            = "add"
-					source            = "weight"
-					max_idle_duration = "24h"
-				}
-			}
-		}
-
-		stage.match {
-			selector = `{kind="LeiosVoteAcquired"}`
-
-			stage.metrics {
-				metric.counter {
-					name              = "votes_acquired_total"
-					description       = "The total votes acquired"
-					prefix            = "leios_"
-					action            = "inc"
-					match_all         = true
-					max_idle_duration = "24h"
-				}
-			}
-		}
-	}
-
+mod.call_trace_process "call" {
 	forward_to = [loki.write.loki.receiver]
 }
 
-loki.process "extract_call_trace_logs" {
-	stage.json {
-		expressions = {
-			kind = "kind",
-		}
-	}
+// tx-generator services: each writes directly (single write per line).
+mod.tx_firehose_process "firehose" {
+	forward_to = [loki.write.loki.receiver]
+}
 
-	stage.labels {
-		values = {
-			kind = "kind",
-		}
-	}
-
-	stage.match {
-		selector = `{kind="Call"}`
-
-		stage.json {
-			expressions = {
-				event     = "event",
-				argument  = "argument",
-				id        = "id",
-				child_id  = "child_id",
-				parent_id = "child_id",
-				name      = "name",
-				stack     = "stack",
-				thread    = "thread",
-			}
-			drop_malformed = true
-		}
-
-		stage.static_labels {
-			values = {
-				service = "call-trace",
-				type    = "call-trace",
-			}
-		}
-
-		stage.labels {
-			values = {
-				event  = "event",
-				name   = "name",
-				stack  = "stack",
-				thread = "thread",
-			}
-		}
-
-		stage.match {
-			selector = `{event="Start"}`
-
-			stage.metrics {
-				metric.counter {
-					name              = "started_total"
-					description       = "Total started calls"
-					prefix            = "call_"
-					action            = "inc"
-					match_all         = true
-					max_idle_duration = "24h"
-				}
-			}
-		}
-
-		stage.match {
-			selector = `{event="End"}`
-
-			stage.json {
-				expressions = {
-					duration    = "duration",
-					allocations = "allocations",
-					result      = "result",
-				}
-				drop_malformed = true
-			}
-
-			stage.metrics {
-				metric.counter {
-					name              = "ended_total"
-					description       = "Total ended calls"
-					prefix            = "call_"
-					action            = "inc"
-					match_all         = true
-					max_idle_duration = "24h"
-				}
-
-				metric.counter {
-					name              = "duration_total"
-					description       = "Total call duration"
-					prefix            = "call_"
-					action            = "add"
-					source            = "duration"
-					max_idle_duration = "24h"
-				}
-
-				metric.counter {
-					name              = "allocations_total"
-					description       = "Total call allocations"
-					prefix            = "call_"
-					action            = "add"
-					source            = "allocations"
-					max_idle_duration = "24h"
-				}
-			}
-		}
-	}
-
+mod.tx_centrifuge_process "centrifuge" {
 	forward_to = [loki.write.loki.receiver]
 }
 
 prometheus.scrape "alloy_pipeline_metrics" {
-	targets         = [{"__address__" = "localhost:12345"}]
+	// Tag the loki-derived counters (cardano_node_metrics_loki_*, incl. txgen_*)
+	// with environment/instance/group so they carry the same labels as
+	// playground's leios_alloy_pipeline_metrics scrape -- the shared throughput
+	// dashboard selects them by environment="leios".
+	targets = [{
+		"__address__" = "localhost:12345",
+		"instance"    = "proto-devnet",
+		"environment" = "leios",
+		"group"       = "proto-devnet",
+	}]
 	forward_to      = [prometheus.remote_write.prometheus.receiver]
 	scrape_timeout  = "1s"
 	scrape_interval = "1s"

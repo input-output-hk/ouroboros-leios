@@ -1,0 +1,94 @@
+// leios_voting_process — Leios voting facet of the cardano-node stream.
+//
+// Chained after cardano_node_process rather than fanned: votes are a sub-kind of
+// the node stream, not a separate service, so enriching inline keeps the single
+// write. Only kind=LeiosVoted|LeiosVoteAcquired are touched; every other line
+// passes straight through to forward_to untouched, still part of the one node
+// write, never dropped.
+//
+//   Input  : cardano_node_process output -- body = decoded data, kind label set.
+//   Output : same line; on vote lines the service is refined and voterId indexed.
+//   Labels : service=cardano-node/leios-voting, plus voterId on vote lines.
+//   Metrics: voted_weight_total, votes_acquired_total.
+//   Example input:
+//     {
+//       "kind": "LeiosVoted",
+//       "vote": {
+//         "rbHash": "e9df5c66...",
+//         "voterId": 44
+//       },
+//       "weight": 0.187125064554
+//     }
+//
+// rbHash is not labelled, since it is roughly one value per block; it stays in the
+// body for `| json` as vote.rbHash, which also keeps the counters bounded.
+declare "leios_voting_process" {
+  argument "forward_to" {}
+
+  export "receiver" {
+    value = loki.process.enrich.receiver
+  }
+
+  loki.process "enrich" {
+    stage.match {
+      selector = `{kind=~"LeiosVoted|LeiosVoteAcquired"}`
+
+      stage.json {
+        expressions = {
+          voterId = "vote.voterId",
+        }
+        drop_malformed = true
+      }
+
+      stage.static_labels {
+        values = {
+          service = "cardano-node/leios-voting",
+        }
+      }
+
+      stage.labels {
+        values = {
+          voterId = "voterId",
+        }
+      }
+
+      stage.match {
+        selector = `{kind="LeiosVoted"}`
+
+        stage.json {
+          expressions = {
+            weight = "weight",
+          }
+        }
+
+        stage.metrics {
+          metric.counter {
+            name              = "voted_weight_total"
+            description       = "The total accumulated voting weight"
+            prefix            = "cardano_node_metrics_loki_leios_"
+            action            = "add"
+            source            = "weight"
+            max_idle_duration = "24h"
+          }
+        }
+      }
+
+      stage.match {
+        selector = `{kind="LeiosVoteAcquired"}`
+
+        stage.metrics {
+          metric.counter {
+            name              = "votes_acquired_total"
+            description       = "The total votes acquired"
+            prefix            = "cardano_node_metrics_loki_leios_"
+            action            = "inc"
+            match_all         = true
+            max_idle_duration = "24h"
+          }
+        }
+      }
+    }
+
+    forward_to = argument.forward_to.value
+  }
+}

@@ -93,7 +93,12 @@
               cardano-node-release =
                 let
                   upstream =
-                    if lib.elem system [ "x86_64-linux" "aarch64-linux" ] then
+                    if
+                      lib.elem system [
+                        "x86_64-linux"
+                        "aarch64-linux"
+                      ]
+                    then
                       inputs.cardano-node-leios.hydraJobs.${system}.musl.cardano-node-linux
                     else
                       inputs.cardano-node-leios.hydraJobs.${system}.native.cardano-node-macos;
