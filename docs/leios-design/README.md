@@ -572,7 +572,7 @@ The result is still correct: the on-screen state is identical to re-applying all
 
 > [!WARNING]
 >
-> TODO: Not yet implemented and likely incomplete design
+> TODO: Not yet implemented and incomplete design. How will this exactly result in less checking in the forge loop? Shouldn't we incorporate knowledge of the leader schedule?
 
 A transaction is applicable only over a **validity range** of slots: its own validity interval (`invalidBefore`/`invalidHereafter`), together with the era and protocol parameters that govern how it is validated. So advancing the slot, not only changing the `base`, can invalidate a transaction.
 
@@ -598,15 +598,15 @@ Removing the lock contention lets forging run concurrently with ingestion and di
 
 For forging, a block producer works against not one `base` but two. Under Leios in Dijkstra it issues an EB alongside each RB, and that RB either certifies the EB announced by the preceding RB (a `CertRB`) or carries transactions directly (a `TxRB`). Those two outcomes are two different bases the mempool's transactions would be applied on:
 
-- one where the preceding announcement is **not** being certified, so all of the mempool's transactions are still available to forge and announce;
+- one where the preceding endorsement is **not** being certified, so all mempool transactions are available to forge and announce;
 - one where it **is** being certified, so the transactions of that now-settled EB are already in the ledger and must be excluded.
 
 Which base applies is only decided at forge time, once it is known whether enough votes for the preceding EB have arrived. The Mempool therefore keeps **two ready-to-forge views**, one per base, pre-computed so that neither outcome pays a re-application on the critical path. At forge time the block producer just picks the matching view, selects transactions, and performs the cheap slot-dependent checks (see [cheap ticking](#cheap-ticking)).
 
-In the `cardano-node` this takes two forms:
+For that to hold, forging must stay a cheap *read* of a view and never turn into a fresh computation. Two mechanisms keep it so, each with a concrete form in the `cardano-node`:
 
-- a **capped forging snapshot**: obtaining a forging snapshot (via `getSnapshotFor`) can trigger a full revalidation, so a capped variant time- and size-bounds the work done on the critical path, ensuring that producing a snapshot cannot stall behind a large re-application;
-- an **optimistic view**: the block producer forges from the current view rather than first synchronising it to the very latest base, accepting that a tip which arrived moments earlier is picked up on the next block-production opportunity.
+- an **optimistic view** keeps forging off the rebase path: the block producer reads the matching ready-to-forge view as it stands, just as any other reader is served from the on-screen buffer, rather than first synchronising it to the very latest base. A tip that arrived moments earlier is picked up on the next block-production opportunity.
+- a **capped forging snapshot** bounds whatever reconciliation is still unavoidable: advancing the chosen view to the forging slot is free while it stays within the `interval` (cheap ticking), and any residual re-application against the base (today `getSnapshotFor` can trigger a full one) is time- and size-bounded, so producing the snapshot cannot stall behind a large re-apply.
 
 ### Block production
 
