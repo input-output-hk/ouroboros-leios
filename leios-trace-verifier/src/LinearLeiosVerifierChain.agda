@@ -213,13 +213,13 @@ module LinearLeiosVerifierChain where
         if not (started a)
           then (record a { curSlot = primWord64ToNat s ; started = true } , [])
           else
-            let block = closeSlot a
+            let steps = closeSlot a
             in (record a
                   { curSlot = primWord64ToNat s
                   ; FFD-blks = []
                   ; forgedEB = nothing
                   ; votedEB = nothing
-                  } , block)
+                  } , steps)
       traceEvent→action a (CEBForged h s) =
         let eb = mkEBrec h s
         in (record a { EB-refs = (h , eb) ∷ EB-refs a ; forgedEB = just eb } , [])
