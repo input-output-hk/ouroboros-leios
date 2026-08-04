@@ -77,6 +77,10 @@ declare "call_trace_process" {
 			stage.match {
 				selector = `{event="Start"}`
 
+        stage.label_drop {
+          values = [ "event" ]
+        }
+
 				stage.metrics {
 					metric.counter {
 						name              = "started_total"
@@ -91,6 +95,10 @@ declare "call_trace_process" {
 
 			stage.match {
 				selector = `{event="End"}`
+
+        stage.label_drop {
+          values = [ "event" ]
+        }
 
 				stage.json {
 					expressions = {
