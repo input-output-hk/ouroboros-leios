@@ -529,7 +529,7 @@ That very size is also what creates the challenge: the Mempool now holds roughly
 
 The solution is a threefold design: removing the lock contention so that accepting, diffusing and forging proceed concurrently (the *double-buffered mempool*), exploiting transaction validity ranges to make advancing the slot cheap, and keeping ready-to-forge views so that block production never re-applies the whole mempool on the critical path. The data structures and function names below track the `ouroboros-consensus` implementation and may evolve.
 
-#### Validation vs. application
+#### Double-buffering
 
 Processing a transaction has three stages of very different cost:
 
@@ -537,68 +537,73 @@ Processing a transaction has three stages of very different cost:
 - **Validate**: check signatures, scripts, limits, values. Expensive, but once a transaction is resolved this is **state-independent** and valid for the whole era, so it need only be done **once** and can be cached.
 - **Apply**: check the transaction fits the current state (its inputs still exist, its slot is in range). Cheap, but **must be redone every time the base ledger state changes**.
 
-So a caught-up node validates each transaction once and thereafter only *re-applies* it (`reapplyTx`, not `applyTx`) when the base changes. This asymmetry is the lever the whole design pulls on: a change of base forces `O(|txs|)` re-applications, but each one is cheap, and in particular cheaper than the full validation that concurrent additions are paying at the same time. The double-buffered mempool below turns that gap into a way to move the re-application off the lock.
+So a caught-up node validates each transaction once and thereafter only *re-applies* it (`reapplyTx`, not `applyTx`) when the base changes. This asymmetry is what makes a mempool viable in the first place, and the double-buffering leans on it further: a change of base forces `O(|txs|)` re-applications, but each one is cheap, and in particular cheaper than the full validation that concurrent additions are paying at the same time.
 
-#### Model
-
-The Mempool is concurrent state mutated by three actions:
+Model the Mempool as a single shared state, read by many and mutated by only two operations. The state is a set of transactions applied on top of a ledger state:
 
 ```haskell
-data MempoolAction
-  = AddTx  Tx           -- from peers and local clients (~1000/s)
-  | Rebase LedgerState  -- chain selection picked a new base (a few per 20s)
-  | Tick   SlotNo       -- time advancing (~1/s)
-
 data MempoolState = MempoolState
-  { base     :: LedgerState       -- ledger state the txs are applied on top of
-  , interval :: (SlotNo, SlotNo)  -- slot range the mempool is valid for
-  , txs      :: [Tx]              -- resolved, validated, applicable transactions
+  { base :: LedgerState  -- ledger state the txs are applied on top of
+  , txs  :: [Tx]         -- resolved, validated, applicable transactions
   }
+
+data MempoolAction
+  = AddTx  Tx           -- validate and apply a new tx (~1000/s)
+  | Rebase LedgerState  -- re-apply all txs onto a new base (a few per 20s)
 ```
 
-A `MempoolState` is the set of resolved, validated, applicable `txs` held on top of a `base` ledger state over a slot `interval`. It is exactly what a buffer holds, so the three actions map onto the three ideas:
+Reading dominates and must never block: diffusion continuously serves `txs` to peers, and block production draws from them to fill blocks. Against that steady stream of reads, the two mutations are comparatively rare. `AddTx` validates and applies a peer's or client's transaction against `base` (`applyTx`) and appends it. `Rebase` takes a new `base` from chain selection and re-applies (`reapplyTx`) every transaction onto it. The invariant both preserve is that a transaction is in `txs` exactly when it is valid and applicable to `base`, which is also the Mempool's core question: which transactions to accept, diffuse, and allow into a block.
 
-- `AddTx` appends a newly resolved and validated transaction; cheap and frequent.
-- `Rebase` re-applies every transaction onto a new `base` when chain selection moves. This is the `O(|txs|)` transition that motivates the *double-buffered mempool*.
-- `Tick` advances the slot, which is free within the `interval` and only costly at its boundary (see [cheap ticking](#cheap-ticking-via-validity-ranges)).
+`Rebase` is the hard case: re-applying every transaction is `O(|txs|)`, and under Leios `|txs|` is large. Serialising it under one lock is exactly the bottleneck: while a rebase runs, nothing can be accepted, diffused or forged.
 
-A transaction is accepted, diffused, and eligible for a block exactly when it is valid and applicable to the current `base` and `interval`.
+The design that removes this contention is a **double-buffered mempool**, the same trick a graphics pipeline uses to keep a display smooth: readers are always served from the buffer **on screen**, the expensive work happens on a second buffer **off screen**, and the two are exchanged by a single quick flip.
 
-#### Double-buffering
+- **On screen** is the committed state, the single authoritative buffer and the only commit point. Readers (block production, diffusion) are served from it without blocking each other; it is held for writing only briefly, to commit an `AddTx` or to flip in a completed `Rebase`. Because there is exactly one on-screen buffer, size and capacity accounting has one source of truth and cannot diverge.
+- **Off screen**, `Rebase` re-applies every transaction against the new `base`, the `O(|txs|)` work, without holding the on-screen buffer or blocking anyone.
 
-`Rebase` is the hard case introduced above: re-applying every transaction onto a new `base` is `O(|txs|)`, and under Leios `|txs|` is large. Serialising it under one lock is exactly the bottleneck: while a rebase runs, nothing can be accepted, diffused or forged.
+Both mutations commit through one operation, which reconciles the state they prepared off screen against whatever is on screen at that moment:
 
-The design that removes this contention is a **double-buffered mempool**: a rebase prepares the next state in a second buffer, off to the side, while readers keep observing the current one, and only a short final swap is serialised. There are two buffers and a single commit point:
+- `AddTx` validates its transaction off screen (the expensive, adversary-facing work), then commits it on screen by appending. Adds are serialised, so each commit is cheap.
+- `Rebase` re-applies all `txs` off screen, then runs a **converging loop**: it reads the transactions that landed on screen meanwhile (the delta) and re-applies only those on top, repeating until the delta drops below a target size or a maximum number of iterations is reached. The delta tends to shrink each round, because ingestion pays full validation whereas `Rebase` only re-applies, which is cheaper per tx, and ingestion is serialised; but a steady stream of adds could keep it from ever reaching zero, so the iteration cap guarantees the loop always terminates. Only then does it take the on-screen buffer, re-apply that small residual under the lock, and flip to the new `base`. Since the residual never exceeds the target size (or the cap), the screen is held for a bounded time, independent of `|txs|`.
 
-- **The committed cell** is the single authoritative state and the only commit point. Readers (block production, diffusion) observe it without blocking each other; a writer takes it only for the final swap. Because there is exactly one cell, size and capacity accounting has one source of truth and cannot diverge.
-- **The working buffer** is a non-emptying snapshot of the committed state that a rebase re-applies against the new `base` off-lock, without holding the cell or blocking anyone.
-
-Reconciling the working buffer back into the cell is a single operation, `mergeMempoolState`:
-
-- An **add** does its resolve and validate off the cell (the expensive, adversary-facing work) and then commits by appending. Adds are serialised, so each commit is cheap.
-- A **rebase** does its re-application in the working buffer, then runs a **converging loop**: it reads the transactions that arrived meanwhile (the delta) and re-applies only those on top, repeating until the delta is small. The delta shrinks each round, because ingestion pays full validation whereas the rebase only re-applies, which is cheaper per tx, and ingestion is serialised. Only then does it take the cell, fold in a bounded residual, and swap `base`. **The cell is held for a bounded time, independent of `|txs|`.**
-
-This gives `mergeMempoolState` its two required properties. For performance, the commit that blocks readers is bounded regardless of occupancy, since the lock is held only for the bounded residual rather than the full re-application. For correctness, the committed state is identical to re-applying all transactions against the new `base` in one pass, because re-apply is an ordered fold and splitting then resuming it yields the same result. Committing through the cell, rather than an optimistic compare-and-swap, means a rebase always makes progress and cannot be starved by a stream of concurrent adds; the cost is that its final commit briefly delays readers, which the bounded residual keeps small.
+The result is still correct: the on-screen state is identical to re-applying all transactions against the new `base` in one pass, because re-apply is an ordered fold and splitting then resuming it yields the same result. And committing through the blocking flip, rather than an optimistic compare-and-swap, keeps a rebase always making progress, never starved by a stream of concurrent adds.
 
 #### Cheap ticking
 
 > [!WARNING]
 >
-> TODO: Not yet implemented; the following sketches the intended design.
+> TODO: Not yet implemented and likely incomplete design
 
-`Tick` advances the slot. Time affects a transaction's validity (protocol parameters and the ledger law change at era boundaries) and its applicability (its own slot range, plus epoch-boundary state changes), but **only at epoch boundaries**. The design exploits this with the `interval`: a ~20-slot window between the current tip or epoch start and the next expected block or epoch end. Ticking *within* the interval changes nothing observable to transactions, so it costs nothing; only crossing an epoch boundary forces a re-apply (and a re-validate on a new era). The trade-off is that transactions whose validity range is narrower than the interval are rejected, which is acceptable for a large performance win.
+A transaction is applicable only over a **validity range** of slots: its own validity interval (`invalidBefore`/`invalidHereafter`), together with the era and protocol parameters that govern how it is validated. So advancing the slot, not only changing the `base`, can invalidate a transaction.
+
+Two facts keep this cheap to track. The era and protocol parameters change only at **epoch boundaries**, so within an epoch the validation rules are fixed. And the mempool commits to an `interval` of its own, a window reaching to the next expected block or the epoch boundary, admitting only transactions valid across the whole of it:
+
+```haskell
+data MempoolState = MempoolState
+  { base     :: LedgerState
+  , interval :: (SlotNo, SlotNo)  -- slot range the whole mempool is valid over
+  , txs      :: [Tx]
+  }
+```
+
+A third operation, `Tick`, advances the current slot as a cheap **intersection**: as long as the new slot stays within `interval`, nothing observable to the transactions changes and nothing is re-applied. Leaving the `interval`, at the latest at an epoch boundary, forces a re-apply (and a re-validate on a new era). Since `interval` is roughly a 20-slot window, from the current tip or epoch start to the next expected block or epoch end, maintaining it lets the node advance many slots between the bigger, base-changing rebases without ever touching `txs`. The trade-off is that a transaction whose own validity range is narrower than `interval` cannot be admitted, which is acceptable for the performance win.
 
 #### Ready-to-forge views
 
 > [!WARNING]
 >
-> TODO: Not yet implemented; the following sketches the intended design.
+> TODO: Not yet implemented and likely incomplete design
 
-Removing the lock contention lets forging run concurrently with ingestion and diffusion, but it does not by itself make forging fast: the block producer still needs the transactions applicable at the forging slot, and computing that naively means re-applying the mempool at the moment of forging, the same `O(|txs|)` cost we must keep off the critical path, where only a fraction of a slot is available to produce a block.
+Removing the lock contention lets forging run concurrently with ingestion and diffusion, but it does not by itself make forging fast: the block producer still needs the transactions applicable at the forging slot, and computing that naively means re-applying the mempool at that moment, the `O(|txs|)` cost we must keep off the critical path where only a fraction of a slot is available.
 
-The design keeps the transactions in a shape that is immediately forgeable, so that at forge time the block producer only selects transactions and performs the cheap slot-dependent checks (see [ticking](#cheap-ticking-via-validity-ranges)) rather than a full re-application. Under Leios in Dijkstra a block producer issues an EB alongside each RB, and its RB is either a `CertRB` certifying the preceding EB or a `TxRB` carrying transactions directly. Which of the two it issues is only settled at forge time, once it is known whether enough votes for the preceding EB have arrived. The Mempool therefore keeps **two ready-to-forge views**: one for the certifying case, where the certified EB's transactions are already settled and excluded, and one for the non-certifying case, where those transactions are still available. Pre-computing both means neither branch pays a re-application on the critical path.
+For forging, a block producer works against not one `base` but two. Under Leios in Dijkstra it issues an EB alongside each RB, and that RB either certifies the EB announced by the preceding RB (a `CertRB`) or carries transactions directly (a `TxRB`). Those two outcomes are two different bases the mempool's transactions would be applied on:
 
-On the Haskell node this takes two forms:
+- one where the preceding announcement is **not** being certified, so all of the mempool's transactions are still available to forge and announce;
+- one where it **is** being certified, so the transactions of that now-settled EB are already in the ledger and must be excluded.
+
+Which base applies is only decided at forge time, once it is known whether enough votes for the preceding EB have arrived. The Mempool therefore keeps **two ready-to-forge views**, one per base, pre-computed so that neither outcome pays a re-application on the critical path. At forge time the block producer just picks the matching view, selects transactions, and performs the cheap slot-dependent checks (see [cheap ticking](#cheap-ticking)).
+
+In the `cardano-node` this takes two forms:
 
 - a **capped forging snapshot**: obtaining a forging snapshot (via `getSnapshotFor`) can trigger a full revalidation, so a capped variant time- and size-bounds the work done on the critical path, ensuring that producing a snapshot cannot stall behind a large re-application;
 - an **optimistic view**: the block producer forges from the current view rather than first synchronising it to the very latest base, accepting that a tip which arrived moments earlier is picked up on the next block-production opportunity.
