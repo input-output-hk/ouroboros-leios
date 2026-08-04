@@ -531,13 +531,13 @@ The solution is a threefold design: removing the lock contention so that accepti
 
 #### Double-buffering
 
-Processing a transaction has three stages of very different cost:
+A transaction is fully validated only once, when it is first admitted (`applyTx`), and thereafter only re-applied against a changed base (`reapplyTx`), which is far cheaper because it reuses that validation and only re-checks that the transaction still applies (see [Transaction validation levels](#transaction-validation-levels)).
 
-- **Resolve**: fetch the transaction's input UTxOs (from the cache or on-disk ledger). Dependent transactions must be resolved in sequence.
-- **Validate**: check signatures, scripts, limits, values. Expensive, but once a transaction is resolved this is **state-independent** and valid for the whole era, so it need only be done **once** and can be cached.
-- **Apply**: check the transaction fits the current state (its inputs still exist, its slot is in range). Cheap, but **must be redone every time the base ledger state changes**.
+This asymmetry is currently used by the mempool, and the double-buffering design leans on it further: a change of base forces `O(|txs|)` re-applications, but each one is cheap, and in particular cheaper than the full validation that concurrent additions are paying at the same time. It also means only that first validation should need to load data from an on-disk ledger; a transaction already in the mempool should be re-applied without reading from disk at all.
 
-So a caught-up node validates each transaction once and thereafter only *re-applies* it (`reapplyTx`, not `applyTx`) when the base changes. This asymmetry is what makes a mempool viable in the first place, and the double-buffering leans on it further: a change of base forces `O(|txs|)` re-applications, but each one is cheap, and in particular cheaper than the full validation that concurrent additions are paying at the same time.
+> [!WARNING]
+>
+> TODO: Re-application can still reach the on-disk ledger today. Deliberately keeping a mempool transaction's resolved data cache-local would keep rebase off the disk entirely.
 
 Model the Mempool as a single shared state, read by many and mutated by only two operations. The state is a set of transactions applied on top of a ledger state:
 
