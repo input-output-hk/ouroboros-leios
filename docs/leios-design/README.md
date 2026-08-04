@@ -9,6 +9,7 @@ author:
   - Michael Karg <michael.karg@iohk.io>
   - Martin Kourim <martin.kourim@iohk.io>
   - Marcin Wójtowicz <marcin.wojtowicz@iohk.io>
+  - Drazen Popovic <drazen.popovic@iohk.io>
 ---
 
 # Introduction
