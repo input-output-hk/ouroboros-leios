@@ -517,19 +517,27 @@ CIP-0164 implies functional requirements for the node to issue EBs alongside RBs
 
 ### High-throughput mempool
 
-The Mempool stages transactions that have been submitted but not yet included in a block. It has three jobs: **accept** transactions from local clients, **diffuse** good ones to peers, and **pre-compute** their validation and application so a block producer can include them cheaply.
+The Mempool is a component in `cardano-node` that *stages* transactions submitted by users of the network that have not yet been *committed* on-chain, i.e. not yet included in a forged block. Functionally, it aims to achieve three primary goals:
 
-Under Praos the second and third jobs are only partially met, which is tolerable. Under Leios it is not: the Mempool now holds roughly two endorser blocks' worth of transactions instead of two Praos blocks', and it is fed at up to ~1000 tx/s. Re-processing that many transactions whenever the chain moves, while serialising every Mempool operation behind a single lock, blocks transaction diffusion and block production for as long as the re-processing takes (**RSK-LeiosMempoolOverheadLatency**).
+1. **Accept** new transactions into the network from local clients (e.g. user wallets via `LocalTxSubmission`),
+2. **Diffuse** (propagate) "good" transactions across the network (e.g. to peers via `TxSubmission`),
+3. **Pre-compute** transaction validation and application (the state change), for timely inclusion in a block during block production.
+
+As of today, goals 2 and 3 are not fully met. We could get away with these inefficiencies under Ouroboros Praos traffic loads, but they become a massive bottleneck under Ouroboros Leios, which requires a much bigger Mempool (**UPD-LeiosBiggerMempool**). It must hold enough valid transactions for a block producer to fill a full EB alongside a full RB, at least twice an EB's capacity, so that a stake pool issuing a `CertRB` for a full EB can still fill a fresh EB alongside it (a `TxRB` carries fewer transactions than the EB certified by a `CertRB`). Stake pools are in any case indirectly incentivised to maximise EB size, just as with `TxRB`s, so that more fees enter the epoch's reward calculation.
+
+That very size is also what creates the challenge: the Mempool now holds roughly two endorser blocks' worth of transactions instead of two Praos blocks', and it is fed at up to ~1000 tx/s. Re-processing that many transactions whenever the chain moves, while serialising every Mempool operation behind a single lock, blocks transaction diffusion and block production for as long as the re-processing takes (**RSK-LeiosMempoolOverheadLatency**).
+
+The solution is a threefold design: removing the lock contention so that accepting, diffusing and forging proceed concurrently (the *double-buffered mempool*), exploiting transaction validity ranges to make advancing the slot cheap, and keeping ready-to-forge views so that block production never re-applies the whole mempool on the critical path. The data structures and function names below track the `ouroboros-consensus` implementation and may evolve.
 
 #### Validation vs. application
 
-A transaction is processed in three stages, with very different costs:
+Processing a transaction has three stages of very different cost:
 
-- **Resolve** — fetch the transaction's input UTxOs (from the cache or on-disk ledger). Dependent transactions must be resolved in sequence.
-- **Validate** — check signatures, scripts, limits, values. Expensive, but once a transaction is resolved this is **state-independent** and, crucially, valid for the whole era: it need only be done **once** and can be cached.
-- **Apply** — check the transaction fits the current state (its inputs still exist, its slot is in range). Cheap, but **must be redone every time the base ledger state changes**.
+- **Resolve**: fetch the transaction's input UTxOs (from the cache or on-disk ledger). Dependent transactions must be resolved in sequence.
+- **Validate**: check signatures, scripts, limits, values. Expensive, but once a transaction is resolved this is **state-independent** and valid for the whole era, so it need only be done **once** and can be cached.
+- **Apply**: check the transaction fits the current state (its inputs still exist, its slot is in range). Cheap, but **must be redone every time the base ledger state changes**.
 
-So a caught-up node validates each transaction once and only ever *re-applies* (`reapplyTx`, not `applyTx`) when the base changes. Getting the validate/apply split right is what makes high throughput feasible.
+So a caught-up node validates each transaction once and thereafter only *re-applies* it (`reapplyTx`, not `applyTx`) when the base changes. This asymmetry is the lever the whole design pulls on: a change of base forces `O(|txs|)` re-applications, but each one is cheap, and in particular cheaper than the full validation that concurrent additions are paying at the same time. The double-buffered mempool below turns that gap into a way to move the re-application off the lock.
 
 #### Model
 
@@ -548,61 +556,66 @@ data MempoolState = MempoolState
   }
 ```
 
-Two questions define correct behaviour: which transactions do we accept and diffuse, and which are eligible for a block? Both answer: those that are valid and applicable to `base` and `interval`.
+A `MempoolState` is the set of resolved, validated, applicable `txs` held on top of a `base` ledger state over a slot `interval`. It is exactly what a buffer holds, so the three actions map onto the three ideas:
 
-#### Tick
+- `AddTx` appends a newly resolved and validated transaction; cheap and frequent.
+- `Rebase` re-applies every transaction onto a new `base` when chain selection moves. This is the `O(|txs|)` transition that motivates the *double-buffered mempool*.
+- `Tick` advances the slot, which is free within the `interval` and only costly at its boundary (see [cheap ticking](#cheap-ticking-via-validity-ranges)).
 
-Time (the slot) affects a transaction's validity (protocol parameters and the ledger law change at era boundaries) and its applicability (its own slot range, plus epoch-boundary state changes) — but **only at epoch boundaries**. We exploit this with the `interval`: a ~20-slot window between the current tip/epoch start and the next expected block/epoch end. Ticking *within* the interval changes nothing observable to transactions, so it costs nothing; only crossing an epoch boundary forces a re-apply (and a re-validate on a new era). The trade-off is that transactions whose validity range is narrower than the interval are rejected — acceptable for a large performance win.
+A transaction is accepted, diffused, and eligible for a block exactly when it is valid and applicable to the current `base` and `interval`.
 
-#### Rebase and concurrency
+#### Double-buffering
 
-`Rebase` is the hard case. When chain selection picks a new `base`, every transaction must be re-applied onto it — `O(|txs|)`, and under Leios `|txs|` is large. Serialising this under one lock is exactly the bottleneck above: while a rebase runs, nothing can be accepted, diffused or forged.
+`Rebase` is the hard case introduced above: re-applying every transaction onto a new `base` is `O(|txs|)`, and under Leios `|txs|` is large. Serialising it under one lock is exactly the bottleneck: while a rebase runs, nothing can be accepted, diffused or forged.
 
-All the performance and correctness of the concurrent case live in one operation — reconciling a state proposed by an action with the currently committed one, `mergeMempoolState`. The design:
+The design that removes this contention is a **double-buffered mempool**: a rebase prepares the next state in a second buffer, off to the side, while readers keep observing the current one, and only a short final swap is serialised. There are two buffers and a single commit point:
 
-- **A single authoritative state cell** is both the state and the commit point. Readers (block production, diffusion) observe it without blocking each other; a writer holds it only to commit. Because there is exactly one cell, the size/capacity accounting has one source of truth and cannot diverge.
-- **`AddTx`** resolves and validates off the cell (the expensive, adversary- facing work), then commits by appending. Adds are serialised, so each commit is cheap.
-- **`Rebase`** re-applies the transactions off the cell against the new `base`, then runs a **converging loop**: read the transactions that arrived meanwhile (the delta) and re-apply only those on top, repeating until the delta is small. The delta shrinks each round — ingestion pays full validation whereas the rebase only re-applies, which is cheaper per tx, and ingestion is serialised. Only then does it take the cell, fold in a bounded residual, and swap `base`. **The cell is held for a bounded time, independent of `|txs|`.**
+- **The committed cell** is the single authoritative state and the only commit point. Readers (block production, diffusion) observe it without blocking each other; a writer takes it only for the final swap. Because there is exactly one cell, size and capacity accounting has one source of truth and cannot diverge.
+- **The working buffer** is a non-emptying snapshot of the committed state that a rebase re-applies against the new `base` off-lock, without holding the cell or blocking anyone.
 
-This gives `mergeMempoolState` its two required properties.
+Reconciling the working buffer back into the cell is a single operation, `mergeMempoolState`:
 
-**Performance:** the commit that blocks readers is bounded regardless of occupancy. Driving the real Mempool under concurrent load (full validation costed at 10× re-apply, matching proto-devnet), the maximum reader stall during a rebase stays roughly flat as occupancy grows, versus growing linearly when the whole re-apply is done under the lock:
+- An **add** does its resolve and validate off the cell (the expensive, adversary-facing work) and then commits by appending. Adds are serialised, so each commit is cheap.
+- A **rebase** does its re-application in the working buffer, then runs a **converging loop**: it reads the transactions that arrived meanwhile (the delta) and re-applies only those on top, repeating until the delta is small. The delta shrinks each round, because ingestion pays full validation whereas the rebase only re-applies, which is cheaper per tx, and ingestion is serialised. Only then does it take the cell, fold in a bounded residual, and swap `base`. **The cell is held for a bounded time, independent of `|txs|`.**
 
-| mempool occupancy | re-apply under the lock | off-lock converging loop |
-| ----------------: | ----------------------: | -----------------------: |
-|              ~5k | 143 ms | 53 ms |
-|           ~12–15k | 483–546 ms | 63–112 ms |
-|             ~56k | 2100 ms | 300 ms |
+This gives `mergeMempoolState` its two required properties. For performance, the commit that blocks readers is bounded regardless of occupancy, since the lock is held only for the bounded residual rather than the full re-application. For correctness, the committed state is identical to re-applying all transactions against the new `base` in one pass, because re-apply is an ordered fold and splitting then resuming it yields the same result. Committing through the cell, rather than an optimistic compare-and-swap, means a rebase always makes progress and cannot be starved by a stream of concurrent adds; the cost is that its final commit briefly delays readers, which the bounded residual keeps small.
 
-**Correctness:** the committed state is identical to re-applying all transactions against the new `base` in one pass (re-apply is an ordered fold, so splitting and resuming it yields the same result), and is checked by a parallel linearizability test. Committing through the cell — rather than an optimistic compare-and-swap — means a rebase always makes progress and cannot be starved by a stream of concurrent adds; the cost is that its final commit briefly delays readers, which the bounded residual keeps small.
-
-This is implemented in `ouroboros-consensus` (`Ouroboros.Consensus.Mempool`).
-
-#### Diffusion
-
-Deciding what to accept and diffuse assumes peers agree on `base` and `interval`, but today they do not share that state, so a node cannot distinguish adversarial from honest submissions. The intended direction is to split `TxSubmission` into two protocols — **MempoolSync**, which syncs `MempoolState` between peers, and **TxFetch**, which fetches a transaction by reference — making such behaviour detectable.
-
-### Block production
+#### Cheap ticking
 
 > [!WARNING]
 >
-> FIXME: Move mempool size discussion into section above. Interface between Mempool / BlockForging needs to change -> forge loop needs quick or at least time bound access to txs to be put into a block (+EB in dijkstra)
+> TODO: Not yet implemented; the following sketches the intended design.
+
+`Tick` advances the slot. Time affects a transaction's validity (protocol parameters and the ledger law change at era boundaries) and its applicability (its own slot range, plus epoch-boundary state changes), but **only at epoch boundaries**. The design exploits this with the `interval`: a ~20-slot window between the current tip or epoch start and the next expected block or epoch end. Ticking *within* the interval changes nothing observable to transactions, so it costs nothing; only crossing an epoch boundary forces a re-apply (and a re-validate on a new era). The trade-off is that transactions whose validity range is narrower than the interval are rejected, which is acceptable for a large performance win.
+
+#### Ready-to-forge views
+
+> [!WARNING]
+>
+> TODO: Not yet implemented; the following sketches the intended design.
+
+Removing the lock contention lets forging run concurrently with ingestion and diffusion, but it does not by itself make forging fast: the block producer still needs the transactions applicable at the forging slot, and computing that naively means re-applying the mempool at the moment of forging, the same `O(|txs|)` cost we must keep off the critical path, where only a fraction of a slot is available to produce a block.
+
+The design keeps the transactions in a shape that is immediately forgeable, so that at forge time the block producer only selects transactions and performs the cheap slot-dependent checks (see [ticking](#cheap-ticking-via-validity-ranges)) rather than a full re-application. Under Leios in Dijkstra a block producer issues an EB alongside each RB, and its RB is either a `CertRB` certifying the preceding EB or a `TxRB` carrying transactions directly. Which of the two it issues is only settled at forge time, once it is known whether enough votes for the preceding EB have arrived. The Mempool therefore keeps **two ready-to-forge views**: one for the certifying case, where the certified EB's transactions are already settled and excluded, and one for the non-certifying case, where those transactions are still available. Pre-computing both means neither branch pays a re-application on the critical path.
+
+On the Haskell node this takes two forms:
+
+- a **capped forging snapshot**: obtaining a forging snapshot (via `getSnapshotFor`) can trigger a full revalidation, so a capped variant time- and size-bounds the work done on the critical path, ensuring that producing a snapshot cannot stall behind a large re-application;
+- an **optimistic view**: the block producer forges from the current view rather than first synchronising it to the very latest base, accepting that a tip which arrived moments earlier is picked up on the next block-production opportunity.
+
+### Block production
 
 The existing block production thread must be updated to generate an EB at the same time it generates an RB (**UPD-LeiosAwareBlockProductionThread**). In particular, the hash of the EB is a field in the RB header, and so the RB header can only be decided after the EB is decided, and that can only be after the RB payload is decided. Moreover, the RB payload is either a certificate or transactions, and that must also be decided by this thread, making it intertwined enough to justify doing it in a single thread.
 
 - **REQ-IssueLeiosBlocks** The node must issue an EB alongside each RB it issues, unless that EB would be empty.
 
-The Mempool capacity should be increased (**UPD-LeiosBiggerMempool**) to hold enough valid transactions for the block producer to issue a full EB alongside a full RB. The Mempool capacity should at least be twice the capacity of an EB, so that the stake pool issuing a CertRB for a full EB would still be able to issue a full EB alongside that CertRB (TxRB's have less transaction capacity than the EB certified by a CertRB). In general, SPOs are indirectly incentivized to maximize the size of the EB, just like TxRBs—so that more fees are included in the epoch's reward calculation.
-
 For the block production thread to determine which transactions from a mempool snapshot can go into an RB, which overflow into an EB and how many can fit into the EB, a new capacity measure analogous to the existing `blockCapacityTxMeasure` will be needed for EBs (**NEW-LeiosEbCapacityMeasure**). The EB capacity measure must incorporate the new EB-specific block limit [protocol parameters](#new-protocol-parameters) from the ledger state, much like the existing Praos block capacity is also determined by protocol parameters.
 
-Furthermore, the existing `forgeBlock` method and/or the `BlockForging` interface must be extended (**UPD-LeiosForgeBlock**) to optionally produce an EB for a given block type (`blk`).
+Furthermore, the existing `forgeBlock` method and/or the `BlockForging` interface must be extended (**UPD-LeiosForgeBlock**) to optionally produce an EB for a given block type (`blk`). The transactions to include are prepared by the Mempool ahead of time, see [ready-to-forge views](#ready-to-forge-views).
 
 > [!WARNING]
 >
 > FIXME: also write about including certificates in blocks when available, also link to certification and subsequent sections on chain selection/block validation
-
-The first version of the Mempool can be naive, with the block production thread handling everything. A second version can try to pre-compute in order to avoid delays (ie discarding the certified EB's chunk of transactions) when issuing a CertRB and its announced EB.
 
 ### Endorser block diffusion
 
