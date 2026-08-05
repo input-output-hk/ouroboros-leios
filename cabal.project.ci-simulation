@@ -63,6 +63,14 @@ constraints:
   , any.proto-lens >= 0.7.1.6
   -- plutus-core's `ral` caps QuickCheck < 2.16; pin the whole project there.
   , any.QuickCheck < 2.16
+  -- Without a lower bound, this index-state resolves graphviz-2999.5.0.0
+  -- (a transitive dep, needed by leios-deltaq/betti0's plotting), whose
+  -- Data/GraphViz/Types/Printing.hs fails to compile on GHC 9.10.1:
+  -- `(<>)` is ambiguous between Prelude and Text.PrettyPrint. That module
+  -- doesn't exist any more as of 2999.18 (folded into Data.GraphViz.Printing,
+  -- which correctly picks (<>) from Data.Semigroup/Data.Monoid depending on
+  -- the base version), so pin a lower bound past the refactor.
+  , any.graphviz >= 2999.18
 
 -- See https://github.com/haskell/cabal/issues/11663 ; worked around with these.
 allow-newer:
