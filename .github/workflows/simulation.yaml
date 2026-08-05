@@ -65,7 +65,21 @@ jobs:
 
       - name: 🛠️ Configure
         run: |
-          cabal configure --enable-tests --enable-benchmarks --disable-documentation
+          # Not `cabal configure --enable-tests ...`: that command doesn't
+          # accept a target list and (per its own --help) unconditionally
+          # "checks that there is a consistent set of dependencies for the
+          # project as a whole" — i.e. it solves for every local package,
+          # including the vendored Cardano stack, even though we only ever
+          # build/test $PACKAGES below. Write the same settings it would
+          # have written to cabal.project.local ourselves instead.
+          cat > cabal.project.local << 'EOF'
+          tests: True
+          benchmarks: True
+          documentation: False
+
+          package *
+            documentation: False
+          EOF
           cabal build $PACKAGES --dry-run
         # The last step generates dist-newstyle/cache/plan.json for the cache key.
 
