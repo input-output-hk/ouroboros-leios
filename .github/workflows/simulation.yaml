@@ -28,6 +28,19 @@ jobs:
       matrix:
         os: [macos-14, ubuntu-22.04]
         ghc-version: ["9.10.1"]
+    env:
+      # Build/test only the packages this workflow actually cares about,
+      # by name, instead of `all`. cabal.project also vendors the Cardano
+      # stack (cardano-api, ouroboros-consensus, ...) via
+      # source-repository-package for the Nix-driven trace-verifier build;
+      # `all` treats those as local build targets too, and they need
+      # IOG's patched libsodium/secp256k1 (only available via Nix), which
+      # this plain-cabal job doesn't set up.
+      PACKAGES: ouroboros-leios-sim leios-trace-hs trace-processor leios-deltaq betti0
+      # Unlike `cabal build`, `cabal test` errors on a named target that has
+      # no test suite (whereas `test all` silently skips it), so this list
+      # is narrower. Add a package here once it grows a test suite.
+      TEST_PACKAGES: ouroboros-leios-sim
 
     steps:
       - name: 📥 Checkout repository
@@ -53,7 +66,7 @@ jobs:
       - name: 🛠️ Configure
         run: |
           cabal configure --enable-tests --enable-benchmarks --disable-documentation
-          cabal build all --dry-run
+          cabal build $PACKAGES --dry-run
         # The last step generates dist-newstyle/cache/plan.json for the cache key.
 
       - name: 💾➤ Restore dependency cache
@@ -73,7 +86,7 @@ jobs:
       - name: 🛠️ Install Cabal dependencies
         # If we had an exact cache hit, the dependencies will be up to date.
         if: steps.cache.outputs.cache-hit != 'true'
-        run: cabal build all --only-dependencies
+        run: cabal build $PACKAGES --only-dependencies
 
       # Cache dependencies already here, so that we do not have to rebuild them should the subsequent steps fail.
       - name: ➤💾 Save dependency cache
@@ -85,10 +98,10 @@ jobs:
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
       - name: 🏗️ Build
-        run: cabal build all
+        run: cabal build $PACKAGES
 
       - name: 🏗️ Test
-        run: cabal test all
+        run: cabal test $TEST_PACKAGES
 
   simulation-hlint:
     name: "Check with HLint"
