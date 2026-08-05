@@ -68,27 +68,10 @@ package bitvec
 -- functions we use live in cardano-api.  Pulling cardano-cli forces a newer
 -- io-classes that conflicts with cardano-diffusion (ouroboros-network).
 
--- NOTE: This contains a workaround for the compile error with pango >=1.56.
---       For discussion, see:
---       https://input-output-rnd.slack.com/archives/C074AHSKJF7/p1737132491221259
-source-repository-package
-    type: git
-    location: https://github.com/wenkokke/gtk2hs.git
-    tag: ca7f98bd3e9462deac3661244dc76004a36fc8c3
-    --sha256: 0g5hsjm7bixlwy6m6n98bf8s4khcbg832444w19x35jkjznr2yr1
-    subdir:
-      pango
-
--- NOTE: DeltaQ source is also pinned in flake.nix (deltaq-src input) for the
--- Jupyter kernel in analysis/deltaq/. Keep both pins in sync.
-source-repository-package
-    type: git
-    location: https://github.com/DeltaQ-SD/deltaq.git
-    tag: fd9371d174f6333893274253be11f7ece981cf10
-    --sha256: sha256-9MBLy/E1PySUGmVzkayNxmG0z3a1sTT4RDCqIXNdPcw=
-    subdir:
-      lib/deltaq
-      lib/probability-polynomial
+-- NOTE: The gtk2hs (pango) and DeltaQ source pins that used to live here
+-- moved to cabal.project.ci-simulation: only the (currently trimmed)
+-- simulation/deltaq packages need them, and unused source-repository-package
+-- stanzas break haskell.nix's install-plan processing ("TargetNotLocal").
 
 -- plutus pin matching the w31 node (needed by the bumped cardano-api)
 
@@ -171,16 +154,20 @@ source-repository-package
   location: https://github.com/IntersectMBO/plutus.git
   tag: b1db04cc425fab303ac3b79d7140dc2a17f29e6d
   --sha256: sha256-XtYzjNVx4+IGWpgm+p/YTf56DrJtK0I98umZCTE3U80=
+  -- Subdirs trimmed vs. the node's stanza: plutus-tx-plugin and
+  -- plutus-metatheory are not needed by cardano-api, and their presence
+  -- breaks haskell.nix's install-plan processing (their libs resolve
+  -- non-locally, leaving only "TargetNotLocal" test targets).
   subdir:
     plutus-core
     plutus-ledger-api
     plutus-tx
-    plutus-tx-plugin
-    plutus-metatheory
 
 
 -- cuddle >=1.8 needed by the w31 ledger; CHaP masks Hackage's newer releases
 source-repository-package
   type: git
   location: https://github.com/input-output-hk/cuddle
-  tag: 1.8.1.0
+  -- 1.8.1.0 (tag pinned by commit so haskell.nix can hash-lock the fetch)
+  tag: 416f7aeaa510d4be5ea8f1d26d4cdd5501629058
+  --sha256: sha256-uQk1D1MiCaaoI0XzH4K666UGpHngm0XZDdbiK0+9K2s=

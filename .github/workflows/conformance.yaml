@@ -50,7 +50,11 @@ jobs:
         nix run --show-trace .#test-trace-verifier
     - name: 🔬 Check example trace
       run: |
-        nix run .#ols -- \
+        # The simulator comes from main's flake: the w31-aligned cabal.project
+        # on this branch trims the project to the trace-verifier's needs, so
+        # `.#ols` is not built here (the simulation still pins the older
+        # cardano stack). Hydra caches main's ols build.
+        nix run github:input-output-hk/ouroboros-leios#ols -- \
           sim leios \
           --leios-config-file data/simulation/config.default.yaml \
           --topology-file data/simulation/topo-default-100.yaml \

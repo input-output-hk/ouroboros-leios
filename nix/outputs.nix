@@ -11,6 +11,26 @@ let
   inherit (repoRoot.nix) project agda;
   artifacts = import ./artifacts.nix { inherit pkgs; };
 
+  # haskell.nix's raw project.flake exposes packages/apps under compound
+  # component names (e.g. "trace-parser:exe:linear-leios-trace-verifier").
+  # iogx's mkHaskellProject used to flatten these; now that nix/project.nix
+  # drives haskell.nix directly (see its comment), re-add short aliases for
+  # the names CI, docs, and scripts already reference. Aliases whose package
+  # is absent from the current cabal.project are skipped: the w31-aligned
+  # cabal.project trims the project to the trace-verifier's needs (the
+  # simulation et al. still pin the older cardano stack), so e.g. `ols` is
+  # not built from this flake at the moment.
+  aliasNames = {
+    ols = "ouroboros-leios-sim:exe:ols";
+    linear-leios-trace-verifier = "trace-parser:exe:linear-leios-trace-verifier";
+    linear-leios-trace-verifier-chain = "trace-parser:exe:linear-leios-trace-verifier-chain";
+    test-trace-verifier = "trace-parser:test:test-trace-verifier";
+    leios-trace-processor = "trace-processor:exe:leios-trace-processor";
+  };
+
+  presentAliases =
+    set: lib.filterAttrs (_: v: v != null) (lib.mapAttrs (_: name: set.${name} or null) aliasNames);
+
 in
 
 [
@@ -18,27 +38,8 @@ in
   {
     packages = agda // artifacts;
   }
-  # haskell.nix's raw project.flake exposes packages/apps under compound
-  # component names (e.g. "trace-parser:exe:linear-leios-trace-verifier").
-  # iogx's mkHaskellProject used to flatten these; now that nix/project.nix
-  # drives haskell.nix directly (see its comment), re-add short aliases for
-  # the names CI, docs, and scripts already reference.
   (lib.optionalAttrs (system == "x86_64-linux") {
-    packages = {
-      ols = project.flake.packages."ouroboros-leios-sim:exe:ols";
-      linear-leios-trace-verifier = project.flake.packages."trace-parser:exe:linear-leios-trace-verifier";
-      linear-leios-trace-verifier-chain =
-        project.flake.packages."trace-parser:exe:linear-leios-trace-verifier-chain";
-      test-trace-verifier = project.flake.packages."trace-parser:test:test-trace-verifier";
-      leios-trace-processor = project.flake.packages."trace-processor:exe:leios-trace-processor";
-    };
-    apps = {
-      ols = project.flake.apps."ouroboros-leios-sim:exe:ols";
-      linear-leios-trace-verifier = project.flake.apps."trace-parser:exe:linear-leios-trace-verifier";
-      linear-leios-trace-verifier-chain =
-        project.flake.apps."trace-parser:exe:linear-leios-trace-verifier-chain";
-      test-trace-verifier = project.flake.apps."trace-parser:test:test-trace-verifier";
-      leios-trace-processor = project.flake.apps."trace-processor:exe:leios-trace-processor";
-    };
+    packages = presentAliases project.flake.packages;
+    apps = presentAliases project.flake.apps;
   })
 ]
