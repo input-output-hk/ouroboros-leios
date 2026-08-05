@@ -21,8 +21,11 @@ let
     name = "leios-hs-sources";
     src = ./..;
     patchPhase = ''
-      # The trace verifier package (leios-trace-verifier/dist/haskell) is now
-      # listed directly in cabal.project, so no patching is needed here.
+      # Add the trace verifier package. It's deliberately not listed in the
+      # checked-in cabal.project: that file is also used by plain `cabal
+      # build/test all` (e.g. .github/workflows/simulation.yaml), which has
+      # no Agda toolchain to generate leios-trace-verifier/dist/haskell.
+      sed -i '/^packages:/a\ \ leios-trace-verifier/dist/haskell' cabal.project
       # Clean up troublesome symbolic links.
       rm -r simulation/test/data
       cp -r data simulation/test/

@@ -26,7 +26,13 @@ packages:
   analysis/sims/trace-processor
   analysis/deltaq/linear-leios
   post-cip/tx-measurements/betti0
-  leios-trace-verifier/dist/haskell
+  -- leios-trace-verifier/dist/haskell is generated (Agda -> Haskell via
+  -- `make -C leios-trace-verifier` or the Nix `sources` derivation in
+  -- nix/project.nix) and doesn't exist in a plain checkout. Listing it here
+  -- unconditionally breaks `cabal build/test all` in CI and for anyone
+  -- without Agda installed (see .github/workflows/simulation.yaml, which
+  -- has no Agda toolchain). The Nix build patches it in dynamically
+  -- instead; run `make -C leios-trace-verifier` first to add it locally.
 
 tests: True
 
