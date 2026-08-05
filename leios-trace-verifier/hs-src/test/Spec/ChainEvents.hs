@@ -2,9 +2,10 @@
 
 -- | Parser tests for the node.log 'ChainEvents' extraction, covering both
 --   node trace schemas: the pre-w31 combined @TraceLeiosKernel@ namespace and
---   the w31+ per-event namespaces with RB-keyed votes (resolved via
---   @BlockAnnounced@). Payload shapes mirror
---   @traceLeiosKernelToObject@ (ouroboros-consensus @LeiosDemoTypes@).
+--   the w31+ per-event namespaces with RB-keyed votes. w31+ votes are
+--   resolved via two linkage facts: @AnnouncementAccepted@ (election slot →
+--   ebHash) composed with ChainDB @AddedToCurrentChain@ (rbHash → slot).
+--   Payload shapes mirror real node.log lines.
 module Spec.ChainEvents (
   chainEvents,
 ) where
@@ -15,6 +16,10 @@ import Test.Hspec (Spec, describe, it, shouldBe)
 
 parse :: [BSL8.ByteString] -> [ChainEvent]
 parse = parseNodeLog . BSL8.unlines
+
+-- | A 64-hex-char RB hash (ChainDB's @newtip@ parser requires exactly 64).
+rb64 :: BSL8.ByteString
+rb64 = BSL8.concat (replicate 32 "ab")
 
 chainEvents :: Spec
 chainEvents = do
@@ -47,16 +52,17 @@ chainEvents = do
     it "parses BlockAcquired (real node.log shape)" $
       parse ["{\"at\":\"2026-07-27T08:57:45.5Z\",\"ns\":\"Consensus.LeiosKernel.BlockAcquired\",\"data\":{\"ebHash\":\"a23c6d\",\"ebSlot\":571219,\"kind\":\"LeiosBlockAcquired\"},\"sev\":\"Info\",\"thread\":\"125\",\"host\":\"starbook\"}"]
         `shouldBe` [CEBAcquired "a23c6d" 571219]
-    it "resolves RB-keyed votes via BlockAnnounced" $
+    it "resolves RB-keyed votes via AnnouncementAccepted + AddedToCurrentChain" $
       parse
-        [ "{\"ns\":\"Consensus.LeiosKernel.BlockAnnounced\",\"data\":{\"kind\":\"LeiosBlockAnnounced\",\"rbHash\":\"rb01\",\"ebHash\":\"eb05\",\"ebSlot\":300}}"
-        , "{\"ns\":\"Consensus.LeiosKernel.Voted\",\"data\":{\"kind\":\"LeiosVoted\",\"vote\":{\"rbHash\":\"rb01\",\"voterId\":20},\"weight\":1.22e-2}}"
-        , "{\"ns\":\"Consensus.LeiosKernel.VoteAcquired\",\"data\":{\"kind\":\"LeiosVoteAcquired\",\"vote\":{\"rbHash\":\"rb01\",\"voterId\":32}}}"
+        [ "{\"ns\":\"Consensus.LeiosKernel.AnnouncementAccepted\",\"data\":{\"kind\":\"LeiosAnnouncementAccepted\",\"ebHash\":\"eb05\",\"electionSlot\":300,\"ebBodySize\":70347,\"equivocation\":false}}"
+        , "{\"ns\":\"ChainDB.AddBlockEvent.AddedToCurrentChain\",\"data\":{\"kind\":\"AddedToCurrentChain\",\"newtip\":\"" <> rb64 <> "@300\"}}"
+        , "{\"ns\":\"Consensus.LeiosKernel.Voted\",\"data\":{\"kind\":\"LeiosVoted\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":20},\"weight\":1.22e-2}}"
+        , "{\"ns\":\"Consensus.LeiosKernel.VoteAcquired\",\"data\":{\"kind\":\"LeiosVoteAcquired\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":32}}}"
         ]
         `shouldBe` [CVoted "eb05" 300, CVoteAcquired "eb05" 300]
-    it "keeps unresolved RB-keyed votes visible (RB hash, slot 0)" $
-      parse ["{\"ns\":\"Consensus.LeiosKernel.VoteAcquired\",\"data\":{\"kind\":\"LeiosVoteAcquired\",\"vote\":{\"rbHash\":\"rb99\",\"voterId\":1}}}"]
-        `shouldBe` [CVoteAcquired "rb99" 0]
+    it "drops votes whose linkage is missing (truncated log prefix)" $
+      parse ["{\"ns\":\"Consensus.LeiosKernel.VoteAcquired\",\"data\":{\"kind\":\"LeiosVoteAcquired\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":1}}}"]
+        `shouldBe` []
 
   describe "irrelevant input" $ do
     it "drops other Leios kinds, banners, and junk" $
