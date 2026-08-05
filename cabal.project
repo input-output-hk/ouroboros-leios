@@ -13,19 +13,17 @@ repository cardano-haskell-packages
 -- Aligned with cardano-node leios-prototype so that cardano-api / cardano-cli
 -- (used by the trace verifier) resolve against a mutually-compatible set.
 index-state:
-  , hackage.haskell.org 2026-03-26T20:21:33Z
-  , cardano-haskell-packages 2026-05-02T16:21:41Z
+  , hackage.haskell.org 2026-06-29T22:49:53Z
+  , cardano-haskell-packages 2026-06-29T12:05:19Z
 
 active-repositories:
   , :rest
   , cardano-haskell-packages:override
 
 packages:
-  simulation
+  -- trimmed to the verifier's needs for the w31-aligned build (simulation et
+  -- al. still pin the older stack and over-constrain the solver)
   leios-trace-hs
-  analysis/sims/trace-processor
-  analysis/deltaq/linear-leios
-  post-cip/tx-measurements/betti0
   leios-trace-verifier/dist/haskell
 
 tests: True
@@ -57,43 +55,9 @@ package bitvec
 -- leios-trace-verifier.
 
 -- ouroboros-consensus/leios-prototype
-source-repository-package
-  type: git
-  location: https://github.com/IntersectMBO/ouroboros-consensus
-  tag: e3803b0c86fc0b5f0a7b8f3a977aebf5afe31b8b
-  --sha256: sha256-PxhS4cB4pnP+izLMOTfsyjrEUCsW2aSEMUKl603Bpk4=
-
 -- cardano-ledger/leios-prototype
-source-repository-package
-  type: git
-  location: https://github.com/IntersectMBO/cardano-ledger
-  tag: 4bf2edca4ccbf18d4e2574b1544a2cf7ffc992eb
-  --sha256: sha256-rFFN26bjo0Wji9htl5Bj5Et7m3FsREv72vdP91fo8+o=
-  subdir:
-    libs/cardano-ledger-core
-    eras/dijkstra/impl
-
 -- ouroboros-network/leios-prototype
-source-repository-package
-  type: git
-  location: https://github.com/IntersectMBO/ouroboros-network
-  tag: ff3e39af5aa51d4d89c23c72d67716fd9bfcc516
-  --sha256: sha256-Ctw/Vi8j9KyDtVm0NK+Jk0COtPi1kpL4lHfUF8/eCgI=
-  subdir:
-    ouroboros-network
-    cardano-diffusion
-    network-mux
-
 -- cardano-api/leios-prototype
-source-repository-package
-  type: git
-  location: https://github.com/IntersectMBO/cardano-api
-  tag: 856cb3f2aa11ca78d3fcc6bd20864075bf6e9075
-  --sha256: sha256-TqHVLjYGY73EJDtaWQUi5y6yQZSpngQV3Z+Wu5JYmII=
-  subdir:
-    cardano-api
-    cardano-api-gen
-
 -- NOTE: cardano-cli is intentionally NOT pinned: the leadership-schedule query
 -- functions we use live in cardano-api.  Pulling cardano-cli forces a newer
 -- io-classes that conflicts with cardano-diffusion (ouroboros-network).
@@ -119,3 +83,98 @@ source-repository-package
     subdir:
       lib/deltaq
       lib/probability-polynomial
+
+-- plutus pin matching the w31 node (needed by the bumped cardano-api)
+
+-- === stanzas transplanted verbatim from cardano-node@d697d3a6 (prototype-2026w31) ===
+
+source-repository-package
+  type: git
+  location: https://github.com/IntersectMBO/typed-protocols
+  tag: 9b4627221ae5d649f2303c6926a8dba3f9934658
+  --sha256: sha256-55skVYIR0WjXMwJEirLgF0HFHUpFLBppuV9gvTWqoOI=
+  subdir:
+    typed-protocols
+
+
+source-repository-package
+  type: git
+  location: https://github.com/IntersectMBO/ouroboros-consensus
+  tag: 50c97115f8bc4d11b75d3048e360f4a391aaf9b6
+  --sha256: sha256-LqUz8+YoTjS6rec/hpmg6WqXHwIEl6N8Z8JnQiVuO/0=
+
+
+source-repository-package
+  type: git
+  location: https://github.com/IntersectMBO/cardano-ledger
+  tag: fb8d6f8a83b0efb86281e0b80e7ffba160dad8b1
+  --sha256: sha256-U/vpyZNerL1YXiQg1TIAOL5L438NNE3XkuIYD0HPTJw=
+  subdir:
+    libs/cardano-data
+    libs/cardano-ledger-api
+    libs/small-steps
+    libs/cardano-ledger-binary
+    libs/cardano-ledger-core
+    libs/cardano-protocol-tpraos
+    eras/shelley/impl
+    eras/shelley/test-suite
+    eras/shelley-ma/test-suite
+    eras/mary/impl
+    eras/allegra/impl
+    eras/alonzo/impl
+    eras/alonzo/test-suite
+    eras/babbage/impl
+    eras/conway/impl
+    eras/dijkstra/impl
+
+
+source-repository-package
+  type: git
+  location: https://github.com/IntersectMBO/ouroboros-network
+  tag: 4b3ab7664f609a1aee0f0c24dcfcfd0ab899fc42
+  --sha256: sha256-fIqpI2whstetodpiONmUDVgnhTpzXeq1/gmzuHItK5A=
+  subdir:
+    ouroboros-network
+    cardano-diffusion
+    network-mux
+
+
+source-repository-package
+  type: git
+  location: https://github.com/IntersectMBO/cardano-api
+  tag: 947645ea9c912da13feadc16bef44a7550c3c55b
+  --sha256: sha256-+fIsJuJV4YBSPdVe3wpIxq9lf6nAI5yB7qdzH0iKmrc=
+  subdir:
+    cardano-api
+    cardano-api-gen
+    cardano-rpc
+
+
+source-repository-package
+  type: git
+  location: https://github.com/input-output-hk/kes-agent.git
+  tag: 4e7ec7b5102a030587413f4af770e87a15c9cb9c
+  --sha256: sha256-OUnBy86ny2RHHJZoOXPHeHbYwvWBHmnXoVyQp0FZjEA=
+  subdir:
+    kes-agent
+    kes-agent-crypto
+
+
+source-repository-package
+  type: git
+  location: https://github.com/IntersectMBO/plutus.git
+  tag: b1db04cc425fab303ac3b79d7140dc2a17f29e6d
+  --sha256: sha256-XtYzjNVx4+IGWpgm+p/YTf56DrJtK0I98umZCTE3U80=
+  subdir:
+    plutus-core
+    plutus-ledger-api
+    plutus-tx
+    plutus-tx-plugin
+    plutus-metatheory
+
+
+-- cuddle >=1.8 needed by the w31 ledger; CHaP masks Hackage's newer releases
+source-repository-package
+  type: git
+  location: https://github.com/input-output-hk/cuddle
+  tag: 1.8.1.0
