@@ -11,8 +11,10 @@ repository cardano-haskell-packages
 
 -- See CONTRIBUTING.md for information about when and how to update these.
 index-state:
-  , hackage.haskell.org 2024-10-04T11:45:34Z
-  , cardano-haskell-packages 2024-10-04T09:54:45Z
+  , hackage.haskell.org 2026-05-15T00:00:00Z
+  , cardano-haskell-packages 2026-05-13T16:23:27Z
+
+with-compiler: ghc-9.10
 
 packages:
   simulation
