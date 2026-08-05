@@ -2,6 +2,7 @@
 module Main where
 
 -- import Spec.Generated (generated)
+import Spec.ChainEvents (chainEvents)
 import Spec.Golden (golden)
 import Test.Hspec (describe, hspec)
 
@@ -12,3 +13,4 @@ main =
     -- TODO: port test cases for Short- to Linear Leios
     -- describe "Generated traces" generated
     describe "Golden traces" golden
+    describe "node.log chain events" chainEvents
