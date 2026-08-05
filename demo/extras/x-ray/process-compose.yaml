@@ -40,6 +40,28 @@ processes:
     availability:
       restart: "always"
 
+  # Using caddy server as CORS-enabled proxy of Loki
+  #
+  # The visualizer in ./ui needs CORS in order to use `query_range` endpoint
+  # instead of `tail`. The `tail` endpoint is known to sometimes drop messages,
+  # which leads to nonsensical visualizations such as more receives than sends.
+  LokiCORS:
+    namespace: x-ray
+    command: |
+      set -exuo pipefail;
+
+      # Caddy insists on writable data/config dirs; keep them in WORKING_DIR.
+      export XDG_DATA_HOME="$WORKING_DIR/caddy/data";
+      export XDG_CONFIG_HOME="$WORKING_DIR/caddy/config";
+      mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME";
+
+      caddy run --adapter caddyfile --config "$CADDYFILE";
+    depends_on:
+      Loki:
+        condition: "process_started"
+    availability:
+      restart: "always"
+
   Alloy:
     namespace: x-ray
     command: |

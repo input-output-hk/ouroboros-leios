@@ -39,6 +39,10 @@ fi
 # X-ray observability (on by default, disable with XRAY=0)
 : "${XRAY:=1}"
 : "${XRAY_SOURCE_DIR:="${SOURCE_DIR}/../extras/x-ray"}"
+# Network topology: "mesh" (default, all-to-all) or "line" (Node1-Node2-Node3
+# with no direct Node1<->Node3 edge, so Node2 is the only path between the
+# ends). Opt in with TOPOLOGY=line.
+: "${TOPOLOGY:=mesh}"
 set +a
 
 # Check for required commands
@@ -50,7 +54,7 @@ REQUIRED_COMMANDS=(
   "envsubst"
   "cardano-node"
   "cardano-cli"
-  "tx-centrifuge"
+  "tx-firehose"
 )
 
 MISSING_COMMANDS=()
@@ -119,10 +123,17 @@ for i in "${nodes[@]}"; do
     yq ".TraceOptions.\"\".backends[1] = \"PrometheusSimple 0.0.0.0 $((12900 + "$i"))\"" \
       >"$NODE_DIR/config.yaml"
 
-  # Generate upstream endpoints to other nodes
+  # Generate upstream endpoints. "mesh": every other node. "line": only
+  # adjacent nodes (|i-j| == 1), i.e. Node1-Node2-Node3 with no Node1<->Node3.
+  # These localRoots are the whole enforcement: config.yaml sets
+  # PeerSharing: false with no public/ledger peers, so a node only ever
+  # connects to the peers listed here (re-enabling PeerSharing would let the
+  # line collapse back toward a mesh).
   accessPoints=$(for j in "${nodes[@]}"; do
-    # Except self
-    if [ "$i" -ne "$j" ]; then
+    absdiff=$((i - j))
+    absdiff=${absdiff#-}
+    if { [ "$TOPOLOGY" = "line" ] && [ "$absdiff" -eq 1 ]; } ||
+      { [ "$TOPOLOGY" != "line" ] && [ "$i" -ne "$j" ]; }; then
       port="PORT_NODE$j"
       address="IP_NODE$j"
       echo "{ \"port\": ${!port}, \"address\": \"${!address}\" }"
@@ -145,18 +156,21 @@ for i in "${nodes[@]}"; do
   chmod 400 "$NODE_DIR/keys"/*.skey
 done
 
-# Copy utxo-keys for tx-centrifuge and set permissions
-echo "Setting up utxo-keys for tx-centrifuge"
-cp -r "$CONFIG_DIR/utxo-keys" "$WORKING_DIR/utxo-keys"
-find "$WORKING_DIR/utxo-keys" -name "*.skey" -exec chmod 400 {} \;
-cp -r "$CONFIG_DIR/funds.json" "$WORKING_DIR/funds.json"
-envsubst <"${CONFIG_DIR}/centrifuge.template.json" >"${WORKING_DIR}/centrifuge.json"
+# tx-firehose reads its delegator payment/staking .skey files directly from
+# $SOURCE_DIR/config/stake-delegators/delegator1/ (see process-compose.yaml).
+# No copy or config-file generation needed.
 
 # Configure alloy for x-ray observability (named config.alloy to avoid conflict with alloy/ storage dir)
 export ALLOY_CONFIG="${WORKING_DIR}/config.alloy"
 envsubst <"${CONFIG_DIR}/alloy.template" >"${ALLOY_CONFIG}"
 
+# Shared per-service Alloy enrichment modules that config.alloy imports via
+# import.file. They carry no envsubst vars, so a plain copy suffices.
+mkdir -p "${WORKING_DIR}/alloy-modules"
+cp "${CONFIG_DIR}/alloy-modules/"*.alloy "${WORKING_DIR}/alloy-modules/"
+
 echo "Starting proto-devnet ..."
+echo "  Topology: ${TOPOLOGY}"
 # Traffic control integration
 TC_COMPOSE=()
 if [ "$TC" = "1" ]; then

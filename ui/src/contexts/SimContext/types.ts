@@ -7,6 +7,7 @@ export enum EMessageType {
   RB = "rb",
   Txs = "txs",
   Votes = "votes",
+  Announcement = "announcement",
 }
 
 export enum ActivityAction {
@@ -48,11 +49,20 @@ export interface IChainEB {
   id: string;
   slot: number;
   producer: string;
+  /** On-wire size of the EB body (hash + size table). */
   sizeBytes: number;
-  // FIXME: temporary proxy — count of `Vote` records seen targeting this EB.
-  // Replace with proper sum-of-vote-weights / total-stake once the trace
-  // carries vote weights (especially from the real cardano-node prototype).
+  /** Sum of the referenced txs' bytes — the full tx closure a peer must
+   *  fetch to reconstruct the EB. Prototype only; absent for simulator
+   *  traces. */
+  closureSizeBytes?: number;
+  /** Sum of `Vote.weight` (stake fraction) for votes credited to this EB.
+   *  For sources without per-vote weight, contributions are 1 per vote. */
   voteCount?: number;
+  /** Per-vote records that fed `voteCount`, as carried in the prototype's
+   *  `LeiosVoted` traces. Used to surface a per-voter breakdown in the
+   *  details panel. Empty / absent for simulator traces that aggregate
+   *  votes by EB without preserving individual records. */
+  votes?: IVote[];
 }
 
 export interface IChainState {
@@ -86,6 +96,7 @@ export interface IMessageTypeCounts {
   [EMessageType.EB]: number;
   [EMessageType.Votes]: number;
   [EMessageType.Txs]: number;
+  [EMessageType.Announcement]: number;
 }
 
 export interface IEdgeState {
@@ -103,6 +114,7 @@ export interface ISimulationAggregatedDataState {
   global: ISimulationGlobalData;
   messages: IMessageAnimation[]; // Active messages traveling on the graph
   edges: Map<string, IEdgeState>; // Edge state for coloring based on message priority
+  traversedEdges: Set<string>; // Edge keys that have carried a message (either direction) up to currentTime
   nodeActivity: Map<string, INodeActivityState>; // Node activity state for priority-based coloring
   eventCounts: {
     total: number;
@@ -166,6 +178,10 @@ export interface ISimContextState {
   tracePath: string;
   lokiHost?: string;
   lokiConnectionState: EConnectionState;
+  // Cumulative count of entries Loki's tail handler dropped due to
+  // consumer backpressure; sourced from the `dropped_entries` field on
+  // each WS payload. Reset alongside RESET_TIMELINE.
+  lokiDroppedEntries: number;
   topography: ITransformedNodeMap;
   topologyPath: string;
   topologyLoaded: boolean;
@@ -205,6 +221,7 @@ export type TSimContextActions =
   | { type: "SET_TIMELINE_SPEED"; payload: number }
   | { type: "RESET_TIMELINE" }
   | { type: "SET_LOKI_CONNECTION_STATE"; payload: EConnectionState }
+  | { type: "ADD_LOKI_DROPPED_ENTRIES"; payload: number }
   | { type: "SET_LAYOUT_MODE"; payload: LayoutMode }
   | { type: "SET_NODE_POSITIONS"; payload: Map<string, { fx: number; fy: number }> }
   | { type: "SET_MERCATOR_PARAMS"; payload: MercatorParams | null }

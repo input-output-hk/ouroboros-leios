@@ -1,9 +1,9 @@
 {
   "committee": {
     "members": {
-      "keyHash-0104305319ac0db0b79488982e6f0529e97326606d9fe060fb3d7f48": 293,
-      "keyHash-82027345b779d2735d01034626ad60f493c198dc9d30e689c087f4d2": 293,
-      "keyHash-90ef1da09e08cf6660e833ca057b06a4f30cca5f972683f189a8b587": 293
+      "keyHash-1ca34d7e04e4bca4ef764b0f3decd6835d27d322f9a13e4515022c6d": 293,
+      "keyHash-6deecaddddfe910ff57936b60f8f115425f223b3ee08bd9e93b95ce9": 293,
+      "keyHash-7715990aad65e1f0530c24125b094791ee1f1c76643f3f1632e93a89": 293
     },
     "threshold": {
       "denominator": 3,

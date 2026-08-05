@@ -35,7 +35,7 @@ The security analysis of Linear Leios is based on the following assumptions:
 
 This analysis adopts a stronger version of the first assumption than the CIP requires: every certified EB must reach all honest block-producing nodes by the end of $L_\text{diff}$, i.e., within $\Delta_\text{EB}$ slots of its creation.
 
-$\Delta_\text{EB}$ plays a role in Leios analogous to the $\Delta$ parameter in Ouroboros Praos[^3] - both bound the time within which a message must reach all honest block producers, and a violation in either case can cause a fork. In Leios, if $\Delta_\text{EB}$ is violated, a block producer may receive a new RB carrying a certificate that references an EB the local node has not yet received. That node therefore does not know about the transactions in the EB and has not updated its ledger state accordingly, leading to a divergence in perceived ledger state. The parameter $L_\text{diff}$ is therefore critical: it reserves enough time after a quorum is reached for the EB to finish diffusing to all remaining nodes, during $L_\text{diff}$ no new RB is being added to the chain giving those nodes the opportunity to receive and apply the EB.
+$\Delta_\text{EB}$ plays a role in Leios analogous to the $\Delta$ parameter in Ouroboros Praos[^3] - both bound the time within which a message must reach all honest block producers, and a violation in either case can cause a fork. In Leios, if $\Delta_\text{EB}$ is violated, a block producer may receive a new RB carrying a certificate that references an EB the local node has not yet received. That node therefore does not know about the transactions in the EB and has not updated its ledger state accordingly, leading to a divergence in perceived ledger state. The parameter $L_\text{diff}$ is therefore critical: it reserves enough time after a quorum is reached for the EB to finish diffusing to all remaining nodes.
 
 [^3]: The Praos requirement is that 95% of blocks arrive and are validated within 5 seconds
 
@@ -185,9 +185,9 @@ For an EB with $n$ transaction refereneces, the node fetches all missing transac
 
 Each transaction is a cache hit with rate $p$, or a miss in the TxCache with probability $1 - p$. Again using a mixture model, the CDF for a single transaction is:
 
-$$F_{\text{single}}(t) = \omega_1 \cdot F_{\text{hit}}(t) + \omega_2 \cdot F_{\text{miss}}(t)$$
+$$F_{\text{single}}(t) = \pi_2 \cdot F_{\text{hit}}(t) + \pi_1 \cdot F_{\text{miss}}(t)$$
 
-Here $F_{\text{hit}}(t)$ models a cache lookup as a small constant delay, and $F_{\text{miss}}(t)$ models a network fetch using the Praos diffusion model. The weights $\omega_1$ and $\omega_2$ are steady-state hit and miss rates from a Markov chain, so that the mixture reflects the long-run fraction of transactions handled by each path.
+Here $F_{\text{hit}}(t)$ models a cache lookup as a small constant delay, and $F_{\text{miss}}(t)$ models a network fetch using the Praos diffusion model. The weights $\pi_2$ and $\pi_1$ are steady-state hit and miss rates from a Markov chain, so that the mixture reflects the long-run fraction of transactions handled by each path.
 
 When an EB carries $n$ transactions fetched in parallel, the batch completes when the last one finishes. Since all $n$ transactions must complete by time $t$, the batch CDF is:
 

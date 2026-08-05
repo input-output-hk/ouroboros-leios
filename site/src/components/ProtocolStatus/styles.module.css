@@ -237,7 +237,7 @@
 }
 
 .crossGrid .widget {
-  position: static;
+  position: relative;
   transform: none;
 }
 

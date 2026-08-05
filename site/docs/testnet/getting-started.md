@@ -3,6 +3,9 @@ sidebar_position: 1
 description: Install the Leios node, run a relay, and sync it against the public testnet.
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Install and run a node
 
 :::info Musashi Dōjō
@@ -83,8 +86,8 @@ endorser blocks, as they land.
 | **Bootstrap relay** | `leios-node.play.dev.cardano.org:3001`                                                                   |
 | **Network magic**   | `164`                                                                                                    |
 | **Faucet**          | [faucet.leios.play.dev.cardano.org](https://faucet.leios.play.dev.cardano.org/basic-faucet)              |
-| **Node release**    | [`prototype-2026w25`](https://github.com/input-output-hk/ouroboros-leios/releases/tag/prototype-2026w25) |
-| **Node version**    | reports `cardano-node 11.0.1.164`                                                                        |
+| **Node releases**   | [https://github.com/input-output-hk/ouroboros-leios/releases](https://github.com/input-output-hk/ouroboros-leios/releases) |
+| **Node version**    | reports `cardano-node 11.1.0.164`                                                                        |
 
 ## System requirements
 
@@ -94,7 +97,7 @@ requires a reasonably fast disk:
 
 |               |                                                    |
 |---------------|----------------------------------------------------|
-| **OS / arch** | Linux **x86-64** (to use the prebuilt binaries)    |
+| **OS / arch** | Linux **x86-64**, Linux **aarch64**, or macOS **aarch64** for prebuilt binaries |
 | **CPU**       | 2 cores is fine; more only speeds the initial sync |
 | **RAM**       | 4 GB comfortable (the node uses ~2–2.5 GB)         |
 | **Disk**      | SSD, ~25 GB                                        |
@@ -120,10 +123,10 @@ A few ways to start one — pick whichever fits your setup:
 - **Nix** — one command builds, installs, and runs the node together
   with a Grafana + Loki + Prometheus stack. Every dependency is
   provided.
-- **Prebuilt binaries** — download the statically linked binaries and
-  run them with the repository's launch script. Compatible with the
-  same observability stack if you install the extra tooling, or run
-  the node on its own and bring your own tools.
+- **Prebuilt binaries** — download the release tarball (Linux x86-64,
+  Linux aarch64, or macOS aarch64) and run with the repository's launch script.
+  Compatible with the same observability stack if you install the
+  extra tooling, or run the node on its own and bring your own tools.
 - **Docker** — the same binaries packaged as a container image, for
   setups that already orchestrate nodes that way. No observability
   stack included.
@@ -201,63 +204,109 @@ cardano-node --version   # expect: cardano-node x.y.z.164
 
 ### Prebuilt binaries
 
-The release ships statically linked binaries for **Linux x86-64** — they
-carry all their dependencies inside, so there is nothing else to install
-to run them.
+The release ships a tarball per platform with `cardano-node` and
+`cardano-cli` under `bin/`. On Linux x86-64 and aarch64 the binaries are
+statically linked; on macOS aarch64 the dylib paths are pre-rewritten
+so they run on a stock macOS host. Either way, nothing else needs
+installing.
 
 **1. Pick a working directory.** Everything for this relay — binaries,
 config, database, socket, log — lives here.
 
 ```shell
 export WORKING_DIR=~/leios-testnet
-mkdir -p "$WORKING_DIR/bin"
+mkdir -p "$WORKING_DIR"
 ```
 
-**2. Download the node and CLI, and verify the checksums.**
+**2. Download the release tarball and verify the checksum.**
+
+<Tabs groupId="os">
+<TabItem value="linux" label="Linux x86-64" default>
 
 ```shell
-cd "$WORKING_DIR/bin"
+cd "$WORKING_DIR"
 
-BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w25
-curl -L -O "$BASE/cardano-node"
-curl -L -O "$BASE/cardano-cli"
-curl -L -O "$BASE/SHA256SUMS"
-sha256sum -c SHA256SUMS
+BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w30
+ARCHIVE=cardano-node-leios-x86_64-linux.tar.gz
+CHECKSUM=cardano-node-leios-x86_64-linux.sha256
+curl -L -O "$BASE/$ARCHIVE"
+curl -L -O "$BASE/$CHECKSUM"
+sha256sum -c "$CHECKSUM"
 ```
 
-You should see `cardano-node: OK` and `cardano-cli: OK`. If you see
-`FAILED`, delete the files and download them again.
-
-**3. Put the binaries on your `PATH`.**
+</TabItem>
+<TabItem value="linux-arm64" label="Linux aarch64">
 
 ```shell
-chmod +x cardano-node cardano-cli
+cd "$WORKING_DIR"
+
+BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w30
+ARCHIVE=cardano-node-leios-aarch64-linux.tar.gz
+CHECKSUM=cardano-node-leios-aarch64-linux.sha256
+curl -L -O "$BASE/$ARCHIVE"
+curl -L -O "$BASE/$CHECKSUM"
+sha256sum -c "$CHECKSUM"
+```
+
+</TabItem>
+<TabItem value="macos" label="macOS aarch64">
+
+```shell
+cd "$WORKING_DIR"
+
+BASE=https://github.com/input-output-hk/ouroboros-leios/releases/download/prototype-2026w30
+ARCHIVE=cardano-node-leios-aarch64-darwin.tar.gz
+CHECKSUM=cardano-node-leios-aarch64-darwin.sha256
+curl -L -O "$BASE/$ARCHIVE"
+curl -L -O "$BASE/$CHECKSUM"
+shasum -a 256 -c "$CHECKSUM"
+```
+
+</TabItem>
+</Tabs>
+
+You should see `cardano-node-leios-…tar.gz: OK`. If you see `FAILED`,
+delete the files and download them again.
+
+**3. Extract and put the binaries on your `PATH`.** The tarball
+unpacks straight into `bin/`.
+
+```shell
+tar -xzf "$ARCHIVE"
 export PATH="$WORKING_DIR/bin:$PATH"
 ```
 
 Confirm `cardano-node --version` reports a version with `.164` suffix - this
 marks the Leios prototype build.
 
-**4. Get the testnet configuration.** Clone the repository for the pinned
-config and the launch script:
+**4. Get the testnet configuration.** Fetch the pin script and run it —
+it downloads the `musashi` config (the node configuration
+(`config.json`), topology (`topology.json`) that points at the public
+bootstrap relays, and the era genesis files) from
+[`book.play.dev.cardano.org`](https://book.play.dev.cardano.org/adv-musashi.html)
+into `./config/`. Edit any of these locally if you want to experiment:
 
 ```shell
 cd "$WORKING_DIR"
-git clone --depth 1 https://github.com/input-output-hk/ouroboros-leios
-cd ouroboros-leios/testnet
+curl -LO https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/testnet/pin-config.sh
+bash pin-config.sh
 ```
 
-The `testnet/config/` folder holds everything the node needs to find and
-trust the network: the genesis files, the node configuration
-(`config.json`), and the topology (`topology.json`) that points at the
-public bootstrap relays.
-
-**5. Start the relay.** `run-node.sh` launches a single `cardano-node` as
-a non-producing relay, bound to `0.0.0.0:3010`, picking up `$WORKING_DIR`
-for its database, socket, and log:
+**5. Start the relay.** Launch `cardano-node` as a non-producing relay,
+bound to `0.0.0.0:3010`, with `$WORKING_DIR` holding its database,
+socket, and log:
 
 ```shell
-./run-node.sh
+cd "$WORKING_DIR"
+mkdir -p db
+cardano-node run \
+  --config config/config.json \
+  --topology config/topology.json \
+  --database-path db \
+  --socket-path node.socket \
+  --host-addr 0.0.0.0 \
+  --port 3010 \
+  2>&1 | tee -a node.log
 ```
 
 Within a few seconds you will see the node connect to peers and begin
@@ -274,30 +323,31 @@ or wrap it into a systemd service.
 
 A prebuilt image carrying both `cardano-node` and `cardano-cli` is published for
 each leios prototype release at
-`ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w25`
+`ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w30`
 — useful if you already orchestrate nodes with containers. The image runs as a
 non-block-producing relay out of the box; no observability stack is included.
 
-Pick a host working directory, grab the pinned config from the repo, and run:
+Pick a host working directory, pull the pinned `musashi` config, and start the container mounting both:
 
 ```shell
 export WORKING_DIR=~/leios-testnet
 mkdir -p "$WORKING_DIR"
+cd "$WORKING_DIR"
 
-git clone --depth 1 https://github.com/input-output-hk/ouroboros-leios
-cd ouroboros-leios/testnet
+curl -LO https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/testnet/pin-config.sh
+bash pin-config.sh
 
 docker run -d --name leios-relay \
   -p 3010:3010 \
   -v "$WORKING_DIR:/data" \
-  -v "$PWD/config:/app/config:ro" \
-  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w25
+  -v "$WORKING_DIR/config:/app/config:ro" \
+  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w30
 ```
 
 The `$WORKING_DIR` mount keeps the database, socket (`$WORKING_DIR/node.socket`),
-and log on the host across container restarts. The image also ships the same
-config inside, so the `-v $PWD/config:/app/config:ro` mount is optional — drop it
-to pin to the in-image version.
+and log on the host across container restarts. The image also ships a pinned
+copy of the same config inside, so the `-v $WORKING_DIR/config:/app/config:ro`
+mount is optional — drop it to fall back to the in-image snapshot.
 
 Follow the running container with `docker logs -f leios-relay`.
 
@@ -373,12 +423,15 @@ and gives you:
   the UI rather than tailing files
 - Prometheus metrics for resource usage, mempool depth, and chain tip
 
-To get the same on the **Prebuilt binaries** path, run `./run.sh`
-instead of `./run-node.sh` — it needs extra tools on your `PATH`
-(`process-compose`, `envsubst`, Grafana, Loki, Prometheus); the
-`dev-testnet` Nix dev shell supplies them all. The Docker image
-carries only the binaries; observability there is whatever you wire
-up around it.
+The **Prebuilt binaries** and **Docker** paths bring only the node
+itself; observability there is whatever you wire up around it. If you
+want the same wrapped experience without going all-in on Nix, clone the
+repository and run its
+[`testnet/run.sh`](https://github.com/input-output-hk/ouroboros-leios/blob/prototype-2026w30/testnet/run.sh)
+— a `process-compose` script that boots the node together with Grafana
++ Loki + Prometheus. It needs `process-compose`, `envsubst`, Grafana,
+Loki, and Prometheus on your `PATH`, all of which the `dev-testnet` Nix
+dev shell supplies.
 
 ## What to look for
 
@@ -388,19 +441,20 @@ either through Loki/Grafana, or by tailing `$WORKING_DIR/node.log`
 directly:
 
 ```shell
-tail -f "$WORKING_DIR/node.log" | grep -E 'Leios|CertRB'
+tail -f "$WORKING_DIR/node.log" | grep -E 'Leios'
 ```
 
 Greppable highlights:
 
-- `"kind":"LeiosBlockForged"` / `"kind":"LeiosBlockCertified"` — an
-  endorser block being produced and certified (emitted by block
-  producers; at a relay you see the offers arrive).
+- `"kind":"LeiosBlockForged"` — an endorser block being produced
+  (block-producer side; at a relay you see the announcement propagate).
+- `"kind":"LeiosVoted"` / `"kind":"LeiosNotVoted"` — a voter deciding
+  whether to cast a vote on an endorser block.
+- `"kind":"LeiosCertified"` / `"kind":"LeiosBlockCertified"` — enough
+  votes accumulated to form a certificate for an endorser block, and
+  the certified block being adopted into chain selection.
 - `"kind":"LeiosBlockAcquired"` / `"kind":"LeiosBlockTxsAcquired"` — an
   endorser-block body or its transaction closure arriving from a peer.
-- `"kind":"CertRBStaged"` / `"kind":"CertRBReleased"` — a ranking block
-  held back until its endorser-block closure is local, then released
-  once it arrives.
 
 If you have the [out-of-the-box grafana dashboard](http://localhost:3000/d/gg7w7r/proto-devnet-throughput?orgId=1&from=now-5m&to=now&timezone=browser&refresh=5s&viewPanel=panel-1) or other means to watch the current mempool size, you can see Leios in action:
 

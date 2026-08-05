@@ -79,6 +79,53 @@ def report_assertions(
     else:
         log(f"Leios blocks created: EBs={metrics.leios_ebs_created}")
 
+    # Leios announcement/certification liveness. These assertions deliberately
+    # use all pool log files instead of a single-node filter: the demo's
+    # observability uncovered that activity can be present on a different node.
+    expected_nodes = {"pool1", "pool2", "pool3"}
+    if ANTITHESIS_AVAILABLE:
+        sometimes(
+            metrics.leios_announcements_observed > 0,
+            "Leios block announcements were observed",
+            {
+                "announcements": metrics.leios_announcements_observed,
+                "nodes": sorted(metrics.announcement_nodes),
+            },
+        )
+        sometimes(
+            metrics.leios_certifications_observed > 0,
+            "Leios block certifications were observed",
+            {
+                "certifications": metrics.leios_certifications_observed,
+                "nodes": sorted(metrics.certification_nodes),
+            },
+        )
+        sometimes(
+            expected_nodes <= metrics.announcement_nodes,
+            "Leios announcements were observed on every pool",
+            {
+                "expected_nodes": sorted(expected_nodes),
+                "observed_nodes": sorted(metrics.announcement_nodes),
+            },
+        )
+        sometimes(
+            expected_nodes <= metrics.certification_nodes,
+            "Leios certifications were observed on every pool",
+            {
+                "expected_nodes": sorted(expected_nodes),
+                "observed_nodes": sorted(metrics.certification_nodes),
+            },
+        )
+    else:
+        log(
+            f"  Leios announcements: {metrics.leios_announcements_observed} "
+            f"on {sorted(metrics.announcement_nodes)}"
+        )
+        log(
+            f"  Leios certifications: {metrics.leios_certifications_observed} "
+            f"on {sorted(metrics.certification_nodes)}"
+        )
+
     # Praos blocks flowing assertion
     if ANTITHESIS_AVAILABLE:
         always(
@@ -372,7 +419,9 @@ def main():
                 f"Praos blocks: created={metrics.praos_blocks_created}, received={metrics.praos_blocks_received}"
             )
             log(
-                f"Leios: EBs={metrics.leios_ebs_created}, votes={metrics.leios_votes_created}"
+                f"Leios: EBs={metrics.leios_ebs_created}, votes={metrics.leios_votes_created}, "
+                f"announcements={metrics.leios_announcements_observed}, "
+                f"certifications={metrics.leios_certifications_observed}"
             )
             log(f"Per-pool: {dict(metrics.blocks_created_by_node)}")
             log(

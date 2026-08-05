@@ -3,6 +3,7 @@ limits_config:
   allow_structured_metadata: true
   volume_enabled: true
   max_streams_per_user: 100000
+  max_label_names_per_series: 20
 server:
   http_listen_port: 3100
   log_level: info

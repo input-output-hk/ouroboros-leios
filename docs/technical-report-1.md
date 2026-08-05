@@ -337,23 +337,23 @@ For more details on each parameter, refer to the comments in the
 
 ### Rust simulation
 
-The Rust simulator, found in the [sim-rs/](https://github.com/cardano-scaling/leios-tools/tree/main/sim-rs) folder, contains the
+The Rust simulator, found in the [sim-rs/](https://github.com/input-output-hk/leios-tools/tree/main/sim-rs) folder, contains the
 following crates.
 
 - The `sim-cli` crate provides a command-line interface for controlling the
   simulation.
 - The `sim-core` crate implements the simulation itself.
 
-![Container diagram of Rust simulation](https://raw.githubusercontent.com/cardano-scaling/leios-tools/main/sim-rs/docs/container.png)
+![Container diagram of Rust simulation](https://raw.githubusercontent.com/input-output-hk/leios-tools/main/sim-rs/docs/container.png)
 
 The simulation is partitioned into components that deal with the protocol
 itself, network transport, event logging, and configuration.
 
-![Component diagram of Rust simulation](https://raw.githubusercontent.com/cardano-scaling/leios-tools/main/sim-rs/docs/component.png)
+![Component diagram of Rust simulation](https://raw.githubusercontent.com/input-output-hk/leios-tools/main/sim-rs/docs/component.png)
 
 #### Running the simulator
 
-Execute the following in the [sim-rs/](https://github.com/cardano-scaling/leios-tools/tree/main/sim-rs) folder to run the Rust
+Execute the following in the [sim-rs/](https://github.com/input-output-hk/leios-tools/tree/main/sim-rs) folder to run the Rust
 simulation of Short Leios.
 
 ```sh

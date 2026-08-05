@@ -1,6 +1,6 @@
 # Data processing tool for simulation traces
 
-The `leios-trace-processor` reads simulation trace log files from the Leios [Haskell](../../../simulation/) or [Rust](https://github.com/cardano-scaling/leios-tools/tree/main/sim-rs) simulator, analyzes them, and formats the results as CSV files.
+The `leios-trace-processor` reads simulation trace log files from the Leios [Haskell](../../../simulation/) or [Rust](https://github.com/input-output-hk/leios-tools/tree/main/sim-rs) simulator, analyzes them, and formats the results as CSV files.
 
 
 ## Running the tool

@@ -61,6 +61,11 @@ const config: Config = {
             from: "/docs/development/monthly-reviews",
             to: "/docs/monthly-reviews",
           },
+          // Join the musashi dojo link used in PR (2026-06-26)
+          {
+            from: "/join",
+            to: "https://www.musashi.network/",
+          },
         ],
       },
     ],

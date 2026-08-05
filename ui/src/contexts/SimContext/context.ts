@@ -15,6 +15,7 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
   },
   messages: [],
   edges: new Map(),
+  traversedEdges: new Set(),
   nodeActivity: new Map(),
   eventCounts: {
     total: 0,
@@ -39,6 +40,7 @@ export const defaultState: ISimContextState = {
   tracePath: "",
   lokiHost: undefined,
   lokiConnectionState: EConnectionState.NotConnected,
+  lokiDroppedEntries: 0,
   topography: { links: new Map(), nodes: new Map() },
   topologyPath: "",
   topologyLoaded: false,

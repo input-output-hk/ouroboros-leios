@@ -21,10 +21,15 @@
 /** A single vote as carried in the prototype's `MsgLeiosVotes` payloads. */
 export interface Vote {
   voterId: number;
-  ebHash: string;
-  /** Slot of the EB being voted on (current prototype trace format). */
+  /** Hash of the announcing RB the vote targets. Current prototype shape:
+   *  votes are cast on the RB that announced the EB, not on the EB itself. */
+  rbHash?: string;
+  /** EB hash, carried by simulator traces and by older prototype traces
+   *  (pre-"vote on the announcing RbHash" change). */
+  ebHash?: string;
+  /** Slot of the EB being voted on (older prototype trace format). */
   slot?: number;
-  /** Legacy field name for `slot`, kept for older prototype traces. */
+  /** Legacy field name for `slot`, kept for very old prototype traces. */
   electionId?: number;
   voteSignature?: boolean;
   /** Stake-weighted vote weight, as a fraction of total stake in [0,1].
@@ -79,7 +84,14 @@ export interface UIEBGenerated {
   id: string;
   slot: number;
   producer: string;
+  /** On-wire size of the EB body — the (txHash, txSize) table peers pull
+   *  before fetching the referenced txs. Prototype 'ebSize' on
+   *  `LeiosBlockForged`. */
   size_bytes: number;
+  /** Sum of the referenced txs' byte sizes — how much a peer has to
+   *  download to reconstruct the EB's tx closure. Prototype
+   *  'closureSize' on `LeiosBlockForged`; absent on simulator traces. */
+  closure_size_bytes?: number;
 }
 
 /** Vote-generation event. `VTBundleGenerated` is the simulator name;
@@ -200,6 +212,29 @@ export interface UITxsReceived {
   num_txs?: number;
 }
 
+// --- Network: EB announcements (prototype only) ---------------------------
+
+/** Sent event for a `MsgLeiosBlockAnnouncement` relay hop over LeiosNotify.
+ *  The message is an RB header; `id`/`slot` identify the EB it announces, so
+ *  an announcement's diffusion can be linked to its endorser block. */
+export interface UIAnnouncementSent {
+  type: "AnnouncementSent";
+  /** Hash of the announced EB, extracted from the relayed RB header. */
+  id: string;
+  sender: string;
+  recipient: string;
+  /** Slot of the announced EB. */
+  slot: number;
+}
+
+export interface UIAnnouncementReceived {
+  type: "AnnouncementReceived";
+  id: string;
+  recipient: string;
+  sender?: string;
+  slot: number;
+}
+
 // --- Union ----------------------------------------------------------------
 
 /** Union of every message shape the UI renders. */
@@ -215,7 +250,9 @@ export type UIMessage =
   | UIRBReceived
   | UIEBReceived
   | UIVotesReceived
-  | UITxsReceived;
+  | UITxsReceived
+  | UIAnnouncementSent
+  | UIAnnouncementReceived;
 
 /** Set of `message.type` strings the UI renders — also used by CI to filter
  *  a trace before validating it against this schema. */

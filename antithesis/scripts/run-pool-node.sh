@@ -44,7 +44,8 @@ echo "  PORT: $PORT"
 echo "  HOST_ADDR: $HOST_ADDR"
 echo "  LEIOS_DB_PATH: $LEIOS_DB_PATH"
 
-# Run cardano-node as block producer with pool credentials
+# Keep the full node log on the shared volume. Emitting it on stdout makes
+# Antithesis retain every routine node event in the test-run log stream.
 exec cardano-node run \
 	--config "$DATA_DIR/config.yaml" \
 	--topology "$DATA_DIR/topology.json" \
@@ -55,4 +56,4 @@ exec cardano-node run \
 	--shelley-vrf-key "$DATA_DIR/keys/vrf.skey" \
 	--shelley-kes-key "$DATA_DIR/keys/kes.skey" \
 	--shelley-operational-certificate "$DATA_DIR/keys/opcert.cert" \
-	2>&1 | tee "$LOG_DIR/${POOL_NAME}.log"
+	>> "$LOG_DIR/${POOL_NAME}.log" 2>&1

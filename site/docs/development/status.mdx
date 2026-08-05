@@ -19,105 +19,79 @@ export const stages = [
 
 export const rows = [
   {
-    id: 'multiplexing',
-    name: 'Pros > Leios / Multiplexing',
-    anchor: { x: 140, y: 25 },
+    id: 'praos-leios-prioritization',
+    name: 'Praos > Leios prioritization',
     cells: {
       'Requirements': { mark: 'done' },
-      Prototype: { mark: 'ongoing' },
+      Prototype: { mark: 'done' },
       Design: { mark: 'ongoing' },
-      Implementation: { mark: 'open' },
     },
   },
   {
     id: 'ht-tx-submission',
-    name: 'High-Throughput Tx Submission',
-    anchor: { x: 460, y: 25 },
+    name: 'High-throughput Tx submission',
+    anchor: { x: 160, y: 25 },
     cells: {
+      'Requirements': { mark: 'done' },
       Implementation: { mark: 'ongoing', note: 'V2-undecision' },
     },
   },
   {
     id: 'ht-mempool',
-    name: 'High-Throughput Mempool',
-    anchor: { x: 760, y: 25 },
+    name: 'High-throughput mempool',
+    anchor: { x: 460, y: 25 },
     cells: {
-      'Requirements': { mark: 'ongoing' },
-      Prototype: { mark: 'ongoing' },
-      Design: { mark: 'ongoing' },
+      'Requirements': { mark: 'done' },
+      Design: { mark: 'ongoing', note: 'Design ideas only' },
     },
   },
   {
-    id: 'eb-production',
-    name: 'EB Production',
-    anchor: { x: 430, y: 150 },
+    id: 'block-production',
+    name: 'Block production',
+    anchor: { x: 430, y: 160 },
     cells: {
       'Requirements': { mark: 'done' },
       Prototype: { mark: 'done' },
-      Design: { mark: 'open', note: 'Pre-application' },
+      Design: { mark: 'open', note: 'Announcement & pre-application' },
     },
   },
   {
-    id: 'eb-announcement',
-    name: 'EB Announcement',
-    anchor: { x: 470, y: 190 },
+    id: 'eb-diffusion-storage',
+    name: 'EB diffusion & storage',
+    anchor: { x: 470, y: 280 },
     cells: {
-      'Requirements': { mark: 'done' },
-      Design: { mark: 'open', note: 'Block structure' },
-    },
-  },
-  {
-    id: 'eb-diffusion',
-    name: 'EB Diffusion',
-    anchor: { x: 470, y: 230 },
-    cells: {
-      'Requirements': { mark: 'open' },
+      'Requirements': { mark: 'open', note: 'Delay bounds' },
       Prototype: { mark: 'done' },
       Design: { mark: 'ongoing' },
     },
   },
   {
-    id: 'vote-production',
-    name: 'Vote Production',
-    anchor: { x: 370, y: 410 },
+    id: 'tx-cache',
+    name: 'Transaction cache',
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'open', note: 'Not yet implemented' },
+      Design: { mark: 'done', note: 'Sizing settled' },
+    },
+  },
+  {
+    id: 'voting-certification',
+    name: 'Voting & certification',
+    anchor: { x: 500, y: 410 },
     cells: {
       'Requirements': { mark: 'done' },
       Prototype: { mark: 'done' },
+      Design: { mark: 'done', note: 'Shared with Peras' },
+      Implementation: { mark: 'ongoing', note: 'Cert agg, peer-reviewed' },
     },
   },
   {
-    id: 'vote-diffusion',
-    name: 'Vote Diffusion',
-    anchor: { x: 550, y: 410 },
-    cells: {
-      'Requirements': { mark: 'open' },
-      Prototype: { mark: 'done' },
-    },
-  },
-  {
-    id: 'certification',
-    name: 'Certification',
-    anchor: { x: 850, y: 320 },
-    cells: {
-      'Requirements': { mark: 'done' },
-    },
-  },
-  {
-    id: 'rb-validation',
-    name: 'RB Validation',
+    id: 'block-validation-adoption',
+    name: 'Block validation & adoption',
     anchor: { x: 985, y: 70 },
     cells: {
       'Requirements': { mark: 'done' },
       Prototype: { mark: 'done' },
-      Design: { mark: 'ongoing' },
-    },
-  },
-  {
-    id: 'rb-staging-area',
-    name: 'RB Staging area',
-    anchor: { x: 760, y: 170 },
-    cells: {
-      Prototype: { mark: 'ongoing' },
       Design: { mark: 'ongoing' },
     },
   },
@@ -127,38 +101,66 @@ export const rows = [
     anchor: { x: 980, y: 400 },
     cells: {
       'Requirements': { mark: 'done' },
-    },
-  },
-  {
-    id: 'key-registration',
-    name: 'Key Registration',
-    anchor: { x: 90, y: 200 },
-    cells: {
-      'Requirements': { mark: 'ongoing' },
-      Prototype: { mark: 'ongoing' },
-      Design: { mark: 'ongoing' },
+      Prototype: { mark: 'ongoing', note: 'Baseline via chain selection' },
+      Design: { mark: 'ongoing', note: 'Efficient path' },
     },
   },
   {
     id: 'committee-selection',
-    name: 'Committee Selection',
+    name: 'Committee selection',
     anchor: { x: 230, y: 320 },
     cells: {
       'Requirements': { mark: 'done' },
-      Prototype: { mark: 'done' },
-      Design: { mark: 'open', note: 'Simplified' },
+      Prototype: { mark: 'ongoing', note: 'Interim all-vote' },
+      Design: { mark: 'done', note: 'Simplified truncation' },
+    },
+  },
+  {
+    id: 'key-registration',
+    name: 'Key registration & rotation',
+    anchor: { x: 120, y: 200 },
+    cells: {
+      'Requirements': { mark: 'done' },
+      Design: { mark: 'ongoing' },
+      Implementation: { mark: 'ongoing', note: 'Key-gen CLI only' },
     },
   },
   {
     id: 'crypto',
-    name: 'Crypto primitives',
-    anchor: { x: 140, y: 445 },
+    name: 'Cryptographic primitives',
     cells: {
       'Requirements': { mark: 'done' },
       Prototype: { mark: 'done' },
       Design: { mark: 'done' },
       Implementation: { mark: 'done' },
-      Confidence: { mark: 'done', note: 'Audited' },
+      Confidence: { mark: 'ongoing', note: 'Primitives audited; cert layer peer-reviewed' },
+    },
+  },
+  {
+    id: 'serialization',
+    name: 'Serialization',
+    cells: {
+      'Requirements': { mark: 'done' },
+      Design: { mark: 'done' },
+      Implementation: { mark: 'ongoing' },
+    },
+  },
+  {
+    id: 'protocol-parameters',
+    name: 'New protocol parameters',
+    cells: {
+      'Requirements': { mark: 'done' },
+      Design: { mark: 'ongoing', note: 'Set being finalized' },
+      Implementation: { mark: 'open', note: 'Not implemented yet' },
+    },
+  },
+  {
+    id: 'node-api-config',
+    name: 'Node API & configuration',
+    cells: {
+      'Requirements': { mark: 'done' },
+      Prototype: { mark: 'done', note: 'Inlined-block N2C, on testnet' },
+      Design: { mark: 'ongoing', note: 'New queries to add' },
     },
   },
 ];
@@ -173,23 +175,23 @@ Click or hover a badge for the full breakdown.
 
 ## Full matrix
 
-| Component                     | Requirements CIP | Prototype | Design            | Implementation  | High Confidence |
-|-------------------------------|------------------|-----------|-------------------|-----------------|-----------------|
-| Pros > Leios / Multiplexing   | ✓                | ~         | ~                 | ?               |                 |
-| High-Throughput Tx Submission |                  |           |                   | ~ V2-undecision |                 |
-| High-Throughput Mempool       | ~                | ~         | ~                 |                 |                 |
-| EB Production                 | ✓                | ✓         | ? Pre-application |                 |                 |
-| EB Announcement               | ✓                |           | ? Block structure |                 |                 |
-| EB Diffusion                  | ?                | ✓         | ~                 |                 |                 |
-| Vote Production               | ✓                | ✓         |                   |                 |                 |
-| Vote Diffusion                | ?                | ✓         |                   |                 |                 |
-| Certification                 | ✓                |           |                   |                 |                 |
-| RB Validation                 | ✓                | ✓         | ~                 |                 |                 |
-| RB Staging area               |                  | ~         | ~                 |                 |                 |
-| Catching up                   | ✓                |           |                   |                 |                 |
-| Key Registration              | ~                | ~         | ~                 |                 |                 |
-| Committee Selection           | ✓                | ✓         | ? Simplified      |                 |                 |
-| Crypto primitives             | ✓                | ✓         | ✓                 | ✓               | ✓ Audited       |
+| Component                     | Requirements         | Prototype                      | Design                              | Implementation              | Confidence                                       |
+|-------------------------------|----------------------|--------------------------------|-------------------------------------|-----------------------------|--------------------------------------------------|
+| Praos > Leios prioritization  | ✓                    | ✓                              | ~                                   |                             |                                                  |
+| High-throughput Tx submission | ✓                    |                                |                                     | ~ V2-undecision             |                                                  |
+| High-throughput mempool       | ✓                    |                                | ~ Design ideas only                 |                             |                                                  |
+| Block production              | ✓                    | ✓                              | ? Announcement & pre-application    |                             |                                                  |
+| EB diffusion & storage        | ? Delay bounds       | ✓                              | ~                                   |                             |                                                  |
+| Transaction cache             | ✓                    | ? Not yet implemented          | ✓ Sizing settled                    |                             |                                                  |
+| Voting & certification        | ✓                    | ✓                              | ✓ Shared with Peras                 | ~ Cert agg, peer-reviewed   |                                                  |
+| Block validation & adoption   | ✓                    | ✓                              | ~                                   |                             |                                                  |
+| Catching up                   | ✓                    | ~ Baseline via chain selection | ~ Efficient path                    |                             |                                                  |
+| Committee selection           | ✓                    | ~ Interim all-vote             | ✓ Simplified truncation             |                             |                                                  |
+| Key registration & rotation   | ✓                    |                                | ~                                   | ~ Key-gen CLI only          |                                                  |
+| Cryptographic primitives      | ✓                    | ✓                              | ✓                                   | ✓                           | ~ Primitives audited; cert layer peer-reviewed   |
+| Serialization                 | ✓                    |                                | ✓                                   | ~                           |                                                  |
+| New protocol parameters       | ✓                    |                                | ~ Set being finalized               | ? Not implemented yet       |                                                  |
+| Node API & configuration      | ✓                    | ✓ Inlined-block N2C, on testnet| ~ New queries to add                |                             |                                                  |
 
 | Symbol | Meaning         |
 |--------|-----------------|

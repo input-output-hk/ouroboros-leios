@@ -59,6 +59,19 @@ loki.process "logs" {
       type    = "cardano-node",
     }
   }
+
+  // tx-firehose emits cardano-node-shaped JSON traces, but it is a separate
+  // workload and should not be counted as node traffic in local dashboards.
+  stage.match {
+    selector = `{node="tx-firehose"}`
+
+    stage.static_labels {
+      values = {
+        service = "tx-firehose",
+        type    = "tx-firehose",
+      }
+    }
+  }
 }
 
 // Send to Loki

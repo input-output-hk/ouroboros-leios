@@ -4,6 +4,9 @@ title: Register a stake pool
 description: Register a Leios stake pool (block producer) on the public testnet, magic 164.
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Register a stake pool
 
 This is the second of two guides. It assumes you have already
@@ -14,26 +17,14 @@ follow the chain; registering a **stake pool** lets it forge blocks —
 both ordinary Praos ranking blocks and Leios endorser blocks — and makes
 you a full participant in the Earth-phase work.
 
-:::info About BLS keys — what changes soon
-For the first few days of the testnet, registering a stake pool uses
-**exactly the same method you use on Cardano today** — the keys and
-certificates below. In the coming days the engineering team will release
-a node version that requires stake pools to additionally register a new
-**BLS key**. BLS keys are an essential part of Leios: they are what pools
-use to vote on and certify endorser blocks. When that release lands, this
-guide will add the extra registration step. Until then, the standard flow
-on this page is all you need.
-:::
-
 :::note First, get `cardano-cli` and `cardano-node` on your PATH
 Every command in this guide uses `cardano-cli`, and the final step runs
 `cardano-node` directly — so you need both available.
 
-- **Installed with Nix?** Run everything below from the project's dev
-  shell, which puts the tools on your `PATH`:
+- **Installed with Nix?** Drop into the `dev-testnet` shell, which puts
+  the tools on your `PATH`:
   ```shell
-  cd ~/leios/ouroboros-leios     # the repo you cloned
-  nix develop                    # or `direnv allow`
+  nix develop github:input-output-hk/ouroboros-leios#dev-testnet
   ```
 - **Installed the prebuilt binaries?** They are already on your `PATH` —
   nothing extra to do.
@@ -56,25 +47,22 @@ Every command in this guide uses `cardano-cli`, and the final step runs
   sudo systemctl enable --now chrony
   ```
 
-Keep the environment from the previous guide set in your shell. With
-`CARDANO_NODE_NETWORK_ID` exported, every `cardano-cli` command targets
-magic `164` automatically — no `--testnet-magic` flag needed:
+Keep the environment from the previous guide set in your shell —
+`$WORKING_DIR` points at the relay's working directory, and with
+`CARDANO_NODE_NETWORK_ID` exported every `cardano-cli` command targets
+magic `164` automatically (no `--testnet-magic` flag needed):
 
 ```shell
+export WORKING_DIR=~/leios-testnet         # or wherever you put the relay
 export CARDANO_NODE_NETWORK_ID=164
-export CARDANO_NODE_SOCKET_PATH=~/leios/relay/node.socket
+export CARDANO_NODE_SOCKET_PATH="$WORKING_DIR/node.socket"
 ```
 
-The paths in this guide assume the prebuilt-binary layout from the
-previous guide (socket and config under `~/leios/relay`). If you ran the
-**Nix** relay instead, point `CARDANO_NODE_SOCKET_PATH` — and the genesis
-path in Step 4 — at your `./tmp-testnet` working directory.
-
-Work in a dedicated keys folder and **back it up** — these keys control
-your pool:
+Work in a dedicated keys folder under `$WORKING_DIR` and **back it up** —
+these keys control your pool:
 
 ```shell
-mkdir -p ~/leios/keys && cd ~/leios/keys
+mkdir -p "$WORKING_DIR/keys" && cd "$WORKING_DIR/keys"
 ```
 
 :::note Era command group
@@ -85,7 +73,7 @@ The commands below use the `dijkstra` era command group
 word in these commands to match.
 :::
 
-## Step 1 — Generate payment and stake keys
+## Payment and stake keys
 
 ```shell
 # Payment key pair (holds funds)
@@ -99,7 +87,7 @@ cardano-cli dijkstra stake-address key-gen \
   --signing-key-file stake.skey
 ```
 
-## Step 2 — Build your payment address and fund it
+## Fund a payment address
 
 ```shell
 cardano-cli dijkstra address build \
@@ -120,7 +108,7 @@ cardano-cli dijkstra query utxo --address "$(cat payment.addr)"
 
 You should see one or more UTxO entries (a `TxHash#TxIx` and an amount).
 
-## Step 3 — Generate the node's operational keys
+## Node operational keys
 
 ```shell
 # Cold keys (your pool's identity — keep offline / backed up)
@@ -140,14 +128,26 @@ cardano-cli dijkstra node key-gen-VRF \
   --signing-key-file vrf.skey
 ```
 
-## Step 4 — Issue the operational certificate
+## BLS keys
+
+BLS keys are keys that pools use to vote on and certify endorser blocks.
+You need them to register a Leios-enabled stake pool.
+
+```shell
+# BLS key pair (Leios voting/certification key)
+cardano-cli dijkstra node key-gen-BLS \
+  --verification-key-file bls.vkey \
+  --signing-key-file bls.skey
+```
+
+## Operational certificate
 
 Compute the current KES period from the chain tip and the genesis
 parameter, then issue the certificate that binds your KES key to your
 cold key:
 
 ```shell
-slotsPerKESPeriod=$(jq -r '.slotsPerKESPeriod' ~/leios/relay/shelley-genesis.json)
+slotsPerKESPeriod=$(jq -r '.slotsPerKESPeriod' "$WORKING_DIR/config/shelley-genesis.json")
 slotNo=$(cardano-cli query tip | jq -r '.slot')
 kesPeriod=$(( slotNo / slotsPerKESPeriod ))
 
@@ -159,20 +159,11 @@ cardano-cli dijkstra node issue-op-cert \
   --out-file opcert.cert
 ```
 
-## Step 5 — Register your stake address and pool
+## Register stake address and pool
 
 Two things go on-chain together: your **stake address** (a 2 ada deposit)
 and your **pool** (a 500 ada deposit). Build both certificates, then
 submit them in a single transaction.
-
-:::warning Why `build-raw` and not `build`?
-Normally `transaction build` balances the transaction (fee and change) for
-you. In the **current release** it does *not* support certificate
-transactions in the Dijkstra era — it fails with `Dijkstra cert path not
-yet implemented`. The fix is expected in the next node release, after which
-you can use the simpler `transaction build`. Until then, the steps below
-use `transaction build-raw`, where you set the fee and change yourself.
-:::
 
 Stake-address registration certificate:
 
@@ -190,6 +181,7 @@ public IP (the address other nodes will use to reach it):
 cardano-cli dijkstra stake-pool registration-certificate \
   --cold-verification-key-file cold.vkey \
   --vrf-verification-key-file vrf.vkey \
+  --bls-signing-key-file bls.skey \
   --pool-pledge 1000000000 \
   --pool-cost 170000000 \
   --pool-margin 0.05 \
@@ -200,6 +192,14 @@ cardano-cli dijkstra stake-pool registration-certificate \
   --out-file pool-reg.cert
 ```
 
+:::warning BLS key included but not yet active
+The `cardano-cli` command for creating a pool registration certificate now
+requires a BLS key. The Musashi testnet does not utilize it yet at the time of
+writing, but transactions carrying it are already accepted. Reach out on the
+[Musashi Dōjō Discord](https://discord.gg/Bx2qvsjCte) if you need help to
+register a pool.
+:::
+
 :::tip
 `--pool-pledge 1000000000` is 1000 test ada — a reasonable pledge for a testnet
 pool. `--pool-cost 170000000` (170 ada) and `--pool-margin 0.05` (5%) are
@@ -207,40 +207,19 @@ typical values; adjust to taste. `--pool-relay-port` must match the port
 your node listens on (`3010` by default in this guide).
 :::
 
-Submit both certificates in one transaction. With `build-raw` you choose
-the input, fee, and change yourself. Pull your funded input straight from
-`query utxo` (this assumes a single UTxO at the address — true right after
-the faucet payment):
+Submit both certificates in one transaction. `transaction build` queries
+the node for protocol parameters and your UTxOs to balance the fee and
+return the change automatically — you just pick an input and a change
+address. Pull your funded input straight from `query utxo` (this assumes
+a single UTxO at the address — true right after the faucet payment),
+then sign with three keys (payment, stake, cold) and submit:
 
 ```shell
-UTXO=$(cardano-cli dijkstra query utxo --address "$(cat payment.addr)")
-TXIN=$(echo "$UTXO" | jq -r 'keys[0]')
-FUNDS=$(echo "$UTXO" | jq -r '.[keys[0]].value.lovelace')
+TXIN=$(cardano-cli dijkstra query utxo --address "$(cat payment.addr)" | jq -r 'keys[0]')
 
-FEE=200000             # flat 0.2 ada — ample for this small cert tx
-DEPOSITS=502000000     # 500 ada pool + 2 ada stake
-CHANGE=$(( FUNDS - DEPOSITS - FEE ))
-echo "TXIN=$TXIN  CHANGE=$CHANGE"
-```
-
-:::note Why a flat fee?
-`build-raw` doesn't auto-balance, so you supply the fee yourself. A
-certificate transaction this size needs ~0.18 ada, so a flat **0.2 ada
-(`200000`)** always clears it — you overpay a negligible ~0.02 ada.
-(Computing it with `transaction calculate-min-fee` against a draft tends to
-come out a few hundred lovelace short here, and the node rejects it with
-`FeeTooSmallUTxO`.) Once the next release fixes `transaction build`, it
-computes the exact fee for you.
-:::
-
-Build the transaction, then sign with three keys (payment, stake, cold)
-and submit:
-
-```shell
-cardano-cli dijkstra transaction build-raw \
+cardano-cli dijkstra transaction build \
   --tx-in "$TXIN" \
-  --tx-out "$(cat payment.addr)+$CHANGE" \
-  --fee "$FEE" \
+  --change-address "$(cat payment.addr)" \
   --certificate-file stake-reg.cert \
   --certificate-file pool-reg.cert \
   --out-file pool-reg-tx.raw
@@ -256,14 +235,12 @@ cardano-cli dijkstra transaction submit \
   --tx-file pool-reg-tx.signed
 ```
 
-## Step 6 — Delegate your stake to your pool
+## Delegate stake to your pool
 
 Your pledge only counts once your own stake is delegated to your pool.
-Build a delegation certificate and submit it in its own transaction. Your
-UTxO set changed in Step 5, so the snippet re-queries it for the current
-input. This transaction is signed by two keys (payment, stake) and pays no
-deposit, so the change is simply `funds - fee` — using the same flat
-`FEE=200000`:
+Build a delegation certificate and submit it in its own transaction.
+Your UTxO set changed in the previous step, so the snippet re-queries it
+for the current input. Two signatures here — payment and stake:
 
 ```shell
 cardano-cli dijkstra stake-address stake-delegation-certificate \
@@ -271,17 +248,11 @@ cardano-cli dijkstra stake-address stake-delegation-certificate \
   --cold-verification-key-file cold.vkey \
   --out-file delegation.cert
 
-UTXO=$(cardano-cli dijkstra query utxo --address "$(cat payment.addr)")
-TXIN=$(echo "$UTXO" | jq -r 'keys[0]')
-FUNDS=$(echo "$UTXO" | jq -r '.[keys[0]].value.lovelace')
+TXIN=$(cardano-cli dijkstra query utxo --address "$(cat payment.addr)" | jq -r 'keys[0]')
 
-FEE=200000
-CHANGE=$(( FUNDS - FEE ))
-
-cardano-cli dijkstra transaction build-raw \
+cardano-cli dijkstra transaction build \
   --tx-in "$TXIN" \
-  --tx-out "$(cat payment.addr)+$CHANGE" \
-  --fee "$FEE" \
+  --change-address "$(cat payment.addr)" \
   --certificate-file delegation.cert \
   --out-file delegation-tx.raw
 
@@ -308,50 +279,99 @@ cardano-cli dijkstra stake-pool id --output-bech32 --cold-verification-key-file 
 ```
 :::
 
-## Step 7 — Verify your registration
+## Verify registration
 
-Find your **pool id**, then confirm the pool is on-chain and your stake is
-delegated to it:
+Capture your **pool id** (from the cold key) and your **stake address**:
 
 ```shell
-# Capture your pool id (from the cold key) and stake address
 POOL_ID=$(cardano-cli dijkstra stake-pool id --cold-verification-key-file cold.vkey --output-format hex)
 STAKE_ADDR=$(cardano-cli dijkstra stake-address build --stake-verification-key-file stake.vkey)
 echo "pool id: $POOL_ID"
 echo "stake address: $STAKE_ADDR"
+```
 
-# Is the pool registered on-chain?
+Check the pool is registered on-chain — this should print your pool's
+parameters (pledge, cost, margin, VRF):
+
+```shell
 cardano-cli dijkstra query pool-state --stake-pool-id "$POOL_ID"
+```
 
-# Did the delegation take effect?
+Check the delegation took effect — `stakeDelegation` should point at
+your pool id:
+
+```shell
 cardano-cli dijkstra query stake-address-info --address "$STAKE_ADDR"
 ```
 
-`query pool-state` should return your pool's parameters (pledge, cost,
-margin, VRF). `query stake-address-info` should show a `stakeDelegation`
-pointing at your pool id. If both look right, your pool is registered.
+If both look right, your pool is registered.
 
-## Step 8 — Restart your node as a block producer
+## Restart as block producer
 
 Stop the relay and restart it with the KES key, VRF key, and operational
-certificate so it can forge — this time launching `cardano-node`
-directly (the `nix run` / `run-node.sh` wrappers run a non-producing
-relay only). Run it from your relay's working directory, which holds the
-config and database — `~/leios/relay` if you used the prebuilt binaries,
-or `./tmp-testnet` if you used the Nix relay:
+certificate so it can forge — extending the `cardano-node run`
+invocation from the previous guide (or, on the Nix path, replacing
+`nix run …#leios-testnet-relay` since that wrapper only runs a
+non-producing relay).
+
+:::tip Keep it up
+By now you should have settled on a way to keep the node running in the
+background and watch its uptime — `tmux`/`screen`, a `systemd` unit, or
+the Docker invocation below. A block producer that drifts offline
+silently mints no blocks and earns no rewards, so make sure something is
+watching it.
+:::
+
+Run it from `$WORKING_DIR`, which holds the config and database:
+
+<Tabs groupId="runtime">
+<TabItem value="binary" label="cardano-node" default>
 
 ```shell
+cd "$WORKING_DIR"
 cardano-node run \
-  --config config.json \
-  --topology topology.json \
+  --config config/config.json \
+  --topology config/topology.json \
   --database-path db \
   --socket-path node.socket \
   --host-addr 0.0.0.0 \
   --port 3010 \
-  --shelley-kes-key ~/leios/keys/kes.skey \
-  --shelley-vrf-key ~/leios/keys/vrf.skey \
-  --shelley-operational-certificate ~/leios/keys/opcert.cert
+  --shelley-kes-key keys/kes.skey \
+  --shelley-vrf-key keys/vrf.skey \
+  --shelley-operational-certificate keys/opcert.cert
 ```
+
+</TabItem>
+<TabItem value="docker" label="Docker">
+
+Stop the relay container from the previous guide and start a producer
+that mounts the same `$WORKING_DIR` — reusing the synced database and
+the pinned config under `config/` — plus the keys underneath it:
+
+```shell
+docker rm -f leios-relay
+
+docker run -d --name leios-producer \
+  -p 3010:3010 \
+  -v "$WORKING_DIR:/data" \
+  -w /data \
+  ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w30 \
+  cardano-node run \
+    --config config/config.json \
+    --topology config/topology.json \
+    --database-path db \
+    --socket-path node.socket \
+    --host-addr 0.0.0.0 \
+    --port 3010 \
+    --shelley-kes-key keys/kes.skey \
+    --shelley-vrf-key keys/vrf.skey \
+    --shelley-operational-certificate keys/opcert.cert
+```
+
+Follow it with `docker logs -f leios-producer`.
+
+</TabItem>
+</Tabs>
 
 Once your pool is registered and your node is forging, you are a block
 producer on the testnet. Block production begins after the stake snapshot

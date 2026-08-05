@@ -60,8 +60,17 @@
 }
 
 .heroTitle {
+  font-size: var(--text-7xl);
+  line-height: var(--line-height-xs);
   margin-bottom: 2.5rem !important;
   font-weight: 500;
+  font-family: var(--font-spectral);
+}
+
+@media (max-width: 997px) {
+  .heroTitle {
+    font-size: var(--text-6xl);
+  }
 }
 
 .heroSubtitle {
@@ -192,6 +201,11 @@
   color: rgba(255, 255, 255, 0.9);
 }
 
+.stayUpdToDateHeading {
+  font-family: var(--font-spectral);
+  font-size: var(--text-3xl);
+}
+
 .reviewMeetingContaner {
   position: relative;
   display: flex;
@@ -245,7 +259,7 @@
 .countdown {
   white-space: pre-line;
   font-size: var(--text-2xl);
-  font-family: var(--font-lexend);
+  font-family: var(--font-spectral);
   line-height: var(--text-3xl);
   color: #fff;
   text-decoration: none;

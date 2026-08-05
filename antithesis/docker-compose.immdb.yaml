@@ -29,6 +29,9 @@ x-wan-env-downstream: &wan-env-downstream
   RATE: ${RATE_DOWN_TO_N0:-10Mbps}
   DELAY: ${DELAY_DOWN_TO_N0:-200ms}
 
+x-antithesis-exclude-labels: &antithesis-exclude-labels
+  com.antithesis.exclude_from_faults: "network,kill,pause,stop"
+
 services:
   # ==========================================================================
   # Init Containers
@@ -190,6 +193,7 @@ services:
 
   dingo:
     image: ghcr.io/blinklabs-io/dingo:${DINGO_VERSION:-0.24.1}
+    labels: *antithesis-exclude-labels
     depends_on:
       init-dingo:
         condition: service_completed_successfully
@@ -223,6 +227,7 @@ services:
   # ==========================================================================
   analysis-immdb:
     image: ghcr.io/input-output-hk/ouroboros-leios/antithesis-analysis:${GIT_SHA:-latest}
+    labels: *antithesis-exclude-labels
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.analysis

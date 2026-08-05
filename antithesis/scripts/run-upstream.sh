@@ -29,7 +29,8 @@ echo "  PORT: $PORT"
 echo "  REF_SLOT: $REF_SLOT"
 echo "  ONSET_OF_REF_SLOT: $ONSET_OF_REF_SLOT"
 
-# Run immdb-server with tee to both stdout and log file
+# Keep the full server log on the shared volume instead of emitting every
+# routine event on the Antithesis test-run log stream.
 exec immdb-server \
     --db "$DATA_DIR/immutable/" \
     --config "$DATA_DIR/config.json" \
@@ -39,4 +40,4 @@ exec immdb-server \
     --leios-db "$DATA_DIR/leios.db" \
     --address "0.0.0.0" \
     --port "$PORT" \
-    2>&1 | tee "$LOG_DIR/upstream-node.log"
+    >> "$LOG_DIR/upstream-node.log" 2>&1

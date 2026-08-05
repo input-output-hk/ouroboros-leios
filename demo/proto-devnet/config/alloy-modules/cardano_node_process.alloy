@@ -1,0 +1,85 @@
+// cardano_node_process — cardano-node trace enrichment, service = "cardano-node".
+//
+// Pattern B, drop-first: lines whose service is not cardano-node are dropped up
+// front, so the module only ever touches its own stream. The body is parsed
+// exactly once here; the vote and call facets chained downstream route on the
+// kind label without re-parsing. Downstream is injected via argument.forward_to.
+//
+//   Input  : cardano-node trace JSON {at, sev, ns, data{kind,...}}, service pre-stamped by the front-end.
+//   Output : decoded data as the body, so downstream `| json` sees kind and the rest at top level.
+//   Labels : service=cardano-node, level, sev, ns, kind.
+//   Metrics: none; the chained facets emit their own.
+//   Example input:
+//     {
+//       "at": "...",
+//       "ns": "Mempool.AddedTx",
+//       "data": {
+//         "kind": "TraceMempoolAddedTx",
+//         "mempoolSize": {
+//           "bytes": 163812,
+//           "numTxs": 803
+//         },
+//         "tx": {
+//           "txid": "5292ab63"
+//         }
+//       },
+//       "sev": "Info",
+//       "thread": "1032",
+//       "host": "leios2-rel-b-2"
+//     }
+//
+// host is omitted since it duplicates the base instance label. rbHash and stack
+// are never labelled; they stay in the body for query-time `| json`.
+declare "cardano_node_process" {
+  argument "forward_to" {}
+
+  export "receiver" {
+    value = loki.process.enrich.receiver
+  }
+
+  loki.process "enrich" {
+    stage.match {
+      selector = `{service!="cardano-node"}`
+      action   = "drop"
+    }
+
+    stage.json {
+      expressions = {
+        at   = "at",
+        sev  = "sev",
+        ns   = "ns",
+        kind = "data.kind",
+        data = "data",
+      }
+      drop_malformed = true
+    }
+
+    stage.timestamp {
+      source = "at"
+      format = "RFC3339"
+    }
+
+    stage.labels {
+      values = {
+        level = "sev",
+        sev   = "sev",
+        ns    = "ns",
+        kind  = "kind",
+      }
+    }
+
+    stage.static_labels {
+      values = {
+        service = "cardano-node",
+      }
+    }
+
+    // Republish the decoded `data` object as the body so the vote/call modules
+    // (and query-time `| json`) see kind/vote/event/... at the top level.
+    stage.output {
+      source = "data"
+    }
+
+    forward_to = argument.forward_to.value
+  }
+}
