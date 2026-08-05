@@ -71,13 +71,13 @@ jobs:
           ref: ${{ github.event.inputs.ref || github.ref }}
 
       - name: Install nix
-        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        # Keep the action new enough that its default Nix is >= 2.27.0: the
+        # pinned ouroboros-consensus flake input uses `inputs.self.submodules`
+        # (Nix 2.27.0+, https://github.com/NixOS/nix/pull/12421); older Nix
+        # fails evaluating this flake with "unexpected flake input attribute
+        # 'submodules'". v31.11.0 installs Nix 2.35.1 by default.
+        uses: cachix/install-nix-action@v31.11.0
         with:
-          # Pin a Nix new enough to parse `self.submodules = true` in the
-          # ouroboros-consensus flake input (older Nix rejects it with
-          # "unexpected flake input attribute 'submodules'"). Matches the
-          # version validated locally.
-          install_url: https://releases.nixos.org/nix/nix-2.31.5/install
           extra_nix_config: |
             accept-flake-config = true
             substituters = https://cache.nixos.org https://cache.iog.io
@@ -229,13 +229,13 @@ jobs:
           ref: ${{ github.event.inputs.ref || github.ref }}
 
       - name: Install nix
-        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        # Keep the action new enough that its default Nix is >= 2.27.0: the
+        # pinned ouroboros-consensus flake input uses `inputs.self.submodules`
+        # (Nix 2.27.0+, https://github.com/NixOS/nix/pull/12421); older Nix
+        # fails evaluating this flake with "unexpected flake input attribute
+        # 'submodules'". v31.11.0 installs Nix 2.35.1 by default.
+        uses: cachix/install-nix-action@v31.11.0
         with:
-          # Pin a Nix new enough to parse `self.submodules = true` in the
-          # ouroboros-consensus flake input (older Nix rejects it with
-          # "unexpected flake input attribute 'submodules'"). Matches the
-          # version validated locally.
-          install_url: https://releases.nixos.org/nix/nix-2.31.5/install
           extra_nix_config: |
             accept-flake-config = true
             substituters = https://cache.nixos.org https://cache.iog.io
@@ -402,13 +402,13 @@ jobs:
           ref: ${{ github.event.inputs.ref || github.ref }}
 
       - name: Install nix
-        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        # Keep the action new enough that its default Nix is >= 2.27.0: the
+        # pinned ouroboros-consensus flake input uses `inputs.self.submodules`
+        # (Nix 2.27.0+, https://github.com/NixOS/nix/pull/12421); older Nix
+        # fails evaluating this flake with "unexpected flake input attribute
+        # 'submodules'". v31.11.0 installs Nix 2.35.1 by default.
+        uses: cachix/install-nix-action@v31.11.0
         with:
-          # Pin a Nix new enough to parse `self.submodules = true` in the
-          # ouroboros-consensus flake input (older Nix rejects it with
-          # "unexpected flake input attribute 'submodules'"). Matches the
-          # version validated locally.
-          install_url: https://releases.nixos.org/nix/nix-2.31.5/install
           extra_nix_config: |
             accept-flake-config = true
             substituters = https://cache.nixos.org https://cache.iog.io

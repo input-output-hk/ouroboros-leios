@@ -62,7 +62,7 @@ jobs:
         # (Nix 2.27.0+, https://github.com/NixOS/nix/pull/12421); older Nix
         # fails evaluating this flake with "unexpected flake input attribute
         # 'submodules'". v31.11.0 installs Nix 2.35.1 by default.
-        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
+        uses: cachix/install-nix-action@v31.11.0
         with:
           extra_nix_config: |
             accept-flake-config = true
