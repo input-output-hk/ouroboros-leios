@@ -59,6 +59,13 @@ jobs:
       - name: Install nix
         uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
         with:
+          # install-nix-action@v31 defaults to Nix 2.26.3, which predates the
+          # `inputs.self.submodules` flake attribute (Nix 2.27.0,
+          # https://github.com/NixOS/nix/pull/12421) that the pinned
+          # ouroboros-consensus flake input relies on. Pin explicitly so
+          # evaluating this flake doesn't fail with "unexpected flake input
+          # attribute 'submodules'".
+          install_url: https://releases.nixos.org/nix/nix-2.31.5/install
           extra_nix_config: |
             accept-flake-config = true
             substituters = https://cache.nixos.org https://cache.iog.io
