@@ -186,7 +186,7 @@ data LeadershipOpts = LeadershipOpts
   { loSocketPath :: FilePath
   , loNetworkId :: Api.NetworkId
   , loGenesisFile :: FilePath
-  , loStakePoolId :: Api.PoolId
+  , loStakePoolId :: (Api.Hash Api.StakePoolKey)
   , loVrfSkeyFile :: FilePath
   , loWhich :: WhichEpoch
   }
@@ -281,7 +281,7 @@ queryChain LeadershipOpts{..} = do
 --   @node-i@; the SUT is the pool given by --stake-pool-id, at its natural
 --   index. Relative stakes are scaled to naturals (per billion).
 buildChainData ::
-  Api.PoolId ->
+  (Api.Hash Api.StakePoolKey) ->
   Integer ->
   [Integer] ->
   Map.Map (Api.Hash Api.StakePoolKey) Rational ->
@@ -365,11 +365,11 @@ networkIdParser =
             <$> option auto (long "testnet-magic" <> metavar "NATURAL" <> help "Testnet network magic")
         )
 
-readPoolId :: String -> Either String Api.PoolId
+readPoolId :: String -> Either String (Api.Hash Api.StakePoolKey)
 readPoolId s =
   case Api.deserialiseFromBech32 (T.pack s) of
-    Right (p :: Api.PoolId) -> Right p
+    Right (p :: (Api.Hash Api.StakePoolKey)) -> Right p
     Left _ ->
       case Api.deserialiseFromRawBytesHex (BSC.pack s) of
-        Right (p :: Api.PoolId) -> Right p
+        Right (p :: (Api.Hash Api.StakePoolKey)) -> Right p
         Left e -> Left ("invalid stake pool id: " <> show e)
