@@ -21,15 +21,13 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN || github.token }}
 
       - name: 🔧 Setup Nix
-        uses: cachix/install-nix-action@v24
+        # Keep the action new enough that its default Nix is >= 2.27.0: the
+        # pinned ouroboros-consensus flake input uses `inputs.self.submodules`
+        # (Nix 2.27.0+, https://github.com/NixOS/nix/pull/12421); older Nix
+        # fails evaluating this flake with "unexpected flake input attribute
+        # 'submodules'". v31.11.0 installs Nix 2.35.1 by default.
+        uses: cachix/install-nix-action@v31.11.0
         with:
-          # install-nix-action@v24 defaults to Nix 2.19.1, which predates the
-          # `inputs.self.submodules` flake attribute (Nix 2.27.0,
-          # https://github.com/NixOS/nix/pull/12421) that the pinned
-          # ouroboros-consensus flake input relies on. Pin explicitly so
-          # evaluating this flake doesn't fail with "unexpected flake input
-          # attribute 'submodules'".
-          install_url: https://releases.nixos.org/nix/nix-2.31.5/install
           extra_nix_config: |
             experimental-features = nix-command flakes
 
