@@ -29,13 +29,11 @@ jobs:
         os: [macos-14, ubuntu-22.04]
         ghc-version: ["9.10.1"]
     env:
-      # Build/test only the packages this workflow actually cares about,
-      # by name, instead of `all`. cabal.project also vendors the Cardano
-      # stack (cardano-api, ouroboros-consensus, ...) via
-      # source-repository-package for the Nix-driven trace-verifier build;
-      # `all` treats those as local build targets too, and they need
-      # IOG's patched libsodium/secp256k1 (only available via Nix), which
-      # this plain-cabal job doesn't set up.
+      # Build/test only the packages this workflow actually cares about, by
+      # name, instead of `all` (which would also pull in ouroboros-network,
+      # gtk2hs, and deltaq's own test/exe components — see the "Use
+      # cabal.project.ci-simulation" step below for why the Cardano stack
+      # itself isn't even an option here).
       PACKAGES: ouroboros-leios-sim leios-trace-hs trace-processor leios-deltaq betti0
       # Unlike `cabal build`, `cabal test` errors on a named target that has
       # no test suite (whereas `test all` silently skips it), so this list
@@ -45,6 +43,28 @@ jobs:
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
+
+      - name: 🛠️ Use cabal.project.ci-simulation (no Cardano stack)
+        # cabal.project vendors cardano-api/cardano-ledger/ouroboros-consensus
+        # via source-repository-package for the Nix-driven trace-verifier
+        # build. cabal always solves *every* local package regardless of the
+        # requested build target — so as long as those are part of the
+        # project at all, `cabal build` (even scoped to $PACKAGES) tries to
+        # solve them too and fails, since cardano-crypto-praos needs IOG's
+        # patched libsodium via pkg-config, which only the Nix build
+        # provides:
+        #
+        #   Error: [Cabal-7107]
+        #   Could not resolve dependencies:
+        #   [__0] trying: cardano-api-11.0.0.0 (user goal)
+        #   ...
+        #   [__2] rejecting: cardano-crypto-praos-2.2.2.0 (conflict:
+        #         pkg-config package libsodium-any, not found in the
+        #         pkg-config database)
+        #
+        # cabal.project.ci-simulation mirrors cabal.project but omits those
+        # entries entirely, so they're never part of the project to solve.
+        run: cp cabal.project.ci-simulation cabal.project
 
       - name: 🛠️ Install GHC ${{ matrix.ghc-version }}
         uses: haskell-actions/setup@v2
@@ -68,10 +88,10 @@ jobs:
           # Not `cabal configure --enable-tests ...`: that command doesn't
           # accept a target list and (per its own --help) unconditionally
           # "checks that there is a consistent set of dependencies for the
-          # project as a whole" — i.e. it solves for every local package,
-          # including the vendored Cardano stack, even though we only ever
-          # build/test $PACKAGES below. Write the same settings it would
-          # have written to cabal.project.local ourselves instead.
+          # project as a whole" — i.e. it solves for every local package
+          # even though we only ever build/test $PACKAGES below. Write the
+          # same settings it would have written to cabal.project.local
+          # ourselves instead.
           cat > cabal.project.local << 'EOF'
           tests: True
           benchmarks: True
