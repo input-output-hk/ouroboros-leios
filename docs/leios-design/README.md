@@ -529,6 +529,8 @@ That very size is also what creates the challenge: the Mempool now holds roughly
 
 The solution is a threefold design: removing the lock contention so that accepting, diffusing and forging proceed concurrently (the *double-buffered mempool*), exploiting transaction validity ranges to make advancing the slot cheap, and keeping ready-to-forge views so that block production never re-applies the whole mempool on the critical path. The data structures and function names below track the `ouroboros-consensus` implementation and may evolve.
 
+![](./mempool-component-diagram.svg)
+
 #### Double-buffering
 
 A transaction is fully validated only once, when it is first admitted (`applyTx`), and thereafter only re-applied against a changed base (`reapplyTx`), which is far cheaper because it reuses that validation and only re-checks that the transaction still applies (see [Transaction validation levels](#transaction-validation-levels)).
@@ -568,6 +570,10 @@ Both mutations commit through one operation, which reconciles the state they pre
 - `Rebase` re-applies all `txs` off screen, then runs a **converging loop**: it reads the transactions that landed on screen meanwhile (the delta) and re-applies only those on top, repeating until the delta drops below a target size or a maximum number of iterations is reached. The delta tends to shrink each round, because ingestion pays full validation whereas `Rebase` only re-applies, which is cheaper per tx, and ingestion is serialised; but a steady stream of adds could keep it from ever reaching zero, so the iteration cap guarantees the loop always terminates. Only then does it take the on-screen buffer, re-apply that small residual under the lock, and flip to the new `base`. Since the residual never exceeds the target size (or the cap), the screen is held for a bounded time, independent of `|txs|`.
 
 The result is still correct: the on-screen state is identical to re-applying all transactions against the new `base` in one pass, because re-apply is an ordered fold and splitting then resuming it yields the same result. And committing through the blocking flip, rather than an optimistic compare-and-swap, keeps a rebase always making progress, never starved by a stream of concurrent adds.
+
+> [!WARNING]
+>
+> TODO: Shouldn't we be more confident that our own constructed block is valid?
 
 One mutation breaks the purely additive picture the converging loop relies on. `Remove` force-drops a given set of transactions *even though they are still valid*. It exists only for a rare inconsistency: the node forged a block the ledger then rejected, so those transactions must leave the Mempool or they would be forged into the same rejected block again. A `Rebase` cannot stand in for it, since re-application would find the transactions valid (that is how they entered a block in the first place) and, the block having not been adopted, there is no new `base` to rebase onto. Because `Remove` deletes rather than appends, an in-flight `Rebase` that snapshotted before it would resurrect the deleted transactions when it flips. The double-buffer keeps the loop additive by **preempting**: a `Remove` commits on screen and restarts any in-flight `Rebase` from a fresh, post-removal snapshot. This is cheap precisely because `Remove` is a rare recovery action, never the normal way forged transactions leave the Mempool (that is an ordinary `Rebase` once the node adopts its own block); were removals to become frequent, replaying an additions-and-removals log during the rebase would be preferable to restarting it.
 
