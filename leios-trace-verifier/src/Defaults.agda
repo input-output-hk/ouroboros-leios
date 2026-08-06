@@ -367,5 +367,7 @@ d-SpecStructure = record
       ; KF                        = d-KeyRegistrationFunctionality
       ; va                        = d-VotingAbstract
       ; getEBCert                 = λ _ → []
-      ; validityCheckTime         = λ _ → 4
+      ; validityCheckTime         = λ _ → 3
+      -- 3 matches the w31 node: it votes at exactly ebSlot + 3 slots
+      -- (= 3·Lhdr ⊔ validityCheckTime with Lhdr = 1), observed on Musashi.
       }
