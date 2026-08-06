@@ -539,7 +539,7 @@ This asymmetry is currently used by the mempool, and the double-buffering design
 >
 > TODO: Re-application can still reach the on-disk ledger today. Deliberately keeping a mempool transaction's resolved data cache-local would keep rebase off the disk entirely.
 
-Model the Mempool as a single shared state, read by many and mutated by only two operations. The state is a set of transactions applied on top of a ledger state:
+Model the Mempool as a single shared state, read by many and mutated by a few operations. The state is a set of transactions applied on top of a ledger state:
 
 ```haskell
 data MempoolState = MempoolState
@@ -550,6 +550,7 @@ data MempoolState = MempoolState
 data MempoolAction
   = AddTx  Tx           -- validate and apply a new tx (~1000/s)
   | Rebase LedgerState  -- re-apply all txs onto a new base (a few per 20s)
+  | Remove [TxId]       -- force-drop txs to recover from forging a rejected block (rare)
 ```
 
 Reading dominates and must never block: diffusion continuously serves `txs` to peers, and block production draws from them to fill blocks. Against that steady stream of reads, the two mutations are comparatively rare. `AddTx` validates and applies a peer's or client's transaction against `base` (`applyTx`) and appends it. `Rebase` takes a new `base` from chain selection and re-applies (`reapplyTx`) every transaction onto it. The invariant both preserve is that a transaction is in `txs` exactly when it is valid and applicable to `base`, which is also the Mempool's core question: which transactions to accept, diffuse, and allow into a block.
@@ -567,6 +568,8 @@ Both mutations commit through one operation, which reconciles the state they pre
 - `Rebase` re-applies all `txs` off screen, then runs a **converging loop**: it reads the transactions that landed on screen meanwhile (the delta) and re-applies only those on top, repeating until the delta drops below a target size or a maximum number of iterations is reached. The delta tends to shrink each round, because ingestion pays full validation whereas `Rebase` only re-applies, which is cheaper per tx, and ingestion is serialised; but a steady stream of adds could keep it from ever reaching zero, so the iteration cap guarantees the loop always terminates. Only then does it take the on-screen buffer, re-apply that small residual under the lock, and flip to the new `base`. Since the residual never exceeds the target size (or the cap), the screen is held for a bounded time, independent of `|txs|`.
 
 The result is still correct: the on-screen state is identical to re-applying all transactions against the new `base` in one pass, because re-apply is an ordered fold and splitting then resuming it yields the same result. And committing through the blocking flip, rather than an optimistic compare-and-swap, keeps a rebase always making progress, never starved by a stream of concurrent adds.
+
+One mutation breaks the purely additive picture the converging loop relies on. `Remove` force-drops a given set of transactions *even though they are still valid*. It exists only for a rare inconsistency: the node forged a block the ledger then rejected, so those transactions must leave the Mempool or they would be forged into the same rejected block again. A `Rebase` cannot stand in for it, since re-application would find the transactions valid (that is how they entered a block in the first place) and, the block having not been adopted, there is no new `base` to rebase onto. Because `Remove` deletes rather than appends, an in-flight `Rebase` that snapshotted before it would resurrect the deleted transactions when it flips. The double-buffer keeps the loop additive by **preempting**: a `Remove` commits on screen and restarts any in-flight `Rebase` from a fresh, post-removal snapshot. This is cheap precisely because `Remove` is a rare recovery action, never the normal way forged transactions leave the Mempool (that is an ordinary `Rebase` once the node adopts its own block); were removals to become frequent, replaying an additions-and-removals log during the rebase would be preferable to restarting it.
 
 #### Cheap ticking
 
