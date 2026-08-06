@@ -59,6 +59,15 @@ let
     };
     name = "ouroboros-leios";
     compiler-nix-name = lib.mkDefault "ghc9101";
+    modules = [
+      {
+        # cardano-rpc (a subdir of the cardano-api pin) depends on
+        # proto-lens-protobuf-types, whose Setup.hs runs protoc at build time.
+        packages.proto-lens-protobuf-types.components.library.build-tools = [
+          pkgs.buildPackages.protobuf
+        ];
+      }
+    ];
     # Development shell. Replaces iogx's mkHaskellProject + shellArgs: the modern
     # haskell.nix flake API ('flake'' / devShells) is incompatible with the iogx
     # version pinned here (it calls haskell.nix's mkFlake with the obsolete
