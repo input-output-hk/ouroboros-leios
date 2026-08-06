@@ -566,21 +566,13 @@
           },
           "unit": "s",
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
+          "thresholds": {}
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "age Node1"
+              "options": "age node1"
             },
             "properties": [
               {
@@ -595,7 +587,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "age Node2"
+              "options": "age node2"
             },
             "properties": [
               {
@@ -610,7 +602,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "age Node3"
+              "options": "age node3"
             },
             "properties": [
               {
@@ -672,7 +664,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{kind=\"LeiosAnnouncementAccepted\"} | json age=\"announcementAgeSeconds\" | age != \"\"",
+          "expr": "{kind=\"LeiosAnnouncementAccepted\"} | json age=\"announcementAgeSeconds\", source=\"source\" | source != \"receivedViaChainSync\" | age != \"\"",
           "legendFormat": "{{instance}}",
           "queryType": "range",
           "refId": "A"
