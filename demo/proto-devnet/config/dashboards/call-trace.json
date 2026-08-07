@@ -534,8 +534,8 @@
         "showHeader": true,
         "sortBy": [
           {
-            "desc": true,
-            "displayName": "duration"
+            "desc": false,
+            "displayName": "Time"
           }
         ]
       },
@@ -561,7 +561,22 @@
           "options": {
             "delimiter": ",",
             "format": "json",
+            "jsonPaths": [],
             "source": "Line"
+          }
+        },
+        {
+          "id": "extractFields",
+          "options": {
+            "delimiter": ",",
+            "format": "json",
+            "jsonPaths": [
+              {
+                "alias": "instance",
+                "path": "instance"
+              }
+            ],
+            "source": "labels"
           }
         },
         {
@@ -585,53 +600,70 @@
           "options": {
             "excludeByName": {
               "Line": true,
+              "allocations 1": true,
+              "allocations 2": true,
               "argument": false,
               "argument_ebHash": true,
               "argument_ebSlot": true,
+              "child_id 1": true,
+              "child_id 2": true,
               "detected_level": true,
+              "duration 1": true,
+              "duration 2": true,
               "filename": true,
               "function": true,
               "host": true,
               "id": false,
               "id 1": true,
+              "id 2": false,
+              "id 3": true,
               "kind": true,
               "kind_extracted": true,
               "labelTypes": true,
               "labels": true,
               "level": true,
+              "name_extracted": true,
               "ns": true,
+              "parent_id 1": true,
+              "parent_id 2": true,
+              "process": true,
               "ptrace_call_stack": true,
               "ptrace_event": true,
               "ptrace_function": true,
               "ptrace_thread": true,
               "replica": true,
+              "result": false,
               "service": true,
               "service_name": true,
               "sev": true,
+              "stack_extracted": true,
+              "thread_extracted": true,
               "tsNs": true,
               "type": true
             },
             "includeByName": {},
             "indexByName": {
-              "Line": 13,
+              "Line": 14,
               "Time": 1,
-              "allocations": 8,
-              "argument": 5,
-              "child_id": 10,
-              "duration": 7,
-              "event": 2,
-              "id 1": 17,
-              "id 2": 12,
-              "kind": 16,
-              "labelTypes": 15,
+              "allocations": 10,
+              "argument": 6,
+              "child_id": 13,
+              "duration": 9,
+              "event": 4,
+              "id 1": 18,
+              "id 2": 11,
+              "instance": 2,
+              "kind": 17,
+              "labelTypes": 16,
               "labels": 0,
-              "name": 4,
-              "parent_id": 11,
-              "result": 6,
-              "stack": 9,
+              "name": 5,
+              "parent_id": 12,
+              "result": 8,
+              "stack": 7,
               "thread": 3,
-              "tsNs": 14
+              "tsNs": 15
             },
+            "orderByMode": "manual",
             "renameByName": {
               "Time": "",
               "id 2": "id",
