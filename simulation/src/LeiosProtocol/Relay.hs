@@ -31,6 +31,7 @@ import Control.DeepSeq (NFData)
 import Control.Exception (Exception, assert, throw)
 import Control.Monad (forM_, join, unless, void, when)
 import Control.Monad.Class.MonadAsync (MonadAsync)
+import Control.Monad.Class.MonadThrow (MonadEvaluate)
 import Data.Bits (Bits, FiniteBits (..))
 import qualified Data.Foldable as Foldable
 import Data.Kind (Type)
@@ -398,7 +399,7 @@ newtype RelayProducerSharedState id header body m = RelayProducerSharedState
   }
 
 runRelayProducer ::
-  (Ord id, MonadSTM m, MonadDelay m) =>
+  (Ord id, MonadSTM m, MonadDelay m, MonadEvaluate m) =>
   RelayConfig ->
   RelayProducerSharedState id header body m ->
   Chan m (RelayMessage id header body) ->
@@ -536,7 +537,7 @@ data RelayConsumerSharedState id header body m = RelayConsumerSharedState
   }
 
 runRelayConsumer ::
-  (Ord id, MonadSTM m, MonadAsync m, MonadDelay m, MonadTime m) =>
+  (Ord id, MonadSTM m, MonadAsync m, MonadDelay m, MonadEvaluate m, MonadTime m) =>
   RelayConsumerConfig id header body m ->
   RelayConsumerSharedState id header body m ->
   Chan m (RelayMessage id header body) ->

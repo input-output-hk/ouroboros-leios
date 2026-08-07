@@ -218,7 +218,12 @@ jobs:
           path: site/static/mempool-viz
 
       - name: 🔧 Setup Nix
-        uses: cachix/install-nix-action@v24
+        # Keep the action new enough that its default Nix is >= 2.27.0: the
+        # pinned ouroboros-consensus flake input uses `inputs.self.submodules`
+        # (Nix 2.27.0+, https://github.com/NixOS/nix/pull/12421); older Nix
+        # fails evaluating this flake with "unexpected flake input attribute
+        # 'submodules'". v31.11.0 installs Nix 2.35.1 by default.
+        uses: cachix/install-nix-action@v31.11.0
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes

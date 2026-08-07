@@ -39,42 +39,48 @@
           # node and CLI, and is consumed by the Antithesis devnet image.
           tx-firehose-static = muslJobs.tx-firehose;
         }
-        // lib.optionalAttrs (lib.elem system [ "x86_64-linux" "aarch64-linux" ]) {
+        //
+          lib.optionalAttrs
+            (lib.elem system [
+              "x86_64-linux"
+              "aarch64-linux"
+            ])
+            {
 
-          # Streamed layered image: `nix build .#cardano-node-leios-image`
-          # produces a script that, when run, writes the image tarball to
-          # stdout. Typical use:
-          #
-          #   $(nix build .#cardano-node-leios-image --print-out-paths) | docker load
-          #
-          # The image carries only the two binaries plus minimal /etc
-          # files (ca-certs, /etc/passwd, /etc/group, tmp dirs). No shell,
-          # no package manager — overlays add what they need.
-          cardano-node-leios-image = pkgs.dockerTools.streamLayeredImage {
-            name = "cardano-node-leios";
-            tag = "latest";
-            contents = [
-              muslJobs.cardano-node
-              muslJobs.cardano-cli
-              # ca-certificates for TLS to bootstrap relays / Hydra / etc.
-              pkgs.cacert
-              # /etc/passwd + /etc/group + /tmp so things that expect a
-              # POSIX-ish layout don't fall over.
-              pkgs.dockerTools.fakeNss
-              # Shell + core utils so derived Dockerfiles can RUN chmod /
-              # mkdir / etc., and for ad-hoc debugging via `docker exec`.
-              pkgs.bashInteractive
-              pkgs.coreutils
-            ];
-            config = {
-              Entrypoint = [ "/bin/cardano-node" ];
-              Env = [
-                "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
-                "PATH=/bin"
-              ];
-            };
-          };
-        }
+              # Streamed layered image: `nix build .#cardano-node-leios-image`
+              # produces a script that, when run, writes the image tarball to
+              # stdout. Typical use:
+              #
+              #   $(nix build .#cardano-node-leios-image --print-out-paths) | docker load
+              #
+              # The image carries only the two binaries plus minimal /etc
+              # files (ca-certs, /etc/passwd, /etc/group, tmp dirs). No shell,
+              # no package manager — overlays add what they need.
+              cardano-node-leios-image = pkgs.dockerTools.streamLayeredImage {
+                name = "cardano-node-leios";
+                tag = "latest";
+                contents = [
+                  muslJobs.cardano-node
+                  muslJobs.cardano-cli
+                  # ca-certificates for TLS to bootstrap relays / Hydra / etc.
+                  pkgs.cacert
+                  # /etc/passwd + /etc/group + /tmp so things that expect a
+                  # POSIX-ish layout don't fall over.
+                  pkgs.dockerTools.fakeNss
+                  # Shell + core utils so derived Dockerfiles can RUN chmod /
+                  # mkdir / etc., and for ad-hoc debugging via `docker exec`.
+                  pkgs.bashInteractive
+                  pkgs.coreutils
+                ];
+                config = {
+                  Entrypoint = [ "/bin/cardano-node" ];
+                  Env = [
+                    "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
+                    "PATH=/bin"
+                  ];
+                };
+              };
+            }
         //
           lib.optionalAttrs
             (lib.elem system [

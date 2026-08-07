@@ -16,9 +16,31 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs";
 
-    iogx.url = "github:input-output-hk/iogx";
+    # Keep iogx's API (mkHaskellProject), but bump its pinned package indices
+    # forward to 2026 so cardano-api / cardano-cli (leios-prototype) resolve.
+    # Without this, plan-to-nix silently falls back to the ~2024-11 index.
+    iogx = {
+      url = "github:input-output-hk/iogx";
+      inputs = {
+        # Snapshots must be at/after cabal.project's index-states
+        # (hackage 2026-06-29T22:49:53Z / CHaP 2026-06-29T12:05:19Z, the
+        # prototype-2026w31 node's pins).
+        CHaP.url = "github:intersectmbo/cardano-haskell-packages/3ee6b1ecce230d62f0083590f38c4ae3457da226";
+        # The old haskell.nix can't consume the 2026 hackage.nix; bump it too.
+        haskell-nix = {
+          url = "github:input-output-hk/haskell.nix/ef52c36b9835c77a255befe2a20075ba71e3bfab";
+          inputs.hackage.url = "github:input-output-hk/hackage.nix/be6128e4463955ebc0e3eb04edfbe23ebe22b1c3";
+        };
+        # Some Nix versions resolve the nested override above as iogx's
+        # declared `follows = "hackage"` instead, re-locking
+        # haskell-nix/hackage to iogx's own hackage pin. Pin that one to the
+        # same snapshot so both resolutions agree (otherwise plan-to-nix
+        # fails: index older than cabal.project's index-state).
+        hackage.url = "github:input-output-hk/hackage.nix/be6128e4463955ebc0e3eb04edfbe23ebe22b1c3";
+      };
+    };
 
-    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=a654a1761476fcf8e6a43aeedbc1455bd7ad77db";
+    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=1f8afb1276183d2cb19bb88e31d0d593dee1ab82";
 
     flake-parts.url = "github:hercules-ci/flake-parts";
 
