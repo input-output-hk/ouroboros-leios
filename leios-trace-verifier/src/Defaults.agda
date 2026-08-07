@@ -43,7 +43,8 @@ open Equivalence
 
 module Defaults
   (params : Params) (let open Params params)
-  (testParams : TestParams params) (let open TestParams testParams) where
+  (testParams : TestParams params) (let open TestParams testParams)
+  (validityCheckTimeValue : ℕ) where
 
 instance
   htx : Hashable (List ℕ) (List ℕ)
@@ -367,5 +368,5 @@ d-SpecStructure = record
       ; KF                        = d-KeyRegistrationFunctionality
       ; va                        = d-VotingAbstract
       ; getEBCert                 = λ _ → []
-      ; validityCheckTime         = λ _ → 4
+      ; validityCheckTime         = λ _ → validityCheckTimeValue
       }

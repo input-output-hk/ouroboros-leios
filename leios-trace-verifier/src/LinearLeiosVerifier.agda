@@ -150,7 +150,7 @@ module LinearLeiosVerifier where
           ; winning-slots = winning-slots-of
           }
 
-      open import Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)
+      open import Defaults params testParams validityCheckTimeValue using (d-SpecStructure; FFDBuffers; isb; hpe)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
       open import Leios.Linear.Trace.Verifier d-SpecStructure params renaming (verifyTrace to checkTrace)
