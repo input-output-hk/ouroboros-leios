@@ -100,8 +100,8 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "sortBy": "Name",
-          "sortDesc": false
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
           "hideZeros": false,
@@ -118,7 +118,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\"} \n      | json\n      | event=\"End\"\n      | unwrap duration [5m]\n  )\n)",
+          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} \n      | json\n      | event=\"End\"\n      | unwrap duration [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{stack}}",
           "queryType": "range",
           "refId": "A"
@@ -224,7 +224,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "avg by(thread, stack) (\n  avg_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\"} \n      | json\n      | event=\"End\"\n      | unwrap duration [5m]\n  )\n)",
+          "expr": "avg by(thread, stack) (\n  avg_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"}\n      | json\n      | event=\"End\"\n      | unwrap duration [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{stack}}",
           "queryType": "range",
           "refId": "A"
@@ -330,7 +330,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\"} \n      | json\n      | event=\"End\"\n      | unwrap allocations [5m]\n  )\n)",
+          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} \n      | json\n      | event=\"End\"\n      | unwrap allocations [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{stack}}",
           "queryType": "range",
           "refId": "A"
@@ -436,7 +436,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "avg by(thread, stack) (\n  avg_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\"} \n      | json\n      | event=\"End\"\n      | unwrap allocations [5m]\n  )\n)",
+          "expr": "avg by(thread, stack) (\n  avg_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} \n      | json\n      | event=\"End\"\n      | unwrap allocations [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{stack}}",
           "queryType": "range",
           "refId": "A"
@@ -548,7 +548,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{service=\"call-trace\", instance=~\"$instance\", name=~\"$name\"} | json",
+          "expr": "{service=\"call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} | json",
           "legendFormat": "{{process}}",
           "queryType": "range",
           "refId": "A"
@@ -681,7 +681,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{service=\"call-trace\", instance=~\"$instance\"} \n  | json\n  | event=\"End\"\n  | label_format root_id=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  # Span fields\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .instance }} - {{ .thread }}`\n  | label_format spanID=`{{ .instance }} - {{ .thread }} - {{ .id }}`\n  | label_format parentSpanID=`{{ .instance }} - {{ .thread }} - {{ .parent_id }}`\n  | label_format traceID=`{{ .instance }} - {{ .thread }} - {{ .root_id }}`\n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName",
+          "expr": "{service=\"call-trace\", instance=~\"$instance\", thread=~\"$thread\"} \n  | json\n  | event=\"End\"\n  | label_format root_id=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  # Span fields\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .instance }} - {{ .thread }}`\n  | label_format spanID=`{{ .instance }} - {{ .thread }} - {{ .id }}`\n  | label_format parentSpanID=`{{ .instance }} - {{ .thread }} - {{ .parent_id }}`\n  | label_format traceID=`{{ .instance }} - {{ .thread }} - {{ .root_id }}`\n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName",
           "queryType": "range",
           "refId": "A"
         }
@@ -745,112 +745,6 @@
         }
       ],
       "type": "traces"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic-by-name",
-            "seriesBy": "max"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 59
-      },
-      "id": 8,
-      "options": {
-        "legend": {
-          "calcs": [
-            "max",
-            "min"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true,
-          "sortBy": "Name",
-          "sortDesc": false
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
-          },
-          "direction": "backward",
-          "editorMode": "code",
-          "expr": "(\n  sum by(thread, stack) (\n    count_over_time({service=\"call-trace\", instance=~\"$instance\", name=~\"$name\"} | json | event=\"Start\" [5m])\n  ) \n  - \n  sum by(thread, stack) (\n    count_over_time({service=\"call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} | json | event=\"End\" [5m])\n  )\n) or sum by(thread, stack) (\n  count_over_time({service=\"call-trace\", instance=~\"$instance\", name=~\"$name\"} | json | event=\"Start\" [5m]) * 0\n)",
-          "hide": false,
-          "legendFormat": "[{{thread}}] $ {{stack}}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Active Calls by Thread & Call Stack [5m window]",
-      "type": "timeseries"
     }
   ],
   "preload": false,
@@ -909,6 +803,30 @@
         "options": [],
         "query": {
           "label": "name",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "{service=\"call-trace\"}",
+          "type": 1
+        },
+        "refresh": 2,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "Forge",
+          "value": "Forge"
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "P8E80F9AEF21F6940"
+        },
+        "definition": "",
+        "includeAll": true,
+        "multi": true,
+        "name": "thread",
+        "options": [],
+        "query": {
+          "label": "thread",
           "refId": "LokiVariableQueryEditor-VariableQuery",
           "stream": "{service=\"call-trace\"}",
           "type": 1
