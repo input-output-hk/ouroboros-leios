@@ -10,6 +10,7 @@ open import Data.Bool using (if_then_else_)
 import Data.Nat.Show as S
 import Data.String as S
 open import Agda.Builtin.Word using (Word64; primWord64ToNat)
+open import Agda.Builtin.Char using (primCharToNat)
 open import Foreign.Haskell.Pair
 
 open import Tactic.Defaults
@@ -130,16 +131,19 @@ module LinearLeiosVerifierChain where
         VT-Blk : List Vote → Blk
         RB-Blk : RankingBlock → Blk
 
-      -- Synthesized non-empty transaction list (the node records only counts).
-      synthTxs : List Tx
-      synthTxs = 0 ∷ []
+      -- Synthetic transactions derived from the EB's on-wire hash string:
+      -- distinct per EB (Defaults hashes an EB to its txs, so constant lists
+      -- made ALL EBs collide) and always non-empty. The node logs only tx
+      -- counts, so content equality is structural, not literal.
+      synthTxsOf : String → List Tx
+      synthTxsOf h = map primCharToNat (S.toList h)
 
       mkEBrec : String → Word64 → EndorserBlock
-      mkEBrec _ s = record
+      mkEBrec h s = record
         { slotNumber = primWord64ToNat s
         ; producerID = SUT-id
         ; lotteryPf  = tt
-        ; txs        = synthTxs
+        ; txs        = synthTxsOf h
         ; signature  = tt
         }
 
@@ -197,7 +201,15 @@ module LinearLeiosVerifierChain where
                   (record { txs = [] ; announcedEB = just (hashOf a h) ; ebCert = nothing ; slot = s } ∷ [])))) ∷ []
             ebRole : List Step
             ebRole = case forgedEB a of λ where
-              (just eb) → (EB-Role-Action s eb , inj₁ FFDT.SLOT) ∷ []
+              -- Base₁ (SubmitTxs) replaces ToPropose: set it to the forged
+              -- EB's txs so toProposeEB matches, and clear it afterwards so
+              -- later No-EB-Role abstentions (empty mempool at a winning
+              -- slot) remain justified.
+              (just eb) →
+                (Base₁-Action s , inj₂ (inj₂ (SubmitTxs (EndorserBlockOSig.txs eb))))
+                ∷ (EB-Role-Action s eb , inj₁ FFDT.SLOT)
+                ∷ (Base₁-Action s , inj₂ (inj₂ (SubmitTxs [])))
+                ∷ []
               nothing   → (No-EB-Role-Action s , inj₁ FFDT.SLOT) ∷ []
             vtRole : List Step
             vtRole = case votedEB a of λ where
