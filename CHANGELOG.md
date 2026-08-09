@@ -5,6 +5,30 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w32 - 2026-08-09
+
+The registered BLS Leios keys are now **used**: nodes build the voting committee from the on-chain stake distribution, sign votes with the pool operator's BLS key, and verify certificates against that committee. This completes the "registrable but not utilized" path from w30/w31 and drops the insecure key-derivation shortcut.
+
+> [!IMPORTANT]
+>
+> **Requires respin:** the stake distribution (`PoolDistr`) now carries the per-pool BLS keys, so ledger state and blocks from earlier releases no longer decode. Delete your local state and re-sync from genesis or sideload from the IOG relays, using the `musashi` network config from https://book.play.dev.cardano.org/adv-musashi.html. The respin is expected to happen in 1-2 days.
+
+> [!NOTE]
+>
+> A pool now votes only if its node is started with `--shelley-bls-key` pointing at the BLS signing key whose verification key is registered on-chain (see the testnet guide). Without it the node runs as a non-voting relay.
+
+- Construct the Leios committee from the BLS keys in the stake distribution [ledger#5974](https://github.com/IntersectMBO/cardano-ledger/issues/5974), tracked in [#1010](https://github.com/input-output-hk/ouroboros-leios/issues/1010)
+  - `cardano-ledger` plumbs each pool's `LeiosKey` through to `PoolDistr` (`individualPoolStakeBls`), so the BLS verification keys travel with the stake snapshots.
+  - `ouroboros-consensus` adds `selectCommitteeByStake` and a new `mkLeiosCommittee` that assemble the committee from those keys; voting and certificate verification now check signatures against the stake-weighted committee seats, replacing the previous placeholder committee.
+
+- Use a real BLS signing key and drop the insecure key-derivation shortcut [#1009](https://github.com/input-output-hk/ouroboros-leios/issues/1009)
+  - `cardano-node` gains a `--shelley-bls-key` option to load the operator's BLS signing key alongside VRF/KES.
+  - The signing key is wired into `PraosCanBeLeader`; the hacked key-derivation shortcut flagged in w30/w31 is removed, so votes are signed with the registered key.
+
+> [!TIP]
+>
+> The insecure key-derivation shortcut is gone, but the committee is still selected purely by stake with a placeholder coverage target; committee sizing/eligibility parameters are not yet governance-configurable. See also the [cardano-blueprint](https://cardano-scaling.github.io/cardano-blueprint/pr-preview/pr-67/consensus/leios-committee.html) for more details about the implemented key registration and committee selection.
+
 ## prototype-2026w31a - 2026-08-03
 
 Small hotfix that tones down errors when adopting blocks (e.g. `invalid Leios cert: InvalidSignature`) to not crash the node and only result in `InvalidBlock` traces.
