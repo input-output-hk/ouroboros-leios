@@ -270,11 +270,15 @@ queryChain LeadershipOpts{..} = do
         era
   case result of
     Left err -> die ("local state query failed: " <> show err)
-    -- A stakeless pool (e.g. freshly registered on a young network) has no
-    -- leadership schedule; that just means no winning slots this epoch.
-    Right (Left lerr, stakeDistr) -> do
-      hPutStrLn stderr ("leadership schedule unavailable (" <> show lerr <> "); assuming no winning slots")
+    Right (Left (Api.LeaderErrStakePoolHasNoStake _), stakeDistr) -> do
+      -- No active stake is a state, not a fault: the SUT simply has no
+      -- production obligations this epoch (schedule = []), and every
+      -- No-EB/No-VT abstention is trivially justified. The verifier runs and
+      -- has nothing interesting to say -- which is the correct report. Stake
+      -- appearing in a later epoch is picked up by the boundary re-query.
+      hPutStrLn stderr "SUT has no active stake this epoch: leadership schedule = [] (production obligations vacuous)"
       pure $ buildChainData loStakePoolId epochLength [] stakeDistr
+    Right (Left lerr, _) -> die ("leadership schedule error: " <> show lerr)
     Right (Right slots, stakeDistr) ->
       pure $ buildChainData loStakePoolId epochLength (Prelude.map (toInteger . Api.unSlotNo) (Set.toList slots)) stakeDistr
 
@@ -300,7 +304,7 @@ buildChainData sutPool epochLength winning m =
       scaleStake r = floor (r * 1000000000) :: Integer
       stakeDist = [(nodeName i, scaleStake r) | (i, (_, r)) <- Prelude.zip [0 ..] pairs]
       sutIdx =
-        maybe (error "SUT stake pool not found in chain stake distribution") toInteger $
+        maybe (error "impossible: SUT appended above") toInteger $
           List.findIndex ((== sutPool) . fst) pairs
    in ChainData
         { cdWinningSlots = winning
