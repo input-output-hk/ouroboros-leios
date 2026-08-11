@@ -2379,17 +2379,17 @@
         "nixpkgs": "nixpkgs_6"
       },
       "locked": {
-        "lastModified": 1782914223,
-        "narHash": "sha256-YPcGENKa+b81cXWlLqOc8ik0RkFgA/HtztGTPaVX/zc=",
+        "lastModified": 1786443368,
+        "narHash": "sha256-+tAUxd6UQ9D8ghaSkrd9NsoJHCR1ClIsgdt+mA+VXSo=",
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "1f8afb1276183d2cb19bb88e31d0d593dee1ab82",
+        "rev": "2686578ac01ae561a421ccc5705f678094dd6b1e",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "1f8afb1276183d2cb19bb88e31d0d593dee1ab82",
+        "rev": "2686578ac01ae561a421ccc5705f678094dd6b1e",
         "type": "github"
       }
     },

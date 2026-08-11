@@ -40,7 +40,7 @@
       };
     };
 
-    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=1f8afb1276183d2cb19bb88e31d0d593dee1ab82";
+    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=2686578ac01ae561a421ccc5705f678094dd6b1e";
 
     flake-parts.url = "github:hercules-ci/flake-parts";
 
