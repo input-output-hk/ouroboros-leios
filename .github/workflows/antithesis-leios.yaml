@@ -64,6 +64,11 @@ jobs:
         # 'submodules'". v31.11.0 installs Nix 2.35.1 by default.
         uses: cachix/install-nix-action@v31.11.0
         with:
+          # Pin a Nix new enough to parse `self.submodules = true` in the
+          # ouroboros-consensus flake input (older Nix rejects it with
+          # "unexpected flake input attribute 'submodules'"). Matches the
+          # version validated locally.
+          install_url: https://releases.nixos.org/nix/nix-2.31.5/install
           extra_nix_config: |
             accept-flake-config = true
             substituters = https://cache.nixos.org https://cache.iog.io

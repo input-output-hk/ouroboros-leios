@@ -1,0 +1,5 @@
+{
+    "type": "BlsVerificationKey_bls12-381-BLS-Signature-Mininimal-Signature-Size",
+    "description": "BLS12-381 verification key",
+    "cborHex": "586099786f625a1c9973d15990047f23120c0c1f9fa801b31ce241440935d224a79f39be5ce7fa9158964b99d66d8d2376cc0825294de6eca720541716ca8794e5498e916c97a50bcab26708a4024a640e64718b6098b159498288b72512555ba38c"
+}

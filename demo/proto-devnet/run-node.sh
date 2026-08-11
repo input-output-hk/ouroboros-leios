@@ -24,4 +24,5 @@ cardano-node run \
   --socket-path "node.socket" \
   --shelley-vrf-key "keys/vrf.skey" \
   --shelley-kes-key "keys/kes.skey" \
+  --shelley-bls-key "keys/bls.skey" \
   --shelley-operational-certificate "keys/opcert.cert"
