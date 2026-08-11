@@ -871,7 +871,7 @@ Note that the PoP checks probably are done at the certificate level, and that th
 > FIXME: Write this. Feature flags for dev phases and new configuration data exposed to operators.
 
 
-# End-to-end testing
+## End-to-end testing
 
 > [!WARNING]
 >
@@ -885,14 +885,14 @@ The end-to-end functional test suite checks existing functionalities. It operate
 
 Linear Leios primarily impacts the consensus component of `cardano-node`, leaving end-user experience and existing functionalities unchanged. Consequently, the current test suite can largely be used to verify `cardano-node`'s operation after the Leios upgrade, requiring only minor adjustments.
 
-## New end-to-end tests for Leios
+### New end-to-end tests for Leios
 
 New end-to-end tests for Leios will focus on two areas:
 
 - Hard-fork testing from the latest mainnet era to Leios
 - Upgrading from the latest mainnet `cardano-node` release to a Leios-enabled release
 
-## New automated upgrade testing test suite
+### New automated upgrade testing test suite
 
 The suite will perform the following actions:
 
@@ -906,13 +906,13 @@ The suite will perform the following actions:
 8. **Post-Hard-Fork Functional Tests** - Run a final subset of the functional tests.
 
 
-# Performance and quality assurance strategy
+## Performance and tracing
 
 > [!WARNING]
 >
 > FIXME: Integrate this with the implementation plan
     
-## Observability as a first-class citizen
+### Observability as a first-class citizen
 
 By implementing evidence of code execution, a well-founded tracing system is the prime provider of observability for a system.
 This observability not only forms the base for monitoring and logging, but also performance and conformance testing.  
@@ -924,7 +924,7 @@ Proper emission of those traces true to their semantics will need to be ensured 
 
 Last not least, the existing simulations will be maintained and kept operational. Insights based on concrete evidence from testing implementation(s) can be used to further refine their model as Leios is developing.
 
-## Testing during development
+### Testing during development
 
 Wheras simulations operate on models and are able to falsify hypotheses or assess probability of certain outcomes, evolving
 prototypes and implementations rely on evidence to that end. A dedicated environment suitable for both performance and conformance testing will be created; primarily as feedback for development, but also to provide transparency into the ongoing process.  
@@ -945,14 +945,14 @@ As raw data from a benchmark / conformance test can be huge, existing analysis t
 
 This requires the presence of basic observability with shared semantics of traces in all participating prototypes or implementations, as outlined in the previous section.
 
-### Micro-benchmarks
+#### Micro-benchmarks
 
 Additionally, smaller units of implementation (vs. full system integration) also deserve a performance safeguard. We will create and executing benchmarks that target isolated components of the system, and do not need a full testnet to run.
 The aim of those microbenchmarks is to provide long-term performance comparability for those components. This entails that the benchmark input needs to be stable across versions; it also requires a stable hardware specification to execute those
 benchmarks on (dynamically allocated environments are not suitable for that purpose). Thus, these microbenchmarks will be automated on fixed hardware - which can be considered a calibrated measurement device - and their artifacts archived and
 conveniently exposed for feedback and transparency.
 
-## Testing a full implementation
+### Testing a full implementation
 
 This eventual step will stop support for prototypes and instead focus on full implementations of Leios. This will allow
 for a uniform way to operate, and artificially constrain, Leios by configuration while maintaining its performance properties.
@@ -960,6 +960,65 @@ for a uniform way to operate, and artificially constrain, Leios by configuration
 Furthermore, this phase will see custom benchmarks that can scale individual aspects of Leios independently (by config or protocol
 parameter), so that the observed change in performance metrics can be clearly correlated to a specific protocol change. This also paves the way for testing hypotheses about the effect of protocol settings or changes based
 on evidence rather than a model.
+
+
+
+# Dimensional plan on hard-fork readiness
+
+> [!WARNING]
+>
+> TODO: Link back to the implementation plan, dependencies and risks to introduce the need of a dimensional plan (hard fork coordination being a main driver and source of "dead time"). Also, what is a dimensional plan?
+>
+> TODO: Each stage is a cardano-node release scope that could be considered to hard-fork
+>
+> TODO: motivate the scope cutting
+
+## Stage 1: Dijkstra supports Leios
+
+- Dijkstra block definition / serialization contains Leios
+  - Announcements in headers
+  - BLS keys in block headers (?)
+  - Certificates in body
+  - BLS key registration in pool registration cert in txs
+  - Protocol parameters in txs
+
+- Constitution guard rails can reference Leios protocol parameters
+
+- Generate BLS keys
+- Create and submit pool registration with BLS keys
+- Query pool state showing key registration
+
+## Stage 2: Start with zero (0/0/∞/0/0)
+
+- Register BLS keys via block headers (?)
+- Committee selection at epoch boundaries
+  - Committee in ledger state
+- Validate EB announcing and/or certifying blocks
+  - Disallowed by protocol parameters
+- Client APIs inline certified EB txs
+- No-op mini-protocols (?)
+- ...?
+
+## Stage 3: Low params (1/4/7/100k/1M)
+
+- Double-buffered mempool
+- Capped forge loop
+- Forge and store EBs
+- Small quantity EB storage
+- Announce and detect equivocations of EBs
+- Diffuse and validate EBs via TxCache
+- EB fetching on chain selection
+- Vote and aggregate certificates
+- Forge RBs with certificates 
+- ...?
+
+## Stage 4: High params
+
+- High-throughput tx submission
+- Efficient forge loop
+- Disk-backed TxCache
+- Large quantity, low latency EB storage
+- ...?
 
 
 # Glossary
