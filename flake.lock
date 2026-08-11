@@ -20,17 +20,17 @@
     "CHaP_2": {
       "flake": false,
       "locked": {
-        "lastModified": 1782769557,
-        "narHash": "sha256-tCYMTwH15mNajHybvC3KGVPBPMlLlqIOYE0ZgcqRkJU=",
+        "lastModified": 1785784703,
+        "narHash": "sha256-Nqftjz5u71ys+VY1dw3s9unnmulBSZstAIESrIZxxqc=",
         "owner": "intersectmbo",
         "repo": "cardano-haskell-packages",
-        "rev": "3ee6b1ecce230d62f0083590f38c4ae3457da226",
+        "rev": "60ad9c29de7b30cb480547110cffad0cb6c71ab2",
         "type": "github"
       },
       "original": {
         "owner": "intersectmbo",
         "repo": "cardano-haskell-packages",
-        "rev": "3ee6b1ecce230d62f0083590f38c4ae3457da226",
+        "rev": "60ad9c29de7b30cb480547110cffad0cb6c71ab2",
         "type": "github"
       }
     },
@@ -1007,17 +1007,17 @@
     "hackage": {
       "flake": false,
       "locked": {
-        "lastModified": 1782857746,
-        "narHash": "sha256-CYiQEmkYnnDeS8+UawKASb2MM+ythwZLrcgVqMnWM9o=",
+        "lastModified": 1785861789,
+        "narHash": "sha256-mVgzj67M3FVQXtM5LHFi4JWwjaUeCz5FreNnb/b+DFw=",
         "owner": "input-output-hk",
         "repo": "hackage.nix",
-        "rev": "be6128e4463955ebc0e3eb04edfbe23ebe22b1c3",
+        "rev": "956836e90e902e23b7bf080a0c9d0a88ddf0273a",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "hackage.nix",
-        "rev": "be6128e4463955ebc0e3eb04edfbe23ebe22b1c3",
+        "rev": "956836e90e902e23b7bf080a0c9d0a88ddf0273a",
         "type": "github"
       }
     },
@@ -1171,17 +1171,17 @@
     "hackage_2": {
       "flake": false,
       "locked": {
-        "lastModified": 1782857746,
-        "narHash": "sha256-CYiQEmkYnnDeS8+UawKASb2MM+ythwZLrcgVqMnWM9o=",
+        "lastModified": 1785861789,
+        "narHash": "sha256-mVgzj67M3FVQXtM5LHFi4JWwjaUeCz5FreNnb/b+DFw=",
         "owner": "input-output-hk",
         "repo": "hackage.nix",
-        "rev": "be6128e4463955ebc0e3eb04edfbe23ebe22b1c3",
+        "rev": "956836e90e902e23b7bf080a0c9d0a88ddf0273a",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "hackage.nix",
-        "rev": "be6128e4463955ebc0e3eb04edfbe23ebe22b1c3",
+        "rev": "956836e90e902e23b7bf080a0c9d0a88ddf0273a",
         "type": "github"
       }
     },
