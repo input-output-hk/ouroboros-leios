@@ -15,11 +15,16 @@ The journey starts by learning to **install** and **run** a Leios node —
 and, for the adventurous, how to **register a pool**.
 
 The **Earth phase** — the first of the dojo's five phases of intense
-experimentation, learning, and development — begins in July. Now is the
-time to get familiar with this implementation.
+experimentation, learning, and development — ran from July to August 2026
+and has now concluded.
+
+The **Water phase**, the second of the five, begins on 11 August 2026. Now
+is the time to get familiar with this implementation: install a node, join
+the testnet, and if you run a pool, look at the
+[SPO Rewards Program](./rewards-program.md).
 
 Bring your questions to the dojo floor: join the
-**[Musashi Dōjō Discord](https://discord.gg/Bx2qvsjCte)** for advice and
+**[Musashi Dōjō Discord](https://discord.gg/AyUXD9VHn)** for advice and
 guidance when you hit a snag, and to raise any issues, concerns, or bugs
 you find.
 :::
@@ -107,7 +112,7 @@ requires a reasonably fast disk:
 Keep an eye out for these system requirements changing, especially the later
 phases which will have more load and parameter exploration, which requires more
 resources. In any case, we would like to [hear from your
-experience](https://discord.gg/Bx2qvsjCte) running it on your individual
+experience](https://discord.gg/AyUXD9VHn) running it on your individual
 hardware or cloud provider.
 :::
 
@@ -406,7 +411,7 @@ fine — it costs the small amount of unwritten state, not the synced
 chain on disk.
 
 If you keep hitting a wall, please reach out on the
-**[Musashi Dōjō Discord](https://discord.gg/Bx2qvsjCte)** — that's
+**[Musashi Dōjō Discord](https://discord.gg/AyUXD9VHn)** — that's
 exactly the feedback the onboarding phase is here to surface.
 :::
 
