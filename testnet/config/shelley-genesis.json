@@ -1,24 +1,55 @@
 {
   "activeSlotsCoeff": 0.050,
-  "epochLength": 86400,
-  "genDelegs": {
-    "054690c98088c8024ed183b2614b68891a172cba0994a1c7353f4b24": {
-      "delegate": "9c656681cf608dda2207b1eb4f6264c9c2a6d964336927b764918057",
-      "vrf": "8d27e714529eb8b091f6f4e02563b80d43026d571392a72e8509bc95a2bcca53"
+  "epochLength": 21600,
+  "extraConfig": {
+    "initialFunds": {
+      "data": {
+        "0066878003c80c68e610236f87f742f06c53f30e4b051720faeff49f855e81366cb6f3c0d14837614afcea669d51b8be9519eaec4a237504f8": 900000000,
+        "60318277a23738a860d7b8f727b113236b2cd11cc413a5db0938241a27": 30000000000000000
+      }
     },
-    "9c07195879998318c656519e3648b54ff082c25f2b9955c447f21233": {
-      "delegate": "ed6b9092d849b632a38a951203926172d2091b771508ecdf061c577d",
-      "vrf": "8d74a6a65a837b80c3abb353af41ca323f40bc16b7304ecf7a0a03be8a6dab9a"
+    "stakeCredentials": {
+      "data": {
+        "5e81366cb6f3c0d14837614afcea669d51b8be9519eaec4a237504f8": "747aca09f322d2dfc56243b839e2d573ab92287684e5e37d66ec0f87"
+      }
     },
-    "bf6e565990e79c03add8a6f0a7121efd1dd76b773fab47ca15f5aca3": {
-      "delegate": "f64c850cf3a55b85ac98e36009d3c828b9d5a03328b80cfca2929dd0",
-      "vrf": "4885c0d7f297f61dc3f7a55dd73ff1aa8154a135530644842d4fd5b8a5f87964"
+    "stakePools": {
+      "data": {
+        "747aca09f322d2dfc56243b839e2d573ab92287684e5e37d66ec0f87": {
+          "accountAddress": {
+            "credential": {
+              "keyHash": "bc2b888f42c68e4e118a4fa16ada52db896bffb61ceea51a58301bf6"
+            },
+            "network": "Testnet"
+          },
+          "cost": 0,
+          "leiosKey": null,
+          "margin": 0,
+          "metadata": null,
+          "owners": [],
+          "pledge": 0,
+          "poolId": "747aca09f322d2dfc56243b839e2d573ab92287684e5e37d66ec0f87",
+          "relays": [],
+          "vrf": "d8252bd637a90ba4dbd2cf63afda20a19888b7895ede067081ce7fb7411a972b"
+        }
+      }
     }
   },
-  "initialFunds": {
-    "00ed4c39181c54b9de2285f8177950ab323e8acebc59c41a3ae950c6dade4cdcc79894fb63beb060a116eb8c3e0967cf7167117648549a8df4": 900000000,
-    "6022c41ef65abb8a6eff20c486396467633a60ea5264f2b019c3391013": 30000000000000000
+  "genDelegs": {
+    "12d894311704be0bcbbf3c802d1df931c1042f165118b5950c38c4fb": {
+      "delegate": "28e61504346b2321a7474e84bb868d20282ecca551fa195b474134cd",
+      "vrf": "815dfe31669dec6dae261a0c38009d6c195cb746b6f1053a12bb29fd585228bd"
+    },
+    "293a1d21af16b2a6c4553e5a587c6518c7ed13aecf6d467a276c5f5b": {
+      "delegate": "aa43125599455749e209b6ac89f87f4b2b7829b951b278914ff41da7",
+      "vrf": "ea3081e44ca2429c22bc1f8e09756a722ca76d9f89a1a637bac363d2d5fddefe"
+    },
+    "aa57d73d4b8790ac4fd195c2cfb0aefb82abb828893f4203e5eaf223": {
+      "delegate": "3c633d470ebb66763f598b92366c034daf87bd32f5619d9be7421281",
+      "vrf": "e431849e1f74782bde85e4030abebfbae6a5cd6c18c20ca35068d1c449287064"
+    }
   },
+  "initialFunds": {},
   "maxKESEvolutions": 62,
   "maxLovelaceSupply": 45000000000000000,
   "networkId": "Testnet",
@@ -47,32 +78,13 @@
     "rho": 0.0030,
     "tau": 0.2
   },
-  "securityParam": 432,
+  "securityParam": 108,
   "slotLength": 1,
   "slotsPerKESPeriod": 129600,
   "staking": {
-    "pools": {
-      "275d7a0632217b7cd60c62d6393172bc626b0080a99a6dc01ff4e1dd": {
-        "accountAddress": {
-          "credential": {
-            "keyHash": "63a87ed8d359bb4acfbe0b003fa226096a9f0622d0d2209ce231653e"
-          },
-          "network": "Testnet"
-        },
-        "cost": 0,
-        "margin": 0,
-        "metadata": null,
-        "owners": [],
-        "pledge": 0,
-        "poolId": "275d7a0632217b7cd60c62d6393172bc626b0080a99a6dc01ff4e1dd",
-        "relays": [],
-        "vrf": "85a1137e13e707240bc94d3064afcb472bf0056006f9ac3ddda72f258f2c8171"
-      }
-    },
-    "stake": {
-      "de4cdcc79894fb63beb060a116eb8c3e0967cf7167117648549a8df4": "275d7a0632217b7cd60c62d6393172bc626b0080a99a6dc01ff4e1dd"
-    }
+    "pools": {},
+    "stake": {}
   },
-  "systemStart": "2026-07-01T00:00:00Z",
+  "systemStart": "2026-08-07T00:00:00Z",
   "updateQuorum": 3
 }
