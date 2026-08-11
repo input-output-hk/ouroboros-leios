@@ -32,9 +32,8 @@ verify =
     lHdr = 1 -- TODO: read from config
     lVote = toInteger (linearVoteStageLengthSlots Scenario.config)
     lDiff = toInteger (linearDiffuseStageLengthSlots Scenario.config)
-    validityCheckTime = 3 -- TODO: read from config
    in
-    verifyTrace nrNodes Scenario.idSut stakeDistribution lHdr lVote lDiff validityCheckTime
+    verifyTrace nrNodes Scenario.idSut stakeDistribution lHdr lVote lDiff
 
 -- | Expectation for checking a trace.
 data Check

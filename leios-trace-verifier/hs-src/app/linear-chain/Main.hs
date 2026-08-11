@@ -42,7 +42,6 @@ main = do
   let lhdr = 1
       lvote = 4
       ldiff = 7
-      validityCheckTime = 3
 
   hSetBuffering stdout LineBuffering
   evs <- parseNodeLog <$> BSL.getContents
@@ -54,7 +53,7 @@ main = do
     "skipped "
       <> show (Prelude.length preSlot)
       <> " pre-slot events (node sync/replay backlog, before the first leadership-check slot)"
-  runSegmented leadershipOpts (lhdr, lvote, ldiff, validityCheckTime) rest
+  runSegmented leadershipOpts (lhdr, lvote, ldiff) rest
 
 -- | A verification segment: the part of the trace within one epoch, verified
 --   against the schedule and stake distribution queried for that epoch.
@@ -75,10 +74,10 @@ data Segment = Segment
 --   epoch voted in the next) are a known limitation of the hard reset.
 runSegmented ::
   LeadershipOpts ->
-  (Integer, Integer, Integer, Integer) ->
+  (Integer, Integer, Integer) ->
   [ChainEvent] ->
   IO ()
-runSegmented opts (lhdr, lvote, ldiff, validityCheckTime) = loop Nothing []
+runSegmented opts (lhdr, lvote, ldiff) = loop Nothing []
  where
   loop :: Maybe Segment -> [ChainEvent] -> [ChainEvent] -> IO ()
   loop mseg seen [] = finishSeg mseg (Prelude.reverse seen)
@@ -128,7 +127,6 @@ runSegmented opts (lhdr, lvote, ldiff, validityCheckTime) = loop Nothing []
           lhdr
           lvote
           ldiff
-          validityCheckTime
           prefix
           (segStart seg)
 
@@ -272,7 +270,11 @@ queryChain LeadershipOpts{..} = do
         era
   case result of
     Left err -> die ("local state query failed: " <> show err)
-    Right (Left lerr, _) -> die ("leadership schedule error: " <> show lerr)
+    -- A stakeless pool (e.g. freshly registered on a young network) has no
+    -- leadership schedule; that just means no winning slots this epoch.
+    Right (Left lerr, stakeDistr) -> do
+      hPutStrLn stderr ("leadership schedule unavailable (" <> show lerr <> "); assuming no winning slots")
+      pure $ buildChainData loStakePoolId epochLength [] stakeDistr
     Right (Right slots, stakeDistr) ->
       pure $ buildChainData loStakePoolId epochLength (Prelude.map (toInteger . Api.unSlotNo) (Set.toList slots)) stakeDistr
 
@@ -287,7 +289,13 @@ buildChainData ::
   Map.Map (Api.Hash Api.StakePoolKey) Rational ->
   ChainData
 buildChainData sutPool epochLength winning m =
-  let pairs = Map.toList m -- sorted by pool-id, deterministic
+  -- A stakeless SUT is absent from the chain's stake distribution; append it
+  -- with stake 0 so the verifier still has a party index for it (the model
+  -- then expects neither block production nor committee membership).
+  let pairs0 = Map.toList m -- sorted by pool-id, deterministic
+      pairs
+        | Prelude.any ((== sutPool) . fst) pairs0 = pairs0
+        | otherwise = pairs0 <> [(sutPool, 0)]
       nodeName i = T.pack ("node-" <> show (i :: Int))
       scaleStake r = floor (r * 1000000000) :: Integer
       stakeDist = [(nodeName i, scaleStake r) | (i, (_, r)) <- Prelude.zip [0 ..] pairs]

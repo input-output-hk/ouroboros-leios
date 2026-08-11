@@ -7,6 +7,8 @@ open import Leios.SpecStructure using (SpecStructure)
 open import Leios.Prelude hiding (id)
 
 open import Data.Bool using (if_then_else_)
+import Data.Char as C
+import Data.Nat as N
 import Data.Nat.Show as S
 import Data.String as S
 open import Agda.Builtin.Word using (Word64; primWord64ToNat)
@@ -50,7 +52,7 @@ module LinearLeiosVerifierChain where
     (numberOfParties : ℕ)
     (sutId : ℕ)
     (stakeDistr : List (Pair String ℕ))
-    (Lhdr Lvote Ldiff validityCheckTimeValue : ℕ)
+    (Lhdr Lvote Ldiff : ℕ)
     where
 
     from-id : ℕ → Fin numberOfParties
@@ -59,7 +61,10 @@ module LinearLeiosVerifierChain where
         (yes p) → #_ n {numberOfParties} {fromWitness p}
         (no _) → error $ "Conversion to Fin not possible! " ◇ show n ◇ " / " ◇ show numberOfParties
 
-    SUT-id : Fin numberOfParties
+    Party : Type
+    Party = Fin numberOfParties
+
+    SUT-id : Party
     SUT-id = from-id sutId
 
     instance
@@ -100,6 +105,9 @@ module LinearLeiosVerifierChain where
           ; Lhdr  = Lhdr
           ; Lvote = Lvote
           ; Ldiff = Ldiff
+          -- CIP-0164 feasible value σc = 0.99 (committee stake coverage)
+          ; σc-num = 99
+          ; σc-den = 100
           }
 
       -- EB-production eligibility comes from the leadership schedule (queried from
@@ -114,7 +122,7 @@ module LinearLeiosVerifierChain where
           ; winning-slots = winning-slots-of
           }
 
-      open import Defaults params testParams validityCheckTimeValue using (d-SpecStructure; FFDBuffers; isb; hpe)
+      open import Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
       open import Leios.Linear.Trace.Verifier d-SpecStructure params renaming (verifyTrace to checkTrace)
@@ -131,15 +139,20 @@ module LinearLeiosVerifierChain where
         RB-Blk : RankingBlock → Blk
 
       -- Synthesized non-empty transaction list (the node records only counts).
-      synthTxs : List Tx
-      synthTxs = 0 ∷ []
+      -- The model's EB hash is its transaction list ('hpe' in Defaults), so
+      -- the synthetic txs must encode the EB's real hash string injectively —
+      -- otherwise every EB hashes to the same value and the first successful
+      -- vote poisons VotedEBs ("Already voted" on all later votes). The
+      -- leading 0 keeps the list non-empty (CIP: EBs are non-empty).
+      synthTxs : String → List Tx
+      synthTxs h = 0 ∷ L.map C.toℕ (S.toList h)
 
-      mkEBrec : String → Word64 → EndorserBlock
-      mkEBrec _ s = record
+      mkEBrec : Party → String → Word64 → EndorserBlock
+      mkEBrec p h s = record
         { slotNumber = primWord64ToNat s
-        ; producerID = SUT-id
+        ; producerID = p
         ; lotteryPf  = tt
-        ; txs        = synthTxs
+        ; txs        = synthTxs h
         ; signature  = tt
         }
 
@@ -208,6 +221,19 @@ module LinearLeiosVerifierChain where
            ++ vtRole
            ++ ((Slot₁-Action s , inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks a)))) ∷ [])
 
+      -- Fake producer for acquired EBs: distinct for EBs sharing a slot (so an
+      -- honest slot battle does not register as equivocation, which requires
+      -- equal producers) and never the SUT (so acquired EBs cannot equivocate
+      -- with the SUT's own forged EBs). Genuine equivocation by other pools is
+      -- not detectable until the trace carries real producer identities.
+      fakeProducer : Accumulator → Word64 → Party
+      fakeProducer a s =
+        let slotNat = primWord64ToNat s
+            n = L.length (L.filter
+                  (λ (_ , eb) → EndorserBlockOSig.slotNumber eb ≟ slotNat)
+                  (Accumulator.EB-refs a))
+        in from-id (if n N.<ᵇ sutId then n else suc n)
+
       traceEvent→action : Accumulator → ChainEvent → Accumulator × List Step
       traceEvent→action a (CSlot s) =
         if not (started a)
@@ -221,10 +247,10 @@ module LinearLeiosVerifierChain where
                   ; votedEB = nothing
                   } , steps)
       traceEvent→action a (CEBForged h s) =
-        let eb = mkEBrec h s
+        let eb = mkEBrec SUT-id h s
         in (record a { EB-refs = (h , eb) ∷ EB-refs a ; forgedEB = just eb } , [])
       traceEvent→action a (CEBAcquired h s) =
-        let eb = mkEBrec h s
+        let eb = mkEBrec (fakeProducer a s) h s
         in (record a
               { EB-refs = (h , eb) ∷ EB-refs a
               ; EB-received = (h , curSlot a) ∷ EB-received a
@@ -240,7 +266,11 @@ module LinearLeiosVerifierChain where
       traceEvent→action a (CRBForged h s) = (a , [])
 
       s₀ : LeiosState
-      s₀ = initLeiosState tt exampleDistr ((SUT-id , tt) ∷ [])
+      -- Register a key for every party: acquired EBs carry (fake) non-SUT
+      -- producer IDs, and 'isValid' resolves the producer's key from this
+      -- list — with only the SUT registered, every acquired EB header would
+      -- be dropped as invalid and never reach EBs'.
+      s₀ = initLeiosState tt exampleDistr (L.tabulate (λ i → (i , tt)))
 
       format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
       format-error x = errorMsg x , "error verifyChainTrace"

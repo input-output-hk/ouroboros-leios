@@ -39,14 +39,13 @@ golden = do
   let lHdr = 1 -- TODO: read from config
   let lVote = toInteger (linearVoteStageLengthSlots config)
   let lDiff = toInteger (linearDiffuseStageLengthSlots config)
-  let validityCheckTime = 3 -- TODO: read from config
   let check :: String -> String -> [FilePath] -> (Text -> Text -> Expectation) -> SpecWith ()
       check label folder files predicate =
         describe label $ do
           forM_ files $ \file ->
             it file $ do
               result <-
-                verifyTrace nrNodes idSut stakeDistribution lHdr lVote lDiff validityCheckTime
+                verifyTrace nrNodes idSut stakeDistribution lHdr lVote lDiff
                   . decodeJSONL
                   <$> BSL.readFile (dir </> folder </> file)
               fst (snd result) `predicate` "ok"
