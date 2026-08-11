@@ -744,70 +744,60 @@ Leios uses a per-pool BLS12-381 key to cast votes on endorser blocks and to buil
 
 The registered key material is a public key together with a proof of possession, `bls_key = [bls_pubkey: G2 (96 bytes), bls_possessionproof: G1 (48 bytes)]` (using the small-signature BLS variant; the proof of possession is discussed under [Committee selection](#committee-selection)). The most direct and definitely viable way to register keys is to extend the existing stake pool registration certificate. A dedicated certificate or a header field are alternatives which were also considered. 
 
-> ![WARNING]
+A dedicated registration certificate would also work, but it adds a new certificate type with its own ledger rules and its own registration/retirement lifecycle to specify, test and maintain. Because only stake pools sit on the committee, the BLS key is intrinsically tied to a pool's identity and stake, so it belongs with the pool's other registered key material (VRF, cold and hot keys). Extending the pool registration certificate binds the key and pool lifecycle and reuses the cold key authorization already required to register a pool, so no new certificate, rule, or witnessing scheme is needed.
+
+> [!WARNING]
 >
-> TODO: Discuss why no dedicated certificate
->
-> TODO: Discuss key registration via block headers here (why, why not)
+> TODO: Discuss a **block-header field** carrying the key like the VRF key and signed by KES — still to be decided. Note that the ledger today processes only block bodies, so reading keys from headers would require giving the ledger access to header data it does not have today.
 
-> ![WARNING]
->
-> FIXME: rotation on similar cadence than KES key rotation (every 90 days) is sufficient, don't mix it with key evolution (every ~12 hours). This demands a time to life for BLS keys (also 90 days). Then, KES keys work different than BLS keys as they come into effect right away on the chain they are used to build. BLS keys need to be slot activated (at an epoch boundary), thus share more similarity to VRF keys here (which are limited to be rotated only once per epoch, with a 2 epoch delay to avoid grinding). For a good user experience, BLS and VRF key rotation is aligned -> a node operator needs to swap keys only in one epoch.
+**Rotation.** A BLS key is a long-lived signing secret whose compromise is chain-safety relevant, so it must be rotated regularly. The right reference point is the KES _key rotation_ cadence (~90 days), not KES _key evolution_ (~12 hours): evolution provides forward secrecy within a single key's lifetime and is a separate mechanism that Leios does not require. A KES-like rotation cadence implies giving BLS keys a comparable time-to-live (~90 days), after which a freshly registered key must have taken over.
 
-**Rotation.** A Leios key is a long-lived signing secret whose compromise is chain-safety relevant, so it warrants regular rotation on a cadence comparable to KES keys — KES keys are evolved precisely to bound the damage of a leaked signing key, and the same argument applies here. Rather than give Leios its own KES-style evolving-key schedule, however, rotation is realized through the **stake snapshot** pipeline:
+Unlike a KES key, which takes effect immediately on the chain it is used to build, a BLS key must be slot-activated at an epoch boundary, because the committee is fixed once per epoch from the stake distribution. In this respect BLS keys behave like VRF keys: rotatable at most once per epoch and only effective after a stake snapshot delay. A rotated key becomes active for voting when the snapshot in which it appears becomes the active stake distribution.
 
-- The Leios key travels with the pool's stake into the stake distribution (see [Committee selection](#committee-selection)); the key that is _active_ for voting in an epoch is the one captured in the snapshot that fixes that epoch's stake distribution.
-- That is the very same snapshot that fixes VRF-based leadership eligibility, so a rotated key activates at the same epoch boundary, with the same snapshot delay, as a stake or VRF change. An SPO rotates simply by re-registering; there is a single activation rule, shared with existing leadership machinery, and no separate rotation protocol to specify or operate.
+- **REQ-RotateBLSKeys** A registered BLS key must be rotatable by re-registration and activated at an epoch boundary
 
-- **REQ-LeiosKeyRotation** A registered Leios key must be rotatable by re-registration, with the active key for an epoch determined by the stake distribution snapshot so that activation aligns with VRF/stake rotation.
+Aligning BLS activation with VRF is a deliberate choice rather than a necessity, and BLS could in fact activate sooner. VRF keys are held back for two epochs precisely so that the leader-election nonce cannot be ground; BLS keys carry no such concern, so a registered BLS key could become active a full epoch earlier — as soon as the mark stake snapshot it appears in has stabilised (after the `3k/f` stability window), taking effect the next epoch. We forgo that earlier activation and instead pin BLS to VRF's two-epoch schedule, because activation is not only an on-chain event: the operator must place the newly-active signing key on the hot, block-producing machine for the epoch in which it takes effect. If BLS activated an epoch before VRF, an SPO that rotated both keys in epoch `e` would face two separate hot-key swaps — the BLS key in `e+1` and the VRF key in `e+2`. Aligning the two collapses this to a single swap in `e+2`; we accept the longer dead time — the BLS key sits registered but inactive for an extra epoch — in exchange for the more convenient, single-event key handling.
 
-> [!NOTE]
-> Aligning with the snapshot means a freshly registered or rotated key is not eligible to vote until the snapshot in which it appears becomes the active stake distribution — the same delay stake and VRF keys are subject to. A committee that must be live from the very first epoch (e.g. a fresh devnet) therefore needs the key seeded into the initial snapshots directly.
+Either way, a freshly registered or rotated key is not eligible to vote until the snapshot in which it appears becomes the active stake distribution. A committee that must be live from the very first epoch (e.g. a fresh devnet) therefore needs the key seeded into the initial snapshots directly.
 
 ### Committee selection
 
-The voting committee is derived deterministically from the stake distribution at each epoch boundary, weighted by stake. Selection is a pure function of ledger state, so every node can compute the same committee deterministically. The committee is selected from the stake pool stake distribution (`PoolDistr`, `nesPd`) the ledger already maintains: it is computed at the epoch boundary from the active stake snapshot and stored (and serialized to disk) as part of the ledger state. This design extends each per-pool entry of `PoolDistr` with the pool's registered BLS key, so a single structure carries stake, VRF key and BLS key together and committee derivation needs no new snapshot machinery. 
+The voting committee is derived deterministically from the stake distribution at each epoch boundary, weighted by stake. Selection is a pure function of ledger state, so every node can compute the same committee deterministically. The committee is selected from the stake pool stake distribution (`PoolDistr`, `nesPd`) the ledger already maintains: it is computed at the epoch boundary from the active stake snapshot and stored (and serialized to disk) as part of the ledger state. This design extends each per-pool entry of `PoolDistr` with the pool's registered BLS key, so a single structure carries stake and BLS key together and committee derivation needs no new snapshot machinery.
 
 **Algorithm.** Selection orders all pools descending by stake and admits pools until a target stake coverage [protocol parameters](#new-protocol-parameters) is reached. For example 99% was determined feasible in [CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#votes-and-certificates). 
+
+> [!WARNING]
+>
+> TODO: Switch to committee size or hybrid parameterization?
+>
+> FIXME: Definitely discuss changing stake distributions and their effects on committee size (more votes, less stake to reach threshold, NO underrepresentation either way!)
 
 - **REQ-StakeBasedCommitteeSelection** The committee must be selected deterministically from the stake distribution so that all nodes agree on both membership and seat assignment.
 
 **Keyless seats.** Seats on the committee are assigned by stake, but a stake-selected pool need not have registered a (valid) BLS key. Such a seat is _keyless_: it exists in the committee, and counts toward the committee's stake structure, but no key can sign for it. A keyless seat cannot cast a valid vote, and a certificate whose signer bitfield marks a keyless seat as a signer must be rejected. Because keyless seats are part of the deterministic committee derivation, every node must agree on exactly which seats are keyless; a mismatch turns honest certificates into apparently invalid ones.
 
-- **REQ-KeylessSeat** The set of keyless seats must be a deterministic function of ledger state shared by all nodes, and a certificate signed by a keyless seat must be treated as invalid.
+- **REQ-KeylessSeat** The committee must be able to represent keyless seats, such that committee selection is independent of key registration.
 
 **Proof-of-possession checks.** BLS aggregate signatures are vulnerable to rogue-key attacks, in which an adversary registers a key crafted relative to others' keys so that an aggregate appears to include victims who never signed. Thus, BLS key therefore ships with a proof of possession over its public key, and only keys with a valid proof may occupy a committee seat or contribute to a certificate. The proof is checked when the key is registered — a registration carrying an invalid proof is rejected — so that keys already resident in the committee-defining state can be trusted without re-checking on every certificate.
 
-- **REQ-CheckProofOfPossession** A committee seat with an invalid proof of posssession must be treated as if the pool had not registered a key.
+- **REQ-CheckProofOfPossession** A committee seat with an invalid proof of posssession must be treated as keyless.
 
 ### Certificate verification
 
-> ![WARNING]
->
-> TODO: This is only easily possible as part of BBODY if we allow the consensus layer to load and process EB txs _before_ verifying the certificate, which would only happen by calling the ledger with the CertRB body after applying all EB txs.
->
-> FIXME: translate requires into concrete design statements (e.g. BBODY ledger rule is updated to verify the cert when present against the committee in the ledger state etc.)
->
-> FIXME: discuss here how the Dijkstra block body changes — it gets a `Maybe LeiosCert` (mirroring `Maybe PerasCert`) — and what the Leios cert actually holds (serialization). Moved from the former "New block structure" section.
+A ranking block that anchors a certified EB (a "CertRB") carries a Leios certificate. Concretely the Dijkstra block body gains an optional certificate — a `Maybe LeiosCert`, mirroring the `Maybe PerasCert` already present — which is set only on such a block. The certificate is compact: a **bitfield** identifying which committee seats signed, and a single **aggregate BLS signature** standing in for their individual votes for the endorser block (its exact contents and encoding are covered under [Serialization](#serialization)).
 
-In order to verify certificates contained in ranking blocks, the ledger must be aware of the voting committee and able to access their public keys. The ledger will need to be able to keep track of the registered keys and use them to do [committee selection](#committee-selection) and certificate verification. Besides verifying certificates, individual votes must also be verifiable by other components (e.g. to avoid diffusing invalid votes).
+Verifying a certificate requires the committee for the relevant epoch. That committee is derived deterministically from the stake distribution already held in the ledger state (see [Committee selection](#committee-selection)), so no new inputs are needed — and because keys are registered through transactions (see [Key registration and rotation](#key-registration-and-rotation)), the ledger already holds every public key in its state and does **not** need access to block headers. Being part of the ledger state, the committee is also stored in ledger snapshots (and hence on disk under Ledger-HD) and can be exposed through the existing query interfaces, which components also use to check individual votes before diffusing them.
 
-- **REQ-LedgerStateVotingCommittee** The Leios voting committee must be part of the ledger state, updated on epoch boundaries and queryable through existing interfaces.
+- **REQ-LedgerStateVotingCommittee** The Leios voting committee must be derivable from the ledger state, updated on epoch boundaries, and queryable through existing interfaces.
 
-Being part of the ledger state, the voting committee will be stored in ledger snapshots and hence on disk in course of Ledger-HD. Depending on how exactly keys will be registered, the ledger might need to be able to access block headers in order to read the BLS public keys from the operational certificate. As this is not the case today (only block bodies are processed by the ledger), this results in requirement:
+Verification then reconstructs the signing public keys from the bitfield — rejecting the certificate if any signalled seat is [keyless](#committee-selection) — aggregates those keys, checks the aggregate signature, and confirms the signing seats clear the required stake threshold.
 
-- **REQ-LedgerBlockHeaderAccess** The ledger must be able to access block headers.
+- **REQ-LedgerCertificateVerification** The ledger must verify a certificate contained in a ranking block against the voting committee derived from its state, treating a certificate that references a keyless seat, fails signature verification, or falls short of the stake threshold as invalid.
+
+Certificate verification and block-body application are coupled. A valid certificate is precisely what authorizes a node to incorporate an EB's transaction closure _without_ re-validating it (see [Transaction validation levels](#transaction-validation-levels)): the closure must be applied for the resulting ledger state to be correct, while the certificate is what makes applying it without validation safe. The `BBODY` rule is therefore extended so that, when a ranking block carries a certificate, it verifies the certificate against the committee and, on success, applies the endorsed closure through the cheap non-validating path.
 
 > [!NOTE]
-> This is a very generic requirement and will likely change depending on how the consensus/ledger interface for block validation is realized. It might be desirable to limit the ledger's access to block headers and only provide (a means to extract) relevant information. That is, the BLS public keys to be tracked and the voting committee to be selected from.
-
-The voting committee consists of persistent and non-persistent voters. The persistent voters are to be selected at epoch boundaries using a [Fait Accompli sortition scheme](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#votes-and-certificates). Hence:
-
-- **REQ-LedgerCommitteeSelection** The ledger must select persistent voters in the voting committee at epoch boundaries using the Fait Accompli sortition scheme.
-
-Finally, block validation of the ledger can use the voting committee state to verify certificates contained in ranking blocks:
-
-- **REQ-LedgerCertificateVerification** The ledger must verify certificates contained in ranking blocks using the voting committee state.
+> This requires the EB closure to be available to `BBODY`, and leaves open how much of the work lives in `BBODY` itself versus a dedicated EB-body rule, and the precise ordering of applying the closure relative to verifying the certificate. That depends on the consensus/ledger interface for block validation and is still being settled.
 
 ### Serialization
 
