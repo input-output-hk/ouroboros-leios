@@ -762,25 +762,33 @@ Either way, a freshly registered or rotated key is not eligible to vote until th
 
 ### Committee selection
 
-The voting committee is derived deterministically from the stake distribution at each epoch boundary, weighted by stake. Selection is a pure function of ledger state, so every node can compute the same committee deterministically. The committee is selected from the stake pool stake distribution (`PoolDistr`, `nesPd`) the ledger already maintains: it is computed at the epoch boundary from the active stake snapshot and stored (and serialized to disk) as part of the ledger state. This design extends each per-pool entry of `PoolDistr` with the pool's registered BLS key, so a single structure carries stake and BLS key together and committee derivation needs no new snapshot machinery.
-
-**Algorithm.** Selection orders all pools descending by stake and admits pools until a target stake coverage [protocol parameters](#new-protocol-parameters) is reached. For example 99% was determined feasible in [CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#votes-and-certificates). 
-
-> [!WARNING]
->
-> TODO: Switch to committee size or hybrid parameterization?
->
-> FIXME: Definitely discuss changing stake distributions and their effects on committee size (more votes, less stake to reach threshold, NO underrepresentation either way!)
+The voting committee for an epoch is chosen from the active stake distribution, weighted by stake, and fixed for the whole epoch.
 
 - **REQ-StakeBasedCommitteeSelection** The committee must be selected deterministically from the stake distribution so that all nodes agree on both membership and seat assignment.
 
-**Keyless seats.** Seats on the committee are assigned by stake, but a stake-selected pool need not have registered a (valid) BLS key. Such a seat is _keyless_: it exists in the committee, and counts toward the committee's stake structure, but no key can sign for it. A keyless seat cannot cast a valid vote, and a certificate whose signer bitfield marks a keyless seat as a signer must be rejected. Because keyless seats are part of the deterministic committee derivation, every node must agree on exactly which seats are keyless; a mismatch turns honest certificates into apparently invalid ones.
+This is realized from the stake pool distribution the ledger already maintains (`PoolDistr`, stored in the ledger state as `nesPd`). Since the BLS key is threaded through `PoolDistr` — every `IndividualPoolStake` carries an `individualPoolStakeBls :: StrictMaybe BlsKey` alongside its stake and VRF key — that single structure is sufficient input for committee derivation, and no new snapshot machinery is needed. Derivation is a pure function of `PoolDistr`, so every node computes an identical committee.
+
+The committee is **materialized once per epoch and stored in the ledger state**, rather than recomputed on each use. This is not merely an optimization: over an epoch a node may have to validate millions of votes against the committee, each needing to resolve a `voter_id`/seat to its stake weight and public key. Recomputing (ordering and truncating `PoolDistr`) per lookup would be prohibitive, so the committee is kept as a ready-to-index structure and refreshed at the epoch boundary. Being part of the ledger state, it is also stored in ledger snapshots (and hence on disk under Ledger-HD) and exposed through the query interface (see [Certificate verification](#certificate-verification)).
+
+**Committee representation.** A committee is an ordered sequence of _seats_, indexed `0..N-1`. Each seat records the pool's relative stake (its voting weight) and its `StrictMaybe BlsKey`. The seat index is the `voter_id` a vote carries and the bit position addressed by a certificate's signer bitfield, so the ordering must be canonical: pools are ordered by descending stake, ties broken by pool id. A seat's index is thereby a deterministic function of `PoolDistr` alone.
+
+**Selection.** Sorts the `PoolDistr` entries descending by stake and admits pools until a stopping condition on a [protocol parameter](#new-protocol-parameters) is met. The scheme in [CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#committee-structure) uses a cumulative-stake coverage target — for example 99% of active stake was found feasible. On the current mainnet stake distribution this is a strongly concentrated, long-tailed curve: of the ~2,700 registered pools, roughly 900 already cover 99% of active stake (and ~580 cover 95%), while the remaining long tail contributes the last percent.
+
+![](./mainnet-stake-distribution-e657.png)
+
+> [!WARNING]
+>
+> TODO: Switch to committee size or hybrid parameterization? Not yet decided — the shape of the parameter (cumulative-stake coverage vs. a fixed committee size vs. a hybrid cap) is still open; see the effect of stake-distribution changes below.
+
+**Effect of stake-distribution changes.** Because votes are stake-weighted and each seat's weight is recorded, certification always evaluates the _actual_ signed stake — the sum of the weights of the seats whose bits are set — against the quorum threshold. There is therefore no under-representation in the sortition sense: the committee cannot misrepresent how much stake voted, whatever its size. A shift in the stake distribution changes only the committee's _shape_. Under a cumulative-stake coverage parameter a flatter distribution admits more pools, so there are more (individually lighter) votes to diffuse and more signatures must accumulate to reach the threshold stake; a more concentrated distribution gives a smaller committee with heavier votes. A fixed committee-size parameter would instead pin the vote count and let the represented stake float with the distribution. This is exactly the open trade-off above — vote-diffusion load versus how tightly the committee's stake tracks the network's active stake — and neither choice risks under-representing the stake that actually signed.
+
+**Keyless seats.** Committee membership is by stake, independent of key registration: a stake-selected pool whose `individualPoolStakeBls` is `SNothing` still occupies a seat, but that seat is _keyless_ — it holds a weight yet has no key to sign with. A keyless seat can never contribute to a valid certificate, and a certificate whose signer bitfield sets a keyless seat's bit must be rejected. Because keyless seats fall out of the same deterministic derivation from `PoolDistr`, every node agrees on exactly which seats are keyless; a divergence would make honest certificates appear invalid (the `SignerWithoutKey` failure).
 
 - **REQ-KeylessSeat** The committee must be able to represent keyless seats, such that committee selection is independent of key registration.
 
-**Proof-of-possession checks.** BLS aggregate signatures are vulnerable to rogue-key attacks, in which an adversary registers a key crafted relative to others' keys so that an aggregate appears to include victims who never signed. Thus, BLS key therefore ships with a proof of possession over its public key, and only keys with a valid proof may occupy a committee seat or contribute to a certificate. The proof is checked when the key is registered — a registration carrying an invalid proof is rejected — so that keys already resident in the committee-defining state can be trusted without re-checking on every certificate.
+**Proof-of-possession checks.** BLS aggregate signatures are vulnerable to rogue-key attacks, in which an adversary registers a key crafted relative to others' keys so that an aggregate appears to include victims who never signed. A `BlsKey` therefore carries a proof of possession over its public key, verified when the key is registered so that a key already resident in `PoolDistr` can be trusted without re-checking it on every certificate. A registration whose proof does not verify is rejected and never reaches `PoolDistr`; equivalently, a seat without a valid proof is treated as keyless.
 
-- **REQ-CheckProofOfPossession** A committee seat with an invalid proof of posssession must be treated as keyless.
+- **REQ-CheckProofOfPossession** A committee seat with an invalid proof of possession must be treated as keyless.
 
 ### Certificate verification
 
@@ -788,7 +796,7 @@ A ranking block that anchors a certified EB (a "CertRB") carries a Leios certifi
 
 Verifying a certificate requires the committee for the relevant epoch. That committee is derived deterministically from the stake distribution already held in the ledger state (see [Committee selection](#committee-selection)), so no new inputs are needed — and because keys are registered through transactions (see [Key registration and rotation](#key-registration-and-rotation)), the ledger already holds every public key in its state and does **not** need access to block headers. Being part of the ledger state, the committee is also stored in ledger snapshots (and hence on disk under Ledger-HD) and can be exposed through the existing query interfaces, which components also use to check individual votes before diffusing them.
 
-- **REQ-LedgerStateVotingCommittee** The Leios voting committee must be derivable from the ledger state, updated on epoch boundaries, and queryable through existing interfaces.
+- **REQ-LedgerStateVotingCommittee** The Leios voting committee must be part of the ledger state, materialized and updated on epoch boundaries, and queryable through existing interfaces.
 
 Verification then reconstructs the signing public keys from the bitfield — rejecting the certificate if any signalled seat is [keyless](#committee-selection) — aggregates those keys, checks the aggregate signature, and confirms the signing seats clear the required stake threshold.
 
