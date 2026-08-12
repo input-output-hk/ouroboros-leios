@@ -131,6 +131,8 @@ module LinearLeiosVerifierChain where
         RB-Blk : RankingBlock → Blk
 
       -- Synthesized non-empty transaction list (the node records only counts).
+      -- Must agree with the 'ToPropose' established by 'closeSlot', otherwise the
+      -- EB the spec derives from the mempool will not match 'mkEBrec' below.
       synthTxs : List Tx
       synthTxs = 0 ∷ []
 
@@ -189,6 +191,16 @@ module LinearLeiosVerifierChain where
       closeSlot : Accumulator → List Step
       closeSlot a =
         let s = curSlot a
+            -- node.log carries no mempool contents, so re-establish the
+            -- synthesized proposal set at the head of every slot. Without it
+            -- 'ToPropose' stays empty, 'toProposeEB' is always 'nothing', and
+            -- EB-Role's first premise is unsatisfiable — leaving every forged EB
+            -- unverifiable. 'synthTxs' is chosen so the EB the spec derives from
+            -- 'ToPropose' coincides with the one 'mkEBrec' builds. 'Base₁' has no
+            -- premises, records no upkeep and only overwrites 'ToPropose', so
+            -- re-emitting it each slot is idempotent.
+            mempool : List Step
+            mempool = (Base₁-Action s , inj₂ (inj₂ (SubmitTxs synthTxs))) ∷ []
             annRB : List Step
             annRB = case curEB a of λ where
               nothing  → []
@@ -203,7 +215,8 @@ module LinearLeiosVerifierChain where
             vtRole = case votedEB a of λ where
               (just (eb , slot')) → (VT-Role-Action s eb slot' , inj₁ FFDT.SLOT) ∷ []
               nothing             → (No-VT-Role-Action s , inj₁ FFDT.SLOT) ∷ []
-        in annRB
+        in mempool
+           ++ annRB
            ++ ((Base₂-Action s , inj₁ FFDT.SLOT) ∷ ebRole)
            ++ vtRole
            ++ ((Slot₁-Action s , inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks a)))) ∷ [])
