@@ -5,7 +5,7 @@ title: Protocol status
 import ProtocolStatus, { ProtocolMatrix, ImplementationStages } from '@site/src/components/ProtocolStatus';
 
 export const stages = [
-  'Requirements',
+  'CIP',
   'Prototype',
   'Design',
   'Implementation',
@@ -18,8 +18,8 @@ Single source of truth for both the diagram badges and the full matrix below.
 - Component name @x,y     first level: a component; the optional `@x,y` pins its
                             badge into the SVG viewBox (1120.77 × 471.62). Components
                             without an anchor render as cross-cutting cards.
-    - [x] Stage — note      second level: one entry per stage (see `stages` above);
-                            the optional note after ` — ` replaces the default label.
+    - [x] Stage: note      second level: one entry per stage (see `stages` above);
+                            the optional note after the `:` replaces the default label.
     - [ ] Detail          third level: scope details, shown in the tooltip only.
 
 Marks: [x] done · [~] ongoing · [?] open question · [-] missing · [ ] not started
@@ -31,139 +31,139 @@ wording of a detail identical to its scope item, or the two lists drift apart.
 */}
 
 export const source = `
-- Praos > Leios prioritization
-  - [x] Requirements
+- Cryptographic primitives
+  - [x] CIP
+  - [x] Prototype
+  - [x] Design
+  - [x] Implementation
+  - [x] Confidence
+    - [x] Primitives audited
+    - [x] Certs peer-reviewed
+
+- New protocol parameters
+  - [?] CIP: Per-tx limits
+  - [~] Prototype
+  - [?] Design: Commitee size param
+  - [~] Implementation
+    - [ ] Protocol parameters and genesis config
+    - [ ] Constitution guard rails
+  - [ ] Confidence
+
+- Serialization
+  - [x] CIP
   - [x] Prototype
   - [~] Design
-  - [ ] Implementation
+  - [~] Implementation
+    - [x] Announcements and certifies bit in headers
+    - [ ] BLS keys in block headers
+    - [x] Certificates in body
+    - [x] BLS key in pool registration cert in txs
+    - [ ] Protocol parameter updates in txs
+  - [ ] Confidence
+
+- Praos > Leios prioritization
+  - [x] CIP
+  - [x] Prototype
+  - [x] Design
+  - [~] Implementation
     - [~] Socket options
     - [ ] Incremental decoding
+  - [?] Confidence: good enough?
+
+- Key registration & rotation @130,200
+  - [x] CIP
+  - [x] Prototype
+  - [~] Design
+  - [~] Implementation
+    - [x] Generate BLS keys
+    - [~] Create and submit pool registration with BLS keys
+    - [ ] Register BLS keys via block headers
+  - [~] Confidence: on testnet
+
+- Committee selection @230,320
+  - [x] CIP
+  - [~] Prototype: Interim all-vote
+  - [x] Design: Simplified truncation
+  - [ ] Implementation
+    - [x] Stake-based committee selection
+    - [ ] Committee selection at epoch boundaries
+  - [~] Confidence: on testnet
+
+- High-throughput Tx submission @180,25
+  - [x] CIP
+  - [~] Prototype
+  - [~] Design
+  - [~] Implementation
+    - [~] TxSubmisison V2-undecision
+    - [ ] TxSubmission param tuning
   - [~] Confidence
 
-- High-throughput Tx submission @160,25
-  - [x] Requirements
-  - [ ] Prototype
-  - [ ] Design
-  - [~] Implementation — V2-undecision
-    - [ ] High-throughput tx submission
-  - [ ] Confidence
-
-- High-throughput mempool @460,25
-  - [x] Requirements
-  - [ ] Prototype
-  - [~] Design — Design ideas only
+- High-throughput mempool @550,25
+  - [x] CIP
+  - [~] Prototype
+  - [~] Design
   - [ ] Implementation
     - [ ] Double-buffered mempool
-    - [ ] Capped forge loop
-    - [ ] Efficient forge loop
-  - [ ] Confidence
+    - [ ] Capped forging
+    - [ ] Pre-flight forging
+  - [~] Confidence
 
-- Block production @430,160
-  - [x] Requirements
-  - [x] Prototype
-  - [?] Design — Announcement & pre-application
+- Block production @460,170
+  - [x] CIP
+  - [~] Prototype
+  - [~] Design: Pre-application vs. mempool
   - [ ] Implementation
     - [ ] Forge and store EBs
-    - [ ] Announce and detect equivocations of EBs
     - [ ] Forge RBs with certificates
   - [ ] Confidence
 
-- EB diffusion & storage @470,280
-  - [?] Requirements — Delay bounds
+- EB diffusion @480,280
+  - [?] CIP: Delay bounds
   - [x] Prototype
   - [~] Design
   - [ ] Implementation
-    - [ ] No-op mini-protocols
+    - [ ] Announce and detect equivocations of EBs
     - [ ] Diffuse and validate EBs via TxCache
+  - [?] Confidence: good enough?
+
+- Transaction cache & storage
+  - [x] CIP
+  - [~] Prototype: In progress
+  - [x] Design: Sizing settled
+  - [ ] Implementation
+    - [ ] Diffuse and validate EBs via TxCache
+    - [ ] Disk-backed TxCache
     - [ ] Small quantity EB storage
     - [ ] Large quantity, low latency EB storage
   - [ ] Confidence
 
-- Transaction cache
-  - [x] Requirements
-  - [?] Prototype — Not yet implemented
-  - [x] Design — Sizing settled
-  - [ ] Implementation
-    - [ ] Diffuse and validate EBs via TxCache
-    - [ ] Disk-backed TxCache
-  - [ ] Confidence
-
-- Voting & certification @500,410
-  - [x] Requirements
+- Voting & certification @600,420
+  - [x] CIP
   - [x] Prototype
-  - [x] Design — Shared with Peras
-  - [~] Implementation — Cert agg, peer-reviewed
-    - [ ] Vote and aggregate certificates
+  - [x] Design: Shared with Peras
+  - [ ] Implementation
+    - [ ] Voting logic
+    - [ ] Diffuse and validate votes
+    - [ ] Store and aggregate votes
   - [ ] Confidence
 
 - Block validation & adoption @985,70
-  - [x] Requirements
+  - [x] CIP
   - [x] Prototype
   - [~] Design
   - [ ] Implementation
-    - [ ] Validate EB announcing and/or certifying blocks
+    - [ ] Validate EB announcing and certifying blocks
     - [ ] EB fetching on chain selection
   - [ ] Confidence
 
-- Catching up @980,400
-  - [x] Requirements
-  - [~] Prototype — Baseline via chain selection
-  - [~] Design — Efficient path
-  - [ ] Implementation
-  - [ ] Confidence
-
-- Committee selection @230,320
-  - [x] Requirements
-  - [~] Prototype — Interim all-vote
-  - [x] Design — Simplified truncation
-  - [ ] Implementation
-    - [ ] Committee selection at epoch boundaries
-  - [ ] Confidence
-
-- Key registration & rotation @120,200
-  - [x] Requirements
-  - [ ] Prototype
-  - [~] Design
-  - [~] Implementation — Key-gen CLI only
-    - [x] Generate BLS keys
-    - [ ] Create and submit pool registration with BLS keys
-    - [ ] Register BLS keys via block headers
-  - [ ] Confidence
-
-- Cryptographic primitives
-  - [x] Requirements
-  - [x] Prototype
-  - [x] Design
-  - [x] Implementation
-  - [~] Confidence — Primitives audited; cert layer peer-reviewed
-
-- Serialization
-  - [x] Requirements
-  - [ ] Prototype
-  - [x] Design
-  - [~] Implementation
-    - [ ] Announcements in headers
-    - [ ] BLS keys in block headers
-    - [ ] Certificates in body
-    - [ ] BLS key registration in pool registration cert in txs
-    - [ ] Protocol parameters in txs
-  - [ ] Confidence
-
-- New protocol parameters
-  - [x] Requirements
-  - [ ] Prototype
-  - [~] Design — Set being finalized
-  - [?] Implementation — Not implemented yet
-    - [ ] Constitution guard rails can reference Leios protocol parameters
-  - [ ] Confidence
-
 - Node API & configuration
-  - [x] Requirements
-  - [x] Prototype — Inlined-block N2C, on testnet
-  - [~] Design — New queries to add
-  - [ ] Implementation
-    - [ ] Query pool state showing key registration
-    - [ ] Client APIs inline certified EB txs
+  - [x] CIP
+  - [x] Prototype
+  - [~] Design
+  - [~] Implementation
+    - [x] Query pool state showing key registration
+    - [~] Client APIs inline certified EB txs
+    - [ ] Node accepts BLS keys
   - [ ] Confidence
 `;
 
@@ -177,43 +177,53 @@ Staged scopes of the dimensional plan, mirroring the "Dimensional plan on
 export const plan = `
 - Stage 1: Dijkstra supports Leios
   - Dijkstra block definition / serialization contains Leios
-    - Announcements in headers
+    - Announcements and certifies bit in headers
     - BLS keys in block headers (?)
     - Certificates in body
-    - BLS key registration in pool registration cert in txs
+    - BLS key in pool registration cert in txs
     - Protocol parameters in txs
-  - Constitution guard rails can reference Leios protocol parameters
   - Generate BLS keys
   - Create and submit pool registration with BLS keys
+    - Check PoP in ledger rules
   - Query pool state showing key registration
+  - Node integration
 
 - Stage 2: Start with zero (0/0/∞/0/0)
   - Register BLS keys via block headers (?)
+  - Stake-based committee selection
   - Committee selection at epoch boundaries
     - Committee in ledger state
-  - Validate EB announcing and/or certifying blocks
+  - Validate EB announcing and certifying blocks
     - Disallowed by protocol parameters
   - Client APIs inline certified EB txs
   - No-op mini-protocols (?)
+  - Node integration
 
 - Stage 3: Low params (1/4/7/100k/1M)
   - Socket options
+  - TxSubmisison V2-undecision
   - Double-buffered mempool
-  - Capped forge loop
+  - Capped forging
   - Forge and store EBs
   - Small quantity EB storage
   - Announce and detect equivocations of EBs
   - Diffuse and validate EBs via TxCache
   - EB fetching on chain selection
-  - Vote and aggregate certificates
+  - Voting logic
+  - Diffuse and validate votes
+  - Store and aggregate votes
   - Forge RBs with certificates
+  - Node accepts BLS keys
+  - Node integration
 
 - Stage 4: High params
+  - TxSubmission param tuning
   - Incremental decoding
   - High-throughput tx submission
-  - Efficient forge loop
+  - Pre-flight forging
   - Disk-backed TxCache
   - Large quantity, low latency EB storage
+  - Node integration
 `;
 
 # Protocol status

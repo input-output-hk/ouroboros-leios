@@ -1,9 +1,9 @@
 .root {
   margin: 1.5rem 0 2rem;
-  --done: #16a34a;
+  --done: #4ade80;
   --ongoing: #eab308;
   --missing: #ef4444;
-  --open: #f97316;
+  --open: #f87171;
   --empty: #d4d4d8;
   --widget-bg: var(--ifm-background-surface-color, #fff);
   --widget-border: var(--ifm-color-emphasis-300, #d1d5db);
@@ -177,12 +177,13 @@
   text-align: left;
   font-weight: 500;
   color: var(--ifm-color-emphasis-700, #4b5563);
-  padding: 0.15rem 0.5rem 0.15rem 0;
+  padding: 0.35rem 0.9rem 0.35rem 0;
   white-space: nowrap;
+  vertical-align: top;
 }
 
 .tooltipTable td {
-  padding: 0.15rem 0;
+  padding: 0.35rem 0;
 }
 
 .pip {
@@ -201,6 +202,7 @@
 
 .pip_done {
   background: var(--done);
+  color: #1f2937;
 }
 .pip_ongoing {
   background: var(--ongoing);
@@ -211,6 +213,7 @@
 }
 .pip_open {
   background: var(--open);
+  color: #1f2937;
 }
 .pip_empty {
   background: transparent;
@@ -291,10 +294,10 @@
 }
 
 .matrixWrap {
-  --done: #16a34a;
+  --done: #4ade80;
   --ongoing: #eab308;
   --missing: #ef4444;
-  --open: #f97316;
+  --open: #f87171;
   --empty: #d4d4d8;
   overflow-x: auto;
   margin: 1rem 0 2rem;
