@@ -92,9 +92,17 @@ runSegmented opts (lhdr, lvote, ldiff, validityCheckTime) = loop Nothing []
           checkSeg seg (Prelude.reverse seen')
           loop mseg seen' rest
         _ -> do
-          -- first segment, or an epoch boundary: (re-)query and start fresh
+          -- First segment, or an epoch boundary. This CSlot is what completes the
+          -- outgoing segment's last slot, so give that segment one final check
+          -- with the boundary event appended before discarding its events —
+          -- otherwise the last slot of every epoch would go unverified, since a
+          -- streaming check never adjudicates the slot still in progress.
+          case mseg of
+            Just old -> checkSeg old (Prelude.reverse (ev : seen))
+            Nothing -> pure ()
+          -- (re-)query and start fresh. No check here: a lone CSlot closes no
+          -- slot, so there would be nothing to verify yet.
           seg <- newSegment (toInteger s)
-          checkSeg seg [ev]
           loop (Just seg) [ev] rest
       _ -> loop mseg (ev : seen) rest
 
@@ -144,7 +152,12 @@ runSegmented opts (lhdr, lvote, ldiff, validityCheckTime) = loop Nothing []
   finishSeg (Just seg) prefix =
     let (acts, (status, detail)) = verifySeg seg prefix
      in if status == "ok"
-          then hPutStrLn stderr "stream ended: ok" >> printActions acts
+          then
+            -- The slot in progress when the input ended is deliberately not
+            -- adjudicated: a stream truncated mid-slot has not yet shown the
+            -- events that would discharge that slot's obligations.
+            hPutStrLn stderr "stream ended: ok (slot in progress at end of input left unverified)"
+              >> printActions acts
           else failOut prefix acts status detail
 
   printActions = mapM_ (\a -> hPutStrLn stderr ("  action: " <> T.unpack a))

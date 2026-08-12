@@ -277,10 +277,16 @@ module LinearLeiosVerifierChain where
       opaque
         unfolding List-Model
 
-        verifyChainTrace' : LeiosState → Pair (List String) (Pair String String)
-        verifyChainTrace' s =
+        -- 'closeLast' decides whether the trailing slot is adjudicated. A slot is
+        -- complete only once a later CSlot has closed it in 'traceEvent→action';
+        -- the slot still in progress has not had its CEBForged/CVoted events read
+        -- yet, so emitting its obligations asserts an abstention that the rest of
+        -- the input may contradict. Streaming checkpoints must pass 'false'; only
+        -- a caller that knows the log ends on a slot boundary may pass 'true'.
+        verifyChainTrace' : Bool → LeiosState → Pair (List String) (Pair String String)
+        verifyChainTrace' closeLast s =
           let (aFinal , l') = mapAccuml traceEvent→action (n₀ (LeiosState.slot s)) l
-              final = if started aFinal then closeSlot aFinal else []
+              final = if closeLast then (if started aFinal then closeSlot aFinal else []) else []
               chron = L.concat l' ++ final
               αs = L.reverse chron
               tr = checkTrace αs s
@@ -298,6 +304,15 @@ module LinearLeiosVerifierChain where
             result f g (Ok x) = f x
             result f g (Err x) = g x
 
+        -- Streaming checkpoint: adjudicate only the slots already closed by a
+        -- later CSlot, leaving the in-progress one to the next checkpoint.
         verifyChainTraceFromSlot : ℕ → Pair (List String) (Pair String String)
-        verifyChainTraceFromSlot n = verifyChainTrace' (record s₀ { slot = n })
+        verifyChainTraceFromSlot n = verifyChainTrace' false (record s₀ { slot = n })
         {-# COMPILE GHC verifyChainTraceFromSlot as verifyChainTraceFromSlot #-}
+
+        -- Whole-log variant: additionally adjudicate the trailing slot. Sound only
+        -- for a complete capture (e.g. a fixed event list in a test); on a stream
+        -- truncated mid-slot it reports a spurious abstention violation.
+        verifyChainTraceFinalFromSlot : ℕ → Pair (List String) (Pair String String)
+        verifyChainTraceFinalFromSlot n = verifyChainTrace' true (record s₀ { slot = n })
+        {-# COMPILE GHC verifyChainTraceFinalFromSlot as verifyChainTraceFinalFromSlot #-}
