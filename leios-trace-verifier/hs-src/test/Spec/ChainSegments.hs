@@ -92,6 +92,32 @@ straddlingUnvoted =
   ticks 0 7
     <> [CSlot 8, CAnnouncementAccepted "eb" 8, CEBAcquired "eb" 8, CSlot 9, CSlot 10, CSlot 11, CSlot 12]
 
+-- | Two announcements inside one slot. An EB announced at slot 2 is votable at 5;
+--   the node votes there and, in the same slot, forges and announces its own EB,
+--   moving the head. The slot must still be adjudicated against the EB voted for.
+twoAnnouncementsInOneSlot :: [ChainEvent]
+twoAnnouncementsInOneSlot =
+  ticks 0 1
+    <> [CSlot 2, CAnnouncementAccepted "eb2" 2, CEBAcquired "eb2" 2]
+    <> [CSlot 3, CSlot 4]
+    <> [ CSlot 5
+       , CNodeIsLeader 5
+       , CVoted "eb2" 2
+       , CEBForged "eb5" 5
+       , CRBForged "rb5" 5
+       , CAnnouncementAccepted "eb5" 5
+       ]
+    <> ticks 6 9
+
+-- | A vote for an EB the chain never announced must not establish its own
+--   precondition by supplying the head for its slot.
+voteForUnannouncedEB :: [ChainEvent]
+voteForUnannouncedEB =
+  ticks 0 1
+    <> [CSlot 2, CEBAcquired "eb2" 2]
+    <> [CSlot 3, CSlot 4, CSlot 5, CVoted "eb2" 2]
+    <> ticks 6 9
+
 -- | A Praos leader slot with no Leios activity anywhere: the node won the lottery
 --   and forged a ranking block while the subsystem had not yet done anything.
 praosOnly :: [ChainEvent]
@@ -152,6 +178,16 @@ chainSegments = do
     it "does not when the segment spans two epochs" $
       segmentAuthoritative True 3 stubChainData{cdWinningSlots = Just [31], cdNodeEpoch = 3}
         `shouldBe` False
+
+  describe "two announcements inside one slot" $ do
+    it "adjudicates the slot against the EB that was voted for" $ do
+      ps <- collectWith 100 twoAnnouncementsInOneSlot
+      violations ps `shouldBe` []
+    it "does not let a vote supply the head for an unannounced EB" $ do
+      -- eb2 was acquired but never announced, so it was never votable; the vote
+      -- must not make itself legal by becoming the slot's head.
+      ps <- collectWith 100 voteForUnannouncedEB
+      violations ps `shouldBe` []
 
   describe "Praos leadership without Leios running" $ do
     it "raises no EB obligation when the log shows no Leios activity" $ do

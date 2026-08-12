@@ -233,6 +233,10 @@ module LinearLeiosVerifierChain where
               curSlot     : ℕ
               started     : Bool
               curEB       : Maybe String
+              -- Every EB the chain has announced, not only the latest. Two
+              -- announcements can land inside a single slot, and closeSlot collapses
+              -- a slot into one snapshot.
+              announced   : List String
               forgedEB    : Maybe EndorserBlock
               votedEB     : Maybe (EndorserBlock × ℕ)
 
@@ -266,6 +270,12 @@ module LinearLeiosVerifierChain where
         (just eb) → hash eb
         nothing   → []
 
+      wasAnnounced : String → List String → Bool
+      wasAnnounced h []       = false
+      wasAnnounced h (x ∷ xs) = case h ≟ x of λ where
+        (yes _) → true
+        (no  _) → wasAnnounced h xs
+
       -- Emit the obligations for the slot being closed, chronologically.
       closeSlot : Accumulator → List Step
       closeSlot a =
@@ -282,12 +292,33 @@ module LinearLeiosVerifierChain where
             mempool = case forgedEB a of λ where
               (just eb) → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs (EndorserBlockOSig.txs eb)))) ∷ []
               nothing   → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs synthTxs))) ∷ []
+            -- Which announced EB to present as the chain head for this slot.
+            --
+            -- Two announcements can land inside one slot: the node votes for an EB
+            -- announced earlier, then forges its own and that gets announced too,
+            -- moving the head. closeSlot collapses the slot into a single snapshot,
+            -- so taking the latest announcement would contradict the vote emitted
+            -- for the same slot — observed as
+            -- "442 : Err-VT-Role-premises: Current EB hash does not match".
+            --
+            -- So present the EB the vote was cast for. That is not self-justifying:
+            -- CVoted only records a vote for an EB the chain actually announced, so
+            -- a vote for an unannounced EB still leaves votedEB unset. What it gives
+            -- up is intra-slot ordering — "the EB the head announced at that instant"
+            -- weakens to "an EB the head announced" — which the log cannot support
+            -- anyway.
+            headHash : Maybe Hash
+            headHash = case votedEB a of λ where
+              (just (eb , _)) → just (hash eb)
+              nothing         → case curEB a of λ where
+                (just h) → just (hashOf a h)
+                nothing  → nothing
             annRB : List Step
-            annRB = case curEB a of λ where
+            annRB = case headHash of λ where
               nothing  → []
               (just h) →
                 (Slot₂-Action s , inj₂ (inj₁ (BaseAbstract.BASE-LDG
-                  (record { txs = [] ; announcedEB = just (hashOf a h) ; ebCert = nothing ; slot = s } ∷ [])))) ∷ []
+                  (record { txs = [] ; announcedEB = just h ; ebCert = nothing ; slot = s } ∷ [])))) ∷ []
             ebRole : List Step
             ebRole = case forgedEB a of λ where
               (just eb) → (EB-Role-Action s eb , inj₁ FFDT.SLOT) ∷ []
@@ -331,14 +362,14 @@ module LinearLeiosVerifierChain where
       -- The chain head announces this EB, which is what 'getCurrentEBHash' denotes.
       -- This, and not acquisition, is what makes the EB votable.
       traceEvent→action a (CAnnouncementAccepted h _) =
-        (record a { curEB = just h } , [])
+        (record a { curEB = just h ; announced = h ∷ announced a } , [])
       -- Deliberately does not touch 'curEB': letting a vote establish its own
       -- precondition would make VT-Role self-justifying, hiding a node that voted for
       -- an EB its chain never announced.
       traceEvent→action a (CVoted h s)
-        with EB-refs a ⁉ h | EB-received a ⁉ h
-      ... | just eb | just slot' = (record a { votedEB = just (eb , slot') } , [])
-      ... | _       | _          = (a , [])
+        with wasAnnounced h (announced a) | EB-refs a ⁉ h | EB-received a ⁉ h
+      ... | true | just eb | just slot' = (record a { votedEB = just (eb , slot') } , [])
+      ... | _    | _       | _          = (a , [])
       traceEvent→action a (CVoteAcquired _ _) =
         (record a { FFD-blks = VT-Blk (tt ∷ []) ∷ FFD-blks a } , [])
       traceEvent→action a (CRBForged h s) = (a , [])
@@ -365,7 +396,8 @@ module LinearLeiosVerifierChain where
       n₀ : ℕ → Accumulator
       n₀ st = record
         { EB-refs = [] ; EB-received = [] ; FFD-blks = [] ; curSlot = st
-        ; started = false ; curEB = nothing ; forgedEB = nothing ; votedEB = nothing }
+        ; started = false ; curEB = nothing ; announced = []
+        ; forgedEB = nothing ; votedEB = nothing }
 
       opaque
         unfolding List-Model
