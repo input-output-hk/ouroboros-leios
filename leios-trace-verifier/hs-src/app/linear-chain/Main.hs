@@ -15,13 +15,19 @@
 --   is needed.
 module Main where
 
-import ChainEvents (ChainEvent (..), parseNodeLog)
+import ChainEvents (parseNodeLog)
 import Control.Monad (when)
 import Data.ByteString.Lazy as BSL
-import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.Maybe (fromMaybe)
 import Data.Yaml (FromJSON (..), decodeEither', withObject, (.:))
-import LinearLeiosLib
+import LinearLeiosChain (
+  ChainData (..),
+  Progress (..),
+  Segment (..),
+  Timings (..),
+  isCSlot,
+  runSegmented,
+ )
 import Options.Applicative
 import System.Exit (exitFailure)
 import System.IO (BufferMode (LineBuffering), hPutStrLn, hSetBuffering, stderr, stdout)
@@ -40,10 +46,7 @@ main :: IO ()
 main = do
   ChainCommand{..} <- execParser commandParser
 
-  let lhdr = 1
-      lvote = 4
-      ldiff = 7
-      validityCheckTime = 3
+  let timings = Timings{tLhdr = 1, tLvote = 4, tLdiff = 7, tValidityCheckTime = 3}
 
   hSetBuffering stdout LineBuffering
   evs <- parseNodeLog <$> BSL.getContents
@@ -55,252 +58,134 @@ main = do
     "skipped "
       <> show (Prelude.length preSlot)
       <> " pre-slot events (node sync/replay backlog, before the first leadership-check slot)"
-  runSegmented leadershipOpts (lhdr, lvote, ldiff, validityCheckTime) rest
+  runSegmented render timings (const (queryChain leadershipOpts)) rest
 
--- | A verification segment: the part of the trace within one epoch, verified
---   against the schedule and stake distribution queried for that epoch.
-data Segment = Segment
-  { segEpoch :: Integer
-  , segStart :: Integer
-  -- ^ first leadership-check slot of the segment
-  , segCD :: ChainData
-  , segAuthoritative :: Bool
-  -- ^ Whether the queried leadership schedule applies to this epoch: obtained at
-  --   all, and for this very epoch. Pool stake takes two epochs to become active
-  --   (before that the query fails with @LeaderErrStakePoolHasNoStake@) and a node
-  --   answers only for its own current epoch, which in practice trails the epoch
-  --   being verified. When it does not apply, eligibility is taken from the node's
-  --   own leadership record in the log instead, so the segment is still verified.
-  }
+-- * Rendering
 
--- | Verify the node.log stream one epoch-segment at a time. At each epoch
---   boundary the node is re-queried for that epoch's leadership schedule and
---   stake distribution, and a fresh segment is started from the boundary slot —
---   so no process restart is needed and re-verification cost stays bounded per
---   epoch rather than growing over the whole run. A segment does not begin exactly
---   at the boundary, though: it carries 'overlapSlots' of the outgoing epoch with it,
---   so an obligation raised there but falling due after the boundary is still
---   checked. A clean cut would clear EBs' and curEB, and such a vote would then pass
---   vacuously.
---
---   A node can only answer for its own current epoch, and not at all until pool
---   stake has activated two epochs in. A log that starts at genesis therefore
---   always contains epochs whose schedule is unobtainable; those segments are
---   skipped and named rather than verified against the wrong lottery, and the run
---   ends with a summary of which epochs were verified and which were skipped.
-runSegmented ::
-  LeadershipOpts ->
-  (Integer, Integer, Integer, Integer) ->
-  [ChainEvent] ->
-  IO ()
-runSegmented opts (lhdr, lvote, ldiff, validityCheckTime) evs = do
-  tally <- newIORef []
-  loop tally Nothing [] evs
-  summarize tally
+-- | Render the driver's progress, and abort on a violation. Kept out of
+--   "LinearLeiosChain" so the driver stays testable with a collecting reporter.
+render :: Progress -> IO ()
+render = \case
+  Saw ev -> hPutStrLn stderr $ "event: " <> show ev
+  SegmentStarted seg spans -> reportSchedule seg spans
+  Verified nEvents nActions ->
+    hPutStrLn stderr $
+      "ok @ " <> show nEvents <> " events, " <> show nActions <> " actions"
+  Violation nEvents acts status detail -> failOut nEvents acts status detail
+  NothingToVerify ->
+    hPutStrLn stderr "no leadership-check slot found in input — nothing to verify"
+  StreamEnded acts -> do
+    -- The slot in progress when the input ended is deliberately not adjudicated: a
+    -- stream truncated mid-slot has not yet shown the events that would discharge
+    -- that slot's obligations.
+    hPutStrLn stderr "stream ended: ok (slot in progress at end of input left unverified)"
+    printActions acts
+  Summary entries -> summarize entries
+
+reportSchedule :: Segment -> Bool -> IO ()
+reportSchedule seg spansEpochs = do
+  hPutStrLn stderr $
+    "epoch "
+      <> show ep
+      <> " (from slot "
+      <> show (segStart seg)
+      <> (if spansEpochs then ", carrying the tail of the previous epoch" else "")
+      <> "): "
+      <> show (cdNumParties cd)
+      <> " parties, SUT at index "
+      <> show (cdSutIndex cd)
+      <> ", eligibility from "
+      <> source
+  when (segAuthoritative seg) (warnSlotsOutsideEpoch cd ep)
  where
-  loop :: IORef [(Integer, Bool)] -> Maybe Segment -> [ChainEvent] -> [ChainEvent] -> IO ()
-  loop _ mseg seen [] = finishSeg mseg (Prelude.reverse seen)
-  loop tally mseg seen (ev : rest) = do
-    hPutStrLn stderr $ "event: " <> show ev
-    case ev of
-      CSlot s -> case mseg of
-        Just seg | toInteger s `div` cdEpochLength (segCD seg) == segEpoch seg -> do
-          -- same epoch: extend and re-check the current segment
-          let seen' = ev : seen
-          checkSeg seg (Prelude.reverse seen')
-          loop tally mseg seen' rest
-        _ -> do
-          -- First segment, or an epoch boundary. This CSlot is what completes the
-          -- outgoing segment's last slot, so give that segment one final check
-          -- with the boundary event appended before discarding its events —
-          -- otherwise the last slot of every epoch would go unverified, since a
-          -- streaming check never adjudicates the slot still in progress.
-          case mseg of
-            Just old -> checkSeg old (Prelude.reverse (ev : seen))
-            Nothing -> pure ()
-          -- Carry the tail of the outgoing epoch into the new segment, so that an
-          -- obligation raised before the boundary and falling due after it is still
-          -- checked. No check here: the carried slots were just adjudicated by the
-          -- outgoing segment, and the boundary slot itself is still in progress.
-          let carried = Prelude.takeWhile (notBefore (toInteger s - overlapSlots)) seen
-              seen' = ev : carried
-              start = earliestSlot (toInteger s) seen'
-          seg <- newSegment tally (toInteger s) start (not (Prelude.null carried))
-          loop tally (Just seg) seen' rest
-      _ -> loop tally mseg (ev : seen) rest
+  cd = segCD seg
+  ep = segEpoch seg
+  source = case cdWinningSlots cd of
+    Nothing -> "the log (the node could supply no schedule)"
+    Just slots
+      | segAuthoritative seg ->
+          "the node schedule: "
+            <> show (Prelude.length slots)
+            <> " winning slots "
+            <> show slots
+      | spansEpochs ->
+          "the log (this segment spans two epochs, so the schedule "
+            <> show slots
+            <> " for epoch "
+            <> show (cdNodeEpoch cd)
+            <> " cannot govern all of it)"
+      | otherwise ->
+          "the log (the node answered for epoch "
+            <> show (cdNodeEpoch cd)
+            <> ", so its schedule "
+            <> show slots
+            <> " does not apply here)"
 
-  -- How far back an obligation can reach. An EB with election slot e becomes votable
-  -- in slot e + (3 * Lhdr `max` validityCheckTime), and its acquisition may lag the
-  -- election by up to Lhdr, so carrying that many slots covers every obligation able
-  -- to straddle a boundary.
-  overlapSlots :: Integer
-  overlapSlots = Prelude.max (3 * lhdr) validityCheckTime + lhdr
-
-  notBefore :: Integer -> ChainEvent -> Bool
-  notBefore cutoff (CSlot sl) = toInteger sl >= cutoff
-  notBefore _ _ = True
-
-  -- Earliest slot tick among a segment's events, which is where verification starts.
-  earliestSlot :: Integer -> [ChainEvent] -> Integer
-  earliestSlot dflt es = case [toInteger sl | CSlot sl <- es] of
-    [] -> dflt
-    ss -> Prelude.minimum ss
-
-  newSegment :: IORef [(Integer, Bool)] -> Integer -> Integer -> Bool -> IO Segment
-  newSegment tally boundary start spansEpochs = do
-    cd <- queryChain opts
-    let ep = boundary `div` cdEpochLength cd
-        -- Authoritative only if a schedule was obtained, it describes this very
-        -- epoch, and this segment lies wholly inside that epoch. A segment carrying
-        -- an overlap spans two, so no single epoch's schedule governs all of it and
-        -- eligibility has to come from the log. Otherwise an EB forged in the carried
-        -- tail would be judged against the following epoch's lottery.
-        authoritative =
-          not spansEpochs
-            && maybe False (const (ep == cdNodeEpoch cd)) (cdWinningSlots cd)
-    reportSchedule cd ep start spansEpochs authoritative
-    modifyIORef' tally ((ep, authoritative) :)
-    pure Segment{segEpoch = ep, segStart = start, segCD = cd, segAuthoritative = authoritative}
-
-  reportSchedule :: ChainData -> Integer -> Integer -> Bool -> Bool -> IO ()
-  reportSchedule cd ep s spansEpochs authoritative = do
-    hPutStrLn stderr $
-      "epoch "
-        <> show ep
-        <> " (from slot "
-        <> show s
-        <> (if spansEpochs then ", carrying the tail of the previous epoch" else "")
-        <> "): "
-        <> show (cdNumParties cd)
-        <> " parties, SUT at index "
-        <> show (cdSutIndex cd)
-        <> ", eligibility from "
-        <> source
-    when authoritative (warnSlotsOutsideEpoch cd ep)
-   where
-    source = case cdWinningSlots cd of
-      Nothing -> "the log (the node could supply no schedule)"
-      Just slots
-        | authoritative ->
-            "the node schedule: "
-              <> show (Prelude.length slots)
-              <> " winning slots "
-              <> show slots
-        | spansEpochs ->
-            "the log (this segment spans two epochs, so the schedule "
-              <> show slots
-              <> " for epoch "
-              <> show (cdNodeEpoch cd)
-              <> " cannot govern all of it)"
-        | otherwise ->
-            "the log (the node answered for epoch "
-              <> show (cdNodeEpoch cd)
-              <> ", so its schedule "
-              <> show slots
-              <> " does not apply here)"
-
-  -- The node claims this epoch, so its winning slots ought to lie inside it. If any
-  -- do not, an assumption is wrong — epochLength, or which epoch the schedule is
-  -- computed for — and this segment is being verified unsoundly. Report loudly
-  -- rather than refuse: refusing has already proved too blunt, and this is precisely
-  -- the diagnostic needed to tell which assumption is off.
-  warnSlotsOutsideEpoch :: ChainData -> Integer -> IO ()
-  warnSlotsOutsideEpoch cd ep =
-    case Prelude.filter (not . inEpoch) (fromMaybe [] (cdWinningSlots cd)) of
-      [] -> pure ()
-      out ->
-        hPutStrLn stderr $
-          "warning: node reported epoch "
-            <> show ep
-            <> " but winning slots "
-            <> show out
-            <> " fall outside its slot range "
-            <> show (ep * len)
-            <> ".."
-            <> show ((ep + 1) * len - 1)
-            <> " (they lie in epoch(s) "
-            <> show (Prelude.map (`div` len) out)
-            <> "); verification of this segment is unsound"
-   where
-    len = cdEpochLength cd
-    inEpoch sl = sl >= ep * len && sl < (ep + 1) * len
-
-  -- Every segment is verified now, so the interesting distinction is which
-  -- eligibility source each epoch used. A log-derived one cannot catch an EB forged
-  -- in a slot the node never recorded winning, so it is worth knowing where the
-  -- guarantee is weaker.
-  summarize :: IORef [(Integer, Bool)] -> IO ()
-  summarize tally = do
-    entries <- Prelude.reverse <$> readIORef tally
-    let fromSchedule = [ep | (ep, True) <- entries]
-        fromLog = [ep | (ep, False) <- entries]
-    if Prelude.null entries
-      then hPutStrLn stderr "summary: no segment was verified"
-      else
-        hPutStrLn stderr $
-          "summary: verified epoch(s) "
-            <> show (Prelude.map fst entries)
-            <> "; eligibility from the node schedule for "
-            <> (if Prelude.null fromSchedule then "none" else show fromSchedule)
-            <> ", from the log for "
-            <> (if Prelude.null fromLog then "none" else show fromLog)
-
-  verifySeg :: Segment -> [ChainEvent] -> ([T.Text], (T.Text, T.Text))
-  verifySeg seg prefix =
-    let cd = segCD seg
-     in verifyChainTraceFromSlot
-          (cdNumParties cd)
-          (cdSutIndex cd)
-          (cdStakeDistribution cd)
-          lhdr
-          lvote
-          ldiff
-          validityCheckTime
-          (fromMaybe [] (cdWinningSlots cd))
-          (segAuthoritative seg)
-          prefix
-          (segStart seg)
-
-  checkSeg :: Segment -> [ChainEvent] -> IO ()
-  checkSeg seg prefix =
-    let (acts, (status, detail)) = verifySeg seg prefix
-     in if status == "ok"
-          then hPutStrLn stderr $ "ok @ " <> show (Prelude.length prefix) <> " events, " <> show (Prelude.length acts) <> " actions"
-          else failOut prefix acts status detail
-
-  finishSeg :: Maybe Segment -> [ChainEvent] -> IO ()
-  finishSeg Nothing _ = hPutStrLn stderr "no leadership-check slot found in input — nothing to verify"
-  finishSeg (Just seg) prefix =
-    let (acts, (status, detail)) = verifySeg seg prefix
-     in if status == "ok"
-          then
-            -- The slot in progress when the input ended is deliberately not
-            -- adjudicated: a stream truncated mid-slot has not yet shown the
-            -- events that would discharge that slot's obligations.
-            hPutStrLn stderr "stream ended: ok (slot in progress at end of input left unverified)"
-              >> printActions acts
-          else failOut prefix acts status detail
-
-  printActions = mapM_ (\a -> hPutStrLn stderr ("  action: " <> T.unpack a))
-  -- The slot an action or error status belongs to.
-  slotOfAction a = T.takeWhile (/= ' ') (T.drop 1 (T.dropWhile (/= '@') a))
-  failOut prefix acts status detail = do
-    hPutStrLn stderr $
-      "VIOLATION after " <> show (Prelude.length prefix) <> " events: " <> T.unpack status
-    hPutStrLn stderr $ T.unpack detail
-    when ("Err-Invalid" `T.isInfixOf` status) $
+-- The node claims this epoch, so its winning slots ought to lie inside it. If any do
+-- not, an assumption is wrong — epochLength, or which epoch the schedule is computed
+-- for — and this segment is being verified unsoundly. Report loudly rather than
+-- refuse: refusing has already proved too blunt, and this is precisely the diagnostic
+-- needed to tell which assumption is off.
+warnSlotsOutsideEpoch :: ChainData -> Integer -> IO ()
+warnSlotsOutsideEpoch cd ep =
+  case Prelude.filter (not . inEpoch) (fromMaybe [] (cdWinningSlots cd)) of
+    [] -> pure ()
+    out ->
       hPutStrLn stderr $
-        "  (Err-Invalid: a No-EB-Role/No-VT-Role abstention was rejected — the spec "
-          <> "permits abstaining only when the role cannot be performed this slot.)"
-    -- Only the actions in the failing slot.
-    let failSlot = T.takeWhile (/= ' ') status
-    printActions (Prelude.filter ((== failSlot) . slotOfAction) acts)
-    exitFailure
+        "warning: node reported epoch "
+          <> show ep
+          <> " but winning slots "
+          <> show out
+          <> " fall outside its slot range "
+          <> show (ep * len)
+          <> ".."
+          <> show ((ep + 1) * len - 1)
+          <> " (they lie in epoch(s) "
+          <> show (Prelude.map (`div` len) out)
+          <> "); verification of this segment is unsound"
+ where
+  len = cdEpochLength cd
+  inEpoch sl = sl >= ep * len && sl < (ep + 1) * len
 
--- | True iff the event is a slot tick (used as a re-verification checkpoint).
-isCSlot :: ChainEvent -> Bool
-isCSlot (CSlot _) = True
-isCSlot _ = False
+-- Every segment is verified, so the interesting distinction is which eligibility
+-- source each epoch used. A log-derived one is the SUT's self-report, so it cannot
+-- catch the node's own leadership logging being wrong; it is worth knowing where the
+-- guarantee is weaker.
+summarize :: [(Integer, Bool)] -> IO ()
+summarize entries
+  | Prelude.null entries = hPutStrLn stderr "summary: no segment was verified"
+  | otherwise =
+      hPutStrLn stderr $
+        "summary: verified epoch(s) "
+          <> show (Prelude.map fst entries)
+          <> "; eligibility from the node schedule for "
+          <> (if Prelude.null fromSchedule then "none" else show fromSchedule)
+          <> ", from the log for "
+          <> (if Prelude.null fromLog then "none" else show fromLog)
+ where
+  fromSchedule = [ep | (ep, True) <- entries]
+  fromLog = [ep | (ep, False) <- entries]
+
+printActions :: [T.Text] -> IO ()
+printActions = mapM_ (\a -> hPutStrLn stderr ("  action: " <> T.unpack a))
+
+-- | The slot an action or error status belongs to.
+slotOfAction :: T.Text -> T.Text
+slotOfAction a = T.takeWhile (/= ' ') (T.drop 1 (T.dropWhile (/= '@') a))
+
+failOut :: Int -> [T.Text] -> T.Text -> T.Text -> IO ()
+failOut nEvents acts status detail = do
+  hPutStrLn stderr $
+    "VIOLATION after " <> show nEvents <> " events: " <> T.unpack status
+  hPutStrLn stderr $ T.unpack detail
+  when ("Err-Invalid" `T.isInfixOf` status) $
+    hPutStrLn stderr $
+      "  (Err-Invalid: a No-EB-Role/No-VT-Role abstention was rejected — the spec "
+        <> "permits abstaining only when the role cannot be performed this slot.)"
+  -- Only the actions in the failing slot.
+  let failSlot = T.takeWhile (/= ' ') status
+  printActions (Prelude.filter ((== failSlot) . slotOfAction) acts)
+  exitFailure
 
 -- * Reading from the chain via cardano-api
 
@@ -324,32 +209,6 @@ data LeadershipOpts = LeadershipOpts
   , loVrfSkeyFile :: FilePath
   , loWhich :: WhichEpoch
   }
-
--- | Everything we read from the chain for verification.
-data ChainData = ChainData
-  { cdWinningSlots :: Maybe [Integer]
-  -- ^ The SUT's leadership schedule, as plain naturals for the Agda oracle.
-  --   'Nothing' when the node could not supply one at all — chiefly on a young
-  --   network, where pool stake has not activated yet. Not fatal: eligibility then
-  --   comes from the node's own leadership record in the log.
-  , cdNumParties :: Integer
-  -- ^ Number of parties (= number of stake pools).
-  , cdStakeDistribution :: [(T.Text, Integer)]
-  -- ^ Per-party stake, keyed @node-i@ (pool i in chain order).
-  , cdSutIndex :: Integer
-  -- ^ The SUT's party index (position of --stake-pool-id in chain order).
-  , cdEpochLength :: Integer
-  -- ^ Slots per epoch (from the Shelley genesis), used to detect epoch
-  --   boundaries so the schedule and stake distribution can be re-queried.
-  , cdNodeEpoch :: Integer
-  -- ^ The epoch the node itself reported when queried, i.e. the epoch the
-  --   returned schedule belongs to. This is the epoch of the /chain tip/ (the
-  --   query runs at 'Api.VolatileTip'), not of the wall clock, so it lags
-  --   whenever block production is sparse — which is one way the schedule ends
-  --   up describing a different epoch than the one being verified.
-  }
-
--- | Query the chain for the leadership schedule, stake distribution and party count.
 --
 -- A missing schedule is not fatal: eligibility falls back to the node's own
 -- leadership record in the log, so every epoch is still verified. It is reported
