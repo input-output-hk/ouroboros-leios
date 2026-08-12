@@ -92,6 +92,23 @@ straddlingUnvoted =
   ticks 0 7
     <> [CSlot 8, CAnnouncementAccepted "eb" 8, CEBAcquired "eb" 8, CSlot 9, CSlot 10, CSlot 11, CSlot 12]
 
+-- | A Praos leader slot with no Leios activity anywhere: the node won the lottery
+--   and forged a ranking block while the subsystem had not yet done anything.
+praosOnly :: [ChainEvent]
+praosOnly =
+  ticks 0 3
+    <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4]
+    <> ticks 5 9
+
+-- | The same leader slot, but preceded by a Leios acquisition, so the gate is open
+--   and forging no EB at slot 4 is a genuine abstention from an available role.
+leiosActiveThenSilentLeader :: [ChainEvent]
+leiosActiveThenSilentLeader =
+  ticks 0 1
+    <> [CSlot 2, CAnnouncementAccepted "eb" 2, CEBAcquired "eb" 2, CSlot 3]
+    <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4]
+    <> ticks 5 9
+
 chainSegments :: Spec
 chainSegments = do
   describe "carry width" $
@@ -135,6 +152,21 @@ chainSegments = do
     it "does not when the segment spans two epochs" $
       segmentAuthoritative True 3 stubChainData{cdWinningSlots = Just [31], cdNodeEpoch = 3}
         `shouldBe` False
+
+  describe "Praos leadership without Leios running" $ do
+    it "raises no EB obligation when the log shows no Leios activity" $ do
+      -- The devnet shape that failed: leader at slot 4, a ranking block forged, and
+      -- nothing Leios anywhere. NodeIsLeader alone is Praos leadership.
+      ps <- collectWith 100 praosOnly
+      violations ps `shouldBe` []
+    it "reports the suppression rather than exempting the slot silently" $ do
+      ps <- collectWith 100 praosOnly
+      length [n | LeiosInactive n <- ps] `shouldNotBe` 0
+    it "still enforces the EB role once Leios has shown activity" $ do
+      -- Same leader slot, but an EB was acquired earlier, so the gate is open and
+      -- forging nothing at slot 4 is a violation.
+      ps <- collectWith 100 leiosActiveThenSilentLeader
+      violations ps `shouldNotBe` []
 
   describe "checkpoint throttling" $ do
     it "re-verifies periodically rather than at every slot" $ do

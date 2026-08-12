@@ -7,6 +7,7 @@ open import Leios.SpecStructure using (SpecStructure)
 open import Leios.Prelude hiding (id)
 
 open import Data.Bool using (if_then_else_)
+import Data.Nat as Nat
 import Data.Nat.Show as S
 import Data.String as S
 open import Agda.Builtin.Word using (Word64; primWord64ToNat)
@@ -110,11 +111,54 @@ module LinearLeiosVerifierChain where
           ; Ldiff = Ldiff
           }
 
-      -- Slots in which the log records the node winning the Praos lottery.
+      -- Slots at which the log shows the Leios subsystem itself doing something.
+      -- Praos events — NodeIsLeader, RBForged — deliberately do not count.
+      leiosActivitySlots : EventLog → List ℕ
+      leiosActivitySlots []                               = []
+      leiosActivitySlots (CEBForged _ s ∷ es)             = primWord64ToNat s ∷ leiosActivitySlots es
+      leiosActivitySlots (CEBAcquired _ s ∷ es)           = primWord64ToNat s ∷ leiosActivitySlots es
+      leiosActivitySlots (CAnnouncementAccepted _ s ∷ es) = primWord64ToNat s ∷ leiosActivitySlots es
+      leiosActivitySlots (CVoted _ s ∷ es)                = primWord64ToNat s ∷ leiosActivitySlots es
+      leiosActivitySlots (CVoteAcquired _ s ∷ es)         = primWord64ToNat s ∷ leiosActivitySlots es
+      leiosActivitySlots (_ ∷ es)                         = leiosActivitySlots es
+
+      minSlot : ℕ → List ℕ → ℕ
+      minSlot m []       = m
+      minSlot m (x ∷ xs) = minSlot (if x Nat.<ᵇ m then x else m) xs
+
+      -- Leader slots at or after the first slot where Leios did anything.
+      leaderSlotsFrom : ℕ → EventLog → List ℕ
+      leaderSlotsFrom from []                     = []
+      leaderSlotsFrom from (CNodeIsLeader s ∷ es) =
+        let n = primWord64ToNat s
+        in if n Nat.<ᵇ from
+             then leaderSlotsFrom from es
+             else n ∷ leaderSlotsFrom from es
+      leaderSlotsFrom from (_ ∷ es)               = leaderSlotsFrom from es
+
+      -- Slots in which the node won the Praos lottery, gated on Leios having shown
+      -- signs of life.
+      --
+      -- NodeIsLeader is a Praos event. Treating it as EB-production eligibility rests
+      -- on the spec assuming canProduceEB holds exactly when the node can make a
+      -- ranking block, and that only holds while Leios is actually running. Observed
+      -- against a devnet: 31 slots in, with no EB forged, acquired, announced or voted
+      -- anywhere in the log, the node was Praos leader at slot 9 and forged a plain
+      -- ranking block — and No-EB-Role was rejected, because eligibility had been
+      -- inferred from a Praos event alone while the subsystem was still warming up.
+      --
+      -- Only the negative inference is gated. A forged EB is still verified wherever
+      -- it appears, since accepting one needs no assumption about the subsystem being
+      -- up; and because the gate compares slot numbers rather than log positions, a
+      -- leader slot whose own EB forge is the first Leios activity still qualifies.
+      --
+      -- The node emits no positive readiness event, and its "wait for leios ready"
+      -- message recurs a dozen times in runs that do forge EBs, so that cannot serve
+      -- as the gate.
       leaderSlots : EventLog → List ℕ
-      leaderSlots []                     = []
-      leaderSlots (CNodeIsLeader s ∷ es) = primWord64ToNat s ∷ leaderSlots es
-      leaderSlots (_ ∷ es)               = leaderSlots es
+      leaderSlots es = case leiosActivitySlots es of λ where
+        []       → []
+        (a ∷ as) → leaderSlotsFrom (minSlot a as) es
 
       -- EB-production eligibility. The queried leadership schedule is authoritative
       -- and is used whenever it applies to the epoch under test. It does not always:

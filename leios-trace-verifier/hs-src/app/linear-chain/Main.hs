@@ -80,6 +80,13 @@ render = \case
     -- that slot's obligations.
     hPutStrLn stderr "stream ended: ok (slot in progress at end of input left unverified)"
     printActions acts
+  LeiosInactive led ->
+    hPutStrLn stderr $
+      "warning: the log shows no Leios activity — no EB forged, acquired, announced "
+        <> "or voted — so EB-role enforcement is suppressed for the "
+        <> show led
+        <> " slot(s) the node led. NodeIsLeader alone is Praos leadership, and only "
+        <> "implies EB eligibility while Leios is actually running."
   Summary entries -> summarize entries
 
 reportSchedule :: Segment -> Bool -> IO ()

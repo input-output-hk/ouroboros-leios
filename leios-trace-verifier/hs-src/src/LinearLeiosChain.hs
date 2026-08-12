@@ -14,6 +14,7 @@ module LinearLeiosChain (
   Progress (..),
   Carry (..),
   isCSlot,
+  isLeiosActivity,
   checkpointEvery,
   overlapSlots,
   carryAcross,
@@ -81,6 +82,10 @@ data Progress
     NothingToVerify
   | -- | Input ended with the final check passing; the actions adjudicated.
     StreamEnded [Text]
+  | -- | The segment holds slots the node led, but the log shows no Leios activity
+    --   at all, so EB-role enforcement is suppressed for them. Carries how many
+    --   such leader slots were seen.
+    LeiosInactive Int
   | -- | Per epoch, whether eligibility came from the queried schedule.
     Summary [(Integer, Bool)]
 
@@ -88,6 +93,18 @@ data Progress
 isCSlot :: ChainEvent -> Bool
 isCSlot (CSlot _) = True
 isCSlot _ = False
+
+-- | True iff the event shows the Leios subsystem itself doing something. Praos
+--   events — 'CNodeIsLeader', 'CRBForged' — deliberately do not count, since the
+--   point is to tell whether Leios is running at all.
+isLeiosActivity :: ChainEvent -> Bool
+isLeiosActivity ev = case ev of
+  CEBForged{} -> True
+  CEBAcquired{} -> True
+  CAnnouncementAccepted{} -> True
+  CVoted{} -> True
+  CVoteAcquired{} -> True
+  _ -> False
 
 -- | How many slots pass between periodic re-verifications within a segment.
 --
@@ -247,15 +264,26 @@ runSegmented report ts query = loop [] Nothing []
     report (SegmentStarted seg (carrySpans carry))
     pure (seg, (ep, segAuthoritative seg) : tally)
 
-  checkSeg seg prefix =
+  -- The EB-role gate lives in the translator, which cannot report. Say so wherever
+  -- a prefix is verified, rather than letting leader slots be silently exempted.
+  -- Both verification sites need this: a run too short to reach a periodic
+  -- checkpoint is verified only at end of input.
+  reportIfLeiosInactive prefix = do
+    let led = length [() | CNodeIsLeader _ <- prefix]
+    when (led > 0 && not (any isLeiosActivity prefix)) $
+      report (LeiosInactive led)
+
+  checkSeg seg prefix = do
+    reportIfLeiosInactive prefix
     let (acts, (status, detail)) = verifySegment ts seg prefix
-     in if status == "ok"
-          then report (Verified (length prefix) (length acts))
-          else report (Violation (length prefix) acts status detail)
+    if status == "ok"
+      then report (Verified (length prefix) (length acts))
+      else report (Violation (length prefix) acts status detail)
 
   finishSeg Nothing _ = report NothingToVerify
-  finishSeg (Just seg) prefix =
+  finishSeg (Just seg) prefix = do
+    reportIfLeiosInactive prefix
     let (acts, (status, detail)) = verifySegment ts seg prefix
-     in if status == "ok"
-          then report (StreamEnded acts)
-          else report (Violation (length prefix) acts status detail)
+    if status == "ok"
+      then report (StreamEnded acts)
+      else report (Violation (length prefix) acts status detail)
