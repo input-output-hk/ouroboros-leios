@@ -968,10 +968,12 @@ on evidence rather than a model.
 > [!WARNING]
 >
 > TODO: Link back to the implementation plan, dependencies and risks to introduce the need of a dimensional plan (hard fork coordination being a main driver and source of "dead time"). Also, what is a dimensional plan?
+
+Each stage is a cardano-node release scope that could be considered to hard-fork mainnet. Each release in composition, but also each item individually requires "high confidence". That is, quality assurance through testing, formal methods, statistical analysis and adersarial testing.
+
+> [!WARNING]
 >
-> TODO: Each stage is a cardano-node release scope that could be considered to hard-fork
->
-> TODO: motivate the scope cutting
+> TODO: motivate the scope cutting this way
 
 ## Stage 1: Dijkstra supports Leios
 
@@ -981,9 +983,7 @@ on evidence rather than a model.
   - Certificates in body
   - BLS key registration in pool registration cert in txs
   - Protocol parameters in txs
-
 - Constitution guard rails can reference Leios protocol parameters
-
 - Generate BLS keys
 - Create and submit pool registration with BLS keys
 - Query pool state showing key registration
