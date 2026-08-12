@@ -59,7 +59,13 @@ chainEvents = do
         , "{\"ns\":\"Consensus.LeiosKernel.Voted\",\"data\":{\"kind\":\"LeiosVoted\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":20},\"weight\":1.22e-2}}"
         , "{\"ns\":\"Consensus.LeiosKernel.VoteAcquired\",\"data\":{\"kind\":\"LeiosVoteAcquired\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":32}}}"
         ]
-        `shouldBe` [CVoted "eb05" 300, CVoteAcquired "eb05" 300]
+        `shouldBe` [CAnnouncementAccepted "eb05" 300, CVoted "eb05" 300, CVoteAcquired "eb05" 300]
+    it "emits AnnouncementAccepted, which is what makes an EB votable" $
+      parse ["{\"ns\":\"Consensus.LeiosKernel.AnnouncementAccepted\",\"data\":{\"kind\":\"LeiosAnnouncementAccepted\",\"ebHash\":\"eb06\",\"electionSlot\":301,\"ebBodySize\":1,\"equivocation\":false}}"]
+        `shouldBe` [CAnnouncementAccepted "eb06" 301]
+    it "parses NodeIsLeader" $
+      parse ["{\"ns\":\"Forge.Loop.NodeIsLeader\",\"data\":{\"kind\":\"TraceNodeIsLeader\",\"slot\":7}}"]
+        `shouldBe` [CNodeIsLeader 7]
     it "drops votes whose linkage is missing (truncated log prefix)" $
       parse ["{\"ns\":\"Consensus.LeiosKernel.VoteAcquired\",\"data\":{\"kind\":\"LeiosVoteAcquired\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":1}}}"]
         `shouldBe` []

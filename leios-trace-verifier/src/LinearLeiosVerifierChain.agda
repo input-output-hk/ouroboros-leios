@@ -33,6 +33,7 @@ module LinearLeiosVerifierChain where
     CVoteAcquired : String → Word64 → ChainEvent
     CRBForged    : String → Word64 → ChainEvent
     CNodeIsLeader : Word64 → ChainEvent
+    CAnnouncementAccepted : String → Word64 → ChainEvent
 
   {-# FOREIGN GHC import qualified ChainEvents #-}
   {-# COMPILE GHC ChainEvent = data ChainEvents.ChainEvent
@@ -43,6 +44,7 @@ module LinearLeiosVerifierChain where
         | ChainEvents.CVoteAcquired
         | ChainEvents.CRBForged
         | ChainEvents.CNodeIsLeader
+        | ChainEvents.CAnnouncementAccepted
         ) #-}
 
   module _
@@ -271,17 +273,27 @@ module LinearLeiosVerifierChain where
       traceEvent→action a (CEBForged h s) =
         let eb = mkEBrec h s
         in (record a { EB-refs = (h , eb) ∷ EB-refs a ; forgedEB = just eb } , [])
+      -- Acquiring an EB means its body is in hand, which is what Slot₁ ingestion
+      -- models. It says nothing about the EB being announced on the chain, so it must
+      -- not set 'curEB': doing so made VT-Role possible for any EB the node merely
+      -- fetched, and a node is right not to vote for one its chain never announced.
       traceEvent→action a (CEBAcquired h s) =
         let eb = mkEBrec h s
         in (record a
               { EB-refs = (h , eb) ∷ EB-refs a
               ; EB-received = (h , curSlot a) ∷ EB-received a
               ; FFD-blks = EB-Blk eb ∷ FFD-blks a
-              ; curEB = just h
               } , [])
+      -- The chain head announces this EB, which is what 'getCurrentEBHash' denotes.
+      -- This, and not acquisition, is what makes the EB votable.
+      traceEvent→action a (CAnnouncementAccepted h _) =
+        (record a { curEB = just h } , [])
+      -- Deliberately does not touch 'curEB': letting a vote establish its own
+      -- precondition would make VT-Role self-justifying, hiding a node that voted for
+      -- an EB its chain never announced.
       traceEvent→action a (CVoted h s)
         with EB-refs a ⁉ h | EB-received a ⁉ h
-      ... | just eb | just slot' = (record a { votedEB = just (eb , slot') ; curEB = just h } , [])
+      ... | just eb | just slot' = (record a { votedEB = just (eb , slot') } , [])
       ... | _       | _          = (a , [])
       traceEvent→action a (CVoteAcquired _ _) =
         (record a { FFD-blks = VT-Blk (tt ∷ []) ∷ FFD-blks a } , [])

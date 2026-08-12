@@ -58,6 +58,11 @@ data ChainEvent
     --   the cardano-api schedule it covers every epoch the log spans, which makes it
     --   usable as a fallback when the query cannot supply a schedule for an epoch.
     CNodeIsLeader !Word64
+  | -- | @Consensus.LeiosKernel.AnnouncementAccepted@: the chain head now announces
+    --   this EB (ebHash, election slot). This — not acquiring the body — is what
+    --   makes an EB votable, so it is what the verifier must key voting obligations
+    --   on. Also retained internally as vote-resolution linkage.
+    CAnnouncementAccepted !Text !Word64
   deriving (Eq, Show, Generic)
 
 -- | Internal: one parsed line — a directly-emittable event, a linkage fact
@@ -89,7 +94,9 @@ parseNodeLog =
   step !st raw = case raw of
     RawEvent ev -> (st, Just ev)
     RawAnn slot ebHash ->
-      (st{lsEbBySlot = Map.insert slot ebHash (lsEbBySlot st)}, Nothing)
+      ( st{lsEbBySlot = Map.insert slot ebHash (lsEbBySlot st)}
+      , Just (CAnnouncementAccepted ebHash slot)
+      )
     RawRb rbHash slot ->
       (st{lsSlotByRb = Map.insert rbHash slot (lsSlotByRb st)}, Nothing)
     RawVote ours rbHash ->
