@@ -77,9 +77,11 @@ data Segment = Segment
 --   boundary the node is re-queried for that epoch's leadership schedule and
 --   stake distribution, and a fresh segment is started from the boundary slot —
 --   so no process restart is needed and re-verification cost stays bounded per
---   epoch rather than growing over the whole run. Votes that straddle a boundary
---   (an EB from the previous epoch voted in the next) are a known limitation of the
---   hard reset.
+--   epoch rather than growing over the whole run. A segment does not begin exactly
+--   at the boundary, though: it carries 'overlapSlots' of the outgoing epoch with it,
+--   so an obligation raised there but falling due after the boundary is still
+--   checked. A clean cut would clear EBs' and curEB, and such a vote would then pass
+--   vacuously.
 --
 --   A node can only answer for its own current epoch, and not at all until pool
 --   stake has activated two epochs in. A log that starts at genesis therefore
@@ -116,31 +118,58 @@ runSegmented opts (lhdr, lvote, ldiff, validityCheckTime) evs = do
           case mseg of
             Just old -> checkSeg old (Prelude.reverse (ev : seen))
             Nothing -> pure ()
-          -- (re-)query and start fresh. No check here: a lone CSlot closes no
-          -- slot, so there would be nothing to verify yet.
-          seg <- newSegment tally (toInteger s)
-          loop tally (Just seg) [ev] rest
+          -- Carry the tail of the outgoing epoch into the new segment, so that an
+          -- obligation raised before the boundary and falling due after it is still
+          -- checked. No check here: the carried slots were just adjudicated by the
+          -- outgoing segment, and the boundary slot itself is still in progress.
+          let carried = Prelude.takeWhile (notBefore (toInteger s - overlapSlots)) seen
+              seen' = ev : carried
+              start = earliestSlot (toInteger s) seen'
+          seg <- newSegment tally (toInteger s) start (not (Prelude.null carried))
+          loop tally (Just seg) seen' rest
       _ -> loop tally mseg (ev : seen) rest
 
-  newSegment :: IORef [(Integer, Bool)] -> Integer -> IO Segment
-  newSegment tally s = do
-    cd <- queryChain opts
-    let ep = s `div` cdEpochLength cd
-        -- Authoritative only if a schedule was obtained and it describes this very
-        -- epoch. Otherwise the log supplies eligibility and the segment is still
-        -- verified — an unusable schedule is no longer a reason to skip an epoch.
-        authoritative = maybe False (const (ep == cdNodeEpoch cd)) (cdWinningSlots cd)
-    reportSchedule cd ep s authoritative
-    modifyIORef' tally ((ep, authoritative) :)
-    pure Segment{segEpoch = ep, segStart = s, segCD = cd, segAuthoritative = authoritative}
+  -- How far back an obligation can reach. An EB with election slot e becomes votable
+  -- in slot e + (3 * Lhdr `max` validityCheckTime), and its acquisition may lag the
+  -- election by up to Lhdr, so carrying that many slots covers every obligation able
+  -- to straddle a boundary.
+  overlapSlots :: Integer
+  overlapSlots = Prelude.max (3 * lhdr) validityCheckTime + lhdr
 
-  reportSchedule :: ChainData -> Integer -> Integer -> Bool -> IO ()
-  reportSchedule cd ep s authoritative = do
+  notBefore :: Integer -> ChainEvent -> Bool
+  notBefore cutoff (CSlot sl) = toInteger sl >= cutoff
+  notBefore _ _ = True
+
+  -- Earliest slot tick among a segment's events, which is where verification starts.
+  earliestSlot :: Integer -> [ChainEvent] -> Integer
+  earliestSlot dflt es = case [toInteger sl | CSlot sl <- es] of
+    [] -> dflt
+    ss -> Prelude.minimum ss
+
+  newSegment :: IORef [(Integer, Bool)] -> Integer -> Integer -> Bool -> IO Segment
+  newSegment tally boundary start spansEpochs = do
+    cd <- queryChain opts
+    let ep = boundary `div` cdEpochLength cd
+        -- Authoritative only if a schedule was obtained, it describes this very
+        -- epoch, and this segment lies wholly inside that epoch. A segment carrying
+        -- an overlap spans two, so no single epoch's schedule governs all of it and
+        -- eligibility has to come from the log. Otherwise an EB forged in the carried
+        -- tail would be judged against the following epoch's lottery.
+        authoritative =
+          not spansEpochs
+            && maybe False (const (ep == cdNodeEpoch cd)) (cdWinningSlots cd)
+    reportSchedule cd ep start spansEpochs authoritative
+    modifyIORef' tally ((ep, authoritative) :)
+    pure Segment{segEpoch = ep, segStart = start, segCD = cd, segAuthoritative = authoritative}
+
+  reportSchedule :: ChainData -> Integer -> Integer -> Bool -> Bool -> IO ()
+  reportSchedule cd ep s spansEpochs authoritative = do
     hPutStrLn stderr $
       "epoch "
         <> show ep
         <> " (from slot "
         <> show s
+        <> (if spansEpochs then ", carrying the tail of the previous epoch" else "")
         <> "): "
         <> show (cdNumParties cd)
         <> " parties, SUT at index "
@@ -157,6 +186,12 @@ runSegmented opts (lhdr, lvote, ldiff, validityCheckTime) evs = do
               <> show (Prelude.length slots)
               <> " winning slots "
               <> show slots
+        | spansEpochs ->
+            "the log (this segment spans two epochs, so the schedule "
+              <> show slots
+              <> " for epoch "
+              <> show (cdNodeEpoch cd)
+              <> " cannot govern all of it)"
         | otherwise ->
             "the log (the node answered for epoch "
               <> show (cdNodeEpoch cd)
