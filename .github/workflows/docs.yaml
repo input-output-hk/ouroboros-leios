@@ -218,7 +218,7 @@ jobs:
           path: site/static/mempool-viz
 
       - name: 🔧 Setup Nix
-        uses: cachix/install-nix-action@v24
+        uses: cachix/install-nix-action@v31.11.0
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes

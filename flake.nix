@@ -18,7 +18,23 @@
 
     iogx.url = "github:input-output-hk/iogx";
 
-    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=a654a1761476fcf8e6a43aeedbc1455bd7ad77db";
+    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=eeb5b2da0083cf3b7a9e80d172685ae941638125";
+
+    # Trace verifier only: it links cardano-api against the Leios prototype
+    # node's pins (cabal.project.trace-verifier), which need newer
+    # CHaP/hackage snapshots than iogx's. A dedicated haskell.nix instance
+    # keeps the rest of this flake identical to main. Snapshots must be
+    # at/after cabal.project.trace-verifier's index-states
+    # (hackage 2026-07-15T21:58:35Z / CHaP 2026-07-27T20:44:57Z, the
+    # prototype-2026w32 node's pins).
+    haskell-nix-tv = {
+      url = "github:input-output-hk/haskell.nix/ef52c36b9835c77a255befe2a20075ba71e3bfab";
+      inputs.hackage.url = "github:input-output-hk/hackage.nix/956836e90e902e23b7bf080a0c9d0a88ddf0273a";
+    };
+    CHaP-tv = {
+      url = "github:intersectmbo/cardano-haskell-packages/60ad9c29de7b30cb480547110cffad0cb6c71ab2";
+      flake = false;
+    };
 
     flake-parts.url = "github:hercules-ci/flake-parts";
 

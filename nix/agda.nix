@@ -62,6 +62,7 @@ let
     p.abstract-set-theory
     p.agda-categories
     p.iog-prelude
+    p.categorical-crypto
     leiosSpec
   ]);
 
