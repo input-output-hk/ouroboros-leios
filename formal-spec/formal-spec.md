@@ -38,12 +38,16 @@ Abstract interface, specifing core types and functions
 </pre>### Cryptographic Foundations
 Category-theoretic approach to cryptography
 <pre class="Agda"><a id="1370" class="Keyword">open</a> <a id="1375" class="Keyword">import</a> <a id="1382" href="CategoricalCrypto.html" class="Module">CategoricalCrypto</a>
+<a id="1400" class="Keyword">import</a> <a id="1407" href="CategoricalCrypto.Ext.html" class="Module">CategoricalCrypto.Ext</a>
+</pre>### Blockchain abstractions
+<pre class="Agda"><a id="1469" class="Keyword">import</a> <a id="1476" href="Blockchain.Liveness.Transfer.html" class="Module">Blockchain.Liveness.Transfer</a>
 </pre>### Network Layer
 Basic broadcast networking primitives
-<pre class="Agda"><a id="1468" class="Keyword">open</a> <a id="1473" class="Keyword">import</a> <a id="1480" href="Network.BasicBroadcast.html" class="Module">Network.BasicBroadcast</a>
+<pre class="Agda"><a id="1573" class="Keyword">open</a> <a id="1578" class="Keyword">import</a> <a id="1585" href="Network.BasicBroadcast.html" class="Module">Network.BasicBroadcast</a>
+<a id="1608" class="Keyword">open</a> <a id="1613" class="Keyword">import</a> <a id="1620" href="Network.Leios.html" class="Module">Network.Leios</a>
 </pre>### Verification and Testing
 Trace verification for protocol properties
-<pre class="Agda"><a id="1587" class="Keyword">open</a> <a id="1592" class="Keyword">import</a> <a id="1599" href="Leios.Linear.Trace.Verifier.html" class="Module">Leios.Linear.Trace.Verifier</a>
-<a id="1627" class="Keyword">open</a> <a id="1632" class="Keyword">import</a> <a id="1639" href="Leios.Linear.Trace.Verifier.Test.html" class="Module">Leios.Linear.Trace.Verifier.Test</a>
-<a id="1672" class="Keyword">open</a> <a id="1677" class="Keyword">import</a> <a id="1684" href="Test.Defaults.html" class="Module">Test.Defaults</a>
+<pre class="Agda"><a id="1718" class="Keyword">open</a> <a id="1723" class="Keyword">import</a> <a id="1730" href="Leios.Linear.Trace.Verifier.html" class="Module">Leios.Linear.Trace.Verifier</a>
+<a id="1758" class="Keyword">open</a> <a id="1763" class="Keyword">import</a> <a id="1770" href="Leios.Linear.Trace.Verifier.Test.html" class="Module">Leios.Linear.Trace.Verifier.Test</a>
+<a id="1803" class="Keyword">open</a> <a id="1808" class="Keyword">import</a> <a id="1815" href="Test.Defaults.html" class="Module">Test.Defaults</a>
 </pre>

@@ -12,7 +12,9 @@ and defines a Freshest First Delivery (FFD) for Leios Blocks.
 <a id="332" class="Keyword">open</a> <a id="337" class="Keyword">import</a> <a id="344" href="Tactic.Defaults.html" class="Module">Tactic.Defaults</a>
 <a id="360" class="Keyword">open</a> <a id="365" class="Keyword">import</a> <a id="372" href="Tactic.Derive.DecEq.html" class="Module">Tactic.Derive.DecEq</a>
 
-<a id="393" class="Keyword">module</a> <a id="400" href="Leios.Blocks.html" class="Module">Leios.Blocks</a> <a id="413" class="Symbol">(</a><a id="414" href="Leios.Blocks.html#414" class="Bound">a</a> <a id="416" class="Symbol">:</a> <a id="418" href="Leios.Abstract.html#452" class="Record">LeiosAbstract</a><a id="431" class="Symbol">)</a> <a id="433" class="Symbol">(</a><a id="434" class="Keyword">let</a> <a id="438" class="Keyword">open</a> <a id="443" href="Leios.Abstract.html#452" class="Module">LeiosAbstract</a> <a id="457" href="Leios.Blocks.html#414" class="Bound">a</a><a id="458" class="Symbol">)</a> <a id="460" class="Keyword">where</a>
+<a id="393" class="Keyword">module</a> <a id="400" href="Leios.Blocks.html" class="Module">Leios.Blocks</a>
+  <a id="415" class="Symbol">(</a><a id="416" href="Leios.Blocks.html#416" class="Bound">a</a> <a id="418" class="Symbol">:</a> <a id="420" href="Leios.Abstract.html#452" class="Record">LeiosAbstract</a><a id="433" class="Symbol">)</a>
+  <a id="437" class="Symbol">(</a><a id="438" class="Keyword">open</a> <a id="443" href="Leios.Abstract.html#452" class="Module">LeiosAbstract</a> <a id="457" href="Leios.Blocks.html#416" class="Bound">a</a><a id="458" class="Symbol">)</a> <a id="460" class="Keyword">where</a>
 
 <a id="467" class="Comment">-- IsBlock typeclass (could do a closed-world approach instead)</a>
 <a id="531" class="Comment">-- Q: should votes have an instance of this class?</a>
