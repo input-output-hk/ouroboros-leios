@@ -323,6 +323,11 @@ queryChainOnce LeadershipOpts{..} = do
     Left err -> die ("local state query failed: " <> show err)
     Right (eSlots, stakeDistr, nodeEpoch) ->
       let mSlots = case eSlots of
+            -- No active stake is a state, not a fault: the schedule is KNOWN
+            -- empty (every production obligation is vacuous), unlike other
+            -- leadership errors, where it is unknown and we fall back to the
+            -- node log for EB eligibility.
+            Left (Api.LeaderErrStakePoolHasNoStake _) -> Just []
             Left _ -> Nothing
             Right slots -> Just (Prelude.map (toInteger . Api.unSlotNo) (Set.toList slots))
           mErr = case eSlots of
@@ -350,7 +355,13 @@ buildChainData ::
   Map.Map (Api.Hash Api.StakePoolKey) Rational ->
   ChainData
 buildChainData sutPool epochLength nodeEpoch winning m =
-  let pairs = Map.toList m -- sorted by pool-id, deterministic
+  -- A SUT absent from the distribution (no stake at all) joins as a
+  -- zero-stake party at the end: keeps the party set total for the spec
+  -- side, and the committee arithmetic correctly excludes it.
+  let pairs0 = Map.toList m -- sorted by pool-id, deterministic
+      pairs
+        | Prelude.any ((== sutPool) . fst) pairs0 = pairs0
+        | otherwise = pairs0 <> [(sutPool, 0)]
       nodeName i = T.pack ("node-" <> show (i :: Int))
       scaleStake r = floor (r * 1000000000) :: Integer
       stakeDist = [(nodeName i, scaleStake r) | (i, (_, r)) <- Prelude.zip [0 ..] pairs]
