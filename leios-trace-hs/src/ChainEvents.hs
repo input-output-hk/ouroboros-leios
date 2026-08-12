@@ -17,14 +17,17 @@
 --
 --     * election slot -> ebHash            (from @AnnouncementAccepted@; in
 --       Linear Leios the announcing RB and its EB share the election slot)
---     * rbHash -> slot                     (from @AddedToCurrentChain@)
+--     * rbHash -> slot                     (from @AddedToCurrentChain@ and
+--       @SwitchedToAFork@, the two ways ChainDB reports a new selection; both
+--       carry the adopted tip in @newtip@, and a node votes on the RB it
+--       selected however it came to select it)
 --
 --   composed at each vote event to resolve rbHash -> (ebHash, ebSlot).
 --   Unresolvable votes (linkage missing, e.g. truncated log prefix) are
 --   dropped rather than guessed.
 module ChainEvents where
 
-import Data.Aeson (Value, decode, withObject, (.:))
+import Data.Aeson (Object, Value, decode, withObject, (.:))
 import Data.Aeson.Types (Parser, parseMaybe)
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import Data.List (mapAccumL)
@@ -133,9 +136,11 @@ pRaw = withObject "logline" $ \o -> do
     "Consensus.LeiosKernel.VoteAcquired" -> do
       v <- d .: "vote"
       RawVote False <$> v .: "rbHash"
-    "ChainDB.AddBlockEvent.AddedToCurrentChain" -> do
-      tip <- d .: "newtip"
-      maybe (fail "unparseable newtip") (pure . uncurry RawRb) (parseTip tip)
+    -- Extending the current chain and switching to a fork are the two ways
+    -- ChainDB reports adopting a new tip. Ignoring the latter silently drops
+    -- every vote for an RB that arrived on a fork.
+    "ChainDB.AddBlockEvent.AddedToCurrentChain" -> newtip d
+    "ChainDB.AddBlockEvent.SwitchedToAFork" -> newtip d
     -- pre-w31 envelope (kept for older logs)
     "Consensus.LeiosKernel.TraceLeiosKernel" -> do
       kind <- d .: "kind"
@@ -150,6 +155,12 @@ pRaw = withObject "logline" $ \o -> do
           RawEvent <$> (CVoteAcquired <$> v .: "ebHash" <*> v .: "slot")
         _ -> fail "unhandled LeiosKernel kind"
     _ -> fail "unhandled ns"
+
+-- | The newly adopted tip, shared by ChainDB's two selection-change events.
+newtip :: Object -> Parser Raw
+newtip d = do
+  tip <- d .: "newtip"
+  maybe (fail "unparseable newtip") (pure . uncurry RawRb) (parseTip tip)
 
 -- | @"\<64 hex chars\>@\<decimal slot\>"@ from ChainDB's @newtip@ field.
 parseTip :: Text -> Maybe (Text, Word64)

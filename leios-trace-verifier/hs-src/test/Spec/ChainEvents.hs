@@ -4,7 +4,8 @@
 --   node trace schemas: the pre-w31 combined @TraceLeiosKernel@ namespace and
 --   the w31+ per-event namespaces with RB-keyed votes. w31+ votes are
 --   resolved via two linkage facts: @AnnouncementAccepted@ (election slot →
---   ebHash) composed with ChainDB @AddedToCurrentChain@ (rbHash → slot).
+--   ebHash) composed with ChainDB's selection-change events,
+--   @AddedToCurrentChain@ and @SwitchedToAFork@ (rbHash → slot).
 --   Payload shapes mirror real node.log lines.
 module Spec.ChainEvents (
   chainEvents,
@@ -60,6 +61,18 @@ chainEvents = do
         , "{\"ns\":\"Consensus.LeiosKernel.VoteAcquired\",\"data\":{\"kind\":\"LeiosVoteAcquired\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":32}}}"
         ]
         `shouldBe` [CAnnouncementAccepted "eb05" 300, CVoted "eb05" 300, CVoteAcquired "eb05" 300]
+    -- An RB can be adopted by switching to a fork rather than by extending the
+    -- current chain. Both report the adopted tip in 'newtip', and the node votes
+    -- on whatever it selected, so both must feed the linkage map. Listening only
+    -- to AddedToCurrentChain silently drops the vote, which reads downstream as
+    -- an unexplained abstention.
+    it "resolves votes for an RB adopted by switching to a fork" $
+      parse
+        [ "{\"ns\":\"Consensus.LeiosKernel.AnnouncementAccepted\",\"data\":{\"kind\":\"LeiosAnnouncementAccepted\",\"ebHash\":\"eb07\",\"electionSlot\":699,\"ebBodySize\":70347,\"equivocation\":false}}"
+        , "{\"ns\":\"ChainDB.AddBlockEvent.SwitchedToAFork\",\"data\":{\"kind\":\"TraceAddBlockEvent.SwitchedToAFork\",\"newSuffixSelectView\":{\"blockNo\":32,\"kind\":\"PraosTiebreakerView\",\"slotNo\":699},\"newtip\":\"" <> rb64 <> "@699\"}}"
+        , "{\"ns\":\"Consensus.LeiosKernel.Voted\",\"data\":{\"kind\":\"LeiosVoted\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":2},\"weight\":0.333333333333}}"
+        ]
+        `shouldBe` [CAnnouncementAccepted "eb07" 699, CVoted "eb07" 699]
     it "emits AnnouncementAccepted, which is what makes an EB votable" $
       parse ["{\"ns\":\"Consensus.LeiosKernel.AnnouncementAccepted\",\"data\":{\"kind\":\"LeiosAnnouncementAccepted\",\"ebHash\":\"eb06\",\"electionSlot\":301,\"ebBodySize\":1,\"equivocation\":false}}"]
         `shouldBe` [CAnnouncementAccepted "eb06" 301]

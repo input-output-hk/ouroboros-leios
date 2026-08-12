@@ -109,6 +109,19 @@ twoAnnouncementsInOneSlot =
        ]
     <> ticks 6 9
 
+-- | Announcements in consecutive slots. The EB announced at slot 2 is superseded as
+--   the head at slot 3, before its own vote window opens at 5, so slot 5 abstains
+--   legally and the only vote due is for the later EB at slot 6. Observed against a
+--   devnet as announcements at 698 and 699 with a single vote at 702.
+supersededBeforeVotable :: [ChainEvent]
+supersededBeforeVotable =
+  ticks 0 1
+    <> [CSlot 2, CAnnouncementAccepted "eb2" 2, CEBAcquired "eb2" 2]
+    <> [CSlot 3, CAnnouncementAccepted "eb3" 3, CEBAcquired "eb3" 3]
+    <> [CSlot 4, CSlot 5]
+    <> [CSlot 6, CVoted "eb3" 3]
+    <> ticks 7 9
+
 -- | A vote for an EB the chain never announced must not establish its own
 --   precondition by supplying the head for its slot.
 voteForUnannouncedEB :: [ChainEvent]
@@ -179,7 +192,7 @@ chainSegments = do
       segmentAuthoritative True 3 stubChainData{cdWinningSlots = Just [31], cdNodeEpoch = 3}
         `shouldBe` False
 
-  describe "two announcements inside one slot" $ do
+  describe "which announced EB heads a slot" $ do
     it "adjudicates the slot against the EB that was voted for" $ do
       ps <- collectWith 100 twoAnnouncementsInOneSlot
       violations ps `shouldBe` []
@@ -187,6 +200,9 @@ chainSegments = do
       -- eb2 was acquired but never announced, so it was never votable; the vote
       -- must not make itself legal by becoming the slot's head.
       ps <- collectWith 100 voteForUnannouncedEB
+      violations ps `shouldBe` []
+    it "raises no obligation for a head superseded before its vote window opens" $ do
+      ps <- collectWith 100 supersededBeforeVotable
       violations ps `shouldBe` []
 
   describe "Praos leadership without Leios running" $ do
