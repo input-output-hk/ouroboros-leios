@@ -252,7 +252,7 @@ several of them progress in parallel and feed back into each other:
 | Prototype      | Explored in simulation or on real infrastructure, enough to trust the approach is feasible.                                        |
 | Design         | *How* to build it in `cardano-node` is written down in the [technical design](https://leios.cardano-scaling.org/leios-design.pdf). |
 | Implementation | Production code exists in `cardano-node` (and, eventually, other node implementations).                                            |
-| Confidence     | Quality assurance — testing, formal methods, statistical analysis and adversarial testing — sufficient to hard-fork mainnet.       |
+| Confidence     | Quality assurance — formal methods, statistical analysis, e2e and adversarial testing — sufficient to hard-fork mainnet.           |
 
 :::warning[This is a work-in-progress self-assessment]
 
@@ -262,24 +262,16 @@ Please read the marks below with several grains of salt:
   implementation team sees the state of things at the time of writing. Nothing
   here has been externally audited, and none of it constitutes acceptance
   criteria, a commitment, or a schedule.
-- **The underlying document is a draft.** This page is derived from the
-  [Leios technical design and implementation plan](https://leios.cardano-scaling.org/leios-design.pdf),
-  a living document that "reflects our current understanding of the protocol" and
-  still carries open TODOs in most chapters. Where the design is still being
-  argued out, that shows up here as a `?` or `~` rather than as a settled answer.
-- **The component breakdown is not exhaustive.** The design document itself asks
-  whether it covers everything; components and their names will change as the
-  architecture firms up.
-- **Known gaps are not yet reflected.** Interactions with Peras, Genesis and
-  on-disk storage (UTxO-HD / Ledger-HD) are acknowledged as open points in the
-  design document but are not tracked as components here.
-- **Open design questions sit behind several marks.** How strong a
-  Praos-over-Leios bias is actually needed, which EB to prioritize and from which
-  peer to fetch it, staging area versus enhanced chain selection, and how much of
-  the mempool model has to change are all still being worked out.
-- **Nothing is "done" until it is confident.** A component with everything but
+- **Its a moving target.** The CIP is mostly stable, but the detailed
+  [node-level design](https://leios.cardano-scaling.org/leios-design.pdf) is a
+  living document and still evolves along with prototyping and confidence
+  seeking work chapters. Open questions are indicated by `?` items, but
+  visibility may be incomplete.
+- **Nothing is "done" until high confidence.** A component with everything but
   the confidence stage marked is not ready for mainnet. That last column is the
-  gate, and it is empty nearly everywhere.
+  gate, and it is empty nearly everywhere. Furthermore, attaining high
+  confidence on some components may raise issues with others and may uncover
+  more work.
 
 :::
 
@@ -298,19 +290,15 @@ The same implementation scope, cut along the other dimension: each stage is a
 only the release as a whole, but each individual item requires "high confidence"
 before that step is taken. Scope items take their status from the component
 breakdown above; where an item groups several sub-items, it shows the roll-up of
-those. See the
-[dimensional plan](https://leios.cardano-scaling.org/leios-design.pdf) for the
-staging itself.
+those. See the [dimensional
+plan](https://leios.cardano-scaling.org/leios-design.pdf) for the staging
+itself.
 
 :::warning[The staging is provisional]
 
-- **The rationale is not written down yet.** The design document still has this
-  chapter marked with open TODOs: why a dimensional plan is needed at all, and
-  why the scope is cut in exactly these stages, are questions we owe an answer
-  to. Expect the cuts to move.
-- **The stage contents are incomplete.** Several stages end in an open "…?" in
-  the source document — items are still being discovered, and an empty-looking
-  stage table is not evidence of a small scope.
+- **The stage contents may be incomplete.** As we are continously prototyping and
+  validating, implementation items are still being discovered, and an
+  empty-looking stage table is not evidence of a small scope.
 - **The parameter tuples are illustrative.** Names like "0/0/∞/0/0" or
   "1/4/7/100k/1M" sketch the intent of a stage, not agreed values; the Leios
   protocol parameter set is still being finalized and would in any case be
