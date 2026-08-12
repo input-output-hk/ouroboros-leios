@@ -10,6 +10,7 @@ open import Data.Bool using (if_then_else_)
 import Data.Nat.Show as S
 import Data.String as S
 open import Agda.Builtin.Word using (Word64; primWord64ToNat)
+open import Agda.Builtin.Char using (primCharToNat)
 open import Foreign.Haskell.Pair
 
 open import Tactic.Defaults
@@ -130,18 +131,27 @@ module LinearLeiosVerifierChain where
         VT-Blk : List Vote → Blk
         RB-Blk : RankingBlock → Blk
 
-      -- Synthesized non-empty transaction list (the node records only counts).
-      -- Must agree with the 'ToPropose' established by 'closeSlot', otherwise the
-      -- EB the spec derives from the mempool will not match 'mkEBrec' below.
+      -- Fallback payload for a slot in which the node forged nothing (it records
+      -- only counts, never contents). Needs only to be non-empty, so that
+      -- 'toProposeEB' returns 'just' and a failing EB-Role is attributable to
+      -- 'canProduceEB' alone.
       synthTxs : List Tx
       synthTxs = 0 ∷ []
 
+      -- EB payload, derived injectively from the EB hash string. 'Defaults' hashes
+      -- an EB to its transaction list, so a constant payload collapses every EB to
+      -- a single spec-level hash: 'getCurrentEBHash' then matches whichever EB
+      -- happens to come first in 'EBs'', and the second vote of a run is rejected
+      -- as 'Already voted' because 'VotedEBs' already holds that hash.
+      txsOfHash : String → List Tx
+      txsOfHash h = L.map primCharToNat (S.toList h)
+
       mkEBrec : String → Word64 → EndorserBlock
-      mkEBrec _ s = record
+      mkEBrec h s = record
         { slotNumber = primWord64ToNat s
         ; producerID = SUT-id
         ; lotteryPf  = tt
-        ; txs        = synthTxs
+        ; txs        = txsOfHash h
         ; signature  = tt
         }
 
@@ -191,16 +201,18 @@ module LinearLeiosVerifierChain where
       closeSlot : Accumulator → List Step
       closeSlot a =
         let s = curSlot a
-            -- node.log carries no mempool contents, so re-establish the
-            -- synthesized proposal set at the head of every slot. Without it
-            -- 'ToPropose' stays empty, 'toProposeEB' is always 'nothing', and
-            -- EB-Role's first premise is unsatisfiable — leaving every forged EB
-            -- unverifiable. 'synthTxs' is chosen so the EB the spec derives from
-            -- 'ToPropose' coincides with the one 'mkEBrec' builds. 'Base₁' has no
-            -- premises, records no upkeep and only overwrites 'ToPropose', so
-            -- re-emitting it each slot is idempotent.
+            -- node.log carries no mempool contents, so re-establish a proposal set
+            -- at the head of every slot. Without it 'ToPropose' stays empty,
+            -- 'toProposeEB' is always 'nothing', and EB-Role's first premise is
+            -- unsatisfiable — leaving every forged EB unverifiable. In a slot with
+            -- a forge the payload has to be that of the forged EB itself, since
+            -- EB-Role checks 'toProposeEB s π ≡ just eb'. 'Base₁' has no premises,
+            -- records no upkeep and only overwrites 'ToPropose', so re-emitting it
+            -- each slot is idempotent.
             mempool : List Step
-            mempool = (Base₁-Action s , inj₂ (inj₂ (SubmitTxs synthTxs))) ∷ []
+            mempool = case forgedEB a of λ where
+              (just eb) → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs (EndorserBlockOSig.txs eb)))) ∷ []
+              nothing   → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs synthTxs))) ∷ []
             annRB : List Step
             annRB = case curEB a of λ where
               nothing  → []
