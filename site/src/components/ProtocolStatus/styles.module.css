@@ -1,10 +1,10 @@
 .root {
   margin: 1.5rem 0 2rem;
   --done: #4ade80;
-  --ongoing: #eab308;
+  --ongoing: #facc15;
   --missing: #ef4444;
-  --open: #f87171;
-  --empty: #d4d4d8;
+  --open: #fb923c;
+  --empty: #f87171;
   --widget-bg: var(--ifm-background-surface-color, #fff);
   --widget-border: var(--ifm-color-emphasis-300, #d1d5db);
   --widget-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
@@ -216,9 +216,8 @@
   color: #1f2937;
 }
 .pip_empty {
-  background: transparent;
-  border: 1px dashed var(--ifm-color-emphasis-400, #9ca3af);
-  color: var(--ifm-color-emphasis-500, #6b7280);
+  background: var(--empty);
+  color: #1f2937;
 }
 
 .markText {
@@ -295,10 +294,10 @@
 
 .matrixWrap {
   --done: #4ade80;
-  --ongoing: #eab308;
+  --ongoing: #facc15;
   --missing: #ef4444;
-  --open: #f87171;
-  --empty: #d4d4d8;
+  --open: #fb923c;
+  --empty: #f87171;
   overflow-x: auto;
   margin: 1rem 0 2rem;
 }
