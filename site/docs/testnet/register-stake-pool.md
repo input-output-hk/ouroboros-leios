@@ -164,6 +164,18 @@ cardano-cli dijkstra node issue-op-cert \
 Two things go on-chain together: your **stake address** (a 2 ada deposit)
 and your **pool** (a 500 ada deposit). Build both certificates, then
 submit them in a single transaction.
+:::tip Joining the Rewards Program?
+The [Rewards Program](./rewards-program.md) rewards stake pool
+operators for running a pool on MusashiNet and sharing operational data.
+Proving you control the pool requires an **Application Code** in the
+metadata of *this* transaction, so read that page and apply before you
+submit, and you avoid sending a second registration certificate later.
+Applying needs only your pool id, which you already have:
+
+```shell
+cardano-cli dijkstra stake-pool id --output-bech32 --cold-verification-key-file cold.vkey
+```
+:::
 
 Stake-address registration certificate:
 
@@ -196,7 +208,7 @@ cardano-cli dijkstra stake-pool registration-certificate \
 The `cardano-cli` command for creating a pool registration certificate now
 requires a BLS key. The Musashi testnet does not utilize it yet at the time of
 writing, but transactions carrying it are already accepted. Reach out on the
-[Musashi Dōjō Discord](https://discord.gg/Bx2qvsjCte) if you need help to
+[Musashi Dōjō Discord](https://discord.gg/AyUXD9VHn) if you need help to
 register a pool.
 :::
 
@@ -377,6 +389,12 @@ Once your pool is registered and your node is forging, you are a block
 producer on the testnet. Block production begins after the stake snapshot
 takes effect — roughly two epochs after registration.
 
+**Getting rewarded for it.** The
+[Rewards Program](./rewards-program.md) pays up to 100
+pools for staying reachable, sharing telemetry and producing blocks. If
+you did not apply before registering, you can still join by submitting an
+updated registration certificate carrying your Application Code.
+
 ## What to send back
 
 The testnet is where the protocol practices in public, and what you see
@@ -388,7 +406,7 @@ When you report, include three things: the command or action you took,
 what you expected, and what actually happened. Attach your node version
 (`cardano-node --version`) and the relevant log lines.
 
-- **Discord:** the [Musashi Dōjō Discord](https://discord.gg/Bx2qvsjCte) —
+- **Discord:** the [Musashi Dōjō Discord](https://discord.gg/AyUXD9VHn) —
   advice, guidance, and the place to raise issues, concerns, or bugs.
 - **Issues:** [Ouroboros Leios repository](https://github.com/input-output-hk/ouroboros-leios/issues)
 - **Design reference:** [CIP-0164](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md)

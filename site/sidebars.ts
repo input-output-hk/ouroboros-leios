@@ -37,7 +37,11 @@ const sidebars: SidebarsConfig = {
       type: "category",
       label: "Testnet",
       collapsed: false,
-      items: ["testnet/getting-started", "testnet/register-stake-pool"],
+      items: [
+        "testnet/getting-started",
+        "testnet/register-stake-pool",
+        "testnet/rewards-program",
+      ],
     },
   ],
 };
