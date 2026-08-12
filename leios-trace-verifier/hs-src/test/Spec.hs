@@ -3,6 +3,7 @@ module Main where
 
 -- import Spec.Generated (generated)
 import Spec.ChainEvents (chainEvents)
+import Spec.ChainVerifier (chainVerifier)
 import Spec.Golden (golden)
 import Test.Hspec (describe, hspec)
 
@@ -14,3 +15,4 @@ main =
     -- describe "Generated traces" generated
     describe "Golden traces" golden
     describe "node.log chain events" chainEvents
+    describe "chain verifier" chainVerifier

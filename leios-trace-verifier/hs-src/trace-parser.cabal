@@ -80,6 +80,7 @@ test-suite test-trace-verifier
   main-is:          Spec.hs
   other-modules:    Paths_trace_parser
                     Spec.ChainEvents
+                    Spec.ChainVerifier
                     Spec.Generated
                     Spec.Golden
                     Spec.Scenario
