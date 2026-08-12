@@ -230,9 +230,60 @@ export const plan = `
 
 # Protocol status
 
-The diagram below sketches the Leios protocol flow. Each badge marks a
-component of the protocol and summarises its progress across the stages.
-Click or hover a badge for the full breakdown.
+Realizing Ouroboros Leios is not a single hand-off from research to engineering,
+but a progression: the protocol described in
+[CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md)
+is matured through simulation, prototyping, design, implementation and quality
+assurance until it can be considered for deployment to mainnet. This page tracks
+where that work currently stands, cut along two dimensions:
+
+- **Components**: the parts of the protocol flow, each progressing through the
+  stages below. Shown as badges on the diagram, and in full in the
+  [matrix](#full-matrix).
+- **Release scopes**: what a `cardano-node` release would need to contain to be
+  considered for a hard fork, as [implementation stages](#implementation-stages).
+
+A component moves through these stages, which are deliberately not a waterfall
+several of them progress in parallel and feed back into each other:
+
+| Stage          | Meaning                                                                                                                            |
+|----------------|------------------------------------------------------------------------------------------------------------------------------------|
+| CIP            | The protocol-level question is settled in CIP-164; we know *what* is needed.                                                       |
+| Prototype      | Explored in simulation or on real infrastructure, enough to trust the approach is feasible.                                        |
+| Design         | *How* to build it in `cardano-node` is written down in the [technical design](https://leios.cardano-scaling.org/leios-design.pdf). |
+| Implementation | Production code exists in `cardano-node` (and, eventually, other node implementations).                                            |
+| Confidence     | Quality assurance — testing, formal methods, statistical analysis and adversarial testing — sufficient to hard-fork mainnet.       |
+
+:::warning[This is a work-in-progress self-assessment]
+
+Please read the marks below with several grains of salt:
+
+- **They are our own judgement, not a review.** The marks reflect how the
+  implementation team sees the state of things at the time of writing. Nothing
+  here has been externally audited, and none of it constitutes acceptance
+  criteria, a commitment, or a schedule.
+- **The underlying document is a draft.** This page is derived from the
+  [Leios technical design and implementation plan](https://leios.cardano-scaling.org/leios-design.pdf),
+  a living document that "reflects our current understanding of the protocol" and
+  still carries open TODOs in most chapters. Where the design is still being
+  argued out, that shows up here as a `?` or `~` rather than as a settled answer.
+- **The component breakdown is not exhaustive.** The design document itself asks
+  whether it covers everything; components and their names will change as the
+  architecture firms up.
+- **Known gaps are not yet reflected.** Interactions with Peras, Genesis and
+  on-disk storage (UTxO-HD / Ledger-HD) are acknowledged as open points in the
+  design document but are not tracked as components here.
+- **Open design questions sit behind several marks.** How strong a
+  Praos-over-Leios bias is actually needed, which EB to prioritize and from which
+  peer to fetch it, staging area versus enhanced chain selection, and how much of
+  the mempool model has to change are all still being worked out.
+- **Nothing is "done" until it is confident.** A component with everything but
+  the confidence stage marked is not ready for mainnet. That last column is the
+  gate, and it is empty nearly everywhere.
+
+:::
+
+Click or hover a badge for the full breakdown of a component.
 
 <ProtocolStatus stages={stages} source={source} plan={plan} />
 
@@ -243,9 +294,31 @@ Click or hover a badge for the full breakdown.
 ## Implementation stages
 
 The same implementation scope, cut along the other dimension: each stage is a
-`cardano-node` release scope that could be considered to hard-fork mainnet. Scope
-items take their status from the component breakdown above. See the
-[dimensional plan](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/leios-design/README.md)
-for the rationale behind the staging.
+`cardano-node` release scope that could be considered to hard-fork mainnet. Not
+only the release as a whole, but each individual item requires "high confidence"
+before that step is taken. Scope items take their status from the component
+breakdown above; where an item groups several sub-items, it shows the roll-up of
+those. See the
+[dimensional plan](https://leios.cardano-scaling.org/leios-design.pdf) for the
+staging itself.
+
+:::warning[The staging is provisional]
+
+- **The rationale is not written down yet.** The design document still has this
+  chapter marked with open TODOs: why a dimensional plan is needed at all, and
+  why the scope is cut in exactly these stages, are questions we owe an answer
+  to. Expect the cuts to move.
+- **The stage contents are incomplete.** Several stages end in an open "…?" in
+  the source document — items are still being discovered, and an empty-looking
+  stage table is not evidence of a small scope.
+- **The parameter tuples are illustrative.** Names like "0/0/∞/0/0" or
+  "1/4/7/100k/1M" sketch the intent of a stage, not agreed values; the Leios
+  protocol parameter set is still being finalized and would in any case be
+  subject to on-chain governance.
+- **Stages are scopes, not dates.** A completed stage means a release *could* be
+  considered for a hard fork, not that one is planned. Hard forks require
+  governance approval by DReps and stake pool operators.
+
+:::
 
 <ImplementationStages stages={stages} source={source} plan={plan} />
