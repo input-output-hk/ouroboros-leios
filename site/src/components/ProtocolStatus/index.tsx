@@ -1,27 +1,20 @@
 import React, { useState } from "react";
 import useBaseUrl from "@docusaurus/useBaseUrl";
 import styles from "./styles.module.css";
+import {
+  Cell,
+  Mark,
+  Row,
+  correlate,
+  detailIndex,
+  nameKey,
+  parsePlan,
+  parseStatus,
+  stageLabels,
+} from "./parse";
 
-type Mark = "done" | "ongoing" | "missing" | "open" | "empty";
-
-type Cell = {
-  mark: Mark;
-  note?: string;
-};
-
-export type RawRow = {
-  id: string;
-  name: string;
-  cells: Record<string, { mark: Mark; note?: string }>;
-  anchor?: { x: number; y: number };
-};
-
-type Row = {
-  id: string;
-  name: string;
-  anchor?: { x: number; y: number };
-  cells: Cell[]; // aligned with the stages prop
-};
+export { parseStatus, parsePlan } from "./parse";
+export type { Mark, Row, PlanStage } from "./parse";
 
 const MARK_LABEL: Record<Mark, string> = {
   done: "Done",
@@ -63,6 +56,14 @@ function worstMark(row: Row): Mark {
   return "done";
 }
 
+function Pip({ mark }: { mark: Mark }) {
+  return (
+    <span className={`${styles.pip} ${styles[`pip_${mark}`]}`}>
+      {MARK_SYMBOL[mark]}
+    </span>
+  );
+}
+
 function StatusDots({ row }: { row: Row }) {
   return (
     <span className={styles.dots} aria-hidden="true">
@@ -76,7 +77,41 @@ function StatusDots({ row }: { row: Row }) {
   );
 }
 
-function StatusTable({ row, stages }: { row: Row; stages: string[] }) {
+function CellDetails({
+  cell,
+  labels,
+}: {
+  cell: Cell;
+  labels: Map<string, string>;
+}) {
+  if (!cell.details.length) return null;
+  return (
+    <ul className={styles.details}>
+      {cell.details.map((d, i) => {
+        const label = labels.get(nameKey(d.text));
+        return (
+          <li key={i}>
+            <span className={`${styles.detailPip} ${styles[`dot_${d.mark}`]}`} />
+            <span>
+              {label && <span className={styles.stageChip}>{label}</span>}
+              {d.text}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function StatusTable({
+  row,
+  stages,
+  labels,
+}: {
+  row: Row;
+  stages: string[];
+  labels: Map<string, string>;
+}) {
   return (
     <table className={styles.tooltipTable}>
       <tbody>
@@ -86,12 +121,11 @@ function StatusTable({ row, stages }: { row: Row; stages: string[] }) {
             <tr key={stage}>
               <th>{stage}</th>
               <td>
-                <span className={`${styles.pip} ${styles[`pip_${cell.mark}`]}`}>
-                  {MARK_SYMBOL[cell.mark]}
-                </span>
+                <Pip mark={cell.mark} />
                 <span className={styles.markText}>
                   {cell.note ?? MARK_LABEL[cell.mark]}
                 </span>
+                <CellDetails cell={cell} labels={labels} />
               </td>
             </tr>
           );
@@ -104,12 +138,14 @@ function StatusTable({ row, stages }: { row: Row; stages: string[] }) {
 function Widget({
   row,
   stages,
+  labels,
   style,
   open,
   onToggle,
 }: {
   row: Row;
   stages: string[];
+  labels: Map<string, string>;
   style?: React.CSSProperties;
   open: boolean;
   onToggle: () => void;
@@ -142,7 +178,7 @@ function Widget({
       </button>
       <div className={styles.tooltip} role="dialog">
         <div className={styles.tooltipTitle}>{row.name}</div>
-        <StatusTable row={row} stages={stages} />
+        <StatusTable row={row} stages={stages} labels={labels} />
       </div>
     </div>
   );
@@ -150,22 +186,21 @@ function Widget({
 
 export default function ProtocolStatus({
   stages,
-  rows,
+  source,
+  plan,
 }: {
   stages: string[];
-  rows: RawRow[];
+  source: string;
+  /** Optional dimensional plan; adds a stage chip to matching details. */
+  plan?: string;
 }): JSX.Element {
   const svgUrl = useBaseUrl("/img/leios-protocol-flow.svg");
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const normalized: Row[] = rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    anchor: r.anchor,
-    cells: stages.map((s) => r.cells[s] ?? { mark: "empty" as Mark }),
-  }));
-  const anchored = normalized.filter((r) => r.anchor);
-  const crossCutting = normalized.filter((r) => !r.anchor);
+  const rows = parseStatus(source, stages);
+  const labels = plan ? stageLabels(parsePlan(plan)) : new Map<string, string>();
+  const anchored = rows.filter((r) => r.anchor);
+  const crossCutting = rows.filter((r) => !r.anchor);
 
   return (
     <div className={styles.root}>
@@ -187,6 +222,7 @@ export default function ProtocolStatus({
               key={row.id}
               row={row}
               stages={stages}
+              labels={labels}
               style={{ left, top }}
               open={openId === row.id}
               onToggle={() => setOpenId(openId === row.id ? null : row.id)}
@@ -204,6 +240,7 @@ export default function ProtocolStatus({
                 key={row.id}
                 row={row}
                 stages={stages}
+                labels={labels}
                 open={openId === row.id}
                 onToggle={() => setOpenId(openId === row.id ? null : row.id)}
               />
@@ -215,13 +252,132 @@ export default function ProtocolStatus({
       <div className={styles.legend}>
         {(["done", "ongoing", "open", "empty"] as Mark[]).map((m) => (
           <span key={m} className={styles.legendItem}>
-            <span className={`${styles.pip} ${styles[`pip_${m}`]}`}>
-              {MARK_SYMBOL[m]}
-            </span>
+            <Pip mark={m} />
             <span>{MARK_LABEL[m]}</span>
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * One table per stage of the dimensional plan. The plan itself carries no
+ * marks; each item's status is looked up in the status list by name.
+ */
+export function ImplementationStages({
+  stages,
+  source,
+  plan,
+}: {
+  stages: string[];
+  source: string;
+  plan: string;
+}): JSX.Element {
+  const index = detailIndex(parseStatus(source, stages), stages);
+  const correlated = correlate(parsePlan(plan), index);
+
+  return (
+    <>
+      {correlated.map((stage) => {
+        const tracked = stage.items.filter((i) => !i.untracked);
+        const done = tracked.filter((i) => i.mark === "done").length;
+        return (
+          <div key={stage.id} className={styles.stageBlock}>
+            <h3 id={stage.id} className={styles.stageTitle}>
+              {stage.title}
+              <span className={styles.stageCount}>
+                {done}/{stage.items.length} done
+              </span>
+            </h3>
+            <div className={styles.matrixWrap}>
+              <table className={styles.matrix}>
+                <thead>
+                  <tr>
+                    <th>Scope item</th>
+                    <th>Component</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stage.items.map((item) => (
+                    <tr key={item.name}>
+                      <td className={styles.scopeCell}>
+                        {item.name}
+                        {item.children.length > 0 && (
+                          <ul className={styles.details}>
+                            {item.children.map((c) => (
+                              <li key={c}>{c}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </td>
+                      <td>
+                        {item.untracked ? (
+                          <span className={styles.untracked}>
+                            not in status list
+                          </span>
+                        ) : (
+                          item.refs
+                            .map((r) => r.componentName)
+                            .filter((n, i, all) => all.indexOf(n) === i)
+                            .join(", ")
+                        )}
+                      </td>
+                      <td title={MARK_LABEL[item.mark]}>
+                        {!item.untracked && <Pip mark={item.mark} />}
+                        <span className={styles.markText}>
+                          {item.untracked ? "–" : MARK_LABEL[item.mark]}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/** The same data rendered as a full component × stage matrix. */
+export function ProtocolMatrix({
+  stages,
+  source,
+}: {
+  stages: string[];
+  source: string;
+}): JSX.Element {
+  const rows = parseStatus(source, stages);
+  return (
+    <div className={styles.matrixWrap}>
+      <table className={styles.matrix}>
+        <thead>
+          <tr>
+            <th>Component</th>
+            {stages.map((s) => (
+              <th key={s}>{s}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              <th scope="row">{row.name}</th>
+              {row.cells.map((cell, i) => (
+                <td key={i} title={cell.note ?? MARK_LABEL[cell.mark]}>
+                  <Pip mark={cell.mark} />
+                  {cell.note && (
+                    <span className={styles.matrixNote}>{cell.note}</span>
+                  )}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

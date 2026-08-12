@@ -2,7 +2,7 @@
 title: Protocol status
 ---
 
-import ProtocolStatus from '@site/src/components/ProtocolStatus';
+import ProtocolStatus, { ProtocolMatrix, ImplementationStages } from '@site/src/components/ProtocolStatus';
 
 export const stages = [
   'Requirements',
@@ -12,158 +12,209 @@ export const stages = [
   'Confidence',
 ];
 
-{/* Marks: 'done' (✓) · 'ongoing' (~) · 'open' (?) · 'empty' (blank).
-    Optional `note` overrides the default label in the tooltip.
-    `anchor` pins the badge to a position in the SVG viewBox (1120.77 × 471.62);
-    rows without an anchor render as cross-cutting cards under the diagram. */}
+{/*
+Single source of truth for both the diagram badges and the full matrix below.
 
-export const rows = [
-  {
-    id: 'praos-leios-prioritization',
-    name: 'Praos > Leios prioritization',
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'done' },
-      Design: { mark: 'ongoing' },
-    },
-  },
-  {
-    id: 'ht-tx-submission',
-    name: 'High-throughput Tx submission',
-    anchor: { x: 160, y: 25 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Implementation: { mark: 'ongoing', note: 'V2-undecision' },
-    },
-  },
-  {
-    id: 'ht-mempool',
-    name: 'High-throughput mempool',
-    anchor: { x: 460, y: 25 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Design: { mark: 'ongoing', note: 'Design ideas only' },
-    },
-  },
-  {
-    id: 'block-production',
-    name: 'Block production',
-    anchor: { x: 430, y: 160 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'done' },
-      Design: { mark: 'open', note: 'Announcement & pre-application' },
-    },
-  },
-  {
-    id: 'eb-diffusion-storage',
-    name: 'EB diffusion & storage',
-    anchor: { x: 470, y: 280 },
-    cells: {
-      'Requirements': { mark: 'open', note: 'Delay bounds' },
-      Prototype: { mark: 'done' },
-      Design: { mark: 'ongoing' },
-    },
-  },
-  {
-    id: 'tx-cache',
-    name: 'Transaction cache',
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'open', note: 'Not yet implemented' },
-      Design: { mark: 'done', note: 'Sizing settled' },
-    },
-  },
-  {
-    id: 'voting-certification',
-    name: 'Voting & certification',
-    anchor: { x: 500, y: 410 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'done' },
-      Design: { mark: 'done', note: 'Shared with Peras' },
-      Implementation: { mark: 'ongoing', note: 'Cert agg, peer-reviewed' },
-    },
-  },
-  {
-    id: 'block-validation-adoption',
-    name: 'Block validation & adoption',
-    anchor: { x: 985, y: 70 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'done' },
-      Design: { mark: 'ongoing' },
-    },
-  },
-  {
-    id: 'catching-up',
-    name: 'Catching up',
-    anchor: { x: 980, y: 400 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'ongoing', note: 'Baseline via chain selection' },
-      Design: { mark: 'ongoing', note: 'Efficient path' },
-    },
-  },
-  {
-    id: 'committee-selection',
-    name: 'Committee selection',
-    anchor: { x: 230, y: 320 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'ongoing', note: 'Interim all-vote' },
-      Design: { mark: 'done', note: 'Simplified truncation' },
-    },
-  },
-  {
-    id: 'key-registration',
-    name: 'Key registration & rotation',
-    anchor: { x: 120, y: 200 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Design: { mark: 'ongoing' },
-      Implementation: { mark: 'ongoing', note: 'Key-gen CLI only' },
-    },
-  },
-  {
-    id: 'crypto',
-    name: 'Cryptographic primitives',
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'done' },
-      Design: { mark: 'done' },
-      Implementation: { mark: 'done' },
-      Confidence: { mark: 'ongoing', note: 'Primitives audited; cert layer peer-reviewed' },
-    },
-  },
-  {
-    id: 'serialization',
-    name: 'Serialization',
-    cells: {
-      'Requirements': { mark: 'done' },
-      Design: { mark: 'done' },
-      Implementation: { mark: 'ongoing' },
-    },
-  },
-  {
-    id: 'protocol-parameters',
-    name: 'New protocol parameters',
-    cells: {
-      'Requirements': { mark: 'done' },
-      Design: { mark: 'ongoing', note: 'Set being finalized' },
-      Implementation: { mark: 'open', note: 'Not implemented yet' },
-    },
-  },
-  {
-    id: 'node-api-config',
-    name: 'Node API & configuration',
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'done', note: 'Inlined-block N2C, on testnet' },
-      Design: { mark: 'ongoing', note: 'New queries to add' },
-    },
-  },
-];
+- Component name @x,y     first level: a component; the optional `@x,y` pins its
+                            badge into the SVG viewBox (1120.77 × 471.62). Components
+                            without an anchor render as cross-cutting cards.
+    - [x] Stage — note      second level: one entry per stage (see `stages` above);
+                            the optional note after ` — ` replaces the default label.
+    - [ ] Detail          third level: scope details, shown in the tooltip only.
+
+Marks: [x] done · [~] ongoing · [?] open question · [-] missing · [ ] not started
+
+Detail names are matched against the scope items of the `plan` below (ignoring
+case, punctuation and "(?)"), which is what fills the per-stage tables. Keep the
+wording of a detail identical to its scope item, or the two lists drift apart. 
+
+*/}
+
+export const source = `
+- Praos > Leios prioritization
+  - [x] Requirements
+  - [x] Prototype
+  - [~] Design
+  - [ ] Implementation
+    - [~] Socket options
+    - [ ] Incremental decoding
+  - [~] Confidence
+
+- High-throughput Tx submission @160,25
+  - [x] Requirements
+  - [ ] Prototype
+  - [ ] Design
+  - [~] Implementation — V2-undecision
+    - [ ] High-throughput tx submission
+  - [ ] Confidence
+
+- High-throughput mempool @460,25
+  - [x] Requirements
+  - [ ] Prototype
+  - [~] Design — Design ideas only
+  - [ ] Implementation
+    - [ ] Double-buffered mempool
+    - [ ] Capped forge loop
+    - [ ] Efficient forge loop
+  - [ ] Confidence
+
+- Block production @430,160
+  - [x] Requirements
+  - [x] Prototype
+  - [?] Design — Announcement & pre-application
+  - [ ] Implementation
+    - [ ] Forge and store EBs
+    - [ ] Announce and detect equivocations of EBs
+    - [ ] Forge RBs with certificates
+  - [ ] Confidence
+
+- EB diffusion & storage @470,280
+  - [?] Requirements — Delay bounds
+  - [x] Prototype
+  - [~] Design
+  - [ ] Implementation
+    - [ ] No-op mini-protocols
+    - [ ] Diffuse and validate EBs via TxCache
+    - [ ] Small quantity EB storage
+    - [ ] Large quantity, low latency EB storage
+  - [ ] Confidence
+
+- Transaction cache
+  - [x] Requirements
+  - [?] Prototype — Not yet implemented
+  - [x] Design — Sizing settled
+  - [ ] Implementation
+    - [ ] Diffuse and validate EBs via TxCache
+    - [ ] Disk-backed TxCache
+  - [ ] Confidence
+
+- Voting & certification @500,410
+  - [x] Requirements
+  - [x] Prototype
+  - [x] Design — Shared with Peras
+  - [~] Implementation — Cert agg, peer-reviewed
+    - [ ] Vote and aggregate certificates
+  - [ ] Confidence
+
+- Block validation & adoption @985,70
+  - [x] Requirements
+  - [x] Prototype
+  - [~] Design
+  - [ ] Implementation
+    - [ ] Validate EB announcing and/or certifying blocks
+    - [ ] EB fetching on chain selection
+  - [ ] Confidence
+
+- Catching up @980,400
+  - [x] Requirements
+  - [~] Prototype — Baseline via chain selection
+  - [~] Design — Efficient path
+  - [ ] Implementation
+  - [ ] Confidence
+
+- Committee selection @230,320
+  - [x] Requirements
+  - [~] Prototype — Interim all-vote
+  - [x] Design — Simplified truncation
+  - [ ] Implementation
+    - [ ] Committee selection at epoch boundaries
+  - [ ] Confidence
+
+- Key registration & rotation @120,200
+  - [x] Requirements
+  - [ ] Prototype
+  - [~] Design
+  - [~] Implementation — Key-gen CLI only
+    - [x] Generate BLS keys
+    - [ ] Create and submit pool registration with BLS keys
+    - [ ] Register BLS keys via block headers
+  - [ ] Confidence
+
+- Cryptographic primitives
+  - [x] Requirements
+  - [x] Prototype
+  - [x] Design
+  - [x] Implementation
+  - [~] Confidence — Primitives audited; cert layer peer-reviewed
+
+- Serialization
+  - [x] Requirements
+  - [ ] Prototype
+  - [x] Design
+  - [~] Implementation
+    - [ ] Announcements in headers
+    - [ ] BLS keys in block headers
+    - [ ] Certificates in body
+    - [ ] BLS key registration in pool registration cert in txs
+    - [ ] Protocol parameters in txs
+  - [ ] Confidence
+
+- New protocol parameters
+  - [x] Requirements
+  - [ ] Prototype
+  - [~] Design — Set being finalized
+  - [?] Implementation — Not implemented yet
+    - [ ] Constitution guard rails can reference Leios protocol parameters
+  - [ ] Confidence
+
+- Node API & configuration
+  - [x] Requirements
+  - [x] Prototype — Inlined-block N2C, on testnet
+  - [~] Design — New queries to add
+  - [ ] Implementation
+    - [ ] Query pool state showing key registration
+    - [ ] Client APIs inline certified EB txs
+  - [ ] Confidence
+`;
+
+{/*
+Staged scopes of the dimensional plan, mirroring the "Dimensional plan on
+    hard-fork readiness" chapter of docs/leios-design/README.md. No marks here:
+    each scope item takes its status from the matching detail of the status list
+    above; grouping items take the roll-up of their sub-items.
+*/}
+
+export const plan = `
+- Stage 1: Dijkstra supports Leios
+  - Dijkstra block definition / serialization contains Leios
+    - Announcements in headers
+    - BLS keys in block headers (?)
+    - Certificates in body
+    - BLS key registration in pool registration cert in txs
+    - Protocol parameters in txs
+  - Constitution guard rails can reference Leios protocol parameters
+  - Generate BLS keys
+  - Create and submit pool registration with BLS keys
+  - Query pool state showing key registration
+
+- Stage 2: Start with zero (0/0/∞/0/0)
+  - Register BLS keys via block headers (?)
+  - Committee selection at epoch boundaries
+    - Committee in ledger state
+  - Validate EB announcing and/or certifying blocks
+    - Disallowed by protocol parameters
+  - Client APIs inline certified EB txs
+  - No-op mini-protocols (?)
+
+- Stage 3: Low params (1/4/7/100k/1M)
+  - Socket options
+  - Double-buffered mempool
+  - Capped forge loop
+  - Forge and store EBs
+  - Small quantity EB storage
+  - Announce and detect equivocations of EBs
+  - Diffuse and validate EBs via TxCache
+  - EB fetching on chain selection
+  - Vote and aggregate certificates
+  - Forge RBs with certificates
+
+- Stage 4: High params
+  - Incremental decoding
+  - High-throughput tx submission
+  - Efficient forge loop
+  - Disk-backed TxCache
+  - Large quantity, low latency EB storage
+`;
 
 # Protocol status
 
@@ -171,31 +222,18 @@ The diagram below sketches the Leios protocol flow. Each badge marks a
 component of the protocol and summarises its progress across the stages.
 Click or hover a badge for the full breakdown.
 
-<ProtocolStatus stages={stages} rows={rows} />
+<ProtocolStatus stages={stages} source={source} plan={plan} />
 
 ## Full matrix
 
-| Component                     | Requirements         | Prototype                      | Design                              | Implementation              | Confidence                                       |
-|-------------------------------|----------------------|--------------------------------|-------------------------------------|-----------------------------|--------------------------------------------------|
-| Praos > Leios prioritization  | ✓                    | ✓                              | ~                                   |                             |                                                  |
-| High-throughput Tx submission | ✓                    |                                |                                     | ~ V2-undecision             |                                                  |
-| High-throughput mempool       | ✓                    |                                | ~ Design ideas only                 |                             |                                                  |
-| Block production              | ✓                    | ✓                              | ? Announcement & pre-application    |                             |                                                  |
-| EB diffusion & storage        | ? Delay bounds       | ✓                              | ~                                   |                             |                                                  |
-| Transaction cache             | ✓                    | ? Not yet implemented          | ✓ Sizing settled                    |                             |                                                  |
-| Voting & certification        | ✓                    | ✓                              | ✓ Shared with Peras                 | ~ Cert agg, peer-reviewed   |                                                  |
-| Block validation & adoption   | ✓                    | ✓                              | ~                                   |                             |                                                  |
-| Catching up                   | ✓                    | ~ Baseline via chain selection | ~ Efficient path                    |                             |                                                  |
-| Committee selection           | ✓                    | ~ Interim all-vote             | ✓ Simplified truncation             |                             |                                                  |
-| Key registration & rotation   | ✓                    |                                | ~                                   | ~ Key-gen CLI only          |                                                  |
-| Cryptographic primitives      | ✓                    | ✓                              | ✓                                   | ✓                           | ~ Primitives audited; cert layer peer-reviewed   |
-| Serialization                 | ✓                    |                                | ✓                                   | ~                           |                                                  |
-| New protocol parameters       | ✓                    |                                | ~ Set being finalized               | ? Not implemented yet       |                                                  |
-| Node API & configuration      | ✓                    | ✓ Inlined-block N2C, on testnet| ~ New queries to add                |                             |                                                  |
+<ProtocolMatrix stages={stages} source={source} />
 
-| Symbol | Meaning         |
-|--------|-----------------|
-| ✓      | Done / OK       |
-| ~      | Vague / Ongoing |
-| ?      | Open questions  |
-|        | Not started     |
+## Implementation stages
+
+The same implementation scope, cut along the other dimension: each stage is a
+`cardano-node` release scope that could be considered to hard-fork mainnet. Scope
+items take their status from the component breakdown above. See the
+[dimensional plan](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/leios-design/README.md)
+for the rationale behind the staging.
+
+<ImplementationStages stages={stages} source={source} plan={plan} />
