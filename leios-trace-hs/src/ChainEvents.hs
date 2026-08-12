@@ -51,6 +51,13 @@ data ChainEvent
     CVoteAcquired !Text !Word64
   | -- | @Forge.Loop.ForgedBlock@: the SUT forged a ranking (Praos) block (hash, slot).
     CRBForged !Text !Word64
+  | -- | @Forge.Loop.NodeIsLeader@: the SUT won the Praos slot lottery (slot).
+    --   Emitted by consensus independently of anything Leios does, so it is a
+    --   non-circular record of EB-production eligibility — the spec assumes
+    --   @canProduceEB@ holds exactly when the node can make a ranking block. Unlike
+    --   the cardano-api schedule it covers every epoch the log spans, which makes it
+    --   usable as a fallback when the query cannot supply a schedule for an epoch.
+    CNodeIsLeader !Word64
   deriving (Eq, Show, Generic)
 
 -- | Internal: one parsed line — a directly-emittable event, a linkage fact
@@ -105,6 +112,7 @@ pRaw = withObject "logline" $ \o -> do
     "Forge.Loop.StartLeadershipCheck" -> RawEvent . CSlot <$> d .: "slot"
     "Forge.Loop.ForgedBlock" ->
       RawEvent <$> (CRBForged <$> d .: "block" <*> d .: "slot")
+    "Forge.Loop.NodeIsLeader" -> RawEvent . CNodeIsLeader <$> d .: "slot"
     -- w31+ per-event namespaces
     "Consensus.LeiosKernel.BlockForged" ->
       RawEvent <$> (CEBForged <$> d .: "hash" <*> d .: "slot")

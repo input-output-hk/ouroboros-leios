@@ -23,10 +23,6 @@ module LinearLeiosVerifierChain where
   {-# FOREIGN GHC import Data.Text #-}
   {-# COMPILE GHC error = \ _ s -> error (unpack s) #-}
 
-  postulate leadershipSchedule : List ℕ
-  {-# FOREIGN GHC import qualified LeadershipSchedule #-}
-  {-# COMPILE GHC leadershipSchedule = LeadershipSchedule.leadershipScheduleSlots #-}
-
   -- | A Leios event extracted from a cardano-node tracing log (node.log), keyed
   --   by the EB hash. Mirrors 'ChainEvents.ChainEvent' on the Haskell side.
   data ChainEvent : Type where
@@ -36,6 +32,7 @@ module LinearLeiosVerifierChain where
     CVoted       : String → Word64 → ChainEvent
     CVoteAcquired : String → Word64 → ChainEvent
     CRBForged    : String → Word64 → ChainEvent
+    CNodeIsLeader : Word64 → ChainEvent
 
   {-# FOREIGN GHC import qualified ChainEvents #-}
   {-# COMPILE GHC ChainEvent = data ChainEvents.ChainEvent
@@ -45,6 +42,7 @@ module LinearLeiosVerifierChain where
         | ChainEvents.CVoted
         | ChainEvents.CVoteAcquired
         | ChainEvents.CRBForged
+        | ChainEvents.CNodeIsLeader
         ) #-}
 
   module _
@@ -52,6 +50,13 @@ module LinearLeiosVerifierChain where
     (sutId : ℕ)
     (stakeDistr : List (Pair String ℕ))
     (Lhdr Lvote Ldiff validityCheckTimeValue : ℕ)
+    -- The SUT's EB-production eligibility, as queried from the node, together with
+    -- whether that answer is authoritative for the epoch about to be verified.
+    -- Passed in per call rather than read from a mutable global: the caller chooses
+    -- a different source per segment, and a top-level binding would be a CAF, fixed
+    -- after its first evaluation.
+    (winningSlots : List ℕ)
+    (scheduleAuthoritative : Bool)
     where
 
     from-id : ℕ → Fin numberOfParties
@@ -103,10 +108,28 @@ module LinearLeiosVerifierChain where
           ; Ldiff = Ldiff
           }
 
-      -- EB-production eligibility comes from the leadership schedule (queried from
-      -- the node); voting eligibility is the CIP-0164 committee in Defaults.
+      -- Slots in which the log records the node winning the Praos lottery.
+      leaderSlots : EventLog → List ℕ
+      leaderSlots []                     = []
+      leaderSlots (CNodeIsLeader s ∷ es) = primWord64ToNat s ∷ leaderSlots es
+      leaderSlots (_ ∷ es)               = leaderSlots es
+
+      -- EB-production eligibility. The queried leadership schedule is authoritative
+      -- and is used whenever it applies to the epoch under test. It does not always:
+      -- pool stake takes two epochs to activate, and a node answers only for its own
+      -- current epoch, which in practice trails the epoch being verified. In those
+      -- gaps fall back to the node's own leadership record from the log, which covers
+      -- every epoch the log spans and is not circular with the EB events being
+      -- checked. Note an authoritative schedule may legitimately be empty, so that
+      -- case must not be mistaken for an absent one — hence the explicit flag.
+      --
+      -- Voting eligibility is unaffected: it follows the CIP-0164 committee in
+      -- Defaults, computed from the stake distribution rather than a per-slot lottery.
       winning-slots-of : ℙ (BlockType × ℕ)
-      winning-slots-of = fromList (L.map (λ s → EB , s) leadershipSchedule)
+      winning-slots-of =
+        if scheduleAuthoritative
+          then fromList (L.map (λ s → EB , s) winningSlots)
+          else fromList (L.map (λ s → EB , s) (leaderSlots l))
 
       testParams : TestParams params
       testParams =
@@ -263,6 +286,8 @@ module LinearLeiosVerifierChain where
       traceEvent→action a (CVoteAcquired _ _) =
         (record a { FFD-blks = VT-Blk (tt ∷ []) ∷ FFD-blks a } , [])
       traceEvent→action a (CRBForged h s) = (a , [])
+      -- Consumed by 'leaderSlots' as the eligibility fallback, not as a step.
+      traceEvent→action a (CNodeIsLeader _) = (a , [])
 
       s₀ : LeiosState
       s₀ = initLeiosState tt exampleDistr ((SUT-id , tt) ∷ [])
