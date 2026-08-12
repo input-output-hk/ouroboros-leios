@@ -20,6 +20,7 @@ import LinearLeiosChain (
   Segment (..),
   Timings (..),
   carryAcross,
+  checkpointEvery,
   overlapSlots,
   runSegmented,
   segmentAuthoritative,
@@ -47,14 +48,27 @@ stubChainData =
 
 -- | Run the driver over an event list, collecting progress instead of rendering it.
 --   Nothing aborts, so a violation does not stop the run and everything is observed.
-collect :: [ChainEvent] -> IO [Progress]
-collect evs = do
+collectWith :: Integer -> [ChainEvent] -> IO [Progress]
+collectWith epochLen evs = do
   ref <- newIORef []
-  runSegmented (\p -> modifyIORef' ref (p :)) timings (const (pure stubChainData)) evs
+  runSegmented
+    (\p -> modifyIORef' ref (p :))
+    timings
+    (const (pure stubChainData{cdEpochLength = epochLen}))
+    evs
   reverse <$> readIORef ref
+
+collect :: [ChainEvent] -> IO [Progress]
+collect = collectWith 10
 
 violations :: [Progress] -> [Text]
 violations ps = [status | Violation _ _ status _ <- ps]
+
+verifiedCount :: [Progress] -> Int
+verifiedCount ps = length [() | Verified _ _ <- ps]
+
+streamEndedCount :: [Progress] -> Int
+streamEndedCount ps = length [() | StreamEnded _ <- ps]
 
 segmentStarts :: [Progress] -> [Integer]
 segmentStarts ps = [segStart s | SegmentStarted s _ <- ps]
@@ -121,6 +135,17 @@ chainSegments = do
     it "does not when the segment spans two epochs" $
       segmentAuthoritative True 3 stubChainData{cdWinningSlots = Just [31], cdNodeEpoch = 3}
         `shouldBe` False
+
+  describe "checkpoint throttling" $ do
+    it "re-verifies periodically rather than at every slot" $ do
+      -- 46 ticks inside one epoch, so only the periodic checkpoints fire. Slot 0
+      -- takes the boundary path, which starts the segment without checking it.
+      ps <- collectWith 100 (ticks 0 45)
+      verifiedCount ps
+        `shouldBe` length [s | s <- [1 .. 45 :: Integer], s `mod` checkpointEvery == 0]
+    it "still checks the tail at end of input despite throttling" $ do
+      ps <- collectWith 100 (ticks 0 45)
+      streamEndedCount ps `shouldBe` 1
 
   describe "obligations that straddle an epoch boundary" $ do
     it "starts the second segment before the boundary" $ do

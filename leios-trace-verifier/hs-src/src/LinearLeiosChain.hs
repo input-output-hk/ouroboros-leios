@@ -14,6 +14,7 @@ module LinearLeiosChain (
   Progress (..),
   Carry (..),
   isCSlot,
+  checkpointEvery,
   overlapSlots,
   carryAcross,
   segmentAuthoritative,
@@ -22,6 +23,7 @@ module LinearLeiosChain (
 ) where
 
 import ChainEvents (ChainEvent (..))
+import Control.Monad (when)
 import Data.List (dropWhileEnd)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
@@ -86,6 +88,25 @@ data Progress
 isCSlot :: ChainEvent -> Bool
 isCSlot (CSlot _) = True
 isCSlot _ = False
+
+-- | How many slots pass between periodic re-verifications within a segment.
+--
+--   A segment is re-verified from its start, so checking at every tick costs
+--   O(n²) across an epoch. That is not merely slow: measured against a devnet at
+--   @slotLength = 1@, by slot 370 each checkpoint was re-verifying ~2200 actions,
+--   and the node — sharing the machine — began missing its own leadership checks,
+--   stalling for 535 slots. The verifier was starving the node it observes and
+--   then reporting the damage as a conformance violation. Checking every 20th slot
+--   cuts that cost twentyfold.
+--
+--   Correctness is unaffected. A prefix check at tick n adjudicates every slot
+--   below n, so no slot is skipped, only reported later; and the check at an epoch
+--   boundary, plus the one at end of input, are never throttled. Re-verification
+--   was once load-bearing, because a checkpoint's verdict on the slot still in
+--   progress was provisional — but slots have been adjudicated only once complete
+--   since the closeLast split, so redoing the prefix is now pure waste.
+checkpointEvery :: Integer
+checkpointEvery = 20
 
 -- | How far back an obligation can reach. An EB with election slot @e@ becomes
 --   votable in slot @e + (3 * Lhdr `max` validityCheckTime)@, and its acquisition may
@@ -191,9 +212,11 @@ runSegmented report ts query = loop [] Nothing []
       CSlot s
         | Just seg <- mseg
         , toInteger s `div` cdEpochLength (segCD seg) == segEpoch seg -> do
-            -- Same epoch: extend the segment and re-check it.
+            -- Same epoch: extend the segment, and periodically re-check it. Not at
+            -- every tick — see 'checkpointEvery'.
             let seen' = ev : seen
-            checkSeg seg (reverse seen')
+            when (toInteger s `mod` checkpointEvery == 0) $
+              checkSeg seg (reverse seen')
             loop tally mseg seen' rest
         | otherwise -> do
             -- First segment, or an epoch boundary. This tick is what completes the
