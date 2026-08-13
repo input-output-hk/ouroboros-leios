@@ -208,6 +208,15 @@ export default function ProtocolStatus({
 
   return (
     <div className={styles.root}>
+      <div className={styles.legend}>
+        {(["done", "ongoing", "open", "empty"] as Mark[]).map((m) => (
+          <span key={m} className={styles.legendItem}>
+            <Pip mark={m} />
+            <span>{MARK_LABEL[m]}</span>
+          </span>
+        ))}
+      </div>
+      <br />
       <div
         className={styles.diagramWrap}
         style={{ aspectRatio: `${VIEWBOX_W} / ${VIEWBOX_H}` }}
@@ -252,15 +261,6 @@ export default function ProtocolStatus({
           </div>
         </div>
       )}
-
-      <div className={styles.legend}>
-        {(["done", "ongoing", "open", "empty"] as Mark[]).map((m) => (
-          <span key={m} className={styles.legendItem}>
-            <Pip mark={m} />
-            <span>{MARK_LABEL[m]}</span>
-          </span>
-        ))}
-      </div>
     </div>
   );
 }
@@ -280,7 +280,11 @@ export function ReleaseStages({
 }): JSX.Element {
   // Assurance is tracked per component, in the last stage column.
   const assuranceStage = stages[stages.length - 1];
-  const index = detailIndex(parseStatus(source, stages), stages, assuranceStage);
+  const index = detailIndex(
+    parseStatus(source, stages),
+    stages,
+    assuranceStage,
+  );
   const correlated = correlate(parsePlan(plan), index);
 
   return (

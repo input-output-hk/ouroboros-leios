@@ -90,7 +90,7 @@ export const source = `
     - [ ] Committee selection at epoch boundaries
   - [~] Assurance: on testnet
 
-- High-throughput Tx submission @180,25
+- High-throughput Tx submission @400,25
   - [x] CIP
   - [~] Prototype
   - [~] Design
@@ -99,7 +99,7 @@ export const source = `
     - [ ] TxSubmission param tuning
   - [~] Assurance
 
-- High-throughput mempool @550,25
+- High-throughput mempool @680,25
   - [x] CIP
   - [~] Prototype
   - [~] Design
@@ -109,7 +109,7 @@ export const source = `
     - [ ] Pre-flight forging
   - [~] Assurance
 
-- Block production @460,170
+- Block production @450,170
   - [x] CIP
   - [~] Prototype
   - [~] Design: Pre-application vs. mempool
@@ -129,7 +129,7 @@ export const source = `
 
 - Transaction cache & storage
   - [x] CIP
-  - [~] Prototype: In progress
+  - [~] Prototype
   - [x] Design: Sizing settled
   - [ ] Implementation
     - [ ] Diffuse and validate EBs via TxCache
@@ -138,10 +138,10 @@ export const source = `
     - [ ] Large quantity, low latency EB storage
   - [ ] Assurance
 
-- Voting & certification @600,420
+- Voting & certification @580,400
   - [x] CIP
-  - [x] Prototype
-  - [x] Design: Shared with Peras
+  - [~] Prototype: EB validation gap
+  - [~] Design: Shared with Peras
   - [ ] Implementation
     - [ ] Voting logic
     - [ ] Diffuse and validate votes
@@ -239,23 +239,22 @@ assurance until it can be considered for deployment to mainnet. This page tracks
 where that work currently stands, cut along two dimensions:
 
 - **Component stages**: the parts of the protocol flow, each progressing through the
-  stages below. Shown as badges on the diagram, and in full in the
-  [matrix](#full-matrix).
+  stages below. Visualized graphically and in a [full matrix](#full-matrix).
 - **Release stages**: possible increments that can be considered for a rollout
-  to mainnet, as [node releases](#release-stages).
+  to mainnet, as a dimensional plan to [node releases](#release-stages).
 
 ## Component stages
 
 A component moves through these stages, which are deliberately not a waterfall
 several of them progress in parallel and feed back into each other:
 
-| Stage | Meaning |
-|----------------|------------------------------------------------------------------------------------------------------------------------------------|
-| CIP            | The protocol-level question is settled in CIP-164; we know *what* is needed.                                                       |
-| Prototype      | Explored in simulation or on real infrastructure, enough to trust the approach is feasible.                                        |
-| Design         | *How* to build it in `cardano-node` is written down in the [technical design](https://leios.cardano-scaling.org/leios-design.pdf). |
-| Implementation | Production code exists in `cardano-node` (and, eventually, other node implementations).                                            |
-| Assurance     | Quality assurance — formal methods, statistical analysis, e2e and adversarial testing — sufficient to hard-fork mainnet.           |
+| Stage          | Meaning                                                                                                                             |
+|----------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| CIP            | The protocol-level question is settled in CIP-164; we know *what* is needed.                                                        |
+| Prototype      | Explored in simulation or on real infrastructure, enough to trust the approach is feasible.                                         |
+| Design         | *How* to build it in `cardano-node` is written down in the [technical design](https://leios.cardano-scaling.org/leios-design.pdf).  |
+| Implementation | Production code exists in `cardano-node` (and, eventually, other node implementations).                                             |
+| Assurance | Confidence gained through formal methods, statistical analysis, e2e and adversarial testing sufficiently high to deploy to mainnet. |
 
 :::warning[This is a work-in-progress self-assessment]
 
@@ -312,10 +311,12 @@ itself.
 
 :::
 
-Each stage is increment on the dimensional plan of having a more and more capable Leios-enabled cardano node. Besides the scope that goes into it, they differ in risk to deploy and how we can progress once deployed to mainnet:
-
-- Stage 1 to 2: a new release and another hard-fork (protocol version update)
-- Stage 2 to 3: a new release and a protocol parameter update (with higher risks)
-- Stage 3 to 4: new releases and protocol parameter updates (with lower risks)
-
 <ReleaseStages stages={stages} source={source} plan={plan} />
+
+### Risks
+
+In general there is a higher technical risk on later stages, but that is typically mitigated by having more time to gain confidence and do quality assurance. Deployment wise, there is also risks of progressing between stages once deployed:
+
+- Stage **1 -> 2**: a new release and another hard-fork -> risk of further delay
+- Stage **2 -> 3**: a new release and a protocol parameter update -> high deployment risk as no guarantee of latest software
+- Stage **3 -> 4**: new releases and protocol parameter updates -> lower deployment risk as mostly performance differences
