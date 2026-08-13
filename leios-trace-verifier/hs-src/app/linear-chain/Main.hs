@@ -221,6 +221,9 @@ data LeadershipOpts = LeadershipOpts
 -- leadership record in the log, so every epoch is still verified. It is reported
 -- anyway, because that fallback is the SUT's self-report rather than an independent
 -- oracle and so cannot catch the node's leadership logging itself being wrong.
+-- One leadership error does not fall back at all — no stake, once the chain is past
+-- the two-epoch activation delay, is a known-empty schedule and stronger than the
+-- log — so the message is chosen from the resulting schedule, not from the error.
 --
 -- No waiting: retrying until the query succeeds would not help. Success is not the
 -- same as applicability — the node answers for the epoch of its chain tip, which
@@ -232,25 +235,37 @@ queryChain opts = do
   (cd, mlerr) <- queryChainOnce opts
   case mlerr of
     Nothing -> pure ()
-    Just lerr -> hPutStrLn stderr (scheduleUnavailable opts lerr)
+    Just lerr -> hPutStrLn stderr (scheduleUnavailable opts lerr (cdWinningSlots cd))
   pure cd
 
--- | Explain why no authoritative schedule could be had. Two quite different
--- situations produce it and they call for different responses, so name both.
-scheduleUnavailable :: LeadershipOpts -> Api.LeadershipError -> String
-scheduleUnavailable LeadershipOpts{..} lerr =
+-- | Explain what the leadership error means and, crucially, what was done about it.
+-- Not every such error causes a fallback: past the stake activation delay, no stake
+-- is a known-empty schedule rather than a missing one, and saying "continuing from
+-- the log" there would contradict the epoch line printed immediately afterwards.
+-- The resulting schedule therefore decides which explanation is the true one.
+scheduleUnavailable :: LeadershipOpts -> Api.LeadershipError -> Maybe [Integer] -> String
+scheduleUnavailable LeadershipOpts{..} lerr mSlots =
   "no leadership schedule for pool "
     <> T.unpack (Api.serialiseToRawBytesHexText loStakePoolId)
     <> ": "
     <> show lerr
     <> ".\n"
-    <> "  (a) The network may be too young: pool stake takes two epochs to become\n"
-    <> "      active, so no schedule exists until the third epoch is under way.\n"
-    <> "  (b) That pool may have no stake at all — not registered, nothing\n"
-    <> "      delegated, or the wrong --stake-pool-id. Compare the id above with\n"
-    <> "      'cardano-cli query stake-pools'.\n"
-    <> "  Continuing with eligibility taken from the log instead, which cannot catch\n"
-    <> "  an EB forged in a slot the node never recorded winning."
+    <> case mSlots of
+      -- Past the activation delay: "no stake" is the answer, not a gap in it.
+      Just _ ->
+        "  The chain is past the two-epoch stake activation delay, so this pool\n"
+          <> "  genuinely has no stake — not registered, nothing delegated, or the wrong\n"
+          <> "  --stake-pool-id. Compare the id above with 'cardano-cli query stake-pools'.\n"
+          <> "  Taking the schedule as known-empty, which is stronger than the log: every\n"
+          <> "  production obligation is vacuous, so an EB forged here is a real violation."
+      Nothing ->
+        "  (a) The network may be too young: pool stake takes two epochs to become\n"
+          <> "      active, so no schedule exists until the third epoch is under way.\n"
+          <> "  (b) That pool may have no stake at all — not registered, nothing\n"
+          <> "      delegated, or the wrong --stake-pool-id. Compare the id above with\n"
+          <> "      'cardano-cli query stake-pools'.\n"
+          <> "  Continuing with eligibility taken from the log instead, which cannot catch\n"
+          <> "  an EB forged in a slot the node never recorded winning."
 
 -- | One attempt at the chain query (via the cardano-api local-state-query protocol):
 --   the SUT's leadership schedule (the slots in which its pool is an eligible
@@ -322,12 +337,21 @@ queryChainOnce LeadershipOpts{..} = do
   case result of
     Left err -> die ("local state query failed: " <> show err)
     Right (eSlots, stakeDistr, nodeEpoch) ->
-      let mSlots = case eSlots of
-            -- No active stake is a state, not a fault: the schedule is KNOWN
-            -- empty (every production obligation is vacuous), unlike other
-            -- leadership errors, where it is unknown and we fall back to the
-            -- node log for EB eligibility.
-            Left (Api.LeaderErrStakePoolHasNoStake _) -> Just []
+      let -- Stake registered in epoch e becomes active in epoch e+2, so before
+          -- epoch 2 a pool that will have stake still reports as having none. The
+          -- error cannot tell the two apart, so the epoch decides which reading is
+          -- safe.
+          stakeCanHaveActivated = toInteger (Api.unEpochNo nodeEpoch) >= 2
+          mSlots = case eSlots of
+            -- From epoch 2 on, no active stake is a state rather than a fault: the
+            -- schedule is KNOWN empty, every production obligation is vacuous, and
+            -- an EB forge would be a genuine violation. Earlier than that the same
+            -- error means only "not snapshotted yet", so it is an unknown schedule
+            -- like any other leadership error and eligibility comes from the log —
+            -- otherwise a devnet pool forging on genesis stake in epoch 0 is
+            -- reported as violating EB-Role.
+            Left (Api.LeaderErrStakePoolHasNoStake _)
+              | stakeCanHaveActivated -> Just []
             Left _ -> Nothing
             Right slots -> Just (Prelude.map (toInteger . Api.unSlotNo) (Set.toList slots))
           mErr = case eSlots of
