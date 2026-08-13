@@ -3932,6 +3932,23 @@
         "type": "github"
       }
     },
+    "praos-spec-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1781223391,
+        "narHash": "sha256-nBNg4oOGKBxrSxr5YzwrXRnxvHKf5JYLhq04KYUlbyE=",
+        "owner": "input-output-hk",
+        "repo": "ouroboros-praos-formal-spec",
+        "rev": "847697eec805983c6ac2afa793443e4da954d11a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "input-output-hk",
+        "repo": "ouroboros-praos-formal-spec",
+        "rev": "847697eec805983c6ac2afa793443e4da954d11a",
+        "type": "github"
+      }
+    },
     "pre-commit-hooks": {
       "inputs": {
         "flake-compat": [
@@ -4027,6 +4044,7 @@
         "leios-spec": "leios-spec",
         "nixpkgs": "nixpkgs_8",
         "ouroboros-consensus": "ouroboros-consensus",
+        "praos-spec-src": "praos-spec-src",
         "pre-commit-hooks": "pre-commit-hooks_2"
       }
     },

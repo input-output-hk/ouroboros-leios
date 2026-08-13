@@ -1,4 +1,3 @@
-{-# OPTIONS --safe #-}
 {- Module: Defaults
 
    Concrete instantiation of the Leios 'SpecStructure' obligations used by the
@@ -9,17 +8,22 @@
    decided by the 'winning-slots' oracle (the Praos VRF leadership schedule)
    supplied through 'TestParams'. See 'sortition' below.
 
-   The cryptographic components stay abstract (this is '--safe'): hashing is the
-   identity on the relevant payloads, signatures/proofs are the unit type. The
-   base layer is the spec's simple single-producer blockchain machine.
+   The cryptographic components stay abstract: hashing is the identity on the
+   relevant payloads, signatures/proofs are the unit type. The base layer is
+   the real Praos node from ouroboros-praos-formal-spec, wrapped as a
+   BaseMachine by Leios.Base.Praos (see d-BaseFunctionality below and
+   docs/praos-base-machine-sketch.md).
+
+   Not '--safe' (it was, with the previous stub base machine): the Praos
+   instantiation transitively imports Protocol.Chain, whose chainFromBlock is
+   TERMINATING, and Leios.Base.Praos.Assumptions postulates the block-tree
+   laws — the same tradeoff as the verifier's leadershipSchedule postulate.
 -}
 
 open import Leios.Prelude hiding (_⊗_)
 open import Leios.Abstract
 open import Leios.Config
 open import Leios.SpecStructure
-open import Blockchain.Safety
-import Blockchain.IsBlockchain
 
 open import Axiom.Set.Properties th
 open import Data.Bool using (if_then_else_)
@@ -34,10 +38,6 @@ open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
 open import LibExt
-
-open import CategoricalCrypto using (I ; Machine ; machine-type ; Channel ; _⊗ᵀ_)
-open import CategoricalCrypto.Channel.Core
-open import CategoricalCrypto.Channel.Selection
 
 open Equivalence
 
@@ -121,106 +121,41 @@ d-KeyRegistrationFunctionality =
 
 open import Leios.Base d-Abstract d-VRF public
 
+-- Base layer: the real Praos node (ouroboros-praos-formal-spec, wrapped by
+-- Leios.Base.Praos — see docs/praos-base-machine-sketch.md). Cert/VTy/
+-- initSlot/V-chkCerts keep the trivial choices the previous stub machine
+-- made, so the verifier-facing BaseIOF interface is unchanged; what changes
+-- is the machine behind it: FTCH-LDG/FTCH-SLOT answers and RB minting now
+-- follow Praos's honest-node semantics (processMsgsʰ/makeBlockʰ/bestChain)
+-- instead of echoing untouched state.
+
+-- RB-production eligibility for the wrapped Praos node: the same
+-- leadership-schedule oracle 'sortition' consults under the EB tag (in
+-- linear Leios the RB is the Praos block; a leader slot lets the SUT mint an
+-- RB, announcing an EB in it). The party argument is deliberately ignored:
+-- the schedule is the SUT's own and the machine only ever evaluates 'winner'
+-- at its own identity (makeBlockʰ), which also neutralizes the
+-- party₀-vs-sutId identity fixed inside Leios.Base.Praos.Assumptions.
+d-winner : Fin numberOfParties → ℕ → Type
+d-winner _ sl = (EB , sl) ∈ winning-slots
+
+instance
+  d-winner⁇² : d-winner ⁇²
+  d-winner⁇² {_} {sl} .dec = (EB , sl) ∈? winning-slots
+
+import Leios.Base.Praos.Machine as PraosMachine
+module PM = PraosMachine d-Abstract d-VRF numberOfParties d-winner
+  ⦃ winner⁇² = λ {p} {sl} → d-winner⁇² {p} {sl} ⦄
+-- producer is a placeholder (a bare RankingBlock does not determine its
+-- minter) but operationally inert: IsBlockchain's producer/slotOf are read
+-- only by deployment-level modules the verifier never imports.
+module PB = PM.Assembled ⊤ ⊤ (λ _ → 0) (λ _ _ → true) stakeDistribution (λ _ → sutId)
+
 d-Base : BaseAbstract
-d-Base =
-  record
-    { Cert        = ⊤
-    ; VTy         = ⊤
-    ; initSlot    = λ _ → 0
-    ; V-chkCerts  = λ _ _ → true
-    ; BaseAdv     = I
-    ; BaseMsg     = ⊤
-    }
-
-d-BaseState : Type
-d-BaseState = List RankingBlock × ℕ
-
-d-BaseChannel : Channel
-d-BaseChannel = BaseNetwork ⊗ᵀ (BaseIO ⊗₀ BaseAdv)
-  where open BaseAbstract d-Base
-
-data d-BaseRel : machine-type d-BaseState d-BaseChannel where
-
-  fetch-blocks :
-    ∀ blocks slot →
-      d-BaseRel
-        (blocks , slot)
-        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-LDG)
-        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks))
-        (blocks , slot)
-
-  fetch-slot :
-    ∀ blocks slot →
-      d-BaseRel
-        (blocks , slot)
-        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-SLOT)
-        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot))
-        (blocks , slot)
-
-open Blockchain.IsBlockchain (Fin 1)
-
-helper : BlockChainInfo RankingBlock → BaseAbstract.BaseIOF d-Base CategoricalCrypto.Out
-helper = let open BaseAbstract.BaseIOF in λ where
-  Chain → FTCH-LDG
-  Slot  → FTCH-SLOT
-
-private
-  open BaseAbstract.BaseIOF
-
-  opaque
-    unfolding _⊗₀_
-
-    correctness-chain : ∀ {s response' s'}
-      → d-BaseRel s (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG) response' s'
-      → ∃ λ response → response' ≡ just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BASE-LDG response)
-    correctness-chain (fetch-blocks blocks _) = blocks , refl
-
-    correctness-slot : ∀ {s response' s'}
-      → d-BaseRel s (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-SLOT) response' s'
-      → ∃ λ response → response' ≡ just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ SLOT response)
-    correctness-slot (fetch-slot _ slot) = slot , refl
-
-    isPure-chain : ∀ {s response' s'}
-      → d-BaseRel s (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG) response' s'
-      → s ≡ s'
-    isPure-chain (fetch-blocks _ _) = refl
-
-    isPure-slot : ∀ {s response' s'}
-      → d-BaseRel s (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-SLOT) response' s'
-      → s ≡ s'
-    isPure-slot (fetch-slot _ _) = refl
+d-Base = PB.B'
 
 d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
-d-BaseFunctionality =
-  record
-    { n = 1
-    ; m =
-        record
-          { State = (List RankingBlock × ℕ)
-          ; stepRel = d-BaseRel
-          }
-    ; is-blockchain = let open BaseAbstract.BaseIOF in
-        record
-          { isConstrained =
-              record
-                { queryI = (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ_) ∘ helper
-                ; queryO = λ where
-                    {Chain} rankingBlocks → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BASE-LDG rankingBlocks
-                    {Slot}  slot          → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ SLOT slot
-                ; correctness = λ where
-                    {Chain} → correctness-chain
-                    {Slot}  → correctness-slot
-                ; completeness = λ where
-                    {Chain} {blocks , slot} → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks , (blocks , slot) , fetch-blocks blocks slot
-                    {Slot}  {blocks , slot} → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT     slot   , (blocks , slot) , fetch-slot   blocks slot
-                }
-          ; isPure = λ where
-              Chain → isPure-chain
-              Slot  → isPure-slot
-          ; producer = λ _ → Fin.zero
-          ; slotOf   = λ _ → 0
-          }
-    }
+d-BaseFunctionality = PB.praosBase
 
 open import Leios.FFD public
 
