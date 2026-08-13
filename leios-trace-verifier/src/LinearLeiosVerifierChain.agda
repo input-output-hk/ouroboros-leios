@@ -35,6 +35,8 @@ module LinearLeiosVerifierChain where
     CRBForged    : String → Word64 → ChainEvent
     CNodeIsLeader : Word64 → ChainEvent
     CAnnouncementAccepted : String → Word64 → ChainEvent
+    CNotVoted    : String → Word64 → String → ChainEvent
+    CChainExtended : Word64 → ChainEvent
 
   {-# FOREIGN GHC import qualified ChainEvents #-}
   {-# COMPILE GHC ChainEvent = data ChainEvents.ChainEvent
@@ -46,6 +48,8 @@ module LinearLeiosVerifierChain where
         | ChainEvents.CRBForged
         | ChainEvents.CNodeIsLeader
         | ChainEvents.CAnnouncementAccepted
+        | ChainEvents.CNotVoted
+        | ChainEvents.CChainExtended
         ) #-}
 
   module _
@@ -224,6 +228,27 @@ module LinearLeiosVerifierChain where
         ; signature  = tt
         }
 
+      -- Status of the EB the chain currently announces, as the model tracks it
+      -- across a voting window. This drives the 'Slot₂'/'BASE-LDG' ledger step
+      -- ('annRB' below), which is the ONLY thing that sets the spec's
+      -- 'currentRB' — and hence 'getCurrentEBHash', 'voteDeadline', and every
+      -- role rule that reads them.
+      --
+      --   none          : no EB currently announced (default RB announces nothing)
+      --   announcing h  : the head RB announces EB 'h'; re-asserted each slot to
+      --                   keep the voting window open until 'voteDeadline'
+      --   superseded    : the chain has extended past the announcer (a later RB
+      --                   is now the tip). The EB can no longer be certified, so
+      --                   the window must close: 'closeSlot' emits ONE
+      --                   non-announcing 'Slot₂' to overwrite 'currentRB', then
+      --                   drops to 'none'. Merely forgetting the hash would stop
+      --                   re-announcing but never reset the spec's 'currentRB',
+      --                   leaving the window (wrongly) open.
+      data EBStatus : Type where
+        none       : EBStatus
+        announcing : String → EBStatus
+        superseded : EBStatus
+
       -- Accumulator threaded through the chain events. Slot obligations are
       -- flushed when the next CSlot arrives (or at end of stream).
       record Accumulator : Type where
@@ -232,7 +257,7 @@ module LinearLeiosVerifierChain where
               FFD-blks    : List Blk
               curSlot     : ℕ
               started     : Bool
-              curEB       : Maybe String
+              curEB       : EBStatus
               -- Every EB the chain has announced, not only the latest. Two
               -- announcements can land inside a single slot, and closeSlot collapses
               -- a slot into one snapshot.
@@ -292,33 +317,52 @@ module LinearLeiosVerifierChain where
             mempool = case forgedEB a of λ where
               (just eb) → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs (EndorserBlockOSig.txs eb)))) ∷ []
               nothing   → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs synthTxs))) ∷ []
-            -- Which announced EB to present as the chain head for this slot.
+            -- One 'Slot₂'/'BASE-LDG' step per slot, setting the spec's 'currentRB'
+            -- (the head of 'RBs') — which is what 'getCurrentEBHash', and hence the
+            -- voting window and every role rule reading it, is derived from.
+            announceStep : Maybe Hash → List Step
+            announceStep mh =
+              (Slot₂-Action s , inj₂ (inj₁ (BaseAbstract.BASE-LDG
+                (record { txs = [] ; announcedEB = mh ; ebCert = nothing ; slot = s } ∷ [])))) ∷ []
+            -- Which EB to present as the chain head for this slot.
             --
-            -- Two announcements can land inside one slot: the node votes for an EB
-            -- announced earlier, then forges its own and that gets announced too,
-            -- moving the head. closeSlot collapses the slot into a single snapshot,
-            -- so taking the latest announcement would contradict the vote emitted
-            -- for the same slot — observed as
-            -- "442 : Err-VT-Role-premises: Current EB hash does not match".
+            -- A vote cast in this slot wins over the announcement status, because
+            -- closeSlot collapses a slot into one snapshot and the log timestamps
+            -- only to slot granularity, so intra-slot order is unknowable. Two ways
+            -- that bites:
             --
-            -- So present the EB the vote was cast for. That is not self-justifying:
-            -- CVoted only records a vote for an EB the chain actually announced, so
-            -- a vote for an unannounced EB still leaves votedEB unset. What it gives
-            -- up is intra-slot ordering — "the EB the head announced at that instant"
-            -- weakens to "an EB the head announced" — which the log cannot support
-            -- anyway.
-            headHash : Maybe Hash
-            headHash = case votedEB a of λ where
-              (just (eb , _)) → just (hash eb)
-              nothing         → case curEB a of λ where
-                (just h) → just (hashOf a h)
-                nothing  → nothing
+            --   * Two announcements in one slot — the node votes for an EB announced
+            --     earlier, then forges its own and that is announced too, moving the
+            --     head. Presenting the later one contradicts the vote emitted for the
+            --     same slot: "442 : Err-VT-Role-premises: Current EB hash does not
+            --     match".
+            --   * The chain supersedes the announcer in the very slot the vote was
+            --     cast. De-announcing here would refuse a vote we cannot show was
+            --     illegal, so the de-announcement is deferred one slot ('nextEB').
+            --
+            -- Presenting the voted EB is not self-justifying: 'CVoted' records a vote
+            -- only for an EB the chain actually announced, so a vote for an
+            -- unannounced EB leaves 'votedEB' unset and no head is invented for it.
+            --
+            -- The residual weakening is deliberate: a vote cast in its legal slot for
+            -- an EB whose announcer the chain had already superseded is accepted
+            -- rather than refused. Refusing it would mean rejecting votes the log
+            -- cannot prove were late, which is the false-positive class this file has
+            -- been repeatedly corrected for. Votes genuinely outside the window are
+            -- still caught, by VT-Role's timing premise.
             annRB : List Step
-            annRB = case headHash of λ where
-              nothing  → []
-              (just h) →
-                (Slot₂-Action s , inj₂ (inj₁ (BaseAbstract.BASE-LDG
-                  (record { txs = [] ; announcedEB = just h ; ebCert = nothing ; slot = s } ∷ [])))) ∷ []
+            annRB = case votedEB a of λ where
+              (just (eb , _)) → announceStep (just (hash eb))
+              nothing         → case curEB a of λ where
+                -- No announcement to make: leave 'currentRB' as it stands.
+                none           → []
+                -- Re-assert the announcement so the window stays open this slot.
+                (announcing h) → announceStep (just (hashOf a h))
+                -- The chain has extended past the announcer: overwrite 'currentRB'
+                -- with a non-announcing RB so 'getCurrentEBHash ≡ nothing',
+                -- 'voteDeadline ≡ 0', and the spec's own rules close the window
+                -- (abstention becomes licensed by Roles₂, no vote is forced).
+                superseded     → announceStep nothing
             ebRole : List Step
             ebRole = case forgedEB a of λ where
               (just eb) → (EB-Role-Action s eb , inj₁ FFDT.SLOT) ∷ []
@@ -339,9 +383,25 @@ module LinearLeiosVerifierChain where
           then (record a { curSlot = primWord64ToNat s ; started = true } , [])
           else
             let steps = closeSlot a
+                -- A 'superseded' de-announcement is emitted once, by the closeSlot
+                -- above; the spec's 'currentRB' is then non-announcing, so drop to
+                -- 'none'. 'announcing'/'none' persist across the slot.
+                --
+                -- Unless a vote was cast in this slot: 'annRB' presented the voted EB
+                -- instead of de-announcing, so the de-announcement has not happened
+                -- yet and 'superseded' must survive into the next slot to fire there.
+                -- Dropping to 'none' here would retire the status without ever
+                -- resetting 'currentRB', leaving the window open — the very failure
+                -- the three-state status was introduced to avoid.
+                nextEB = case curEB a of λ where
+                  superseded → case votedEB a of λ where
+                    (just _) → superseded
+                    nothing  → none
+                  st         → st
             in (record a
                   { curSlot = primWord64ToNat s
                   ; FFD-blks = []
+                  ; curEB = nextEB
                   ; forgedEB = nothing
                   ; votedEB = nothing
                   } , steps)
@@ -362,7 +422,7 @@ module LinearLeiosVerifierChain where
       -- The chain head announces this EB, which is what 'getCurrentEBHash' denotes.
       -- This, and not acquisition, is what makes the EB votable.
       traceEvent→action a (CAnnouncementAccepted h _) =
-        (record a { curEB = just h ; announced = h ∷ announced a } , [])
+        (record a { curEB = announcing h ; announced = h ∷ announced a } , [])
       -- Deliberately does not touch 'curEB': letting a vote establish its own
       -- precondition would make VT-Role self-justifying, hiding a node that voted for
       -- an EB its chain never announced.
@@ -375,6 +435,18 @@ module LinearLeiosVerifierChain where
       traceEvent→action a (CRBForged h s) = (a , [])
       -- Consumed by 'leaderSlots' as the eligibility fallback, not as a step.
       traceEvent→action a (CNodeIsLeader _) = (a , [])
+      -- The selected chain extended past the announcer. Mark the announcement
+      -- 'superseded' so the next 'closeSlot' de-announces it via a non-announcing
+      -- 'Slot₂', collapsing the spec's voteDeadline to 0. If nothing is currently
+      -- announced, there is nothing to supersede.
+      traceEvent→action a (CChainExtended _) =
+        case curEB a of λ where
+          (announcing _) → (record a { curEB = superseded } , [])
+          _              → (a , [])
+      -- A deliberate, protocol-legal abstention the node logged. It corroborates
+      -- the retirement but drives no state itself: the window is closed by the
+      -- chain extension (CChainExtended) or by the deadline, both via 'currentRB'.
+      traceEvent→action a (CNotVoted _ _ _) = (a , [])
 
       s₀ : LeiosState
       s₀ = initLeiosState tt exampleDistr ((SUT-id , tt) ∷ [])
@@ -396,7 +468,7 @@ module LinearLeiosVerifierChain where
       n₀ : ℕ → Accumulator
       n₀ st = record
         { EB-refs = [] ; EB-received = [] ; FFD-blks = [] ; curSlot = st
-        ; started = false ; curEB = nothing ; announced = []
+        ; started = false ; curEB = none ; announced = []
         ; forgedEB = nothing ; votedEB = nothing }
 
       opaque

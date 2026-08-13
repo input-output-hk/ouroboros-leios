@@ -60,25 +60,36 @@ chainEvents = do
         , "{\"ns\":\"Consensus.LeiosKernel.Voted\",\"data\":{\"kind\":\"LeiosVoted\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":20},\"weight\":1.22e-2}}"
         , "{\"ns\":\"Consensus.LeiosKernel.VoteAcquired\",\"data\":{\"kind\":\"LeiosVoteAcquired\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":32}}}"
         ]
-        `shouldBe` [CAnnouncementAccepted "eb05" 300, CVoted "eb05" 300, CVoteAcquired "eb05" 300]
+        `shouldBe` [CAnnouncementAccepted "eb05" 300, CChainExtended 300, CVoted "eb05" 300, CVoteAcquired "eb05" 300]
     -- An RB can be adopted by switching to a fork rather than by extending the
     -- current chain. Both report the adopted tip in 'newtip', and the node votes
     -- on whatever it selected, so both must feed the linkage map. Listening only
     -- to AddedToCurrentChain silently drops the vote, which reads downstream as
-    -- an unexplained abstention.
+    -- an unexplained abstention. Distinct from the CChainExtended cases below:
+    -- this pins the vote *resolving* through a fork switch, not merely the tip
+    -- advance being reported.
     it "resolves votes for an RB adopted by switching to a fork" $
       parse
         [ "{\"ns\":\"Consensus.LeiosKernel.AnnouncementAccepted\",\"data\":{\"kind\":\"LeiosAnnouncementAccepted\",\"ebHash\":\"eb07\",\"electionSlot\":699,\"ebBodySize\":70347,\"equivocation\":false}}"
         , "{\"ns\":\"ChainDB.AddBlockEvent.SwitchedToAFork\",\"data\":{\"kind\":\"TraceAddBlockEvent.SwitchedToAFork\",\"newSuffixSelectView\":{\"blockNo\":32,\"kind\":\"PraosTiebreakerView\",\"slotNo\":699},\"newtip\":\"" <> rb64 <> "@699\"}}"
         , "{\"ns\":\"Consensus.LeiosKernel.Voted\",\"data\":{\"kind\":\"LeiosVoted\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":2},\"weight\":0.333333333333}}"
         ]
-        `shouldBe` [CAnnouncementAccepted "eb07" 699, CVoted "eb07" 699]
+        `shouldBe` [CAnnouncementAccepted "eb07" 699, CChainExtended 699, CVoted "eb07" 699]
     it "emits AnnouncementAccepted, which is what makes an EB votable" $
       parse ["{\"ns\":\"Consensus.LeiosKernel.AnnouncementAccepted\",\"data\":{\"kind\":\"LeiosAnnouncementAccepted\",\"ebHash\":\"eb06\",\"electionSlot\":301,\"ebBodySize\":1,\"equivocation\":false}}"]
         `shouldBe` [CAnnouncementAccepted "eb06" 301]
     it "parses NodeIsLeader" $
       parse ["{\"ns\":\"Forge.Loop.NodeIsLeader\",\"data\":{\"kind\":\"TraceNodeIsLeader\",\"slot\":7}}"]
         `shouldBe` [CNodeIsLeader 7]
+    it "emits CChainExtended when the tip advances (AddedToCurrentChain)" $
+      parse ["{\"ns\":\"ChainDB.AddBlockEvent.AddedToCurrentChain\",\"data\":{\"kind\":\"AddedToCurrentChain\",\"newtip\":\"" <> rb64 <> "@432\"}}"]
+        `shouldBe` [CChainExtended 432]
+    it "emits CChainExtended on a fork switch too (SwitchedToAFork)" $
+      parse ["{\"ns\":\"ChainDB.AddBlockEvent.SwitchedToAFork\",\"data\":{\"kind\":\"TraceAddBlockEvent.SwitchedToAFork\",\"newtip\":\"" <> rb64 <> "@433\"}}"]
+        `shouldBe` [CChainExtended 433]
+    it "maps NotVoted (a deliberate, protocol-legal abstention) with its reason" $
+      parse ["{\"ns\":\"Consensus.LeiosKernel.NotVoted\",\"data\":{\"kind\":\"LeiosNotVoted\",\"ebHash\":\"eb07\",\"ebSlot\":540,\"reason\":\"chainTipDoesNotAnnounce\"}}"]
+        `shouldBe` [CNotVoted "eb07" 540 "chainTipDoesNotAnnounce"]
     it "drops votes whose linkage is missing (truncated log prefix)" $
       parse ["{\"ns\":\"Consensus.LeiosKernel.VoteAcquired\",\"data\":{\"kind\":\"LeiosVoteAcquired\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":1}}}"]
         `shouldBe` []

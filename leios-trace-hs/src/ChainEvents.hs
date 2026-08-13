@@ -66,6 +66,18 @@ data ChainEvent
     --   makes an EB votable, so it is what the verifier must key voting obligations
     --   on. Also retained internally as vote-resolution linkage.
     CAnnouncementAccepted !Text !Word64
+  | -- | @Consensus.LeiosKernel.NotVoted@: the SUT deliberately abstained from
+    --   voting on an EB (ebHash, EB's election slot, reason). In Linear Leios an
+    --   abstention is not a fault: the reason enumerates protocol-legal causes
+    --   (@chainTipDoesNotAnnounce@ once the chain has extended past the announcer,
+    --   @tooLate@, @notOnCommittee@). Corroborates a closed voting window.
+    CNotVoted !Text !Word64 !Text
+  | -- | @ChainDB.AddBlockEvent.AddedToCurrentChain@ / @SwitchedToAFork@: the SUT's
+    --   selected chain now has this tip slot. In Linear Leios a cert is valid only
+    --   in the ranking block that directly extends the announcer, so once the tip
+    --   advances past an announced EB that EB can no longer be certified — the
+    --   verifier uses this to close the EB's voting window.
+    CChainExtended !Word64
   deriving (Eq, Show, Generic)
 
 -- | Internal: one parsed line — a directly-emittable event, a linkage fact
@@ -74,10 +86,13 @@ data Raw
   = RawEvent !ChainEvent
   | -- | announcement accepted: election slot, ebHash
     RawAnn !Word64 !Text
-  | -- | chain linkage: rbHash, slot
+  | -- | chain linkage: rbHash, new tip slot. Records rbHash -> slot for vote
+    --   resolution AND surfaces the tip advance as 'CChainExtended'.
     RawRb !Text !Word64
   | -- | vote (True = cast by the SUT, False = acquired from a peer): rbHash
     RawVote !Bool !Text
+  | -- | deliberate abstention: ebHash, election slot, reason. EB-keyed.
+    RawNotVoted !Text !Word64 !Text
 
 -- | Vote-resolution state.
 data LinkState = LinkState
@@ -101,7 +116,9 @@ parseNodeLog =
       , Just (CAnnouncementAccepted ebHash slot)
       )
     RawRb rbHash slot ->
-      (st{lsSlotByRb = Map.insert rbHash slot (lsSlotByRb st)}, Nothing)
+      ( st{lsSlotByRb = Map.insert rbHash slot (lsSlotByRb st)}
+      , Just (CChainExtended slot)
+      )
     RawVote ours rbHash ->
       ( st
       , do
@@ -109,6 +126,8 @@ parseNodeLog =
           ebHash <- Map.lookup slot (lsEbBySlot st)
           pure $ (if ours then CVoted else CVoteAcquired) ebHash slot
       )
+    RawNotVoted ebHash slot reason ->
+      (st, Just (CNotVoted ebHash slot reason))
 
 -- | Parse a single log line; @Nothing@ for non-JSON banners and unrelated events.
 parseRaw :: BSL8.ByteString -> Maybe Raw
@@ -136,9 +155,13 @@ pRaw = withObject "logline" $ \o -> do
     "Consensus.LeiosKernel.VoteAcquired" -> do
       v <- d .: "vote"
       RawVote False <$> v .: "rbHash"
+    "Consensus.LeiosKernel.NotVoted" ->
+      RawNotVoted <$> d .: "ebHash" <*> d .: "ebSlot" <*> d .: "reason"
     -- Extending the current chain and switching to a fork are the two ways
-    -- ChainDB reports adopting a new tip. Ignoring the latter silently drops
-    -- every vote for an RB that arrived on a fork.
+    -- ChainDB reports adopting a new tip, and both matter twice over: the tip
+    -- advance retires any EB the superseded announcer carried, and the adopted
+    -- RB is what a vote is keyed on. Ignoring the fork-switch case silently
+    -- drops every vote for an RB that arrived on a fork.
     "ChainDB.AddBlockEvent.AddedToCurrentChain" -> newtip d
     "ChainDB.AddBlockEvent.SwitchedToAFork" -> newtip d
     -- pre-w31 envelope (kept for older logs)
