@@ -39,6 +39,11 @@ verify slots authoritative evs =
 fromLog :: [ChainEvent] -> Text
 fromLog = verify [] False
 
+-- | Verify from a given start slot, as a windowed verifier does for each window.
+verifyFrom :: Integer -> [ChainEvent] -> Text
+verifyFrom from evs =
+  fst (snd (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 3 [] False evs from))
+
 -- | An EB announced and acquired in slot 1 and voted in slot 4.
 announcedAndVoted :: [ChainEvent]
 announcedAndVoted =
@@ -64,6 +69,40 @@ acquiredNotAnnounced =
   , CSlot 3
   , CSlot 4
   , CSlot 5
+  ]
+
+-- | A repeat vote far from the original, and the bounded window a windowed verifier
+--   would see when it reaches slot 20: overlap is 4, so the window starts at 16 and
+--   contains neither the announcement nor the first vote.
+votedTwiceFar :: [ChainEvent]
+votedTwiceFar =
+  [CSlot 0, CSlot 1, CAnnouncementAccepted "eb" 1, CEBAcquired "eb" 1]
+    <> [CSlot s | s <- [2 .. 3]]
+    <> [CSlot 4, CVoted "eb" 1]
+    <> [CSlot s | s <- [5 .. 19]]
+    <> [CSlot 20, CVoted "eb" 1]
+    <> [CSlot 21]
+
+windowOfVotedTwiceFar :: [ChainEvent]
+windowOfVotedTwiceFar =
+  [CSlot s | s <- [16 .. 19]]
+    <> [CSlot 20, CVoted "eb" 1]
+    <> [CSlot 21]
+
+-- | The same EB voted twice: once in its one legal slot 4, then again in slot 5.
+votedTwice :: [ChainEvent]
+votedTwice =
+  [ CSlot 0
+  , CSlot 1
+  , CAnnouncementAccepted "eb" 1
+  , CEBAcquired "eb" 1
+  , CSlot 2
+  , CSlot 3
+  , CSlot 4
+  , CVoted "eb" 1
+  , CSlot 5
+  , CVoted "eb" 1
+  , CSlot 6
   ]
 
 -- | Two announced EBs, each voted in its own slot. Requires the EB payload to be
@@ -120,3 +159,16 @@ chainVerifier = do
       fromLog acquiredNotAnnounced `shouldBe` "ok"
     it "accepts votes for two distinct EBs in one run" $
       fromLog twoVotes `shouldBe` "ok"
+    it "refuses a repeat vote in the slot after the legal one" $
+      fromLog votedTwice `shouldNotBe` "ok"
+    it "refuses a repeat vote long after the legal one" $
+      fromLog votedTwiceFar `shouldNotBe` "ok"
+    -- Characterises what bounding the verified prefix would cost, rather than
+    -- asserting it is desirable. Verification from slot 16 sees neither the
+    -- announcement nor the first vote, so 'wasAnnounced' is false, CVoted is
+    -- dropped, no VT-Role is raised, and the stale vote passes unnoticed. Any
+    -- windowing scheme has to carry the announcement history forward, or accept
+    -- this blind spot: the overlap width is sized for legitimate obligations and
+    -- says nothing about how far back a spurious event may reach.
+    it "loses a stale vote when the prefix cannot see the announcement" $
+      verifyFrom 16 windowOfVotedTwiceFar `shouldBe` "ok"
