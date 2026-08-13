@@ -3,14 +3,14 @@ title: Protocol status
 hide_table_of_contents: true
 ---
 
-import ProtocolStatus, { ProtocolMatrix, ImplementationStages } from '@site/src/components/ProtocolStatus';
+import ProtocolStatus, { ProtocolMatrix, ReleaseStages } from '@site/src/components/ProtocolStatus';
 
 export const stages = [
   'CIP',
   'Prototype',
   'Design',
   'Implementation',
-  'Confidence',
+  'Assurance',
 ];
 
 {/*
@@ -37,7 +37,7 @@ export const source = `
   - [x] Prototype
   - [x] Design
   - [x] Implementation
-  - [x] Confidence
+  - [x] Assurance: Audited
     - [x] Primitives audited
     - [x] Certs peer-reviewed
 
@@ -48,7 +48,7 @@ export const source = `
   - [~] Implementation
     - [ ] Protocol parameters and genesis config
     - [ ] Constitution guard rails
-  - [ ] Confidence
+  - [ ] Assurance
 
 - Serialization
   - [x] CIP
@@ -60,7 +60,7 @@ export const source = `
     - [x] Certificates in body
     - [x] BLS key in pool registration cert in txs
     - [ ] Protocol parameter updates in txs
-  - [ ] Confidence
+  - [ ] Assurance
 
 - Praos > Leios prioritization
   - [x] CIP
@@ -69,7 +69,7 @@ export const source = `
   - [~] Implementation
     - [~] Socket options
     - [ ] Incremental decoding
-  - [?] Confidence: good enough?
+  - [?] Assurance: good enough?
 
 - Key registration & rotation @130,200
   - [x] CIP
@@ -79,7 +79,7 @@ export const source = `
     - [x] Generate BLS keys
     - [~] Create and submit pool registration with BLS keys
     - [ ] Register BLS keys via block headers
-  - [~] Confidence: on testnet
+  - [~] Assurance: on testnet
 
 - Committee selection @230,320
   - [x] CIP
@@ -88,7 +88,7 @@ export const source = `
   - [ ] Implementation
     - [x] Stake-based committee selection
     - [ ] Committee selection at epoch boundaries
-  - [~] Confidence: on testnet
+  - [~] Assurance: on testnet
 
 - High-throughput Tx submission @180,25
   - [x] CIP
@@ -97,7 +97,7 @@ export const source = `
   - [~] Implementation
     - [~] TxSubmisison V2-undecision
     - [ ] TxSubmission param tuning
-  - [~] Confidence
+  - [~] Assurance
 
 - High-throughput mempool @550,25
   - [x] CIP
@@ -107,7 +107,7 @@ export const source = `
     - [ ] Double-buffered mempool
     - [ ] Capped forging
     - [ ] Pre-flight forging
-  - [~] Confidence
+  - [~] Assurance
 
 - Block production @460,170
   - [x] CIP
@@ -116,7 +116,7 @@ export const source = `
   - [ ] Implementation
     - [ ] Forge and store EBs
     - [ ] Forge RBs with certificates
-  - [ ] Confidence
+  - [ ] Assurance
 
 - EB diffusion @480,280
   - [?] CIP: Delay bounds
@@ -125,7 +125,7 @@ export const source = `
   - [ ] Implementation
     - [ ] Announce and detect equivocations of EBs
     - [ ] Diffuse and validate EBs via TxCache
-  - [?] Confidence: good enough?
+  - [?] Assurance: good enough?
 
 - Transaction cache & storage
   - [x] CIP
@@ -136,7 +136,7 @@ export const source = `
     - [ ] Disk-backed TxCache
     - [ ] Small quantity EB storage
     - [ ] Large quantity, low latency EB storage
-  - [ ] Confidence
+  - [ ] Assurance
 
 - Voting & certification @600,420
   - [x] CIP
@@ -146,7 +146,7 @@ export const source = `
     - [ ] Voting logic
     - [ ] Diffuse and validate votes
     - [ ] Store and aggregate votes
-  - [ ] Confidence
+  - [ ] Assurance
 
 - Block validation & adoption @985,70
   - [x] CIP
@@ -156,7 +156,7 @@ export const source = `
     - [ ] Reject all announcements and certificates
     - [ ] Validate EB announcing and certifying blocks
     - [ ] EB fetching on chain selection
-  - [ ] Confidence
+  - [ ] Assurance
 
 - Node API & configuration
   - [x] CIP
@@ -166,7 +166,7 @@ export const source = `
     - [x] Query pool state showing key registration
     - [~] Client APIs inline certified EB txs
     - [ ] Node accepts BLS keys
-  - [ ] Confidence
+  - [ ] Assurance
 `;
 
 {/*
@@ -196,10 +196,11 @@ export const plan = `
   - Stake-based committee selection
   - Committee selection at epoch boundaries
     - Committee in ledger state
+  - EB fetching on chain selection
   - Validate EB announcing and certifying blocks
     - Disallowed by protocol parameters
   - Client APIs inline certified EB txs
-  - No-op mini-protocols (?)
+  - Inert mini-protocols handlers
   - Node integration
 
 - Stage 3: Low params (1/4/7/100k/1M)
@@ -211,7 +212,6 @@ export const plan = `
   - Small quantity EB storage
   - Announce and detect equivocations of EBs
   - Diffuse and validate EBs via TxCache
-  - EB fetching on chain selection
   - Voting logic
   - Diffuse and validate votes
   - Store and aggregate votes
@@ -238,22 +238,24 @@ is matured through simulation, prototyping, design, implementation and quality
 assurance until it can be considered for deployment to mainnet. This page tracks
 where that work currently stands, cut along two dimensions:
 
-- **Components**: the parts of the protocol flow, each progressing through the
+- **Component stages**: the parts of the protocol flow, each progressing through the
   stages below. Shown as badges on the diagram, and in full in the
   [matrix](#full-matrix).
-- **Release scopes**: what a `cardano-node` release would need to contain to be
-  considered for a hard fork, as [implementation stages](#implementation-stages).
+- **Release stages**: possible increments that can be considered for a rollout
+  to mainnet, as [node releases](#release-stages).
+
+## Component stages
 
 A component moves through these stages, which are deliberately not a waterfall
 several of them progress in parallel and feed back into each other:
 
-| Stage          | Meaning                                                                                                                            |
+| Stage | Meaning |
 |----------------|------------------------------------------------------------------------------------------------------------------------------------|
 | CIP            | The protocol-level question is settled in CIP-164; we know *what* is needed.                                                       |
 | Prototype      | Explored in simulation or on real infrastructure, enough to trust the approach is feasible.                                        |
 | Design         | *How* to build it in `cardano-node` is written down in the [technical design](https://leios.cardano-scaling.org/leios-design.pdf). |
 | Implementation | Production code exists in `cardano-node` (and, eventually, other node implementations).                                            |
-| Confidence     | Quality assurance — formal methods, statistical analysis, e2e and adversarial testing — sufficient to hard-fork mainnet.           |
+| Assurance     | Quality assurance — formal methods, statistical analysis, e2e and adversarial testing — sufficient to hard-fork mainnet.           |
 
 :::warning[This is a work-in-progress self-assessment]
 
@@ -280,11 +282,11 @@ Click or hover a badge for the full breakdown of a component.
 
 <ProtocolStatus stages={stages} source={source} plan={plan} />
 
-## Full matrix
+### Full matrix
 
 <ProtocolMatrix stages={stages} source={source} />
 
-## Implementation stages
+## Release stages
 
 The same implementation scope, cut along the other dimension: each stage is a
 `cardano-node` release scope that could be considered to hard-fork mainnet. Not
@@ -310,4 +312,10 @@ itself.
 
 :::
 
-<ImplementationStages stages={stages} source={source} plan={plan} />
+Each stage is increment on the dimensional plan of having a more and more capable Leios-enabled cardano node. Besides the scope that goes into it, they differ in risk to deploy and how we can progress once deployed to mainnet:
+
+- Stage 1 to 2: a new release and another hard-fork (protocol version update)
+- Stage 2 to 3: a new release and a protocol parameter update (with higher risks)
+- Stage 3 to 4: new releases and protocol parameter updates (with lower risks)
+
+<ReleaseStages stages={stages} source={source} plan={plan} />

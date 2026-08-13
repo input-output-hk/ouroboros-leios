@@ -230,15 +230,24 @@ export type ScopeRef = {
   componentId: string;
   componentName: string;
   mark: Mark;
+  /** The owning component's mark in the assurance stage. */
+  assurance: Mark;
 };
 
-/** All implementation details of the status list, keyed by name. */
+/**
+ * All details of the status list, keyed by name. Each reference also carries
+ * the assurance mark of its component, since assurance is tracked per component
+ * rather than per scope item.
+ */
 export function detailIndex(
   rows: Row[],
   stages: string[],
+  assuranceStage: string = stages[stages.length - 1],
 ): Map<string, ScopeRef[]> {
+  const assuranceIdx = stages.indexOf(assuranceStage);
   const index = new Map<string, ScopeRef[]>();
   rows.forEach((row) => {
+    const assurance = row.cells[assuranceIdx]?.mark ?? "empty";
     row.cells.forEach((cell) => {
       cell.details.forEach((detail) => {
         const key = nameKey(detail.text);
@@ -247,6 +256,7 @@ export function detailIndex(
           componentId: row.id,
           componentName: row.name,
           mark: detail.mark,
+          assurance,
         });
         index.set(key, refs);
       });
@@ -268,6 +278,8 @@ export function rollUp(marks: Mark[]): Mark {
 export type CorrelatedItem = PlanItem & {
   refs: ScopeRef[];
   mark: Mark;
+  /** Roll-up of the assurance marks of the components owning this item. */
+  assurance: Mark;
   /** No detail in the status list matches this item, nor any of its children. */
   untracked: boolean;
 };
@@ -296,6 +308,15 @@ export function correlate(
         ...item,
         refs,
         mark: rollUp(refs.map((r) => r.mark)),
+        // One assurance vote per component, however many details it contributed.
+        assurance: rollUp(
+          refs
+            .filter(
+              (r, i) =>
+                refs.findIndex((o) => o.componentId === r.componentId) === i,
+            )
+            .map((r) => r.assurance),
+        ),
         untracked: refs.length === 0,
       };
     }),

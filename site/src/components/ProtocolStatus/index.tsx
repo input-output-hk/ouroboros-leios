@@ -91,7 +91,9 @@ function CellDetails({
         const label = labels.get(nameKey(d.text));
         return (
           <li key={i}>
-            <span className={`${styles.detailPip} ${styles[`dot_${d.mark}`]}`} />
+            <span
+              className={`${styles.detailPip} ${styles[`dot_${d.mark}`]}`}
+            />
             <span>
               {label && <span className={styles.stageChip}>{label}</span>}
               {d.text}
@@ -198,7 +200,9 @@ export default function ProtocolStatus({
   const [openId, setOpenId] = useState<string | null>(null);
 
   const rows = parseStatus(source, stages);
-  const labels = plan ? stageLabels(parsePlan(plan)) : new Map<string, string>();
+  const labels = plan
+    ? stageLabels(parsePlan(plan))
+    : new Map<string, string>();
   const anchored = rows.filter((r) => r.anchor);
   const crossCutting = rows.filter((r) => !r.anchor);
 
@@ -265,7 +269,7 @@ export default function ProtocolStatus({
  * One table per stage of the dimensional plan. The plan itself carries no
  * marks; each item's status is looked up in the status list by name.
  */
-export function ImplementationStages({
+export function ReleaseStages({
   stages,
   source,
   plan,
@@ -274,7 +278,9 @@ export function ImplementationStages({
   source: string;
   plan: string;
 }): JSX.Element {
-  const index = detailIndex(parseStatus(source, stages), stages);
+  // Assurance is tracked per component, in the last stage column.
+  const assuranceStage = stages[stages.length - 1];
+  const index = detailIndex(parseStatus(source, stages), stages, assuranceStage);
   const correlated = correlate(parsePlan(plan), index);
 
   return (
@@ -296,7 +302,8 @@ export function ImplementationStages({
                   <tr>
                     <th>Scope item</th>
                     <th>Component</th>
-                    <th>Status</th>
+                    <th>Implementation</th>
+                    <th>{assuranceStage}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -328,6 +335,12 @@ export function ImplementationStages({
                         {!item.untracked && <Pip mark={item.mark} />}
                         <span className={styles.markText}>
                           {item.untracked ? "–" : MARK_LABEL[item.mark]}
+                        </span>
+                      </td>
+                      <td title={MARK_LABEL[item.assurance]}>
+                        {!item.untracked && <Pip mark={item.assurance} />}
+                        <span className={styles.markText}>
+                          {item.untracked ? "–" : MARK_LABEL[item.assurance]}
                         </span>
                       </td>
                     </tr>
