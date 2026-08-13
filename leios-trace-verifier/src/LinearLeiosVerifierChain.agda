@@ -234,19 +234,22 @@ module LinearLeiosVerifierChain where
       -- 'currentRB' — and hence 'getCurrentEBHash', 'voteDeadline', and every
       -- role rule that reads them.
       --
-      --   none          : no EB currently announced (default RB announces nothing)
-      --   announcing h  : the head RB announces EB 'h'; re-asserted each slot to
-      --                   keep the voting window open until 'voteDeadline'
-      --   superseded    : the chain has extended past the announcer (a later RB
-      --                   is now the tip). The EB can no longer be certified, so
-      --                   the window must close: 'closeSlot' emits ONE
-      --                   non-announcing 'Slot₂' to overwrite 'currentRB', then
-      --                   drops to 'none'. Merely forgetting the hash would stop
-      --                   re-announcing but never reset the spec's 'currentRB',
-      --                   leaving the window (wrongly) open.
+      --   none            : no EB currently announced (default RB announces nothing)
+      --   announcing h e  : the head RB announces EB 'h', whose election slot is 'e';
+      --                     re-asserted each slot to keep the voting window open
+      --                     until 'voteDeadline'. The election slot is carried
+      --                     because it is what tells a tip advance *to* the
+      --                     announcer from one *past* it — see 'CChainExtended'.
+      --   superseded      : the chain has extended past the announcer (a later RB
+      --                     is now the tip). The EB can no longer be certified, so
+      --                     the window must close: 'closeSlot' emits ONE
+      --                     non-announcing 'Slot₂' to overwrite 'currentRB', then
+      --                     drops to 'none'. Merely forgetting the hash would stop
+      --                     re-announcing but never reset the spec's 'currentRB',
+      --                     leaving the window (wrongly) open.
       data EBStatus : Type where
         none       : EBStatus
-        announcing : String → EBStatus
+        announcing : String → ℕ → EBStatus
         superseded : EBStatus
 
       -- Accumulator threaded through the chain events. Slot obligations are
@@ -355,9 +358,9 @@ module LinearLeiosVerifierChain where
               (just (eb , _)) → announceStep (just (hash eb))
               nothing         → case curEB a of λ where
                 -- No announcement to make: leave 'currentRB' as it stands.
-                none           → []
+                none             → []
                 -- Re-assert the announcement so the window stays open this slot.
-                (announcing h) → announceStep (just (hashOf a h))
+                (announcing h _) → announceStep (just (hashOf a h))
                 -- The chain has extended past the announcer: overwrite 'currentRB'
                 -- with a non-announcing RB so 'getCurrentEBHash ≡ nothing',
                 -- 'voteDeadline ≡ 0', and the spec's own rules close the window
@@ -421,8 +424,8 @@ module LinearLeiosVerifierChain where
               } , [])
       -- The chain head announces this EB, which is what 'getCurrentEBHash' denotes.
       -- This, and not acquisition, is what makes the EB votable.
-      traceEvent→action a (CAnnouncementAccepted h _) =
-        (record a { curEB = announcing h ; announced = h ∷ announced a } , [])
+      traceEvent→action a (CAnnouncementAccepted h s) =
+        (record a { curEB = announcing h (primWord64ToNat s) ; announced = h ∷ announced a } , [])
       -- Deliberately does not touch 'curEB': letting a vote establish its own
       -- precondition would make VT-Role self-justifying, hiding a node that voted for
       -- an EB its chain never announced.
@@ -435,14 +438,25 @@ module LinearLeiosVerifierChain where
       traceEvent→action a (CRBForged h s) = (a , [])
       -- Consumed by 'leaderSlots' as the eligibility fallback, not as a step.
       traceEvent→action a (CNodeIsLeader _) = (a , [])
-      -- The selected chain extended past the announcer. Mark the announcement
-      -- 'superseded' so the next 'closeSlot' de-announces it via a non-announcing
-      -- 'Slot₂', collapsing the spec's voteDeadline to 0. If nothing is currently
-      -- announced, there is nothing to supersede.
-      traceEvent→action a (CChainExtended _) =
+      -- The selected chain adopted a new tip. Mark the announcement 'superseded' so
+      -- the next 'closeSlot' de-announces it via a non-announcing 'Slot₂', collapsing
+      -- the spec's voteDeadline to 0. If nothing is currently announced, there is
+      -- nothing to supersede.
+      --
+      -- Only a tip strictly beyond the announcer retires the EB. Adopting the
+      -- announcer itself is the ordinary case — in Linear Leios the announcing RB and
+      -- its EB share an election slot, and the node reports adopting its own block
+      -- immediately after announcing it, so treating any tip advance as superseding
+      -- closes every window in the slot it opened. Observed on a devnet as
+      -- CAnnouncementAccepted at slot 20 followed by CChainExtended 20, which then
+      -- retired an EB not votable until slot 23.
+      traceEvent→action a (CChainExtended tip) =
         case curEB a of λ where
-          (announcing _) → (record a { curEB = superseded } , [])
-          _              → (a , [])
+          (announcing h e) →
+            if e Nat.<ᵇ primWord64ToNat tip
+              then (record a { curEB = superseded } , [])
+              else (record a { curEB = announcing h e } , [])
+          _ → (a , [])
       -- A deliberate, protocol-legal abstention the node logged. It corroborates
       -- the retirement but drives no state itself: the window is closed by the
       -- chain extension (CChainExtended) or by the deadline, both via 'currentRB'.

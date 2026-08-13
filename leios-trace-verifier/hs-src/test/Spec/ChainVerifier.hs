@@ -71,6 +71,39 @@ acquiredNotAnnounced =
   , CSlot 5
   ]
 
+-- | The announcer's own adoption: 'CChainExtended' in the very slot the EB was
+--   announced, which is the ordinary self-forge shape — the node reports adopting its
+--   own ranking block right after announcing, and in Linear Leios that block shares
+--   the EB's election slot. The tip has reached the announcer, not passed it, so the
+--   window must stay open and the vote at slot 4 is still due.
+adoptedAtAnnouncer :: [ChainEvent]
+adoptedAtAnnouncer =
+  [ CSlot 0
+  , CSlot 1
+  , CAnnouncementAccepted "eb" 1
+  , CEBAcquired "eb" 1
+  , CChainExtended 1
+  , CSlot 2
+  , CSlot 3
+  , CSlot 4
+  , CSlot 5
+  ]
+
+-- | The chain moves strictly past the announcer, so the EB can no longer be
+--   certified and the window closes. Abstaining at slot 4 is then correct.
+adoptedPastAnnouncer :: [ChainEvent]
+adoptedPastAnnouncer =
+  [ CSlot 0
+  , CSlot 1
+  , CAnnouncementAccepted "eb" 1
+  , CEBAcquired "eb" 1
+  , CSlot 2
+  , CChainExtended 2
+  , CSlot 3
+  , CSlot 4
+  , CSlot 5
+  ]
+
 -- | A repeat vote far from the original, and the bounded window a windowed verifier
 --   would see when it reaches slot 20: overlap is 4, so the window starts at 16 and
 --   contains neither the announcement nor the first vote.
@@ -159,6 +192,13 @@ chainVerifier = do
       fromLog acquiredNotAnnounced `shouldBe` "ok"
     it "accepts votes for two distinct EBs in one run" $
       fromLog twoVotes `shouldBe` "ok"
+    -- What distinguishes these two is the obligation, not the vote: our head
+    -- selection would let a vote through either way, so the cost of treating the
+    -- announcer's own adoption as superseding is a withheld vote going unreported.
+    it "keeps the window open when the tip only reaches the announcer" $
+      fromLog adoptedAtAnnouncer `shouldNotBe` "ok"
+    it "closes the window when the tip moves past the announcer" $
+      fromLog adoptedPastAnnouncer `shouldBe` "ok"
     it "refuses a repeat vote in the slot after the legal one" $
       fromLog votedTwice `shouldNotBe` "ok"
     it "refuses a repeat vote long after the legal one" $
