@@ -38,10 +38,14 @@ module Leios.Base.Praos.Machine
   ⦃ DecEq-EBCert : DecEq EBCert ⦄
   (numParties : ℕ) ⦃ NonZero-numParties : NonZero numParties ⦄
   (winner : Fin numParties → ℕ → Type) ⦃ winner⁇² : winner ⁇² ⦄
+  -- Everyone wins the genesis slot; discharges the Assumptions record's
+  -- genesisWinner. Harmless: the machine never mints at slot 0 (Deliver
+  -- mints at `suc clock`).
+  (winner₀ : ∀ p → winner p 0)
   where
 
 open import Leios.Base.Praos.Assumptions a vrf' numParties winner
-  ⦃ winner⁇² = winner⁇² ⦄
+  ⦃ winner⁇² = winner⁇² ⦄ winner₀
   using (praosNode)
 open import Leios.Base.Praos a vrf' using (module Node)
 open import Leios.Base a vrf' using (RankingBlock; StakeDistr)

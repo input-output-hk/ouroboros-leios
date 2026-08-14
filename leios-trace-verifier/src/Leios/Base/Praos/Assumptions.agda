@@ -3,33 +3,54 @@
 -- missing: "no concrete Tree implementation with discharged laws exists
 -- upstream, so it stays a parameter."
 --
--- The TreeImpl (a plain pool of delivered blocks) and its operations are
--- real, computational code — not stubs. The five Tree obligations
--- (instantiated/extendable/valid/optimal/selfContained) plus genesisWinner
--- are POSTULATED rather than proved: they are open, unsolved problems even
--- upstream (ouroboros-praos-formal-spec's own Examples.Praos leaves the same
--- five as `{!!}` holes under `--allow-unsolved-metas`, and its extendTree
--- there looks like it actually violates `extendable` for blocks that fork
--- below the current chain tips). See the "Tree proof strategy" discussion —
--- postulating here unblocks wiring Leios.Base.Praos into the trace verifier
--- today; it's the same honesty tradeoff as this codebase's existing
--- `leadershipSchedule` postulate (LinearLeiosVerifier.agda).
+-- All five Protocol.Tree obligations (instantiated/extendable/valid/optimal/
+-- selfContained) are PROVED here — upstream leaves the same five as `{!!}`
+-- holes in its own Examples.Praos. The design that makes them provable:
 --
--- NOT --safe (postulates below, and Leios.Base.Praos.Instance itself isn't).
+--   * allBlocks t = genesisBlock ∷ t — genesis is built into every tree, so
+--     a valid best chain (which must end at genesis) always exists inside
+--     the pool; with a bare pool, `valid` and `selfContained` conflict on
+--     trees that lack genesis.
+--   * bestChain enumerates every subsequence of the slot-descending sorting
+--     of the (slot-pruned) pool, keeps those that pass a decidable validity
+--     (_✓) and pool-membership check, and returns the longest, with
+--     [ genesisBlock ] as base. `optimal` then holds because every valid
+--     chain has strictly decreasing slots, hence IS a sublist of the sorted
+--     pool (ListLemmas.decr-sub-sorted) and so is enumerated.
+--
+-- bestChain is exponential in the pool size: this is a REFERENCE
+-- implementation for the spec-level machine (the verifier never executes it
+-- — the SpecStructure's BM is only consumed by deployment-level theorem
+-- transport). An efficient longest-valid-path implementation can replace it
+-- later, with a proof relating the two.
+--
+-- genesisWinner is a module parameter (winner₀): the leader predicate is
+-- caller-supplied, so only the caller can witness it at the genesis slot
+-- (Defaults.agda makes slot 0 a universal winner — the machine never mints
+-- at slot 0, since Deliver mints at `suc clock`).
+--
+-- NOT --safe: Leios.Base.Praos.Instance (Praos's chainFromBlock is
+-- TERMINATING) — but this module contains no postulates.
 
-open import Leios.Prelude hiding (_⊗_; prune; Hashable)
+open import Leios.Prelude hiding (_⊗_; prune; Hashable; hash)
 open import Leios.Abstract
 open import Leios.VRF
 
 open import Protocol.Prelude using (Default; def; _⊆ˢ_)
 open import Protocol.BaseTypes using (Honesty; honest)
 
-open import Data.Nat.Base using (NonZero; >-nonZero⁻¹; _<ᵇ_)
+open import Data.Nat.Base using (NonZero; >-nonZero⁻¹; z≤n)
 open import Data.Fin.Base using (fromℕ<)
-open import Data.Bool.Base using (if_then_else_)
-open import Data.List.Relation.Binary.SetEquality using (_≡ˢ_)
+open import Data.List.Relation.Binary.SetEquality using (_≡ˢ_; ⊆×⊇⇒≡ˢ)
 import Data.List.Relation.Unary.All as All'
+import Data.List.Relation.Unary.Any as Any'
 import Data.List.Relation.Unary.AllPairs.Core as AllPairs'
+import Data.List.Relation.Unary.Linked as Lkd
+open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ˡ_)
+open import Data.List.Membership.Propositional.Properties
+  using (∈-filter⁺; ∈-filter⁻; ∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
+
+open import Leios.Base.Praos.ListLemmas
 
 module Leios.Base.Praos.Assumptions
   (a    : LeiosAbstract) (open LeiosAbstract a)
@@ -37,6 +58,7 @@ module Leios.Base.Praos.Assumptions
   ⦃ DecEq-EBCert : DecEq EBCert ⦄
   (numParties : ℕ) ⦃ NonZero-numParties : NonZero numParties ⦄
   (winner : Fin numParties → ℕ → Type) ⦃ winner⁇² : winner ⁇² ⦄
+  (winner₀ : ∀ p → winner p 0)
   where
 
 open import Leios.Base.Praos.Instance a vrf' numParties winner ⦃ winner⁇² = winner⁇² ⦄
@@ -49,17 +71,18 @@ party₀ : Fin numParties
 party₀ = fromℕ< (>-nonZero⁻¹ numParties)
 
 open import Protocol.Block  ⦃ praosParams ⦄
-open import Protocol.Crypto ⦃ praosParams ⦄ using (Hashable)
+open import Protocol.Crypto ⦃ praosParams ⦄ using (Hashable; hash)
 
 -- Ignores prev/slot/pid/announcedEB/ebCert, so distinct blocks with the same
--- RB payload collide — acceptable only because `valid`/`optimal` below are
--- postulated rather than proved from this definition.
+-- RB payload collide. That weakens which chains link up (hash collisions blur
+-- parenthood) but no Tree law depends on hash injectivity: bestChain checks
+-- validity of each candidate directly.
 instance
   praosHashableBlock : Hashable Block
-  praosHashableBlock = record { hash = λ b → Hashable-Txs .hash (RankingBlock.txs (Block.txs b)) }
+  praosHashableBlock = record { hash = λ b → Leios.Prelude.Hashable.hash Hashable-Txs (RankingBlock.txs (Block.txs b)) }
 
   praosDefaultBlock : Default Block
-  praosDefaultBlock = record { def = mkBlock (Hashable-Txs .hash []) 0 emptyRB party₀ }
+  praosDefaultBlock = record { def = mkBlock (Leios.Prelude.Hashable.hash Hashable-Txs []) 0 emptyRB party₀ }
 
 open import Protocol.Chain ⦃ praosParams ⦄
 open import Protocol.Tree  ⦃ praosParams ⦄
@@ -67,42 +90,128 @@ open import Protocol.Tree  ⦃ praosParams ⦄
 TreeImpl : Type
 TreeImpl = List Block
 
--- The longest chain reconstructable (via chainFromBlock) from any block in
--- the slot-bounded pool, ties broken arbitrarily. Protocol.Chain.prune is
--- Slot → Chain → Chain, but Chain = List Block = TreeImpl, so it applies.
-candidateChains : ℕ → TreeImpl → List Chain
-candidateChains sl t = L.map (λ b → chainFromBlock b pruned) pruned
-  where pruned = prune sl t
+-- Genesis is part of every tree's block set by construction.
+praosAllBlocks : TreeImpl → List Block
+praosAllBlocks t = genesisBlock ∷ t
 
-longest : List Chain → Chain
-longest = L.foldr (λ c best → if (length best <ᵇ length c) then c else best) []
+-- ── Decision procedures for the candidate filter ────────────────────────
+
+correctBlocks? : ∀ c → Dec (CorrectBlocks c)
+correctBlocks? = All'.all? (λ b → ¿ CorrectBlock b ¿)
+
+properlyLinked? : ∀ c → Dec (ProperlyLinked c)
+properlyLinked? []            = no id
+properlyLinked? (b ∷ [])      = b ≟ genesisBlock
+properlyLinked? (b ∷ b′ ∷ bs) = (b .prev ≟ hash b′) ×-dec properlyLinked? (b′ ∷ bs)
+
+decreasingSlots? : ∀ c → Dec (DecreasingSlots c)
+decreasingSlots? []            = yes Lkd.[]
+decreasingSlots? (b ∷ [])      = yes Lkd.[-]
+decreasingSlots? (b ∷ b′ ∷ bs) with b′ .slot <? b .slot | decreasingSlots? (b′ ∷ bs)
+... | yes p | yes q = yes (p Lkd.∷ q)
+... | no ¬p | _     = no λ where (r Lkd.∷ _) → ¬p r
+... | yes _ | no ¬q = no λ where (_ Lkd.∷ s) → ¬q s
+
+opaque
+  unfolding _✓
+
+  ✓? : ∀ c → Dec (c ✓)
+  ✓? c = correctBlocks? c ×-dec (properlyLinked? c ×-dec decreasingSlots? c)
+
+  gb✓ : [ genesisBlock ] ✓
+  gb✓ = All'._∷_ (winner₀ party₀) All'.[] , refl , Lkd.[-]
+
+  ✓⇒decr : ∀ {c} → c ✓ → DecreasingSlots c
+  ✓⇒decr (_ , _ , ds) = ds
+
+sub? : ∀ (c ys : List Block) → Dec (All'.All (_∈ˡ ys) c)
+sub? c ys = All'.all? (λ x → Any'.any? (x ≟_) ys) c
+
+-- ── bestChain: longest checked candidate ────────────────────────────────
+
+open MaxBy {B = Chain} length
+open SortDesc _≟_ slot
+
+pruned : ℕ → TreeImpl → List Block
+pruned sl t = L.filter ((_≤? sl) ∘ slot) (praosAllBlocks t)
+
+Candidate : ℕ → TreeImpl → Chain → Type
+Candidate sl t c = (c ✓) × All'.All (_∈ˡ pruned sl t) c
+
+candidate? : ∀ sl t c → Dec (Candidate sl t c)
+candidate? sl t c = ✓? c ×-dec sub? c (pruned sl t)
+
+candidates : ℕ → TreeImpl → List Chain
+candidates sl t = L.filter (candidate? sl t) (subseqs (sortDesc (pruned sl t)))
 
 praosBestChain : ℕ → TreeImpl → Chain
-praosBestChain sl t = longest (candidateChains sl t)
+praosBestChain sl t = maxBy [ genesisBlock ] (candidates sl t)
 
-praosAllBlocks : TreeImpl → List Block
-praosAllBlocks = id
+-- ── The Tree laws ────────────────────────────────────────────────────────
 
-postulate
-  -- Tree obligations (Protocol.Tree.Tree's five fields) — see header.
-  praosInstantiated  : praosAllBlocks [ genesisBlock ] ≡ [ genesisBlock ]
-  praosExtendable    : ∀ (t : TreeImpl) (b : Block) →
-    praosAllBlocks (b ∷ t) ≡ˢ praosAllBlocks t ++ [ b ]
-  praosValid         : ∀ (t : TreeImpl) (sl : ℕ) → praosBestChain sl t ✓
-  praosOptimal       : ∀ (c : Chain) (t : TreeImpl) (sl : ℕ) →
-      c ✓ → c ⊆ˢ L.filter ((_≤? sl) ∘ slot) (praosAllBlocks t)
-    → ∣ c ∣ ≤ ∣ praosBestChain sl t ∣
-  praosSelfContained : ∀ (t : TreeImpl) (sl : ℕ) →
-    praosBestChain sl t ⊆ˢ L.filter ((_≤? sl) ∘ slot) (praosAllBlocks t)
+praosExtendable : ∀ (t : TreeImpl) (b : Block) →
+  praosAllBlocks (b ∷ t) ≡ˢ praosAllBlocks t ++ [ b ]
+praosExtendable t b = ⊆×⊇⇒≡ˢ to′ from′
+  where
+    -- praosAllBlocks t ++ [ b ] reduces to gb ∷ (t ++ [ b ])
+    to′ : praosAllBlocks (b ∷ t) ⊆ˢ praosAllBlocks t ++ [ b ]
+    to′ (here refl)         = here refl
+    to′ (there (here refl)) = there (∈-++⁺ʳ t (here refl))
+    to′ (there (there p))   = there (∈-++⁺ˡ p)
+
+    from′ : praosAllBlocks t ++ [ b ] ⊆ˢ praosAllBlocks (b ∷ t)
+    from′ (here refl) = here refl
+    from′ (there q) with ∈-++⁻ t q
+    ... | inj₁ p           = there (there p)
+    ... | inj₂ (here refl) = there (here refl)
+
+praosValid : ∀ (t : TreeImpl) (sl : ℕ) → praosBestChain sl t ✓
+praosValid t sl with maxBy-mem [ genesisBlock ] (candidates sl t)
+... | inj₁ eq  = subst _✓ (sym eq) gb✓
+... | inj₂ mem =
+  ∈-filter⁻ (candidate? sl t) {xs = subseqs (sortDesc (pruned sl t))} mem .proj₂ .proj₁
+
+praosSelfContained : ∀ (t : TreeImpl) (sl : ℕ) →
+  praosBestChain sl t ⊆ˢ L.filter ((_≤? sl) ∘ slot) (praosAllBlocks t)
+praosSelfContained t sl with maxBy-mem [ genesisBlock ] (candidates sl t)
+... | inj₁ eq  = subst (_⊆ˢ pruned sl t) (sym eq) gb⊆
+  where
+    -- pruned sl t head-reduces to gb ∷ … since slot gb = 0 ≤ sl definitionally
+    gb⊆ : [ genesisBlock ] ⊆ˢ pruned sl t
+    gb⊆ (here refl) = here refl
+... | inj₂ mem = λ p∈ →
+  All'.lookup
+    (∈-filter⁻ (candidate? sl t) {xs = subseqs (sortDesc (pruned sl t))} mem .proj₂ .proj₂)
+    p∈
+
+praosOptimal : ∀ (c : Chain) (t : TreeImpl) (sl : ℕ) →
+    c ✓ → c ⊆ˢ L.filter ((_≤? sl) ∘ slot) (praosAllBlocks t)
+  → ∣ c ∣ ≤ ∣ praosBestChain sl t ∣
+praosOptimal c t sl c✓ c⊆ = maxBy-≥ [ genesisBlock ] (candidates sl t) c∈cands
+  where
+    prn = pruned sl t
+
+    c∈prn : All'.All (_∈ˡ prn) c
+    c∈prn = All'.tabulate c⊆
+
+    c∈srt : All'.All (_∈ˡ sortDesc prn) c
+    c∈srt = All'.map (sortDesc-∈ prn) c∈prn
+
+    c∈cands : c ∈ˡ candidates sl t
+    c∈cands =
+      ∈-filter⁺ (candidate? sl t)
+        (subseqs-complete
+          (decr-sub-sorted (✓⇒decr c✓) c∈srt (sortDesc-sorted prn)))
+        (c✓ , c∈prn)
 
 instance
   praosTree : Tree TreeImpl
   praosTree = record
-    { tree₀         = [ genesisBlock ]
+    { tree₀         = []
     ; extendTree    = λ t b → b ∷ t
     ; allBlocks     = praosAllBlocks
     ; bestChain     = praosBestChain
-    ; instantiated  = praosInstantiated
+    ; instantiated  = refl
     ; extendable    = praosExtendable
     ; valid         = praosValid
     ; optimal       = praosOptimal
@@ -110,13 +219,6 @@ instance
     }
 
 open import Protocol.Assumptions ⦃ praosParams ⦄
-
-postulate
-  -- winner is an arbitrary caller-supplied predicate ("derived from the
-  -- Leios VRF" per docs/praos-base-machine-sketch.md); nothing here can
-  -- prove it holds for the genesis party/slot without a witness from the
-  -- caller.
-  praosGenesisWinner : winner (genesisBlock .pid) (genesisBlock .slot)
 
 instance
   praosAssumptions : Assumptions
@@ -142,7 +244,7 @@ instance
     ; parties₀HasHonest  = here refl
     ; genesisBlockSlot   = refl
     ; genesisHonesty     = refl
-    ; genesisWinner      = praosGenesisWinner
+    ; genesisWinner      = winner₀ party₀
     }
 
 -- Closes the gap docs/praos-base-machine-sketch.md flagged: with a concrete

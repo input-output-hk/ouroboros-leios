@@ -16,8 +16,8 @@
 
    Not '--safe' (it was, with the previous stub base machine): the Praos
    instantiation transitively imports Protocol.Chain, whose chainFromBlock is
-   TERMINATING, and Leios.Base.Praos.Assumptions postulates the block-tree
-   laws — the same tradeoff as the verifier's leadershipSchedule postulate.
+   TERMINATING. The block-tree laws themselves are proved, not postulated
+   (Leios.Base.Praos.Assumptions).
 -}
 
 open import Leios.Prelude hiding (_⊗_)
@@ -136,16 +136,25 @@ open import Leios.Base d-Abstract d-VRF public
 -- the schedule is the SUT's own and the machine only ever evaluates 'winner'
 -- at its own identity (makeBlockʰ), which also neutralizes the
 -- party₀-vs-sutId identity fixed inside Leios.Base.Praos.Assumptions.
+-- Slot 0 is a universal winner: it discharges the Praos Assumptions record's
+-- genesisWinner (only the genesis block sits at slot 0) and changes no real
+-- behavior — the machine never mints at slot 0 (Deliver mints at `suc
+-- clock`), so the schedule is only ever consulted at slots ≥ 1.
 d-winner : Fin numberOfParties → ℕ → Type
-d-winner _ sl = (EB , sl) ∈ winning-slots
+d-winner _ Nat.zero     = ⊤
+d-winner _ (Nat.suc sl) = (EB , Nat.suc sl) ∈ winning-slots
 
-instance
-  d-winner⁇² : d-winner ⁇²
-  d-winner⁇² {_} {sl} .dec = (EB , sl) ∈? winning-slots
+-- Deliberately NOT an instance: `d-winner _ zero` reduces to ⊤, so as an
+-- instance this would overlap with Dec-⊤ in unrelated searches. It is passed
+-- to the Praos machine explicitly below.
+d-winner⁇² : d-winner ⁇²
+d-winner⁇² {_} {Nat.zero}   .dec = yes tt
+d-winner⁇² {_} {Nat.suc sl} .dec = (EB , Nat.suc sl) ∈? winning-slots
 
 import Leios.Base.Praos.Machine as PraosMachine
 module PM = PraosMachine d-Abstract d-VRF numberOfParties d-winner
   ⦃ winner⁇² = λ {p} {sl} → d-winner⁇² {p} {sl} ⦄
+  (λ _ → tt)
 -- producer is a placeholder (a bare RankingBlock does not determine its
 -- minter) but operationally inert: IsBlockchain's producer/slotOf are read
 -- only by deployment-level modules the verifier never imports.

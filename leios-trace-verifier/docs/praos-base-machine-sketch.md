@@ -21,26 +21,45 @@ become the real modules and are not duplicated here.
   `Protocol.Semantics`. Not `--safe` (Praos's `chainFromBlock` is
   `TERMINATING`).
 - `Assumptions.agda` — a concrete `Assumptions` instance: `TreeImpl := List
-  Block`, `bestChain` = the longest chain `chainFromBlock` reconstructs from
-  the slot-bounded pool, all parties honest. The five `Protocol.Tree` laws
-  (`instantiated`/`extendable`/`valid`/`optimal`/`selfContained`) and
-  `genesisWinner` are **postulated** — open problems even upstream:
-  `ouroboros-praos-formal-spec`'s own `Examples.Praos` leaves the same five
-  as `{!!}` holes under `--allow-unsolved-metas`, and its `extendTree` there
-  looks like it actually *violates* `extendable` for blocks that fork below
-  the current chain tips. Same honesty tradeoff as the verifier's
-  `leadershipSchedule` postulate. Node identity is fixed at `party₀`
-  (index 0), made harmless by the `winner` choice below.
+  Block`, all parties honest, node identity fixed at `party₀` (index 0, made
+  harmless by the `winner` choice below). The five `Protocol.Tree` laws
+  (`instantiated`/`extendable`/`valid`/`optimal`/`selfContained`) are
+  **proved, with no postulates** — upstream `ouroboros-praos-formal-spec`'s
+  own `Examples.Praos` leaves the same five as `{!!}` holes under
+  `--allow-unsolved-metas` (and its `extendTree` there looks like it actually
+  *violates* `extendable` for blocks that fork below the current chain tips).
+  The design that makes them provable:
+    * `allBlocks t = genesisBlock ∷ t` — genesis is built into every tree
+      (with a bare pool, `valid` and `selfContained` conflict on trees
+      lacking genesis, since a valid chain must end at genesis yet be drawn
+      from the pool);
+    * `bestChain` enumerates every subsequence of the slot-descending sorting
+      of the slot-pruned pool, filters by a decidable `_✓` + pool-membership
+      check, and takes the longest (base `[ genesisBlock ]`). `optimal` holds
+      because a valid chain has strictly decreasing slots, hence is a sublist
+      of the sorted pool (`ListLemmas.decr-sub-sorted`) and is enumerated.
+      This is exponential — a spec-level reference implementation, never
+      executed by the verifier (see below); an efficient longest-valid-path
+      version can replace it later with a proof relating the two.
+  `genesisWinner` is a module parameter (`winner₀ : ∀ p → winner p 0`),
+  discharged by the caller.
+- `ListLemmas.agda` (`--safe`) — the generic machinery behind those proofs:
+  descending insertion sort by a measure, subsequence enumeration with
+  completeness, longest-element fold with soundness/maximality, and the
+  decreasing-selection-is-a-sublist-of-sorted lemma.
 - `Machine.agda` — assembles `praosNode` to `Assembled.praosBase :
   BaseMachine`; exports `B'` for the `SpecStructure`.
 - `Defaults.agda` — `d-Base = PB.B'`, `d-BaseFunctionality = PB.praosBase`,
   with the stub's trivial `Cert`/`VTy`/`initSlot`/`V-chkCerts` kept (so the
-  verifier-facing `BaseIOF` interface is unchanged) and `winner := λ _ sl →
-  (EB , sl) ∈ winning-slots`, the same leadership-schedule oracle `sortition`
-  consults. The party argument is ignored: the schedule is the SUT's own and
-  `makeBlockʰ` only evaluates `winner` at the machine's own identity — which
-  also neutralizes the `party₀`-vs-`sutId` mismatch. This cost `Defaults.agda`
-  its `--safe` flag.
+  verifier-facing `BaseIOF` interface is unchanged) and `winner` = the same
+  leadership-schedule oracle `sortition` consults, except slot 0 is a
+  universal winner: that discharges `winner₀` (only genesis sits at slot 0,
+  and the machine never mints there — `Deliver` mints at `suc clock`). The
+  party argument is ignored: the schedule is the SUT's own and `makeBlockʰ`
+  only evaluates `winner` at the machine's own identity — which also
+  neutralizes the `party₀`-vs-`sutId` mismatch. This cost `Defaults.agda`
+  its `--safe` flag (Praos's `TERMINATING chainFromBlock`; no postulates
+  are involved).
 
 The modules aren't reachable from `src/trace-parser.agda`'s `--safe`-only
 prefix on their own; the Makefile's `praos-base` / `praos-instance` /
