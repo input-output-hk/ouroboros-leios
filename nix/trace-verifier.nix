@@ -117,8 +117,8 @@ in
 {
   inherit cabalProject;
 
-  # Flat names used by CI (conformance.yaml) and scripts, plus the raw
-  # cabal-component names (trace-parser:exe:...) from the project flake.
+  # Flat names used by scripts (e.g. run.sh), plus the raw cabal-component
+  # names (trace-parser:exe:...) from the project flake.
   packages = tvFlake.packages // {
     linear-leios-trace-verifier = tvFlake.packages."trace-parser:exe:linear-leios-trace-verifier";
     linear-leios-trace-verifier-chain = tvFlake.packages."trace-parser:exe:linear-leios-trace-verifier-chain";
