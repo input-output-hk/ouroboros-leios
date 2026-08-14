@@ -31,6 +31,7 @@ open import Leios.Abstract
 open import Leios.VRF
 
 open import Data.Nat.Base using (NonZero)
+import Leios.Base as LB
 
 module Leios.Base.Praos.Machine
   (a    : LeiosAbstract) (open LeiosAbstract a)
@@ -42,11 +43,13 @@ module Leios.Base.Praos.Machine
   -- genesisWinner. Harmless: the machine never mints at slot 0 (Deliver
   -- mints at `suc clock`).
   (winner₀ : ∀ p → winner p 0)
+  -- Block-content hash for prev-linkage (see Assumptions.agda).
+  (blockHash : ℕ → Fin numParties → LB.RankingBlock a vrf' → Hash)
   where
 
 open import Leios.Base.Praos.Assumptions a vrf' numParties winner
-  ⦃ winner⁇² = winner⁇² ⦄ winner₀
-  using (praosNode)
+  ⦃ winner⁇² = winner⁇² ⦄ winner₀ blockHash
+  public using (praosNode; mkPraosBlock; praosBlockHash; genesisHash)
 open import Leios.Base.Praos a vrf' using (module Node)
 open import Leios.Base a vrf' using (RankingBlock; StakeDistr)
 open import Leios.Blocks a using (EndorserBlock)

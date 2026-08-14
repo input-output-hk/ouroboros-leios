@@ -38,11 +38,14 @@ become the real modules and are not duplicated here.
       check, and takes the longest (base `[ genesisBlock ]`). `optimal` holds
       because a valid chain has strictly decreasing slots, hence is a sublist
       of the sorted pool (`ListLemmas.decr-sub-sorted`) and is enumerated.
-      This is exponential — a spec-level reference implementation, never
-      executed by the verifier (see below); an efficient longest-valid-path
-      version can replace it later with a proof relating the two.
+      This is exponential — fine at conformance-trace scale (the verifier's
+      pool is the handful of RBs the SUT saw, deduplicated); node.log-scale
+      verification needs an efficient incremental chain selection proved
+      against the same laws (future work).
   `genesisWinner` is a module parameter (`winner₀ : ∀ p → winner p 0`),
-  discharged by the caller.
+  discharged by the caller; `blockHash` is a module parameter too (the
+  block-content hash used for prev-linkage — no law depends on it, but
+  faithful chain reconstruction wants it injective on slot/producer/payload).
 - `ListLemmas.agda` (`--safe`) — the generic machinery behind those proofs:
   descending insertion sort by a measure, subsequence enumeration with
   completeness, longest-element fold with soundness/maximality, and the
@@ -64,6 +67,30 @@ become the real modules and are not duplicated here.
 The modules aren't reachable from `src/trace-parser.agda`'s `--safe`-only
 prefix on their own; the Makefile's `praos-base` / `praos-instance` /
 `praos-assumptions` / `praos-machine` targets check them individually.
+
+## The verifier feeds the tree (LinearLeiosVerifier)
+
+The batch verifier now maintains the SUT's Praos block tree from trace
+events and derives the base-ledger answers from it, instead of echoing the
+trace:
+
+- `RBGenerated` records per-RB Praos-header data (`RB-meta`: prev-hash from
+  the event's `parent` ref — genesis hash when null — slot, producer).
+  Blocks are materialized on demand (`buildBlk`) because the RB payload in
+  `RB-refs` may still be corrected by a later `EBGenerated`.
+- The SUT's own minted RBs and every RB it receives are inserted
+  (deduplicated by id) via the machine's own `processMsgs`
+  (`PraosNode.processMsgs`, i.e. `extendTree`).
+- On `RBReceived`, the `BASE-LDG` answer is `map payloadOf (readChain
+  currentSlot tree)` — the Praos-selected best chain (tip first, genesis
+  payload last) — rather than the trace's single RB. `LeiosState.RBs`,
+  `currentRB` and `Ledger` therefore reflect *checked* chain selection: a
+  trace whose RBs don't form a valid chain yields a diverging ledger view
+  and downstream violations.
+
+The chain verifier (`LinearLeiosVerifierChain`, node.log source) is NOT yet
+wired to the tree: node.log-scale pools need the efficient chain selection
+noted above first.
 
 ## The shape of the wrapper
 

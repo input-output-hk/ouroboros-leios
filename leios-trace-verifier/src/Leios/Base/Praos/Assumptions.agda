@@ -18,11 +18,12 @@
 --     chain has strictly decreasing slots, hence IS a sublist of the sorted
 --     pool (ListLemmas.decr-sub-sorted) and so is enumerated.
 --
--- bestChain is exponential in the pool size: this is a REFERENCE
--- implementation for the spec-level machine (the verifier never executes it
--- — the SpecStructure's BM is only consumed by deployment-level theorem
--- transport). An efficient longest-valid-path implementation can replace it
--- later, with a proof relating the two.
+-- bestChain is exponential in the pool size. The trace verifier DOES execute
+-- it (LinearLeiosVerifier maintains the SUT's block tree from trace events
+-- and answers BASE-LDG from readChain), which is fine at conformance-trace
+-- scale (a handful of RBs, deduplicated). Verifying real node.log-scale
+-- chains needs an efficient (incremental) chain selection proved against the
+-- same laws — future work.
 --
 -- genesisWinner is a module parameter (winner₀): the leader predicate is
 -- caller-supplied, so only the caller can witness it at the genesis slot
@@ -51,6 +52,7 @@ open import Data.List.Membership.Propositional.Properties
   using (∈-filter⁺; ∈-filter⁻; ∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 
 open import Leios.Base.Praos.ListLemmas
+import Leios.Base as LB
 
 module Leios.Base.Praos.Assumptions
   (a    : LeiosAbstract) (open LeiosAbstract a)
@@ -59,6 +61,11 @@ module Leios.Base.Praos.Assumptions
   (numParties : ℕ) ⦃ NonZero-numParties : NonZero numParties ⦄
   (winner : Fin numParties → ℕ → Type) ⦃ winner⁇² : winner ⁇² ⦄
   (winner₀ : ∀ p → winner p 0)
+  -- Content hash of a block (slot, producer, payload), used for prev-hash
+  -- linkage. No Tree law depends on its injectivity, but callers should make
+  -- it injective enough (e.g. include slot and producer) that reconstructed
+  -- chains reflect real parenthood.
+  (blockHash : ℕ → Fin numParties → LB.RankingBlock a vrf' → Hash)
   where
 
 open import Leios.Base.Praos.Instance a vrf' numParties winner ⦃ winner⁇² = winner⁇² ⦄
@@ -73,13 +80,9 @@ party₀ = fromℕ< (>-nonZero⁻¹ numParties)
 open import Protocol.Block  ⦃ praosParams ⦄
 open import Protocol.Crypto ⦃ praosParams ⦄ using (Hashable; hash)
 
--- Ignores prev/slot/pid/announcedEB/ebCert, so distinct blocks with the same
--- RB payload collide. That weakens which chains link up (hash collisions blur
--- parenthood) but no Tree law depends on hash injectivity: bestChain checks
--- validity of each candidate directly.
 instance
   praosHashableBlock : Hashable Block
-  praosHashableBlock = record { hash = λ b → Leios.Prelude.Hashable.hash Hashable-Txs (RankingBlock.txs (Block.txs b)) }
+  praosHashableBlock = record { hash = λ b → blockHash (b .slot) (b .pid) (b .txs) }
 
   praosDefaultBlock : Default Block
   praosDefaultBlock = record { def = mkBlock (Leios.Prelude.Hashable.hash Hashable-Txs []) 0 emptyRB party₀ }
@@ -251,3 +254,15 @@ instance
 -- Assumptions instance in hand, Leios.Base.Praos.Instance.WithAssumptions no
 -- longer needs one as a bare module parameter.
 open WithAssumptions ⦃ praosAssumptions ⦄ party₀ public using (praosNode)
+
+-- Verifier-facing helpers for building tree blocks from trace data (the
+-- PraosAbstract interface keeps Block abstract, so construction and hashing
+-- need explicit exports).
+mkPraosBlock : Hash → ℕ → RankingBlock → Fin numParties → Block
+mkPraosBlock = mkBlock
+
+praosBlockHash : Block → Hash
+praosBlockHash = hash
+
+genesisHash : Hash
+genesisHash = hash genesisBlock

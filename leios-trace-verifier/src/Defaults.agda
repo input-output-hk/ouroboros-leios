@@ -29,6 +29,7 @@ open import Axiom.Set.Properties th
 open import Data.Bool using (if_then_else_)
 open import Data.Nat.Show as N
 import Data.Nat as Nat
+open import Data.Fin.Base using (toℕ)
 open import Data.Integer hiding (_≟_)
 open import Data.String as S using (intersperse)
 open import Function.Related.TypeIsomorphisms
@@ -151,10 +152,17 @@ d-winner⁇² : d-winner ⁇²
 d-winner⁇² {_} {Nat.zero}   .dec = yes tt
 d-winner⁇² {_} {Nat.suc sl} .dec = (EB , Nat.suc sl) ∈? winning-slots
 
+-- Block-content hash for the Praos tree's prev-linkage: slot and producer
+-- uniquely identify honest blocks; the payload part disambiguates the rest.
+d-blockHash : ℕ → Fin numberOfParties → RankingBlock → List ℕ
+d-blockHash sl pid rb =
+  sl ∷ toℕ pid ∷ RankingBlock.slot rb ∷ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+
 import Leios.Base.Praos.Machine as PraosMachine
 module PM = PraosMachine d-Abstract d-VRF numberOfParties d-winner
   ⦃ winner⁇² = λ {p} {sl} → d-winner⁇² {p} {sl} ⦄
   (λ _ → tt)
+  d-blockHash
 -- producer is a placeholder (a bare RankingBlock does not determine its
 -- minter) but operationally inert: IsBlockchain's producer/slotOf are read
 -- only by deployment-level modules the verifier never imports.
@@ -165,6 +173,14 @@ d-Base = PB.B'
 
 d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
 d-BaseFunctionality = PB.praosBase
+
+-- The Praos node's honest-local interface (tree state, block insertion,
+-- chain read-out) plus block construction/hashing, for the verifier to
+-- maintain the SUT's block tree from trace events.
+open PM public using (mkPraosBlock; praosBlockHash; genesisHash)
+
+open import Leios.Base.Praos d-Abstract d-VRF using (PraosAbstract)
+module PraosNode = PraosAbstract PM.praosNode
 
 open import Leios.FFD public
 
