@@ -121,7 +121,8 @@ in
   # names (trace-parser:exe:...) from the project flake.
   packages = tvFlake.packages // {
     linear-leios-trace-verifier = tvFlake.packages."trace-parser:exe:linear-leios-trace-verifier";
-    linear-leios-trace-verifier-chain = tvFlake.packages."trace-parser:exe:linear-leios-trace-verifier-chain";
+    linear-leios-trace-verifier-chain =
+      tvFlake.packages."trace-parser:exe:linear-leios-trace-verifier-chain";
     test-trace-verifier = tvFlake.packages."trace-parser:test:test-trace-verifier";
   };
 
