@@ -125,12 +125,16 @@ isLeiosActivity ev = case ev of
 checkpointEvery :: Integer
 checkpointEvery = 20
 
--- | How far back an obligation can reach. An EB with election slot @e@ becomes
---   votable in slot @e + (3 * Lhdr `max` validityCheckTime)@, and its acquisition may
---   lag the election by up to @Lhdr@, so carrying this many slots of the outgoing
---   epoch covers every obligation able to straddle a boundary.
+-- | How far back an obligation can reach. Under the CIP voting window an EB
+--   with election slot @e@ may legally be voted on as late as
+--   @e + (3 * Lhdr `max` validityCheckTime) + Lvote@ (the deadline), and its
+--   acquisition may lag the election by up to @Lhdr@, so carrying this many
+--   slots of the outgoing epoch covers every obligation able to straddle a
+--   boundary. The pre-window formula omitted @Lvote@ and could orphan an
+--   obligation whose deadline fell just past a boundary — a withheld vote then
+--   passed silently (caught by the straddling-vote segment test).
 overlapSlots :: Timings -> Integer
-overlapSlots ts = max (3 * tLhdr ts) (tValidityCheckTime ts) + tLhdr ts
+overlapSlots ts = max (3 * tLhdr ts) (tValidityCheckTime ts) + tLvote ts + tLhdr ts
 
 -- | The tail of the outgoing epoch that a new segment carries across a boundary.
 data Carry = Carry

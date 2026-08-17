@@ -32,7 +32,7 @@ stakeDist = [("node-0", 1000000000), ("node-1", 1000000000), ("node-2", 10000000
 --   @ebSlot + (3 * Lhdr `max` validityCheckTime) == ebSlot + 3@.
 verify :: [Integer] -> Bool -> [ChainEvent] -> Text
 verify slots authoritative evs =
-  fst (snd (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 3 slots authoritative evs 0))
+  fst (snd (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 slots authoritative evs 0))
 
 -- | Eligibility taken from the log, as happens for any epoch the queried schedule
 --   cannot cover.
@@ -42,7 +42,7 @@ fromLog = verify [] False
 -- | Verify from a given start slot, as a windowed verifier does for each window.
 verifyFrom :: Integer -> [ChainEvent] -> Text
 verifyFrom from evs =
-  fst (snd (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 3 [] False evs from))
+  fst (snd (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 [] False evs from))
 
 -- | An EB announced and acquired in slot 1 and voted in slot 4.
 announcedAndVoted :: [ChainEvent]
@@ -56,6 +56,13 @@ announcedAndVoted =
   , CSlot 4
   , CVoted "eb" 1
   , CSlot 5
+  -- extended past the CIP vote deadline (slot 8 = announce+3*Lhdr+Lvote) so a
+  -- withheld vote is adjudicated at the deadline rather than escaping when the
+  -- trace ends mid-window (deferral is legal inside the window).
+  , CSlot 6
+  , CSlot 7
+  , CSlot 8
+  , CSlot 9
   ]
 
 -- | The same EB fetched but never announced on the chain, so nothing makes it
@@ -87,6 +94,10 @@ adoptedAtAnnouncer =
   , CSlot 3
   , CSlot 4
   , CSlot 5
+  , CSlot 6
+  , CSlot 7
+  , CSlot 8
+  , CSlot 9
   ]
 
 -- | The chain moves strictly past the announcer, so the EB can no longer be
@@ -184,7 +195,7 @@ chainVerifier = do
       verify [0] True [CSlot 0, CSlot 1] `shouldNotBe` "ok"
 
   describe "voting" $ do
-    it "accepts a vote for an announced EB in its one legal slot" $
+    it "accepts a vote for an announced EB inside its voting window" $
       fromLog announcedAndVoted `shouldBe` "ok"
     it "rejects abstention when an announced EB was votable" $
       fromLog (dropVotes announcedAndVoted) `shouldNotBe` "ok"

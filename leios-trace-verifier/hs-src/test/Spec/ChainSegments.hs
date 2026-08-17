@@ -27,8 +27,8 @@ import LinearLeiosChain (
  )
 import Test.Hspec (Spec, describe, it, shouldBe, shouldNotBe)
 
--- | The timings the chain app uses, under which an announced EB has exactly one legal
---   vote slot at @ebSlot + 3@ and the carry width is 4.
+-- | The timings the chain app uses, under which an announced EB has a legal
+--   voting window opening at @ebSlot + 3@ (deadline +7) and carry width 8.
 timings :: Timings
 timings = Timings{tLhdr = 1, tLvote = 4, tLdiff = 7, tValidityCheckTime = 3}
 
@@ -90,7 +90,7 @@ straddlingVoted =
 straddlingUnvoted :: [ChainEvent]
 straddlingUnvoted =
   ticks 0 7
-    <> [CSlot 8, CAnnouncementAccepted "eb" 8, CEBAcquired "eb" 8, CSlot 9, CSlot 10, CSlot 11, CSlot 12]
+    <> [CSlot 8, CAnnouncementAccepted "eb" 8, CEBAcquired "eb" 8, CSlot 9, CSlot 10, CSlot 11, CSlot 12, CSlot 13, CSlot 14, CSlot 15, CSlot 16]
 
 -- | Two announcements inside one slot. An EB announced at slot 2 is votable at 5;
 --   the node votes there and, in the same slot, forges and announces its own EB,
@@ -152,7 +152,7 @@ chainSegments :: Spec
 chainSegments = do
   describe "carry width" $
     it "spans the vote window plus the acquisition lead" $
-      overlapSlots timings `shouldBe` 4
+      overlapSlots timings `shouldBe` 8
 
   describe "carrying across a boundary" $ do
     it "carries nothing for the first segment" $ do
@@ -234,7 +234,7 @@ chainSegments = do
   describe "obligations that straddle an epoch boundary" $ do
     it "starts the second segment before the boundary" $ do
       ps <- collect straddlingVoted
-      segmentStarts ps `shouldBe` [0, 6]
+      segmentStarts ps `shouldBe` [0, 2]
     it "accepts a straddling vote that was cast" $ do
       ps <- collect straddlingVoted
       violations ps `shouldBe` []
