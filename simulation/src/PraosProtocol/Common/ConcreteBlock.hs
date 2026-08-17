@@ -51,7 +51,6 @@ module PraosProtocol.Common.ConcreteBlock (
 ) where
 
 import Chan.TCP (Bytes)
-import Control.DeepSeq (NFData)
 import Data.ByteString (ByteString)
 import Data.Coerce
 import Data.Function (fix)
@@ -142,7 +141,7 @@ instance (StandardHash b, Hashable (HeaderHash b)) => Hashable (ChainHash b)
 
 -- | The hash of all the information in a 'BlockHeader'.
 newtype ConcreteHeaderHash = HeaderHash Int
-  deriving (Show, Eq, Ord, Generic, Hashable, NoThunks, NFData)
+  deriving (Show, Eq, Ord, Generic, Hashable, NoThunks)
 
 -- | The hash of all the information in a 'BlockBody'.
 newtype BodyHash = BodyHash Int

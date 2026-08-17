@@ -17,7 +17,6 @@ import Chan (Chan)
 import Chan.Driver (ProtocolMessage, chanDriver)
 import Control.Exception (assert)
 import Control.Monad (void)
-import Control.Monad.Class.MonadThrow (MonadEvaluate)
 import Control.Tracer (Tracer)
 import Data.Maybe (fromMaybe)
 import Data.Type.Equality ((:~:) (Refl))
@@ -153,7 +152,7 @@ data ChainConsumerState m = ChainConsumerState
   }
 
 runChainConsumer ::
-  (MonadSTM m, MonadEvaluate m) =>
+  MonadSTM m =>
   Tracer m (PraosNodeEvent body) ->
   PraosConfig body ->
   Chan m ChainSyncMessage ->
@@ -223,7 +222,7 @@ chainConsumer _tracer _cfg (ChainConsumerState{chainVar = hchainVar, ..}) = idle
 --------------------------------
 
 runChainProducer ::
-  (IsBody body, MonadSTM m, MonadEvaluate m) =>
+  (IsBody body, MonadSTM m) =>
   Chan m ChainSyncMessage ->
   FollowerId ->
   TVar m (ChainProducerState (Block body)) ->

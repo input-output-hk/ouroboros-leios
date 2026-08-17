@@ -10,164 +10,75 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 -- See CONTRIBUTING.md for information about when and how to update these.
--- Aligned with cardano-node leios-prototype so that cardano-api / cardano-cli
--- (used by the trace verifier) resolve against a mutually-compatible set.
 index-state:
-  , hackage.haskell.org 2026-06-29T22:49:53Z
-  , cardano-haskell-packages 2026-06-29T12:05:19Z
-
-active-repositories:
-  , :rest
-  , cardano-haskell-packages:override
+  , hackage.haskell.org 2024-10-04T11:45:34Z
+  , cardano-haskell-packages 2024-10-04T09:54:45Z
 
 packages:
-  -- trimmed to the verifier's needs for the w31-aligned build (simulation et
-  -- al. still pin the older stack and over-constrain the solver)
+  simulation
   leios-trace-hs
-  -- leios-trace-verifier/dist/haskell is generated (Agda -> Haskell via
-  -- `make -C leios-trace-verifier` or the Nix `sources` derivation in
-  -- nix/project.nix) and doesn't exist in a plain checkout. Listing it here
-  -- unconditionally breaks `cabal build/test all` in CI and for anyone
-  -- without Agda installed (see .github/workflows/simulation.yaml, which
-  -- has no Agda toolchain). The Nix build patches it in dynamically
-  -- instead; run `make -C leios-trace-verifier` first to add it locally.
+  analysis/sims/trace-processor
+  analysis/deltaq/linear-leios
+  post-cip/tx-measurements/betti0
 
 tests: True
 
-constraints:
-  -- haskell.nix patch does not work for 1.6.8
-  , any.crypton-x509-system < 1.6.8
-  -- haskell.nix tries to use 0.7.1.5 for some reason
-  , any.proto-lens >= 0.7.1.6
-  -- plutus-core's `ral` caps QuickCheck < 2.16; pin the whole project there.
-  , any.QuickCheck < 2.16
-
--- See https://github.com/haskell/cabal/issues/11663 ; worked around with these.
-allow-newer:
-  , io-sim:time
-  , io-classes:time
-  -- fgl-arbitrary's QuickCheck <2.15 upper bound is stale; it builds with 2.15.
-  , fgl-arbitrary:QuickCheck
-
-package cryptonite
-  -- Use /dev/urandom rather than RDRAND for entropy.
-  flags: -support_rdrand
-
-package bitvec
-  flags: -simd
-
--- Cardano stack, pinned to the leios-prototype branches (matching the
--- cardano-node-leios flake input).  cardano-api / cardano-cli are consumed by
--- leios-trace-verifier.
-
--- ouroboros-consensus/leios-prototype
--- cardano-ledger/leios-prototype
--- ouroboros-network/leios-prototype
--- cardano-api/leios-prototype
--- NOTE: cardano-cli is intentionally NOT pinned: the leadership-schedule query
--- functions we use live in cardano-api.  Pulling cardano-cli forces a newer
--- io-classes that conflicts with cardano-diffusion (ouroboros-network).
-
--- NOTE: The gtk2hs (pango) and DeltaQ source pins that used to live here
--- moved to cabal.project.ci-simulation: only the (currently trimmed)
--- simulation/deltaq packages need them, and unused source-repository-package
--- stanzas break haskell.nix's install-plan processing ("TargetNotLocal").
-
--- plutus pin matching the w31 node (needed by the bumped cardano-api)
-
--- === stanzas transplanted verbatim from cardano-node@d697d3a6 (prototype-2026w31) ===
+source-repository-package
+    type: git
+    location: https://github.com/IntersectMBO/ouroboros-network.git
+    tag: da1de0ecd52df70508d3f0f9d298832af8392d47
+    --sha256: 9KcLfecbi5L6AHMbubFXTRDm3Yo4QjyPd93ZdpmUlQ4=
+    -- included all package subdirs for consistency
+    subdir: cardano-ping
+            monoidal-synchronisation
+            quickcheck-monoids
+            network-mux
+            ouroboros-network
+            ouroboros-network-api
+            ouroboros-network-framework
+            ouroboros-network-mock
+            ouroboros-network-protocols
+            ouroboros-network-testing
+            ntp-client
+            cardano-client
 
 source-repository-package
-  type: git
-  location: https://github.com/IntersectMBO/typed-protocols
-  tag: 9b4627221ae5d649f2303c6926a8dba3f9934658
-  --sha256: sha256-55skVYIR0WjXMwJEirLgF0HFHUpFLBppuV9gvTWqoOI=
-  subdir:
-    typed-protocols
+    type: git
+    location: https://github.com/Saizan/io-sim.git
+    tag: cb3926463e42d5eff98acdbdeadd4a05c7c81f90
+    --sha256: 64IWzs36fLSvf1Jb5z1ajeBppMooFynN2/lgjlu3ojo=
+    subdir:
+      io-sim
+      io-classes
 
-
+-- NOTE: This contains a workaround for the compile error with pango >=1.56.
+--       For discussion, see:
+--       https://input-output-rnd.slack.com/archives/C074AHSKJF7/p1737132491221259
 source-repository-package
-  type: git
-  location: https://github.com/IntersectMBO/ouroboros-consensus
-  tag: 50c97115f8bc4d11b75d3048e360f4a391aaf9b6
-  --sha256: sha256-LqUz8+YoTjS6rec/hpmg6WqXHwIEl6N8Z8JnQiVuO/0=
+    type: git
+    location: https://github.com/wenkokke/gtk2hs.git
+    tag: ca7f98bd3e9462deac3661244dc76004a36fc8c3
+    --sha256: 0g5hsjm7bixlwy6m6n98bf8s4khcbg832444w19x35jkjznr2yr1
+    subdir:
+      pango
 
-
+-- Update this when the following PR is merged: https://github.com/well-typed/cborg/pull/345
 source-repository-package
-  type: git
-  location: https://github.com/IntersectMBO/cardano-ledger
-  tag: fb8d6f8a83b0efb86281e0b80e7ffba160dad8b1
-  --sha256: sha256-U/vpyZNerL1YXiQg1TIAOL5L438NNE3XkuIYD0HPTJw=
-  subdir:
-    libs/cardano-data
-    libs/cardano-ledger-api
-    libs/small-steps
-    libs/cardano-ledger-binary
-    libs/cardano-ledger-core
-    libs/cardano-protocol-tpraos
-    eras/shelley/impl
-    eras/shelley/test-suite
-    eras/shelley-ma/test-suite
-    eras/mary/impl
-    eras/allegra/impl
-    eras/alonzo/impl
-    eras/alonzo/test-suite
-    eras/babbage/impl
-    eras/conway/impl
-    eras/dijkstra/impl
+    type: git
+    location: https://github.com/well-typed/cborg.git
+    tag: ad4927388efab6994589384a421c96f4caeafe15
+    --sha256: YlN8RQ0iuTKiGpBQqfvsogGkgRSK6wRK3yFh3vAJdVA=
+    subdir:
+      cborg-json
 
-
+-- NOTE: DeltaQ source is also pinned in flake.nix (deltaq-src input) for the
+-- Jupyter kernel in analysis/deltaq/. Keep both pins in sync.
 source-repository-package
-  type: git
-  location: https://github.com/IntersectMBO/ouroboros-network
-  tag: 4b3ab7664f609a1aee0f0c24dcfcfd0ab899fc42
-  --sha256: sha256-fIqpI2whstetodpiONmUDVgnhTpzXeq1/gmzuHItK5A=
-  subdir:
-    ouroboros-network
-    cardano-diffusion
-    network-mux
+    type: git
+    location: https://github.com/DeltaQ-SD/deltaq.git
+    tag: fd9371d174f6333893274253be11f7ece981cf10
+    --sha256: sha256-9MBLy/E1PySUGmVzkayNxmG0z3a1sTT4RDCqIXNdPcw=
+    subdir:
+      lib/deltaq
+      lib/probability-polynomial
 
-
-source-repository-package
-  type: git
-  location: https://github.com/IntersectMBO/cardano-api
-  tag: 947645ea9c912da13feadc16bef44a7550c3c55b
-  --sha256: sha256-+fIsJuJV4YBSPdVe3wpIxq9lf6nAI5yB7qdzH0iKmrc=
-  subdir:
-    cardano-api
-    cardano-api-gen
-    cardano-rpc
-
-
-source-repository-package
-  type: git
-  location: https://github.com/input-output-hk/kes-agent.git
-  tag: 4e7ec7b5102a030587413f4af770e87a15c9cb9c
-  --sha256: sha256-OUnBy86ny2RHHJZoOXPHeHbYwvWBHmnXoVyQp0FZjEA=
-  subdir:
-    kes-agent
-    kes-agent-crypto
-
-
-source-repository-package
-  type: git
-  location: https://github.com/IntersectMBO/plutus.git
-  tag: b1db04cc425fab303ac3b79d7140dc2a17f29e6d
-  --sha256: sha256-XtYzjNVx4+IGWpgm+p/YTf56DrJtK0I98umZCTE3U80=
-  -- Subdirs trimmed vs. the node's stanza: plutus-tx-plugin and
-  -- plutus-metatheory are not needed by cardano-api, and their presence
-  -- breaks haskell.nix's install-plan processing (their libs resolve
-  -- non-locally, leaving only "TargetNotLocal" test targets).
-  subdir:
-    plutus-core
-    plutus-ledger-api
-    plutus-tx
-
-
--- cuddle >=1.8 needed by the w31 ledger; CHaP masks Hackage's newer releases
-source-repository-package
-  type: git
-  location: https://github.com/input-output-hk/cuddle
-  -- 1.8.1.0 (tag pinned by commit so haskell.nix can hash-lock the fetch)
-  tag: 416f7aeaa510d4be5ea8f1d26d4cdd5501629058
-  --sha256: sha256-uQk1D1MiCaaoI0XzH4K666UGpHngm0XZDdbiK0+9K2s=

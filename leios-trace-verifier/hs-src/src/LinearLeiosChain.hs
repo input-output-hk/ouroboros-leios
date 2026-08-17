@@ -190,7 +190,8 @@ verifySegment ts seg prefix =
         (tLhdr ts)
         (tLvote ts)
         (tLdiff ts)
-        (tValidityCheckTime ts)
+        -- validityCheckTime is no longer a spec argument (CIP: isValidityChecked
+        -- is wired in Defaults); tValidityCheckTime remains only in overlapSlots.
         (fromMaybe [] (cdWinningSlots cd))
         (segAuthoritative seg)
         prefix

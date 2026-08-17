@@ -27,7 +27,6 @@ import Chan (Chan)
 import Chan.Driver (ProtocolMessage, chanDriver)
 import Control.Exception (assert)
 import Control.Monad (forM, forever, guard, join, unless, void, when, (<=<))
-import Control.Monad.Class.MonadThrow (MonadEvaluate)
 import Control.Tracer (Tracer, traceWith)
 import Data.Bifunctor (second)
 import Data.Kind (Type)
@@ -143,7 +142,7 @@ newtype BlockFetchProducerState body m = BlockFetchProducerState
   { blocksVar :: ReadOnly (TVar m (Blocks body))
   }
 
-runBlockFetchProducer :: (IsBody body, MonadSTM m, MonadEvaluate m) => Chan m (BlockFetchMessage body) -> BlockFetchProducerState body m -> m ()
+runBlockFetchProducer :: (IsBody body, MonadSTM m) => Chan m (BlockFetchMessage body) -> BlockFetchProducerState body m -> m ()
 runBlockFetchProducer chan blockFetchProducerState =
   void $ runPeerWithDriver (chanDriver decideBlockFetchState chan) (blockFetchProducer blockFetchProducerState)
 
@@ -252,7 +251,7 @@ data BlockFetchConsumerState body m = BlockFetchConsumerState
   }
 
 runBlockFetchConsumer ::
-  (IsBody body, Show body, MonadSTM m, MonadDelay m, MonadEvaluate m) =>
+  (IsBody body, Show body, MonadSTM m, MonadDelay m) =>
   Tracer m (PraosNodeEvent body) ->
   PraosConfig body ->
   Chan m (BlockFetchMessage body) ->

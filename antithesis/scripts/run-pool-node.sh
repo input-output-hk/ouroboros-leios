@@ -29,7 +29,7 @@ mkdir -p "$LOG_DIR"
 export LEIOS_DB_PATH="$DATA_DIR/leios.db"
 
 # Verify required files exist
-for required_file in config.yaml topology.json shelley-genesis.json keys/vrf.skey keys/kes.skey keys/opcert.cert; do
+for required_file in config.yaml topology.json shelley-genesis.json keys/vrf.skey keys/kes.skey keys/bls.skey keys/opcert.cert; do
 	if [ ! -f "$DATA_DIR/$required_file" ]; then
 		echo "ERROR: Required file not found: $DATA_DIR/$required_file"
 		exit 1
@@ -55,5 +55,6 @@ exec cardano-node run \
 	--port "$PORT" \
 	--shelley-vrf-key "$DATA_DIR/keys/vrf.skey" \
 	--shelley-kes-key "$DATA_DIR/keys/kes.skey" \
+	--shelley-bls-key "$DATA_DIR/keys/bls.skey" \
 	--shelley-operational-certificate "$DATA_DIR/keys/opcert.cert" \
 	>> "$LOG_DIR/${POOL_NAME}.log" 2>&1

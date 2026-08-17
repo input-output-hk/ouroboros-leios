@@ -21,50 +21,43 @@ on:
 
 jobs:
 
-  trace-verifier:
-    name: Leios trace verifier
-    runs-on: ubuntu-latest
-    steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
-    - name: 🛠️ Install Nix
-      # Keep the action new enough that its default Nix is >= 2.27.0: the
-      # pinned ouroboros-consensus flake input uses `inputs.self.submodules`
-      # (Nix 2.27.0+, https://github.com/NixOS/nix/pull/12421); older Nix
-      # fails evaluating this flake with "unexpected flake input attribute
-      # 'submodules'". v31.11.0 installs Nix 2.35.1 by default.
-      uses: cachix/install-nix-action@v31.11.0
-      with:
-        nix_path: nixpkgs=channel:nixos-24.05
-        extra_nix_config: |
-          allowed-uris = ${{ env.ALLOWED_URIS }}
-          trusted-public-keys = ${{ env.TRUSTED_PUBLIC_KEYS }}
-          substituters = ${{ env.SUBSTITUTERS }}
-          experimental-features = nix-command flakes
-          accept-flake-config = true
-    - name: 🏗️ Build trace verifier
-      run: |
-        nix build --show-trace .#linear-leios-trace-verifier
-    - name: 🧪 Test trace verifier
-      run: |
-        nix run --show-trace .#test-trace-verifier
-    - name: 🔬 Check example trace
-      run: |
-        # The simulator comes from main's flake: the w31-aligned cabal.project
-        # on this branch trims the project to the trace-verifier's needs, so
-        # `.#ols` is not built here (the simulation still pins the older
-        # cardano stack). Hydra caches main's ols build.
-        nix run github:input-output-hk/ouroboros-leios#ols -- \
-          sim leios \
-          --leios-config-file data/simulation/config.default.yaml \
-          --topology-file data/simulation/topo-default-100.yaml \
-          --conformance-events \
-          --shared-log-format JSON \
-          --output-seconds 30 \
-          --output-file sim.log
-        nix run .#linear-leios-trace-verifier -- \
-          --config-file data/simulation/config.default.yaml \
-          --topology-file data/simulation/topo-default-100.yaml \
-          --trace-file sim.log \
-          --idSut 0 \
-        || true   # FIXME: Remove when simulations conform to spec.
+# commented - running the trace-verifier against the simulator is deprecated
+#
+#  trace-verifier:
+#    name: Leios trace verifier
+#    runs-on: ubuntu-latest
+#    steps:
+#    - name: 📥 Checkout repository
+#      uses: actions/checkout@v4
+#    - name: 🛠️ Install Nix
+#      uses: cachix/install-nix-action@v31.11.0
+#      with:
+#        nix_path: nixpkgs=channel:nixos-24.05
+#        extra_nix_config: |
+#          allowed-uris = ${{ env.ALLOWED_URIS }}
+#          trusted-public-keys = ${{ env.TRUSTED_PUBLIC_KEYS }}
+#          substituters = ${{ env.SUBSTITUTERS }}
+#          experimental-features = nix-command flakes
+#          accept-flake-config = true
+#    - name: 🏗️ Build trace verifier
+#      run: |
+#        nix build --show-trace .#linear-leios-trace-verifier
+#    - name: 🧪 Test trace verifier
+#      run: |
+#        nix run --show-trace .#test-trace-verifier
+#    - name: 🔬 Check example trace
+#      run: |
+#        nix run .#ols -- \
+#          sim leios \
+#          --leios-config-file data/simulation/config.default.yaml \
+#          --topology-file data/simulation/topo-default-100.yaml \
+#          --conformance-events \
+#          --shared-log-format JSON \
+#          --output-seconds 30 \
+#          --output-file sim.log
+#        nix run .#linear-leios-trace-verifier -- \
+#          --config-file data/simulation/config.default.yaml \
+#          --topology-file data/simulation/topo-default-100.yaml \
+#          --trace-file sim.log \
+#          --idSut 0 \
+#        || true   # FIXME: Remove when simulations conform to spec.

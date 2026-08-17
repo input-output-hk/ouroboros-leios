@@ -1,9 +1,9 @@
 {
   "committee": {
     "members": {
-      "keyHash-1ca34d7e04e4bca4ef764b0f3decd6835d27d322f9a13e4515022c6d": 293,
-      "keyHash-6deecaddddfe910ff57936b60f8f115425f223b3ee08bd9e93b95ce9": 293,
-      "keyHash-7715990aad65e1f0530c24125b094791ee1f1c76643f3f1632e93a89": 293
+      "keyHash-4a45ab0e4dc24e2567d282adc3928a69e6b6a8e155a9b14ae7147c21": 293,
+      "keyHash-6bb088d6ada8d97d130a8e3406360fbdf39be38b699a77778d26ae72": 293,
+      "keyHash-c3c5d6f905a91c12ea51b328953ccee359efb2cff6130d9fee8dea05": 293
     },
     "threshold": {
       "denominator": 3,
@@ -33,8 +33,16 @@
     "treasuryWithdrawal": 0.67,
     "updateToConstitution": 0.75
   },
+  "extraConfig": {
+    "delegs": {
+      "data": {}
+    },
+    "initialDReps": {
+      "data": {}
+    }
+  },
   "govActionDeposit": 100000000000,
-  "govActionLifetime": 30,
+  "govActionLifetime": 120,
   "minFeeRefScriptCostPerByte": 15,
   "plutusV3CostModel": [
     100788,

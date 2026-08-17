@@ -43,8 +43,7 @@ open Equivalence
 
 module Defaults
   (params : Params) (let open Params params)
-  (testParams : TestParams params) (let open TestParams testParams)
-  (validityCheckTimeValue : ℕ) where
+  (testParams : TestParams params) (let open TestParams testParams) where
 
 instance
   htx : Hashable (List ℕ) (List ℕ)
@@ -75,46 +74,11 @@ open import Leios.VRF d-Abstract public
 sutStake : ℕ
 sutStake = TotalMap.lookup stakeDistribution sutId
 
--- Voting-committee selection (CIP-0164): the committee is fixed once per epoch,
--- deterministically, from the epoch-boundary stake distribution — order pools
--- by active stake (descending) and accumulate until the cumulative coverage
--- reaches the target σc. It is NOT a per-slot VRF lottery. We fix σc = 99/100,
--- expressed as a rational σc-num / σc-den so the test stays all-naturals.
-σc-num σc-den : ℕ
-σc-num = 99
-σc-den = 100
-
--- Stake of every party, paired with its index.
-partyStakes : List (Fin numberOfParties × ℕ)
-partyStakes = tabulate (λ i → i , TotalMap.lookup stakeDistribution i)
-
-totalStake : ℕ
-totalStake = foldr (λ (_ , s) acc → s Nat.+ acc) 0 partyStakes
-
--- Stake of a pool that strictly precedes the SUT in committee order, else 0.
--- Order is descending stake, ties broken by ascending index.
-precedingContribution : Fin numberOfParties → ℕ → ℕ
-precedingContribution i s =
-  if sutStake Nat.<ᵇ s then s
-  else if s Nat.<ᵇ sutStake then 0
-  else if toℕ i Nat.<ᵇ toℕ sutId then s
-  else 0
-
--- Cumulative stake of all pools ahead of the SUT in committee order.
-precedingStake : ℕ
-precedingStake =
-  foldr (λ (i , s) acc → precedingContribution i s Nat.+ acc) 0 partyStakes
-
--- The SUT is on the committee iff the pools ahead of it have not yet covered
--- the target σc, i.e. precedingStake · σc-den < totalStake · σc-num.
-sut-in-committee : Bool
-sut-in-committee = (precedingStake Nat.* σc-den) Nat.<ᵇ (totalStake Nat.* σc-num)
-
--- Eligibility. Block production (EB) follows the Praos VRF leadership schedule
--- supplied through the 'winning-slots' oracle. Voting (VT) follows the
--- deterministic committee above and is independent of the slot.
+-- Eligibility for block production (EB): the Praos VRF leadership schedule
+-- supplied through the 'winning-slots' oracle. Voting (VT) eligibility does
+-- not go through the VRF at all: it is the explicit CIP-0164 stake-truncation
+-- committee, `inVotingCommittee` in Leios.Config.
 sortition : BlockType → ℕ → ℕ
-sortition VT _ = if sut-in-committee then 0 else sutStake
 sortition b n with (b , n) ∈? winning-slots
 ... | yes _ = 0
 ... | no _ = sutStake
@@ -272,6 +236,10 @@ instance
   hpe : Hashable PreEndorserBlock Hash
   hpe .hash = EndorserBlockOSig.txs
 
+  -- Votes sign the announcing RB's hash: slot plus announced-EB payload.
+  hrb : Hashable RankingBlock Hash
+  hrb .hash rb = RankingBlock.slot rb ∷ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+
 record FFDBuffers : Type where
   field inEBs : List EndorserBlock
         inVTs : List (List Vote)
@@ -355,6 +323,7 @@ d-SpecStructure : SpecStructure
 d-SpecStructure = record
       { a                         = d-Abstract
       ; Hashable-PreEndorserBlock = hpe
+      ; Hashable-RankingBlock     = hrb
       ; id                        = sutId
       ; FFD'                      = d-FFDFunctionality
       ; vrf'                      = d-VRF
@@ -368,5 +337,11 @@ d-SpecStructure = record
       ; KF                        = d-KeyRegistrationFunctionality
       ; va                        = d-VotingAbstract
       ; getEBCert                 = λ _ → []
-      ; validityCheckTime         = λ _ → validityCheckTimeValue
+      -- The verifier cannot observe validation completion from the trace; the
+      -- node's own gate ensures it only votes after validating, so a logged
+      -- vote is taken as evidence of completed validation. To be refined via
+      -- the asynchronous Validation functionality (see the
+      -- yveshauser/validation-functionality spec branch).
+      ; isValidityChecked         = λ _ _ → ⊤
+      ; isValidityChecked?        = λ _ _ → yes tt
       }

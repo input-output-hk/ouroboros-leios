@@ -1,201 +1,322 @@
 ---
 title: Protocol status
+hide_table_of_contents: true
 ---
 
-import ProtocolStatus from '@site/src/components/ProtocolStatus';
+import ProtocolStatus, { ProtocolMatrix, ReleaseStages } from '@site/src/components/ProtocolStatus';
 
 export const stages = [
-  'Requirements',
+  'CIP',
   'Prototype',
   'Design',
   'Implementation',
-  'Confidence',
+  'Assurance',
 ];
 
-{/* Marks: 'done' (✓) · 'ongoing' (~) · 'open' (?) · 'empty' (blank).
-    Optional `note` overrides the default label in the tooltip.
-    `anchor` pins the badge to a position in the SVG viewBox (1120.77 × 471.62);
-    rows without an anchor render as cross-cutting cards under the diagram. */}
+{/*
+Single source of truth for both the diagram badges and the full matrix below.
 
-export const rows = [
-  {
-    id: 'praos-leios-prioritization',
-    name: 'Praos > Leios prioritization',
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'done' },
-      Design: { mark: 'ongoing' },
-    },
-  },
-  {
-    id: 'ht-tx-submission',
-    name: 'High-throughput Tx submission',
-    anchor: { x: 160, y: 25 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Implementation: { mark: 'ongoing', note: 'V2-undecision' },
-    },
-  },
-  {
-    id: 'ht-mempool',
-    name: 'High-throughput mempool',
-    anchor: { x: 460, y: 25 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Design: { mark: 'ongoing', note: 'Design ideas only' },
-    },
-  },
-  {
-    id: 'block-production',
-    name: 'Block production',
-    anchor: { x: 430, y: 160 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'done' },
-      Design: { mark: 'open', note: 'Announcement & pre-application' },
-    },
-  },
-  {
-    id: 'eb-diffusion-storage',
-    name: 'EB diffusion & storage',
-    anchor: { x: 470, y: 280 },
-    cells: {
-      'Requirements': { mark: 'open', note: 'Delay bounds' },
-      Prototype: { mark: 'done' },
-      Design: { mark: 'ongoing' },
-    },
-  },
-  {
-    id: 'tx-cache',
-    name: 'Transaction cache',
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'open', note: 'Not yet implemented' },
-      Design: { mark: 'done', note: 'Sizing settled' },
-    },
-  },
-  {
-    id: 'voting-certification',
-    name: 'Voting & certification',
-    anchor: { x: 500, y: 410 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'done' },
-      Design: { mark: 'done', note: 'Shared with Peras' },
-      Implementation: { mark: 'ongoing', note: 'Cert agg, peer-reviewed' },
-    },
-  },
-  {
-    id: 'block-validation-adoption',
-    name: 'Block validation & adoption',
-    anchor: { x: 985, y: 70 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'done' },
-      Design: { mark: 'ongoing' },
-    },
-  },
-  {
-    id: 'catching-up',
-    name: 'Catching up',
-    anchor: { x: 980, y: 400 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'ongoing', note: 'Baseline via chain selection' },
-      Design: { mark: 'ongoing', note: 'Efficient path' },
-    },
-  },
-  {
-    id: 'committee-selection',
-    name: 'Committee selection',
-    anchor: { x: 230, y: 320 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'ongoing', note: 'Interim all-vote' },
-      Design: { mark: 'done', note: 'Simplified truncation' },
-    },
-  },
-  {
-    id: 'key-registration',
-    name: 'Key registration & rotation',
-    anchor: { x: 120, y: 200 },
-    cells: {
-      'Requirements': { mark: 'done' },
-      Design: { mark: 'ongoing' },
-      Implementation: { mark: 'ongoing', note: 'Key-gen CLI only' },
-    },
-  },
-  {
-    id: 'crypto',
-    name: 'Cryptographic primitives',
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'done' },
-      Design: { mark: 'done' },
-      Implementation: { mark: 'done' },
-      Confidence: { mark: 'ongoing', note: 'Primitives audited; cert layer peer-reviewed' },
-    },
-  },
-  {
-    id: 'serialization',
-    name: 'Serialization',
-    cells: {
-      'Requirements': { mark: 'done' },
-      Design: { mark: 'done' },
-      Implementation: { mark: 'ongoing' },
-    },
-  },
-  {
-    id: 'protocol-parameters',
-    name: 'New protocol parameters',
-    cells: {
-      'Requirements': { mark: 'done' },
-      Design: { mark: 'ongoing', note: 'Set being finalized' },
-      Implementation: { mark: 'open', note: 'Not implemented yet' },
-    },
-  },
-  {
-    id: 'node-api-config',
-    name: 'Node API & configuration',
-    cells: {
-      'Requirements': { mark: 'done' },
-      Prototype: { mark: 'done', note: 'Inlined-block N2C, on testnet' },
-      Design: { mark: 'ongoing', note: 'New queries to add' },
-    },
-  },
-];
+- Component name @x,y     first level: a component; the optional `@x,y` pins its
+                            badge into the SVG viewBox (1120.77 × 471.62). Components
+                            without an anchor render as cross-cutting cards.
+    - [x] Stage: note      second level: one entry per stage (see `stages` above);
+                            the optional note after the `:` replaces the default label.
+    - [ ] Detail          third level: scope details, shown in the tooltip only.
+
+Marks: [x] done · [~] ongoing · [?] open question · [-] missing · [ ] not started
+
+Detail names are matched against the scope items of the `plan` below (ignoring
+case, punctuation and "(?)"), which is what fills the per-stage tables. Keep the
+wording of a detail identical to its scope item, or the two lists drift apart. 
+
+*/}
+
+export const source = `
+- Cryptographic primitives
+  - [x] CIP
+  - [x] Prototype
+  - [x] Design
+  - [x] Implementation
+  - [x] Assurance: Audited
+    - [x] Primitives audited
+    - [x] Certs peer-reviewed
+
+- New protocol parameters
+  - [?] CIP: Per-tx limits
+  - [~] Prototype
+  - [?] Design: Commitee size param
+  - [~] Implementation
+    - [ ] Protocol parameters and genesis config
+    - [ ] Constitution guard rails
+  - [ ] Assurance
+
+- Serialization
+  - [x] CIP
+  - [x] Prototype
+  - [~] Design
+  - [~] Implementation
+    - [x] Announcements and certifies bit in headers
+    - [ ] BLS keys in block headers
+    - [x] Certificates in body
+    - [x] BLS key in pool registration cert in txs
+    - [ ] Protocol parameter updates in txs
+  - [ ] Assurance
+
+- Praos > Leios prioritization
+  - [x] CIP
+  - [x] Prototype
+  - [x] Design
+  - [~] Implementation
+    - [~] Socket options
+    - [ ] Incremental decoding
+  - [?] Assurance: good enough?
+
+- Key registration & rotation @130,200
+  - [x] CIP
+  - [x] Prototype
+  - [~] Design
+  - [~] Implementation
+    - [x] Generate BLS keys
+    - [~] Create and submit pool registration with BLS keys
+    - [ ] Register BLS keys via block headers
+  - [~] Assurance: on testnet
+
+- Committee selection @230,320
+  - [x] CIP
+  - [~] Prototype: Interim all-vote
+  - [x] Design: Simplified truncation
+  - [ ] Implementation
+    - [x] Stake-based committee selection
+    - [ ] Committee selection at epoch boundaries
+  - [~] Assurance: on testnet
+
+- High-throughput Tx submission @400,25
+  - [x] CIP
+  - [~] Prototype
+  - [~] Design
+  - [~] Implementation
+    - [~] TxSubmisison V2-undecision
+    - [ ] TxSubmission param tuning
+  - [~] Assurance
+
+- High-throughput mempool @680,25
+  - [x] CIP
+  - [~] Prototype
+  - [~] Design
+  - [ ] Implementation
+    - [ ] Double-buffered mempool
+    - [ ] Capped forging
+    - [ ] Pre-flight forging
+  - [~] Assurance
+
+- Block production @450,170
+  - [x] CIP
+  - [~] Prototype
+  - [~] Design: Pre-application vs. mempool
+  - [ ] Implementation
+    - [ ] Forge and store EBs
+    - [ ] Forge RBs with certificates
+  - [ ] Assurance
+
+- EB diffusion @480,280
+  - [?] CIP: Delay bounds
+  - [x] Prototype
+  - [~] Design
+  - [ ] Implementation
+    - [ ] Announce and detect equivocations of EBs
+    - [ ] Diffuse and validate EBs via TxCache
+  - [?] Assurance: good enough?
+
+- Transaction cache & storage
+  - [x] CIP
+  - [~] Prototype
+  - [x] Design: Sizing settled
+  - [ ] Implementation
+    - [ ] Diffuse and validate EBs via TxCache
+    - [ ] Disk-backed TxCache
+    - [ ] Small quantity EB storage
+    - [ ] Large quantity, low latency EB storage
+  - [ ] Assurance
+
+- Voting & certification @580,400
+  - [x] CIP
+  - [~] Prototype: EB validation gap
+  - [~] Design: Shared with Peras
+  - [ ] Implementation
+    - [ ] Voting logic
+    - [ ] Diffuse and validate votes
+    - [ ] Store and aggregate votes
+  - [ ] Assurance
+
+- Block validation & adoption @985,70
+  - [x] CIP
+  - [x] Prototype
+  - [~] Design
+  - [ ] Implementation
+    - [ ] Reject all announcements and certificates
+    - [ ] Validate EB announcing and certifying blocks
+    - [ ] EB fetching on chain selection
+  - [ ] Assurance
+
+- Node API & configuration
+  - [x] CIP
+  - [x] Prototype
+  - [~] Design
+  - [~] Implementation
+    - [x] Query pool state showing key registration
+    - [~] Client APIs inline certified EB txs
+    - [ ] Node accepts BLS keys
+  - [ ] Assurance
+`;
+
+{/*
+Staged scopes of the dimensional plan, mirroring the "Dimensional plan on
+    hard-fork readiness" chapter of docs/leios-design/README.md. No marks here:
+    each scope item takes its status from the matching detail of the status list
+    above; grouping items take the roll-up of their sub-items.
+*/}
+
+export const plan = `
+- Stage 1: Dijkstra supports Leios
+  - Dijkstra block definition / serialization contains Leios
+    - Announcements and certifies bit in headers
+    - BLS keys in block headers (?)
+    - Certificates in body
+    - BLS key in pool registration cert in txs
+    - Protocol parameters in txs
+  - Reject all announcements and certificates
+  - Generate BLS keys
+  - Create and submit pool registration with BLS keys
+    - Check PoP in ledger rules
+  - Query pool state showing key registration
+  - Node integration
+
+- Stage 2: Start with zero (0/0/∞/0/0)
+  - Register BLS keys via block headers (?)
+  - Stake-based committee selection
+  - Committee selection at epoch boundaries
+    - Committee in ledger state
+  - EB fetching on chain selection
+  - Validate EB announcing and certifying blocks
+    - Disallowed by protocol parameters
+  - Client APIs inline certified EB txs
+  - Inert mini-protocols handlers
+  - Node integration
+
+- Stage 3: Low params (1/4/7/100k/1M)
+  - Socket options
+  - TxSubmisison V2-undecision
+  - Double-buffered mempool
+  - Capped forging
+  - Forge and store EBs
+  - Small quantity EB storage
+  - Announce and detect equivocations of EBs
+  - Diffuse and validate EBs via TxCache
+  - Voting logic
+  - Diffuse and validate votes
+  - Store and aggregate votes
+  - Forge RBs with certificates
+  - Node accepts BLS keys
+  - Node integration
+
+- Stage 4: High params
+  - TxSubmission param tuning
+  - Incremental decoding
+  - High-throughput tx submission
+  - Pre-flight forging
+  - Disk-backed TxCache
+  - Large quantity, low latency EB storage
+  - Node integration
+`;
 
 # Protocol status
 
-The diagram below sketches the Leios protocol flow. Each badge marks a
-component of the protocol and summarises its progress across the stages.
-Click or hover a badge for the full breakdown.
+Realizing Ouroboros Leios is not a single hand-off from research to engineering,
+but a progression: the protocol described in
+[CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md)
+is matured through simulation, prototyping, design, implementation and quality
+assurance until it can be considered for deployment to mainnet. This page tracks
+where that work currently stands, cut along two dimensions:
 
-<ProtocolStatus stages={stages} rows={rows} />
+- **Component stages**: the parts of the protocol flow, each progressing through the
+  stages below. Visualized graphically and in a [full matrix](#full-matrix).
+- **Release stages**: possible increments that can be considered for a rollout
+  to mainnet, as a dimensional plan to [node releases](#release-stages).
 
-## Full matrix
+## Component stages
 
-| Component                     | Requirements         | Prototype                      | Design                              | Implementation              | Confidence                                       |
-|-------------------------------|----------------------|--------------------------------|-------------------------------------|-----------------------------|--------------------------------------------------|
-| Praos > Leios prioritization  | ✓                    | ✓                              | ~                                   |                             |                                                  |
-| High-throughput Tx submission | ✓                    |                                |                                     | ~ V2-undecision             |                                                  |
-| High-throughput mempool       | ✓                    |                                | ~ Design ideas only                 |                             |                                                  |
-| Block production              | ✓                    | ✓                              | ? Announcement & pre-application    |                             |                                                  |
-| EB diffusion & storage        | ? Delay bounds       | ✓                              | ~                                   |                             |                                                  |
-| Transaction cache             | ✓                    | ? Not yet implemented          | ✓ Sizing settled                    |                             |                                                  |
-| Voting & certification        | ✓                    | ✓                              | ✓ Shared with Peras                 | ~ Cert agg, peer-reviewed   |                                                  |
-| Block validation & adoption   | ✓                    | ✓                              | ~                                   |                             |                                                  |
-| Catching up                   | ✓                    | ~ Baseline via chain selection | ~ Efficient path                    |                             |                                                  |
-| Committee selection           | ✓                    | ~ Interim all-vote             | ✓ Simplified truncation             |                             |                                                  |
-| Key registration & rotation   | ✓                    |                                | ~                                   | ~ Key-gen CLI only          |                                                  |
-| Cryptographic primitives      | ✓                    | ✓                              | ✓                                   | ✓                           | ~ Primitives audited; cert layer peer-reviewed   |
-| Serialization                 | ✓                    |                                | ✓                                   | ~                           |                                                  |
-| New protocol parameters       | ✓                    |                                | ~ Set being finalized               | ? Not implemented yet       |                                                  |
-| Node API & configuration      | ✓                    | ✓ Inlined-block N2C, on testnet| ~ New queries to add                |                             |                                                  |
+A component moves through these stages, which are deliberately not a waterfall
+several of them progress in parallel and feed back into each other:
 
-| Symbol | Meaning         |
-|--------|-----------------|
-| ✓      | Done / OK       |
-| ~      | Vague / Ongoing |
-| ?      | Open questions  |
-|        | Not started     |
+| Stage          | Meaning                                                                                                                             |
+|----------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| CIP            | The protocol-level question is settled in CIP-164; we know *what* is needed.                                                        |
+| Prototype      | Explored in simulation or on real infrastructure, enough to trust the approach is feasible.                                         |
+| Design         | *How* to build it in `cardano-node` is written down in the [technical design](https://leios.cardano-scaling.org/leios-design.pdf).  |
+| Implementation | Production code exists in `cardano-node` (and, eventually, other node implementations).                                             |
+| Assurance | Confidence gained through formal methods, statistical analysis, e2e and adversarial testing sufficiently high to deploy to mainnet. |
+
+:::warning[This is a work-in-progress self-assessment]
+
+Please read the marks below with several grains of salt:
+
+- **They are our own judgement, not a review.** The marks reflect how the
+  implementation team sees the state of things at the time of writing. Nothing
+  here has been externally audited, and none of it constitutes acceptance
+  criteria, a commitment, or a schedule.
+- **Its a moving target.** The CIP is mostly stable, but the detailed
+  [node-level design](https://leios.cardano-scaling.org/leios-design.pdf) is a
+  living document and still evolves along with prototyping and confidence
+  seeking work chapters. Open questions are indicated by `?` items, but
+  visibility may be incomplete.
+- **Nothing is "done" until high confidence.** A component with everything but
+  the confidence stage marked is not ready for mainnet. That last column is the
+  gate, and it is empty nearly everywhere. Furthermore, attaining high
+  confidence on some components may raise issues with others and may uncover
+  more work.
+
+:::
+
+Click or hover a badge for the full breakdown of a component.
+
+<ProtocolStatus stages={stages} source={source} plan={plan} />
+
+### Full matrix
+
+<ProtocolMatrix stages={stages} source={source} />
+
+## Release stages
+
+The same implementation scope, cut along the other dimension: each stage is a
+`cardano-node` release scope that could be considered to hard-fork mainnet. Not
+only the release as a whole, but each individual item requires "high confidence"
+before that step is taken. Scope items take their status from the component
+breakdown above; where an item groups several sub-items, it shows the roll-up of
+those. See the [dimensional
+plan](https://leios.cardano-scaling.org/leios-design.pdf) for the staging
+itself.
+
+:::warning[The staging is provisional]
+
+- **The stage contents may be incomplete.** As we are continously prototyping and
+  validating, implementation items are still being discovered, and an
+  empty-looking stage table is not evidence of a small scope.
+- **The parameter tuples are illustrative.** Names like "0/0/∞/0/0" or
+  "1/4/7/100k/1M" sketch the intent of a stage, not agreed values; the Leios
+  protocol parameter set is still being finalized and would in any case be
+  subject to on-chain governance.
+- **Stages are scopes, not dates.** A completed stage means a release *could* be
+  considered for a hard fork, not that one is planned. Hard forks require
+  governance approval by DReps and stake pool operators.
+
+:::
+
+<ReleaseStages stages={stages} source={source} plan={plan} />
+
+### Risks
+
+In general there is a higher technical risk on later stages, but that is typically mitigated by having more time to gain confidence and do quality assurance. Deployment wise, there is also risks of progressing between stages once deployed:
+
+- Stage **1 -> 2**: a new release and another hard-fork -> risk of further delay
+- Stage **2 -> 3**: a new release and a protocol parameter update -> high deployment risk as no guarantee of latest software
+- Stage **3 -> 4**: new releases and protocol parameter updates -> lower deployment risk as mostly performance differences

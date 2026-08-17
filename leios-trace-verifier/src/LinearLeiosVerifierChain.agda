@@ -56,7 +56,10 @@ module LinearLeiosVerifierChain where
     (numberOfParties : ℕ)
     (sutId : ℕ)
     (stakeDistr : List (Pair String ℕ))
-    (Lhdr Lvote Ldiff validityCheckTimeValue : ℕ)
+    -- validityCheckTimeValue is gone: the CIP-aligned spec replaced the
+    -- validityCheckTime oracle with the isValidityChecked predicate, wired in
+    -- Defaults rather than passed per call.
+    (Lhdr Lvote Ldiff : ℕ)
     -- The SUT's EB-production eligibility, as queried from the node, together with
     -- whether that answer is authoritative for the epoch about to be verified.
     -- Passed in per call rather than read from a mutable global: the caller chooses
@@ -72,7 +75,10 @@ module LinearLeiosVerifierChain where
         (yes p) → #_ n {numberOfParties} {fromWitness p}
         (no _) → error $ "Conversion to Fin not possible! " ◇ show n ◇ " / " ◇ show numberOfParties
 
-    SUT-id : Fin numberOfParties
+    Party : Type
+    Party = Fin numberOfParties
+
+    SUT-id : Party
     SUT-id = from-id sutId
 
     instance
@@ -113,6 +119,9 @@ module LinearLeiosVerifierChain where
           ; Lhdr  = Lhdr
           ; Lvote = Lvote
           ; Ldiff = Ldiff
+          -- CIP-0164 feasible value σc = 0.99 (committee stake coverage)
+          ; σc-num = 99
+          ; σc-den = 100
           }
 
       -- Slots at which the log shows the Leios subsystem itself doing something.
@@ -188,7 +197,7 @@ module LinearLeiosVerifierChain where
           ; winning-slots = winning-slots-of
           }
 
-      open import Defaults params testParams validityCheckTimeValue using (d-SpecStructure; FFDBuffers; isb; hpe)
+      open import Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
       open import Leios.Linear.Trace.Verifier d-SpecStructure params renaming (verifyTrace to checkTrace)
@@ -219,10 +228,12 @@ module LinearLeiosVerifierChain where
       txsOfHash : String → List Tx
       txsOfHash h = L.map primCharToNat (S.toList h)
 
-      mkEBrec : String → Word64 → EndorserBlock
-      mkEBrec h s = record
+      -- Party is a caller-supplied producer (CIP interface): the spec's
+      -- isEquivocated compares producer+slot, so distinct producers matter.
+      mkEBrec : Party → String → Word64 → EndorserBlock
+      mkEBrec p h s = record
         { slotNumber = primWord64ToNat s
-        ; producerID = SUT-id
+        ; producerID = p
         ; lotteryPf  = tt
         ; txs        = txsOfHash h
         ; signature  = tt
@@ -380,6 +391,19 @@ module LinearLeiosVerifierChain where
            ++ vtRole
            ++ ((Slot₁-Action s , inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks a)))) ∷ [])
 
+      -- Fake producer for acquired EBs: distinct for EBs sharing a slot (so an
+      -- honest slot battle does not register as equivocation, which requires
+      -- equal producers) and never the SUT (so acquired EBs cannot equivocate
+      -- with the SUT's own forged EBs). Genuine equivocation by other pools is
+      -- not detectable until the trace carries real producer identities.
+      fakeProducer : Accumulator → Word64 → Party
+      fakeProducer a s =
+        let slotNat = primWord64ToNat s
+            n = L.length (L.filter
+                  (λ (_ , eb) → EndorserBlockOSig.slotNumber eb ≟ slotNat)
+                  (Accumulator.EB-refs a))
+        in from-id (if n Nat.<ᵇ sutId then n else suc n)
+
       traceEvent→action : Accumulator → ChainEvent → Accumulator × List Step
       traceEvent→action a (CSlot s) =
         if not (started a)
@@ -409,14 +433,14 @@ module LinearLeiosVerifierChain where
                   ; votedEB = nothing
                   } , steps)
       traceEvent→action a (CEBForged h s) =
-        let eb = mkEBrec h s
+        let eb = mkEBrec SUT-id h s
         in (record a { EB-refs = (h , eb) ∷ EB-refs a ; forgedEB = just eb } , [])
       -- Acquiring an EB means its body is in hand, which is what Slot₁ ingestion
       -- models. It says nothing about the EB being announced on the chain, so it must
       -- not set 'curEB': doing so made VT-Role possible for any EB the node merely
       -- fetched, and a node is right not to vote for one its chain never announced.
       traceEvent→action a (CEBAcquired h s) =
-        let eb = mkEBrec h s
+        let eb = mkEBrec (fakeProducer a s) h s
         in (record a
               { EB-refs = (h , eb) ∷ EB-refs a
               ; EB-received = (h , curSlot a) ∷ EB-received a
@@ -463,7 +487,11 @@ module LinearLeiosVerifierChain where
       traceEvent→action a (CNotVoted _ _ _) = (a , [])
 
       s₀ : LeiosState
-      s₀ = initLeiosState tt exampleDistr ((SUT-id , tt) ∷ [])
+      -- Register a key for every party: acquired EBs carry (fake) non-SUT
+      -- producer IDs, and 'isValid' resolves the producer's key from this
+      -- list — with only the SUT registered, every acquired EB header would
+      -- be dropped as invalid and never reach EBs'.
+      s₀ = initLeiosState tt exampleDistr (L.tabulate (λ i → (i , tt)))
 
       format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
       format-error x = errorMsg x , "error verifyChainTrace"

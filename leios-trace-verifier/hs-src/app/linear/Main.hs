@@ -41,7 +41,6 @@ main =
     let lhdr = 1 -- TODO: read from config
     let lvote = toInteger (linearVoteStageLengthSlots config)
     let ldiff = toInteger (linearDiffuseStageLengthSlots config)
-    let validityCheckTime = 3 -- TODO: read from config
 
     -- A single closure capturing all parameters: it applies the (whole-list)
     -- Agda checker to a list of events, returning (#actions, (status, detail)).
@@ -53,7 +52,6 @@ main =
             lhdr
             lvote
             ldiff
-            validityCheckTime
             evs
             startingSlot
 

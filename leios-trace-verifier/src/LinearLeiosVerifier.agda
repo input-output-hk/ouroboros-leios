@@ -39,7 +39,7 @@ module LinearLeiosVerifier where
     (numberOfParties : ℕ)
     (sutId : ℕ)
     (stakeDistr : List (Pair String ℕ))
-    (Lhdr Lvote Ldiff validityCheckTimeValue : ℕ)
+    (Lhdr Lvote Ldiff : ℕ)
     where
 
     from-id : ℕ → Fin numberOfParties
@@ -126,6 +126,9 @@ module LinearLeiosVerifier where
           ; Lhdr  = Lhdr
           ; Lvote = Lvote
           ; Ldiff = Ldiff
+          -- CIP-0164 feasible value σc = 0.99 (committee stake coverage)
+          ; σc-num = 99
+          ; σc-den = 100
           }
 
       -- EB-production eligibility ("winning") slots for the SUT.  When a
@@ -150,7 +153,7 @@ module LinearLeiosVerifier where
           ; winning-slots = winning-slots-of
           }
 
-      open import Defaults params testParams validityCheckTimeValue using (d-SpecStructure; FFDBuffers; isb; hpe)
+      open import Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
       open import Leios.Linear.Trace.Verifier d-SpecStructure params renaming (verifyTrace to checkTrace)
@@ -318,7 +321,11 @@ module LinearLeiosVerifier where
       traceEvent→action l record { message = RBEnteredState _ _ _ }       = l , []
 
       s₀ : LeiosState
-      s₀ = initLeiosState tt exampleDistr ((SUT-id , tt) ∷ [])
+      -- Register a key for every party: acquired EBs carry (fake) non-SUT
+      -- producer IDs, and 'isValid' resolves the producer's key from this
+      -- list — with only the SUT registered, every acquired EB header would
+      -- be dropped as invalid and never reach EBs'.
+      s₀ = initLeiosState tt exampleDistr (L.tabulate (λ i → (i , tt)))
 
       format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
       format-error x = errorMsg x , "error verifyTrace"

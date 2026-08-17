@@ -46,6 +46,9 @@ main :: IO ()
 main = do
   ChainCommand{..} <- execParser commandParser
 
+  -- tValidityCheckTime survives only as driver bookkeeping (the epoch-boundary
+  -- carry window); it is no longer passed to the spec, which wires validity
+  -- checking through Defaults' isValidityChecked predicate (CIP alignment).
   let timings = Timings{tLhdr = 1, tLvote = 4, tLdiff = 7, tValidityCheckTime = 3}
 
   hSetBuffering stdout LineBuffering

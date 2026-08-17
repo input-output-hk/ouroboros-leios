@@ -45,11 +45,6 @@ jobs:
     - name: 📥 Checkout repository
       uses: actions/checkout@v4
     - name: 🛠️ Install Nix
-      # Keep the action new enough that its default Nix is >= 2.27.0: the
-      # pinned ouroboros-consensus flake input uses `inputs.self.submodules`
-      # (Nix 2.27.0+, https://github.com/NixOS/nix/pull/12421); older Nix
-      # fails evaluating this flake with "unexpected flake input attribute
-      # 'submodules'". v31.11.0 installs Nix 2.35.1 by default.
       uses: cachix/install-nix-action@v31.11.0
       with:
         nix_path: nixpkgs=channel:nixos-unstable

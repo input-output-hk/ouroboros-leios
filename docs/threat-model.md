@@ -338,3 +338,43 @@ This applies to both BLS voting keys and VRF keys. For BLS keys, the adversary c
 |-----|--------------------------------------------------|----------------------------------------------------------|----------------------------------------|-------------------------------------------|
 | T32 | Silently accumulate BLS keys to forge certificate | Invalid transactions on-chain, Praos safety violation   | Adaptive adversary, time               | Key rotation, equivocation detection      |
 | T33 | Silently accumulate VRF keys for eligibility      | Disproportionate EB/voting eligibility beyond stake      | Adaptive adversary, time               | Key rotation                              |
+
+
+### Miner extractable value
+
+Miner extractable value (MEV) can alter parties' incentives leading them to take actions that affect Blockchain Safety or High throughput.
+The threat becomes more significant as MEV outgrows the rewards offered by the protocol.
+
+The threat to safety is inherited from Praos: a block producer may decide to fork (instead of extending) a block with high MEV in order 
+to include the relevant transactions into its own block and extract the value himself. However, for such behavior to be successful the forking
+party must control a high amount of stake in order to ensure that the block he created ends up on the main-chain.
+
+The threat to high throughput is specific to Linear Leios. We distinguish between two cases here. High MEV transactions appearing in certified EBs 
+and high MEV transactions appearing in the network. In the first case, a block producer may incentivized to ignore the certified EB, and instead
+include the high MEV transactions into its own block, with the effect of throughput being reduced whenever high MEV opportunities appear in EBs.
+A mitigation to this threat could be adopting urgency signalling (or in fact any mechanism that allows specifying that some transaction is only to be 
+included in an RB). Then, high MEV transactions are expected to adopt this mechanism for inclusion into RBs to avoid delays or loss of value.
+
+In the second case, the block producer observes both high MEV transactions in the network (e.g., through tx submission) and an EB certificate to be included 
+in the next block. If RBs containing EB certificates cannot also contain transactions, then the block producer is incentivized to ignore the EB certificate and instead 
+include the high value transactions directly into the RB. Again, whenever high MEV transactions appear into the network, throughput is going to be impacted severely. 
+The obvious mitigation here is to allow transactions into RBs that also contain certificates. Then, as long as the high MEV transaction volume fits into the RB, the 
+block producer is incentivized to include both the transactions and the certificate into his block to maximize its revenue.
+
+
+**Impact**: High MEV transactions may incentivize parties to either induce forks, thus impacting Blockchain Safety, or forgo EB certificate inclusion, impacting High throughput.
+
+**Assets Affected**: Blockchain Safety, High throughput
+
+**Mitigation**: Allow transaction inclusion into RBs also containing certificates, allow transactions to signal that they only want to be included in RBs.
+
+| #   | Method                                           | Effect                                                   | Resources                              | Mitigation                                |
+|-----|--------------------------------------------------|----------------------------------------------------------|----------------------------------------|-------------------------------------------|
+| T34 | Create a forking chain to extract MEV             | Praos safety violation                                  | Stake-based adversary                   |  ?                                 |
+| T35 | Do not include EB certificate in RB               | Reduced throughput                                      | Block producing party                   | tx inclusion into RBs with EB certificates, tx-to-RB signalling            |
+
+
+
+
+
+
