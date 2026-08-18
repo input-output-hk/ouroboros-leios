@@ -16,15 +16,15 @@ This document enumerates the requirements that Leios must satisfy as implemented
 
 6. Sustain the target throughput (140–300 TxkB/s per CIP-164) on mainnet-like topology and SPO-grade hardware under nominal conditions. [S, B]
 7. Honest nodes include a certificate in each RB they issue whenever they have seen a quorum of votes for the EB announced by the preceding RB. [P, C, T]
-8. Degrade gracefully under adversarial participation and under saturating honest demand: throughput loss as a function of adversarial stake (inaction, invalid EBs, withholding) and of offered load is quantified and bounded, with no unquantified cliff, and throughput recovers to nominal without operator intervention once the cause subsides. [S, B]
+8. Degrade gracefully: under honest load, throughput reaches the target maximum and remains there until the mempool empties; under adversarial participation, throughput degrades at most in proportion to adversarial stake (up to the loss of EB certification at adversarial committee stake above $1-\tau$) and never falls below the Praos baseline; it returns to maximum once the adversarial condition subsides. [S, B]
 9. Bound the distribution of latency from mempool acceptance to ledger inclusion — stated percentiles, not only means — under nominal and congested load. [S, B, T]
-10. The worst-case resource envelope (bandwidth, CPU, memory, disk capacity and I/O) at the target parameterisation is quantified and within SPO-grade hardware. [B, S]
+10. The worst-case resource envelope — bandwidth, CPU, memory, disk I/O, and the rate of disk capacity growth — at the target parameterisation is quantified and sustainable on SPO-grade hardware. [B, S]
 
 **Accept EBs only by distributed consensus**
 
 11. A certificate verifies only if voters representing at least the quorum $\tau$ of committee stake voted for the EB; forging a certificate without such a quorum is computationally infeasible under the BLS and proof-of-possession assumptions. [P, S]
 12. Honest nodes vote exactly according to the CIP-164 voting rules (timely header, no observed equivocation, EB announced by the tip of the current selection, closure fully validated in time). [P, C, T]
-13. A certified EB's transaction closure is retrievable by every honest node within $L_\text{diff}$ of certification, with overwhelming probability. [S, B]
+13. A certified EB's transaction closure is retrievable by honest nodes within $L_\text{diff}$ of certification at the 99th percentile or better, measured across honest nodes and certified EBs. [S, B]
 14. Committee selection is stake-proportional and manipulation-resistant within quantified bounds (Fait Accompli persistent voters; sortition for non-persistent voters). [P, S]
 15. Equivocation is contained: honest nodes never vote for an equivocated EB, consider at most two announcements per election, and disconnect peers exceeding that limit. [P, C, T]
 16. Nodes acquire and serve every promptly-announced EB for the required window, independent of whether they voted for it or prefer its chain. [C, T]
@@ -39,7 +39,7 @@ This document enumerates the requirements that Leios must satisfy as implemented
 
 ## Notation
 
-- Items are cited by number as "R1" … "R20"; the category headings group them but carry no significance beyond presentation.
+- Items are cited by number as "R1" … "R21"; the category headings group them but carry no significance beyond presentation.
 - Proposed assurance routes are suggested for each item, and are preferred but not exclusive. **P** and **S** are protocol-level and discharge once for all implementations; **C**, **B** and **T** are per-implementation and must be produced for each implementation claiming to implement Leios.
     - **P** — proof obligation (Agda formal spec)
     - **S** — simulation or statistical analysis
@@ -50,3 +50,4 @@ This document enumerates the requirements that Leios must satisfy as implemented
 - Every test set, proof obligation, model-checking result, or statistical analysis report produced by the project must cite the requirement identifier(s) it discharges (e.g. "R2"); every requirement must eventually be discharged by at least one such artefact.
 - These requirements are implementation-neutral: they constrain the observable behaviour of a node implementation — at its network interfaces, in the on-chain artefacts it produces, and in its resource consumption.
 - Requirements are stated relative to a protocol parameterisation ($L_\text{hdr}$, $L_\text{vote}$, $L_\text{diff}$, $\tau$, committee size $n$, size limits $S_\text{RB}$, $S_\text{EB}$, $S_\text{EB-tx}$); verification artefacts must state the parameter ranges over which they hold.
+- "SPO-grade hardware" (R6, R10) means hardware meeting the SPO recommendations published for Cardano mainnet at the time of assessment, allowing at most a stated, bounded uplift; an uplift that would exclude currently viable SPOs fails this definition. Artefacts must state the exact specification they measured against.
