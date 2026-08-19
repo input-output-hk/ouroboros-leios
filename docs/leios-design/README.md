@@ -617,6 +617,11 @@ For that to hold, forging must stay a cheap *read* of a view and never turn into
 - an **optimistic view** keeps forging off the rebase path: the block producer reads the matching ready-to-forge view as it stands, just as any other reader is served from the on-screen buffer, rather than first synchronising it to the very latest base. A tip that arrived moments earlier is picked up on the next block-production opportunity.
 - a **capped forging snapshot** bounds whatever reconciliation is still unavoidable: advancing the chosen view to the forging slot is free while it stays within the `interval` (cheap ticking), and any residual re-application against the base (today `getSnapshotFor` can trigger a full one) is time- and size-bounded, so producing the snapshot cannot stall behind a large re-apply.
 
+
+> [!WARNING]
+>
+> FIXME: Write about ingesting txs into the mempool from endorsements (to the end of it). This should actively work against front-running and mempool fragmentation (the latter may be induced by network delay / partitions, while the latter is with zero delay and just reapplying txs from the cache)
+
 ### Block production
 
 The existing block production thread must be updated to generate an EB at the same time it generates an RB (**UPD-LeiosAwareBlockProductionThread**). In particular, the hash of the EB is a field in the RB header, and so the RB header can only be decided after the EB is decided, and that can only be after the RB payload is decided. Moreover, the RB payload is either a certificate or transactions, and that must also be decided by this thread, making it intertwined enough to justify doing it in a single thread.
