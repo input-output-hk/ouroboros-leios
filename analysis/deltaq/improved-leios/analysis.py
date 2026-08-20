@@ -1568,7 +1568,10 @@ def _committee_label(n_nodes: int = 2500, stake_cover: float = 0.99) -> str:
     m_eff = M * M / M2
     stakes = _stake_distribution(n_nodes)
     s = np.sort(stakes)[::-1]
-    k = int(np.searchsorted(np.cumsum(s), stake_cover * float(np.sum(s)), side="left")) + 1
+    k = (
+        int(np.searchsorted(np.cumsum(s), stake_cover * float(np.sum(s)), side="left"))
+        + 1
+    )
     return (
         f"CIP top-stake cover sigma_c={stake_cover:.0%} "
         f"(K={k} of {n_nodes} nodes, M_eff={m_eff:.0f})"
@@ -1731,7 +1734,7 @@ def print_full_closure_diffusion_summary(
         f"  quorum threshold = tau * total active stake = {tau * S_active:.0f} "
         f"(committee weight M = {M:.0f})"
     )
-    print(f"  S_EB_tx   G(t_v)  G(t_f)  P(C)     F_{{full|C}}(t_f)  G(t_f)^N")
+    print("  S_EB_tx   G(t_v)  G(t_f)  P(C)     F_{full|C}(t_f)  G(t_f)^N")
     print("  " + "-" * 70)
     rows = []
     for s_kb in sizes_kb:
@@ -1756,7 +1759,14 @@ def print_full_closure_diffusion_summary(
         )
         f_uncond = g_tf**n_nodes
         rows.append(
-            dict(s_eb_tx_kb=s_kb, g_tv=g_tv, g_tf=g_tf, pC=pC, f_cl=f_cl, f_uncond=f_uncond)
+            dict(
+                s_eb_tx_kb=s_kb,
+                g_tv=g_tv,
+                g_tf=g_tf,
+                pC=pC,
+                f_cl=f_cl,
+                f_uncond=f_uncond,
+            )
         )
         print(
             f"  {s_kb / 1024:>5.0f} MB  {g_tv:.4f}     {g_tf:.4f}     {pC:.4f}   "
@@ -1876,7 +1886,11 @@ def print_full_diffusion_adversarial_summary(
     stake_cover=0.99,
 ):
     # active listed first (security-relevant); honest and silent as references.
-    configs = [("active", beta, "active"), ("honest", 0.0, "active"), ("silent", beta, "silent")]
+    configs = [
+        ("active", beta, "active"),
+        ("honest", 0.0, "active"),
+        ("silent", beta, "silent"),
+    ]
     M, _, S_active = _committee_moments(n_nodes, stake_cover)
     print(f"  committee: {_committee_label(n_nodes, stake_cover)}")
     print(
@@ -1909,9 +1923,7 @@ def print_full_diffusion_adversarial_summary(
                 stake_cover=stake_cover,
             )
             f_cond = success_within(cdf_cond, t_diff_end)
-            rows.append(
-                dict(s_eb_tx_kb=s_kb, model=label, pC=pC, f_cond=f_cond)
-            )
+            rows.append(dict(s_eb_tx_kb=s_kb, model=label, pC=pC, f_cond=f_cond))
             print(f"  {s_kb / 1024:>4.0f}MB  {label:<6s}  {pC:.3e}   {f_cond:.4f}")
     return rows
 
@@ -1964,8 +1976,17 @@ def plot_full_diffusion_adversarial(
             f_at = success_within(cdf_cond, t_diff_end)
             ax.scatter([t_diff_end], [f_at], color=color, zorder=5, s=30)
 
-    ax.axvline(t_vote, color="orange", ls=":", lw=1, alpha=0.7, label=f"$t_v={t_vote:g}$s")
-    ax.axvline(t_diff_end, color="red", ls="--", lw=1, alpha=0.7, label=f"$t_f={t_diff_end:g}$s")
+    ax.axvline(
+        t_vote, color="orange", ls=":", lw=1, alpha=0.7, label=f"$t_v={t_vote:g}$s"
+    )
+    ax.axvline(
+        t_diff_end,
+        color="red",
+        ls="--",
+        lw=1,
+        alpha=0.7,
+        label=f"$t_f={t_diff_end:g}$s",
+    )
     ax.set_xlim(0, 20)
     ax.set_ylim(0, 1.02)
     ax.grid(alpha=0.3)
@@ -1975,7 +1996,10 @@ def plot_full_diffusion_adversarial(
         "Conditional full-diffusion CDF under an active adversary -- EB closure\n"
         f"(active = solid; N={n_nodes}, "
         f"committee={_committee_label(n_nodes, stake_cover)}, "
-        + r"$\tau$=" + f"{tau}, " + r"$\beta$=" + f"{beta:g}, "
+        + r"$\tau$="
+        + f"{tau}, "
+        + r"$\beta$="
+        + f"{beta:g}, "
         f"network={NETWORK_MODEL})"
     )
     ax.legend(loc="lower right", fontsize=7.5)
