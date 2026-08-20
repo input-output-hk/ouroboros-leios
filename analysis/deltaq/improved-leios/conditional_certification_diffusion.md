@@ -67,7 +67,7 @@ of referenced transactions, and re-apply the whole closure. The per-node
 arrival law is therefore the **sequential composition** of stages defined in
 report.md §4,
 
-$$G\\;=\\;\underbrace{\texttt{cdf\\_fetch\\_eb\\_body()}}_{\text{body diffusion}}\\;\otimes\\;\underbrace{\texttt{cdf\\_fetch\\_missing\\_eb\\_closure}(S_{EB\text{-}tx})}_{\text{fetch missing txs (1-hop)}}\\;\otimes\\;\underbrace{\texttt{cdf\\_process\\_eb\\_closure}(S_{EB\text{-}tx})}_{\text{process closure (CPU)}}$$
+$$G\\;=\\;\underbrace{\texttt{cdf\\_fetch\\_eb\\_body()}}\_{\text{body diffusion}}\\;\otimes\\;\underbrace{\texttt{cdf\\_fetch\\_missing\\_eb\\_closure}(S_{EB\text{-}tx})}\_{\text{fetch missing txs (1-hop)}}\\;\otimes\\;\underbrace{\texttt{cdf\\_process\\_eb\\_closure}(S_{EB\text{-}tx})}\_{\text{process closure (CPU)}}$$
 
 where $\otimes$ is sequential composition, resp. convolution (`cdf_sequential`).
 
@@ -169,9 +169,9 @@ Byzantine committee.
    $\\{T_i\le t_v\\}\subseteq\\{T_i\le t\\}$, split each node into three
    disjoint buckets:
 
-   $$\underbrace{\\{T_i\le t_v\\}}_{\text{fast, prob }g_v}\ \uplus\
-   \underbrace{\\{t_v<T_i\le t\\}}_{\text{medium, prob }G_t-g_v}\ \uplus\
-   \underbrace{\\{T_i> t\\}}_{\text{slow, prob }1-G_t}.$$
+   $$\underbrace{\\{T_i\le t_v\\}}\_{\text{fast, prob }g_v}\ \uplus\
+   \underbrace{\\{t_v<T_i\le t\\}}\_{\text{medium, prob }G_t-g_v}\ \uplus\
+   \underbrace{\\{T_i> t\\}}\_{\text{slow, prob }1-G_t}.$$
 
    The diffusion event $A(t)=\bigcap_i\\{T_i\le t\\}$ is exactly "**no node is
    slow**". On $A(t)$ we have $\mathbb 1\\{T_i\le t_v\\}=\mathbb 1\\{i\text{ fast}\\}$,
@@ -186,7 +186,7 @@ Byzantine committee.
    and factorises the probability:
 
    $$P\big(A(t)\cap C\big)
-   =\underbrace{P(\text{no slow node})}_{\displaystyle=\prod_i P(T_i\le t)=G_t^{\\,N}}
+   =\underbrace{P(\text{no slow node})}\_{\displaystyle=\prod_i P(T_i\le t)=G_t^{\\,N}}
    \ \cdot\ P\big(V_\text{fast}\ge\theta\ \big|\ \text{no slow node}\big).$$
 
 4. **Bayes re-bucketing of the conditional law.** For $t\ge t_v$, Bayes'
