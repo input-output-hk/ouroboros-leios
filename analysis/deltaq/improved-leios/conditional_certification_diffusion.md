@@ -169,15 +169,15 @@ Byzantine committee.
    $\\{T_i\le t_v\\}\subseteq\\{T_i\le t\\}$, split each node into three
    disjoint buckets:
 
-   $$\underbrace{\\{T_i\le t_v\\}}\_{\text{fast, prob }g_v}\ \uplus\
-   \underbrace{\\{t_v<T_i\le t\\}}\_{\text{medium, prob }G_t-g_v}\ \uplus\
+   $$\underbrace{\\{T_i\le t_v\\}}\_{\text{fast, prob }g_v}\ \uplus
+   \underbrace{\\{t_v<T_i\le t\\}}\_{\text{medium, prob }G_t-g_v}\ \uplus
    \underbrace{\\{T_i> t\\}}\_{\text{slow, prob }1-G_t}.$$
 
    The diffusion event $A(t)=\bigcap_i\\{T_i\le t\\}$ is exactly "**no node is
    slow**". On $A(t)$ we have $\mathbb 1\\{T_i\le t_v\\}=\mathbb 1\\{i\text{ fast}\\}$,
    so the surviving votes are the *fast* ones:
 
-   $$A(t)\cap C=\\{\text{no slow node}\\}\ \cap\
+   $$A(t)\cap C=\\{\text{no slow node}\\}\ \cap
    \Big\\{\\,V_\text{fast}\ge\theta\\,\Big\\},\qquad
    V_\text{fast}:=\sum_{i\in\text{cmte}} w_i\\,\mathbb 1\\{i\text{ fast}\\}.$$
 
