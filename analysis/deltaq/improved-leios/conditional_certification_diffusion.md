@@ -98,7 +98,7 @@ as a weighted sum **over the committee**
 
 $$V(p)\\;=\\;\sum_{i\in\text{cmte}} w_i\\,\text{Bern}(p),\qquad
 \mathbb{E}[V(p)] = M p,\qquad
-\operatorname{Var}[V(p)] = M_2\\,p(1-p),$$
+\mathrm{Var}[V(p)] = M_2\\,p(1-p),$$
 
 with the committee weight and its second moment
 
@@ -160,7 +160,7 @@ Byzantine committee.
    Binomial**, with
 
    $$\mathbb E[V_\text{on}]=\sum_{i\in\text{cmte}} w_i\\,g_v=M g_v,\qquad
-   \operatorname{Var}[V_\text{on}]=\sum_{i\in\text{cmte}} w_i^2\\,g_v(1-g_v)=M_2\\,g_v(1-g_v),$$
+   \mathrm{Var}[V_\text{on}]=\sum_{i\in\text{cmte}} w_i^2\\,g_v(1-g_v)=M_2\\,g_v(1-g_v),$$
 
    and $P(C)=P(V_\text{on}\ge\theta)=:Q(g_v)$ (evaluated by the Normal
    approximation of Step 7).
