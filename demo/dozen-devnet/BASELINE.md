@@ -277,6 +277,46 @@ other's share, so they should cope, while the block producers inject nothing
 locally and should stay pinned at ~261 — which would hold on-chain flat while
 offered doubles.
 
+## CORRECTION: the on-chain figures below use the wrong metric
+
+Everything below that says "on chain" was measured with
+`cardano_node_metrics_txsProcessedNum_counter`. That is a `CounterM` incremented
+by `length txs` on every `TraceMempoolRemoveTxs` — a count of **this node's
+mempool removals**, not of chain confirmations. A transaction confirmed in an EB
+that the node never fetched is never removed from its mempool, so it is never
+counted. It therefore **undercounts**, and it is also monotonic, so
+rollback-resurrected txs are counted twice.
+
+The rollback-correct measure is `cardano_node_metrics_cumulativeTxBytes_int`,
+read from the ledger state at the tip (`ledgerCumulativeTxBytes . ledgerState`),
+so it follows the selected chain by construction. All three block producers
+report it identically, as a chain property must. This is what the "Confirmed tx
+throughput" dashboard panel already used.
+
+Measured on the three-injection-point run:
+
+| | via `txsProcessedNum` | via `cumulativeTxBytes` |
+| --- | --- | --- |
+| confirmed | 235 tx/s | **341 tx/s** (366–367 over 15 min, 415 over 5 min) |
+| EBs supply | 193 tx/s | **321 tx/s** |
+| txs per certified EB | 3,794 (27% of `maxTxsPerEb`) | **6,115 (44%)** |
+| bytes per EB | 0.87 MB | 1.39 MB of 12 MB |
+
+So the claim below that on-chain throughput is pinned at ~235 tx/s regardless of
+offered load **does not hold**: confirmed 341–415 tx/s against a submitted median
+of 376 means the network was clearing roughly everything offered. Rollbacks are
+not the issue here either — 4 `TrySwitchToAFork` against 89 `AddedToCurrentChain`.
+
+What cannot be recovered: the 1- and 2-origin runs were sampled with the same
+wrong metric, and Prometheus is wiped on each re-init, so **whether confirmed
+throughput actually rose with injection points is unknown**. The
+"unchanged across all three" row is unsupported. Re-run with
+`cumulativeTxBytes` to settle it.
+
+The EB-fill and forge-delay findings stand — those came from call traces and
+Leios certification counts, not from this metric — except that the EB is 44%
+full by count rather than 27%.
+
 ## Where the limit ends up: consensus, not mempool or tx-submission
 
 Three configurations, same host, same binary, only the number of injection points
