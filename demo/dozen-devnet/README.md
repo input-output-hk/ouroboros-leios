@@ -78,6 +78,7 @@ Environment variables, see `run.sh` for the full list:
 | `DELAY`             | `20ms`               | one-way delay, so an RTT is `2 x DELAY`             |
 | `TC`                | `1`                  | traffic control; `0` puts nodes on loopback         |
 | `XRAY`              | `1`                  | observability stack                                 |
+| `SERVER`            | `1`                  | process-compose control API on `127.0.0.1:8080`     |
 | `WORKING_DIR`       | `$(pwd)/tmp-devnet`  | where the devnet is initialized                     |
 | `SHARED_CONFIG_DIR` | `../proto-devnet/config` | genesis, pool keys, delegators, dashboards      |
 
