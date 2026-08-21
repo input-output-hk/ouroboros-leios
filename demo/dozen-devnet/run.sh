@@ -43,8 +43,13 @@ if [ "$TC" = "1" ]; then
   # send capacity shared across all of its peers — not a per-peer allowance.
   # DELAY is applied once per direction (on the receiving side), so it stays a
   # one-way delay and the round trip between any two nodes is 2 x DELAY.
+  #
+  # 20ms one way = 40ms RTT, a same-continent average. Deliberately not the
+  # intercontinental 100ms/200ms: with a uniform delay that figure would also
+  # apply to each block producer's link to its own relays, which in reality are
+  # co-located. Raise it once the happy-path throughput picture is established.
   : "${RATE:=50Mbps}"
-  : "${DELAY:=100ms}"
+  : "${DELAY:=20ms}"
   # A different subnet than proto-devnet's 172.28.0.0/24 so both devnets can be
   # up at the same time (turn XRAY off on one of them, the observability stack
   # binds fixed ports).

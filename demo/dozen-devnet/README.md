@@ -75,7 +75,7 @@ Environment variables, see `run.sh` for the full list:
 | ------------------- | -------------------- | --------------------------------------------------- |
 | `TPS`               | `100`                | tx-firehose submission rate                         |
 | `RATE`              | `50Mbps`             | per-node uplink and downlink cap                    |
-| `DELAY`             | `100ms`              | one-way delay, so an RTT is `2 x DELAY`             |
+| `DELAY`             | `20ms`               | one-way delay, so an RTT is `2 x DELAY`             |
 | `TC`                | `1`                  | traffic control; `0` puts nodes on loopback         |
 | `XRAY`              | `1`                  | observability stack                                 |
 | `WORKING_DIR`       | `$(pwd)/tmp-devnet`  | where the devnet is initialized                     |
