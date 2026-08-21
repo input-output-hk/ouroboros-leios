@@ -103,6 +103,16 @@ To reset the demo, simply remove the working directory, for example:
 rm -rf tmp-devnet
 ```
 
+The network namespaces are removed when the project stops: the `Namespaces`
+process holds them for the run's lifetime and tears them down from a signal
+trap. `InitNamespaces` also tears down before it builds, so a run that was
+killed outright still leaves nothing that blocks the next one. To clean up by
+hand:
+
+``` shell
+sudo -E scripts/teardown-namespaces.sh
+```
+
 ## About the configuration
 
 The `config/` directory contains pre-prepared configuration files for the 3-node devnet:

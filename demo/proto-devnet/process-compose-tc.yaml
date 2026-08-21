@@ -16,7 +16,25 @@ processes:
       IP_NODE2="${IP_NODE2}" \
       IP_NODE3="${IP_NODE3}" \
       IP_HOST="${IP_HOST}" \
+      TOOL_PATH="${TOOL_PATH}" \
       bash "${SOURCE_DIR}/scripts/init-namespaces.sh"
+
+  # Owns the teardown. InitNamespaces exits as soon as it has built everything,
+  # and process-compose only runs a shutdown hook for a process that is still
+  # alive, so the cleanup has to hang off something long-lived — this. Stopping
+  # the project stops this process, whose trap removes the namespaces.
+  #
+  # Shutdown order between this and the nodes is not enforced, so the nodes may
+  # lose their interfaces a moment before they finish exiting. They are being
+  # killed anyway; it only makes their last log lines uglier.
+  Namespaces:
+    is_elevated: true
+    command: |
+      TOOL_PATH="${TOOL_PATH}" \
+      bash "${SOURCE_DIR}/scripts/hold-namespaces.sh"
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
 
   Node1:
     is_elevated: true
@@ -24,7 +42,7 @@ processes:
       NODE_DIR="${WORKING_DIR}/node1" \
       IP="${IP_NODE1}" \
       PORT="${PORT_NODE1}" \
-      ip netns exec proto-devnet:node1 bash "${SOURCE_DIR}/run-node.sh"
+      ${IP_BIN} netns exec proto-devnet:node1 bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node1/node.log"
     depends_on:
       InitNamespaces:
@@ -36,7 +54,7 @@ processes:
       NODE_DIR="${WORKING_DIR}/node2" \
       IP="${IP_NODE2}" \
       PORT="${PORT_NODE2}" \
-      ip netns exec proto-devnet:node2 bash "${SOURCE_DIR}/run-node.sh"
+      ${IP_BIN} netns exec proto-devnet:node2 bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node2/node.log"
     depends_on:
       InitNamespaces:
@@ -48,7 +66,7 @@ processes:
       NODE_DIR="${WORKING_DIR}/node3" \
       IP="${IP_NODE3}" \
       PORT="${PORT_NODE3}" \
-      ip netns exec proto-devnet:node3 bash "${SOURCE_DIR}/run-node.sh"
+      ${IP_BIN} netns exec proto-devnet:node3 bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node3/node.log"
     depends_on:
       InitNamespaces:
