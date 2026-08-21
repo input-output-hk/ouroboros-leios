@@ -195,3 +195,46 @@ The 16-core runs were partly host-bound: the entry-node ceiling there was ~13k
 txs, i.e. 5 s / 13,354 = 374 µs per tx against 145 µs here. Same code, 2.6× the
 validation cost, purely from CPU contention — which is also the reason the
 ceiling is only meaningful with a CPU figure beside it.
+
+## Result: uncongested mempool measured against this
+
+Same host, same config, same 15-minute protocol; only the binary differs
+(`cabal build` against `ouroboros-consensus` `ch1bo/high-throughput-mempool`
+`aa8bbf300` — off-lock sync, delta reapply, removal-generation ratchet).
+
+| | baseline | uncongested |
+| --- | --- | --- |
+| CPU median | 8% | 8% |
+| **on chain, median** | **233.9 tx/s** | **234.8 tx/s** |
+| submitted, median | 246.1 tx/s | 235.5 tx/s |
+| entry node median / max depth | 31,418 / 34,416 | 29,579 / 33,957 |
+| other nodes median / max depth | ~9,600 / ~19,200 | 10,608 / 27,015 |
+| entry : others depth ratio | 3.27× | 2.79× |
+| peak N2N ingest, per node | ~261 tx/s | ~261 tx/s |
+| firehose busy-second rate | ~330 tx/s | 401 tx/s |
+| relay11 time in add gaps > 0.5 s | 41.0% | 39.0% |
+
+**End-to-end throughput is unchanged, and that is the expected result.** The
+per-node N2N ingest ceiling did not move — it is not a mempool limit — so it
+became the binding constraint the moment the entry node stopped being one.
+Prediction from the section above, confirmed.
+
+**The remote nodes improved.** Peak depth +41%, the entry-to-remote ratio
+narrowed, and during the initial fill all twelve mempools tracked the entry node
+*exactly* (all at 25,536 txs), which never happened on the baseline. The mempool
+is no longer what holds them back.
+
+**The entry-node ceiling did not move**: 33,957 vs 34,416 txs, i.e. 147 µs vs
+145 µs per tx. So the ceiling is the wrong metric for *this* change — it inverts
+to per-tx **validation** cost, whereas this work targets lock hold time and sync
+behaviour. Expect it to move only for a change that makes applying a transaction
+cheaper.
+
+Next: the binding limit is tx-submission, not the mempool. Either discriminator
+from [limit 2](#2-per-node-n2n-ingest-ceiling--261-txs--the-binding-throughput-limit)
+applies, and a second injection point (`TxFirehose2`, already wired to `relay21`
+with `delegator2`, one control-API call) tests whether ~261 caps the network or
+only caps diffusion to a given node: two entry nodes each need to pull only the
+other's share, so they should cope, while the block producers inject nothing
+locally and should stay pinned at ~261 — which would hold on-chain flat while
+offered doubles.
