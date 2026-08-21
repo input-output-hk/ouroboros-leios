@@ -273,36 +273,6 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "accepted (firehose, measured)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "accepted (centrifuge, est. 204 B/tx)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "yellow",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "node1 mempool throughput"
             },
             "properties": [
@@ -378,8 +348,8 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum(rate(leios_logmetrics_txgen_bytes_total{environment=\"leios\"}[${window}s])) / 1000",
-          "legendFormat": "accepted (firehose, measured)",
+          "expr": "sum by (process) (rate(leios_logmetrics_txgen_bytes_total{environment=\"leios\", service=\"tx-firehose\"}[${window}s])) / 1000",
+          "legendFormat": "{{process}} submitted",
           "refId": "A"
         },
         {
@@ -388,8 +358,8 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum(rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[${window}s])) * 204 / 1000",
-          "legendFormat": "accepted (centrifuge, est. 204 B/tx)",
+          "expr": "sum by (process) (rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[${window}s])) * 204 / 1000",
+          "legendFormat": "{{process}} submitted (est. 204 B/tx)",
           "refId": "B"
         },
         {
@@ -406,7 +376,7 @@
       ],
       "title": "Submission vs. mempool (kB/s)",
       "type": "timeseries",
-      "description": "Accepted submission throughput. Firehose bytes are the measured on-wire size (txgen_bytes_total); tx-centrifuge has no on-wire size, so its bytes are ESTIMATED at 204 B/tx (submitted-rate x 204). The mempool series is the derivative of mempoolBytes, clamped at 0 so draining (a block being forged) reads as no fill rather than as negative throughput."
+      "description": "Submitted throughput per generator. Firehose bytes are the measured on-wire size (txgen_bytes_total); tx-centrifuge has no on-wire size, so its bytes are ESTIMATED at 204 B/tx (submitted-rate x 204). The mempool series is the derivative of mempoolBytes, clamped at 0 so draining (a block being forged) reads as no fill rather than as negative throughput. Submission is bursty when the mempool stalls, so widen the rate window before reading a level off this panel."
     },
     {
       "datasource": {
