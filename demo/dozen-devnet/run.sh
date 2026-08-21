@@ -163,7 +163,7 @@ gen_nodes_compose() {
 			# sudo, which drops the environment.
 			echo "      NODE_RTS=\"${NODE_RTS}\" \\"
 			if [ "$tc" = "1" ]; then
-				echo "      ip netns exec ${NS_PREFIX}:${name} bash \"${SOURCE_DIR}/run-node.sh\""
+				echo "      ${IP_BIN} netns exec ${NS_PREFIX}:${name} bash \"${SOURCE_DIR}/run-node.sh\""
 			else
 				echo "      bash \"${SOURCE_DIR}/run-node.sh\""
 			fi
@@ -196,6 +196,9 @@ REQUIRED_COMMANDS=(
 	"cardano-cli"
 	"tx-firehose"
 )
+if [ "$TC" = "1" ]; then
+	REQUIRED_COMMANDS+=("ip" "tc")
+fi
 
 MISSING_COMMANDS=()
 for cmd in "${REQUIRED_COMMANDS[@]}"; do
@@ -220,6 +223,22 @@ if [ ! -d "$SHARED_CONFIG_DIR/genesis" ]; then
 	echo "Set SHARED_CONFIG_DIR to a proto-devnet config directory."
 	exit 1
 fi
+
+# Resolve ip/tc to absolute paths. The elevated processes run through sudo,
+# which drops the environment, so a PATH-only iproute2 — the usual case when it
+# comes from a devshell rather than the system profile — would leave both
+# InitNamespaces and every `ip netns exec` failing with "command not found".
+IP_BIN=""
+TOOL_PATH=""
+if [ "$TC" = "1" ]; then
+	IP_BIN=$(command -v ip)
+	TOOL_PATH=$(dirname "$IP_BIN")
+	tc_dir=$(dirname "$(command -v tc)")
+	if [ "$tc_dir" != "$TOOL_PATH" ]; then
+		TOOL_PATH="${TOOL_PATH}:${tc_dir}"
+	fi
+fi
+export TOOL_PATH
 
 # Check if WORKING_DIR already exists
 if [ -d "$WORKING_DIR" ]; then
