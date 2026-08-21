@@ -13,18 +13,14 @@ set -exuo pipefail
 #
 # Expects NS_PREFIX, NODE_SPEC ("name=ip name=ip ..."), IP_HOST, RATE, DELAY.
 
-BRIDGE="br-dozen"
+# Defines BRIDGE, puts iproute2 on PATH (sudo drops it) and provides
+# teardown_namespaces. The Namespaces process sources the same file to tear down
+# at shutdown, so there is one implementation of "remove what we created".
+# shellcheck source=/dev/null
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/teardown-namespaces.sh"
 
-# sudo drops the environment, so iproute2 may not be on PATH here at all when it
-# comes from a devshell rather than the system profile. run.sh resolves it.
-export PATH="${TOOL_PATH}:$PATH"
-
-# Delete namespaces from a previous run (ours only — proto-devnet may be up).
-mapfile -t stale < <(ip netns list | cut -d' ' -f1 | grep "^${NS_PREFIX}:" || true)
-for ns in "${stale[@]}"; do
-  ip netns del "$ns" || true
-done
-ip link del "$BRIDGE" 2>/dev/null || true
+# Clean up after a previous run (ours only — proto-devnet may be up).
+teardown_namespaces
 
 # br_netfilter, if loaded, pushes bridged frames through iptables FORWARD,
 # where a host firewall may drop them. Warn rather than change a global sysctl.

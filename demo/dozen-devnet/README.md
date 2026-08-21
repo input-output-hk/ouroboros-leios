@@ -124,8 +124,17 @@ Prometheus and Loki bind fixed ports, so run one of them with `XRAY=0`.
 rm -rf tmp-devnet
 ```
 
-Network namespaces and the bridge are torn down and recreated on each
-`InitNamespaces` run, so a crashed run leaves nothing that blocks the next one.
+Network namespaces and the bridge are removed when the project stops: the
+`Namespaces` process holds them for the run's lifetime and tears them down from a
+signal trap. `InitNamespaces` also tears down before it builds, so a run that
+was killed outright — or a `kill -9` that never reached the trap — still leaves
+nothing that blocks the next one.
+
+To clean up by hand, e.g. after a hard reboot of the orchestrator:
+
+``` shell
+NS_PREFIX=dozen-devnet sudo -E scripts/teardown-namespaces.sh
+```
 
 ## About the configuration
 
