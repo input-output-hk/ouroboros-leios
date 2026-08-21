@@ -358,6 +358,30 @@ envsubst <"${CONFIG_DIR}/alloy.template" >"${ALLOY_CONFIG}"
 mkdir -p "${WORKING_DIR}/alloy-modules"
 cp "${SHARED_CONFIG_DIR}/alloy-modules/"*.alloy "${WORKING_DIR}/alloy-modules/"
 
+# Record which binaries this run actually resolved, because nothing else can
+# tell you afterwards. `cardano-node --version` reports cardano-node's own git
+# rev, and cabal.project points ../ouroboros-consensus at a local package — so a
+# nix-store binary and a cabal build of the same commit report byte-identical
+# version strings while differing in every dependency. The path and hash are the
+# only durable evidence. Archive this next to the logs.
+{
+	echo "# dozen-devnet run provenance — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+	echo
+	for tool in cardano-node cardano-cli tx-firehose; do
+		path=$(command -v "$tool")
+		echo "${tool}:"
+		echo "  path:    ${path}"
+		echo "  version: $("$tool" --version 2>/dev/null | head -1)"
+		echo "  sha256:  $(sha256sum "$path" 2>/dev/null | cut -d' ' -f1)"
+	done
+	echo
+	echo "settings:"
+	for v in TPS RATE DELAY TC XRAY SERVER NODE_RTS; do
+		echo "  ${v}=${!v}"
+	done
+	echo "  nodes=${#NODES[@]}"
+} >"${WORKING_DIR}/provenance.txt"
+
 echo "Starting dozen-devnet ..."
 echo "  Topology: 3 block producers x 3 relays, relays fully meshed (${#NODES[@]} nodes)"
 # Traffic control integration
