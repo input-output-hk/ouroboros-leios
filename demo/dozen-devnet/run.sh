@@ -71,6 +71,16 @@ fi
 # X-ray observability (on by default, disable with XRAY=0)
 : "${XRAY:=1}"
 : "${XRAY_SOURCE_DIR:="${SOURCE_DIR}/../extras/x-ray"}"
+# Process-compose HTTP API, so the devnet can be driven from another shell
+# without touching the TUI:
+#   process-compose process list
+#   process-compose process start TxFirehose2
+#   process-compose process restart relay11
+# Bound to loopback deliberately — it can start and stop processes. Set
+# SERVER=0 for the old --no-server behaviour.
+: "${SERVER:=1}"
+: "${SERVER_ADDRESS:=127.0.0.1}"
+: "${SERVER_PORT:=8080}"
 set +a
 
 # Network namespace prefix, distinct from proto-devnet's so the two do not
@@ -344,7 +354,14 @@ if [ "$XRAY" = "1" ]; then
 else
   echo "  X-ray observability: disabled XRAY=${XRAY}"
 fi
-process-compose --no-server \
+SERVER_FLAGS=(--no-server)
+if [ "$SERVER" = "1" ]; then
+  SERVER_FLAGS=(--address "${SERVER_ADDRESS}" --port "${SERVER_PORT}")
+  echo "  Control API: http://${SERVER_ADDRESS}:${SERVER_PORT} (process-compose process ...)"
+else
+  echo "  Control API: disabled SERVER=${SERVER}"
+fi
+process-compose "${SERVER_FLAGS[@]}" \
   -f "${SOURCE_DIR}/process-compose.yaml" \
   -f "${NODES_COMPOSE}" \
   "${TC_COMPOSE[@]}" \

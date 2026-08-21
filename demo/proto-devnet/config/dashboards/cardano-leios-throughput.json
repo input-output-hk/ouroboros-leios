@@ -348,8 +348,8 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum by (process) (rate(leios_logmetrics_txgen_bytes_total{environment=\"leios\", service=\"tx-firehose\"}[${window}s])) / 1000",
-          "legendFormat": "{{process}} submitted",
+          "expr": "sum(rate(leios_logmetrics_txgen_bytes_total{environment=\"leios\", service=\"tx-firehose\"}[${window}s])) / 1000",
+          "legendFormat": "submitted (all firehoses)",
           "refId": "A"
         },
         {
@@ -358,8 +358,8 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum by (process) (rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[${window}s])) * 204 / 1000",
-          "legendFormat": "{{process}} submitted (est. 204 B/tx)",
+          "expr": "sum(rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[${window}s])) * 204 / 1000",
+          "legendFormat": "submitted (all centrifuges, est. 204 B/tx)",
           "refId": "B"
         },
         {
