@@ -57,23 +57,23 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Install nix
-        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        uses: cachix/install-nix-action@v31.11.0
         with:
           extra_nix_config: |
             accept-flake-config = true
             substituters = https://cache.nixos.org https://cache.iog.io
             trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
 
-      # Build tx-centrifuge statically and stage it into the build
+      # Build tx-firehose statically and stage it into the build
       # context. The devnet Dockerfile COPYs it from
-      # antithesis/artifacts/tx-centrifuge.
-      - name: Build tx-centrifuge static binary
+      # antithesis/artifacts/tx-firehose.
+      - name: Build tx-firehose static binary
         run: |
           set -euo pipefail
-          nix build .#tx-centrifuge-static -o result-tx-centrifuge
+          nix build .#tx-firehose-static -o result-tx-firehose
           mkdir -p antithesis/artifacts
-          cp -v result-tx-centrifuge/bin/tx-centrifuge antithesis/artifacts/tx-centrifuge
-          chmod +x antithesis/artifacts/tx-centrifuge
+          cp -v result-tx-firehose/bin/tx-firehose antithesis/artifacts/tx-firehose
+          chmod +x antithesis/artifacts/tx-firehose
 
       - name: Resolve base image reference
         id: base
@@ -122,7 +122,7 @@ jobs:
 
       # ----------------------------------------------------------------
       # antithesis-cardano-node-devnet — derived from the base image.
-      # Adds proto-devnet configs, pool keys, tx-centrifuge, and
+      # Adds proto-devnet configs, pool keys, tx-firehose, and
       # pool-mode scripts.
       # ----------------------------------------------------------------
       - name: Extract metadata for antithesis-cardano-node-devnet

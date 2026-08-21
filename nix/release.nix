@@ -2,8 +2,8 @@
 #
 #   nix build .#cardano-node-static          # x86_64-linux
 #   nix build .#cardano-cli-static           # x86_64-linux
-#   nix build .#cardano-node-leios-image     # x86_64-linux; pipe into `docker load`
-#   nix build .#cardano-node-release         # x86_64-linux + aarch64-darwin tarball
+#   nix build .#cardano-node-leios-image     # x86_64-linux or aarch64-linux; pipe into `docker load`
+#   nix build .#cardano-node-release         # x86_64-linux, aarch64-linux, or aarch64-darwin tarball
 #
 # CI publishes the image to GHCR and attaches the release tarball to
 # draft releases on tag pushes. Scenario images (antithesis-*,
@@ -23,7 +23,7 @@
     let
       releaseName = "cardano-node-leios-${system}";
 
-      # Statically-linked x86_64-linux builds (musl, no glibc). `or null`
+      # Statically-linked Linux builds (musl, no glibc). `or null`
       # keeps it safe to reference on other systems; Nix is lazy and only
       # the linux branches below dereference it.
       muslJobs = inputs.cardano-node-leios.hydraJobs.${system}.musl or null;
@@ -35,49 +35,57 @@
         lib.optionalAttrs (system == "x86_64-linux") {
           cardano-node-static = muslJobs.cardano-node;
           cardano-cli-static = muslJobs.cardano-cli;
-          # tx-centrifuge lives on a different cardano-node ref
-          # (bench/leios snapshot) than the rest of the binaries; we
-          # intentionally keep it pinned separately. Same hydraJobs shape.
-          tx-centrifuge-static = inputs.cardano-node-tx-centrifuge.hydraJobs.${system}.musl.tx-centrifuge;
-
-          # Streamed layered image: `nix build .#cardano-node-leios-image`
-          # produces a script that, when run, writes the image tarball to
-          # stdout. Typical use:
-          #
-          #   $(nix build .#cardano-node-leios-image --print-out-paths) | docker load
-          #
-          # The image carries only the two binaries plus minimal /etc
-          # files (ca-certs, /etc/passwd, /etc/group, tmp dirs). No shell,
-          # no package manager — overlays add what they need.
-          cardano-node-leios-image = pkgs.dockerTools.streamLayeredImage {
-            name = "cardano-node-leios";
-            tag = "latest";
-            contents = [
-              muslJobs.cardano-node
-              muslJobs.cardano-cli
-              # ca-certificates for TLS to bootstrap relays / Hydra / etc.
-              pkgs.cacert
-              # /etc/passwd + /etc/group + /tmp so things that expect a
-              # POSIX-ish layout don't fall over.
-              pkgs.dockerTools.fakeNss
-              # Shell + core utils so derived Dockerfiles can RUN chmod /
-              # mkdir / etc., and for ad-hoc debugging via `docker exec`.
-              pkgs.bashInteractive
-              pkgs.coreutils
-            ];
-            config = {
-              Entrypoint = [ "/bin/cardano-node" ];
-              Env = [
-                "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
-                "PATH=/bin"
-              ];
-            };
-          };
+          # tx-firehose is built from the same leios-prototype input as the
+          # node and CLI, and is consumed by the Antithesis devnet image.
+          tx-firehose-static = muslJobs.tx-firehose;
         }
         //
           lib.optionalAttrs
             (lib.elem system [
               "x86_64-linux"
+              "aarch64-linux"
+            ])
+            {
+
+              # Streamed layered image: `nix build .#cardano-node-leios-image`
+              # produces a script that, when run, writes the image tarball to
+              # stdout. Typical use:
+              #
+              #   $(nix build .#cardano-node-leios-image --print-out-paths) | docker load
+              #
+              # The image carries only the two binaries plus minimal /etc
+              # files (ca-certs, /etc/passwd, /etc/group, tmp dirs). No shell,
+              # no package manager — overlays add what they need.
+              cardano-node-leios-image = pkgs.dockerTools.streamLayeredImage {
+                name = "cardano-node-leios";
+                tag = "latest";
+                contents = [
+                  muslJobs.cardano-node
+                  muslJobs.cardano-cli
+                  # ca-certificates for TLS to bootstrap relays / Hydra / etc.
+                  pkgs.cacert
+                  # /etc/passwd + /etc/group + /tmp so things that expect a
+                  # POSIX-ish layout don't fall over.
+                  pkgs.dockerTools.fakeNss
+                  # Shell + core utils so derived Dockerfiles can RUN chmod /
+                  # mkdir / etc., and for ad-hoc debugging via `docker exec`.
+                  pkgs.bashInteractive
+                  pkgs.coreutils
+                ];
+                config = {
+                  Entrypoint = [ "/bin/cardano-node" ];
+                  Env = [
+                    "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
+                    "PATH=/bin"
+                  ];
+                };
+              };
+            }
+        //
+          lib.optionalAttrs
+            (lib.elem system [
+              "x86_64-linux"
+              "aarch64-linux"
               "aarch64-darwin"
             ])
             {
@@ -91,7 +99,12 @@
               cardano-node-release =
                 let
                   upstream =
-                    if system == "x86_64-linux" then
+                    if
+                      lib.elem system [
+                        "x86_64-linux"
+                        "aarch64-linux"
+                      ]
+                    then
                       inputs.cardano-node-leios.hydraJobs.${system}.musl.cardano-node-linux
                     else
                       inputs.cardano-node-leios.hydraJobs.${system}.native.cardano-node-macos;

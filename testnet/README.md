@@ -139,9 +139,9 @@ rm -rf tmp-testnet
 
 ## About the configuration
 
-The `config/` directory holds a pinned snapshot of
-[`cardano-playground/static/book.play.dev.cardano.org/environments-pre/leios`](https://github.com/input-output-hk/cardano-playground/tree/next-2026-05-15/static/book.play.dev.cardano.org/environments-pre/leios)
-at branch `next-2026-05-15`:
+The `config/` directory holds a pinned snapshot of the `musashi`
+network configuration served at
+[`book.play.dev.cardano.org/environments-pre/leios`](https://book.play.dev.cardano.org/adv-musashi.html):
 
 - Genesis files (byron, shelley, alonzo, conway, dijkstra).
 - Node configuration (`config.json`) and topology (`topology.json` +
@@ -152,16 +152,15 @@ The topology points at a single bootstrap relay
 there via ledger peers once it's synced enough to know about them
 (`useLedgerAfterSlot` in `topology.json`).
 
-To re-pin when the testnet rolls (or to try a different branch):
+To re-pin when the testnet rolls (or to try a staging URL):
 
 ```shell
-./pin-config.sh                    # default: next-2026-05-15
-./pin-config.sh some/other-branch  # specific ref
+./pin-config.sh                    # default: book.play.dev.cardano.org
+./pin-config.sh https://other/env  # override base URL
 ```
 
-The script fetches every required file from the raw GitHub URL and
-overwrites the local `config/` snapshot. Re-commit if you want others
-to pick up the change.
+The script overwrites the local `config/` snapshot with the files at
+that base. Re-commit if you want others to pick up the change.
 
 ## Notes
 

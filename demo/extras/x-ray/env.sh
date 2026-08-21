@@ -11,8 +11,9 @@
 : "${ALLOY_CONFIG:=${XRAY_SOURCE_DIR}/alloy}"
 : "${PROMETHEUS_CONFIG:=${XRAY_SOURCE_DIR}/prometheus.yaml}"
 : "${LOKI_CONFIG:=${XRAY_SOURCE_DIR}/loki.yaml}"
+: "${CADDYFILE:=${XRAY_SOURCE_DIR}/Caddyfile}"
 : "${SS_FILTER:=( sport = 3001 and dport = 3002 ) or ( sport = 3002 and dport = 3001 ) or ( sport = 3002 and dport = 3003 ) or ( sport = 3003 and dport = 3002 )}"
 : "${DEMO_DASHBOARDS_DIR:=${WORKING_DIR}/demo-dashboards}"
 
 # shellcheck disable=SC2034
-XRAY_REQUIRED_COMMANDS=(prometheus loki grafana alloy ss_http_exporter process-compose)
+XRAY_REQUIRED_COMMANDS=(prometheus loki grafana alloy ss_http_exporter process-compose caddy)

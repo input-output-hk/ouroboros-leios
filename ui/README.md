@@ -27,7 +27,7 @@ nix run .#ui-live
 ## Add a scenario from sim-rs
 
 The Rust Leios simulator (`sim-rs`) and a few baseline topologies (`small.yaml`,
-`thousand.yaml`) now live in [cardano-scaling/leios-tools](https://github.com/cardano-scaling/leios-tools).
+`thousand.yaml`) now live in [input-output-hk/leios-tools](https://github.com/input-output-hk/leios-tools).
 Bundled topologies in `public/topologies/` are kept here directly.
 
 To add a new topology, drop the YAML file in `public/topologies/`. Then generate

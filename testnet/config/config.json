@@ -2,10 +2,10 @@
   "AlonzoGenesisFile": "alonzo-genesis.json",
   "AlonzoGenesisHash": "387a7c4880477ce7b128566fa7f9f9ed99ee04476084e9f6332b6d42d907faab",
   "ByronGenesisFile": "byron-genesis.json",
-  "ByronGenesisHash": "73522baa9b5c2afecb8794a17a5fc0650ba6621c0d96d0a18d514d94d3755efe",
+  "ByronGenesisHash": "e26f92ae4692880d53cfdf6646b556ec3e6f058f7376eb775d86398997784f43",
   "ConsensusMode": "PraosMode",
   "ConwayGenesisFile": "conway-genesis.json",
-  "ConwayGenesisHash": "7b465adc9d084af42e3f7685e561e974e0804b7efeaed12cf2f1ee409e91cc99",
+  "ConwayGenesisHash": "dd03f3220ba06532ba5edac295e6eefed493721814a0622eb4d0ef31253ca573",
   "DijkstraGenesisFile": "dijkstra-genesis.json",
   "DijkstraGenesisHash": "c6afe2641a407ee17f3625ed304571c3762e3123d38f4d8ae663f765f6c2bcb6",
   "ExperimentalHardForksEnabled": true,
@@ -15,20 +15,23 @@
   "LastKnownBlockVersion-Minor": 1,
   "LedgerDB": {
     "Backend": "V2InMemory",
-    "NumOfDiskSnapshots": 2,
     "QueryBatchSize": 100000,
-    "SnapshotInterval": 864
+    "Snapshots": {
+      "NumOfDiskSnapshots": 2,
+      "SlotOffset": 0,
+      "SnapshotInterval": 4320
+    }
   },
   "LeiosDbConfig": {
     "Backend": "SQLite",
     "Filepath": "leios.db"
   },
   "MempoolCapacityBytesOverride": 500000,
-  "MinNodeVersion": "11.0.1-leios-prototype",
+  "MinNodeVersion": "11.1.0-prototype-2026w32",
   "Protocol": "Cardano",
   "RequiresNetworkMagic": "RequiresMagic",
   "ShelleyGenesisFile": "shelley-genesis.json",
-  "ShelleyGenesisHash": "35381da1578c03d357599dce448cc6f3dddd5ae1020145b7c1cbd607607500e0",
+  "ShelleyGenesisHash": "735d3f9f1f79066ead4ef7df4ac7e6ed25e8d78b7b9c7e5ec5ee1b88476e1c3f",
   "TestAllegraHardForkAtEpoch": 0,
   "TestAlonzoHardForkAtEpoch": 0,
   "TestBabbageHardForkAtEpoch": 0,
@@ -135,14 +138,5 @@
     "Startup.DiffusionInit": {
       "severity": "Info"
     }
-  },
-  "TurnOnLogMetrics": true,
-  "TurnOnLogging": true,
-  "UseTraceDispatcher": true,
-  "defaultBackends": [],
-  "defaultScribes": [],
-  "minSeverity": "Critical",
-  "options": {},
-  "setupBackends": [],
-  "setupScribes": []
+  }
 }

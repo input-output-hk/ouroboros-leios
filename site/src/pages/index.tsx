@@ -92,19 +92,19 @@ let exceptions = {
 
 function getNextMeeting(now = new Date()) {
   let nextMeeting = getLastWednesdayOfMonth(now);
-  const meetingEndTime = new Date(nextMeeting.getTime() + 60 * 60 * 1000); // 1 hour after start
-
-  // If we're past the current month's meeting end time, get next month's meeting
-  if (now >= meetingEndTime) {
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    nextMeeting = getLastWednesdayOfMonth(nextMonth);
-  }
 
   // Unless there is an exception for next meeting
   const exception =
     exceptions[`${nextMeeting.getFullYear()}-${nextMeeting.getMonth() + 1}`];
   if (exception) {
     nextMeeting = exception;
+  }
+
+  // If we're past the current month's meeting end time, get next month's meeting
+  const meetingEndTime = new Date(nextMeeting.getTime() + 60 * 60 * 1000); // 1 hour after start
+  if (now >= meetingEndTime) {
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    nextMeeting = getLastWednesdayOfMonth(nextMonth);
   }
 
   return nextMeeting;
@@ -324,7 +324,12 @@ function MonthlyReviewsSection() {
         <div className="container-padding padding-section">
           <div className={styles.contentWrapper}>
             <div className={styles.stayUpToDateContent}>
-              <h2 style={{ marginBottom: "1.25rem" }}>Stay up to date</h2>
+              <h2
+                className={styles.stayUpdToDateHeading}
+                style={{ marginBottom: "1.25rem" }}
+              >
+                Stay up to date
+              </h2>
               <p>
                 Catch up on the latest Leios progress, key decisions, and Q&A in
                 our monthly review videos
@@ -344,7 +349,7 @@ function MonthlyReviewsSection() {
               <div className={styles.countdownContainer}>
                 <Link
                   className={styles.countdown}
-                  to="https://youtube.com/live/m8r7TvvPUdc"
+                  to="https://youtube.com/live/yDuLH8An6c0"
                   target="_blank"
                   rel="noopener noreferrer"
                 >

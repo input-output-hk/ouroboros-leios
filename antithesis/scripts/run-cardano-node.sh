@@ -32,7 +32,8 @@ echo "  PORT: $PORT"
 echo "  HOST_ADDR: $HOST_ADDR"
 echo "  LEIOS_DB_PATH: $LEIOS_DB_PATH"
 
-# Run cardano-node with tee to both stdout and log file
+# Keep the full node log on the shared volume. Emitting it on stdout makes
+# Antithesis retain every routine node event in the test-run log stream.
 exec cardano-node run \
     --config "$DATA_DIR/config.json" \
     --topology "$DATA_DIR/topology.json" \
@@ -40,4 +41,4 @@ exec cardano-node run \
     --socket-path "$DATA_DIR/socket" \
     --host-addr "$HOST_ADDR" \
     --port "$PORT" \
-    2>&1 | tee "$LOG_DIR/${NODE_NAME}.log"
+    >> "$LOG_DIR/${NODE_NAME}.log" 2>&1

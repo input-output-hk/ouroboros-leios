@@ -18,7 +18,23 @@
 
     iogx.url = "github:input-output-hk/iogx";
 
-    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=a654a1761476fcf8e6a43aeedbc1455bd7ad77db";
+    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=eeb5b2da0083cf3b7a9e80d172685ae941638125";
+
+    # Trace verifier only: it links cardano-api against the Leios prototype
+    # node's pins (cabal.project.trace-verifier), which need newer
+    # CHaP/hackage snapshots than iogx's. A dedicated haskell.nix instance
+    # keeps the rest of this flake identical to main. Snapshots must be
+    # at/after cabal.project.trace-verifier's index-states
+    # (hackage 2026-07-15T21:58:35Z / CHaP 2026-07-27T20:44:57Z, the
+    # prototype-2026w32 node's pins).
+    haskell-nix-tv = {
+      url = "github:input-output-hk/haskell.nix/ef52c36b9835c77a255befe2a20075ba71e3bfab";
+      inputs.hackage.url = "github:input-output-hk/hackage.nix/956836e90e902e23b7bf080a0c9d0a88ddf0273a";
+    };
+    CHaP-tv = {
+      url = "github:intersectmbo/cardano-haskell-packages/60ad9c29de7b30cb480547110cffad0cb6c71ab2";
+      flake = false;
+    };
 
     flake-parts.url = "github:hercules-ci/flake-parts";
 
@@ -32,13 +48,13 @@
     deltaq-src.flake = false;
 
     # Used by demo/
-    ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype";
-    # Patched cardano-node — source of cardano-node and cardano-cli
-    # across the repo.
+    # Uses git+https (not github:) because the leios-prototype branch pulls in a
+    # git submodule; the tarball-based github fetcher rejects `submodules=1`.
+    ouroboros-consensus.url = "git+https://github.com/intersectmbo/ouroboros-consensus?ref=leios-prototype&submodules=1";
+    # Patched cardano-node — source of cardano-node, cardano-cli, and
+    # tx-firehose across the repo. The tx-firehose bench/ package now
+    # lives on top of leios-prototype so a single input suffices.
     cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
-    # tx-centrifuge only. TODO: track latest bench/leios once that
-    # branch is rebased onto something with no cooldown.
-    cardano-node-tx-centrifuge.url = "github:intersectmbo/cardano-node?rev=0ab6523057298eae80cb1aa1b23f4472480084be";
   };
 
   outputs =

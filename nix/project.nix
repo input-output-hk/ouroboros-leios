@@ -8,34 +8,20 @@
 
 let
 
-  inherit (repoRoot.nix) agda;
-
+  # NOTE: unlike main, the trace verifier is NOT part of this project: it
+  # needs a newer cardano stack than the simulation packages and is built
+  # from cabal.project.trace-verifier by its own haskell.nix instance (see
+  # ./trace-verifier.nix). This project mirrors main's.
   sources = pkgs.stdenv.mkDerivation {
     name = "leios-hs-sources";
     src = ./..;
     patchPhase = ''
-      # Add the trace verifier package.
-      sed -i '/^packages:/a\ \ leios-trace-verifier/dist/haskell' cabal.project
       # Clean up troublesome symbolic links.
       rm -r simulation/test/data
       cp -r data simulation/test/
     '';
     buildPhase = ''
-      # Copy the source for the trace verifier.
-      mkdir -p $out/leios-trace-verifier/dist/haskell
-      cp -r ${agda.hsTraceParser.out}/hs-src/* $out/leios-trace-verifier/dist/haskell/
-      # Copy the original source.
       cp -r . $out
-      # Copy the test data.
-      mkdir -p $out/leios-trace-verifier/dist/haskell/data
-      cp -r leios-trace-verifier/conformance-traces/{config.yaml,topology.yaml,valid,invalid} $out/leios-trace-verifier/dist/haskell/data/
-    '';
-    installPhase = ''
-      # Add the MAlonzo modules to the cabal file.
-      chmod +w $out/leios-trace-verifier/dist/haskell/trace-parser.cabal
-      find $out/leios-trace-verifier/dist/haskell/src/MAlonzo -name "*.hs" -print\
-      | sed "s#^.*/src/#        #;s#\.hs##;s#/#.#g" \
-      >> $out/leios-trace-verifier/dist/haskell/trace-parser.cabal
     '';
     fixupPhase = ''
       # Skip fixup phase, so as not to mangle any of the source.
