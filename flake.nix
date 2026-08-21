@@ -16,7 +16,9 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs";
 
-    iogx.url = "github:input-output-hk/iogx";
+    haskell-nix.url = "github:input-output-hk/haskell.nix";
+    CHaP.url = "github:intersectmbo/cardano-haskell-packages?ref=repo";
+    CHaP.flake = false;
 
     leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=eeb5b2da0083cf3b7a9e80d172685ae941638125";
 
