@@ -266,14 +266,14 @@
               }
             ]
           },
-          "unit": "cps",
+          "unit": "TxkB/s",
           "min": 0
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "submitted (all firehoses)"
+              "options": "submitted (firehose, measured)"
             },
             "properties": [
               {
@@ -292,7 +292,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "submitted (all centrifuges)"
+              "options": "submitted (centrifuge, est. 204 B/tx)"
             },
             "properties": [
               {
@@ -305,35 +305,6 @@
               {
                 "id": "custom.lineWidth",
                 "value": 3
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "on chain"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "blue",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 3
-              },
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "dash": [
-                    10,
-                    10
-                  ],
-                  "fill": "dash"
-                }
               }
             ]
           }
@@ -353,7 +324,7 @@
             "max"
           ],
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
@@ -370,8 +341,8 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum(rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\", service=\"tx-firehose\"}[${window}s]))",
-          "legendFormat": "submitted (all firehoses)",
+          "expr": "sum(rate(leios_logmetrics_txgen_bytes_total{environment=\"leios\", service=\"tx-firehose\"}[${window}s])) / 1000",
+          "legendFormat": "submitted (firehose, measured)",
           "range": true,
           "refId": "A"
         },
@@ -381,8 +352,8 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum(rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[${window}s]))",
-          "legendFormat": "submitted (all centrifuges)",
+          "expr": "sum(rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[${window}s])) * 204 / 1000",
+          "legendFormat": "submitted (centrifuge, est. 204 B/tx)",
           "range": true,
           "refId": "B"
         },
@@ -392,26 +363,15 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "rate(cardano_node_metrics_txSubmission_txsAccepted_int{job=\"integrations/cardano-node\", environment=\"leios\", instance=~\"$instance\"}[${window}s])",
+          "expr": "rate(cardano_node_metrics_txSubmission_txsAccepted_int{job=\"integrations/cardano-node\", environment=\"leios\", instance=~\"$instance\"}[${window}s]) * scalar(sum(rate(leios_logmetrics_txgen_bytes_total{environment=\"leios\", service=\"tx-firehose\"}[${window}s])) / sum(rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\", service=\"tx-firehose\"}[${window}s]))) / 1000",
           "legendFormat": "{{instance}} N2N ingest",
           "range": true,
           "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "editorMode": "code",
-          "expr": "max(rate(cardano_node_metrics_txsProcessedNum_counter{job=\"integrations/cardano-node\", environment=\"leios\"}[${window}s]))",
-          "legendFormat": "on chain",
-          "range": true,
-          "refId": "D"
         }
       ],
-      "title": "Submission vs. ingest (tx/s)",
+      "title": "Submission vs. ingest",
       "type": "timeseries",
-      "description": "What is being offered against what each node can actually take from its peers. A node keeping up sits on the submitted line; one that cannot sits below it, and the gap is the diffusion shortfall. The node the generators target reads zero here — it ingests over node-to-client, which does not go through tx-submission at all; watch its mempool on the Mempool panel instead. Everything is a transaction rate, so no byte-size estimate is involved."
+      "description": "What is being offered against what each node can actually take from its peers. A node keeping up sits on the submitted line; one that cannot sits below it, and the gap is the diffusion shortfall. The node the generators target reads zero here — it ingests over node-to-client, which does not go through tx-submission at all; watch its mempool one panel to the left. Ingest is a transaction count scaled by the mean on-wire size measured from the firehose, so it needs a firehose running to render."
     },
     {
       "datasource": {
