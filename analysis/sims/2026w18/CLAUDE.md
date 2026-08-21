@@ -41,8 +41,8 @@ and saves all outputs into a `{voting-mode}/seed-{N}/` subdirectory.
 | `--turbo` | *(default)* | Sequential DES, 6-shard zero-latency-clusters |
 | `--actor` | | Async actor engine (non-deterministic) |
 | `--sequential` | | Sequential DES, single shard |
-| `--memory-limit` | off | Apply backlog caps from [`sim-rs/parameters/memory-limit.yaml`](https://github.com/cardano-scaling/leios-tools/blob/main/sim-rs/parameters/memory-limit.yaml) (generated=10, peer=10000, max-age=24). Note: these caps **alter behaviour** at high throughput — generated=10 drops ~17% of TXs at 0.350 TxMB/s. Avoid for production runs. |
-| `--memory-limit-file PATH` | | Use a custom memory-limit YAML instead of the default; PATH is relative to [`sim-rs/parameters/`](https://github.com/cardano-scaling/leios-tools/tree/main/sim-rs/parameters). |
+| `--memory-limit` | off | Apply backlog caps from [`sim-rs/parameters/memory-limit.yaml`](https://github.com/input-output-hk/leios-tools/blob/main/sim-rs/parameters/memory-limit.yaml) (generated=10, peer=10000, max-age=24). Note: these caps **alter behaviour** at high throughput — generated=10 drops ~17% of TXs at 0.350 TxMB/s. Avoid for production runs. |
+| `--memory-limit-file PATH` | | Use a custom memory-limit YAML instead of the default; PATH is relative to [`sim-rs/parameters/`](https://github.com/input-output-hk/leios-tools/tree/main/sim-rs/parameters). |
 | `--quorum-fraction F` | `0.75` | Quorum fraction for vote threshold |
 | `--stake-fraction F` | `0.99` | Stake fraction for top-stake-fraction mode |
 | `--topology NAME` | `topology-v2` | Basename of topology file under `data/simulation/pseudo-mainnet/` (e.g. `topology-v2-1500` for 1500 nodes) |
@@ -171,7 +171,7 @@ Concrete values:
 | `topology-v2` (750 nodes) | 750 | 458 | 292 | 450 | 563 | 160 (top-213) |
 | `topology-v2-1500` | 1500 | 458 | 1042 | 450 | 1125 | 336 (top-448) |
 
-Note that `everyone` and `top-stake-fraction` use *persistent* vote sizes/CPU costs (no VRF eligibility proof needed since selection is deterministic), so each individual vote is smaller and cheaper than a `wfa-ls` non-persistent vote. See `vote_weighted_average` in [`sim-rs/sim-core/src/config.rs`](https://github.com/cardano-scaling/leios-tools/blob/main/sim-rs/sim-core/src/config.rs).
+Note that `everyone` and `top-stake-fraction` use *persistent* vote sizes/CPU costs (no VRF eligibility proof needed since selection is deterministic), so each individual vote is smaller and cheaper than a `wfa-ls` non-persistent vote. See `vote_weighted_average` in [`sim-rs/sim-core/src/config.rs`](https://github.com/input-output-hk/leios-tools/blob/main/sim-rs/sim-core/src/config.rs).
 
 ## Engine modes
 

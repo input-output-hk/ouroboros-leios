@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 #
 # Re-pin the local snapshot of the Leios testnet config from
-# cardano-playground. Defaults to the next-2026-05-15 branch; pass a
-# different ref as the first argument to update.
+# book.play.dev.cardano.org (the deployed configuration for the
+# `musashi` network). Pass a different base URL as the first argument
+# to override, e.g. to pull from a staging site or a raw
+# cardano-playground branch.
 
 set -euo pipefail
 
-REF="${1:-next-2026-05-15}"
-# Canonical configs live under docs/; the static/ tree is generated for
-# the book site and lags behind redeployments.
-BASE="https://raw.githubusercontent.com/input-output-hk/cardano-playground/${REF}/docs/environments-pre/leios"
+BASE="${1:-https://book.play.dev.cardano.org/environments-pre/leios}"
 DEST="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/config"
 
 mkdir -p "$DEST"
@@ -28,4 +27,4 @@ do
   curl -sfo "$DEST/$f" "$BASE/$f" && printf 'ok (%d bytes)\n' "$(wc -c < "$DEST/$f")"
 done
 
-echo "Pinned to cardano-playground@$REF"
+echo "Pinned from $BASE"

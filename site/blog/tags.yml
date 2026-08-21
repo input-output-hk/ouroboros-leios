@@ -1,0 +1,19 @@
+testnet:
+  label: Testnet
+  permalink: /testnet
+  description: Posts about the Leios public testnet
+
+musashinet:
+  label: MusashiNet
+  permalink: /musashinet
+  description: News from MusashiNet, the Leios public testnet
+
+leios:
+  label: Leios
+  permalink: /leios
+  description: Posts about the Ouroboros Leios protocol
+
+throughput:
+  label: Throughput
+  permalink: /throughput
+  description: Posts about Cardano throughput and scaling

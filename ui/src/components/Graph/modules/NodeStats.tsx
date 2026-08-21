@@ -48,6 +48,11 @@ export const NodeStats: FC = () => {
     { name: "Endorser Blocks", ...getCounts(EMessageType.EB), color: EMessageColor.EB },
     { name: "Votes", ...getCounts(EMessageType.Votes), color: EMessageColor.VOTES },
     { name: "Blocks", ...getCounts(EMessageType.RB), color: EMessageColor.RB },
+    {
+      name: "Announcements",
+      ...getCounts(EMessageType.Announcement),
+      color: EMessageColor.ANNOUNCEMENT,
+    },
   ];
 
   return (

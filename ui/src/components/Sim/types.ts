@@ -74,6 +74,8 @@ import type {
   UITxsGenerated,
   UITxsSent,
   UITxsReceived,
+  UIAnnouncementSent,
+  UIAnnouncementReceived,
   UIMessage,
   UITraceEvent,
 } from "@/schema/trace.ui";
@@ -92,6 +94,8 @@ export enum EServerMessageType {
   RBGenerated = "RBGenerated",
   RBReceived = "RBReceived",
   RBSent = "RBSent",
+  AnnouncementSent = "AnnouncementSent",
+  AnnouncementReceived = "AnnouncementReceived",
 }
 
 export type IVote = Vote;
@@ -107,6 +111,8 @@ export type IEndorserBlockSent = UIEBSent;
 export type IVotesGenerated = UIVotesGenerated;
 export type IVotesReceived = UIVotesReceived;
 export type IVotesSent = UIVotesSent;
+export type IAnnouncementSent = UIAnnouncementSent;
+export type IAnnouncementReceived = UIAnnouncementReceived;
 
 export type TServerMessageType = UIMessage;
 

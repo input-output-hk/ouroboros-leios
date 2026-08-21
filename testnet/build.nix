@@ -47,6 +47,8 @@
         runtimeEnv = {
           SOURCE_DIR = ./.;
           XRAY_SOURCE_DIR = ../demo/extras/x-ray;
+          # Reuse the proto-devnet dashboards until we ship testnet-specific ones.
+          DEMO_DASHBOARDS_DIR = ../demo/proto-devnet/config/dashboards;
           GRAFANA_SHARE = "${pkgs.grafana}/share/grafana";
         };
         text = builtins.readFile ./run.sh;

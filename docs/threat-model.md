@@ -227,7 +227,7 @@ The attack operates by controlling when and to whom transaction data becomes ava
 
 Advanced network-based variants can target high-stake voting nodes through eclipse attacks, where adversaries control the network connections of specific nodes to manipulate their information flow. Since voting committee membership involves some degree of public information, persistent voting members with significant stake could potentially be identified and targeted. However, eclipsing distinct nodes across a distributed network is non-trivial due to high network connectivity degrees and existing eclipse protection mechanisms.
 
-A particularly dangerous and sophisticated variant targets blockchain safety itself by allowing EBs to achieve certification while preventing timely availability to all honest nodes. The adversary releases data to just enough voting committee members to achieve certification, but not to all network participants. This can create scenarios where certified EBs cannot be processed by honest nodes within the L_diff parameter, potentially violating Praos timing assumptions.
+A particularly dangerous and sophisticated variant targets blockchain safety itself by allowing EBs to achieve certification while preventing timely availability to all honest nodes. The adversary releases data to just enough voting committee members to achieve certification, but not to all network participants. The most extreme scenario is when the adversary provides the EB to just enough colocated honest committee members just-in-time for them to vote for it. Combined with the adversary's own, those votes allow a certified EB to begin diffusing from approximately a single point on the globe, which is a profile that L_diff may not have been tuned to accommodate. This can create scenarios where certified EBs cannot be processed by honest nodes within the L_diff parameter, potentially violating Praos timing assumptions.
 
 **Impact**: Data withholding primarily reduces throughput when EBs fail certification due to unavailable data, forcing wasted voting resources and delayed transaction processing. Thereotically, there is a high impact variant that can compromise blockchain safety by creating timing violations in Praos diffusion. By reducing the number of honest nodes that receive EB data in time for certification, adversaries also impair subsequent diffusion, making peer-to-peer propagation slower and less reliable. While occasional timing misses are normal in Ouroboros, persistent violations can lead to longer forks and degraded chain quality.
 
@@ -239,11 +239,11 @@ A particularly dangerous and sophisticated variant targets blockchain safety its
 >
 > TODO: Should this be also about network delays?
 
-| #   | Method                                          | Effect                                             | Resources                              | Mitigation                                               |
-|-----|-------------------------------------------------|----------------------------------------------------|----------------------------------------|----------------------------------------------------------|
-| T20 | Withhold announced EB or endorsed transactions  | Lower throughput                                   | Stake for block production             | Connection timeouts, peer pruning                        |
-| T21 | Selectively withhold data from voting committee | Prevent honest EB certification, reduce throughput | Network position control               | Redundant peer connections, diffusion monitoring         |
-| T22 | Selectively withhold data from honest nodes     | Allow certification, delay block propagation       | Network position control, modest stake | L_diff parameter sizing, worst-case diffusion validation |
+| #   | Method                                           | Effect                                             | Resources                              | Mitigation                                               |
+|-----|--------------------------------------------------|----------------------------------------------------|----------------------------------------|----------------------------------------------------------|
+| T20 | Withhold announced EB or endorsed transactions   | Lower throughput                                   | Stake for block production             | Connection timeouts, peer pruning                        |
+| T21 | Selectively withhold data from voting committee  | Prevent honest EB certification, reduce throughput | Network position control               | Redundant peer connections, diffusion monitoring         |
+| T22 | Selectively withhold data from most honest nodes | Allow certification, delay block propagation       | Network position control, modest stake | L_diff parameter sizing, worst-case diffusion validation |
 
 ### Protocol bursts
 
@@ -338,3 +338,43 @@ This applies to both BLS voting keys and VRF keys. For BLS keys, the adversary c
 |-----|--------------------------------------------------|----------------------------------------------------------|----------------------------------------|-------------------------------------------|
 | T32 | Silently accumulate BLS keys to forge certificate | Invalid transactions on-chain, Praos safety violation   | Adaptive adversary, time               | Key rotation, equivocation detection      |
 | T33 | Silently accumulate VRF keys for eligibility      | Disproportionate EB/voting eligibility beyond stake      | Adaptive adversary, time               | Key rotation                              |
+
+
+### Miner extractable value
+
+Miner extractable value (MEV) can alter parties' incentives leading them to take actions that affect Blockchain Safety or High throughput.
+The threat becomes more significant as MEV outgrows the rewards offered by the protocol.
+
+The threat to safety is inherited from Praos: a block producer may decide to fork (instead of extending) a block with high MEV in order 
+to include the relevant transactions into its own block and extract the value himself. However, for such behavior to be successful the forking
+party must control a high amount of stake in order to ensure that the block he created ends up on the main-chain.
+
+The threat to high throughput is specific to Linear Leios. We distinguish between two cases here. High MEV transactions appearing in certified EBs 
+and high MEV transactions appearing in the network. In the first case, a block producer may incentivized to ignore the certified EB, and instead
+include the high MEV transactions into its own block, with the effect of throughput being reduced whenever high MEV opportunities appear in EBs.
+A mitigation to this threat could be adopting urgency signalling (or in fact any mechanism that allows specifying that some transaction is only to be 
+included in an RB). Then, high MEV transactions are expected to adopt this mechanism for inclusion into RBs to avoid delays or loss of value.
+
+In the second case, the block producer observes both high MEV transactions in the network (e.g., through tx submission) and an EB certificate to be included 
+in the next block. If RBs containing EB certificates cannot also contain transactions, then the block producer is incentivized to ignore the EB certificate and instead 
+include the high value transactions directly into the RB. Again, whenever high MEV transactions appear into the network, throughput is going to be impacted severely. 
+The obvious mitigation here is to allow transactions into RBs that also contain certificates. Then, as long as the high MEV transaction volume fits into the RB, the 
+block producer is incentivized to include both the transactions and the certificate into his block to maximize its revenue.
+
+
+**Impact**: High MEV transactions may incentivize parties to either induce forks, thus impacting Blockchain Safety, or forgo EB certificate inclusion, impacting High throughput.
+
+**Assets Affected**: Blockchain Safety, High throughput
+
+**Mitigation**: Allow transaction inclusion into RBs also containing certificates, allow transactions to signal that they only want to be included in RBs.
+
+| #   | Method                                           | Effect                                                   | Resources                              | Mitigation                                |
+|-----|--------------------------------------------------|----------------------------------------------------------|----------------------------------------|-------------------------------------------|
+| T34 | Create a forking chain to extract MEV             | Praos safety violation                                  | Stake-based adversary                   |  ?                                 |
+| T35 | Do not include EB certificate in RB               | Reduced throughput                                      | Block producing party                   | tx inclusion into RBs with EB certificates, tx-to-RB signalling            |
+
+
+
+
+
+

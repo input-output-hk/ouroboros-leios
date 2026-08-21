@@ -18,70 +18,74 @@ set -a
 # Traffic control (on by default, disable with TC=0)
 : "${TC:=1}"
 if [ "$TC" = "1" ]; then
-	: "${RATE:=50Mbps}"
-	: "${DELAY:=100ms}"
-	: "${IP_HOST:=172.28.0.1}"
-	: "${IP_NODE1:=172.28.0.10}"
-	: "${IP_NODE2:=172.28.0.20}"
-	: "${IP_NODE3:=172.28.0.30}"
+  : "${RATE:=50Mbps}"
+  : "${DELAY:=100ms}"
+  : "${IP_HOST:=172.28.0.1}"
+  : "${IP_NODE1:=172.28.0.10}"
+  : "${IP_NODE2:=172.28.0.20}"
+  : "${IP_NODE3:=172.28.0.30}"
 else
-	# Use distinct loopback aliases so each node's --host-addr (which
-	# ouroboros-network also uses as the source IP for outbound sockets) does
-	# not collide with another node's listening 4-tuple. With all three nodes
-	# sharing 127.0.0.1, outbound connect() can return EADDRNOTAVAIL because
-	# the kernel cannot assign (127.0.0.1:listener_port, 127.0.0.1:peer_port)
-	# for the new socket while the listener still owns that port. Splitting
-	# across the 127/8 range avoids the collision entirely.
-	: "${IP_NODE1:=127.2.0.1}"
-	: "${IP_NODE2:=127.2.0.2}"
-	: "${IP_NODE3:=127.2.0.3}"
+  # Use distinct loopback aliases so each node's --host-addr (which
+  # ouroboros-network also uses as the source IP for outbound sockets) does
+  # not collide with another node's listening 4-tuple. With all three nodes
+  # sharing 127.0.0.1, outbound connect() can return EADDRNOTAVAIL because
+  # the kernel cannot assign (127.0.0.1:listener_port, 127.0.0.1:peer_port)
+  # for the new socket while the listener still owns that port. Splitting
+  # across the 127/8 range avoids the collision entirely.
+  : "${IP_NODE1:=127.2.0.1}"
+  : "${IP_NODE2:=127.2.0.2}"
+  : "${IP_NODE3:=127.2.0.3}"
 fi
 # X-ray observability (on by default, disable with XRAY=0)
 : "${XRAY:=1}"
 : "${XRAY_SOURCE_DIR:="${SOURCE_DIR}/../extras/x-ray"}"
+# Network topology: "mesh" (default, all-to-all) or "line" (Node1-Node2-Node3
+# with no direct Node1<->Node3 edge, so Node2 is the only path between the
+# ends). Opt in with TOPOLOGY=line.
+: "${TOPOLOGY:=mesh}"
 set +a
 
 # Check for required commands
 REQUIRED_COMMANDS=(
-	"process-compose"
-	"sqlite3"
-	"jq"
-	"yq"
-	"envsubst"
-	"cardano-node"
-	"cardano-cli"
-	"tx-centrifuge"
+  "process-compose"
+  "sqlite3"
+  "jq"
+  "yq"
+  "envsubst"
+  "cardano-node"
+  "cardano-cli"
+  "tx-firehose"
 )
 
 MISSING_COMMANDS=()
 for cmd in "${REQUIRED_COMMANDS[@]}"; do
-	if ! command -v "$cmd" &>/dev/null; then
-		MISSING_COMMANDS+=("$cmd")
-	fi
+  if ! command -v "$cmd" &>/dev/null; then
+    MISSING_COMMANDS+=("$cmd")
+  fi
 done
 
 if [ ${#MISSING_COMMANDS[@]} -gt 0 ]; then
-	echo "Error: The following required commands are not available:"
-	for cmd in "${MISSING_COMMANDS[@]}"; do
-		echo "  - $cmd"
-	done
-	echo ""
-	echo "Please install the missing commands or use nix:"
-	echo "  nix run github:input-output-hk/ouroboros-leios#demo-proto-devnet"
-	exit 1
+  echo "Error: The following required commands are not available:"
+  for cmd in "${MISSING_COMMANDS[@]}"; do
+    echo "  - $cmd"
+  done
+  echo ""
+  echo "Please install the missing commands or use nix:"
+  echo "  nix run github:input-output-hk/ouroboros-leios#demo-proto-devnet"
+  exit 1
 fi
 
 # Check if WORKING_DIR already exists
 if [ -d "$WORKING_DIR" ]; then
-	echo "Working directory already exists: $WORKING_DIR"
-	read -r -rp "Remove and re-initialize? (Y/n): " response
-	if [[ "$response" =~ ^[Yy]$ || -z "$response" ]]; then
-		chmod a+w -R "$WORKING_DIR"
-		rm -rf "$WORKING_DIR"
-	else
-		echo "Aborting."
-		exit 0
-	fi
+  echo "Working directory already exists: $WORKING_DIR"
+  read -r -rp "Remove and re-initialize? (Y/n): " response
+  if [[ "$response" =~ ^[Yy]$ || -z "$response" ]]; then
+    chmod a+w -R "$WORKING_DIR"
+    rm -rf "$WORKING_DIR"
+  else
+    echo "Aborting."
+    exit 0
+  fi
 fi
 echo "Initializing proto-devnet in $WORKING_DIR"
 
@@ -98,88 +102,98 @@ startTimeEpoch=$(date +%s)
 startTimeIso=$(date -u -d "@$startTimeEpoch" +"%Y-%m-%dT%H:%M:%SZ")
 
 jq --argjson time "$startTimeEpoch" '.startTime = $time' \
-	"$CONFIG_DIR/genesis/byron-genesis.json" >"$WORKING_DIR/genesis/byron-genesis.json"
+  "$CONFIG_DIR/genesis/byron-genesis.json" >"$WORKING_DIR/genesis/byron-genesis.json"
 
 jq --arg time "$startTimeIso" '.systemStart = $time' \
-	"$CONFIG_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json"
+  "$CONFIG_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json"
 
 # Set up each node
 nodes=(1 2 3)
 for i in "${nodes[@]}"; do
-	NODE_NAME="node$i"
-	NODE_DIR="$WORKING_DIR/$NODE_NAME"
-	POOL_DIR="$CONFIG_DIR/pools-keys/pool$i"
+  NODE_NAME="node$i"
+  NODE_DIR="$WORKING_DIR/$NODE_NAME"
+  POOL_DIR="$CONFIG_DIR/pools-keys/pool$i"
 
-	echo "Setting up $NODE_NAME in $NODE_DIR"
-	mkdir -p "$NODE_DIR"
+  echo "Setting up $NODE_NAME in $NODE_DIR"
+  mkdir -p "$NODE_DIR"
 
-	# Copy config files
-	cat "$CONFIG_DIR/config.yaml" |
-		yq ".TraceOptionNodeName = \"$NODE_NAME\"" |
-		yq ".TraceOptions.\"\".backends[1] = \"PrometheusSimple 0.0.0.0 $((12900 + "$i"))\"" \
-			>"$NODE_DIR/config.yaml"
+  # Copy config files
+  cat "$CONFIG_DIR/config.yaml" |
+    yq ".TraceOptionNodeName = \"$NODE_NAME\"" |
+    yq ".TraceOptions.\"\".backends[1] = \"PrometheusSimple 0.0.0.0 $((12900 + "$i"))\"" \
+      >"$NODE_DIR/config.yaml"
 
-	# Generate upstream endpoints to other nodes
-	accessPoints=$(for j in "${nodes[@]}"; do
-		# Except self
-		if [ "$i" -ne "$j" ]; then
-			port="PORT_NODE$j"
-			address="IP_NODE$j"
-			echo "{ \"port\": ${!port}, \"address\": \"${!address}\" }"
-		fi
-	done | jq -s '.')
-	jq \
-		--argjson accessPoints "$accessPoints" \
-		'.localRoots[0].accessPoints = $accessPoints' \
-		"$CONFIG_DIR/topology.template.json" >"$NODE_DIR/topology.json"
+  # Generate upstream endpoints. "mesh": every other node. "line": only
+  # adjacent nodes (|i-j| == 1), i.e. Node1-Node2-Node3 with no Node1<->Node3.
+  # These localRoots are the whole enforcement: config.yaml sets
+  # PeerSharing: false with no public/ledger peers, so a node only ever
+  # connects to the peers listed here (re-enabling PeerSharing would let the
+  # line collapse back toward a mesh).
+  accessPoints=$(for j in "${nodes[@]}"; do
+    absdiff=$((i - j))
+    absdiff=${absdiff#-}
+    if { [ "$TOPOLOGY" = "line" ] && [ "$absdiff" -eq 1 ]; } ||
+      { [ "$TOPOLOGY" != "line" ] && [ "$i" -ne "$j" ]; }; then
+      port="PORT_NODE$j"
+      address="IP_NODE$j"
+      echo "{ \"port\": ${!port}, \"address\": \"${!address}\" }"
+    fi
+  done | jq -s '.')
+  jq \
+    --argjson accessPoints "$accessPoints" \
+    '.localRoots[0].accessPoints = $accessPoints' \
+    "$CONFIG_DIR/topology.template.json" >"$NODE_DIR/topology.json"
 
-	# Symlink genesis files (shared, read-only)
-	ln -s "../genesis/byron-genesis.json" "$NODE_DIR/"
-	ln -s "../genesis/shelley-genesis.json" "$NODE_DIR/"
-	ln -s "../genesis/alonzo-genesis.json" "$NODE_DIR/"
-	ln -s "../genesis/conway-genesis.json" "$NODE_DIR/"
-	ln -s "../genesis/dijkstra-genesis.json" "$NODE_DIR/"
+  # Symlink genesis files (shared, read-only)
+  ln -s "../genesis/byron-genesis.json" "$NODE_DIR/"
+  ln -s "../genesis/shelley-genesis.json" "$NODE_DIR/"
+  ln -s "../genesis/alonzo-genesis.json" "$NODE_DIR/"
+  ln -s "../genesis/conway-genesis.json" "$NODE_DIR/"
+  ln -s "../genesis/dijkstra-genesis.json" "$NODE_DIR/"
 
-	# Copy pool keys and set permissions
-	cp -r "$POOL_DIR" "$NODE_DIR/keys"
-	chmod 400 "$NODE_DIR/keys"/*.skey
+  # Copy pool keys and set permissions
+  cp -r "$POOL_DIR" "$NODE_DIR/keys"
+  chmod 400 "$NODE_DIR/keys"/*.skey
 done
 
-# Copy utxo-keys for tx-centrifuge and set permissions
-echo "Setting up utxo-keys for tx-centrifuge"
-cp -r "$CONFIG_DIR/utxo-keys" "$WORKING_DIR/utxo-keys"
-find "$WORKING_DIR/utxo-keys" -name "*.skey" -exec chmod 400 {} \;
-cp -r "$CONFIG_DIR/funds.json" "$WORKING_DIR/funds.json"
-envsubst <"${CONFIG_DIR}/centrifuge.template.json" >"${WORKING_DIR}/centrifuge.json"
+# tx-firehose reads its delegator payment/staking .skey files directly from
+# $SOURCE_DIR/config/stake-delegators/delegator1/ (see process-compose.yaml).
+# No copy or config-file generation needed.
 
 # Configure alloy for x-ray observability (named config.alloy to avoid conflict with alloy/ storage dir)
 export ALLOY_CONFIG="${WORKING_DIR}/config.alloy"
 envsubst <"${CONFIG_DIR}/alloy.template" >"${ALLOY_CONFIG}"
 
+# Shared per-service Alloy enrichment modules that config.alloy imports via
+# import.file. They carry no envsubst vars, so a plain copy suffices.
+mkdir -p "${WORKING_DIR}/alloy-modules"
+cp "${CONFIG_DIR}/alloy-modules/"*.alloy "${WORKING_DIR}/alloy-modules/"
+
 echo "Starting proto-devnet ..."
+echo "  Topology: ${TOPOLOGY}"
 # Traffic control integration
 TC_COMPOSE=()
 if [ "$TC" = "1" ]; then
-	TC_COMPOSE=(-f "${SOURCE_DIR}/process-compose-tc.yaml")
-	echo "  Traffic control: enabled TC=${TC} (RATE=${RATE}, DELAY=${DELAY})"
+  TC_COMPOSE=(-f "${SOURCE_DIR}/process-compose-tc.yaml")
+  echo "  Traffic control: enabled TC=${TC} (RATE=${RATE}, DELAY=${DELAY})"
 else
-	echo "  Traffic control: disabled TC=${TC} (nodes on loopback)"
+  echo "  Traffic control: disabled TC=${TC} (nodes on loopback)"
 fi
 # X-ray observability integration
 XRAY_COMPOSE=()
 if [ "$XRAY" = "1" ]; then
-	set -a
-	# shellcheck disable=SC2034
-	DEMO_DASHBOARDS_DIR="${SOURCE_DIR}/config/dashboards"
-	# shellcheck source=/dev/null
-	source "${XRAY_SOURCE_DIR}/env.sh"
-	set +a
-	XRAY_COMPOSE=(-f "${XRAY_SOURCE_DIR}/process-compose.yaml")
-	echo "  X-ray observability: enabled XRAY=${XRAY} (Grafana at http://localhost:3000)"
+  set -a
+  # shellcheck disable=SC2034
+  DEMO_DASHBOARDS_DIR="${SOURCE_DIR}/config/dashboards"
+  # shellcheck source=/dev/null
+  source "${XRAY_SOURCE_DIR}/env.sh"
+  set +a
+  XRAY_COMPOSE=(-f "${XRAY_SOURCE_DIR}/process-compose.yaml")
+  echo "  X-ray observability: enabled XRAY=${XRAY} (Grafana at http://localhost:3000)"
 else
-	echo "  X-ray observability: disabled XRAY=${XRAY}"
+  echo "  X-ray observability: disabled XRAY=${XRAY}"
 fi
 process-compose --no-server \
-	-f "${SOURCE_DIR}/process-compose.yaml" \
-	"${TC_COMPOSE[@]}" \
-	"${XRAY_COMPOSE[@]}"
+  -f "${SOURCE_DIR}/process-compose.yaml" \
+  "${TC_COMPOSE[@]}" \
+  "${XRAY_COMPOSE[@]}"

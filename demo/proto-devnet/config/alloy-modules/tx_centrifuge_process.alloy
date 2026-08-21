@@ -1,0 +1,96 @@
+// tx_centrifuge_process — tx-centrifuge load generator, service = "tx-centrifuge".
+//
+// Fanned from the front-end, symmetric to tx_firehose_process. Present but dormant
+// unless centrifuge is running: with no TxCentrifuge lines it drops everything at
+// zero cost, which is what lets an environment switch centrifuge<->firehose with no
+// Alloy change. ns-discriminated on TxCentrifuge.Builder.NewTx|QueueDepth, no data.kind.
+//
+//   Input  : centrifuge trace JSON in the body, service pre-stamped by the front-end.
+//   Output : decoded data as the body.
+//   Labels : service=tx-centrifuge, level, sev, ns.
+//   Metrics: txgen_submitted_total.
+//   Example input:
+//     {
+//       "at": "...",
+//       "ns": "TxCentrifuge.Builder.NewTx",
+//       "data": {
+//         "builder": "synthetic-chain",
+//         "inputs": [
+//           "4be2503e...#0"
+//         ],
+//         "outputs": [
+//           "1724df34...#0"
+//         ],
+//         "txId": "1724df34..."
+//       },
+//       "sev": "Info",
+//       "thread": "31",
+//       "host": "leios1-centrifuge-a-1"
+//     }
+//
+// Centrifuge has no real submitted-byte size unlike firehose, so only the submitted
+// count is emitted; a bytes estimate is a dashboard concern, count x avg-size.
+declare "tx_centrifuge_process" {
+  argument "forward_to" {}
+
+  export "receiver" {
+    value = loki.process.enrich.receiver
+  }
+
+  loki.process "enrich" {
+    stage.match {
+      selector = `{service!="tx-centrifuge"}`
+      action   = "drop"
+    }
+
+    stage.json {
+      expressions = {
+        at   = "at",
+        sev  = "sev",
+        ns   = "ns",
+        data = "data",
+      }
+      drop_malformed = true
+    }
+
+    stage.timestamp {
+      source = "at"
+      format = "RFC3339"
+    }
+
+    stage.labels {
+      values = {
+        level = "sev",
+        sev   = "sev",
+        ns    = "ns",
+      }
+    }
+
+    stage.static_labels {
+      values = {
+        service = "tx-centrifuge",
+      }
+    }
+
+    stage.output {
+      source = "data"
+    }
+
+    stage.match {
+      selector = `{ns="TxCentrifuge.Builder.NewTx"}`
+
+      stage.metrics {
+        metric.counter {
+          name              = "txgen_submitted_total"
+          description       = "Total txs created for submission"
+          prefix            = "cardano_node_metrics_loki_"
+          action            = "inc"
+          match_all         = true
+          max_idle_duration = "24h"
+        }
+      }
+    }
+
+    forward_to = argument.forward_to.value
+  }
+}

@@ -17,11 +17,13 @@ const EVENT_TYPE_COLOR: Partial<Record<EServerMessageType, string>> = {
   [EServerMessageType.VotesGenerated]: EMessageColor.VOTES,
   [EServerMessageType.VotesSent]: EMessageColor.VOTES,
   [EServerMessageType.VotesReceived]: EMessageColor.VOTES,
+  [EServerMessageType.AnnouncementSent]: EMessageColor.ANNOUNCEMENT,
+  [EServerMessageType.AnnouncementReceived]: EMessageColor.ANNOUNCEMENT,
 };
 
 export const Stats: FC = () => {
   const {
-    state: { aggregatedData, events, currentTime },
+    state: { aggregatedData, events, currentTime, lokiDroppedEntries },
   } = useSimContext();
 
   const formatTimeAsISO8601 = (timeInSeconds: number): string => {
@@ -48,6 +50,14 @@ export const Stats: FC = () => {
         <h4 className="flex items-center justify-between gap-4">
           Events at Time: <span>{aggregatedData.eventCounts.total}</span>
         </h4>
+        {lokiDroppedEntries > 0 && (
+          <h4
+            className="flex items-center justify-between gap-4 text-red-600"
+            title="Entries Loki's tail handler dropped due to consumer backpressure"
+          >
+            Loki dropped: <span>{lokiDroppedEntries}</span>
+          </h4>
+        )}
         <br />
         {aggregatedData.eventCounts.total > 0 && (
           <>

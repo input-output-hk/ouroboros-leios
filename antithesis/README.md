@@ -8,7 +8,7 @@ Docker Compose orchestration for testing Leios consensus using [Antithesis](http
 
 Two compose stacks for local testing:
 
-1. Proto-devnet (`docker-compose.devnet.yaml`): 3 block-producing pools with tx-centrifuge
+1. Proto-devnet (`docker-compose.devnet.yaml`): 3 block-producing pools with tx-firehose
 2. ImmDB mock (`docker-compose.immdb.yaml`): upstream/node0/downstream with immdb-server
 
 An optional observability overlay (`docker-compose.observability.yaml`) can be layered onto either stack.
@@ -17,7 +17,7 @@ An optional observability overlay (`docker-compose.observability.yaml`) can be l
 
 Moog-compatible compose files for submission to [Antithesis](https://antithesis.com/) via the Cardano Foundation's [Moog](https://github.com/cardano-foundation/moog) service:
 
-1. Leios devnet (`testnets/leios-devnet/docker-compose.yaml`): 3-pool mesh with randomized tx-centrifuge
+1. Leios devnet (`testnets/leios-devnet/docker-compose.yaml`): 3-pool mesh with randomized tx-firehose
 
 These files differ from local stacks: no `build:` directives (pre-built GHCR images only), hostname-based DNS, `init: true` on all services, and `${INTERNAL_NETWORK}` for Moog's config image generation. See [Antithesis Deployment](#antithesis-deployment) for details.
 
@@ -37,7 +37,7 @@ every other pool) with transaction load:
      └───────────────┼───────────────┘
                      │
               ┌──────┴──────┐
-              │tx-centrifuge │
+              │ tx-firehose  │
               └──────┬──────┘
                      │
               ┌──────┴──────┐
@@ -50,7 +50,7 @@ every other pool) with transaction load:
 | pool1 | 172.28.0.10 | 3001 | Block producer with pool1 credentials |
 | pool2 | 172.28.0.20 | 3002 | Block producer with pool2 credentials |
 | pool3 | 172.28.0.30 | 3003 | Block producer with pool3 credentials |
-| tx-centrifuge | dynamic | - | Transaction load generator |
+| tx-firehose | dynamic | - | N2C transaction load generator targeting pool1 |
 | analysis | dynamic | - | Metrics analysis and Antithesis assertions |
 
 Features:
@@ -106,6 +106,13 @@ docker compose -f docker-compose.devnet.yaml down -v
 
 ```bash
 docker compose -f docker-compose.devnet.yaml up
+```
+
+The default topology is a full mesh. To exercise a line topology with no
+direct pool1-to-pool3 connection, use:
+
+```bash
+TOPOLOGY=line docker compose -f docker-compose.devnet.yaml up
 ```
 
 ### ImmDB Mock Mode
@@ -184,7 +191,7 @@ antithesis/
 ├── docker-compose.devnet.yaml        # Proto-devnet stack (3 pools) — local
 ├── docker-compose.immdb.yaml         # ImmDB mock stack — local
 ├── docker-compose.observability.yaml # Observability overlay (Prometheus, Loki, Grafana)
-├── Dockerfile.cardano-node-devnet    # Proto-devnet node image (pools + tx-centrifuge)
+├── Dockerfile.cardano-node-devnet    # Proto-devnet node image (pools + tx-firehose)
 ├── Dockerfile.cardano-node-burst     # Burst-demo node image (immdb)
 ├── Dockerfile.immdb-server           # ImmDB server image (immdb)
 ├── Dockerfile.analysis               # Analysis container image
@@ -196,8 +203,8 @@ antithesis/
 ├── scripts/
 │   ├── init-pool-node.sh             # Pool initialization (proto-devnet)
 │   ├── run-pool-node.sh              # Pool runtime (proto-devnet)
-│   ├── run-tx-centrifuge.sh           # TX centrifuge — continuous (local)
-│   ├── run-tx-centrifuge-loop.sh      # TX centrifuge — randomized loop (Antithesis)
+│   ├── run-tx-firehose.sh             # TX firehose — continuous (local)
+│   ├── run-tx-firehose-loop.sh        # TX firehose — randomized loop (Antithesis)
 │   ├── init-node0.sh                 # Node0 initialization (immdb)
 │   ├── init-downstream.sh            # Downstream initialization (immdb)
 │   ├── init-upstream.sh              # Upstream initialization (immdb)
@@ -237,8 +244,8 @@ docker compose -f docker-compose.devnet.yaml ps
 # Verify blocks are being produced
 docker compose -f docker-compose.devnet.yaml logs pool1 | grep -i "AddedToCurrentChain"
 
-# Check tx-centrifuge
-docker compose -f docker-compose.devnet.yaml logs tx-centrifuge
+# Check tx-firehose
+docker compose -f docker-compose.devnet.yaml logs tx-firehose
 
 # View analysis output
 docker compose -f docker-compose.devnet.yaml logs analysis
@@ -272,6 +279,10 @@ The analysis container reports assertions to Antithesis SDK:
 - always_or_unreachable: All received blocks were created by a known node
 - always_or_unreachable: Chain tip divergence is less than k slots (common prefix)
 - sometimes: Leios endorser blocks (EBs) are created
+- sometimes: Leios block announcements are observed
+- sometimes: Leios block certifications are observed
+- sometimes: Leios announcements are observed on every pool
+- sometimes: Leios certifications are observed on every pool
 - always: No pool produces more than 60% of blocks (chain quality)
 - sometimes: Each pool produces blocks (pool1, pool2, pool3)
 - sometimes: Chain tip advances between checks
@@ -305,15 +316,18 @@ The `testnets/` compose files are adapted for the Antithesis environment:
 | `init: true` | Not set | Set on all services (required for core dumps) |
 | `container_name`/`hostname` | Not set | Set and matching on all services |
 | Network isolation | `bridge` | `internal: ${INTERNAL_NETWORK}` |
-| TX centrifuge | Continuous stream | Randomized loop (varying tps and duration) |
+| TX firehose | Continuous stream | Randomized loop (varying tps and duration) |
+
+Both Compose stacks accept `TOPOLOGY=line`. In that mode the pool nodes use
+pool2 as the bridge between pool1 and pool3; Dingo also joins through pool2.
 
 ### Randomized TX Generator
 
-The Antithesis compose uses `run-tx-centrifuge-loop.sh` instead of the continuous `run-tx-centrifuge.sh`. Each iteration:
+The Antithesis compose uses `run-tx-firehose-loop.sh` instead of the continuous `run-tx-firehose.sh`. Each iteration:
 
 1. Picks random `tps` (100-10,000), `duration` (10-300s), and cooldown (1-60s)
 2. Random values sourced from `/dev/urandom`, which Antithesis replaces with a deterministic source it can learn from and replay
-3. Generates config, runs tx-centrifuge for the duration, stops it, sleeps, loops
+3. Runs tx-firehose against pool1 for the duration, stops it, sleeps, and loops
 
 Ranges are configurable via environment variables: `TPS_MIN`, `TPS_MAX`, `DURATION_MIN`, `DURATION_MAX`, `COOLDOWN_MIN`, `COOLDOWN_MAX`.
 

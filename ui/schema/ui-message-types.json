@@ -1,4 +1,6 @@
 [
+  "AnnouncementReceived",
+  "AnnouncementSent",
   "EBGenerated",
   "EBReceived",
   "EBSent",

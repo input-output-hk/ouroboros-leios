@@ -13,6 +13,9 @@
 set -euo pipefail
 
 : "${WORKING_DIR:=$(pwd)/tmp-testnet}"
+# Normalize to absolute so subprocesses with different cwds resolve to the
+# same path (see testnet/run.sh).
+WORKING_DIR="$(realpath -m "$WORKING_DIR")"
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 : "${PORT:=3010}"
 : "${HOST_ADDR:=0.0.0.0}"
@@ -30,7 +33,11 @@ fi
 
 mkdir -p "$WORKING_DIR"
 cp -rf "$SOURCE_DIR/config/." "$WORKING_DIR/"
-chmod u+w -R "$WORKING_DIR"
+# Only chmod the top-level files we just copied (nix-store reads come out r-r).
+# Avoid descending into db/, loki/, prometheus/, grafana/, ... — those are
+# managed live by their own processes and racing with rotation produces
+# "No such file or directory" spam.
+find "$WORKING_DIR" -mindepth 1 -maxdepth 1 -type f -exec chmod u+w {} +
 cd "$WORKING_DIR"
 
 mkdir -p db

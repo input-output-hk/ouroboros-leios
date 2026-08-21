@@ -12,10 +12,15 @@ A small network of patched cardano nodes that is loaded with synthetically creat
 Run the demo with all dependencies automatically provided using nix:
 
 ``` shell
-nix run github:input-output-hk/ouroboros-leios#demo-proto-devnet
+nix run github:input-output-hk/ouroboros-leios#dev-demo-proto-devnet
 ```
 
 Or enter the `nix develop` shell (also available via `direnv allow`) and follow [without nix instructions](#without-nix).
+
+``` shell
+cd demo/proto-devnet
+nix develop ../..#dev-demo-proto-devnet
+```
 
 ### Without Nix
 
@@ -26,7 +31,7 @@ Install these prerequisites:
 - `cardano-cli` compatible with the cardano-node version
 - `sqlite3` for creating Leios databases
 - `jq` and `envsubst` for config modifications
-- `tx-centrifuge` for generating transaction workload
+- `tx-firehose` for generating transaction workload
 
 Ensure they are on your PATH, override if needed with something like:
 
@@ -46,7 +51,7 @@ This `process-compose` orchestrated demo will:
 
 1. Initialize a three node cardano devnet
 2. Start all three nodes
-3. Generate and submit a transaction workload using `tx-centrifuge`
+3. Generate and submit a transaction workload against node1 using `tx-firehose` (single-node N2C push)
 4. Observes tip advancing and mempool size (more observability come later):
 
 ``` shell
