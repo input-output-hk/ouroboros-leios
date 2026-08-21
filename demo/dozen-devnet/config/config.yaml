@@ -8,6 +8,20 @@ DijkstraGenesisFile: dijkstra-genesis.json
 # Lower bound, 2 * maxEBClosure (12.5MB)
 MempoolCapacityBytesOverride: 25000000
 
+# Sledgehammer: passes Nothing to consensus for the whole MempoolTimeoutConfig,
+# switching off all three at once — the per-tx soft timeout (discard), the per-tx
+# hard timeout (disconnect the peer) and the cumulative validation-time capacity.
+# They share one Maybe in consensus, so there is no finer-grained off-switch.
+#
+# The capacity is the one we are actually after: it was admitting 34,416 txs on
+# an idle box (5 s budget / 145 us per tx) while the byte capacity sat at 32%,
+# and it is excluded from the capacity the node reports. With it off, the byte
+# dimension binds instead — 25 MB / 228 B is about 107k txs, so expect mempools
+# roughly three times deeper.
+#
+# Set to true to restore the defaults (1 s / 1.5 s / 5 s).
+MempoolTimeoutsEnabled: false
+
 # Needed < 10.6
 EnableP2P: true
 
