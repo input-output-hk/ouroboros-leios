@@ -21,3 +21,22 @@ processes:
       RATE="${RATE}" \
       DELAY="${DELAY}" \
       bash "${SOURCE_DIR}/scripts/init-namespaces.sh"
+
+  # Owns the teardown. InitNamespaces exits as soon as it has built everything,
+  # and process-compose only runs a shutdown hook for a process that is still
+  # alive, so the cleanup has to hang off something long-lived — this. Stopping
+  # the project stops this process, whose trap removes the namespaces and the
+  # bridge.
+  #
+  # Shutdown order between this and the nodes is not enforced, so the nodes may
+  # lose their interfaces a moment before they finish exiting. They are being
+  # killed anyway; it only makes their last log lines uglier.
+  Namespaces:
+    is_elevated: true
+    command: |
+      TOOL_PATH="${TOOL_PATH}" \
+      NS_PREFIX="${NS_PREFIX}" \
+      bash "${SOURCE_DIR}/scripts/hold-namespaces.sh"
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
