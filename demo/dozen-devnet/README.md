@@ -79,6 +79,7 @@ Environment variables, see `run.sh` for the full list:
 | `TC`                | `1`                  | traffic control; `0` puts nodes on loopback         |
 | `XRAY`              | `1`                  | observability stack                                 |
 | `SERVER`            | `1`                  | process-compose control API on `127.0.0.1:8080`     |
+| `NODE_RTS`          | (empty)              | extra per-node RTS flags, e.g. `-N4` on a big host   |
 | `WORKING_DIR`       | `$(pwd)/tmp-devnet`  | where the devnet is initialized                     |
 | `SHARED_CONFIG_DIR` | `../proto-devnet/config` | genesis, pool keys, delegators, dashboards      |
 

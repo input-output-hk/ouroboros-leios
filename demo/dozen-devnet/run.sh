@@ -82,6 +82,11 @@ fi
 : "${SERVER:=1}"
 : "${SERVER_ADDRESS:=127.0.0.1}"
 : "${SERVER_PORT:=8080}"
+# Extra RTS options per node, appended after the binary's baked-in
+# "-T -I0 -A16m -qg1 -qb1 -N2". Empty keeps the built-in behaviour. Twelve
+# nodes at -N2 is 24 capabilities: oversubscribed on 16 cores, two thirds
+# idle on 64. Try NODE_RTS="-N4" on a big host.
+: "${NODE_RTS:=}"
 set +a
 
 # Network namespace prefix, distinct from proto-devnet's so the two do not
@@ -154,6 +159,9 @@ gen_nodes_compose() {
 			echo "      NODE_DIR=\"${WORKING_DIR}/${name}\" \\"
 			echo "      IP=\"${ip}\" \\"
 			echo "      PORT=\"${PORT}\" \\"
+			# Passed inline rather than inherited: elevated processes go through
+			# sudo, which drops the environment.
+			echo "      NODE_RTS=\"${NODE_RTS}\" \\"
 			if [ "$tc" = "1" ]; then
 				echo "      ip netns exec ${NS_PREFIX}:${name} bash \"${SOURCE_DIR}/run-node.sh\""
 			else
