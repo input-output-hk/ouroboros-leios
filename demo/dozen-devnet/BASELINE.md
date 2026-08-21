@@ -88,6 +88,18 @@ per-tx validation time = MempoolTimeoutCapacity / ceiling_txs
                        = 5 s / 34,416 = 145 µs
 ```
 
+Measured on `relay11` over a 180 s window of steady state. These came from
+analysis run while the devnet was live; the run's logs were **not** archived (only
+the `db/` trees were), so they cannot be recomputed — keep the `*.log` files next
+time.
+
+| | |
+| --- | --- |
+| adds | 41,802 in 180 s = **232.2/s** |
+| add gap | p50 **2.5 ms**, p99 3 ms, max **66.74 s** |
+| time in gaps > 0.5 s | **41.0%** of the window |
+| `Mempool.Synced` events | 20 in 180 s |
+
 Character of the stall, for recognising it again:
 
 - A **blocking wait**, not a rejection — 180,680 firehose submits with zero
