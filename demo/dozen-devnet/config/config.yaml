@@ -91,6 +91,15 @@ TraceOptions:
     maxFrequency: 2.0
   ChainDB.LedgerEvent.Flavor.V1.OnDisk.BackingStoreEvent:
     severity: Silence
+  # One trace per UTxO read. Together these were over 40% of all log lines and
+  # ~250 MB per node in twelve minutes, which makes the tracer itself a
+  # suspect in the very stalls we are measuring. The handle
+  # Create/Duplicate/Close traces are kept — they are low volume and are what
+  # shows forker churn.
+  ChainDB.LedgerEvent.Flavor.V2.LedgerTablesHandleRead:
+    severity: Silence
+  ChainDB.LedgerEvent.Flavor.V2.BackendTrace.LSM.LSMLookup:
+    severity: Silence
   ChainDB.LedgerEvent.Forker:
     severity: Silence
   ChainDB.ReplayBlock.LedgerReplay:
@@ -115,16 +124,20 @@ TraceOptions:
     severity: Debug
   LedgerMetrics:
     severity: Info
+  # The whole mempool add path is traced here, on purpose: a stalled add shows
+  # up as an AttemptAdd with no matching AddedTx, and a LedgerNotFound storm
+  # tells us the mempool is failing to acquire the ledger state it wants rather
+  # than doing slow work. Silencing these is what made the long stalls opaque.
   Mempool:
     severity: Debug
   Mempool.AttemptAdd:
-    severity: Silence
+    severity: Debug
   Mempool.LedgerFound:
-    severity: Silence
+    severity: Debug
   Mempool.LedgerNotFound:
-    severity: Silence
+    severity: Debug
   Mempool.SyncNotNeeded:
-    severity: Silence
+    severity: Debug
   Mempool.Synced:
     severity: Debug
   Net:
