@@ -492,3 +492,50 @@ the hypothesis that the ~6,000-tx cap came from the mempool snapshot inheriting
 the validation-time dimension is **wrong**. Whatever bounds an EB at ~40% of its
 transaction limit, with bytes at ~12% of `maxEBClosureSize`, is elsewhere — and it
 is now the main open question for consensus throughput.
+
+## Settled: EB fill is the ceiling, and the time capacity was a governor
+
+`MempoolTimeoutsEnabled: false` (the whole `MempoolTimeoutConfig` passed as
+`Nothing`), optimistic forging, load ramped 1 → 2 → 3 generators. Digest in
+[`results/2026-08-21-timeouts-off/`](results/2026-08-21-timeouts-off/).
+
+The flag worked emphatically: every relay reached **107,904 txs**, exactly the byte
+capacity (25,033,728 / 232), so the validation-time guard is gone and bytes bind.
+
+| phase | confirmed | submitted | `partition-mempool` | block delay | relay11 depth |
+| --- | --- | --- | --- | --- | --- |
+| 1 generator | 57.1 kB/s (~220 tx/s) | 371.9 | **0.077 s** | 0.36 s | 77,662 |
+| 2 generators | 106.1 kB/s (~410) | 498.2 | 0.393 s | 0.94 s | 107,904 |
+| 3 generators | 55.2 kB/s (~213) | 270.0 | **0.620 s** | 0.76 s | 107,904 |
+
+### The time capacity was load-shedding that protected the forge loop
+
+Removing it did not raise throughput — it degraded forge health:
+
+| | timeouts on | timeouts off |
+| --- | --- | --- |
+| snapshot cache | 19 hits, **0 misses** | 17 hits, **5 misses** (23%) |
+| `partition-mempool` | 0.10–0.18 s | **0.077–0.620 s** |
+| slots missed | 0 / 0 / 4 | **11 / 11 / 9** |
+| block interval | ~19 s | **23.0 s** |
+| confirmed, whole run | ~310 tx/s | 300.2 tx/s |
+
+The mechanism is the cache. A hit returns the cached snapshot untouched; a miss
+recomputes it — and now over 107,904 transactions rather than ~34k. Deeper
+mempools make misses both more likely *and* three times more expensive, which is
+why the optimistic snapshot's cost is **not** depth-independent. So the ~5 s
+validation-time capacity was doing useful work: it bounded mempool depth, and
+therefore bounded the cost of a cache miss on the forge path.
+
+### EB fill is the real ceiling, and it is not supply-limited
+
+**5,965 txs per certified EB with 107,904 transactions available** — against 5,466
+with a third of the supply. Three separate interventions have now failed to move
+it: more injection points, removing forge-path revalidation, and removing the
+mempool's depth bound. It is ~43% of `maxTxsPerEb` and ~12% of
+`maxEBClosureSize`, so neither EB limit is binding either.
+
+One EB per RB opportunity at ~6,000 txs is ~300 tx/s, which is where confirmed
+throughput has landed in every configuration measured (300, 310, 341). **That is
+the ceiling.** What picks ~6,000 inside EB construction is the open question, and
+it is now the only one that matters for throughput.
