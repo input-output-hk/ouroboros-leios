@@ -204,10 +204,15 @@ mod.tx_centrifuge_process "centrifuge" {
 }
 
 prometheus.scrape "alloy_pipeline_metrics" {
-	// Tag the loki-derived counters (cardano_node_metrics_loki_*, incl. txgen_*)
+	// Tag the loki-derived counters (leios_logmetrics_*, incl. txgen_*)
 	// with environment/instance/group so they carry the same labels as
 	// playground's leios_alloy_pipeline_metrics scrape -- the shared throughput
 	// dashboard selects them by environment="leios".
+	//
+	// The prefix says what these are: counters Alloy derives from log lines,
+	// not anything the node exposes. They previously wore a
+	// cardano_node_metrics_ prefix, which read as a node metric and sent people
+	// looking for it on the node's own /metrics. Do not put it back.
 	targets = [{
 		"__address__" = "localhost:12345",
 		"instance"    = "proto-devnet",

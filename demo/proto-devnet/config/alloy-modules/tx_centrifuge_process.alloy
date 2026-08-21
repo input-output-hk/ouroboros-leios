@@ -83,7 +83,7 @@ declare "tx_centrifuge_process" {
         metric.counter {
           name              = "txgen_submitted_total"
           description       = "Total txs created for submission"
-          prefix            = "cardano_node_metrics_loki_"
+          prefix            = "leios_logmetrics_"
           action            = "inc"
           match_all         = true
           max_idle_duration = "24h"

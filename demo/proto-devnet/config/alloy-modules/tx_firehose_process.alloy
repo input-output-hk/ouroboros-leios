@@ -83,7 +83,7 @@ declare "tx_firehose_process" {
         metric.counter {
           name              = "txgen_submitted_total"
           description       = "Total txs accepted on submission"
-          prefix            = "cardano_node_metrics_loki_"
+          prefix            = "leios_logmetrics_"
           action            = "inc"
           match_all         = true
           max_idle_duration = "24h"
@@ -92,7 +92,7 @@ declare "tx_firehose_process" {
         metric.counter {
           name              = "txgen_bytes_total"
           description       = "Total submitted tx bytes"
-          prefix            = "cardano_node_metrics_loki_"
+          prefix            = "leios_logmetrics_"
           action            = "add"
           source            = "size"
           max_idle_duration = "24h"
@@ -107,7 +107,7 @@ declare "tx_firehose_process" {
         metric.counter {
           name              = "txgen_rejected_total"
           description       = "Total txs rejected on submission"
-          prefix            = "cardano_node_metrics_loki_"
+          prefix            = "leios_logmetrics_"
           action            = "inc"
           match_all         = true
           max_idle_duration = "24h"
