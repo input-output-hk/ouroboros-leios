@@ -78,6 +78,12 @@ const config: Config = {
         docs: {
           sidebarPath: "./sidebars.ts",
         },
+        blog: {
+          blogTitle: "Blog",
+          blogSidebarTitle: "Latest posts",
+          showReadingTime: true,
+          authorsMapPath: "../authors.yaml",
+        },
         theme: {
           customCss: "./src/css/custom.css",
         },
@@ -119,6 +125,11 @@ const config: Config = {
           sidebarId: "developmentSidebar",
           position: "right",
           label: "Research and development",
+        },
+        {
+          to: "/blog",
+          label: "Blog",
+          position: "right",
         },
         {
           type: "dropdown",
