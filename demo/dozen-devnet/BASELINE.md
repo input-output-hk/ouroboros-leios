@@ -276,3 +276,68 @@ only caps diffusion to a given node: two entry nodes each need to pull only the
 other's share, so they should cope, while the block producers inject nothing
 locally and should stay pinned at ~261 — which would hold on-chain flat while
 offered doubles.
+
+## Where the limit ends up: consensus, not mempool or tx-submission
+
+Three configurations, same host, same binary, only the number of injection points
+differs (`relay11`, then `+relay21`, then `+relay31` — one per block-producer
+group). Digests in [`results/`](results/).
+
+| | 1 origin | 2 origins | 3 origins |
+| --- | --- | --- | --- |
+| relay N2N ingest, peak | 261 | 511–520 | **607–611 tx/s** |
+| bp1 / bp2 / bp3 | 261 each | 436 / 383 / **261** | 429 / 404 / **405** |
+| submitted, median | 246 | 297 | **376 tx/s** |
+| **on chain, median** | **233.9** | **238.1** | **235.4 tx/s** |
+
+**Mempool ingest is set by distance from an injection point.** bp3 sat at 261
+while bp1 and bp2 reached 436 and 383, because it was the only node with no origin
+among its peers; giving its relay group one lifted it to 405. Becoming an origin
+*lowers* a node's N2N ingest — `relay31` went 519 → 293 once it was fed over N2C —
+which is the same effect seen from the other side.
+
+**Diffusion scales with origins, sub-linearly**: 261 → 520 → 610. The second
+origin doubled it, the third added ~90. Each hop passes on only what it received,
+so one origin rate-limited the whole mesh; past two, duplicate suppression across
+nine peers is the likely tax.
+
+**On-chain throughput did not move at all** — 233.9, 238.1, 235.4 — while offered
+load rose 50% and diffusion capacity 2.3×. Everything above ~235 tx/s accumulates
+in mempools that sit at 32–35k. Decomposing it over 786 slots:
+
+| | |
+| --- | --- |
+| blocks forged | 39 = one per 20.2 s (f=0.05, healthy) |
+| EB certifications | 40 = one per 19.6 s — **one EB per RB** |
+| Praos RBs supply | ≤ 19.6 tx/s (395 txs per RB at 90112 B / 228 B) |
+| **EBs supply** | **193.1 tx/s** |
+| **txs per certified EB** | **3,794** |
+
+So consensus throughput is one EB per RB opportunity carrying ~3,800 txs. **The EB
+is nowhere near its limits** — 865 kB against `maxEBClosureSize` 12 MB (7%), and
+3,794 against `maxTxsPerEb` 13,888 (27%) — and the forger's mempool held 19–35k at
+the time, so the snapshot was not starved. Bare payments, so ExUnits cannot bind
+either.
+
+### Open: what picks 3,794
+
+The EB is filled in `NodeKernel/Forge.hs` (~line 723):
+
+```haskell
+ebCap = fromMaybe Data.Measure.zero $ ebCapacityTxMeasure (configLedger cfg) tickedLedgerState
+let (rbTxs', rbTxsSize') = snapshotTake snap rbCap
+    ebTxs' = let (allTxs, _) = snapshotTake snap (Data.Measure.plus rbCap ebCap)
+             in drop (length rbTxs') allTxs
+```
+
+Neither dimension of `ebCap` binds, so the bound is coming from somewhere else.
+First candidate: the mempool snapshot. `getSnapshotFor` revalidates against the
+ticked ledger state, and mempool capacity is `TxMeasureWithDiffTime`-shaped,
+carrying the same cumulative-validation-time budget that caps admission (5 s by
+default). If the snapshot inherits that dimension while `snapshotTake`'s cap does
+not, the EB is bounded by validation time rather than by any EB limit — and 3,794
+txs at the 145 µs/tx measured here is ~0.55 s of work, the right order.
+
+Which answer it is decides the next move. A time budget means consensus throughput
+scales with cheaper transaction application, and the mempool work reaches it after
+all. A real EB or announcement-rate limit needs a protocol parameter instead.
