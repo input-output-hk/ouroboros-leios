@@ -76,7 +76,7 @@ declare "call_trace_process" {
           metric.counter {
             name              = "started_total"
             description       = "Total started calls"
-            prefix            = "cardano_node_metrics_loki_call_"
+            prefix            = "leios_logmetrics_call_"
             action            = "inc"
             match_all         = true
             max_idle_duration = "24h"
@@ -99,7 +99,7 @@ declare "call_trace_process" {
           metric.counter {
             name              = "ended_total"
             description       = "Total ended calls"
-            prefix            = "cardano_node_metrics_loki_call_"
+            prefix            = "leios_logmetrics_call_"
             action            = "inc"
             match_all         = true
             max_idle_duration = "24h"
@@ -108,7 +108,7 @@ declare "call_trace_process" {
           metric.counter {
             name              = "duration_total"
             description       = "Total call duration"
-            prefix            = "cardano_node_metrics_loki_call_"
+            prefix            = "leios_logmetrics_call_"
             action            = "add"
             source            = "duration"
             max_idle_duration = "24h"
@@ -117,7 +117,7 @@ declare "call_trace_process" {
           metric.counter {
             name              = "allocations_total"
             description       = "Total call allocations"
-            prefix            = "cardano_node_metrics_loki_call_"
+            prefix            = "leios_logmetrics_call_"
             action            = "add"
             source            = "allocations"
             max_idle_duration = "24h"

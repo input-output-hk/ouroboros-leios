@@ -378,7 +378,7 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cardano_node_metrics_loki_txgen_bytes_total{environment=\"leios\"}[${window}s])) / 1000",
+          "expr": "sum(rate(leios_logmetrics_txgen_bytes_total{environment=\"leios\"}[${window}s])) / 1000",
           "legendFormat": "accepted (firehose, measured)",
           "refId": "A"
         },
@@ -388,7 +388,7 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cardano_node_metrics_loki_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[${window}s])) * 204 / 1000",
+          "expr": "sum(rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[${window}s])) * 204 / 1000",
           "legendFormat": "accepted (centrifuge, est. 204 B/tx)",
           "refId": "B"
         },
@@ -964,7 +964,7 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum by (service) (rate(cardano_node_metrics_loki_txgen_submitted_total{environment=\"leios\"}[2m]))",
+          "expr": "sum by (service) (rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\"}[2m]))",
           "legendFormat": "accepted {{service}}",
           "refId": "A"
         },
@@ -974,7 +974,7 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cardano_node_metrics_loki_txgen_rejected_total{environment=\"leios\"}[2m]))",
+          "expr": "sum(rate(leios_logmetrics_txgen_rejected_total{environment=\"leios\"}[2m]))",
           "legendFormat": "rejected",
           "refId": "B"
         }
