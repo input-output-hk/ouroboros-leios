@@ -341,3 +341,53 @@ txs at the 145 µs/tx measured here is ~0.55 s of work, the right order.
 Which answer it is decides the next move. A time budget means consensus throughput
 scales with cheaper transaction application, and the mempool work reaches it after
 all. A real EB or announcement-rate limit needs a protocol parameter instead.
+
+## Forges are delayed by synchronous mempool work
+
+Measured on the three-injection-point run, from the forge loop's own call traces
+(`Forge.Loop.Call`, durations in seconds).
+
+| call | p50 | p95 | max | calls |
+| --- | --- | --- | --- | --- |
+| `partition-mempool` | 0.94–1.06 s | 1.29–1.80 s | **3.19 s** | 24–26 |
+| `forge-block` | 0.30–0.35 s | 0.47–1.21 s | 1.72 s | 24–26 |
+| `add-block-to-chaindb` | 0.24–0.49 s | 0.75–0.86 s | 1.04 s | 24–26 |
+| `resolve-and-apply-leios-closure` | 0.10 s | 0.14–0.21 s | 0.21 s | 14–15 |
+| `decide-leios-certifiy` | 0.007–0.016 s | 0.037–0.045 s | 0.048 s | 24–26 |
+| `mempool-get-snapshot-for-no-cache` | **0.008 s** | 0.012 s | 0.045 s | 14–15 |
+
+`partition-mempool` is the *parent* of the Leios and snapshot calls, so its cost
+decomposes as:
+
+```
+partition-mempool         1.04 s
+  ├─ resolve-and-apply      0.10
+  ├─ decide-leios-certify   0.013
+  ├─ get-snapshot-for       0.008
+  └─ unaccounted           ~0.92 s
+```
+
+Getting the snapshot is cheap (8 ms). The ~0.92 s is the only substantial
+untraced work in `partitionMempool`: the two `snapshotTake` walks over a
+32–35k-transaction snapshot, once for `rbCap` and once for `rbCap + ebCap`. The
+code carries the matching TODO — *"Force this to evaluate and instrument as
+mempool-snapshot-take"* — so instrumenting it is step one.
+
+Consequence, same run:
+
+| | |
+| --- | --- |
+| block arrival delay at peers | **1.73–1.85 s**, uniform across all twelve nodes |
+| of which network | ~0.02 s at `DELAY=10ms` (20 ms RTT) |
+| forge path p50 | ~1.6 s (`partition-mempool` + `forge-block` + `add-block-to-chaindb`) |
+| slots missed | bp1 21, bp2 13, bp3 12 |
+| forged vs adopted | bp1 24 forged, **22 adopted** |
+
+So the block delay is production, not propagation, and it tracks the forge path.
+Leadership is not lost (`node_is_leader` equals `forged` on all three producers),
+but the forge thread is blocked for 1.6 s at p50 against 1-second slots, slots are
+being missed, and bp1 lost two of its own blocks.
+
+Note this is the **same call** as the open 3,794-txs-per-EB question: whatever
+makes `snapshotTake` stop at 3,794 of 33k available is also what it spends ~0.9 s
+doing. One investigation, two answers.
