@@ -1,0 +1,24 @@
+# dozen-devnet run provenance — 2026-08-21T18:19:32Z
+
+cardano-node:
+  path:    /home/ch1bo/code/iog/cardano-node/dist-newstyle/build/x86_64-linux/ghc-9.6.7/cardano-node-11.1.0.164/x/cardano-node/build/cardano-node/cardano-node
+  version: cardano-node 11.1.0.164 - linux-x86_64 - ghc-9.6
+  sha256:  44626f05d339b977c76d133c1994550d9a0c1e0ba96229bf3bf88d436edeb06f
+cardano-cli:
+  path:    /nix/store/ldvj88blbf4a2rl70pp8akdgky3hkyyw-cardano-cli-exe-cardano-cli-11.1.0.0/bin/cardano-cli
+  version: cardano-cli 11.1.0.0 - linux-x86_64 - ghc-9.6
+  sha256:  6ca734dc5b618a7c5d4058d93067f9de7fe787ce338509b40afbe58b19a26820
+tx-firehose:
+  path:    /nix/store/460h71zzvj88a66sy16p5si1rw1b1r0v-tx-firehose-exe-tx-firehose-0.1.0.0/bin/tx-firehose
+  version: 
+  sha256:  284abc43b19b85fcd3269cecfaf71483d942108d506ecf9f2e536dc5e5e24098
+
+settings:
+  TPS=500
+  RATE=50Mbps
+  DELAY=10ms
+  TC=1
+  XRAY=1
+  SERVER=1
+  NODE_RTS=
+  nodes=12

@@ -431,3 +431,45 @@ being missed, and bp1 lost two of its own blocks.
 Note this is the **same call** as the open 3,794-txs-per-EB question: whatever
 makes `snapshotTake` stop at 3,794 of 33k available is also what it spends ~0.9 s
 doing. One investigation, two answers.
+
+## Optimistic forging removes the forge delay
+
+Same host, same topology, `reapplyTxs` dropped from the forge path (consensus
+`506875bfe`, "Make Mempool's getSnapshot for optimistic"). Load ramped 1 → 2 → 3
+generators at 5-minute intervals. Digest in
+[`results/2026-08-21-optimistic-forging/`](results/2026-08-21-optimistic-forging/).
+
+| | with `reapplyTxs` | optimistic |
+| --- | --- | --- |
+| `partition-mempool` p50 | 0.94–1.06 s | **0.10–0.18 s** |
+| block delay at peers | 1.73–1.85 s | **0.51–0.63 s** |
+| slots missed | 21 / 13 / 12 | **0 / 0 / 4** |
+| forks / extensions | 5–9 of 156 | 2 of 59 |
+| txs per certified EB | 6,115 (44%) | 5,466 (39%) |
+
+The forge path is fixed. `partition-mempool` fell to roughly what its traced
+children account for, block delay to ~0.55 s against ~0.02 s of actual network,
+and the forge thread stopped missing slots almost entirely. The snapshot cache
+reports **19 hits and 0 misses** — every request matched the cached ledger state,
+which is the mechanism. (The cache is only consulted on the no-certificate
+branch, so 19 requests against 62 blocks is expected.)
+
+Confirmed throughput scaled with load for the first time: **237 → 323 → 467
+tx/s** across the three phases.
+
+> [!CAUTION]
+> 467 tx/s is a **drain rate, not a sustainable one**. In phase 3 confirmed
+> (466.7) exceeded submitted (280.0), so the chain was working through a backlog
+> accumulated earlier while mempools sat at ~31k. A sustainable figure needs a run
+> long enough for the mempools to stop shrinking. The generators were also
+> throttled well below their ~392 tx/s burst capability, so offered load was not
+> the constraint either.
+
+### Answered: EB fill is not a revalidation artefact
+
+Removing revalidation from the forge path did **not** raise EB fill — 5,466 txs
+(39% of `maxTxsPerEb`) against 6,115 (44%) before, if anything slightly lower. So
+the hypothesis that the ~6,000-tx cap came from the mempool snapshot inheriting
+the validation-time dimension is **wrong**. Whatever bounds an EB at ~40% of its
+transaction limit, with bytes at ~12% of `maxEBClosureSize`, is elsewhere — and it
+is now the main open question for consensus throughput.
