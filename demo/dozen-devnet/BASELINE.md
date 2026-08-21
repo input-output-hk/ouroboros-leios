@@ -115,7 +115,31 @@ Character of the stall, for recognising it again:
   announce/acquire/certify sequence repeated four times with adds continuing
   throughout at 88–398/s.
 
-### 2. Per-node N2N ingest ceiling ≈ 261 tx/s — the binding throughput limit
+### 2. ~261 tx/s per node — NOT a per-node ceiling (corrected)
+
+> [!WARNING]
+> The conclusion below — that ~261 tx/s is a *per-node* limit — is **wrong**, and
+> the reasoning that produced it is the instructive part. Adding a second
+> injection point (a `tx-firehose` on `relay21` alongside `relay11`) doubled it:
+> the seven non-entry relays peaked at **511–520 tx/s**, and per-peer doubled too
+> (29 → 58 tx/s for the nine-peer relays, 87 → 145 for the three-peer BPs). So it
+> was a **supply-side** limit — what a single origin can push into the mesh, with
+> each hop passing on only what it received — not a receiver-side one.
+>
+> The flawed inference: three-peer block producers hitting the same 261 as
+> nine-peer relays looked like proof of degree-independence, hence a per-node
+> limit. But it is *equally* consistent with a single-source supply limit, since
+> everything downstream is fed from one origin and sees the same rate whatever
+> its own degree. The observation did not discriminate; it was treated as if it
+> did. A second injection point is the experiment that separates them.
+>
+> Note what did **not** change: sustained on-chain throughput, median 238.1 vs
+> 233.9 tx/s. Only the peaks rose (490–533 → 646.7). So diffusion was never the
+> sustained bottleneck — with mempools now at ~33k across every node, the surplus
+> accumulates rather than reaching the chain. Look to chain capacity (RB space,
+> EB size, certification rate) for the sustained limit.
+
+### 2. Per-node N2N ingest ceiling ≈ 261 tx/s — as originally concluded
 
 Peak `rate(txSubmission_txsAccepted_int)` over the run:
 
