@@ -182,9 +182,7 @@
       "id": 1,
       "options": {
         "legend": {
-          "calcs": [
-            "max"
-          ],
+          "calcs": ["max"],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -326,10 +324,7 @@
       "id": 2,
       "options": {
         "legend": {
-          "calcs": [
-            "max",
-            "mean"
-          ],
+          "calcs": ["max", "mean"],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
@@ -374,7 +369,7 @@
           "refId": "C"
         }
       ],
-      "title": "Submission vs. mempool (kB/s)",
+      "title": "Submission vs. mempool",
       "type": "timeseries",
       "description": "Submitted throughput per generator. Firehose bytes are the measured on-wire size (txgen_bytes_total); tx-centrifuge has no on-wire size, so its bytes are ESTIMATED at 204 B/tx (submitted-rate x 204). The mempool series is the derivative of mempoolBytes, clamped at 0 so draining (a block being forged) reads as no fill rather than as negative throughput. Submission is bursty when the mempool stalls, so widen the rate window before reading a level off this panel."
     },
@@ -436,7 +431,7 @@
               }
             ]
           },
-          "unit": "TxB/s"
+          "unit": "TxkB/s"
         },
         "overrides": [
           {
@@ -495,9 +490,7 @@
       "id": 3,
       "options": {
         "legend": {
-          "calcs": [
-            "max"
-          ],
+          "calcs": ["max"],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -516,7 +509,7 @@
             "uid": "mimir"
           },
           "editorMode": "builder",
-          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"integrations/cardano-node\", environment=\"leios\", instance=~\"$instance\"}[${window}s])",
+          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"integrations/cardano-node\", environment=\"leios\", instance=~\"$instance\"}[${window}s]) / 1000",
           "legendFormat": "{{instance}}",
           "range": true,
           "refId": "A"
@@ -592,12 +585,7 @@
       "id": 4,
       "options": {
         "legend": {
-          "calcs": [
-            "min",
-            "max",
-            "mean",
-            "median"
-          ],
+          "calcs": ["min", "max", "mean", "median"],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -805,9 +793,7 @@
         {
           "id": "partitionByValues",
           "options": {
-            "fields": [
-              "instance"
-            ],
+            "fields": ["instance"],
             "keepFields": false
           }
         }
@@ -912,10 +898,7 @@
       "id": 6,
       "options": {
         "legend": {
-          "calcs": [
-            "max",
-            "mean"
-          ],
+          "calcs": ["max", "mean"],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
@@ -1013,12 +996,8 @@
       },
       {
         "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": ["All"],
+          "value": ["$__all"]
         },
         "datasource": {
           "type": "loki",
