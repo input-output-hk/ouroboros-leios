@@ -57,6 +57,30 @@ processes:
       restart: on_failure
       backoff_seconds: 30
 
+  # Third generator, giving bp3's relay group an origin too. Without it bp3 is
+  # the only node with no injection point among its peers, and its mempool
+  # ingest is capped at roughly one origin's worth of supply (measured: 260 tx/s
+  # against 511-520 for the relays, which each peer with two origins).
+  # delegator3's key, so its tx chain is independent of the other two.
+  TxFirehose3:
+    disabled: true
+    working_dir: ${WORKING_DIR}
+    command: >
+      tx-firehose
+      --socket-path relay31/node.socket
+      --testnet-magic 164
+      --signing-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator3/payment.skey
+      --staking-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator3/staking.skey
+      --tps ${TPS}
+      --fee 1000000
+    log_location: "${WORKING_DIR}/tx-firehose3.log"
+    depends_on:
+      relay31:
+        condition: process_healthy
+    availability:
+      restart: on_failure
+      backoff_seconds: 30
+
   # A block producer and one relay, to see whether the two ends of the network
   # agree. The remaining ten nodes are on the Grafana dashboards.
   ObserveTipBp1:

@@ -133,11 +133,25 @@ Character of the stall, for recognising it again:
 > its own degree. The observation did not discriminate; it was treated as if it
 > did. A second injection point is the experiment that separates them.
 >
-> Note what did **not** change: sustained on-chain throughput, median 238.1 vs
-> 233.9 tx/s. Only the peaks rose (490–533 → 646.7). So diffusion was never the
-> sustained bottleneck — with mempools now at ~33k across every node, the surplus
-> accumulates rather than reaching the chain. Look to chain capacity (RB space,
-> EB size, certification rate) for the sustained limit.
+> What governs a node's mempool ingest is its **distance from an injection
+> point**, which the two-generator run separates cleanly:
+>
+> | origin neighbours | nodes | peak ingest |
+> | --- | --- | --- |
+> | 2 | the seven non-entry relays | 511–520 tx/s |
+> | 1 | bp1, bp2 | 435.9, 383.2 |
+> | 0 | bp3 | 260.7 |
+>
+> Every relay peers with both origins (the nine relays are fully meshed and the
+> entry points are among them); bp1 and bp2 each have an origin inside their own
+> relay group; bp3 has none, so everything reaches it second-hand. In this
+> topology a block producer with no entry relay in its group is structurally the
+> worst-served node — a placement consequence, not a node defect. `TxFirehose3`
+> (`relay31`, `delegator3`) exists to give bp3's group an origin too.
+>
+> Sustained on-chain throughput barely moved (median 238.1 vs 233.9 tx/s) while
+> peaks rose (490–533 → 646.7), but on-chain is not what this demo is measuring —
+> mempool and tx-submission throughput are.
 
 ### 2. Per-node N2N ingest ceiling ≈ 261 tx/s — as originally concluded
 
