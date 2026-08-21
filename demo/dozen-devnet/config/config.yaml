@@ -130,8 +130,11 @@ TraceOptions:
   # than doing slow work. Silencing these is what made the long stalls opaque.
   Mempool:
     severity: Debug
+  # Silenced again now that it has done its job: it confirmed the stalls are
+  # slow work rather than a LedgerNotFound retry storm, and at hundreds of
+  # tx/s it is pure volume.
   Mempool.AttemptAdd:
-    severity: Debug
+    severity: Silence
   Mempool.LedgerFound:
     severity: Debug
   Mempool.LedgerNotFound:
@@ -225,6 +228,14 @@ TraceOptions:
     severity: Notice
   TxSubmission.TxInbound:
     severity: Debug
+  # These two fire once per decision-loop iteration and were half of all log
+  # lines at 330 tx/s — 12 MB/s across twelve nodes, enough JSON encoding to
+  # make the tracer a load source in its own right. They only ever told us a
+  # ratio; raise them to Debug for a diagnostic run, not a throughput one.
+  TxSubmission.TxInbound.CanRequestMoreTxs:
+    severity: Silence
+  TxSubmission.TxInbound.CannotRequestMoreTxs:
+    severity: Silence
   TxSubmission.TxOutbound:
     severity: Notice
   Version.NodeVersion:
