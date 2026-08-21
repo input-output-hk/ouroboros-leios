@@ -14,6 +14,7 @@ processes:
   InitNamespaces:
     is_elevated: true
     command: |
+      TOOL_PATH="${TOOL_PATH}" \
       NS_PREFIX="${NS_PREFIX}" \
       NODE_SPEC="${NODE_SPEC}" \
       IP_HOST="${IP_HOST}" \

@@ -15,6 +15,10 @@ set -exuo pipefail
 
 BRIDGE="br-dozen"
 
+# sudo drops the environment, so iproute2 may not be on PATH here at all when it
+# comes from a devshell rather than the system profile. run.sh resolves it.
+export PATH="${TOOL_PATH}:$PATH"
+
 # Delete namespaces from a previous run (ours only — proto-devnet may be up).
 mapfile -t stale < <(ip netns list | cut -d' ' -f1 | grep "^${NS_PREFIX}:" || true)
 for ns in "${stale[@]}"; do
