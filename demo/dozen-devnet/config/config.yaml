@@ -100,6 +100,8 @@ TraceOptions:
     severity: Silence
   ChainDB.LedgerEvent.Flavor.V2.BackendTrace.LSM.LSMLookup:
     severity: Silence
+  ChainDB.LedgerEvent.Flavor.V2.BackendTrace.LSM.LSMTrace:
+    severity: Silence
   ChainDB.LedgerEvent.Forker:
     severity: Silence
   ChainDB.ReplayBlock.LedgerReplay:
@@ -235,6 +237,19 @@ TraceOptions:
   TxSubmission.TxInbound.CanRequestMoreTxs:
     severity: Silence
   TxSubmission.TxInbound.CannotRequestMoreTxs:
+    severity: Silence
+  # Per-tx bookkeeping, four lines for every transaction pulled from a peer, and
+  # all of it is already available: Mempool.AddedTx covers the adds and the
+  # txSubmission_* metrics cover the accept/request counts. Every node line is
+  # parsed three times over by the Alloy chain (node -> voting -> call-trace),
+  # so line count is what a saturated collector actually costs.
+  TxSubmission.TxInbound.Processed:
+    severity: Silence
+  TxSubmission.TxInbound.Collected:
+    severity: Silence
+  TxSubmission.TxInbound.RequestTxs:
+    severity: Silence
+  TxSubmission.TxInbound.AddedToMempool:
     severity: Silence
   TxSubmission.TxOutbound:
     severity: Notice
