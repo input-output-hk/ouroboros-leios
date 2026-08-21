@@ -458,7 +458,26 @@ Confirmed throughput scaled with load for the first time: **237 → 323 → 467
 tx/s** across the three phases.
 
 > [!CAUTION]
-> 467 tx/s is a **drain rate, not a sustainable one**. In phase 3 confirmed
+> **Divisor correction:** confirmed tx/s figures derived as
+> `cumulativeTxBytes / 228` are ~13% too high. Measured over a whole run,
+> `cumulativeTxBytes / submitted_total` = **258.9 B/tx**, so the ledger's per-tx
+> accounting is larger than the 228 B on-wire size the firehose reports. Use 259.
+> Corrected phase medians: 209 / 285 / 411 tx/s confirmed against 204 / 252 / 280
+> submitted. (`submitted` itself is sound — the txgen counter was within 0.1% of
+> the log lines.)
+>
+> **Which limit was binding is therefore unsettled.** Confirmed still exceeded
+> submitted (411 vs 280) and the entry relays stalled 48–59% of the window with
+> depth pinned near the ~34.4k time-capacity ceiling, so supply was throttled by
+> mempool admission and consensus had headroom. But EBs were only 39% full with
+> 27–31k txs sitting in the mempools — if consensus took what was available they
+> would be full. Both limits are live and close in magnitude.
+>
+> `MempoolTimeoutsEnabled: false` separates them: confirmed rising well past 411
+> means supply was the constraint; confirmed plateauing while mempools grow past
+> 34k means consensus is the wall and EB fill is the mechanism.
+>
+> 467 tx/s (411 corrected) is also a **drain rate, not a sustainable one**. In phase 3 confirmed
 > (466.7) exceeded submitted (280.0), so the chain was working through a backlog
 > accumulated earlier while mempools sat at ~31k. A sustainable figure needs a run
 > long enough for the mempools to stop shrinking. The generators were also
