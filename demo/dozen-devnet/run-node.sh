@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Generic node run script
+# Expects NODE_DIR, IP, and PORT to be set
+
+cd "$NODE_DIR"
+
+export LEIOS_DB_PATH="leios.db"
+
+# Make socket accessible to non-root (node runs elevated for namespace access)
+(
+  while [ ! -S "node.socket" ]; do sleep 0.1; done
+  chmod a+rw "node.socket"
+) &
+
+# Only block producers have pool keys copied into keys/ by run.sh; a relay runs
+# with none of the forging arguments at all.
+FORGE_ARGS=()
+if [ -f "keys/vrf.skey" ]; then
+  FORGE_ARGS=(
+    --shelley-vrf-key "keys/vrf.skey"
+    --shelley-kes-key "keys/kes.skey"
+    --shelley-bls-key "keys/bls.skey"
+    --shelley-operational-certificate "keys/opcert.cert"
+  )
+fi
+
+# Run cardano-node
+cardano-node run \
+  --config "config.yaml" \
+  --host-addr "$IP" \
+  --port "$PORT" \
+  --topology "topology.json" \
+  --database-path "db" \
+  --socket-path "node.socket" \
+  "${FORGE_ARGS[@]}"
