@@ -58,6 +58,9 @@ REQUIRED_COMMANDS=(
   "cardano-cli"
   "tx-firehose"
 )
+if [ "$TC" = "1" ]; then
+  REQUIRED_COMMANDS+=("ip" "tc")
+fi
 
 MISSING_COMMANDS=()
 for cmd in "${REQUIRED_COMMANDS[@]}"; do
@@ -95,6 +98,21 @@ echo "Initializing proto-devnet in $WORKING_DIR"
 mkdir -p "$WORKING_DIR"
 
 CONFIG_DIR="${SOURCE_DIR}/config"
+
+# Resolve iproute2 for the elevated processes. sudo drops the environment, so a
+# PATH-only iproute2 — the usual case when it comes from a devshell rather than
+# the system profile — would leave the namespace scripts unable to find ip.
+TOOL_PATH=""
+IP_BIN=""
+if [ "$TC" = "1" ]; then
+  IP_BIN=$(command -v ip)
+  TOOL_PATH=$(dirname "$IP_BIN")
+  tc_dir=$(dirname "$(command -v tc)")
+  if [ "$tc_dir" != "$TOOL_PATH" ]; then
+    TOOL_PATH="${TOOL_PATH}:${tc_dir}"
+  fi
+fi
+export TOOL_PATH IP_BIN
 
 # Copy genesis files and set start time
 cp -r "$CONFIG_DIR/genesis" "$WORKING_DIR/genesis"
