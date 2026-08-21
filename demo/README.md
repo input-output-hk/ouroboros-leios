@@ -4,6 +4,7 @@ This is a collection of Leios demonstrations created using specially patched ver
 
 - [burst](burst/): Protocol burst scenario to reproduce Leios interference with Praos
 - [proto-devnet](proto-devnet/): A leios-enabled devnet created from prototype cardano-nodes
+- [dozen-devnet](dozen-devnet/): Twelve nodes as 3 block producers x 3 relays, for throughput experiments at a realistic peer degree
 
 There are other, component-specific demos you might be looking for:
 
