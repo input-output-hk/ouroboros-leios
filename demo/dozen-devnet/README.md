@@ -73,9 +73,9 @@ Environment variables, see `run.sh` for the full list:
 
 | Variable            | Default              | Meaning                                             |
 | ------------------- | -------------------- | --------------------------------------------------- |
-| `TPS`               | `100`                | tx-firehose submission rate                         |
+| `TPS`               | `500`                | tx-firehose submission rate                         |
 | `RATE`              | `50Mbps`             | per-node uplink and downlink cap                    |
-| `DELAY`             | `20ms`               | one-way delay, so an RTT is `2 x DELAY`             |
+| `DELAY`             | `10ms`               | one-way delay, so an RTT is `2 x DELAY`             |
 | `TC`                | `1`                  | traffic control; `0` puts nodes on loopback         |
 | `XRAY`              | `1`                  | observability stack                                 |
 | `SERVER`            | `1`                  | process-compose control API on `127.0.0.1:8080`     |
@@ -143,7 +143,17 @@ dashboards come from `SHARED_CONFIG_DIR`, i.e. proto-devnet's `config/`.
 Duplicating them would only invite drift; both demos are network magic 164 with
 the same three pools.
 
-> [!NOTE]
-> Twelve nodes on one machine is a lot of `cardano-node`. Under load the box
-> itself can become the bottleneck — consider `+RTS -N2` per node before
-> reading a throughput ceiling as a protocol result.
+> [!IMPORTANT]
+> Twelve nodes on one machine is a lot of `cardano-node`, and the box will
+> become the bottleneck before the protocol does if you let it. `cardano-node`
+> is built with `-N2`, so twelve nodes ask for 24 capabilities regardless of
+> the host: on a 16-core machine that measured loadavg 24 and 90% CPU at
+> 330 tx/s offered, and the resulting ceiling said more about the host than
+> about Leios. Check `loadavg` against your core count before reading any
+> throughput number as a protocol result, and use `NODE_RTS` to size the
+> nodes to the machine.
+>
+> Tracing is part of that cost, not a free observer: at 330 tx/s the twelve
+> nodes wrote 12.2 MB/s of JSON. `config/config.yaml` silences the highest
+> volume traces for this reason — re-enable them for diagnosis, not for
+> throughput runs.
