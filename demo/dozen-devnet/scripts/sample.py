@@ -33,7 +33,7 @@ BPS = ["bp1", "bp2", "bp3"]
 RELAYS = [f"relay{g}{n}" for g in (1, 2, 3) for n in (1, 2, 3)]
 NODES = BPS + RELAYS
 
-METRICS_PORT = 12900
+METRICS_PORT = 12798
 PC_PORT = 8080
 
 # The Nth node in NODES gets IP_PREFIX(IP_OFFSET + N) — mirrors node_ip() in run.sh.
@@ -47,20 +47,22 @@ GAUGES = {
     "cumTxBytes": "cardano_node_metrics_cumulativeTxBytes_int",
 }
 # Per-node gauges, one column per node.
-PER_NODE_GAUGES = {"mp": "cardano_node_metrics_txsInMempool_int"}
+PER_NODE_GAUGES = {
+    "mp": "cardano_node_metrics_txsInMempool_int",
+    "mpB": "cardano_node_metrics_mempoolBytes_int",
+}
 # Per-node counters, reported as a per-second rate against the previous sample.
 PER_NODE_RATES = {"in": "cardano_node_metrics_txSubmission_txsAccepted_int"}
-# Forge counters, summed over the three producers. Ranking = RB, endorser = EB.
-# The tx_count/tx_bytes pair is what settles how many bytes the chain actually
-# accounts per transaction — divide one by the other rather than assuming the
-# on-wire size.
+# Forge counters, summed over the three producers. These are the ones this node
+# build actually exports — the Forge_ranking_*/Forge_endorser_* families appear
+# in the shared dashboards but not in this node's metrics, so EB fill and the
+# chain's bytes-per-tx come from digest.py's log extraction instead.
+# forged vs adopted is the interesting pair: a gap means a block was produced and
+# then lost, which is what a slow forge loop causes.
 FORGE = {
-    "rbBlocks": "cardano_node_metrics_Forge_ranking_block_total_count_counter",
-    "rbTxs": "cardano_node_metrics_Forge_ranking_block_total_tx_count_counter",
-    "rbBytes": "cardano_node_metrics_Forge_ranking_block_total_tx_bytes_counter",
-    "ebBlocks": "cardano_node_metrics_Forge_endorser_block_total_count_counter",
-    "ebTxs": "cardano_node_metrics_Forge_endorser_block_total_tx_count_counter",
-    "ebBytes": "cardano_node_metrics_Forge_endorser_block_total_tx_bytes_counter",
+    "forged": "cardano_node_metrics_Forge_forged_counter",
+    "adopted": "cardano_node_metrics_Forge_adopted_counter",
+    "didntAdopt": "cardano_node_metrics_Forge_didnt_adopt_counter",
     "leader": "cardano_node_metrics_Forge_node_is_leader_counter",
 }
 
@@ -118,8 +120,9 @@ def main():
     columns = (
         ["phase", "t", "slot", "blocks", "cumTxBytes", "confBps"]
         + list(FORGE)
-        + ["ebFill", "bytesPerTx"]
+        + ["mpBytesPerTx"]
         + [f"mp_{n}" for n in NODES]
+        + [f"mpB_{n}" for n in NODES]
         + [f"in_{n}" for n in NODES]
     )
     print("\t".join(columns), flush=True)
@@ -156,21 +159,18 @@ def main():
             if values:
                 totals[label] = sum(values)
                 row[label] = f"{sum(values):.0f}"
-        # Mean EB fill, against maxTxsPerEb = 13,888. This is the direct answer to
-        # "are EBs full" — inferring it from confirmed throughput divided by a
-        # trace count once produced a figure three times too low.
-        if totals.get("ebBlocks"):
-            row["ebFill"] = f"{totals['ebTxs'] / totals['ebBlocks']:.0f}"
-        # Bytes the chain accounts per transaction, over everything forged so far.
-        forged_txs = totals.get("rbTxs", 0) + totals.get("ebTxs", 0)
-        forged_bytes = totals.get("rbBytes", 0) + totals.get("ebBytes", 0)
-        if forged_txs:
-            row["bytesPerTx"] = f"{forged_bytes / forged_txs:.1f}"
-
         for prefix, metric in PER_NODE_GAUGES.items():
             for n in NODES:
                 if metric in samples[n]:
                     row[f"{prefix}_{n}"] = f"{samples[n][metric]:.0f}"
+        # What the mempool charges per transaction, averaged over the entry relay.
+        # Compare against the 228 B on the wire: the mempool, the wire and the
+        # ledger do not agree, and every tx/s figure depends on which one is used.
+        depth = samples["relay11"].get(PER_NODE_GAUGES["mp"])
+        depth_bytes = samples["relay11"].get(PER_NODE_GAUGES["mpB"])
+        if depth and depth_bytes:
+            row["mpBytesPerTx"] = f"{depth_bytes / depth:.1f}"
+
         for prefix, metric in PER_NODE_RATES.items():
             for n in NODES:
                 current = samples[n].get(metric)
