@@ -9,6 +9,7 @@ author:
   - Michael Karg <michael.karg@iohk.io>
   - Martin Kourim <martin.kourim@iohk.io>
   - Marcin Wójtowicz <marcin.wojtowicz@iohk.io>
+  - Drazen Popovic <drazen.popovic@iohk.io>
 ---
 
 # Introduction
@@ -52,11 +53,11 @@ The Linear Leios protocol operates by allowing a second, bigger type of block to
 
 ## Cardano node as a real-time system
 
-The implementation of Leios must be understood in the context of the Cardano node as a concurrent, reactive system operating under real-time constraints in an adversarial environment. While "real-time" in this context does not refer to the millisecond-level hard deadlines found in industrial control systems, timely action at the scale of seconds nontheless remains crucial to protocol success and network security. 
+The implementation of Leios must be understood in the context of the Cardano node as a concurrent, reactive system operating under real-time constraints in an adversarial environment. While "real-time" in this context does not refer to the millisecond-level hard deadlines found in industrial control systems, timely action at the scale of seconds nontheless remains crucial to protocol success and network security.
 
 The currently deployed Praos implementation establishes clear [data diffusion targets](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf#subsection.5.1): blocks must reach 95% of nodes within the 5-second $\Delta$ parameter, with target performance at 98% and stretch goals at 99%. While these are comfortably achieved most of the time, blocks are regularly adopted within 1 second across the network, there are some situations even in the current system where the target is not reached. For example, due to reward calculations happening at the epoch boundary.
 
-Despite being hard deadlines, these targets reflect the reality that network vulnerability increases when not being met. The protocol's safety and liveness guarantees depend on honest nodes being able to propagate blocks rapidly enough to prevent adversarial forks from gaining traction. Failure to meet these timing constraints can lead to increased rates of short forks, reduced chain quality, and - if persistent - ultimately compromise the integrity of the ledger. 
+Despite being hard deadlines, these targets reflect the reality that network vulnerability increases when not being met. The protocol's safety and liveness guarantees depend on honest nodes being able to propagate blocks rapidly enough to prevent adversarial forks from gaining traction. Failure to meet these timing constraints can lead to increased rates of short forks, reduced chain quality, and - if persistent - ultimately compromise the integrity of the ledger.
 
 ## Concurrency and resource management
 
@@ -64,7 +65,7 @@ The current primary responsibilities of a Cardano node are roughly:
 
 - Block diffusion: receiving chains from upstream, validate and select the best chain, and transmit chains downstream.
 - Transaction submission: receiving, validating, and transmitting transactions to be included in blocks.
-- Block production: creating new blocks and extending current chain when selected as slot leader. 
+- Block production: creating new blocks and extending current chain when selected as slot leader.
 
 Despite this apparent simplicity, this already results in a highly concurrent system once cardinalities of upstream and downstream network peers are considered. A `cardano-node` with the default configuration maintains 20 upstream hot peers, 10 upstream warm peers and can have up to a few hundred downstream connections, each of which may be simultaneously requesting or serving data. All of these operations share critical resources, including memory, CPU, and network bandwidth, requiring careful resource management to ensure timing requirements are met even under load.
 
@@ -76,7 +77,7 @@ Concretely, in the current system there are (including protocols for supporting 
 Leios significantly expands this concurrency model by introducing new responsibilities:
 
 - Endorser block and closure diffusion: receiving, validating, and transmitting EBs and their transaction closures.
-- Voting and vote diffusion: receiving, validating, and transmitting own and foreign votes on EBs. 
+- Voting and vote diffusion: receiving, validating, and transmitting own and foreign votes on EBs.
 
 Given the [proposed Leios mini-protocols](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#leios-mini-protocols), this would result in:
 
@@ -385,7 +386,7 @@ The [prototyping and adversarial testing](#prototyping-and-adversarial-testing) 
 >         Cert codecs/CDDL
 >       Cert validation
 >       Voting key registration/rotation via tx certs<br>- akin to Peras
->       Commitee selection 
+>       Commitee selection
 >       Registered keys / selected committee queries
 >       New protocol parameters
 >     ((Consensus))
@@ -513,40 +514,136 @@ The node must include new mini-protocols (**NEW-LeiosMiniProtocols**) to diffuse
 ## Consensus
 
 CIP-0164 implies functional requirements for the node to issue EBs alongside RBs, vote for EBs according to the rules from the CIP, include certificates when enough votes are seen, diffuse EBs and votes through the network layer, and retain EB closures indefinitely when certified. The Consensus layer is responsible for driving these operations and coordinating with the Network layer (which implements the actual mini-protocols) to ensure proper diffusion.
-    
+
 ### High-throughput mempool
 
+The Mempool already accepts transactions, diffuses them to peers, and pre-computes their validation for block production. What changes under Leios is that it must do all three at once, at a size where the way they are currently serialised stops working. Praos loads hide that; Leios does not, because it requires a much bigger Mempool (**UPD-LeiosBiggerMempool**). It must hold enough valid transactions for a block producer to fill a full EB alongside a full RB, at least twice an EB's capacity, so that a stake pool issuing a `CertRB` for a full EB can still fill a fresh EB alongside it (a `TxRB` carries fewer transactions than the EB certified by a `CertRB`). Stake pools are in any case indirectly incentivised to maximise EB size, just as with `TxRB`s, so that more fees enter the epoch's reward calculation.
+
+That very size is also what creates the challenge: the Mempool now holds roughly two endorser blocks' worth of transactions instead of two Praos blocks', and it is fed at up to ~1000 tx/s. Re-processing that many transactions whenever the chain moves, while serialising every Mempool operation behind a single lock, blocks transaction diffusion and block production for as long as the re-processing takes (**RSK-LeiosMempoolOverheadLatency**).
+
+Ad-hoc runs on a local twelve-node devnet, not a published benchmark, suggest that this risk does not degrade gracefully. Comparing two runs that differ only in effective Mempool capacity, roughly two and a half endorser blocks' worth against nearly eight, the deeper Mempool *inverts* the relationship between offered load and confirmed throughput: raising ingestion by a factor of two and a half lowered on-chain throughput by a third, whereas the shallower Mempool rose monotonically over the same load steps. Notably, the median cost of preparing a block was indistinguishable between the two runs; the entire difference sat in the tail. A design that bounds this work on average, rather than in the worst case, would therefore look correct in a benchmark and still lose leader slots in practice.
+
+Two points of interpretation matter for the design. First, nothing in the protocol makes a large Mempool expensive; it is expensive because the implementation still performs work proportional to Mempool contents while a block is being produced, which converts depth into forging latency. Holding more transactions is precisely what fills endorser blocks, and the shallower configuration paid for its stability with a measurable throughput loss at low load. The objective is therefore not a small Mempool but a cheap large one, with a capacity chosen for memory and fairness rather than one that silently keeps forging affordable. Second, if the work on the critical path cannot be made sufficiently sublinear, an explicit governor is preferable to a capacity limit that happens to serve as one.
+
+The solution is a threefold design: removing the lock contention so that accepting, diffusing and forging proceed concurrently (the *double-buffered mempool*), exploiting transaction validity ranges to make advancing the slot cheap, and keeping ready-to-forge views so that block production never re-applies the whole mempool on the critical path. The data structures and function names below track the `ouroboros-consensus` implementation and may evolve.
+
+![](./mempool-component-diagram.svg)
+
+#### Double-buffering
+
+A transaction is fully validated only once, when it is first admitted (`applyTx`), and thereafter only re-applied against a changed base (`reapplyTx`), which is far cheaper because it reuses that validation and only re-checks that the transaction still applies (see [Transaction validation levels](#transaction-validation-levels)).
+
+This asymmetry is currently used by the mempool, and the double-buffering design leans on it further: a change of base forces `O(|txs|)` re-applications, but each one is cheap, and in particular cheaper than the full validation that concurrent additions are paying at the same time.
+
+Cheaper does not mean free of ledger access, however. A new selection may have consumed UTxO that a transaction in the Mempool also consumes, so that transaction no longer applies, and the only way to detect this is against the new selection's UTxO map, which under UTxO-HD may require reading from disk via its `Forker`. Re-application is therefore cheap in validation work but not necessarily in I/O, and a design that assumes an entirely in-memory rebase would be wrong. Since a sync must touch every transaction, this is also where its cost is least predictable, which is a further argument for keeping it off the path that readers and block production depend on.
+
+Model the Mempool as a single shared state, read by many and mutated by a few operations. The state is a set of transactions applied on top of a ledger state:
+
+```haskell
+data MempoolState = MempoolState
+  { base  :: LedgerState  -- the selection's ledger state the mempool sits on top of
+  , txs   :: [Tx]         -- resolved, validated, applicable transactions, in order
+  , after :: LedgerState  -- base with all of txs applied; what a new tx is validated against
+  }
+
+data MempoolAction
+  = AddTx  Tx           -- validate and apply a new tx (~1000/s)
+  | Sync LedgerState    -- re-apply all txs onto a new base (a few per 20s)
+  | Remove [TxId]       -- force-drop txs to recover from forging a rejected block (rare)
+```
+
+Note that a new transaction is not validated against `base` but against `after`, the state that results from applying every transaction already in the Mempool, in order, on top of `base`. That is what allows a chain of dependent transactions to be accepted, and it is why the two fields have to be distinguished.
+
+Reading must never block: diffusion serves `txs` to peers, and block production draws from them to fill blocks. Reads also outnumber mutations, though not because transactions arrive slowly. Each admitted transaction is offered to every downstream peer, and a node may have a few hundred of those, so one `AddTx` gives rise to many reads; block production adds more. Adds and reads are coupled, but with a fan-out between them.
+
+`AddTx` validates and applies a transaction against `after` (`applyTx`), appends it, and advances `after`. `Sync` takes a new `base` from chain selection and re-applies (`reapplyTx`) every transaction onto it, rebuilding `after` as it goes. The invariant both preserve is that a transaction is in `txs` exactly when it is valid and applicable in that order on top of `base`, which is also the Mempool's core question: which transactions to accept, diffuse, and allow into a block.
+
+`Sync` is the hard case: re-applying every transaction is `O(|txs|)`, and under Leios `|txs|` is large. Serialising it under one lock is exactly the bottleneck: while a sync runs, nothing can be accepted, diffused or forged.
+
+The design that removes this contention is a **double-buffered mempool**, the same trick a graphics pipeline uses to keep a display smooth: readers are always served from the buffer **on screen**, the expensive work happens on a second buffer **off screen**, and the two are exchanged by a single quick flip.
+
+- **On screen** is the committed state, the single authoritative buffer and the only commit point. Readers (block production, diffusion) are served from it without blocking each other; it is held for writing only briefly, to commit an `AddTx` or to flip in a completed `Sync`. Because there is exactly one on-screen buffer, size and capacity accounting has one source of truth and cannot diverge.
+- **Off screen**, `Sync` re-applies every transaction against the new `base`, the `O(|txs|)` work, without holding the on-screen buffer or blocking anyone.
+
+Both mutations commit through one operation, which reconciles the state they prepared off screen against whatever is on screen at that moment:
+
+- `AddTx` validates its transaction off screen (the expensive, adversary-facing work), then commits it on screen by appending. Adds are serialised, so each commit is cheap.
+- `Sync` re-applies all `txs` off screen, then runs a **converging loop**: it reads the transactions that landed on screen meanwhile (the delta) and re-applies only those on top, repeating until the delta drops below a target size or a maximum number of iterations is reached. The delta tends to shrink each round, because ingestion pays full validation whereas `Sync` only re-applies, which is cheaper per tx, and ingestion is serialised; but a steady stream of adds could keep it from ever reaching zero, so the iteration cap guarantees the loop always terminates. Only then does it take the on-screen buffer, re-apply that small residual under the lock, and flip to the new `base`. Since the residual never exceeds the target size (or the cap), the screen is held for a bounded time, independent of `|txs|`.
+
+The result is still correct: the on-screen state is identical to re-applying all transactions against the new `base` in one pass, because re-apply is an ordered fold and splitting then resuming it yields the same result. And committing through the blocking flip, rather than an optimistic compare-and-swap, keeps a sync always making progress, never starved by a stream of concurrent adds.
+
 > [!WARNING]
 >
-> FIXME: write up problem statement: reapplyTx on thousands of txs taking too long to block tx submission (link to other section?) and also recomputing the mempool snapshot in/for block forging is insufficient too.
-> FIXME: Write about two concrete consequences:
->     - decouple tx diffusion from mempool syncing -> need to re-apply txs added while syncing
->     - only block producers: keep a view (or two for Leios in Dijkstra) of txs to put into blocks -> only do slot dependent checks in ledger?
-> TODO: More advanced DAG-style mempool model?
+> TODO: Shouldn't we be more confident that our own constructed block is valid?
 
-- **RSK-LeiosMempoolOverheadLatency**: Same as RSK-LeiosLedgerOverheadLatency, but for the Mempool frequently revalidating 15000% load in a caught-up node during congestion (ie 30000% the capacity of a Praos block, since the Leios Mempool capacity is now two EBs instead of two Praos blocks).
+One mutation breaks the purely additive picture the converging loop relies on. `Remove` force-drops a given set of transactions *even though they are still valid*. It exists only for a rare inconsistency: the node forged a block the ledger then rejected, so those transactions must leave the Mempool or they would be forged into the same rejected block again. A `Sync` cannot stand in for it, since re-application would find the transactions valid (that is how they entered a block in the first place) and, the block having not been adopted, there is no new `base` to sync. Because `Remove` deletes rather than appends, an in-flight `Sync` that snapshotted before it would resurrect the deleted transactions when it flips. The double-buffer keeps the loop additive by **preempting**: a `Remove` commits on screen and restarts any in-flight `Sync` from a fresh, post-removal snapshot. This is cheap precisely because `Remove` is a rare recovery action, never the normal way forged transactions leave the Mempool (that is an ordinary `Sync` once the node adopts its own block); were removals to become frequent, replaying an additions-and-removals log during the sync would be preferable to restarting it.
+
+#### Cheap ticking
+
+> [!WARNING]
+>
+> TODO: Not yet implemented and incomplete design. How will this exactly result in less checking in the forge loop? Shouldn't we incorporate knowledge of the leader schedule?
+
+A transaction is applicable only over a **validity range** of slots: its own validity interval (`invalidBefore`/`invalidHereafter`), together with the era and protocol parameters that govern how it is validated. So advancing the slot, not only changing the `base`, can invalidate a transaction.
+
+Two facts keep this cheap to track. The era and protocol parameters change only at **epoch boundaries**, so within an epoch the validation rules are fixed. And the mempool commits to an `interval` of its own, a window reaching to the next expected block or the epoch boundary, admitting only transactions valid across the whole of it:
+
+```haskell
+data MempoolState = MempoolState
+  { base     :: LedgerState
+  , interval :: (SlotNo, SlotNo)  -- slot range the whole mempool is valid over
+  , txs      :: [Tx]
+  }
+```
+
+A third operation, `Tick`, advances the current slot as a cheap **intersection**: as long as the new slot stays within `interval`, nothing observable to the transactions changes and nothing is re-applied. Leaving the `interval`, at the latest at an epoch boundary, forces a re-apply (and a re-validate on a new era). Since `interval` is roughly a 20-slot window, from the current tip or epoch start to the next expected block or epoch end, maintaining it lets the node advance many slots between the bigger, base-changing rebases without ever touching `txs`. The trade-off is that a transaction whose own validity range is narrower than `interval` cannot be admitted, which is acceptable for the performance win.
+
+#### Ready-to-forge views
+
+> [!WARNING]
+>
+> TODO: Not yet implemented and likely incomplete design
+
+Removing the lock contention lets forging run concurrently with ingestion and diffusion, but it does not by itself make forging fast: the block producer still needs the transactions applicable at the forging slot, and computing that naively means re-applying the mempool at that moment, the `O(|txs|)` cost we must keep off the critical path where only a fraction of a slot is available.
+
+For forging, a block producer works against not one `base` but two. Under Leios in Dijkstra it issues an EB alongside each RB, and that RB either certifies the EB announced by the preceding RB (a `CertRB`) or carries transactions directly (a `TxRB`). Those two outcomes are two different bases the mempool's transactions would be applied on:
+
+- one where the preceding endorsement is **not** being certified, so all mempool transactions are available to forge and announce;
+- one where it **is** being certified, so the transactions of that now-settled EB are already in the ledger and must be excluded.
+
+Which base applies is only decided at forge time, once it is known whether enough votes for the preceding EB have arrived. The Mempool therefore keeps **two ready-to-forge views**, one per base, pre-computed so that neither outcome pays a re-application on the critical path. At forge time the block producer just picks the matching view, selects transactions, and performs the cheap slot-dependent checks (see [cheap ticking](#cheap-ticking)).
+
+For that to hold, forging must stay a cheap *read* of a view and never turn into a fresh computation. Two mechanisms keep it so, each with a concrete form in the `cardano-node`:
+
+- an **optimistic view** keeps forging off the rebase path: the block producer reads the matching ready-to-forge view as it stands, just as any other reader is served from the on-screen buffer, rather than first synchronising it to the very latest base. A tip that arrived moments earlier is picked up on the next block-production opportunity.
+- a **capped forging snapshot** bounds whatever reconciliation is still unavoidable: advancing the chosen view to the forging slot is free while it stays within the `interval` (cheap ticking), and any residual re-application against the base (today `getSnapshotFor` can trigger a full one) is time- and size-bounded, so producing the snapshot cannot stall behind a large re-apply.
+
+Of the two, the cap is the harder guarantee, because it is what bounds the case the optimistic view does not cover. Reconciliation, not the selection of transactions, dominates the cost of producing a block, and a view that is free when it is current but unbounded when it is not still puts seconds into a leader slot. Bounding the expected cost is therefore not sufficient; the bound has to hold precisely when the view must be brought forward, which at Leios Mempool depths is a common enough case to dominate the distribution.
+
+Missing it costs more under Leios than under Praos, where a slow forge costs at most the slot. An endorsement can only be certified by the block succeeding the one that announced it, so the votes it needs must be produced and diffused within a single inter-block interval. A slow forge spends part of that interval before anyone else can begin: the announcement, and the EB data a voter needs in order to validate what it is voting on, are released late by however long the producer took to prepare them. Every voter's window is shortened by that delay, not just the producer's own, so votes arrive later and some arrive too late to count, taking with them the endorsement they would have certified. Forging latency therefore does not merely delay a block, it propagates into the voting round and can amplify into certification failures across the network, which argues for keeping this work off the critical path rather than merely making it faster.
+
+> [!WARNING]
+>
+> TODO: This work grows with transaction *size* as well as with their number, so a bound expressed purely in transaction count would not constrain it. The bound presumably wants to be in terms of the ledger work implied by a view, though what the right measure is remains open.
+
+
+> [!WARNING]
+>
+> FIXME: Write about ingesting txs into the mempool from endorsements (to the end of it). This should actively work against front-running and mempool fragmentation (the latter may be induced by network delay / partitions, while the latter is with zero delay and just reapplying txs from the cache)
 
 ### Block production
-
-> [!WARNING]
->
-> FIXME: Move mempool size discussion into section above. Interface between Mempool / BlockForging needs to change -> forge loop needs quick or at least time bound access to txs to be put into a block (+EB in dijkstra)
 
 The existing block production thread must be updated to generate an EB at the same time it generates an RB (**UPD-LeiosAwareBlockProductionThread**). In particular, the hash of the EB is a field in the RB header, and so the RB header can only be decided after the EB is decided, and that can only be after the RB payload is decided. Moreover, the RB payload is either a certificate or transactions, and that must also be decided by this thread, making it intertwined enough to justify doing it in a single thread.
 
 - **REQ-IssueLeiosBlocks** The node must issue an EB alongside each RB it issues, unless that EB would be empty.
 
-The Mempool capacity should be increased (**UPD-LeiosBiggerMempool**) to hold enough valid transactions for the block producer to issue a full EB alongside a full RB. The Mempool capacity should at least be twice the capacity of an EB, so that the stake pool issuing a CertRB for a full EB would still be able to issue a full EB alongside that CertRB (TxRB's have less transaction capacity than the EB certified by a CertRB). In general, SPOs are indirectly incentivized to maximize the size of the EB, just like TxRBs—so that more fees are included in the epoch's reward calculation.
-
 For the block production thread to determine which transactions from a mempool snapshot can go into an RB, which overflow into an EB and how many can fit into the EB, a new capacity measure analogous to the existing `blockCapacityTxMeasure` will be needed for EBs (**NEW-LeiosEbCapacityMeasure**). The EB capacity measure must incorporate the new EB-specific block limit [protocol parameters](#new-protocol-parameters) from the ledger state, much like the existing Praos block capacity is also determined by protocol parameters.
 
-Furthermore, the existing `forgeBlock` method and/or the `BlockForging` interface must be extended (**UPD-LeiosForgeBlock**) to optionally produce an EB for a given block type (`blk`).
+Furthermore, the existing `forgeBlock` method and/or the `BlockForging` interface must be extended (**UPD-LeiosForgeBlock**) to optionally produce an EB for a given block type (`blk`). The transactions to include are prepared by the Mempool ahead of time, see [ready-to-forge views](#ready-to-forge-views).
 
 > [!WARNING]
 >
 > FIXME: also write about including certificates in blocks when available, also link to certification and subsequent sections on chain selection/block validation
-
-The first version of the Mempool can be naive, with the block production thread handling everything. A second version can try to pre-compute in order to avoid delays (ie discarding the certified EB's chunk of transactions) when issuing a CertRB and its announced EB.
 
 ### Endorser block diffusion
 
@@ -562,7 +659,7 @@ The first version of the Mempool can be naive, with the block production thread 
 > FIXME: what kind of validation while diffusing (only size and hash checks)
 >
 > TODO: write about "which EB to prioritize" -> freshest first (protocol burst) vs. oldest (protocol storm) etc.
-> TODO: write about "which peer to fetch from" -> everything from one big ledger peer, round robin from all peers? 
+> TODO: write about "which peer to fetch from" -> everything from one big ledger peer, round robin from all peers?
 >
 > FIXME: at least put a naiive design (fetch freshest from everyone that offers) - safe but wasteful
 
@@ -601,7 +698,7 @@ This component therefore stores EBs on disk just as the ChainDB already does for
 >  - having an immutable EBs table or database should bound access times on EBs
 >    and closures of the volatile part (which should be log n, thus bounding n
 >    is desirable)
-> TODO: interaction with mempool (here or above) 
+> TODO: interaction with mempool (here or above)
 
 The first version of LeiosEbStore can just be two bog standard key-value stores, one for immutable and one for volatile. A second version maybe instead integrates certified EBs into the existing ImmDB? That integration seems like a good fit. It has other benefits (eg saves a disk roundtrip and exhibits linear disk reads for driver prefetching/etc), but those seem unimportant so far.
 
@@ -941,7 +1038,7 @@ The suite will perform the following actions:
 ### Observability as a first-class citizen
 
 By implementing evidence of code execution, a well-founded tracing system is the prime provider of observability for a system.
-This observability not only forms the base for monitoring and logging, but also performance and conformance testing.  
+This observability not only forms the base for monitoring and logging, but also performance and conformance testing.
 
 For principled Leios quality assurance, a formal specification of existing and additional Leios trace semantics is being created, and will need to be maintained. This specification is language- / implementation-independent, and
 should not be automatically generated by the Node's Haskell reference implementation. It needs to be an independent source of truth for system observables.
@@ -953,7 +1050,7 @@ Last not least, the existing simulations will be maintained and kept operational
 ### Testing during development
 
 Wheras simulations operate on models and are able to falsify hypotheses or assess probability of certain outcomes, evolving
-prototypes and implementations rely on evidence to that end. A dedicated environment suitable for both performance and conformance testing will be created; primarily as feedback for development, but also to provide transparency into the ongoing process.  
+prototypes and implementations rely on evidence to that end. A dedicated environment suitable for both performance and conformance testing will be created; primarily as feedback for development, but also to provide transparency into the ongoing process.
 
 This environment serves as a host for operating small testnets. It automates deployment and configuration, and is parametrizable as far as topology, and deployed binaries are concerned. This means it needs to abstract wrt. of configuring
 a specific prototype or implementation. This enables deploying adversarial nodes for the purpose of network conformance testing, as well as performance testing at system integration level. This environment also guarantees the
