@@ -61,7 +61,9 @@ An EB is certifiable only by the block *succeeding* its announcement, so a vote 
 
 **The p50s are indistinguishable — the entire effect lives in the tail.** A run reporting only medians would have concluded the two configurations were identical, so any budget for the forge loop needs stating on the tail rather than the average.
 
-Worth separating out: the *inclusion* rate — EBs whose certificate actually lands, ~52–53% of leader slots — is **not** what the forge work moves, and is best treated as near a structural ceiling rather than headroom. An EB needs its succeeding block to fall more than `minCertificationGap` slots later, so with Poisson block arrival the achievable rate is roughly `e^(-gap × f)`: 61% at the current gap of 10, 50% at the CIP's 14. Measured 52–53% sits between those. Since 10 is if anything already too low, there is no tightening available here. What bounding the forge loop recovers is the votes lost *on top of* that structural rate.
+Worth separating out: the *inclusion* rate — EBs whose certificate actually lands, ~52–53% of leader slots — is **not** what the forge work moves. It is set by the certification window: an EB needs its succeeding block to fall more than `minCertificationGap` slots later, so with Poisson block arrival the achievable rate is roughly `e^(-gap × f)`, which at the gap and `f` used here puts it in the 50–60% range. Measured 52–53% sits there, so it reads as the window doing what it does rather than as headroom. What bounding the forge loop recovers is the votes lost *on top of* that structural rate — which is the part we can act on.
+
+Where exactly that ceiling falls is a parameter question, and one this topology cannot settle on its own; it wants proper sweeps of the Leios parameters across several topologies.
 
 Three explanations this rules out, each of which I chased first: EB fill (EBs are 97% full and get *fuller* under load), forks (6.0% — 21 switches against 329 extensions), and EB overlap (re-endorsing the same transactions across producers is expected protocol behaviour, not waste).
 
