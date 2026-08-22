@@ -7,7 +7,7 @@ record is `results/*/digest.md` and `BASELINE.md`.
 | file | destination |
 | --- | --- |
 | `comment-911.md` | comment on issue #911 (prototype high-throughput mempool) — **consolidated, ready for review** |
-| `comment-845-draft.md` | comment on issue #845 (bottleneck for 200 TxkB/s) |
+| `comment-845.md` | comment on issue #845 (bottleneck for 200 TxkB/s) |
 
 `comment-911.md` supersedes the two earlier #911 drafts, which are deleted. It
 folds the long writeup into the comment and cites the existing screenshots by
