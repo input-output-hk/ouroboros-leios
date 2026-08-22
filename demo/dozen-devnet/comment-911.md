@@ -33,14 +33,14 @@ Peak N2N accept per relay across the injection-point series was **261 → 520 �
 
 Two paired runs differing only in **effective mempool capacity** — about 34,000 transactions against about 108,000 — with three phases each of one/two/three injection points. We reached those two depths by toggling `MempoolTimeoutsEnabled` (with it on, the 5 s validation-time budget admits ~34,400; with it off the 25 MB byte override binds at ~107,900), but the flag is incidental: setting the byte cap directly would give the same two points, and any other pair of caps would probe the same axis.
 
-| | ingest | on chain | kB/block | depth | blocks lost |
-| --- | --- | --- | --- | --- | --- |
-| unbounded, 1 gen | 78.2 | 77.6 | 1921 | 107,904 | 1 |
-| unbounded, 2 gen | 155.5 | 64.1 | 1281 | 107,904 | 3 |
-| unbounded, 3 gen | 196.5 | **51.8** | 1094 | 107,904 | 3 |
-| bounded, 1 gen | 78.2 | 66.6 | 1866 | 33,872 | 0 |
-| bounded, 2 gen | 156.0 | 88.3 | 1767 | 33,559 | 2 |
-| bounded, 3 gen | 186.7 | **96.6** | 1866 | 33,773 | 2 |
+|                  | ingest | on chain | kB/block | depth   | blocks lost |
+|------------------|--------|----------|----------|---------|-------------|
+| unbounded, 1 gen | 78.2   | 77.6     | 1921     | 107,904 | 1           |
+| unbounded, 2 gen | 155.5  | 64.1     | 1281     | 107,904 | 3           |
+| unbounded, 3 gen | 196.5  | **51.8** | 1094     | 107,904 | 3           |
+| bounded, 1 gen   | 78.2   | 66.6     | 1866     | 33,872  | 0           |
+| bounded, 2 gen   | 156.0  | 88.3     | 1767     | 33,559  | 2           |
+| bounded, 3 gen   | 186.7  | **96.6** | 1866     | 33,773  | 2           |
 
 **The shallower mempool scales monotonically up; the deeper one monotonically down.** At three generators the shallow configuration delivers 86% more — 2.5× the offered ingest producing a third *less* on chain is congestion collapse.
 
@@ -52,12 +52,12 @@ So the cap being load-bearing is a statement about our implementation rather tha
 
 ### The mechanism, end to end
 
-| | unbounded | bounded |
-| --- | --- | --- |
-| `partition-mempool` p50 | 0.333 s | 0.306 s |
-| `partition-mempool` **p95** | **7.395 s** | **1.086 s** |
-| votes withheld | 133 / 540 (25%) | 35 / 257 (14%) |
-| **`tooLate` votes** | **78** | **0** |
+|                             | unbounded       | bounded        |
+|-----------------------------|-----------------|----------------|
+| `partition-mempool` p50     | 0.333 s         | 0.306 s        |
+| `partition-mempool` **p95** | **7.395 s**     | **1.086 s**    |
+| votes withheld              | 133 / 540 (25%) | 35 / 257 (14%) |
+| **`tooLate` votes**         | **78**          | **0**          |
 
 An EB is certifiable only by the block *succeeding* its announcement, so a vote gets one inter-block interval to be produced and diffused. A 7 s forge tail eats that window; a 1 s tail does not — bound the tail and `tooLate` goes to zero.
 
@@ -67,6 +67,8 @@ Worth separating out: the *inclusion* rate — EBs whose certificate actually la
 
 Some things the data rules out as explanations: EB fill (EBs are 97% full and get *fuller* under load), forks (6.0% — 21 switches against 329 extensions), and EB overlap (re-endorsing the same transactions across producers is expected protocol behaviour, not waste).
 
-Which puts the direction plainly: critical-path consensus work wants to be constant, or at worst logarithmic, in mempool depth — and per #845, in *bytes* too, since holding everything else fixed and only raising transaction size took `partition-mempool` from 0.306 s to 1.183 s and `add-block-to-chaindb` from 0.054 s to 0.416 s. On this evidence linear work there does not degrade gracefully; it inverts the load-throughput relationship.
+The headline is still the mempool itself: moving sync off the lock is what de-congested it. Sync is O(depth) — 0.104 ms per transaction, near-perfectly linear across all twelve nodes, so ~2.9 s at 28k — and it now costs nothing, which is the whole point. That is the congestion this issue set out to remove, and on this evidence it is removed.
 
-Encouragingly, the pattern already works in this codebase. Mempool *sync* is O(depth) — measured at 0.104 ms per transaction, near-perfectly linear across all twelve nodes, so ~2.9 s at 28k — and it costs nothing, because the double buffer moved it off the lock. The remaining linear term on the critical path is specifically the **snapshot recompute on cache miss**, which revalidates the whole mempool inside the forge loop; the take itself is already O(log n) plus bounded output. Moving that recompute off the critical path is the same move the double buffer made for readers and adders, and it is worth ~0.9 s per forge. The optimistic `getSnapshot` is a hack rather than a fix — it skips revalidation instead of relocating it — but it prices the prize.
+What the paired runs add is a reason to keep going on efficiency rather than stop here. The remaining depth-dependent cost sits in the forge loop, in the snapshot recompute on a cache miss; the take itself is already O(log n) plus bounded output. Running with an optimistic `getSnapshot` is not a serious mechanism — it simply skips the revalidation — but it does size the opportunity at roughly 0.9 s per forge, and that is worth knowing before deciding how much to invest.
+
+Where to look next, roughly in order: prepare the work ahead of the leader slot rather than inside it, so a miss does not mean revalidating the whole mempool synchronously; extend the revalidation result incrementally instead of recomputing it; and keep an eye on the byte dimension, since #845 shows the same calls grow with transaction size as well as with depth (`partition-mempool` 0.306 s → 1.183 s, `add-block-to-chaindb` 0.054 s → 0.416 s at 652 B). None of that is needed for the targets above — it is what buys headroom for the next ones.
