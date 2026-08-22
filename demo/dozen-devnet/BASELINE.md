@@ -1,4 +1,45 @@
-# Baseline: dozen-devnet throughput, pre-uncongestion mempool
+# dozen-devnet throughput
+
+## Conclusion
+
+Achievable throughput is set by two protocol constants and the stochastic block
+arrival. Mempool, tx-submission and forging only have to be good enough not to
+get in the way — and after the work recorded below, they are.
+
+```
+maxTxsPerEb = (maxMsgLeiosBlockBytesSize - 5) / minEbItemBytesSize
+            = (500000 - 5) / 36                    = 13,888 txs per EB
+mean RB interval                          1/f      = 20 s
+minCertificationGap                                = 10 slots
+P(next RB qualifies to certify)  e^(-10 x 0.05)    = 0.607
+effective interval between certifying RBs 20/0.607 = 33.0 s
+
+ceiling = 13,888 / 33.0                            = 421 tx/s
+measured                                           = 411 tx/s   (98%)
+```
+
+Inter-block times are memoryless, so a qualifying gap averages 10 + 20 = 30 s,
+which is why the certifying interval is 33 s and not 20 s. To raise the ceiling,
+raise `maxTxsPerEb` (via `maxMsgLeiosBlockBytesSize`, a CIP-0164 recommendation)
+or shorten `minCertificationGap` — nothing in the mempool or the network path
+will move it.
+
+Measured on a 16-core/32-thread box at ~10% CPU, so these are protocol numbers,
+not host numbers. Announced EBs were 97% full (p50 body 486,111 B of 500,000).
+
+| layer | number | state |
+| --- | --- | --- |
+| submission, one generator unblocked | ~392 tx/s | not limiting |
+| mempool ingest, 3 injection points | 611 tx/s peak per relay | not limiting |
+| mempool admission | ~34,400 txs (5 s validation-time budget) | a useful governor |
+| forge path after optimistic snapshot | 0.10–0.18 s, block delay ~0.55 s | not limiting |
+| **consensus** | **421 tx/s** | **the ceiling** |
+
+Everything below is how this was established, including the wrong turns —
+several conclusions here were retracted after further measurement, and those
+are left visible with the flawed reasoning named.
+
+## Origin: baseline for the pre-uncongestion mempool
 
 Reference run for comparing the high-throughput ("uncongested") mempool against
 the mempool currently on `leios-prototype`. Recorded 2026-08-21.
