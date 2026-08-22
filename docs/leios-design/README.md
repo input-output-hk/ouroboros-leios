@@ -517,13 +517,7 @@ CIP-0164 implies functional requirements for the node to issue EBs alongside RBs
 
 ### High-throughput mempool
 
-The Mempool is a component in `cardano-node` that *stages* transactions submitted by users of the network that have not yet been *committed* on-chain, i.e. not yet included in a forged block. Functionally, it aims to achieve three primary goals:
-
-1. **Accept** new transactions into the network from local clients (e.g. user wallets via `LocalTxSubmission`),
-2. **Diffuse** (propagate) "good" transactions across the network (e.g. to peers via `TxSubmission`),
-3. **Pre-compute** transaction validation and application (the state change), for timely inclusion in a block during block production.
-
-As of today, goals 2 and 3 are not fully met. We could get away with these inefficiencies under Ouroboros Praos traffic loads, but they become a massive bottleneck under Ouroboros Leios, which requires a much bigger Mempool (**UPD-LeiosBiggerMempool**). It must hold enough valid transactions for a block producer to fill a full EB alongside a full RB, at least twice an EB's capacity, so that a stake pool issuing a `CertRB` for a full EB can still fill a fresh EB alongside it (a `TxRB` carries fewer transactions than the EB certified by a `CertRB`). Stake pools are in any case indirectly incentivised to maximise EB size, just as with `TxRB`s, so that more fees enter the epoch's reward calculation.
+The Mempool already accepts transactions, diffuses them to peers, and pre-computes their validation for block production. What changes under Leios is that it must do all three at once, at a size where the way they are currently serialised stops working. Praos loads hide that; Leios does not, because it requires a much bigger Mempool (**UPD-LeiosBiggerMempool**). It must hold enough valid transactions for a block producer to fill a full EB alongside a full RB, at least twice an EB's capacity, so that a stake pool issuing a `CertRB` for a full EB can still fill a fresh EB alongside it (a `TxRB` carries fewer transactions than the EB certified by a `CertRB`). Stake pools are in any case indirectly incentivised to maximise EB size, just as with `TxRB`s, so that more fees enter the epoch's reward calculation.
 
 That very size is also what creates the challenge: the Mempool now holds roughly two endorser blocks' worth of transactions instead of two Praos blocks', and it is fed at up to ~1000 tx/s. Re-processing that many transactions whenever the chain moves, while serialising every Mempool operation behind a single lock, blocks transaction diffusion and block production for as long as the re-processing takes (**RSK-LeiosMempoolOverheadLatency**).
 
@@ -539,18 +533,17 @@ The solution is a threefold design: removing the lock contention so that accepti
 
 A transaction is fully validated only once, when it is first admitted (`applyTx`), and thereafter only re-applied against a changed base (`reapplyTx`), which is far cheaper because it reuses that validation and only re-checks that the transaction still applies (see [Transaction validation levels](#transaction-validation-levels)).
 
-This asymmetry is currently used by the mempool, and the double-buffering design leans on it further: a change of base forces `O(|txs|)` re-applications, but each one is cheap, and in particular cheaper than the full validation that concurrent additions are paying at the same time. It also means only that first validation should need to load data from an on-disk ledger; a transaction already in the mempool should be re-applied without reading from disk at all.
+This asymmetry is currently used by the mempool, and the double-buffering design leans on it further: a change of base forces `O(|txs|)` re-applications, but each one is cheap, and in particular cheaper than the full validation that concurrent additions are paying at the same time.
 
-> [!WARNING]
->
-> TODO: Re-application can still reach the on-disk ledger today. Deliberately keeping a mempool transaction's resolved data cache-local would keep rebase off the disk entirely.
+Cheaper does not mean free of ledger access, however. A new selection may have consumed UTxO that a transaction in the Mempool also consumes, so that transaction no longer applies, and the only way to detect this is against the new selection's UTxO map, which under UTxO-HD may require reading from disk via its `Forker`. Re-application is therefore cheap in validation work but not necessarily in I/O, and a design that assumes an entirely in-memory rebase would be wrong. Since a sync must touch every transaction, this is also where its cost is least predictable, which is a further argument for keeping it off the path that readers and block production depend on.
 
 Model the Mempool as a single shared state, read by many and mutated by a few operations. The state is a set of transactions applied on top of a ledger state:
 
 ```haskell
 data MempoolState = MempoolState
-  { base :: LedgerState  -- ledger state the txs are applied on top of
-  , txs  :: [Tx]         -- resolved, validated, applicable transactions
+  { base  :: LedgerState  -- the selection's ledger state the mempool sits on top of
+  , txs   :: [Tx]         -- resolved, validated, applicable transactions, in order
+  , after :: LedgerState  -- base with all of txs applied; what a new tx is validated against
   }
 
 data MempoolAction
@@ -559,7 +552,11 @@ data MempoolAction
   | Remove [TxId]       -- force-drop txs to recover from forging a rejected block (rare)
 ```
 
-Reading dominates and must never block: diffusion continuously serves `txs` to peers, and block production draws from them to fill blocks. Against that steady stream of reads, the two mutations are comparatively rare. `AddTx` validates and applies a peer's or client's transaction against `base` (`applyTx`) and appends it. `Sync` takes a new `base` from chain selection and re-applies (`reapplyTx`) every transaction onto it. The invariant both preserve is that a transaction is in `txs` exactly when it is valid and applicable to `base`, which is also the Mempool's core question: which transactions to accept, diffuse, and allow into a block.
+Note that a new transaction is not validated against `base` but against `after`, the state that results from applying every transaction already in the Mempool, in order, on top of `base`. That is what allows a chain of dependent transactions to be accepted, and it is why the two fields have to be distinguished.
+
+Reading must never block: diffusion serves `txs` to peers, and block production draws from them to fill blocks. Reads also outnumber mutations, though not because transactions arrive slowly. Each admitted transaction is offered to every downstream peer, and a node may have a few hundred of those, so one `AddTx` gives rise to many reads; block production adds more. Adds and reads are coupled, but with a fan-out between them.
+
+`AddTx` validates and applies a transaction against `after` (`applyTx`), appends it, and advances `after`. `Sync` takes a new `base` from chain selection and re-applies (`reapplyTx`) every transaction onto it, rebuilding `after` as it goes. The invariant both preserve is that a transaction is in `txs` exactly when it is valid and applicable in that order on top of `base`, which is also the Mempool's core question: which transactions to accept, diffuse, and allow into a block.
 
 `Sync` is the hard case: re-applying every transaction is `O(|txs|)`, and under Leios `|txs|` is large. Serialising it under one lock is exactly the bottleneck: while a sync runs, nothing can be accepted, diffused or forged.
 
