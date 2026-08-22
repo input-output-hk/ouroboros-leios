@@ -45,8 +45,19 @@ set -a
 # undershooting costs linearly.
 #
 # 1 output is 232 B as the mempool accounts it (228 B on the wire); each extra
-# output adds roughly 35-40 B. OUTPUTS=20 aims a little past the crossover.
+# output adds roughly 35-40 B.
+#
+# The practical ceiling is funding: each output needs its own min-ada, and the fee
+# is fixed, so the input selection has to cover fee + OUTPUTS * min-ada. 5 outputs
+# gives ~648 B transactions.
 : "${OUTPUTS:=1}"
+# Which tx-firehose to run. Defaults to whatever is on PATH, which is normally the
+# nix-store build; point it at a local cabal build to iterate on the generator
+# without rebuilding the devnet:
+#   TX_FIREHOSE=.../dist-newstyle/.../tx-firehose ./run.sh
+# PATH is resolved by the process at exec time, so an already-running
+# process-compose keeps using whatever it started with — hence the explicit knob.
+: "${TX_FIREHOSE:=tx-firehose}"
 # Traffic control (on by default, disable with TC=0)
 : "${TC:=1}"
 if [ "$TC" = "1" ]; then

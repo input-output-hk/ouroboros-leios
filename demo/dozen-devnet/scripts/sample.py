@@ -24,6 +24,7 @@ here.
 
 import argparse
 import json
+import subprocess
 import sys
 import time
 import urllib.error
@@ -92,7 +93,27 @@ def scrape(name, timeout=3):
 
 
 def generators_running(timeout=2):
-    """How many tx-firehose processes are up — the run's phase."""
+    """How many generators are up — the run's phase.
+
+    Counts actual OS processes rather than asking process-compose, so a generator
+    started by hand counts the same as a supervised one. That matters when
+    iterating on the generator itself: process-compose resolves the binary from
+    the PATH it started with, so testing a fresh build means running it directly.
+    """
+    try:
+        found = subprocess.run(
+            ["pgrep", "-c", "-f", "tx-firehose --socket-path"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        count = int(found.stdout.strip() or 0)
+        if count:
+            return count
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    # Fall back to process-compose, which knows about generators that are
+    # configured but whose process has momentarily exited.
     try:
         url = f"http://localhost:{PC_PORT}/processes"
         with urllib.request.urlopen(url, timeout=timeout) as response:
