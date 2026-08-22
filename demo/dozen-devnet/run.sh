@@ -36,6 +36,17 @@ set -a
 : "${METRICS_PORT:=12798}"
 # Base firehose submission rate (TxFirehose1); override with e.g. TPS=1000
 : "${TPS:=500}"
+# Outputs per generated tx, i.e. a lever on transaction *size*. The EB body holds
+# one (hash, size) pair per tx — 36 B — regardless of how big the tx is, so
+# maxTxsPerEb and therefore tx/s are size-independent, and byte throughput scales
+# linearly with size until maxEBClosureSize (12 MB) binds instead. That crossover
+# is at 12 MB / 13,888 = 864 B per tx, close to the mainnet median. Above it byte
+# throughput is flat and only tx/s falls, so overshooting is cheap and
+# undershooting costs linearly.
+#
+# 1 output is 232 B as the mempool accounts it (228 B on the wire); each extra
+# output adds roughly 35-40 B. OUTPUTS=20 aims a little past the crossover.
+: "${OUTPUTS:=1}"
 # Traffic control (on by default, disable with TC=0)
 : "${TC:=1}"
 if [ "$TC" = "1" ]; then
@@ -376,7 +387,7 @@ cp "${SHARED_CONFIG_DIR}/alloy-modules/"*.alloy "${WORKING_DIR}/alloy-modules/"
 	done
 	echo
 	echo "settings:"
-	for v in TPS RATE DELAY TC XRAY SERVER NODE_RTS; do
+	for v in TPS OUTPUTS RATE DELAY TC XRAY SERVER NODE_RTS; do
 		echo "  ${v}=${!v}"
 	done
 	echo "  nodes=${#NODES[@]}"
