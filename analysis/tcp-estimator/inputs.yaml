@@ -1,0 +1,67 @@
+# Default configuration for the TCP CUBIC short-flow throughput estimator.
+# Override any value here, or pass a different YAML path on the command line.
+
+# 1. Link speed maximum cap, in megabits/sec (1000 = 1 Gbit/s).
+link_speed_mbps: 1000
+
+# 2. File size to download, in kilobytes (1 kB = 1000 B).
+file_size_kb: 12500
+
+# 3. Round-trip time, in milliseconds.
+rtt_ms: 50
+
+# 4. Packet loss model.
+#    bernoulli         : each packet independently lost with probability p.
+#    gilbert_elliott   : two-state Markov model (good/bad), each with its own p,
+#                        plus transition probabilities. Captures bursty loss.
+loss:
+  model: bernoulli           # bernoulli | gilbert_elliott
+  bernoulli:
+    p: 0.0001                # e.g. 1e-4 = 1 in 10000
+  gilbert_elliott:
+    p_good: 0.00001          # loss prob while in "good" state
+    p_bad: 0.05              # loss prob while in "bad" state
+    p_good_to_bad: 0.0005    # per-packet prob of transitioning good -> bad
+    p_bad_to_good: 0.1       # per-packet prob of transitioning bad  -> good
+    start_state: good        # good | bad
+
+# 5. Initial slow-start threshold W_s, in segments. CUBIC exits slow start when
+#    cwnd reaches this (HyStart's dynamic estimate is treated as an input here).
+#    Optional: if omitted or null, defaults to the link BDP
+#    (= link_speed_mbps * 1e6 * rtt_ms/1000 / 8 / mss_bytes), which models
+#    HyStart firing right at link saturation. Set a smaller value to model
+#    conservative HyStart trips (queueing, cross-traffic, lossy access links).
+# initial_ssthresh_segs: 100
+
+# 7. Percentile of the download-time CDF to report (overridable via -p on CLI).
+percentile: 0.95
+
+# Number of independent Monte Carlo runs used to build the CDF.
+monte_carlo_runs: 1000
+
+# TCP/CUBIC parameters.
+tcp:
+  mss_bytes: 1460            # Standard Ethernet TCP MSS.
+  initial_cwnd_segs: 10      # IW10 (RFC 6928, modern Linux default).
+  cubic_c: 0.4               # CUBIC scaling constant.
+  cubic_beta: 0.3            # Multiplicative decrease (30% reduction on loss).
+  fast_convergence: true     # If true, reduces W_max further when current loss
+                             # is below previous W_max (Ha 2008 §3.7).
+
+# Per-round RTT jitter. Each round samples its own RTT from the chosen
+# distribution (mean ~= rtt_ms above). Set model: none to disable.
+rtt_jitter:
+  model: lognormal           # none | lognormal | normal | uniform
+  lognormal:
+    sigma: 0.15              # underlying normal's std; ~15% CV is typical Internet
+  normal:
+    std_ms: 5                # std deviation in ms (RTT clamped to >= 1 ms)
+  uniform:
+    half_range_ms: 10        # RTT drawn from rtt_ms ± half_range_ms
+
+# Random seed for reproducibility. Set to null for a fresh seed each run.
+random_seed: 42
+
+# 8. SVG output path for the CDF plot.
+output:
+  svg_path: cdf.svg
