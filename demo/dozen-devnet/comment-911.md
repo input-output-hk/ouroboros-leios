@@ -16,7 +16,7 @@ Both targets are met. The ~100 TxkB/s ingest figure looks roughly 2× conservati
 
 ### The double buffer does what it is designed to do
 
-Numbers behind the panels above:
+Numbers behind the screenshots above:
 
 |                                        | baseline  | double-buffered   |
 |----------------------------------------|-----------|-------------------|
@@ -42,11 +42,13 @@ Two paired runs differing only in **effective mempool capacity** — about 34,00
 | bounded, 2 gen   | 156.0  | 88.3     | 1767     | 33,559  | 2           |
 | bounded, 3 gen   | 186.7  | **96.6** | 1866     | 33,773  | 2           |
 
-**Bounded scales monotonically up; unbounded monotonically down.** At three generators bounded delivers 86% more. Unbounded is not merely wasteful — it is congestion collapse: 2.5× the offered ingest produces a third *less* on chain.
+**The shallower mempool scales monotonically up; the deeper one monotonically down.** At three generators the shallow configuration delivers 86% more — 2.5× the offered ingest producing a third *less* on chain is congestion collapse.
+
+To be clear about what that does and does not say: a large mempool is not a problem in itself, and nothing in the protocol makes it one. It hurts here purely because our implementation still does work proportional to mempool depth on the critical path, so depth converts into forge latency. Holding more transactions is desirable — it is what fills EBs, and the shallow configuration pays for that with 14% at low load. The right fix is to make the deep mempool cheap, not to keep the mempool small.
 
 `kB/block` is the cleanest line in the table. Block counts are near-identical between the two runs, so the same number of inclusion opportunities deliver constant payload when critical-path work is bounded (1866 → 1767 → 1866) and progressively less when it is not (1921 → 1094, −43%).
 
-Note the trade: the shallower mempool *costs* 14% at one generator (66.6 vs 77.6) and pays 86% at three. Depth does buy slightly fuller EBs; that stops mattering as soon as load rises.
+That trade is visible in the table: the shallower mempool *costs* 14% at one generator (66.6 vs 77.6, where depth buys fuller EBs) and pays 86% at three, once forge latency dominates.
 
 ### The mechanism, end to end
 
@@ -71,7 +73,7 @@ Three explanations this rules out, each of which I chased first: EB fill (EBs ar
 
 **On "time and size-bound revalidation work in the Forge loop":** the bound has to cover the *recompute* path, not just the happy path. `getSnapshot` is free on a cache hit and O(mempool depth) on a miss — with depth unbounded, misses appeared at 23% while `partition-mempool` widened to 0.62 s. A cache that is fast when it hits and unbounded when it misses still puts seconds into a leader slot.
 
-**On bounding mempool depth:** whatever supplies the cap, it is load-bearing, and that is worth seeing as a *workaround* rather than a tuning success. A ~34,000-transaction depth is about 3.6 s of sync — just inside one inter-block window — so the cap exists to keep linear critical-path work affordable, which is why relaxing it collapses throughput rather than merely costing memory. Today that number falls out of the 5 s validation-time budget, but the interesting quantity is the depth, not the mechanism that happens to set it.
+**On bounding mempool depth:** the cap is load-bearing today, and that is a statement about our implementation rather than about the design. A ~34,000-transaction depth is about 3.6 s of sync — just inside one inter-block window — so the cap is currently compensating for critical-path work that scales with depth. Relaxing it collapses throughput for that reason alone, not because deep mempools are inherently costly. Once the critical path is sublinear the cap should stop being load-bearing, and the depth it happens to be set to — today a consequence of the 5 s validation-time budget — should stop mattering.
 
 **The direction this points:** critical-path consensus work wants to be constant, or at worst logarithmic, in mempool depth — and per #845, in *bytes* too, since holding everything else fixed and only raising transaction size took `partition-mempool` from 0.306 s to 1.183 s and `add-block-to-chaindb` from 0.054 s to 0.416 s. On this evidence linear work there does not degrade gracefully; it inverts the load-throughput relationship.
 
