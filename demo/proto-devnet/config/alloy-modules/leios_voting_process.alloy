@@ -65,7 +65,7 @@ declare "leios_voting_process" {
           metric.counter {
             name              = "voted_weight_total"
             description       = "The total accumulated voting weight"
-            prefix            = "cardano_node_metrics_loki_leios_"
+            prefix            = "leios_logmetrics_leios_"
             action            = "add"
             source            = "weight"
             max_idle_duration = "24h"
@@ -80,7 +80,7 @@ declare "leios_voting_process" {
           metric.counter {
             name              = "votes_acquired_total"
             description       = "The total votes acquired"
-            prefix            = "cardano_node_metrics_loki_leios_"
+            prefix            = "leios_logmetrics_leios_"
             action            = "inc"
             match_all         = true
             max_idle_duration = "24h"

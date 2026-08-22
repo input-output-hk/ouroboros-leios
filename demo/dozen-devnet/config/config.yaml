@@ -5,8 +5,33 @@ AlonzoGenesisFile: alonzo-genesis.json
 ConwayGenesisFile: conway-genesis.json
 DijkstraGenesisFile: dijkstra-genesis.json
 
-# Lower bound, 2 * maxEBClosure (12.5MB)
-MempoolCapacityBytesOverride: 25000000
+# 2 * maxEBClosure is the lower bound (24 MB), and 25 MB left no slack once
+# transactions get large: at ~1 kB per tx a full 12 MB closure needs ~12,000 txs,
+# so the mempool has to comfortably exceed that or EBs cannot fill and the size
+# experiment measures the mempool rather than the protocol. 50 MB gives ~2 full
+# closures of 1 kB transactions plus headroom.
+MempoolCapacityBytesOverride: 50000000
+
+# Sledgehammer: passes Nothing to consensus for the whole MempoolTimeoutConfig,
+# switching off all three at once — the per-tx soft timeout (discard), the per-tx
+# hard timeout (disconnect the peer) and the cumulative validation-time capacity.
+# They share one Maybe in consensus, so there is no finer-grained off-switch.
+#
+# The capacity is the one we are actually after: it was admitting 34,416 txs on
+# an idle box (5 s budget / 145 us per tx) while the byte capacity sat at 32%,
+# and it is excluded from the capacity the node reports. With it off, the byte
+# dimension binds instead — 25 MB / 228 B is about 107k txs, so expect mempools
+# roughly three times deeper.
+#
+# Measured with it off, three phases of 1/2/3 injection points: ingest scaled
+# 78 -> 156 -> 197 kB/s while on-chain throughput FELL 77.6 -> 64.1 -> 51.8 kB/s,
+# a conversion of 99% -> 41% -> 26%, with the entry relay pinned at the byte cap
+# (107,904 txs). Offering more load to a node whose forge cost scales with
+# mempool depth converts the extra ingest into lost throughput — congestion
+# collapse, not merely wasted memory.
+#
+# Set to false to reproduce that; true restores the defaults (1 s / 1.5 s / 5 s).
+MempoolTimeoutsEnabled: true
 
 # Needed < 10.6
 EnableP2P: true
@@ -91,6 +116,17 @@ TraceOptions:
     maxFrequency: 2.0
   ChainDB.LedgerEvent.Flavor.V1.OnDisk.BackingStoreEvent:
     severity: Silence
+  # One trace per UTxO read. Together these were over 40% of all log lines and
+  # ~250 MB per node in twelve minutes, which makes the tracer itself a
+  # suspect in the very stalls we are measuring. The handle
+  # Create/Duplicate/Close traces are kept — they are low volume and are what
+  # shows forker churn.
+  ChainDB.LedgerEvent.Flavor.V2.LedgerTablesHandleRead:
+    severity: Silence
+  ChainDB.LedgerEvent.Flavor.V2.BackendTrace.LSM.LSMLookup:
+    severity: Silence
+  ChainDB.LedgerEvent.Flavor.V2.BackendTrace.LSM.LSMTrace:
+    severity: Silence
   ChainDB.LedgerEvent.Forker:
     severity: Silence
   ChainDB.ReplayBlock.LedgerReplay:
@@ -115,16 +151,23 @@ TraceOptions:
     severity: Debug
   LedgerMetrics:
     severity: Info
+  # The whole mempool add path is traced here, on purpose: a stalled add shows
+  # up as an AttemptAdd with no matching AddedTx, and a LedgerNotFound storm
+  # tells us the mempool is failing to acquire the ledger state it wants rather
+  # than doing slow work. Silencing these is what made the long stalls opaque.
   Mempool:
     severity: Debug
+  # Silenced again now that it has done its job: it confirmed the stalls are
+  # slow work rather than a LedgerNotFound retry storm, and at hundreds of
+  # tx/s it is pure volume.
   Mempool.AttemptAdd:
     severity: Silence
   Mempool.LedgerFound:
-    severity: Silence
+    severity: Debug
   Mempool.LedgerNotFound:
-    severity: Silence
+    severity: Debug
   Mempool.SyncNotNeeded:
-    severity: Silence
+    severity: Debug
   Mempool.Synced:
     severity: Debug
   Net:
@@ -212,6 +255,27 @@ TraceOptions:
     severity: Notice
   TxSubmission.TxInbound:
     severity: Debug
+  # These two fire once per decision-loop iteration and were half of all log
+  # lines at 330 tx/s — 12 MB/s across twelve nodes, enough JSON encoding to
+  # make the tracer a load source in its own right. They only ever told us a
+  # ratio; raise them to Debug for a diagnostic run, not a throughput one.
+  TxSubmission.TxInbound.CanRequestMoreTxs:
+    severity: Silence
+  TxSubmission.TxInbound.CannotRequestMoreTxs:
+    severity: Silence
+  # Per-tx bookkeeping, four lines for every transaction pulled from a peer, and
+  # all of it is already available: Mempool.AddedTx covers the adds and the
+  # txSubmission_* metrics cover the accept/request counts. Every node line is
+  # parsed three times over by the Alloy chain (node -> voting -> call-trace),
+  # so line count is what a saturated collector actually costs.
+  TxSubmission.TxInbound.Processed:
+    severity: Silence
+  TxSubmission.TxInbound.Collected:
+    severity: Silence
+  TxSubmission.TxInbound.RequestTxs:
+    severity: Silence
+  TxSubmission.TxInbound.AddedToMempool:
+    severity: Silence
   TxSubmission.TxOutbound:
     severity: Notice
   Version.NodeVersion:
