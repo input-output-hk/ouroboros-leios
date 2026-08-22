@@ -31,3 +31,19 @@ clean:
 
 $(HS_LEIOS): src/trace-parser.agda
 	$(call agdaToHs,trace-parser)
+
+# Leios.Base.Praos (see docs/praos-base-machine-sketch.md) isn't reachable
+# from src/trace-parser.agda yet, so it's checked separately. Praos.agda is
+# --safe; Instance.agda isn't (Praos's chainFromBlock is TERMINATING).
+.PHONY: praos-base praos-instance praos-assumptions praos-machine
+praos-base:
+	$(AGDA) src/Leios/Base/Praos.agda
+
+praos-instance:
+	$(AGDA) src/Leios/Base/Praos/Instance.agda
+
+praos-assumptions:
+	$(AGDA) src/Leios/Base/Praos/Assumptions.agda
+
+praos-machine:
+	$(AGDA) src/Leios/Base/Praos/Machine.agda

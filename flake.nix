@@ -20,6 +20,14 @@
 
     leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=eeb5b2da0083cf3b7a9e80d172685ae941638125";
 
+    # The Praos formal spec, used by leios-trace-verifier's Leios.Base.Praos
+    # to wrap the real Praos node as a Leios BaseMachine (see
+    # leios-trace-verifier/docs/praos-base-machine-sketch.md).
+    praos-spec-src = {
+      url = "github:input-output-hk/ouroboros-praos-formal-spec/847697eec805983c6ac2afa793443e4da954d11a";
+      flake = false;
+    };
+
     # Trace verifier only: it links cardano-api against the Leios prototype
     # node's pins (cabal.project.trace-verifier), which need newer
     # CHaP/hackage snapshots than iogx's. A dedicated haskell.nix instance

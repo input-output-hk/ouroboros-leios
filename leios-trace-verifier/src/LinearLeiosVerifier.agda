@@ -153,7 +153,9 @@ module LinearLeiosVerifier where
           ; winning-slots = winning-slots-of
           }
 
-      open import Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)
+      open import Defaults params testParams using
+        (d-SpecStructure; FFDBuffers; isb; hpe;
+         module PraosNode; mkPraosBlock; praosBlockHash; genesisHash)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
       open import Leios.Linear.Trace.Verifier d-SpecStructure params renaming (verifyTrace to checkTrace)
@@ -174,10 +176,45 @@ module LinearLeiosVerifier where
               EB-received : AssocList String ℕ
               VT-refs : AssocList String (List Vote)
               RB-refs : AssocList String RankingBlock
+              -- Praos-header data per RB (prev-hash, slot, producer); the
+              -- payload lives in RB-refs and may still be corrected by a
+              -- later EBGenerated, so blocks are materialized on demand.
+              RB-meta : AssocList String (Hash × ℕ × Fin (Params.numberOfParties params))
+              -- ids of the RBs in the SUT's Praos block tree (deduplicated)
+              tree-ids : List String
               FFD-blks : List Blk
               currentSlot : ℕ
 
       open Accumulator
+
+      -- ── The SUT's Praos block tree, maintained from trace events ──
+
+      buildBlk : Accumulator → String → Maybe PraosNode.Block
+      buildBlk l i with RB-meta l ⁉ i | RB-refs l ⁉ i
+      ... | just (ph , sl , pid) | just rb = just (mkPraosBlock ph sl rb pid)
+      ... | _ | _ = nothing
+
+      parentHash : Accumulator → Nullable BlockRef → Hash
+      parentHash l p with unwrap p
+      ... | nothing  = genesisHash
+      ... | just ref = maybe praosBlockHash genesisHash (buildBlk l (BlockRef.id ref))
+
+      addTreeId : String → Accumulator → Accumulator
+      addTreeId i l =
+        if L.any (λ j → isYes (j ≟ i)) (tree-ids l)
+          then l
+          else record l { tree-ids = i ∷ tree-ids l }
+
+      sutTree : Accumulator → PraosNode.LocalState
+      sutTree l = foldr
+        (λ i ls → maybe (λ blk → PraosNode.processMsgs (blk ∷ []) ls) ls (buildBlk l i))
+        PraosNode.initState
+        (tree-ids l)
+
+      -- The SUT's current base ledger: the Praos best chain of its tree
+      -- (tip first, ending in the genesis payload).
+      sutLedger : Accumulator → List RankingBlock
+      sutLedger l = L.map PraosNode.payloadOf (PraosNode.readChain (currentSlot l) (sutTree l))
 
       instance
         _ = Show-List
@@ -284,18 +321,26 @@ module LinearLeiosVerifier where
       ... | _ | _ | _ | _ = l , []
 
       -- RBs
-      traceEvent→action l record { message = RBGenerated p i s _ eb _ _ _ txs } =
+      traceEvent→action l record { message = RBGenerated p i s _ eb _ _ parent txs } =
         let rb = record
                    { txs = map primWord64ToNat txs
                    ; announcedEB = nothing -- this is set in EBReceived
                    ; ebCert = unwrap eb >>= λ b → EB-refs l ⁉ BlockRef.id (Endorsement.eb b) >>= λ eb' → return (hash eb')
                    ; slot = primWord64ToNat s
                    }
-        in record l { RB-refs = (i , rb) ∷ RB-refs l } , []
+            l' = record l
+                   { RB-refs = (i , rb) ∷ RB-refs l
+                   ; RB-meta = (i , (parentHash l parent , primWord64ToNat s , nodeId p)) ∷ RB-meta l
+                   }
+        -- The SUT's own block enters its tree at minting (accumulator-only;
+        -- the ledger is next reported at the following BASE-LDG).
+        in (if isYes (p ≟ SUT) then addTreeId i l' else l') , []
 
       traceEvent→action l record { message = RBReceived s p _ _ i _ }
         with p ≟ SUT | RB-refs l ⁉ i
-      ... | yes _ | just rb = l , (Slot₂-Action (currentSlot l) , inj₂ (inj₁ (BaseAbstract.BASE-LDG (rb ∷ [])))) ∷ []
+      ... | yes _ | just rb =
+        let l' = addTreeId i l
+        in l' , (Slot₂-Action (currentSlot l) , inj₂ (inj₁ (BaseAbstract.BASE-LDG (sutLedger l')))) ∷ []
       ... | _ | _ = l , []
 
       -- TXs
@@ -335,7 +380,7 @@ module LinearLeiosVerifier where
 
         verifyTrace' : LeiosState → Pair ℕ (Pair String String)
         verifyTrace' s =
-          let n₀ = record { EB-refs = [] ; EB-received = [] ; VT-refs = [] ; RB-refs = [] ; FFD-blks = [] ; currentSlot = LeiosState.slot s }
+          let n₀ = record { EB-refs = [] ; EB-received = [] ; VT-refs = [] ; RB-refs = [] ; RB-meta = [] ; tree-ids = [] ; FFD-blks = [] ; currentSlot = LeiosState.slot s }
               l' = proj₂ $ mapAccuml traceEvent→action n₀ l
               αs = L.reverse (L.concat l')
               tr = checkTrace αs s
