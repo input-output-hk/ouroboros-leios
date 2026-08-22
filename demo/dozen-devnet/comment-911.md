@@ -6,22 +6,22 @@ Setup: `demo/dozen-devnet`, 3 block producers x 3 private relays with the nine r
 
 ### Against the targets
 
-| | target | measured | |
-| --- | --- | --- | --- |
-| consensus, on chain | 50 TxkB/s | **96.6 kB/s** | 1.9x |
-| " , with ~652 B transactions | | **192.2 kB/s** | 3.8x |
-| mempool / ingest | ~100 TxkB/s | **666 kB/s** | 6.7x |
+|                              | target      | measured       |      |
+|------------------------------|-------------|----------------|------|
+| consensus, on chain          | 50 TxkB/s   | **96.6 kB/s**  | 1.9x |
+| " , with ~652 B transactions |             | **192.2 kB/s** | 3.8x |
+| mempool / ingest             | ~100 TxkB/s | **666 kB/s**   | 6.7x |
 
 Both met. The ~100 TxkB/s ingest figure looks about 2x conservative: a single injection point already sustains 77.6 kB/s on chain at 99% conversion. With forge-loop validation outstanding, treat these as an upper bound on the current prototype.
 
 ### The double buffer does what it is designed to do
 
-| | baseline | double-buffered |
-| --- | --- | --- |
-| remote mempool depth, peak | ~19,200 | **27,015** (+41%) |
-| entry : remote depth ratio | 3.27x | **2.79x** |
-| generator burst rate (busy-second p50) | ~330 tx/s | **401 tx/s** |
-| entry relay time in add gaps > 0.5 s | 41.0% | 39.0% |
+|                                        | baseline  | double-buffered   |
+|----------------------------------------|-----------|-------------------|
+| remote mempool depth, peak             | ~19,200   | **27,015** (+41%) |
+| entry : remote depth ratio             | 3.27x     | **2.79x**         |
+| generator burst rate (busy-second p50) | ~330 tx/s | **401 tx/s**      |
+| entry relay time in add gaps > 0.5 s   | 41.0%     | 39.0%             |
 
 Sharpest of these: during the initial fill **all twelve mempools tracked the entry node exactly**, every node at 25,536 transactions, where on the baseline remotes sawtoothed at a third of the entry node's depth.
 
@@ -31,14 +31,14 @@ Peak N2N accept per relay across the injection-point series was **261 -> 520 -> 
 
 Two paired runs differing only in effective mempool capacity, about 34,000 transactions against about 108,000, three phases each of one/two/three injection points. We reached those depths by toggling `MempoolTimeoutsEnabled`, but the flag is incidental: setting the byte cap directly gives the same two points.
 
-| | ingest | on chain | kB/block | depth | blocks lost |
-| --- | --- | --- | --- | --- | --- |
-| unbounded, 1 gen | 78.2 | 77.6 | 1921 | 107,904 | 1 |
-| unbounded, 2 gen | 155.5 | 64.1 | 1281 | 107,904 | 3 |
-| unbounded, 3 gen | 196.5 | **51.8** | 1094 | 107,904 | 3 |
-| bounded, 1 gen | 78.2 | 66.6 | 1866 | 33,872 | 0 |
-| bounded, 2 gen | 156.0 | 88.3 | 1767 | 33,559 | 2 |
-| bounded, 3 gen | 186.7 | **96.6** | 1866 | 33,773 | 2 |
+|                  | ingest | on chain | kB/block | depth   | blocks lost |
+|------------------|--------|----------|----------|---------|-------------|
+| unbounded, 1 gen | 78.2   | 77.6     | 1921     | 107,904 | 1           |
+| unbounded, 2 gen | 155.5  | 64.1     | 1281     | 107,904 | 3           |
+| unbounded, 3 gen | 196.5  | **51.8** | 1094     | 107,904 | 3           |
+| bounded, 1 gen   | 78.2   | 66.6     | 1866     | 33,872  | 0           |
+| bounded, 2 gen   | 156.0  | 88.3     | 1767     | 33,559  | 2           |
+| bounded, 3 gen   | 186.7  | **96.6** | 1866     | 33,773  | 2           |
 
 **The shallower mempool scales up, the deeper one down.** At three generators the shallow configuration delivers 86% more, and 2.5x the offered ingest producing a third less on chain is congestion collapse.
 
@@ -48,12 +48,14 @@ This is not an argument against large mempools. Nothing in the protocol makes de
 
 ### Why depth costs: votes miss their window
 
-| | unbounded | bounded |
-| --- | --- | --- |
-| `partition-mempool` p50 | 0.333 s | 0.306 s |
-| `partition-mempool` **p95** | **7.395 s** | **1.086 s** |
-| votes withheld | 133 / 540 (25%) | 35 / 257 (14%) |
-| **`tooLate` votes** | **78** | **0** |
+Both runs already use the optimistic `getSnapshot` from [ouroboros-consensus#2094](https://github.com/IntersectMBO/ouroboros-consensus/pull/2094), so revalidation is skipped whenever the cache hits. What follows is the cost that remains after that, not the cost of revalidating in the forge loop.
+
+|                             | unbounded       | bounded        |
+|-----------------------------|-----------------|----------------|
+| `partition-mempool` p50     | 0.333 s         | 0.306 s        |
+| `partition-mempool` **p95** | **7.395 s**     | **1.086 s**    |
+| votes withheld              | 133 / 540 (25%) | 35 / 257 (14%) |
+| **`tooLate` votes**         | **78**          | **0**          |
 
 An EB is certifiable only by the block succeeding its announcement, so a vote has one inter-block interval to be produced and diffused. A 7 s forge tail eats that window, a 1 s tail does not.
 
