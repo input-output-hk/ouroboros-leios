@@ -1,13 +1,16 @@
 ## Where 200 TxkB/s stands
 
-Same setup and caveats as the mempool findings in #911, which cover the forge loop and mempool side. This adds only what is specific to the throughput target. Digests in `demo/dozen-devnet/results/2026-08-22-*`.
+Same setup and caveats as the mempool findings in #911, which cover the forge loop and mempool side. This adds only what is specific to the throughput target.
 
-| | measured | target | |
-| --- | --- | --- | --- |
-| bytes on chain | **192.2 kB/s** | 200 TxkB/s | 96% |
-| transactions | 295 tx/s | 1000 tx/s | 30% |
+The issue asks for ~200 B transactions at a high rate, and that is what most of the runs used. But since the target is stated in bytes, we also ran with larger transactions: `tx-firehose` now takes `--outputs-per-tx`, and 5 outputs gives 652 B instead of 228 B. That turns out to be the difference between missing and meeting the byte target:
 
-The two diverge because the EB body holds one `(hash, size)` pair per transaction, 36 B, whatever the transaction's own size. So `maxTxsPerEb` caps transaction *count* while byte throughput is free to scale with transaction size. Going from 228 B to 652 B transactions (`--outputs-per-tx 5`) gives 96.6 -> 192.2 kB/s, a 1.99x gain, with tx/s only falling 416 -> 295.
+| transaction size | bytes on chain | transactions |
+| --- | --- | --- |
+| 228 B (1 output) | 96.6 kB/s | 416 tx/s |
+| **652 B (5 outputs)** | **192.2 kB/s** | 295 tx/s |
+| target | 200 TxkB/s | 1000 tx/s |
+
+So the larger transactions take us to **96% of 200 TxkB/s**, while transaction count stays at 30% of 1k TPS. The two diverge because the EB body holds one `(hash, size)` pair per transaction, 36 B, whatever the transaction's own size. So `maxTxsPerEb` caps transaction *count* while byte throughput is free to scale with transaction size, and 228 -> 652 B buys a 1.99x gain in bytes for only a 416 -> 295 tx/s fall in count.
 
 That is short of the 2.81x pure size-independence would predict, and the shortfall is EB fill in count: mean fill drops 13,503 -> 11,285 because the validation-time capacity admits fewer transactions once each is more expensive to validate. Inclusion (~53%), vote timeliness (`tooLate` = 0) and block rate are all unchanged, so larger transactions do not stress certification. Throughput reconciles directly: 25 closures over 47 leader slots x 11,285 transactions x 652 B / 21.1 s = 186 kB/s against 190 measured.
 
@@ -15,12 +18,12 @@ That is short of the 2.81x pure size-independence would predict, and the shortfa
 
 The characterization worth adding. Holding everything else fixed and raising only transaction size, on an idle host (loadavg 3.3 of 32 cores):
 
-| call, p50 | 228 B | 652 B | |
-| --- | --- | --- | --- |
-| `partition-mempool` | 0.306 s | **1.183 s** | 3.9x |
-| `add-block-to-chaindb` | 0.054 s | **0.416 s** | 7.7x |
-| `resolve-and-apply-leios-closure` | 0.096 s | 0.201 s | 2.1x |
-| sum | ~0.64 s | **~1.84 s** | ~2 slots |
+| call, p50                         | 228 B   | 652 B       |          |
+|-----------------------------------|---------|-------------|----------|
+| `partition-mempool`               | 0.306 s | **1.183 s** | 3.9x     |
+| `add-block-to-chaindb`            | 0.054 s | **0.416 s** | 7.7x     |
+| `resolve-and-apply-leios-closure` | 0.096 s | 0.201 s     | 2.1x     |
+| sum                               | ~0.64 s | **~1.84 s** | ~2 slots |
 
 So the depth-dependence described in #911 is really a *bytes* dependence: the snapshot walk and the ChainDB write both scale with what they touch, and capping how many transactions sit in the mempool does not bound that on its own. At ~1.84 s the forge path is above half a slot. Votes are still on time, but that is headroom being spent, and it is the first thing to watch if size is pushed further.
 
