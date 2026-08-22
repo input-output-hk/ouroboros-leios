@@ -1,0 +1,17 @@
+# dozen-devnet run provenance — 2026-08-22, --outputs-per-tx 5
+
+Same nodes as results/2026-08-22-phased-depth-bounded (not restarted), with the
+generators replaced. Node config therefore matches that run except:
+
+  MempoolCapacityBytesOverride: 50000000   (was 25000000)
+  MempoolTimeoutsEnabled:       true
+
+generators: three, one per relay group (relay11/21/31), delegators 1-3
+  --tps 500 --fee 1000000 --outputs-per-tx 5   -> 648 B on the wire, 652 B as
+                                                  the mempool accounts it
+
+tx-firehose: local cabal build, cardano-node 09bf071c3 ("select inputs by value,
+and drop inputs the ledger says are gone"). The nix-store build cannot run
+--outputs-per-tx > 1 for more than a few seconds; process-compose resolves the
+binary from the PATH it started with, so the generators were run directly rather
+than under process-compose. `phase` therefore comes from counting processes.
