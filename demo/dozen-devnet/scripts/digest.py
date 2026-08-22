@@ -165,6 +165,43 @@ def quantiles_at(sorted_values, fraction):
     return sorted_values[min(int(len(sorted_values) * fraction), len(sorted_values) - 1)]
 
 
+def votes_withheld(run_dir):
+    """Why nodes declined to vote — the most diagnostic number in a loaded run.
+
+    An EB is certifiable only by the block succeeding its announcement, so a vote
+    has one inter-block interval to be produced and diffused. Miss that and the EB
+    is unrecoverable. Under load this is what actually caps throughput: EBs stay
+    97% full and re-endorsement works as designed, but `tooLate` climbs and fewer
+    certificates form. It is downstream of forge latency — a voter stalled in a
+    multi-second mempool walk votes after the certifying block is already made.
+
+    Read this alongside the forge loop table: `tooLate` rising and
+    `partition-mempool` p95 rising are the same event seen from two ends.
+    """
+    reason = re.compile(rb'\\"reason\\":\\"([^\\]+)')
+    tally = collections.Counter()
+    voted = 0
+    for path in glob.glob(os.path.join(run_dir, "*", "node.log")):
+        with open(path, "rb") as handle:
+            for line in handle:
+                if b"LeiosNotVoted" in line:
+                    found = reason.search(line)
+                    if found:
+                        tally[found.group(1).decode()] += 1
+                elif b"LeiosVoted" in line:
+                    voted += 1
+    if not (tally or voted):
+        return
+    total = sum(tally.values())
+    print("\n### Votes withheld\n")
+    print(f"{voted} votes cast, {total} withheld", end="")
+    print(f" — {100*total/(voted+total):.0f}% of opportunities.\n" if voted + total else ".\n")
+    print("| reason | n |")
+    print("| --- | --- |")
+    for name, count in tally.most_common():
+        print(f"| `{name}` | {count} |")
+
+
 def endorser_blocks(run_dir):
     """EB fill and certification rate.
 
@@ -202,6 +239,8 @@ def endorser_blocks(run_dir):
         print(f"| max | {counts[-1]} | {100*counts[-1]/MAX_TXS_PER_EB:.0f}% | {counts[-1]*36} |")
         full = sum(1 for t in counts if t > 0.9 * MAX_TXS_PER_EB)
         print(f"\n{full}/{len(counts)} over 90% full (maxTxsPerEb = {MAX_TXS_PER_EB}).")
+
+    votes_withheld(run_dir)
 
     # Distinct hashes, because every node traces every announcement it accepts and
     # a raw line count would be per-node observations rather than a chain figure.

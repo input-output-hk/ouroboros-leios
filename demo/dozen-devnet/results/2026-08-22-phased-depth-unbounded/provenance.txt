@@ -1,0 +1,36 @@
+# dozen-devnet run provenance — 2026-08-22T10:19:34Z
+
+cardano-node:
+  path:    /home/ch1bo/code/iog/cardano-node/dist-newstyle/build/x86_64-linux/ghc-9.6.7/cardano-node-11.1.0.164/x/cardano-node/build/cardano-node/cardano-node
+  version: cardano-node 11.1.0.164 - linux-x86_64 - ghc-9.6
+  sha256:  ffb0d71b785270d2484846631055f809726e23dcea824b86d9b8304cf9dd5e50
+cardano-cli:
+  path:    /nix/store/ldvj88blbf4a2rl70pp8akdgky3hkyyw-cardano-cli-exe-cardano-cli-11.1.0.0/bin/cardano-cli
+  version: cardano-cli 11.1.0.0 - linux-x86_64 - ghc-9.6
+  sha256:  6ca734dc5b618a7c5d4058d93067f9de7fe787ce338509b40afbe58b19a26820
+tx-firehose:
+  path:    /nix/store/460h71zzvj88a66sy16p5si1rw1b1r0v-tx-firehose-exe-tx-firehose-0.1.0.0/bin/tx-firehose
+  version: 
+  sha256:  284abc43b19b85fcd3269cecfaf71483d942108d506ecf9f2e536dc5e5e24098
+
+settings:
+  TPS=500
+  RATE=50Mbps
+  DELAY=10ms
+  TC=1
+  XRAY=1
+  SERVER=1
+  NODE_RTS=
+  nodes=12
+
+# appended by the analysis session
+
+mempool settings (this is what separates the two 2026-08-22 runs):
+  MempoolTimeoutsEnabled:       False
+  MempoolCapacityBytesOverride: 25000000
+
+  ouroboros-consensus: 506875bfe Make Mempool's getSnapshot for optimistic
+  ouroboros-leios: 022af4b70 dozen-devnet: commit the sampler, and extend the digest
+
+  phases: generator count, auto-detected per sample row (1 -> 2 -> 3)
+  forge loop: optimistic getSnapshot (consensus 506875bfe), no reapplyTxs
