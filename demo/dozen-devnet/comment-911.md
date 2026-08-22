@@ -2,7 +2,7 @@
 
 Numbers behind the graphs above. Early validation only: several Leios parameters are still hardcoded and the forge loop still owes validation work, so these say more about shape than about achievable limits.
 
-Setup: `demo/dozen-devnet`, 3 block producers x 3 private relays with the nine relays fully meshed, 10 ms one-way delay, 50 Mbps per node, `TxSubmissionV2`, UTxO-HD `V2LSM`, 228 B transactions, 32-core machine at ~10% CPU. Digests in `demo/dozen-devnet/results/2026-08-22-*`.
+Setup: `demo/dozen-devnet`, 3 block producers x 3 private relays with the nine relays fully meshed, 10 ms one-way delay, 50 Mbps per node, `TxSubmissionV2`, UTxO-HD `V2LSM`, 228 B transactions, 32-core machine at ~10% CPU.
 
 ### Against the targets
 
