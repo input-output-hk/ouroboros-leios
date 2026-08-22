@@ -18,6 +18,7 @@ processes:
       --signing-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator1/payment.skey
       --staking-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator1/staking.skey
       --tps ${TPS}
+      --outputs-per-tx ${OUTPUTS}
       --fee 1000000
     log_location: "${WORKING_DIR}/tx-firehose1.log"
     depends_on:
@@ -48,6 +49,7 @@ processes:
       --signing-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator2/payment.skey
       --staking-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator2/staking.skey
       --tps ${TPS}
+      --outputs-per-tx ${OUTPUTS}
       --fee 1000000
     log_location: "${WORKING_DIR}/tx-firehose2.log"
     depends_on:
@@ -72,6 +74,7 @@ processes:
       --signing-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator3/payment.skey
       --staking-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator3/staking.skey
       --tps ${TPS}
+      --outputs-per-tx ${OUTPUTS}
       --fee 1000000
     log_location: "${WORKING_DIR}/tx-firehose3.log"
     depends_on:
