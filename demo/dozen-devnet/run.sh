@@ -45,40 +45,51 @@ set -a
 # undershooting costs linearly.
 #
 # 1 output is 232 B as the mempool accounts it (228 B on the wire); each extra
-# output adds roughly 35-40 B. OUTPUTS=20 aims a little past the crossover.
+# output adds roughly 35-40 B.
+#
+# The practical ceiling is funding: each output needs its own min-ada, and the fee
+# is fixed, so the input selection has to cover fee + OUTPUTS * min-ada. 5 outputs
+# gives ~648 B transactions.
 : "${OUTPUTS:=1}"
+# Which tx-firehose to run. Defaults to whatever is on PATH, which is normally the
+# nix-store build; point it at a local cabal build to iterate on the generator
+# without rebuilding the devnet:
+#   TX_FIREHOSE=.../dist-newstyle/.../tx-firehose ./run.sh
+# PATH is resolved by the process at exec time, so an already-running
+# process-compose keeps using whatever it started with — hence the explicit knob.
+: "${TX_FIREHOSE:=tx-firehose}"
 # Traffic control (on by default, disable with TC=0)
 : "${TC:=1}"
 if [ "$TC" = "1" ]; then
-	# RATE is the rate limit on each node's single uplink, i.e. the whole node's
-	# send capacity shared across all of its peers — not a per-peer allowance.
-	# DELAY is applied once per direction (on the receiving side), so it stays a
-	# one-way delay and the round trip between any two nodes is 2 x DELAY.
-	#
-	# 10ms one way = 20ms RTT, a typical intra-continent link. Deliberately not
-	# the intercontinental 100ms/200ms: with a uniform delay that figure would
-	# also apply to each block producer's link to its own relays, which in
-	# reality are co-located. Raise it once the happy-path throughput picture is
-	# established.
-	: "${RATE:=50Mbps}"
-	: "${DELAY:=10ms}"
-	# A different subnet than proto-devnet's 172.28.0.0/24 so both devnets can be
-	# up at the same time (turn XRAY off on one of them, the observability stack
-	# binds fixed ports).
-	: "${IP_HOST:=172.29.0.1}"
-	: "${IP_PREFIX:=172.29.0.}"
-	: "${IP_OFFSET:=10}"
+  # RATE is the rate limit on each node's single uplink, i.e. the whole node's
+  # send capacity shared across all of its peers — not a per-peer allowance.
+  # DELAY is applied once per direction (on the receiving side), so it stays a
+  # one-way delay and the round trip between any two nodes is 2 x DELAY.
+  #
+  # 10ms one way = 20ms RTT, a typical intra-continent link. Deliberately not
+  # the intercontinental 100ms/200ms: with a uniform delay that figure would
+  # also apply to each block producer's link to its own relays, which in
+  # reality are co-located. Raise it once the happy-path throughput picture is
+  # established.
+  : "${RATE:=50Mbps}"
+  : "${DELAY:=10ms}"
+  # A different subnet than proto-devnet's 172.28.0.0/24 so both devnets can be
+  # up at the same time (turn XRAY off on one of them, the observability stack
+  # binds fixed ports).
+  : "${IP_HOST:=172.29.0.1}"
+  : "${IP_PREFIX:=172.29.0.}"
+  : "${IP_OFFSET:=10}"
 else
-	# Use distinct loopback aliases so each node's --host-addr (which
-	# ouroboros-network also uses as the source IP for outbound sockets) does
-	# not collide with another node's listening 4-tuple. With all nodes sharing
-	# 127.0.0.1, outbound connect() can return EADDRNOTAVAIL because the kernel
-	# cannot assign (127.0.0.1:listener_port, 127.0.0.1:peer_port) for the new
-	# socket while the listener still owns that port. Splitting across the 127/8
-	# range avoids the collision entirely. 127.3/16 leaves proto-devnet's
-	# 127.2/16 alone.
-	: "${IP_PREFIX:=127.3.0.}"
-	: "${IP_OFFSET:=0}"
+  # Use distinct loopback aliases so each node's --host-addr (which
+  # ouroboros-network also uses as the source IP for outbound sockets) does
+  # not collide with another node's listening 4-tuple. With all nodes sharing
+  # 127.0.0.1, outbound connect() can return EADDRNOTAVAIL because the kernel
+  # cannot assign (127.0.0.1:listener_port, 127.0.0.1:peer_port) for the new
+  # socket while the listener still owns that port. Splitting across the 127/8
+  # range avoids the collision entirely. 127.3/16 leaves proto-devnet's
+  # 127.2/16 alone.
+  : "${IP_PREFIX:=127.3.0.}"
+  : "${IP_OFFSET:=0}"
 fi
 # X-ray observability (on by default, disable with XRAY=0)
 : "${XRAY:=1}"
@@ -110,129 +121,129 @@ NODES=("${BPS[@]}" "${RELAYS[@]}")
 
 # The Nth node in NODES gets IP_PREFIX(IP_OFFSET + N).
 node_ip() {
-	local name="$1" i=0 n
-	for n in "${NODES[@]}"; do
-		i=$((i + 1))
-		if [ "$n" = "$name" ]; then
-			echo "${IP_PREFIX}$((IP_OFFSET + i))"
-			return 0
-		fi
-	done
-	echo "unknown node: $name" >&2
-	return 1
+  local name="$1" i=0 n
+  for n in "${NODES[@]}"; do
+    i=$((i + 1))
+    if [ "$n" = "$name" ]; then
+      echo "${IP_PREFIX}$((IP_OFFSET + i))"
+      return 0
+    fi
+  done
+  echo "unknown node: $name" >&2
+  return 1
 }
 
 # A relay is named relay<bp><n>, so relay11 belongs to bp1. Block producers peer
 # with their own relays only; relays peer with their block producer and with
 # every other relay.
 node_peers() {
-	local name="$1" r
-	case "$name" in
-	bp*)
-		for r in "${RELAYS[@]}"; do
-			if [ "${r:5:1}" = "${name#bp}" ]; then
-				echo "$r"
-			fi
-		done
-		;;
-	relay*)
-		echo "bp${name:5:1}"
-		for r in "${RELAYS[@]}"; do
-			if [ "$r" != "$name" ]; then
-				echo "$r"
-			fi
-		done
-		;;
-	*)
-		echo "unknown node: $name" >&2
-		return 1
-		;;
-	esac
+  local name="$1" r
+  case "$name" in
+  bp*)
+    for r in "${RELAYS[@]}"; do
+      if [ "${r:5:1}" = "${name#bp}" ]; then
+        echo "$r"
+      fi
+    done
+    ;;
+  relay*)
+    echo "bp${name:5:1}"
+    for r in "${RELAYS[@]}"; do
+      if [ "$r" != "$name" ]; then
+        echo "$r"
+      fi
+    done
+    ;;
+  *)
+    echo "unknown node: $name" >&2
+    return 1
+    ;;
+  esac
 }
 
 # Emit the process-compose fragment defining all node processes. Generated
 # rather than checked in because the node list is the topology's single source
 # of truth; $1 selects the traffic-controlled variant.
 gen_nodes_compose() {
-	local tc="$1" out="$2" name ip
-	{
-		echo '# Generated by run.sh — do not edit, regenerate instead.'
-		echo 'version: "0.5"'
-		echo
-		echo 'processes:'
-		for name in "${NODES[@]}"; do
-			ip=$(node_ip "$name")
-			echo "  ${name}:"
-			if [ "$tc" = "1" ]; then
-				echo "    is_elevated: true"
-			fi
-			echo "    command: |"
-			echo "      NODE_DIR=\"${WORKING_DIR}/${name}\" \\"
-			echo "      IP=\"${ip}\" \\"
-			echo "      PORT=\"${PORT}\" \\"
-			# Passed inline rather than inherited: elevated processes go through
-			# sudo, which drops the environment.
-			echo "      NODE_RTS=\"${NODE_RTS}\" \\"
-			if [ "$tc" = "1" ]; then
-				echo "      ${IP_BIN} netns exec ${NS_PREFIX}:${name} bash \"${SOURCE_DIR}/run-node.sh\""
-			else
-				echo "      bash \"${SOURCE_DIR}/run-node.sh\""
-			fi
-			echo "    log_location: \"${WORKING_DIR}/${name}/node.log\""
-			# The host reaches every node through the bridge, so the probe works in
-			# both the namespaced and the loopback case.
-			echo "    readiness_probe:"
-			echo "      exec:"
-			echo "        command: \"bash -c ': </dev/tcp/${ip}/${PORT}'\""
-			echo "      initial_delay_seconds: 5"
-			echo "      period_seconds: 2"
-			echo "      failure_threshold: 60"
-			if [ "$tc" = "1" ]; then
-				echo "    depends_on:"
-				echo "      InitNamespaces:"
-				echo "        condition: process_completed_successfully"
-			fi
-		done
-	} >"$out"
+  local tc="$1" out="$2" name ip
+  {
+    echo '# Generated by run.sh — do not edit, regenerate instead.'
+    echo 'version: "0.5"'
+    echo
+    echo 'processes:'
+    for name in "${NODES[@]}"; do
+      ip=$(node_ip "$name")
+      echo "  ${name}:"
+      if [ "$tc" = "1" ]; then
+        echo "    is_elevated: true"
+      fi
+      echo "    command: |"
+      echo "      NODE_DIR=\"${WORKING_DIR}/${name}\" \\"
+      echo "      IP=\"${ip}\" \\"
+      echo "      PORT=\"${PORT}\" \\"
+      # Passed inline rather than inherited: elevated processes go through
+      # sudo, which drops the environment.
+      echo "      NODE_RTS=\"${NODE_RTS}\" \\"
+      if [ "$tc" = "1" ]; then
+        echo "      ${IP_BIN} netns exec ${NS_PREFIX}:${name} bash \"${SOURCE_DIR}/run-node.sh\""
+      else
+        echo "      bash \"${SOURCE_DIR}/run-node.sh\""
+      fi
+      echo "    log_location: \"${WORKING_DIR}/${name}/node.log\""
+      # The host reaches every node through the bridge, so the probe works in
+      # both the namespaced and the loopback case.
+      echo "    readiness_probe:"
+      echo "      exec:"
+      echo "        command: \"bash -c ': </dev/tcp/${ip}/${PORT}'\""
+      echo "      initial_delay_seconds: 5"
+      echo "      period_seconds: 2"
+      echo "      failure_threshold: 60"
+      if [ "$tc" = "1" ]; then
+        echo "    depends_on:"
+        echo "      InitNamespaces:"
+        echo "        condition: process_completed_successfully"
+      fi
+    done
+  } >"$out"
 }
 
 # Check for required commands
 REQUIRED_COMMANDS=(
-	"process-compose"
-	"sqlite3"
-	"jq"
-	"yq"
-	"envsubst"
-	"cardano-node"
-	"cardano-cli"
-	"tx-firehose"
+  "process-compose"
+  "sqlite3"
+  "jq"
+  "yq"
+  "envsubst"
+  "cardano-node"
+  "cardano-cli"
+  "tx-firehose"
 )
 if [ "$TC" = "1" ]; then
-	REQUIRED_COMMANDS+=("ip" "tc")
+  REQUIRED_COMMANDS+=("ip" "tc")
 fi
 
 MISSING_COMMANDS=()
 for cmd in "${REQUIRED_COMMANDS[@]}"; do
-	if ! command -v "$cmd" &>/dev/null; then
-		MISSING_COMMANDS+=("$cmd")
-	fi
+  if ! command -v "$cmd" &>/dev/null; then
+    MISSING_COMMANDS+=("$cmd")
+  fi
 done
 
 if [ ${#MISSING_COMMANDS[@]} -gt 0 ]; then
-	echo "Error: The following required commands are not available:"
-	for cmd in "${MISSING_COMMANDS[@]}"; do
-		echo "  - $cmd"
-	done
-	echo ""
-	echo "Please install the missing commands or use nix:"
-	echo "  nix run github:input-output-hk/ouroboros-leios#demo-dozen-devnet"
-	exit 1
+  echo "Error: The following required commands are not available:"
+  for cmd in "${MISSING_COMMANDS[@]}"; do
+    echo "  - $cmd"
+  done
+  echo ""
+  echo "Please install the missing commands or use nix:"
+  echo "  nix run github:input-output-hk/ouroboros-leios#demo-dozen-devnet"
+  exit 1
 fi
 
 if [ ! -d "$SHARED_CONFIG_DIR/genesis" ]; then
-	echo "Error: no genesis files at $SHARED_CONFIG_DIR/genesis"
-	echo "Set SHARED_CONFIG_DIR to a proto-devnet config directory."
-	exit 1
+  echo "Error: no genesis files at $SHARED_CONFIG_DIR/genesis"
+  echo "Set SHARED_CONFIG_DIR to a proto-devnet config directory."
+  exit 1
 fi
 
 # Resolve ip/tc to absolute paths. The elevated processes run through sudo,
@@ -242,26 +253,26 @@ fi
 IP_BIN=""
 TOOL_PATH=""
 if [ "$TC" = "1" ]; then
-	IP_BIN=$(command -v ip)
-	TOOL_PATH=$(dirname "$IP_BIN")
-	tc_dir=$(dirname "$(command -v tc)")
-	if [ "$tc_dir" != "$TOOL_PATH" ]; then
-		TOOL_PATH="${TOOL_PATH}:${tc_dir}"
-	fi
+  IP_BIN=$(command -v ip)
+  TOOL_PATH=$(dirname "$IP_BIN")
+  tc_dir=$(dirname "$(command -v tc)")
+  if [ "$tc_dir" != "$TOOL_PATH" ]; then
+    TOOL_PATH="${TOOL_PATH}:${tc_dir}"
+  fi
 fi
 export TOOL_PATH
 
 # Check if WORKING_DIR already exists
 if [ -d "$WORKING_DIR" ]; then
-	echo "Working directory already exists: $WORKING_DIR"
-	read -r -rp "Remove and re-initialize? (Y/n): " response
-	if [[ "$response" =~ ^[Yy]$ || -z "$response" ]]; then
-		chmod a+w -R "$WORKING_DIR"
-		rm -rf "$WORKING_DIR"
-	else
-		echo "Aborting."
-		exit 0
-	fi
+  echo "Working directory already exists: $WORKING_DIR"
+  read -r -rp "Remove and re-initialize? (Y/n): " response
+  if [[ "$response" =~ ^[Yy]$ || -z "$response" ]]; then
+    chmod a+w -R "$WORKING_DIR"
+    rm -rf "$WORKING_DIR"
+  else
+    echo "Aborting."
+    exit 0
+  fi
 fi
 echo "Initializing dozen-devnet in $WORKING_DIR"
 
@@ -278,59 +289,59 @@ startTimeEpoch=$(date +%s)
 startTimeIso=$(date -u -d "@$startTimeEpoch" +"%Y-%m-%dT%H:%M:%SZ")
 
 jq --argjson time "$startTimeEpoch" '.startTime = $time' \
-	"$SHARED_CONFIG_DIR/genesis/byron-genesis.json" >"$WORKING_DIR/genesis/byron-genesis.json"
+  "$SHARED_CONFIG_DIR/genesis/byron-genesis.json" >"$WORKING_DIR/genesis/byron-genesis.json"
 
 jq --arg time "$startTimeIso" '.systemStart = $time' \
-	"$SHARED_CONFIG_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json"
+  "$SHARED_CONFIG_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json"
 
 # Set up each node
 for NODE_NAME in "${NODES[@]}"; do
-	NODE_DIR="$WORKING_DIR/$NODE_NAME"
-	NODE_IP=$(node_ip "$NODE_NAME")
+  NODE_DIR="$WORKING_DIR/$NODE_NAME"
+  NODE_IP=$(node_ip "$NODE_NAME")
 
-	echo "Setting up $NODE_NAME ($NODE_IP) in $NODE_DIR"
-	mkdir -p "$NODE_DIR"
+  echo "Setting up $NODE_NAME ($NODE_IP) in $NODE_DIR"
+  mkdir -p "$NODE_DIR"
 
-	# Copy config files. Prometheus binds the node's own address rather than
-	# 0.0.0.0 so a single metrics port works for all twelve.
-	cat "$CONFIG_DIR/config.yaml" |
-		yq ".TraceOptionNodeName = \"$NODE_NAME\"" |
-		yq ".TraceOptions.\"\".backends[1] = \"PrometheusSimple $NODE_IP $METRICS_PORT\"" \
-			>"$NODE_DIR/config.yaml"
+  # Copy config files. Prometheus binds the node's own address rather than
+  # 0.0.0.0 so a single metrics port works for all twelve.
+  cat "$CONFIG_DIR/config.yaml" |
+    yq ".TraceOptionNodeName = \"$NODE_NAME\"" |
+    yq ".TraceOptions.\"\".backends[1] = \"PrometheusSimple $NODE_IP $METRICS_PORT\"" \
+      >"$NODE_DIR/config.yaml"
 
-	# These localRoots are the whole enforcement of the topology: config.yaml sets
-	# PeerSharing: false with no public/ledger peers, so a node only ever connects
-	# to the peers listed here. All twelve nodes share one L2 segment, so
-	# re-enabling PeerSharing would let the structure collapse into a mesh.
-	accessPoints=$(node_peers "$NODE_NAME" | while read -r peer; do
-		echo "{ \"port\": ${PORT}, \"address\": \"$(node_ip "$peer")\" }"
-	done | jq -s '.')
-	# hotValency has to cover every listed peer: the outbound governor promotes
-	# only hotValency many peers from a group to hot, and tx-submission runs on
-	# hot peers only. Leaving it at 2 would silently cap a relay at two upstream
-	# tx sources no matter how many peers it knows.
-	valency=$(echo "$accessPoints" | jq 'length')
-	jq \
-		--argjson accessPoints "$accessPoints" \
-		--argjson valency "$valency" \
-		'.localRoots[0].accessPoints = $accessPoints
+  # These localRoots are the whole enforcement of the topology: config.yaml sets
+  # PeerSharing: false with no public/ledger peers, so a node only ever connects
+  # to the peers listed here. All twelve nodes share one L2 segment, so
+  # re-enabling PeerSharing would let the structure collapse into a mesh.
+  accessPoints=$(node_peers "$NODE_NAME" | while read -r peer; do
+    echo "{ \"port\": ${PORT}, \"address\": \"$(node_ip "$peer")\" }"
+  done | jq -s '.')
+  # hotValency has to cover every listed peer: the outbound governor promotes
+  # only hotValency many peers from a group to hot, and tx-submission runs on
+  # hot peers only. Leaving it at 2 would silently cap a relay at two upstream
+  # tx sources no matter how many peers it knows.
+  valency=$(echo "$accessPoints" | jq 'length')
+  jq \
+    --argjson accessPoints "$accessPoints" \
+    --argjson valency "$valency" \
+    '.localRoots[0].accessPoints = $accessPoints
      | .localRoots[0].hotValency = $valency
      | .localRoots[0].warmValency = $valency' \
-		"$CONFIG_DIR/topology.template.json" >"$NODE_DIR/topology.json"
+    "$CONFIG_DIR/topology.template.json" >"$NODE_DIR/topology.json"
 
-	# Symlink genesis files (shared, read-only)
-	for era in byron shelley alonzo conway dijkstra; do
-		ln -s "../genesis/${era}-genesis.json" "$NODE_DIR/"
-	done
+  # Symlink genesis files (shared, read-only)
+  for era in byron shelley alonzo conway dijkstra; do
+    ln -s "../genesis/${era}-genesis.json" "$NODE_DIR/"
+  done
 
-	# Only block producers forge, so only they get pool keys. run-node.sh keys off
-	# the presence of keys/ to decide whether to pass the forging arguments.
-	case "$NODE_NAME" in
-	bp*)
-		cp -r "$SHARED_CONFIG_DIR/pools-keys/pool${NODE_NAME#bp}" "$NODE_DIR/keys"
-		chmod 400 "$NODE_DIR/keys"/*.skey
-		;;
-	esac
+  # Only block producers forge, so only they get pool keys. run-node.sh keys off
+  # the presence of keys/ to decide whether to pass the forging arguments.
+  case "$NODE_NAME" in
+  bp*)
+    cp -r "$SHARED_CONFIG_DIR/pools-keys/pool${NODE_NAME#bp}" "$NODE_DIR/keys"
+    chmod 400 "$NODE_DIR/keys"/*.skey
+    ;;
+  esac
 done
 
 # tx-firehose reads its delegator payment/staking .skey files directly from
@@ -343,20 +354,20 @@ gen_nodes_compose "$TC" "$NODES_COMPOSE"
 
 NODE_SPEC=""
 for NODE_NAME in "${NODES[@]}"; do
-	NODE_SPEC="${NODE_SPEC}${NODE_SPEC:+ }${NODE_NAME}=$(node_ip "$NODE_NAME")"
+  NODE_SPEC="${NODE_SPEC}${NODE_SPEC:+ }${NODE_NAME}=$(node_ip "$NODE_NAME")"
 done
 export NODE_SPEC NS_PREFIX
 
 # Prometheus scrape targets for every node, substituted into alloy.template.
 # Tabs to match the surrounding Alloy river formatting.
 SCRAPE_TARGETS=$(for NODE_NAME in "${NODES[@]}"; do
-	printf '\t\t{\n'
-	printf '\t\t\t"__address__" = "%s:%s",\n' "$(node_ip "$NODE_NAME")" "$METRICS_PORT"
-	printf '\t\t\t"job"         = "integrations/cardano-node",\n'
-	printf '\t\t\t"instance"    = "%s",\n' "$NODE_NAME"
-	printf '\t\t\t"environment" = "leios",\n'
-	printf '\t\t\t"group"       = "dozen-devnet",\n'
-	printf '\t\t},\n'
+  printf '\t\t{\n'
+  printf '\t\t\t"__address__" = "%s:%s",\n' "$(node_ip "$NODE_NAME")" "$METRICS_PORT"
+  printf '\t\t\t"job"         = "integrations/cardano-node",\n'
+  printf '\t\t\t"instance"    = "%s",\n' "$NODE_NAME"
+  printf '\t\t\t"environment" = "leios",\n'
+  printf '\t\t\t"group"       = "dozen-devnet",\n'
+  printf '\t\t},\n'
 done)
 export SCRAPE_TARGETS
 
@@ -376,21 +387,21 @@ cp "${SHARED_CONFIG_DIR}/alloy-modules/"*.alloy "${WORKING_DIR}/alloy-modules/"
 # version strings while differing in every dependency. The path and hash are the
 # only durable evidence. Archive this next to the logs.
 {
-	echo "# dozen-devnet run provenance — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-	echo
-	for tool in cardano-node cardano-cli tx-firehose; do
-		path=$(command -v "$tool")
-		echo "${tool}:"
-		echo "  path:    ${path}"
-		echo "  version: $("$tool" --version 2>/dev/null | head -1)"
-		echo "  sha256:  $(sha256sum "$path" 2>/dev/null | cut -d' ' -f1)"
-	done
-	echo
-	echo "settings:"
-	for v in TPS OUTPUTS RATE DELAY TC XRAY SERVER NODE_RTS; do
-		echo "  ${v}=${!v}"
-	done
-	echo "  nodes=${#NODES[@]}"
+  echo "# dozen-devnet run provenance — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo
+  for tool in cardano-node cardano-cli tx-firehose; do
+    path=$(command -v "$tool")
+    echo "${tool}:"
+    echo "  path:    ${path}"
+    echo "  version: $("$tool" --version 2>/dev/null | head -1)"
+    echo "  sha256:  $(sha256sum "$path" 2>/dev/null | cut -d' ' -f1)"
+  done
+  echo
+  echo "settings:"
+  for v in TPS OUTPUTS RATE DELAY TC XRAY SERVER NODE_RTS; do
+    echo "  ${v}=${!v}"
+  done
+  echo "  nodes=${#NODES[@]}"
 } >"${WORKING_DIR}/provenance.txt"
 
 echo "Starting dozen-devnet ..."
@@ -398,34 +409,34 @@ echo "  Topology: 3 block producers x 3 relays, relays fully meshed (${#NODES[@]
 # Traffic control integration
 TC_COMPOSE=()
 if [ "$TC" = "1" ]; then
-	TC_COMPOSE=(-f "${SOURCE_DIR}/process-compose-tc.yaml")
-	echo "  Traffic control: enabled TC=${TC} (RATE=${RATE} per node uplink, DELAY=${DELAY} one way)"
+  TC_COMPOSE=(-f "${SOURCE_DIR}/process-compose-tc.yaml")
+  echo "  Traffic control: enabled TC=${TC} (RATE=${RATE} per node uplink, DELAY=${DELAY} one way)"
 else
-	echo "  Traffic control: disabled TC=${TC} (nodes on loopback)"
+  echo "  Traffic control: disabled TC=${TC} (nodes on loopback)"
 fi
 # X-ray observability integration
 XRAY_COMPOSE=()
 if [ "$XRAY" = "1" ]; then
-	set -a
-	# shellcheck disable=SC2034
-	DEMO_DASHBOARDS_DIR="${SHARED_CONFIG_DIR}/dashboards"
-	# shellcheck source=/dev/null
-	source "${XRAY_SOURCE_DIR}/env.sh"
-	set +a
-	XRAY_COMPOSE=(-f "${XRAY_SOURCE_DIR}/process-compose.yaml")
-	echo "  X-ray observability: enabled XRAY=${XRAY} (Grafana at http://localhost:3000)"
+  set -a
+  # shellcheck disable=SC2034
+  DEMO_DASHBOARDS_DIR="${SHARED_CONFIG_DIR}/dashboards"
+  # shellcheck source=/dev/null
+  source "${XRAY_SOURCE_DIR}/env.sh"
+  set +a
+  XRAY_COMPOSE=(-f "${XRAY_SOURCE_DIR}/process-compose.yaml")
+  echo "  X-ray observability: enabled XRAY=${XRAY} (Grafana at http://localhost:3000)"
 else
-	echo "  X-ray observability: disabled XRAY=${XRAY}"
+  echo "  X-ray observability: disabled XRAY=${XRAY}"
 fi
 SERVER_FLAGS=(--no-server)
 if [ "$SERVER" = "1" ]; then
-	SERVER_FLAGS=(--address "${SERVER_ADDRESS}" --port "${SERVER_PORT}")
-	echo "  Control API: http://${SERVER_ADDRESS}:${SERVER_PORT} (process-compose process ...)"
+  SERVER_FLAGS=(--address "${SERVER_ADDRESS}" --port "${SERVER_PORT}")
+  echo "  Control API: http://${SERVER_ADDRESS}:${SERVER_PORT} (process-compose process ...)"
 else
-	echo "  Control API: disabled SERVER=${SERVER}"
+  echo "  Control API: disabled SERVER=${SERVER}"
 fi
 process-compose "${SERVER_FLAGS[@]}" \
-	-f "${SOURCE_DIR}/process-compose.yaml" \
-	-f "${NODES_COMPOSE}" \
-	"${TC_COMPOSE[@]}" \
-	"${XRAY_COMPOSE[@]}"
+  -f "${SOURCE_DIR}/process-compose.yaml" \
+  -f "${NODES_COMPOSE}" \
+  "${TC_COMPOSE[@]}" \
+  "${XRAY_COMPOSE[@]}"

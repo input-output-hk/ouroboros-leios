@@ -12,7 +12,7 @@ processes:
   TxFirehose1:
     working_dir: ${WORKING_DIR}
     command: >
-      tx-firehose
+      ${TX_FIREHOSE:-tx-firehose}
       --socket-path relay11/node.socket
       --testnet-magic 164
       --signing-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator1/payment.skey
@@ -43,7 +43,7 @@ processes:
     disabled: true
     working_dir: ${WORKING_DIR}
     command: >
-      tx-firehose
+      ${TX_FIREHOSE:-tx-firehose}
       --socket-path relay21/node.socket
       --testnet-magic 164
       --signing-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator2/payment.skey
@@ -68,7 +68,7 @@ processes:
     disabled: true
     working_dir: ${WORKING_DIR}
     command: >
-      tx-firehose
+      ${TX_FIREHOSE:-tx-firehose}
       --socket-path relay31/node.socket
       --testnet-magic 164
       --signing-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator3/payment.skey

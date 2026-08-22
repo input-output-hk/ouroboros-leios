@@ -24,6 +24,7 @@ here.
 
 import argparse
 import json
+import subprocess
 import sys
 import time
 import urllib.error
@@ -92,7 +93,27 @@ def scrape(name, timeout=3):
 
 
 def generators_running(timeout=2):
-    """How many tx-firehose processes are up — the run's phase."""
+    """How many generators are up — the run's phase.
+
+    Counts actual OS processes rather than asking process-compose, so a generator
+    started by hand counts the same as a supervised one. That matters when
+    iterating on the generator itself: process-compose resolves the binary from
+    the PATH it started with, so testing a fresh build means running it directly.
+    """
+    try:
+        found = subprocess.run(
+            ["pgrep", "-c", "-f", "tx-firehose --socket-path"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        count = int(found.stdout.strip() or 0)
+        if count:
+            return count
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    # Fall back to process-compose, which knows about generators that are
+    # configured but whose process has momentarily exited.
     try:
         url = f"http://localhost:{PC_PORT}/processes"
         with urllib.request.urlopen(url, timeout=timeout) as response:
@@ -113,8 +134,12 @@ def generators_running(timeout=2):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--interval", type=float, default=10.0, help="seconds between samples")
-    parser.add_argument("--count", type=int, default=0, help="samples to take (0 = until killed)")
+    parser.add_argument(
+        "--interval", type=float, default=10.0, help="seconds between samples"
+    )
+    parser.add_argument(
+        "--count", type=int, default=0, help="samples to take (0 = until killed)"
+    )
     args = parser.parse_args()
 
     columns = (
@@ -147,9 +172,22 @@ def main():
                     break
 
         # On-chain byte rate, differenced against the previous sample.
-        current_bytes = next((samples[n].get(GAUGES["cumTxBytes"]) for n in BPS if samples[n].get(GAUGES["cumTxBytes"])), None)
-        if current_bytes is not None and previous_bytes is not None and now > previous_time:
-            row["confBps"] = f"{(current_bytes - previous_bytes) / (now - previous_time):.0f}"
+        current_bytes = next(
+            (
+                samples[n].get(GAUGES["cumTxBytes"])
+                for n in BPS
+                if samples[n].get(GAUGES["cumTxBytes"])
+            ),
+            None,
+        )
+        if (
+            current_bytes is not None
+            and previous_bytes is not None
+            and now > previous_time
+        ):
+            row["confBps"] = (
+                f"{(current_bytes - previous_bytes) / (now - previous_time):.0f}"
+            )
         previous_bytes, previous_time = current_bytes or previous_bytes, now
 
         # Forge counters, summed over producers — each block is forged once.
