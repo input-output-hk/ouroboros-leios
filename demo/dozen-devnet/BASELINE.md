@@ -527,7 +527,49 @@ why the optimistic snapshot's cost is **not** depth-independent. So the ~5 s
 validation-time capacity was doing useful work: it bounded mempool depth, and
 therefore bounded the cost of a cache miss on the forge path.
 
-### EB fill is the real ceiling, and it is not supply-limited
+### RETRACTED: EBs *are* full — the ceiling is the 500 kB announcement cap
+
+> [!WARNING]
+> The "EB fill is only ~40%" claim below is **wrong**, and so is every earlier
+> version of it (27%, 39%, 44%). The EB body size is traced directly, and
+> announced EBs are essentially full:
+>
+> | `ebBodySize` over 314 announcements | |
+> | --- | --- |
+> | p50 | 486,111 B = **97%** of the cap |
+> | p95 / max | 499,971 B = **100%** |
+> | over 90% of the cap | 282 / 314 = **90%** |
+> | implied txs (body / 36 B per item) | p50 **13,503**, max **13,888** |
+>
+> 13,888 is exactly `maxTxsPerEb`. The EBs are at their limit.
+>
+> **Where the error came from:** I derived txs-per-EB as
+> `(confirmed − RB txs) / (count of Consensus.LeiosKernel.Certified lines in one
+> node's log)`. That denominator is per-node *observations* accumulated over the
+> node's whole lifetime — 207–265 depending on the node — while the numerator
+> covered only the 17-minute sampled window. Too large a denominator, so
+> txs-per-EB came out several times too small. The lesson is the same one as
+> `txsProcessedNum`: a node-local trace count is not a chain quantity.
+>
+> **The actual ceiling** is the EB announcement message:
+>
+> ```
+> maxMsgLeiosBlockBytesSize = 500 kB          -- from CIP-0164's recommendations
+> minEbItemBytesSize        = 36 B            -- 32 B hash + 2 overhead + 2 size
+> maxTxsPerEb = (500000 - 5) / 36 = 13,888
+> ```
+>
+> One full EB per RB opportunity gives **604–731 tx/s** at the 19–23 s block
+> intervals measured. Observed confirmed was 220–410 tx/s, so roughly 40–60% of
+> that — the remaining shortfall is the certification rate (not every announced EB
+> is certified), not EB fill. `maxTxsPerEb` is the parameter to raise if more
+> throughput is wanted, and it is a CIP-0164 recommendation rather than an
+> implementation artefact.
+>
+> This also retires the "what picks ~6,000" question: nothing did. It was an
+> artefact of the bad denominator.
+
+### Superseded: EB fill is the real ceiling, and it is not supply-limited
 
 **5,965 txs per certified EB with 107,904 transactions available** — against 5,466
 with a third of the supply. Three separate interventions have now failed to move
