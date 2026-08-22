@@ -80,3 +80,41 @@ Certification cannot reach 100%: an EB is only certifiable by an RB at
 least `minCertificationGap` slots after the announcing one, so with
 Poisson block arrival a share of announcements never gets a qualifying
 slot. That share, not EB fill, is the gap to the full-EB ceiling.
+
+## Phase breakdown
+
+Derived in-session from the logs before they were deleted; `digest.py` reports run
+totals only, and these per-phase splits are what the conclusion rests on. Phase
+boundaries are the first `Submit.Success` of generators 2 and 3.
+
+| | 1 gen | 2 gens | 3 gens |
+| --- | --- | --- | --- |
+| peak N2N ingest | 343 tx/s (78.2 kB/s) | 682 (155.5) | 862 (196.5) |
+| **on chain** | **77.6 kB/s** | **64.1** | **51.8** |
+| block interval | 24.7 s | 20.0 s | 21.1 s |
+| kB per block | 1920.7 | 1281.4 | 1094.3 |
+| EB fill, mean | 82% | 98% | 98% |
+| EBs announced / included | 32 / 17 | 34 / 12 | 62 / 31 |
+| votes cast / withheld | 90 / 7 | 76 / 27 | 222 / 91 |
+| &nbsp;&nbsp;of which `tooLate` | **0** | 12 | **60** |
+| &nbsp;&nbsp;`chainTipDoesNotAnnounce` | 7 | 15 | 31 |
+| entry relay depth, end | 102,560 | 106,159 | 107,904 (byte cap) |
+
+Ingest scaled 2.5x; on-chain throughput fell by a third, monotonically, with the
+entry relay pinned at the byte capacity.
+
+It is not EB fill — EBs get *fuller* under load. It is not forks — 21 switches
+against 329 extensions, 6.0%. It is vote timeliness: an EB is certifiable only by
+the block succeeding its announcement, so a vote has one inter-block interval to
+be produced and diffused. Deep mempools slow the forge loop
+(`partition-mempool` p95 7.8 s) and block diffusion; votes miss the window;
+fewer certificates form.
+
+Certification gap (certifying slot - EB slot) over 75 included certificates:
+min 11 (the earliest legal value, `minCertificationGap` = 10), p50 26, p95 64,
+max 115 — consistent with succeeding-block certification over ~20 s blocks.
+
+Whole-run calibration: 626,561 txs submitted, 468,103 confirmed (75%), remainder
+still in mempool backlog at teardown. **232 B per tx** on chain, matching the
+mempool's own measure against 228 B on the wire — the "259 B" in earlier notes
+came from a denominator that undercounted submissions.
