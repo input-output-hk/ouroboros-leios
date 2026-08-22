@@ -74,7 +74,9 @@ def main(run_dir):
     print("`sampler.tsv` and `provenance.txt` sit alongside.\n")
 
     print("## Mempool add path, per node\n")
-    print("| node | adds | adds/s | p50 gap | p99 gap | max gap | stalled | peak depth |")
+    print(
+        "| node | adds | adds/s | p50 gap | p99 gap | max gap | stalled | peak depth |"
+    )
     print("| --- | --- | --- | --- | --- | --- | --- | --- |")
     for path in sorted(glob.glob(os.path.join(run_dir, "*", "node.log"))):
         name = os.path.basename(os.path.dirname(path))
@@ -152,17 +154,68 @@ def forge_loop(run_dir):
                 stack, duration = STACK.search(line), DURATION.search(line)
                 if stack and duration:
                     per_stack[stack.group(1).decode()].append(float(duration.group(1)))
-    for stack, values in sorted(per_stack.items(), key=lambda kv: -statistics.median(kv[1])):
+    for stack, values in sorted(
+        per_stack.items(), key=lambda kv: -statistics.median(kv[1])
+    ):
         values.sort()
-        p50, p95, worst = quantiles_at(values, 0.5), quantiles_at(values, 0.95), values[-1]
+        p50, p95, worst = (
+            quantiles_at(values, 0.5),
+            quantiles_at(values, 0.95),
+            values[-1],
+        )
         # Indent children under their parent so the tree stays readable.
         depth = stack.count(" -> ")
         label = ("&nbsp;" * 4 * depth) + stack.rsplit(" -> ", 1)[-1]
-        print(f"| {label} | {len(values)} | {p50:.3f} s | {p95:.3f} s | {worst:.3f} s |")
+        print(
+            f"| {label} | {len(values)} | {p50:.3f} s | {p95:.3f} s | {worst:.3f} s |"
+        )
 
 
 def quantiles_at(sorted_values, fraction):
-    return sorted_values[min(int(len(sorted_values) * fraction), len(sorted_values) - 1)]
+    return sorted_values[
+        min(int(len(sorted_values) * fraction), len(sorted_values) - 1)
+    ]
+
+
+def votes_withheld(run_dir):
+    """Why nodes declined to vote — the most diagnostic number in a loaded run.
+
+    An EB is certifiable only by the block succeeding its announcement, so a vote
+    has one inter-block interval to be produced and diffused. Miss that and the EB
+    is unrecoverable. Under load this is what actually caps throughput: EBs stay
+    97% full and re-endorsement works as designed, but `tooLate` climbs and fewer
+    certificates form. It is downstream of forge latency — a voter stalled in a
+    multi-second mempool walk votes after the certifying block is already made.
+
+    Read this alongside the forge loop table: `tooLate` rising and
+    `partition-mempool` p95 rising are the same event seen from two ends.
+    """
+    reason = re.compile(rb'\\"reason\\":\\"([^\\]+)')
+    tally = collections.Counter()
+    voted = 0
+    for path in glob.glob(os.path.join(run_dir, "*", "node.log")):
+        with open(path, "rb") as handle:
+            for line in handle:
+                if b"LeiosNotVoted" in line:
+                    found = reason.search(line)
+                    if found:
+                        tally[found.group(1).decode()] += 1
+                elif b"LeiosVoted" in line:
+                    voted += 1
+    if not (tally or voted):
+        return
+    total = sum(tally.values())
+    print("\n### Votes withheld\n")
+    print(f"{voted} votes cast, {total} withheld", end="")
+    print(
+        f" — {100*total/(voted+total):.0f}% of opportunities.\n"
+        if voted + total
+        else ".\n"
+    )
+    print("| reason | n |")
+    print("| --- | --- |")
+    for name, count in tally.most_common():
+        print(f"| `{name}` | {count} |")
 
 
 def endorser_blocks(run_dir):
@@ -199,16 +252,24 @@ def endorser_blocks(run_dir):
         for label, fraction in (("p50", 0.5), ("p95", 0.95)):
             txs = quantiles_at(counts, fraction)
             print(f"| {label} | {txs} | {100*txs/MAX_TXS_PER_EB:.0f}% | {txs*36} |")
-        print(f"| max | {counts[-1]} | {100*counts[-1]/MAX_TXS_PER_EB:.0f}% | {counts[-1]*36} |")
+        print(
+            f"| max | {counts[-1]} | {100*counts[-1]/MAX_TXS_PER_EB:.0f}% | {counts[-1]*36} |"
+        )
         full = sum(1 for t in counts if t > 0.9 * MAX_TXS_PER_EB)
         print(f"\n{full}/{len(counts)} over 90% full (maxTxsPerEb = {MAX_TXS_PER_EB}).")
+
+    votes_withheld(run_dir)
 
     # Distinct hashes, because every node traces every announcement it accepts and
     # a raw line count would be per-node observations rather than a chain figure.
     if announced:
         rate = 100 * len(certified) / len(announced)
-        print(f"\n{len(announced)} distinct EBs announced, {len(certified)} certifying blocks seen — {rate:.0f}%.")
-        print("\nCertification cannot reach 100%: an EB is only certifiable by an RB at")
+        print(
+            f"\n{len(announced)} distinct EBs announced, {len(certified)} certifying blocks seen — {rate:.0f}%."
+        )
+        print(
+            "\nCertification cannot reach 100%: an EB is only certifiable by an RB at"
+        )
         print("least `minCertificationGap` slots after the announcing one, so with")
         print("Poisson block arrival a share of announcements never gets a qualifying")
         print("slot. That share, not EB fill, is the gap to the full-EB ceiling.")

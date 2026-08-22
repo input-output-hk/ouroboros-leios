@@ -19,8 +19,15 @@ MempoolCapacityBytesOverride: 25000000
 # dimension binds instead — 25 MB / 228 B is about 107k txs, so expect mempools
 # roughly three times deeper.
 #
-# Set to true to restore the defaults (1 s / 1.5 s / 5 s).
-MempoolTimeoutsEnabled: false
+# Measured with it off, three phases of 1/2/3 injection points: ingest scaled
+# 78 -> 156 -> 197 kB/s while on-chain throughput FELL 77.6 -> 64.1 -> 51.8 kB/s,
+# a conversion of 99% -> 41% -> 26%, with the entry relay pinned at the byte cap
+# (107,904 txs). Offering more load to a node whose forge cost scales with
+# mempool depth converts the extra ingest into lost throughput — congestion
+# collapse, not merely wasted memory.
+#
+# Set to false to reproduce that; true restores the defaults (1 s / 1.5 s / 5 s).
+MempoolTimeoutsEnabled: true
 
 # Needed < 10.6
 EnableP2P: true
