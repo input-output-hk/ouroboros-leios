@@ -5,6 +5,38 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w34 - 2026-08-23
+
+Removed congestion on the mempool and on the voting logic. Plus a few tooling updates on `db-analyser` and `tx-firehose`.
+
+> [!NOTE]
+>
+> No serialization or wire-format change since w32 — update in place, no respin.
+
+> [!IMPORTANT]
+>
+> Syncing from genesis still may get stuck sometimes. Workaround in [#998](https://github.com/input-output-hk/ouroboros-leios/issues/998), or sideload from the IOG relays. A caught-up node is unaffected.
+
+- High-throughput mempool: decouple readers and adders from ledger revalidation [consensus#2229](https://github.com/IntersectMBO/ouroboros-consensus/pull/2229) (prototype cut of [consensus#2148](https://github.com/IntersectMBO/ouroboros-consensus/pull/2148))
+  - Revalidating against a new tip used to hold the mempool state for the whole pass. The bulk now runs off the lock against a snapshot, leaving only a bounded residual under it — the committed state is byte-identical, and reader stall no longer grows with occupancy.
+  - Still linearizable: the sync retries if the tip moved, and a removal generation counter stops a racing `removeTxsEvenIfValid` from being undone.
+  - Adds `mempool-state-bench`; the QSM tests gained a `RemoveTxs` action and a removal-during-sync regression test.
+
+- Cast our own vote without waiting on inbound vote verification [consensus#2225](https://github.com/IntersectMBO/ouroboros-consensus/pull/2225)
+  - `addVote` ran the BLS pairing inside the STM transaction, so under gossip load every concurrent commit aborted it and each retry re-did the pairing — a producer's own ready vote could sit 5–10s and miss the window. Now: dedup peek → validate in plain IO → short insert.
+  - A/B on a live musashi producer: p90 5.91s → 2.14s, max 10.08s → 3.12s, holds over 5s 114 → 0.
+
+- `LeiosNotify`: remove a stale-OCIN timing attack vector [consensus#2179](https://github.com/IntersectMBO/ouroboros-consensus/pull/2179), fixes [#1029](https://github.com/input-output-hk/ouroboros-leios/issues/1029)
+  - An announcement whose OCIN our immutable tip has revoked is now accepted and ignored instead of disconnecting the peer — an honest peer may simply be behind. Removes a source of spurious disconnects; a w32 peer still drops the connection.
+
+- `db-analyser` supports Leios chains [consensus#2181](https://github.com/IntersectMBO/ouroboros-consensus/pull/2181), part of [#1023](https://github.com/input-output-hk/ouroboros-leios/issues/1023)
+  - Opens the LeiosDb with `--leios-db` (`--stubbed-leios-db` when bodies are not needed), applies EB closures in the ledger-state analyses and verifies certificates on the full-application path.
+  - `benchmark-ledger-ops` and `repro-mempool-and-forge` handle cert-RBs; `count-tx-outputs` and `show-block-txs-size` gained EB columns.
+
+- `tx-firehose`: control the shape of generated transactions [cardano-node#6658](https://github.com/IntersectMBO/cardano-node/pull/6658)
+  - `--outputs-per-tx N` alone derives the input count to hold the UTxO set size constant, so steady-state txs are `N`-in/`N`-out at constant size — a way past the tx/s ceiling on byte throughput. With `--inputs-per-tx` both are pinned.
+  - Inputs are selected largest-first, so the generator stops sharpening dust; inputs the ledger says are gone are dropped rather than retried. `Submit.Success` traces carry `inputs` and `outputs`.
+
 ## prototype-2026w32 - 2026-08-09
 
 The registered BLS Leios keys are now **used**: nodes build the voting committee from the on-chain stake distribution, sign votes with the pool operator's BLS key, and verify certificates against that committee. This completes the "registrable but not utilized" path from w30/w31 and drops the insecure key-derivation shortcut.
