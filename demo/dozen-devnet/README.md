@@ -82,7 +82,6 @@ Environment variables, see `run.sh` for the full list:
 | `NODE_RTS`          | (empty)              | extra per-node RTS flags, e.g. `-N4` on a big host   |
 | `WORKING_DIR`       | `$(pwd)/tmp-devnet`  | where the devnet is initialized                     |
 | `SHARED_CONFIG_DIR` | `../proto-devnet/config` | genesis, pool keys, delegators, dashboards      |
-| `MEMPOOL_BYTES`     | (config)             | mempool byte cap; config.yaml sets 5 MB             |
 | `COLOR1..3`         | red, blue, amber     | colour each generator tags its transactions with    |
 
 ``` shell

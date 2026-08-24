@@ -21,7 +21,7 @@ DijkstraGenesisFile: dijkstra-genesis.json
 # dimension binds first. Since the time dimension is the one the node does not
 # report, capping on bytes is what makes the reported capacity the real one.
 #
-# Raise it with MEMPOOL_BYTES=... ./run.sh; 50000000 was the previous setting, big
+# Edit this between runs to vary the cap. 50000000 was the previous setting, big
 # enough for ~2 full 12 MB closures of 1 kB transactions.
 MempoolCapacityBytesOverride: 5000000
 
