@@ -82,10 +82,32 @@ Environment variables, see `run.sh` for the full list:
 | `NODE_RTS`          | (empty)              | extra per-node RTS flags, e.g. `-N4` on a big host   |
 | `WORKING_DIR`       | `$(pwd)/tmp-devnet`  | where the devnet is initialized                     |
 | `SHARED_CONFIG_DIR` | `../proto-devnet/config` | genesis, pool keys, delegators, dashboards      |
+| `MONITOR`           | `1`                  | per-node mempool observers; `0` turns them off      |
+| `MONITOR_INTERVAL`  | `10`                 | seconds between mempool snapshots                   |
+| `COLOR1..3`         | red, blue, amber     | colour each generator tags its transactions with    |
 
 ``` shell
 TPS=1000 RATE=100Mbps DELAY=50ms ./run.sh
 ```
+
+## Mempool colouring
+
+Each generator tags its transactions with a colour (`tx-firehose --color`), and
+one `mempool-monitor` per node reports which colours that node is holding. One
+observer per node is the point: fragmentation is a statement about how mempools
+*differ*, so an aggregate would hide it. Each pane runs interactively, so twelve
+of them need no extra terminals, and each also appends to
+`mempool-<node>.tsv` in the working directory.
+
+A node's `--own-color` is its own block producer's generator: `bp2` and
+`relay21..relay23` all count `COLOR2` as local. So the local share answers "how
+much of this mempool is my group's own load", which is the quantity that should
+fall with distance from an injection point.
+
+`MONITOR=0` turns the observers off, which is also how to measure what the
+observers themselves cost. A drain is a round trip per transaction, so it is
+cheap per round but not free, and at these depths that deserves checking rather
+than assuming.
 
 ## Traffic control
 

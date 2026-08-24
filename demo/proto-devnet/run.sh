@@ -17,6 +17,17 @@ set -a
 : "${METRICS_PORT_NODE3:=12903}"
 # Base firehose submission rate (TxFirehose1); override with e.g. TPS=1000
 : "${TPS:=100}"
+# Colours the two generators tag their transactions with, so the mempool
+# observers can tell whose load each node is holding. Explicit and well
+# separated rather than --color auto, which is uniform but can put two
+# generators close enough to be hard to tell apart by eye.
+: "${COLOR1:=ff0000}"
+: "${COLOR2:=00a0ff}"
+# Which mempool-monitor to run; point it at a local cabal build to iterate.
+: "${MEMPOOL_MONITOR:=mempool-monitor}"
+# Seconds between mempool snapshots. A drain is a round trip per transaction, so
+# this stays generous; fragmentation evolves over tens of seconds anyway.
+: "${MONITOR_INTERVAL:=10}"
 # Traffic control (on by default, disable with TC=0)
 : "${TC:=1}"
 if [ "$TC" = "1" ]; then
