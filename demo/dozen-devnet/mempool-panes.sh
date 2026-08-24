@@ -18,7 +18,10 @@ SESSION="${SESSION:-mempool}"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${WORKING_DIR:=${SOURCE_DIR}/tmp-devnet}"
 : "${MEMPOOL_MONITOR:=mempool-monitor}"
-: "${MONITOR_INTERVAL:=10}"
+# Period between snapshot starts, not a gap after each drain. Drains measure 1-3 s
+# against the 5 MB cap, so 5 s keeps a node iterated well under half the time. A
+# drain that overruns just runs back-to-back rather than stretching the cadence.
+: "${MONITOR_INTERVAL:=5}"
 : "${MAGIC:=164}"
 # Must match the generators; same defaults as run.sh.
 : "${COLOR1:=ff0000}"
