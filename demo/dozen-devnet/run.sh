@@ -65,10 +65,14 @@ set -a
 : "${COLOR1:=ff0000}"
 : "${COLOR2:=00a0ff}"
 : "${COLOR3:=ffd000}"
-# Per-node mempool observers. MONITOR=0 turns them off, which is also the A/B for
-# how much the observer itself perturbs what it measures: a drain is a round trip
-# per transaction, so it is cheap per round but not free.
-: "${MONITOR:=1}"
+# Per-node mempool observers as process-compose processes. Off by default,
+# because process-compose cannot tile: its TUI shows one pane at a time, so
+# twelve of these are only viewable one at a time. Use scripts/mempool-panes.sh
+# for a tiled tmux session instead.
+#
+# Worth turning on for a headless run, where the point is the TSV rather than
+# watching. Do not run both: each observer costs a drain, and two sets double it.
+: "${MONITOR:=0}"
 : "${MEMPOOL_MONITOR:=mempool-monitor}"
 # Seconds between snapshots. Fragmentation evolves over tens of seconds, so a
 # faster rate buys nothing and costs real round trips.

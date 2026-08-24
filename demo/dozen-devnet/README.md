@@ -82,7 +82,8 @@ Environment variables, see `run.sh` for the full list:
 | `NODE_RTS`          | (empty)              | extra per-node RTS flags, e.g. `-N4` on a big host   |
 | `WORKING_DIR`       | `$(pwd)/tmp-devnet`  | where the devnet is initialized                     |
 | `SHARED_CONFIG_DIR` | `../proto-devnet/config` | genesis, pool keys, delegators, dashboards      |
-| `MONITOR`           | `1`                  | per-node mempool observers; `0` turns them off      |
+| `MEMPOOL_BYTES`     | (config)             | mempool byte cap; config.yaml sets 5 MB             |
+| `MONITOR`           | `0`                  | mempool observers as process-compose processes      |
 | `MONITOR_INTERVAL`  | `10`                 | seconds between mempool snapshots                   |
 | `COLOR1..3`         | red, blue, amber     | colour each generator tags its transactions with    |
 
@@ -104,10 +105,28 @@ A node's `--own-color` is its own block producer's generator: `bp2` and
 much of this mempool is my group's own load", which is the quantity that should
 fall with distance from an injection point.
 
-`MONITOR=0` turns the observers off, which is also how to measure what the
-observers themselves cost. A drain is a round trip per transaction, so it is
-cheap per round but not free, and at these depths that deserves checking rather
-than assuming.
+### Watching all twelve
+
+``` shell
+./scripts/mempool-panes.sh
+```
+
+A tiled tmux session, one pane per node, rows grouped by block producer. So a row
+is one group and a column crosses groups: fragmentation reads left-to-right (does
+this group's own colour dominate) and top-to-bottom (has it leaked). Each pane
+wants roughly 50x10, so a wide terminal or a trimmed `NODES` list.
+
+This is separate from the devnet on purpose. process-compose cannot tile — its
+TUI shows one pane at a time — so twelve `is_interactive` processes would only be
+viewable one by one. `MONITOR=1` still defines them as processes, which is worth
+it for a headless run where the TSV is the point rather than watching. Do not run
+both: each observer costs a drain and two sets double it.
+
+### The observer is not free
+
+A drain is a round trip per transaction, so it is cheap per round but not free.
+Running with and without the observers is the way to find out what they cost, and
+at these depths that deserves checking rather than assuming.
 
 ## Traffic control
 
