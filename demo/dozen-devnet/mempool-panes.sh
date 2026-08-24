@@ -5,9 +5,13 @@
 # time, so `is_interactive` gets you a real TTY but not twelve of them side by
 # side. Hence tmux, and hence on-demand rather than part of the devnet.
 #
-# Pane order puts each block producer's group on its own row, so a row is one
-# group and a column crosses groups. Fragmentation reads left-to-right (does this
-# group's own colour dominate) and top-to-bottom (has it leaked).
+# tmux's tiled layout grows rows and columns alternately until rows * columns
+# covers the pane count, so twelve panes is always 4 rows x 3 columns whatever the
+# terminal size. Pane order therefore fills column-major on purpose: each column
+# is one block producer's group, its producer on top and its three relays below.
+#
+# So fragmentation reads down a column (does this group's own colour dominate its
+# own relays) and across a row (has it leaked to the others).
 set -euo pipefail
 
 SESSION="${SESSION:-mempool}"
@@ -23,9 +27,10 @@ SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Whether each pane also appends its snapshots to a TSV.
 : "${TSV:=1}"
 
-# Grouped so that a tiled 4-wide layout puts one block producer per row. Override
-# for a different devnet, e.g. NODES="node1 node2 node3" against proto-devnet.
-: "${NODES:=bp1 relay11 relay12 relay13 bp2 relay21 relay22 relay23 bp3 relay31 relay32 relay33}"
+# Ordered so a 4x3 tiled layout puts one group per column: the producers fill the
+# first row, then each group's relays run down beneath its producer. Override for
+# a different devnet, e.g. NODES="node1 node2 node3" against proto-devnet.
+: "${NODES:=bp1 bp2 bp3 relay11 relay21 relay31 relay12 relay22 relay32 relay13 relay23 relay33}"
 read -ra NODES <<<"$NODES"
 
 for cmd in tmux "$MEMPOOL_MONITOR"; do
@@ -89,9 +94,10 @@ tmux select-pane -t "$SESSION:mempools.0"
 cat <<EOF
 Twelve monitors in tmux session '$SESSION'.
 
-  rows are groups:  bp1 relay11 relay12 relay13
-                    bp2 relay21 relay22 relay23
-                    bp3 relay31 relay32 relay33
+  columns are groups:   bp1      bp2      bp3
+                        relay11  relay21  relay31
+                        relay12  relay22  relay32
+                        relay13  relay23  relay33
 
   zoom one pane     ctrl-b z
   detach            ctrl-b d

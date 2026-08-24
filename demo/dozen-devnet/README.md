@@ -110,10 +110,21 @@ A tiled tmux session, one pane per node, on demand and separate from the devnet.
 process-compose cannot tile — its TUI shows one pane at a time — so the panes
 have to live somewhere else.
 
-Rows are grouped by block producer, so a row is one group and a column crosses
-groups: fragmentation reads left-to-right (does this group's own colour dominate
-its own relays) and top-to-bottom (has it leaked). Each pane wants roughly 50x10,
-so a wide terminal, or trim `NODES`.
+Twelve panes always tile as 4 rows x 3 columns — tmux grows rows and columns
+alternately until they cover the pane count, so it does not depend on terminal
+size — and the node order is set to make **each column one group**, its producer
+on top and its three relays below:
+
+```
+bp1      bp2      bp3
+relay11  relay21  relay31
+relay12  relay22  relay32
+relay13  relay23  relay33
+```
+
+Fragmentation then reads down a column (does this group's own colour dominate its
+own relays) and across a row (has it leaked to the others). Each pane wants
+roughly 50x10, so a wide terminal, or trim `NODES`.
 
 Knobs: `NODES`, `MEMPOOL_MONITOR`, `MONITOR_INTERVAL`, `COLOR1..3`, `TSV`,
 `SESSION`. Each pane also appends to `mempool-<node>.tsv` unless `TSV=0`, so a
