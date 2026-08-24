@@ -7,19 +7,12 @@ same genesis, same x-ray observability, different topology.
 ## Topology
 
 Three block producers, each with three private relays, and the nine relays
-fully meshed among themselves:
+fully meshed among themselves.
 
-```
-bp1 ── relay11 ─┐
-   ├─ relay12 ──┤
-   └─ relay13 ──┤
-bp2 ── relay21 ─┤
-   ├─ relay22 ──┼── full mesh across all nine relays
-   └─ relay23 ──┤
-bp3 ── relay31 ─┤
-   ├─ relay32 ──┤
-   └─ relay33 ──┘
-```
+![Demo diagram](./demo-dozen-devnet.excalidraw.svg)
+
+> [!TIP]
+> This is an excalidraw SVG with embedded scene so it can be loaded and edited in [https://excalidraw.com/].
 
 Why this shape:
 
