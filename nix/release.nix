@@ -38,6 +38,8 @@
           # tx-firehose is built from the same leios-prototype input as the
           # node and CLI, and is consumed by the Antithesis devnet image.
           tx-firehose-static = muslJobs.tx-firehose;
+          # Its observer, static too so it can go wherever a node socket is.
+          mempool-monitor-static = muslJobs.mempool-monitor;
         }
         //
           lib.optionalAttrs

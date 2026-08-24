@@ -31,6 +31,7 @@ read -ra NODES <<<"$NODES"
 for cmd in tmux "$MEMPOOL_MONITOR"; do
 	if ! command -v "$cmd" &>/dev/null; then
 		echo "Error: $cmd not found on PATH" >&2
+		echo "(both come from the dev shell: nix develop .#dev-demo-dozen-devnet)" >&2
 		exit 1
 	fi
 done
