@@ -5,12 +5,25 @@ AlonzoGenesisFile: alonzo-genesis.json
 ConwayGenesisFile: conway-genesis.json
 DijkstraGenesisFile: dijkstra-genesis.json
 
-# 2 * maxEBClosure is the lower bound (24 MB), and 25 MB left no slack once
-# transactions get large: at ~1 kB per tx a full 12 MB closure needs ~12,000 txs,
-# so the mempool has to comfortably exceed that or EBs cannot fill and the size
-# experiment measures the mempool rather than the protocol. 50 MB gives ~2 full
-# closures of 1 kB transactions plus headroom.
-MempoolCapacityBytesOverride: 50000000
+# Deliberately small, for the mempool fragmentation experiment. A mempool large
+# enough to hold everything converges: every node ends up with the same contents
+# and there is no fragmentation left to see. Capping it forces each node to hold a
+# *selection*, and whose transactions make that selection is what the experiment
+# measures.
+#
+# The override is not a byte limit but a block count: consensus rounds it up to
+# the next whole multiple of the block capacity (89,088 B here, that is
+# maxBlockBodySize 90112 less a 1024 fixed overhead), so 5 MB becomes 57 blocks =
+# 5,078,016 B, roughly 22k transactions at 228 B or 18.6k once --color adds its
+# ~45 B of metadata.
+#
+# Usefully, that is below the ~34k the validation-time budget admits, so the byte
+# dimension binds first. Since the time dimension is the one the node does not
+# report, capping on bytes is what makes the reported capacity the real one.
+#
+# Raise it with MEMPOOL_BYTES=... ./run.sh; 50000000 was the previous setting, big
+# enough for ~2 full 12 MB closures of 1 kB transactions.
+MempoolCapacityBytesOverride: 5000000
 
 # Sledgehammer: passes Nothing to consensus for the whole MempoolTimeoutConfig,
 # switching off all three at once — the per-tx soft timeout (discard), the per-tx

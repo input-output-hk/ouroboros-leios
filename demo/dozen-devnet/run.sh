@@ -73,6 +73,11 @@ set -a
 # Seconds between snapshots. Fragmentation evolves over tens of seconds, so a
 # faster rate buys nothing and costs real round trips.
 : "${MONITOR_INTERVAL:=10}"
+# Mempool byte cap. Empty means whatever config.yaml sets, which is deliberately
+# small so mempools cannot all converge on the same contents. Consensus rounds
+# this up to a whole multiple of the block capacity, so the effective cap is
+# always a little above what is asked for.
+: "${MEMPOOL_BYTES:=}"
 # Traffic control (on by default, disable with TC=0)
 : "${TC:=1}"
 if [ "$TC" = "1" ]; then
@@ -357,9 +362,14 @@ for NODE_NAME in "${NODES[@]}"; do
 
 	# Copy config files. Prometheus binds the node's own address rather than
 	# 0.0.0.0 so a single metrics port works for all twelve.
+	local mempool_patch="."
+	if [ -n "$MEMPOOL_BYTES" ]; then
+		mempool_patch=".MempoolCapacityBytesOverride = $MEMPOOL_BYTES"
+	fi
 	cat "$CONFIG_DIR/config.yaml" |
 		yq ".TraceOptionNodeName = \"$NODE_NAME\"" |
-		yq ".TraceOptions.\"\".backends[1] = \"PrometheusSimple $NODE_IP $METRICS_PORT\"" \
+		yq ".TraceOptions.\"\".backends[1] = \"PrometheusSimple $NODE_IP $METRICS_PORT\"" |
+		yq "$mempool_patch" \
 			>"$NODE_DIR/config.yaml"
 
 	# These localRoots are the whole enforcement of the topology: config.yaml sets
