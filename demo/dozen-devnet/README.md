@@ -83,8 +83,6 @@ Environment variables, see `run.sh` for the full list:
 | `WORKING_DIR`       | `$(pwd)/tmp-devnet`  | where the devnet is initialized                     |
 | `SHARED_CONFIG_DIR` | `../proto-devnet/config` | genesis, pool keys, delegators, dashboards      |
 | `MEMPOOL_BYTES`     | (config)             | mempool byte cap; config.yaml sets 5 MB             |
-| `MONITOR`           | `0`                  | mempool observers as process-compose processes      |
-| `MONITOR_INTERVAL`  | `10`                 | seconds between mempool snapshots                   |
 | `COLOR1..3`         | red, blue, amber     | colour each generator tags its transactions with    |
 
 ``` shell
@@ -96,9 +94,7 @@ TPS=1000 RATE=100Mbps DELAY=50ms ./run.sh
 Each generator tags its transactions with a colour (`tx-firehose --color`), and
 one `mempool-monitor` per node reports which colours that node is holding. One
 observer per node is the point: fragmentation is a statement about how mempools
-*differ*, so an aggregate would hide it. Each pane runs interactively, so twelve
-of them need no extra terminals, and each also appends to
-`mempool-<node>.tsv` in the working directory.
+*differ*, so an aggregate would hide it.
 
 A node's `--own-color` is its own block producer's generator: `bp2` and
 `relay21..relay23` all count `COLOR2` as local. So the local share answers "how
@@ -108,25 +104,25 @@ fall with distance from an injection point.
 ### Watching all twelve
 
 ``` shell
-./scripts/mempool-panes.sh
+./mempool-panes.sh
 ```
 
-A tiled tmux session, one pane per node, rows grouped by block producer. So a row
-is one group and a column crosses groups: fragmentation reads left-to-right (does
-this group's own colour dominate) and top-to-bottom (has it leaked). Each pane
-wants roughly 50x10, so a wide terminal or a trimmed `NODES` list.
+A tiled tmux session, one pane per node, on demand and separate from the devnet.
+process-compose cannot tile — its TUI shows one pane at a time — so the panes
+have to live somewhere else.
 
-This is separate from the devnet on purpose. process-compose cannot tile — its
-TUI shows one pane at a time — so twelve `is_interactive` processes would only be
-viewable one by one. `MONITOR=1` still defines them as processes, which is worth
-it for a headless run where the TSV is the point rather than watching. Do not run
-both: each observer costs a drain and two sets double it.
+Rows are grouped by block producer, so a row is one group and a column crosses
+groups: fragmentation reads left-to-right (does this group's own colour dominate
+its own relays) and top-to-bottom (has it leaked). Each pane wants roughly 50x10,
+so a wide terminal, or trim `NODES`.
 
-### The observer is not free
+Knobs: `NODES`, `MEMPOOL_MONITOR`, `MONITOR_INTERVAL`, `COLOR1..3`, `TSV`,
+`SESSION`. Each pane also appends to `mempool-<node>.tsv` unless `TSV=0`, so a
+run is reviewable afterwards and not only while watched.
 
-A drain is a round trip per transaction, so it is cheap per round but not free.
-Running with and without the observers is the way to find out what they cost, and
-at these depths that deserves checking rather than assuming.
+The observers are not free: a drain is a round trip per transaction, cheap per
+round but not nothing. Running with and without them is how to find out what they
+cost, which at these depths deserves checking rather than assuming.
 
 ## Traffic control
 

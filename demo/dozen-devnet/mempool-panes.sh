@@ -11,7 +11,7 @@
 set -euo pipefail
 
 SESSION="${SESSION:-mempool}"
-SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${WORKING_DIR:=${SOURCE_DIR}/tmp-devnet}"
 : "${MEMPOOL_MONITOR:=mempool-monitor}"
 : "${MONITOR_INTERVAL:=10}"
@@ -23,12 +23,10 @@ SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Whether each pane also appends its snapshots to a TSV.
 : "${TSV:=1}"
 
-# Grouped so that a tiled 4-wide layout puts one block producer per row.
-NODES=(
-	bp1 relay11 relay12 relay13
-	bp2 relay21 relay22 relay23
-	bp3 relay31 relay32 relay33
-)
+# Grouped so that a tiled 4-wide layout puts one block producer per row. Override
+# for a different devnet, e.g. NODES="node1 node2 node3" against proto-devnet.
+: "${NODES:=bp1 relay11 relay12 relay13 bp2 relay21 relay22 relay23 bp3 relay31 relay32 relay33}"
+read -ra NODES <<<"$NODES"
 
 for cmd in tmux "$MEMPOOL_MONITOR"; do
 	if ! command -v "$cmd" &>/dev/null; then

@@ -65,18 +65,8 @@ set -a
 : "${COLOR1:=ff0000}"
 : "${COLOR2:=00a0ff}"
 : "${COLOR3:=ffd000}"
-# Per-node mempool observers as process-compose processes. Off by default,
-# because process-compose cannot tile: its TUI shows one pane at a time, so
-# twelve of these are only viewable one at a time. Use scripts/mempool-panes.sh
-# for a tiled tmux session instead.
-#
-# Worth turning on for a headless run, where the point is the TSV rather than
-# watching. Do not run both: each observer costs a drain, and two sets double it.
-: "${MONITOR:=0}"
-: "${MEMPOOL_MONITOR:=mempool-monitor}"
-# Seconds between snapshots. Fragmentation evolves over tens of seconds, so a
-# faster rate buys nothing and costs real round trips.
-: "${MONITOR_INTERVAL:=10}"
+# Mempool observers are not devnet processes: process-compose cannot tile, so
+# twelve panes would only be viewable one at a time. See ./mempool-panes.sh.
 # Mempool byte cap. Empty means whatever config.yaml sets, which is deliberately
 # small so mempools cannot all converge on the same contents. Consensus rounds
 # this up to a whole multiple of the block capacity, so the effective cap is
@@ -142,15 +132,6 @@ NS_PREFIX="dozen-devnet"
 BPS=(bp1 bp2 bp3)
 RELAYS=(relay11 relay12 relay13 relay21 relay22 relay23 relay31 relay32 relay33)
 NODES=("${BPS[@]}" "${RELAYS[@]}")
-
-# Which block producer's group a node belongs to, i.e. the digit after its
-# prefix: bp2 and relay21..relay23 are all group 2. That is the group whose
-# generator colour counts as "local" for that node.
-node_group() {
-	local digits="${1#bp}"
-	digits="${digits#relay}"
-	echo "${digits:0:1}"
-}
 
 # The Nth node in NODES gets IP_PREFIX(IP_OFFSET + N).
 node_ip() {
@@ -238,30 +219,6 @@ gen_nodes_compose() {
 			fi
 		done
 
-		# One observer per node, because fragmentation is a statement about how
-		# mempools differ and an aggregate would hide it. is_interactive gives
-		# each one a process-compose pane, so twelve panes need no extra terminals.
-		if [ "$MONITOR" = "1" ]; then
-			local group own
-			for name in "${NODES[@]}"; do
-				group=$(node_group "$name")
-				own="COLOR${group}"
-				echo "  ObserveMempool-${name}:"
-				echo "    working_dir: ${WORKING_DIR}"
-				echo "    command: >"
-				echo "      ${MEMPOOL_MONITOR}"
-				echo "      --socket-path ${name}/node.socket"
-				echo "      --testnet-magic 164"
-				echo "      --label ${name}"
-				echo "      --own-color ${!own}"
-				echo "      --interval ${MONITOR_INTERVAL}"
-				echo "      --tsv ${WORKING_DIR}/mempool-${name}.tsv"
-				echo "    is_interactive: true"
-				echo "    depends_on:"
-				echo "      ${name}:"
-				echo "        condition: process_healthy"
-			done
-		fi
 	} >"$out"
 }
 
@@ -278,10 +235,6 @@ REQUIRED_COMMANDS=(
 )
 if [ "$TC" = "1" ]; then
 	REQUIRED_COMMANDS+=("ip" "tc")
-fi
-# Only required when the observers are actually being started.
-if [ "$MONITOR" = "1" ] && [ "$MEMPOOL_MONITOR" = "mempool-monitor" ]; then
-	REQUIRED_COMMANDS+=("mempool-monitor")
 fi
 
 MISSING_COMMANDS=()

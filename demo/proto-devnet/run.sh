@@ -23,11 +23,9 @@ set -a
 # generators close enough to be hard to tell apart by eye.
 : "${COLOR1:=ff0000}"
 : "${COLOR2:=00a0ff}"
-# Which mempool-monitor to run; point it at a local cabal build to iterate.
-: "${MEMPOOL_MONITOR:=mempool-monitor}"
-# Seconds between mempool snapshots. A drain is a round trip per transaction, so
-# this stays generous; fragmentation evolves over tens of seconds anyway.
-: "${MONITOR_INTERVAL:=10}"
+# Mempool observers are not devnet processes: process-compose cannot tile. Point
+# ../dozen-devnet/mempool-panes.sh at this devnet instead:
+#   NODES="node1 node2 node3" WORKING_DIR=... ../dozen-devnet/mempool-panes.sh
 # Traffic control (on by default, disable with TC=0)
 : "${TC:=1}"
 if [ "$TC" = "1" ]; then
