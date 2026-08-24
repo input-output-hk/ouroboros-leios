@@ -63,8 +63,8 @@ set -a
 # than --color auto: auto derives a hue from the key, which is uniform but can
 # land two generators close enough to be hard to tell apart by eye.
 : "${COLOR1:=ff0000}"
-: "${COLOR2:=00a0ff}"
-: "${COLOR3:=ffd000}"
+: "${COLOR2:=0000ff}"
+: "${COLOR3:=00ff0}"
 # Mempool observers are not devnet processes: process-compose cannot tile, so
 # twelve panes would only be viewable one at a time. See ./mempool-panes.sh.
 # Traffic control (on by default, disable with TC=0)
