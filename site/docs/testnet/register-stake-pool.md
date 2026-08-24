@@ -350,6 +350,7 @@ cardano-node run \
   --port 3010 \
   --shelley-kes-key keys/kes.skey \
   --shelley-vrf-key keys/vrf.skey \
+  --shelley-bls-key keys/bls.skey \
   --shelley-operational-certificate keys/opcert.cert
 ```
 
@@ -377,6 +378,7 @@ docker run -d --name leios-producer \
     --port 3010 \
     --shelley-kes-key keys/kes.skey \
     --shelley-vrf-key keys/vrf.skey \
+    --shelley-bls-key keys/bls.skey \
     --shelley-operational-certificate keys/opcert.cert
 ```
 
