@@ -78,6 +78,14 @@ data ChainEvent
     --   advances past an announced EB that EB can no longer be certified — the
     --   verifier uses this to close the EB's voting window.
     CChainExtended !Word64
+  | -- | @Mempool.AddedTx@ / @Mempool.RemoveTxs@: the mempool's post-change
+    --   occupancy in transactions (@mempoolSize.numTxs@). Both events carry the
+    --   size AFTER the change, so the occupancy is piecewise-constant between
+    --   them and the last-seen value is exact at any slot boundary. The verifier
+    --   uses it to decide whether an EB-less forge had anything to propose —
+    --   real occupancy, not inferred from the EB's absence, which would be
+    --   circular.
+    CMempoolSize !Word64
   deriving (Eq, Show, Generic)
 
 -- | Internal: one parsed line — a directly-emittable event, a linkage fact
@@ -164,6 +172,9 @@ pRaw = withObject "logline" $ \o -> do
     -- drops every vote for an RB that arrived on a fork.
     "ChainDB.AddBlockEvent.AddedToCurrentChain" -> newtip d
     "ChainDB.AddBlockEvent.SwitchedToAFork" -> newtip d
+    -- Both carry the post-change size, so last-seen tracking is exact.
+    "Mempool.AddedTx" -> mempoolSize d
+    "Mempool.RemoveTxs" -> mempoolSize d
     -- pre-w31 envelope (kept for older logs)
     "Consensus.LeiosKernel.TraceLeiosKernel" -> do
       kind <- d .: "kind"
@@ -178,6 +189,12 @@ pRaw = withObject "logline" $ \o -> do
           RawEvent <$> (CVoteAcquired <$> v .: "ebHash" <*> v .: "slot")
         _ -> fail "unhandled LeiosKernel kind"
     _ -> fail "unhandled ns"
+
+-- | The mempool occupancy in txs, shared by the two size-changing mempool events.
+mempoolSize :: Object -> Parser Raw
+mempoolSize d = do
+  ms <- d .: "mempoolSize"
+  RawEvent . CMempoolSize <$> ms .: "numTxs"
 
 -- | The newly adopted tip, shared by ChainDB's two selection-change events.
 newtip :: Object -> Parser Raw

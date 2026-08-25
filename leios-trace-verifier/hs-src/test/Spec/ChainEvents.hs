@@ -94,6 +94,15 @@ chainEvents = do
       parse ["{\"ns\":\"Consensus.LeiosKernel.VoteAcquired\",\"data\":{\"kind\":\"LeiosVoteAcquired\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":1}}}"]
         `shouldBe` []
 
+  describe "mempool occupancy" $ do
+    -- Both events carry the POST-change size, so last-seen tracking is exact.
+    it "maps AddedTx to the post-change occupancy" $
+      parse ["{\"ns\":\"Mempool.AddedTx\",\"data\":{\"kind\":\"TraceMempoolAddedTx\",\"mempoolSize\":{\"bytes\":162384,\"numTxs\":796},\"tx\":{\"txid\":\"11f4997a\"}}}"]
+        `shouldBe` [CMempoolSize 796]
+    it "maps RemoveTxs to the post-change occupancy" $
+      parse ["{\"ns\":\"Mempool.RemoveTxs\",\"data\":{\"kind\":\"TraceMempoolRemoveTxs\",\"mempoolSize\":{\"bytes\":96084,\"numTxs\":471},\"txs\":[{\"tx\":{\"txid\":\"5ea8a6d2\"}}]}}"]
+        `shouldBe` [CMempoolSize 471]
+
   describe "irrelevant input" $ do
     it "drops other Leios kinds, banners, and junk" $
       parse

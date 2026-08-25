@@ -139,12 +139,14 @@ praosOnly =
     <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4]
     <> ticks 5 9
 
--- | The same leader slot, but preceded by a Leios acquisition, so the gate is open
---   and forging no EB at slot 4 is a genuine abstention from an available role.
+-- | The same leader slot, but preceded by a Leios acquisition (so the gate is open)
+--   and with the mempool holding txs (so an EB was possible): forging no EB at
+--   slot 4 is a genuine abstention from an available role. Without the occupancy
+--   the abstention would be excused as having nothing to propose.
 leiosActiveThenSilentLeader :: [ChainEvent]
 leiosActiveThenSilentLeader =
   ticks 0 1
-    <> [CSlot 2, CAnnouncementAccepted "eb" 2, CEBAcquired "eb" 2, CSlot 3]
+    <> [CSlot 2, CAnnouncementAccepted "eb" 2, CEBAcquired "eb" 2, CMempoolSize 2, CSlot 3]
     <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4]
     <> ticks 5 9
 
@@ -219,6 +221,36 @@ chainSegments = do
       -- forging nothing at slot 4 is a violation.
       ps <- collectWith 100 leiosActiveThenSilentLeader
       violations ps `shouldNotBe` []
+
+  describe "leadership-tick gaps" $ do
+    -- The spec steps one slot at a time, so a jump in the log's leadership ticks
+    -- (a node stall, or a restart) used to fail as Err-Slot — a verifier artifact.
+    -- The driver synthesises the missing ticks as empty slots and reports the gap
+    -- itself for adjudication.
+    it "synthesises missing ticks and reports the gap instead of dying" $ do
+      ps <- collectWith 100 [CSlot 0, CSlot 1, CSlot 4, CSlot 5]
+      [(p, s) | TickGap p s <- ps] `shouldBe` [(1, 4)]
+      violations ps `shouldBe` []
+    it "reports no gap for consecutive ticks" $ do
+      ps <- collectWith 100 (ticks 0 5)
+      [(p, s) | TickGap p s <- ps] `shouldBe` []
+    it "steps a gap spanning an epoch boundary into the new segment" $ do
+      ps <- collect [CSlot 8, CSlot 12, CSlot 13]
+      [(p, s) | TickGap p s <- ps] `shouldBe` [(8, 12)]
+      length (segmentStarts ps) `shouldBe` 2
+      violations ps `shouldBe` []
+    -- A node restarting mid-slot re-runs its leadership check for the slot it
+    -- restarted in, so real logs carry duplicate ticks (node3011, slot
+    -- 1005373). Closing that slot twice fed the spec a second Base₁ bundle
+    -- and failed as Err-Slot — a verifier artifact.
+    it "drops a duplicate tick and reports it instead of double-closing" $ do
+      ps <- collectWith 100 [CSlot 0, CSlot 1, CSlot 1, CSlot 2, CSlot 3]
+      [(s, p) | StaleTick s p <- ps] `shouldBe` [(1, 1)]
+      violations ps `shouldBe` []
+    it "drops a backwards tick likewise" $ do
+      ps <- collectWith 100 [CSlot 0, CSlot 1, CSlot 2, CSlot 1, CSlot 3]
+      [(s, p) | StaleTick s p <- ps] `shouldBe` [(1, 2)]
+      violations ps `shouldBe` []
 
   describe "checkpoint throttling" $ do
     it "re-verifies periodically rather than at every slot" $ do

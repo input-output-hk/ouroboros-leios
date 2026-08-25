@@ -37,6 +37,7 @@ module LinearLeiosVerifierChain where
     CAnnouncementAccepted : String → Word64 → ChainEvent
     CNotVoted    : String → Word64 → String → ChainEvent
     CChainExtended : Word64 → ChainEvent
+    CMempoolSize : Word64 → ChainEvent
 
   {-# FOREIGN GHC import qualified ChainEvents #-}
   {-# COMPILE GHC ChainEvent = data ChainEvents.ChainEvent
@@ -50,6 +51,7 @@ module LinearLeiosVerifierChain where
         | ChainEvents.CAnnouncementAccepted
         | ChainEvents.CNotVoted
         | ChainEvents.CChainExtended
+        | ChainEvents.CMempoolSize
         ) #-}
 
   module _
@@ -278,6 +280,12 @@ module LinearLeiosVerifierChain where
               announced   : List String
               forgedEB    : Maybe EndorserBlock
               votedEB     : Maybe (EndorserBlock × ℕ)
+              -- Last-seen mempool occupancy in txs (CMempoolSize). Both source
+              -- events carry the post-change size, so this is exact whenever the
+              -- log traces the mempool at all; a log without mempool tracing
+              -- leaves it 0, which weakens the lazy-producer check to vacuity
+              -- rather than inventing occupancy. Persists across slots.
+              mempoolTxs  : ℕ
 
       open Accumulator
 
@@ -319,18 +327,28 @@ module LinearLeiosVerifierChain where
       closeSlot : Accumulator → List Step
       closeSlot a =
         let s = curSlot a
-            -- node.log carries no mempool contents, so re-establish a proposal set
-            -- at the head of every slot. Without it 'ToPropose' stays empty,
-            -- 'toProposeEB' is always 'nothing', and EB-Role's first premise is
-            -- unsatisfiable — leaving every forged EB unverifiable. In a slot with
-            -- a forge the payload has to be that of the forged EB itself, since
-            -- EB-Role checks 'toProposeEB s π ≡ just eb'. 'Base₁' has no premises,
-            -- records no upkeep and only overwrites 'ToPropose', so re-emitting it
-            -- each slot is idempotent.
+            -- The proposal set for the slot being closed, re-established at the
+            -- head of every slot ('Base₁' has no premises, records no upkeep and
+            -- only overwrites 'ToPropose', so re-emitting it is idempotent).
+            -- node.log carries no mempool contents, only occupancy counts
+            -- (CMempoolSize), so:
+            --   * a slot that forged an EB submits that EB's own payload, since
+            --     EB-Role checks 'toProposeEB s π ≡ just eb';
+            --   * an EB-less slot with occupancy 0 submits nothing, so
+            --     'toProposeEB' is 'nothing' and No-EB-Role holds by the spec's
+            --     own excuse — there was nothing to propose;
+            --   * an EB-less slot with occupancy > 0 submits a synthetic
+            --     non-empty payload: an EB was possible, so an EB-less forge in
+            --     a winning slot is a genuine lazy-producer violation.
+            -- The occupancy is the log's own last-seen count, never inferred
+            -- from the EB's absence — that inference would excuse exactly the
+            -- laziness this step exists to catch.
             mempool : List Step
             mempool = case forgedEB a of λ where
               (just eb) → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs (EndorserBlockOSig.txs eb)))) ∷ []
-              nothing   → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs synthTxs))) ∷ []
+              nothing   → case mempoolTxs a of λ where
+                zero    → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs []))) ∷ []
+                (suc _) → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs synthTxs))) ∷ []
             -- One 'Slot₂'/'BASE-LDG' step per slot, setting the spec's 'currentRB'
             -- (the head of 'RBs') — which is what 'getCurrentEBHash', and hence the
             -- voting window and every role rule reading it, is derived from.
@@ -485,6 +503,10 @@ module LinearLeiosVerifierChain where
       -- the retirement but drives no state itself: the window is closed by the
       -- chain extension (CChainExtended) or by the deadline, both via 'currentRB'.
       traceEvent→action a (CNotVoted _ _ _) = (a , [])
+      -- Mempool occupancy after a change; piecewise-constant, so overwriting the
+      -- last-seen value keeps it exact at every slot close.
+      traceEvent→action a (CMempoolSize n) =
+        (record a { mempoolTxs = primWord64ToNat n } , [])
 
       s₀ : LeiosState
       -- Register a key for every party: acquired EBs carry (fake) non-SUT
@@ -511,7 +533,7 @@ module LinearLeiosVerifierChain where
       n₀ st = record
         { EB-refs = [] ; EB-received = [] ; FFD-blks = [] ; curSlot = st
         ; started = false ; curEB = none ; announced = []
-        ; forgedEB = nothing ; votedEB = nothing }
+        ; forgedEB = nothing ; votedEB = nothing ; mempoolTxs = 0 }
 
       opaque
         unfolding List-Model

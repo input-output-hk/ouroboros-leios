@@ -28,6 +28,7 @@ import Control.Monad (when)
 import Data.List (dropWhileEnd)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
+import Data.Word (Word64)
 import LinearLeiosLib (verifyChainTraceFromSlot)
 
 -- | Protocol timings, as the spec parameterises them.
@@ -86,6 +87,19 @@ data Progress
     --   at all, so EB-role enforcement is suppressed for them. Carries how many
     --   such leader slots were seen.
     LeiosInactive Int
+  | -- | The log's leadership ticks jumped from the first slot to the second,
+    --   skipping those between (the node missed leadership checks — a stall, or
+    --   a restart). The missing ticks are synthesised as empty slots so the spec
+    --   can keep stepping, and the gap is reported here for adjudication instead
+    --   of surfacing as an Err-Slot verifier artifact.
+    TickGap Word64 Word64
+  | -- | A leadership tick for a slot at or before the last one seen (first
+    --   field), against that last tick (second field). A node restarting
+    --   mid-slot re-runs its leadership check, and overlapping rotated logs
+    --   can replay one. Closing the same slot twice would feed the spec a
+    --   second Base₁/Slot₂ bundle for a slot it has already stepped past — an
+    --   Err-Slot artifact — so the tick is dropped and reported here.
+    StaleTick Word64 Word64
   | -- | Per epoch, whether eligibility came from the queried schedule.
     Summary [(Integer, Bool)]
 
@@ -165,6 +179,12 @@ carryAcross overlap boundary seen =
   notBefore (CSlot sl) = toInteger sl >= boundary - overlap
   notBefore _ = True
 
+-- | The most recent slot tick in a newest-first event list.
+lastTick :: [ChainEvent] -> Maybe Word64
+lastTick es = case [sl | CSlot sl <- es] of
+  [] -> Nothing
+  (sl : _) -> Just sl
+
 -- | Earliest slot tick among a segment's events, or the given default if it has none.
 earliestSlot :: Integer -> [ChainEvent] -> Integer
 earliestSlot dflt es = case [toInteger sl | CSlot sl <- es] of
@@ -228,6 +248,23 @@ runSegmented report ts query = loop [] Nothing []
   loop tally mseg seen [] = do
     finishSeg mseg (reverse seen)
     report (Summary (reverse tally))
+  -- A leadership-tick gap: the node skipped slots (stall or restart). The spec
+  -- steps one slot at a time, so a jump would otherwise fail as Err-Slot — a
+  -- verifier artifact saying nothing about conformance. Synthesise the missing
+  -- ticks as empty slots (their obligations are then adjudicated normally:
+  -- nothing forged, nothing voted) and report the gap itself for adjudication.
+  -- A duplicate or backwards tick: drop it (reported), keeping the slot in
+  -- progress. The non-tick events that follow still belong to that slot.
+  loop tally mseg seen (CSlot s : rest)
+    | Just p <- lastTick seen
+    , s <= p = do
+        report (StaleTick s p)
+        loop tally mseg seen rest
+  loop tally mseg seen evs@(CSlot s : _)
+    | Just p <- lastTick seen
+    , s > p + 1 = do
+        report (TickGap p s)
+        loop tally mseg seen ([CSlot t | t <- [p + 1 .. s - 1]] ++ evs)
   loop tally mseg seen (ev : rest) = do
     report (Saw ev)
     case ev of

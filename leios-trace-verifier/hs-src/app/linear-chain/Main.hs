@@ -90,6 +90,22 @@ render = \case
         <> show led
         <> " slot(s) the node led. NodeIsLeader alone is Praos leadership, and only "
         <> "implies EB eligibility while Leios is actually running."
+  TickGap p s ->
+    hPutStrLn stderr $
+      "tick gap: no leadership check between slots "
+        <> show p
+        <> " and "
+        <> show s
+        <> " ("
+        <> show (s - p - 1)
+        <> " missing tick(s) synthesised as empty slots — the node stalled or restarted here)"
+  StaleTick s p ->
+    hPutStrLn stderr $
+      "stale tick: leadership check for slot "
+        <> show s
+        <> " at or before the last tick ("
+        <> show p
+        <> ") — dropped (node restart mid-slot, or replayed log lines)"
   Summary entries -> summarize entries
 
 reportSchedule :: Segment -> Bool -> IO ()

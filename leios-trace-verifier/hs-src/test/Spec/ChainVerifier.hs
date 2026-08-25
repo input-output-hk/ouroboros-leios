@@ -191,8 +191,24 @@ chainVerifier = do
       fromLog [CSlot 0, CEBForged "eb" 0, CSlot 1] `shouldNotBe` "ok"
     it "accepts an EB forged in a slot an authoritative schedule says was won" $
       verify [0] True [CSlot 0, CEBForged "eb" 0, CSlot 1] `shouldBe` "ok"
-    it "rejects abstention in a slot an authoritative schedule says was won" $
-      verify [0] True [CSlot 0, CSlot 1] `shouldNotBe` "ok"
+    -- The lazy-producer check is real only when the log shows the mempool held
+    -- txs: the node records occupancy counts (CMempoolSize), never contents, and
+    -- an empty mempool is the spec's own excuse for an EB-less slot
+    -- (toProposeEB ≡ nothing). Inferring occupancy from the EB's absence would
+    -- excuse exactly the laziness being checked for, so it is never done.
+    it "rejects abstention in a won slot when the mempool held txs" $
+      verify [0] True [CMempoolSize 3, CSlot 0, CSlot 1] `shouldNotBe` "ok"
+    it "excuses abstention in a won slot when the mempool was empty" $
+      verify [0] True [CMempoolSize 0, CSlot 0, CSlot 1] `shouldBe` "ok"
+    it "excuses abstention when the log never traces the mempool at all" $
+      verify [0] True [CSlot 0, CSlot 1] `shouldBe` "ok"
+    it "tracks occupancy across slots: excused once the mempool drains" $
+      verify [3] True ([CSlot 0, CMempoolSize 5, CSlot 1, CMempoolSize 0] <> [CSlot s | s <- [2 .. 4]])
+        `shouldBe` "ok"
+    it "tracks occupancy across slots: still rejected while txs persist" $
+      verify [2] True [CSlot 0, CMempoolSize 5, CSlot 1, CSlot 2, CSlot 3] `shouldNotBe` "ok"
+    it "still verifies a forged EB when the observed occupancy is zero" $
+      verify [0] True [CMempoolSize 0, CSlot 0, CEBForged "eb" 0, CSlot 1] `shouldBe` "ok"
 
   describe "voting" $ do
     it "accepts a vote for an announced EB inside its voting window" $
