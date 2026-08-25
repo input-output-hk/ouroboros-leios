@@ -1,8 +1,8 @@
 # Full Closure Diffusion Conditional on Certification
 
 This note derives the CDF of full EB-closure diffusion *conditioned on the EB
-having certified*, and its behaviour under a partly Byzantine committee.  It
-was originally written as report §5.7/§5.7.1 on the
+having certified*, and its behaviour under a partly Byzantine voting committee.
+It was originally written as report §5.7/§5.7.1 on the
 `yveshauser/improved-deltaq-notebook` branch; this file backports that
 material standalone, for the markdown/PDF report pipeline used on this
 branch. It assumes the model definitions from `report.md` §4 (in particular
@@ -49,7 +49,7 @@ for model in ("mathis", "cubic"):
 ## 1. Setup
 
 The security assumptions for Linear Leios require that a *certified EB*
-reaches all honest nodes by the end of $L_\text{diff}$. We are therefore
+reaches almost all honest nodes by the end of $L_\text{diff}$. We are therefore
 interested in the conditional CDF
 
 $$F_{\text{full}\mid C}(t)\\;:=\\;P\\!\left(\max_{j=1\ldots N} T_j \le t \\;\bigg|\\; C\right)$$
@@ -57,7 +57,9 @@ $$F_{\text{full}\mid C}(t)\\;:=\\;P\\!\left(\max_{j=1\ldots N} T_j \le t \\;\big
 where $T_j$ is the **EB-closure completion time** at node $j$ and $C$ is the
 certification event "the on-time committee votes carry at least a fraction
 $\tau$ of the **total active stake** by
-$t_v = 3L_\text{hdr}+L_\text{vote}=7\\,\text{s}$".
+$t_v = 3L_\text{hdr}+L_\text{vote}=7\\,\text{s}$". Throughout, $G$ models a
+single EB's diffusion in isolation: it does not account for concurrent
+traffic from other EBs sharing the network (see Caveats, §7).
 
 ## 2. The closure-completion CDF $G$
 
@@ -70,6 +72,9 @@ report.md §4,
 $$G\\;=\\;\underbrace{\texttt{cdf\\_fetch\\_eb\\_body()}}\_{\text{body diffusion}}\\;\otimes\\;\underbrace{\texttt{cdf\\_fetch\\_missing\\_eb\\_closure}(S_{EB\text{-}tx})}\_{\text{fetch missing txs (1-hop)}}\\;\otimes\\;\underbrace{\texttt{cdf\\_process\\_eb\\_closure}(S_{EB\text{-}tx})}\_{\text{process closure (CPU)}}$$
 
 where $\otimes$ is sequential composition, resp. convolution (`cdf_sequential`).
+For plotted CDFs of the fetch stages (network-only, CPU excluded), see
+`report.md` §5.2 "Network Diffusion of the EB Closure"
+(`plots/{mathis,cubic}/network_diffusion.svg`).
 
 ## 3. Stake-weighted committee
 
@@ -87,8 +92,9 @@ the truncation error falls below $\varepsilon_c=1-\sigma_c$). The set is
 fixed for the epoch. Each member of the committee votes with weight
 $w_i=s_i$. Because the committee holds only a fraction $\sigma_c$ of the
 total stake, $S_\text{active}=M/\sigma_c$ and the quorum is
-$\theta=\tau\\,M/\sigma_c$: the committee must contribute $\tau/\sigma_c$ of
-*its own* weight (certification is impossible if $\tau>\sigma_c$).
+$\theta=\tau\\,M/\sigma_c$, where $M$ is the committee stake (total committee weight).
+The committee must contribute $\tau/\sigma_c$ of *its own*
+weight (certification is impossible if $\tau>\sigma_c$).
 
 Because per-node closure completion $T_i$ is assumed independent of stake,
 committee membership only fixes *which* nodes vote (and with what weight);
@@ -303,6 +309,9 @@ is — see §8.
   are systematically better-connected, the (top-stake) committee is
   disproportionately fast and $C$ carries less information about the slow
   tail, making the formula optimistic.
+- **No concurrent traffic:** $G$ is independent of how much other traffic
+  (e.g. other EBs) is diffusing in the network concurrently; contention
+  between concurrent EB diffusions is not modeled.
 
 ## 8. Adversarial committee
 
