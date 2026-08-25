@@ -580,3 +580,29 @@ blockquote {
 .secondary-button {
   background-color: transparent;
 }
+
+/* Blog: the global .col padding above is meant for the docs layout;
+   without this override it inflates the author row inside blog headers */
+.blog-wrapper article > header .col {
+  padding: 0;
+}
+
+/* Blog: tighten vertical rhythm between post title, byline, and content */
+.blog-wrapper article > header h1,
+.blog-wrapper article > header h2 {
+  margin-bottom: 0.5rem;
+}
+
+.blog-wrapper article > header .margin-vert--md {
+  margin-top: 0 !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.blog-wrapper article > header .row.margin-top--md {
+  margin-top: 0 !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.blog-wrapper article > header .avatar.margin-bottom--sm {
+  margin-bottom: 0 !important;
+}

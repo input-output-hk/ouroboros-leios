@@ -125,6 +125,51 @@
                 "value": "decbytes"
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node1 mempool"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node2 mempool"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node3 mempool"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
@@ -175,7 +220,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "palette-classic-by-name"
           },
           "custom": {
             "axisBorderShow": false,
@@ -221,9 +266,49 @@
               }
             ]
           },
-          "unit": "TxkB/s"
+          "unit": "TxkB/s",
+          "min": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "submitted (firehose, measured)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "submitted (centrifuge, est. 204 B/tx)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -235,10 +320,10 @@
       "options": {
         "legend": {
           "calcs": [
-            "max",
-            "mean"
+            "mean",
+            "max"
           ],
-          "displayMode": "list",
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
@@ -256,8 +341,9 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cardano_node_metrics_loki_txgen_bytes_total{environment=\"leios\"}[2m])) / 1000",
-          "legendFormat": "accepted (firehose, measured)",
+          "expr": "sum(rate(leios_logmetrics_txgen_bytes_total{environment=\"leios\", service=\"tx-firehose\"}[${window}s])) / 1000",
+          "legendFormat": "submitted (firehose, measured)",
+          "range": true,
           "refId": "A"
         },
         {
@@ -266,14 +352,26 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cardano_node_metrics_loki_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[2m])) * 204 / 1000",
-          "legendFormat": "accepted (centrifuge, est. 204 B/tx)",
+          "expr": "sum(rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\", service=\"tx-centrifuge\"}[${window}s])) * 204 / 1000",
+          "legendFormat": "submitted (centrifuge, est. 204 B/tx)",
+          "range": true,
           "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "editorMode": "code",
+          "expr": "rate(cardano_node_metrics_txSubmission_txsAccepted_int{job=\"integrations/cardano-node\", environment=\"leios\", instance=~\"$instance\"}[${window}s]) * scalar(sum(rate(leios_logmetrics_txgen_bytes_total{environment=\"leios\", service=\"tx-firehose\"}[${window}s])) / sum(rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\", service=\"tx-firehose\"}[${window}s]))) / 1000",
+          "legendFormat": "{{instance}} N2N ingest",
+          "range": true,
+          "refId": "C"
         }
       ],
-      "title": "Submitted throughput (kB/s)",
+      "title": "Submission vs. ingest",
       "type": "timeseries",
-      "description": "Accepted submission throughput. Firehose bytes are the measured on-wire size (txgen_bytes_total); tx-centrifuge has no on-wire size, so its bytes are ESTIMATED at 204 B/tx (submitted-rate x 204)."
+      "description": "What is being offered against what each node can actually take from its peers. A node keeping up sits on the submitted line; one that cannot sits below it, and the gap is the diffusion shortfall. The node the generators target reads zero here — it ingests over node-to-client, which does not go through tx-submission at all; watch its mempool one panel to the left. Ingest is a transaction count scaled by the mean on-wire size measured from the firehose, so it needs a firehose running to render."
     },
     {
       "datasource": {
@@ -333,9 +431,55 @@
               }
             ]
           },
-          "unit": "TxB/s"
+          "unit": "TxkB/s"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node2"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node3"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -367,7 +511,7 @@
             "uid": "mimir"
           },
           "editorMode": "builder",
-          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"integrations/cardano-node\", environment=\"leios\", instance=~\"$instance\"}[300s])",
+          "expr": "rate(cardano_node_metrics_cumulativeTxBytes_int{job=\"integrations/cardano-node\", environment=\"leios\", instance=~\"$instance\"}[${window}s]) / 1000",
           "legendFormat": "{{instance}}",
           "range": true,
           "refId": "A"
@@ -785,7 +929,7 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum by (service) (rate(cardano_node_metrics_loki_txgen_submitted_total{environment=\"leios\"}[2m]))",
+          "expr": "sum by (service) (rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\"}[2m]))",
           "legendFormat": "accepted {{service}}",
           "refId": "A"
         },
@@ -795,7 +939,7 @@
             "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cardano_node_metrics_loki_txgen_rejected_total{environment=\"leios\"}[2m]))",
+          "expr": "sum(rate(leios_logmetrics_txgen_rejected_total{environment=\"leios\"}[2m]))",
           "legendFormat": "rejected",
           "refId": "B"
         }
@@ -811,6 +955,57 @@
   "tags": [],
   "templating": {
     "list": [
+      {
+        "current": {
+          "text": "30s",
+          "value": "30"
+        },
+        "description": "Averaging window (seconds) for the submission rates and the mempool deriv",
+        "includeAll": false,
+        "label": "Rate window",
+        "multi": false,
+        "name": "window",
+        "options": [
+          {
+            "selected": false,
+            "text": "2s",
+            "value": "2"
+          },
+          {
+            "selected": false,
+            "text": "5s",
+            "value": "5"
+          },
+          {
+            "selected": false,
+            "text": "10s",
+            "value": "10"
+          },
+          {
+            "selected": true,
+            "text": "30s",
+            "value": "30"
+          },
+          {
+            "selected": false,
+            "text": "60s",
+            "value": "60"
+          },
+          {
+            "selected": false,
+            "text": "120s",
+            "value": "120"
+          },
+          {
+            "selected": false,
+            "text": "300s",
+            "value": "300"
+          }
+        ],
+        "query": "2s : 2, 5s : 5, 10s : 10, 30s : 30, 60s : 60, 120s : 120, 300s : 300",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
       {
         "current": {
           "text": [
