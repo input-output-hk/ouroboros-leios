@@ -281,6 +281,20 @@ places at 12 MB under Mathis, and CUBIC (faster network) saturates both to
 1.0000. The honest-committee case is not where the interesting behaviour
 is — see §8.
 
+**Note on the residual $\sim0.003$ gap at 12 MB/Mathis** ($F_{\text{full}\mid
+C}(t_f)=0.9990$ vs. $G(t_f)^N=0.996$): this is *not* the
+certification-conditioning effect — the quorum/conditioning ratio
+$Q(p_\text{fast})/Q(G(t_v))$ is already $1.0$ (to floating-point precision)
+by $t_f$, since $P(C)=1.0000$ this early. The gap is instead because the
+plotted $G(t)^N$ reference is built from $G$, the *full-validation*
+per-node law, while $F_{\text{full}\mid C}$'s all-nodes diffusion term
+actually uses $G_\text{apply}$, the faster *reapply-only* law (§5): once an
+EB is certified, a receiving node re-applies the already-validated closure
+instead of re-validating it from scratch. Indeed
+$G_\text{apply}(t_f)^N=0.9990$ matches $F_{\text{full}\mid C}(t_f)$ exactly.
+So $G(t)^N$ here is an upper-bound-on-cost reference, not the same
+diffusion model $F_{\text{full}\mid C}$ uses.
+
 ![F_{full|C}(t) given certification, honest committee, Mathis](plots/mathis/full_closure_diffusion_given_cert.svg)
 ![F_{full|C}(t) given certification, honest committee, CUBIC](plots/cubic/full_closure_diffusion_given_cert.svg)
 
@@ -439,10 +453,23 @@ active and honest columns are indistinguishable at 4 significant figures
 at every size tested here. The silent case's $P(C)$ collapsing to
 $\sim 10^{-136}$–$10^{-5}$ (consistent with $\beta=0.25$ sitting just past
 the $\beta\le 1-\tau/\sigma_c\approx0.24$ feasibility boundary from part
-(b), and falling faster under CUBIC because the honest on-time probability
-$G(t_v)$ is closer to 1, making the shortfall $(1-\beta)M\ge\theta$ an
-ever-more-extreme tail event) illustrates that silent-adversary
-certification is a rare-event regime. The qualitative effect described in
+(b)) illustrates that silent-adversary certification is a rare-event
+regime. The collapse is not monotonic in $S_{EB\text{-}tx}$ or uniform
+across network models: at 1 MB and 4 MB, $P(C)$ is far smaller under CUBIC
+than under Mathis, tracking CUBIC's higher $G(t_v)$ (a smaller shortfall
+from the honest-only quorum $\theta=699$). But at 12 MB this reverses --
+Mathis's $P(C)=8.994\times10^{-8}$ is smaller than CUBIC's
+$6.956\times10^{-5}$ -- because the normal-approximation tail depends on
+both the mean shortfall $\theta-(1-\beta)Mp$ *and* the vote-count variance
+$\propto p(1-p)$, and the two don't move together: Mathis's lower
+$G(t_v)=0.9482$ at 12 MB gives a larger mean shortfall ($\approx43$ votes)
+but also a proportionally larger standard deviation ($\sigma\approx8.2$),
+for a tail $\approx5.2\sigma$ away; CUBIC's higher $G(t_v)=0.9924$ leaves a
+smaller shortfall ($\approx12$ votes) but an even smaller $\sigma\approx3.2$,
+for a milder $\approx3.8\sigma$ tail. $G(t_v)$ being closer to 1 does not by
+itself predict a smaller $P(C)$ once the shrinking variance is factored in
+-- the size at which this flips depends on both quantities together. The
+qualitative effect described in
 §8(a) — the active curve dipping *below* honest — is a genuine but small
 effect at these parameters; it would show up more clearly at a tighter
 $t_f$ (before the honest on-time probability saturates) or a larger

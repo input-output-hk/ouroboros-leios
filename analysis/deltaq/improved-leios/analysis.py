@@ -1795,8 +1795,9 @@ def plot_full_closure_diffusion_given_cert(
 ):
     """
     F_{full|C}(t) under the closure model for several S_EB_tx sizes, with
-    the single-node closure CDF G(t) at the largest size as a lower-bound
-    reference.  Annotates F_{full|C}(t_diff_end) at the L_diff deadline.
+    the single-node closure CDF G(t) and the unconditional all-nodes
+    baseline G(t)^N at the largest size as reference curves.  Annotates
+    F_{full|C}(t_diff_end) at the L_diff deadline.
     """
     fig, ax = plt.subplots(figsize=(10, 5.5))
     cmap = plt.cm.plasma(np.linspace(0.15, 0.85, len(sizes_kb)))
@@ -1837,6 +1838,28 @@ def plot_full_closure_diffusion_given_cert(
         lw=1.2,
         color="gray",
         label=f"$G(t)$ single-node, {max(sizes_kb) / 1024:.0f} MB (reference)",
+    )
+
+    # Reference: unconditional all-honest-nodes baseline G(t)^N at the
+    # largest size, built from the full-validation law G -- the naive
+    # independence baseline F_{full|C} is compared against in the text
+    # (conditioning on certification barely moves this number at the
+    # largest size / L_diff deadline). NOTE: this is NOT quite the same
+    # model as F_{full|C}'s diffusion term, which uses the faster
+    # reapply-only law G_apply post-certification -- see the prose note
+    # below the plot.
+    ax.plot(
+        TIMES,
+        cdf_full_closure_diffusion_unconditional(
+            max(sizes_kb), n_nodes=n_nodes, include_validation=include_validation
+        ),
+        ls="-.",
+        lw=1.2,
+        color="dimgray",
+        label=(
+            f"$G(t)^N$ full-validation, {max(sizes_kb) / 1024:.0f} MB "
+            "(upper-bound reference)"
+        ),
     )
 
     ax.axvline(
