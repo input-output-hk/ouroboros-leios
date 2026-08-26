@@ -87,6 +87,16 @@ render = \case
         <> show led
         <> " slot(s) the node led. NodeIsLeader alone is Praos leadership, and only "
         <> "implies EB eligibility while Leios is actually running."
+  SlotGap from to ->
+    hPutStrLn stderr $
+      "note: no leadership check logged for slot(s) "
+        <> show (from + 1)
+        <> ".."
+        <> show (to - 1)
+        <> " — verification restarts at "
+        <> show to
+        <> ". The spec advances one slot at a time, so a slot with no record cannot "
+        <> "be verified across; obligations straddling the gap are not checked."
   EBOwedUndecided n ->
     hPutStrLn stderr $
       "note: for "

@@ -90,6 +90,12 @@ data Progress
     --   at all, so EB-role enforcement is suppressed for them. Carries how many
     --   such leader slots were seen.
     LeiosInactive Int
+  | -- | The slot ticks jumped: the node emitted no leadership check for the slots
+    --   between these two. Carries (last seen, next seen). Not a violation — a
+    --   missing tick is usually the node being descheduled, and the verifier's own
+    --   CPU load has been observed causing it, so blaming the node would be
+    --   circular. Verification restarts after the gap instead.
+    SlotGap Integer Integer
   | -- | Slots whose mempool range straddled the RB capacity, so whether an EB was
     --   owed could not be settled and the slot was excused. This count is the
     --   measure of what the rule's one-sidedness costs on a given run: small means
@@ -230,40 +236,52 @@ runSegmented ::
   (Integer -> IO ChainData) ->
   [ChainEvent] ->
   IO ()
-runSegmented report ts query = loop [] Nothing []
+runSegmented report ts query = loop [] Nothing Nothing []
  where
   overlap = overlapSlots ts
 
-  loop tally mseg seen [] = do
+  loop tally mseg mlast seen [] = do
     finishSeg mseg (reverse seen)
     report (Summary (reverse tally))
-  loop tally mseg seen (ev : rest) = do
+  loop tally mseg mlast seen (ev : rest) = do
     report (Saw ev)
     case ev of
       CSlot s
         | Just seg <- mseg
-        , toInteger s `div` cdEpochLength (segCD seg) == segEpoch seg -> do
-            -- Same epoch: extend the segment, and periodically re-check it. Not at
-            -- every tick — see 'checkpointEvery'.
+        , toInteger s `div` cdEpochLength (segCD seg) == segEpoch seg
+        , maybe True (\l -> toInteger s == l + 1) mlast -> do
+            -- Same epoch and the next slot in sequence: extend the segment, and
+            -- periodically re-check it. Not at every tick — see 'checkpointEvery'.
             let seen' = ev : seen
             when (toInteger s `mod` checkpointEvery == 0) $
               checkSeg seg (reverse seen')
-            loop tally mseg seen' rest
+            loop tally mseg (Just (toInteger s)) seen' rest
         | otherwise -> do
-            -- First segment, or an epoch boundary. This tick is what completes the
-            -- outgoing segment's last slot, so give that segment one final check
-            -- with the tick appended; otherwise the last slot of every epoch would
-            -- go unverified, a streaming check never adjudicating the slot still in
-            -- progress.
+            -- First segment, an epoch boundary, or a gap in the slot ticks. This tick
+            -- is what completes the outgoing segment's last slot, so give that
+            -- segment one final check with the tick appended; otherwise the last slot
+            -- before every boundary would go unverified, a streaming check never
+            -- adjudicating the slot still in progress.
             case mseg of
               Just old -> checkSeg old (reverse (ev : seen))
               Nothing -> pure ()
+            -- A gap carries nothing. The spec advances one slot at a time, so a
+            -- carried tail from before the gap would still contain it and the verifier
+            -- would reject the jump — which is what a missing tick looked like before
+            -- this: "8 : Err-Slot / Base₁-Action". Obligations straddling the gap are
+            -- lost, unavoidably: there is no record of the slot to verify against.
+            let gapped = maybe False (\l -> toInteger s > l + 1) mlast
+                carry
+                  | gapped = Carry{carryEvents = [], carryStart = toInteger s, carrySpans = False}
+                  | otherwise = carryAcross overlap (toInteger s) seen
+            case mlast of
+              Just l | gapped -> report (SlotGap l (toInteger s))
+              _ -> pure ()
             -- No check on the new segment yet: its carried slots were just
             -- adjudicated by the outgoing one, and the boundary slot is in progress.
-            let carry = carryAcross overlap (toInteger s) seen
             (seg, tally') <- newSegment tally (toInteger s) carry
-            loop tally' (Just seg) (ev : carryEvents carry) rest
-      _ -> loop tally mseg (ev : seen) rest
+            loop tally' (Just seg) (Just (toInteger s)) (ev : carryEvents carry) rest
+      _ -> loop tally mseg mlast (ev : seen) rest
 
   newSegment tally boundary carry = do
     cd <- query boundary

@@ -152,6 +152,13 @@ leiosActiveThenSilentLeader =
     <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4, CMempoolRange 200 200]
     <> ticks 5 9
 
+-- | The node logs no leadership check for slot 4. The spec advances one slot at a
+--   time, so verification cannot cross the gap; it must restart after it rather than
+--   reject the jump. Observed on a devnet at 30 TX/s as a single missing tick, which
+--   killed the session with "8 : Err-Slot / Base₁-Action".
+tickGap :: [ChainEvent]
+tickGap = ticks 0 3 <> ticks 5 9
+
 chainSegments :: Spec
 chainSegments = do
   describe "carry width" $
@@ -208,6 +215,19 @@ chainSegments = do
     it "raises no obligation for a head superseded before its vote window opens" $ do
       ps <- collectWith 100 supersededBeforeVotable
       violations ps `shouldBe` []
+
+  describe "a gap in the slot ticks" $ do
+    it "does not reject the jump" $ do
+      ps <- collectWith 100 tickGap
+      violations ps `shouldBe` []
+    it "reports the gap rather than passing over it silently" $ do
+      ps <- collectWith 100 tickGap
+      [(f, t) | SlotGap f t <- ps] `shouldBe` [(3, 5)]
+    it "restarts verification after the gap, carrying nothing across it" $ do
+      -- Carrying the overlap would bring slots from before the gap into the new
+      -- segment, which would still contain the gap and still be rejected.
+      ps <- collectWith 100 tickGap
+      segmentStarts ps `shouldBe` [0, 5]
 
   describe "Praos leadership without Leios running" $ do
     it "raises no EB obligation when the log shows no Leios activity" $ do
