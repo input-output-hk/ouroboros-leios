@@ -48,19 +48,19 @@ export const source = `
   - [~] Implementation
     - [ ] Protocol parameters and genesis config
     - [ ] Constitution guard rails
-  - [ ] Assurance
+  - [~] Assurance: working groups
 
 - Serialization
   - [x] CIP
   - [x] Prototype
-  - [~] Design
+  - [?] Design: per-tx limits, key rotation via headers
   - [~] Implementation
     - [x] Announcements and certifies bit in headers
     - [ ] BLS keys in block headers
     - [x] Certificates in body
     - [x] BLS key in pool registration cert in txs
     - [ ] Protocol parameter updates in txs
-  - [ ] Assurance
+  - [~] Assurance: CDDL conformance
 
 - Praos > Leios prioritization
   - [x] CIP
@@ -74,17 +74,17 @@ export const source = `
 - Key registration & rotation @130,200
   - [x] CIP
   - [x] Prototype
-  - [~] Design
+  - [?] Design: Key rotation via headers
   - [~] Implementation
     - [x] Generate BLS keys
-    - [~] Create and submit pool registration with BLS keys
+    - [x] Create and submit pool registration with BLS keys
     - [ ] Register BLS keys via block headers
   - [~] Assurance: on testnet
 
 - Committee selection @230,320
   - [x] CIP
-  - [~] Prototype: Interim all-vote
-  - [x] Design: Simplified truncation
+  - [x] Prototype
+  - [x] Design
   - [ ] Implementation
     - [x] Stake-based committee selection
     - [ ] Committee selection at epoch boundaries
@@ -92,10 +92,10 @@ export const source = `
 
 - High-throughput Tx submission @400,25
   - [x] CIP
-  - [~] Prototype
-  - [~] Design
+  - [x] Prototype
+  - [x] Design
   - [~] Implementation
-    - [~] TxSubmisison V2-undecision
+    - [x] TxSubmisison V2-undecision
     - [ ] TxSubmission param tuning
   - [~] Assurance
 
@@ -103,15 +103,15 @@ export const source = `
   - [x] CIP
   - [~] Prototype
   - [~] Design
-  - [ ] Implementation
-    - [ ] Double-buffered mempool
+  - [~] Implementation
+    - [~] Double-buffered mempool
     - [ ] Capped forging
     - [ ] Pre-flight forging
   - [~] Assurance
 
 - Block production @450,170
   - [x] CIP
-  - [~] Prototype
+  - [~] Prototype: Pre-application vs. mempool
   - [~] Design: Pre-application vs. mempool
   - [ ] Implementation
     - [ ] Forge and store EBs
@@ -119,9 +119,9 @@ export const source = `
   - [ ] Assurance
 
 - EB diffusion @480,280
-  - [?] CIP: Delay bounds
-  - [x] Prototype
-  - [~] Design
+  - [x] CIP
+  - [~] Prototype: Fetching with TxCache
+  - [~] Design: Define full fetching policy
   - [ ] Implementation
     - [ ] Announce and detect equivocations of EBs
     - [ ] Diffuse and validate EBs via TxCache
@@ -129,8 +129,8 @@ export const source = `
 
 - Transaction cache & storage
   - [x] CIP
-  - [~] Prototype
-  - [x] Design: Sizing settled
+  - [x] Prototype
+  - [x] Design
   - [ ] Implementation
     - [ ] Diffuse and validate EBs via TxCache
     - [ ] Disk-backed TxCache
@@ -140,8 +140,8 @@ export const source = `
 
 - Voting & certification @580,400
   - [x] CIP
-  - [~] Prototype: EB validation gap
-  - [~] Design: Shared with Peras
+  - [~] Prototype: EB validation with TxCache
+  - [x] Design
   - [ ] Implementation
     - [ ] Voting logic
     - [ ] Diffuse and validate votes
@@ -151,7 +151,7 @@ export const source = `
 - Block validation & adoption @985,70
   - [x] CIP
   - [x] Prototype
-  - [~] Design
+  - [~] Design: Consensus/Leger API
   - [ ] Implementation
     - [ ] Reject all announcements and certificates
     - [ ] Validate EB announcing and certifying blocks
@@ -161,12 +161,12 @@ export const source = `
 - Node API & configuration
   - [x] CIP
   - [x] Prototype
-  - [~] Design
+  - [x] Design
   - [~] Implementation
     - [x] Query pool state showing key registration
     - [~] Client APIs inline certified EB txs
     - [ ] Node accepts BLS keys
-  - [ ] Assurance
+  - [~] Assurance: Kleioscan, SPO tools
 `;
 
 {/*
@@ -287,8 +287,8 @@ Click or hover a badge for the full breakdown of a component.
 
 ## Release stages
 
-The same implementation scope, cut along the other dimension: each stage is a
-`cardano-node` release scope that could be considered to hard-fork mainnet. Not
+The same implementation scope, cut along the other dimension: each stage is a potential
+`cardano-node` release scope that _could_ be considered to hard-fork mainnet. Not
 only the release as a whole, but each individual item requires "high confidence"
 before that step is taken. Scope items take their status from the component
 breakdown above; where an item groups several sub-items, it shows the roll-up of
