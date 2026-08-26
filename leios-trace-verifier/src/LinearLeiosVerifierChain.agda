@@ -273,6 +273,9 @@ module LinearLeiosVerifierChain where
               announced   : List String
               -- (min , max) mempool bytes observed during the slot being accumulated.
               memRange    : Maybe (ℕ × ℕ)
+              -- Whether the node forged a ranking block in this slot, which locates
+              -- the mempool drain relative to its EB decision. See 'ebOwed'.
+              forgedRB    : Bool
               forgedEB    : Maybe EndorserBlock
               votedEB     : Maybe (EndorserBlock × ℕ)
 
@@ -331,20 +334,30 @@ module LinearLeiosVerifierChain where
             -- 'Roles₂' licenses the abstention — the spec's own account of a node
             -- with nothing to put in an EB.
             --
-            -- Owed iff the mempool could not have fitted in the ranking block:
-            -- 'min > maxRBBody'. The reading is a range because the node decides from
-            -- a snapshot taken at an unobservable instant, and taking the minimum is
-            -- what makes the test one-sided — a range straddling the capacity is
+            -- Owed iff the mempool could not have fitted in the ranking block. The
+            -- reading is a range, and which end of it corresponds to the node's
+            -- decision depends on whether the node forged here.
+            --
+            -- No forge: the snapshot instant is unobservable, so take the MINIMUM.
+            -- That makes the test one-sided — a range straddling the capacity is
             -- treated as not owed, so an indeterminate slot is excused rather than
             -- flagged. A false violation ends the whole verification session, while a
             -- missed one costs only that slot's coverage.
+            --
+            -- Forge: the node's own block drained the mempool, and that drain is
+            -- causally after the decision, so the minimum is the post-decision state
+            -- and the MAXIMUM is what the node actually saw. Taking the minimum here
+            -- would excuse a leader slot precisely because its own block emptied the
+            -- mempool — the very case this rule exists to catch. The maximum is the
+            -- slot's opening value, which the parser seeds the range with.
             --
             -- No reading at all (a log without the Mempool traces) is likewise not
             -- owed: EB-role enforcement then lapses rather than firing on a guess.
             ebOwed : Bool
             ebOwed = case memRange a of λ where
-              nothing          → false
-              (just (mn , _))  → maxRBBody Nat.<ᵇ mn
+              nothing           → false
+              (just (mn , mx))  →
+                maxRBBody Nat.<ᵇ (if forgedRB a then mx else mn)
             mempool : List Step
             mempool = case forgedEB a of λ where
               (just eb) → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs (EndorserBlockOSig.txs eb)))) ∷ []
@@ -437,6 +450,7 @@ module LinearLeiosVerifierChain where
                   ; FFD-blks = []
                   ; curEB = nextEB
                   ; memRange = nothing
+                  ; forgedRB = false
                   ; forgedEB = nothing
                   ; votedEB = nothing
                   } , steps)
@@ -467,7 +481,9 @@ module LinearLeiosVerifierChain where
       ... | _    | _       | _          = (a , [])
       traceEvent→action a (CVoteAcquired _ _) =
         (record a { FFD-blks = VT-Blk (tt ∷ []) ∷ FFD-blks a } , [])
-      traceEvent→action a (CRBForged h s) = (a , [])
+      -- Not a step of its own: what it contributes is locating the mempool drain
+      -- relative to the node's EB decision, which 'ebOwed' reads.
+      traceEvent→action a (CRBForged h s) = (record a { forgedRB = true } , [])
       -- Consumed by 'leaderSlots' as the eligibility fallback, not as a step.
       traceEvent→action a (CNodeIsLeader _) = (a , [])
       -- The selected chain adopted a new tip. Mark the announcement 'superseded' so
@@ -519,7 +535,7 @@ module LinearLeiosVerifierChain where
       n₀ st = record
         { EB-refs = [] ; EB-received = [] ; FFD-blks = [] ; curSlot = st
         ; started = false ; curEB = none ; announced = [] ; memRange = nothing
-        ; forgedEB = nothing ; votedEB = nothing }
+        ; forgedRB = false ; forgedEB = nothing ; votedEB = nothing }
 
       opaque
         unfolding List-Model

@@ -226,6 +226,16 @@ chainVerifier = do
     -- down, and a false violation ends the whole session.
     it "excuses abstention when the mempool range straddles the capacity" $
       verify [0] True [CSlot 0, CMempoolRange 50 200, CSlot 1] `shouldBe` "ok"
+    -- A forge drains the mempool, and that drain is after the decision, so the low
+    -- end of the range is the post-decision state. Reading the minimum here would
+    -- excuse the slot precisely because the node's own block emptied the mempool —
+    -- the case the rule exists to catch. Identical ranges, opposite verdicts,
+    -- decided only by whether a ranking block was forged.
+    it "judges a forge by the mempool before its own block drained it" $
+      verify [0] True [CSlot 0, CRBForged "rb" 0, CMempoolRange 50 200, CSlot 1]
+        `shouldNotBe` "ok"
+    it "judges a slot with no forge by the low end of the range" $
+      verify [0] True [CSlot 0, CMempoolRange 50 200, CSlot 1] `shouldBe` "ok"
 
   describe "voting" $ do
     it "accepts a vote for an announced EB in its one legal slot" $
