@@ -1671,7 +1671,15 @@ def _full_diffusion_given_cert_from_G(
     voter_factor = Q(p_fast_given_arrived)
 
     out = G_pow_N * voter_factor / pC
-    return np.clip(out, 0.0, 1.0)
+    out = np.clip(out, 0.0, 1.0)
+    # F_{full|C} is analytically a CDF (non-decreasing in t), but this
+    # closed form mixes two different arrival laws (G for the voter
+    # factor, G_apply for the diffusion power term) as a first-order
+    # approximation. In extreme-tail regimes (e.g. a near-infeasible
+    # silent-adversary quorum, pC ~ 1e-8) that mismatch can make the raw
+    # product dip before recovering; enforce the known monotonicity
+    # constraint rather than plot the approximation artifact.
+    return np.maximum.accumulate(out)
 
 
 def cdf_full_closure_diffusion_given_cert(

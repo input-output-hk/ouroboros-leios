@@ -412,7 +412,7 @@ in `analysis.py`.)
 | 4 MB  | silent | 8.476e-06 | 1.0000 |
 | 12 MB | active | 1.000e+00 | 0.9993 |
 | 12 MB | honest | 1.000e+00 | 0.9990 |
-| 12 MB | silent | 8.994e-08 | 0.9996 |
+| 12 MB | silent | 8.994e-08 | 1.0000 |
 
 **CUBIC:**
 
