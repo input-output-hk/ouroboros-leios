@@ -18,6 +18,7 @@ module Main where
 import ChainEvents (parseNodeLog)
 import Control.Monad (when)
 import Data.ByteString.Lazy as BSL
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Maybe (fromMaybe)
 import Data.Yaml (FromJSON (..), decodeEither', withObject, (.:))
 import LinearLeiosChain (
@@ -58,7 +59,10 @@ main = do
     "skipped "
       <> show (Prelude.length preSlot)
       <> " pre-slot events (node sync/replay backlog, before the first leadership-check slot)"
-  runSegmented render timings (const (queryChain leadershipOpts)) rest
+  -- The schedule explanation is the same every segment, and a run with frequent
+  -- slot gaps starts many, so say it in full once and abbreviate after that.
+  explained <- newIORef False
+  runSegmented render timings (const (queryChain explained leadershipOpts)) rest
 
 -- * Rendering
 
@@ -265,12 +269,22 @@ data LeadershipOpts = LeadershipOpts
 -- trails the epoch being verified, so a schedule fetched after a wait is usually
 -- still for the wrong epoch. Waiting would also let the log accumulate, leaving the
 -- verifier further behind and the mismatch more likely.
-queryChain :: LeadershipOpts -> IO ChainData
-queryChain opts = do
+queryChain :: IORef Bool -> LeadershipOpts -> IO ChainData
+queryChain explained opts = do
   (cd, mlerr) <- queryChainOnce opts
   case mlerr of
     Nothing -> pure ()
-    Just lerr -> hPutStrLn stderr (scheduleUnavailable opts lerr (cdWinningSlots cd))
+    Just lerr -> do
+      said <- readIORef explained
+      if said
+        then
+          hPutStrLn stderr $
+            "no leadership schedule for this epoch either ("
+              <> show lerr
+              <> "); as above."
+        else do
+          hPutStrLn stderr (scheduleUnavailable opts lerr (cdWinningSlots cd))
+          writeIORef explained True
   pure cd
 
 -- | Explain what the leadership error means and, crucially, what was done about it.
