@@ -133,11 +133,23 @@ voteForUnannouncedEB =
     <> ticks 6 9
 
 -- | A Praos leader slot with no Leios activity anywhere: the node won the lottery
---   and forged a ranking block while the subsystem had not yet done anything.
+--   and forged a ranking block while the subsystem had not yet done anything. The
+--   mempool exceeds the ranking block's capacity, so an EB was owed and the gate is
+--   what excuses the slot — which is the case worth reporting.
 praosOnly :: [ChainEvent]
 praosOnly =
   ticks 0 3
-    <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4]
+    <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4, CMempoolRange 200 200]
+    <> ticks 5 9
+
+-- | The same, but with a mempool that fits. The gate still suppresses enforcement,
+--   and now costs nothing by doing so: the mempool rule would have excused the slot
+--   on its own terms. Reporting suppression here would claim a loss not incurred,
+--   which on a low-traffic network is every led slot.
+praosOnlyMempoolFits :: [ChainEvent]
+praosOnlyMempoolFits =
+  ticks 0 3
+    <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4, CMempoolRange 50 50]
     <> ticks 5 9
 
 -- | The same leader slot, but preceded by a Leios acquisition, so the gate is open;
@@ -238,6 +250,15 @@ chainSegments = do
     it "reports the suppression rather than exempting the slot silently" $ do
       ps <- collectWith 100 praosOnly
       length [n | LeiosInactive n <- ps] `shouldNotBe` 0
+    it "stays quiet when the mempool rule would have excused the slot anyway" $ do
+      -- Same shape, mempool within the ranking block's capacity. The gate suppresses
+      -- nothing the rule would have caught, so claiming a suppression would be noise
+      -- — and on a 1 TX/s network it fires on every led slot.
+      ps <- collectWith 100 praosOnlyMempoolFits
+      length [n | LeiosInactive n <- ps] `shouldBe` 0
+    it "still raises no violation when the gate stays quiet" $ do
+      ps <- collectWith 100 praosOnlyMempoolFits
+      violations ps `shouldBe` []
     it "still enforces the EB role once Leios has shown activity" $ do
       -- Same leader slot, but an EB was acquired earlier, so the gate is open and
       -- forging nothing at slot 4 is a violation.

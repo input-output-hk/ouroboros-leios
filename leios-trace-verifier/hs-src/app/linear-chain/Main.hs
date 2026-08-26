@@ -89,8 +89,11 @@ render = \case
       "warning: the log shows no Leios activity — no EB forged, acquired, announced "
         <> "or voted — so EB-role enforcement is suppressed for the "
         <> show led
-        <> " slot(s) the node led. NodeIsLeader alone is Praos leadership, and only "
-        <> "implies EB eligibility while Leios is actually running."
+        <> " slot(s) the node led, and at least one of those had a mempool too large "
+        <> "for its ranking block, so an EB was owed there. NodeIsLeader alone is "
+        <> "Praos leadership, and only implies EB eligibility while Leios is actually "
+        <> "running — but a node with an oversized mempool doing nothing Leios-side "
+        <> "at all is worth looking into."
   SlotGap from to ->
     hPutStrLn stderr $
       "note: no leadership check logged for slot(s) "

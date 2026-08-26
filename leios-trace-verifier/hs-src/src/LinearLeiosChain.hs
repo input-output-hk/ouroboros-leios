@@ -19,6 +19,7 @@ module LinearLeiosChain (
   overlapSlots,
   carryAcross,
   segmentAuthoritative,
+  gateSuppressesAnObligation,
   verifySegment,
   runSegmented,
 ) where
@@ -86,9 +87,11 @@ data Progress
     NothingToVerify
   | -- | Input ended with the final check passing; the actions adjudicated.
     StreamEnded [Text]
-  | -- | The segment holds slots the node led, but the log shows no Leios activity
-    --   at all, so EB-role enforcement is suppressed for them. Carries how many
-    --   such leader slots were seen.
+  | -- | The segment holds slots the node led where the mempool rule would have
+    --   demanded an EB, but the log shows no Leios activity at all, so EB-role
+    --   enforcement is suppressed for them. Carries how many leader slots were seen.
+    --   Not reported when the rule would have excused those slots anyway — the gate
+    --   costs nothing then, and claiming otherwise buries the notes that matter.
     LeiosInactive Int
   | -- | The slot ticks jumped: the node emitted no leadership check for the slots
     --   between these two. Carries (last seen, next seen). Not a violation — a
@@ -198,6 +201,39 @@ segmentAuthoritative :: Bool -> Integer -> ChainData -> Bool
 segmentAuthoritative spans ep cd =
   not spans && maybe False (const (ep == cdNodeEpoch cd)) (cdWinningSlots cd)
 
+-- | Whether the EB-role gate actually costs anything on this prefix: some slot the
+--   node led where the mempool rule would have demanded an EB.
+--
+--   Without this the gate reports "enforcement suppressed" whenever Leios is quiet,
+--   which on a low-traffic network is every led slot — while the mempool rule had
+--   already excused those same slots on its own terms, the mempool being far below
+--   the ranking block's capacity. Saying "suppressed" there overstates the loss: the
+--   verifier did look, and found nothing owed. The gate is only worth reporting when
+--   it hides an obligation the rule would have raised.
+--
+--   Mirrors the translator's 'ebOwed': the maximum of the slot's mempool range where
+--   the node forged (its own block drained the mempool after deciding), the minimum
+--   otherwise.
+gateSuppressesAnObligation :: Integer -> [ChainEvent] -> Bool
+gateSuppressesAnObligation cap = any owed . slotGroups
+ where
+  -- A slot owns the events from its tick up to the next one, which is the grouping
+  -- the translator uses — hence a mempool range emitted just ahead of a tick belongs
+  -- to the slot then ending.
+  slotGroups [] = []
+  slotGroups (e : es) = let (g, rest) = break isCSlot es in (e : g) : slotGroups rest
+  owed g =
+    any isLeader g
+      && case [(toInteger mn, toInteger mx) | CMempoolRange mn mx <- g] of
+        [] -> False
+        rs
+          | any isRBForged g -> cap < maximum (map snd rs)
+          | otherwise -> cap < minimum (map fst rs)
+  isLeader (CNodeIsLeader _) = True
+  isLeader _ = False
+  isRBForged (CRBForged _ _) = True
+  isRBForged _ = False
+
 -- | Verify one segment's prefix against the spec.
 verifySegment :: Timings -> Segment -> [ChainEvent] -> ([Text], (Text, Text))
 verifySegment ts seg prefix =
@@ -296,14 +332,24 @@ runSegmented report ts query = loop [] Nothing Nothing []
     report (SegmentStarted seg (carrySpans carry))
     pure (seg, (ep, segAuthoritative seg) : tally)
 
-  -- The EB-role gate lives in the translator, which cannot report. Say so wherever
-  -- a prefix is verified, rather than letting leader slots be silently exempted.
-  -- Both verification sites need this: a run too short to reach a periodic
-  -- checkpoint is verified only at end of input.
-  reportIfLeiosInactive prefix = do
+  -- The EB-role gate lives in the translator, which cannot report. Say so wherever a
+  -- prefix is verified, rather than letting leader slots be silently exempted. Both
+  -- verification sites need this: a run too short to reach a periodic checkpoint is
+  -- verified only at end of input.
+  --
+  -- Only when the gate actually hides an obligation, though — see
+  -- 'gateSuppressesAnObligation'. On a quiet network the mempool rule excuses those
+  -- slots on its own terms, and reporting suppression there claims a loss that was
+  -- not incurred.
+  reportIfLeiosInactive seg prefix = do
     let led = length [() | CNodeIsLeader _ <- prefix]
-    when (led > 0 && not (any isLeiosActivity prefix)) $
-      report (LeiosInactive led)
+        cap = cdMaxRBBody (segCD seg)
+    when
+      ( led > 0
+          && not (any isLeiosActivity prefix)
+          && gateSuppressesAnObligation cap prefix
+      )
+      $ report (LeiosInactive led)
 
   -- An EB is owed only when the mempool could not have fitted in the ranking block,
   -- and the reading is a range, so a range straddling the capacity leaves the
@@ -318,7 +364,7 @@ runSegmented report ts query = loop [] Nothing Nothing []
       else when (straddling > 0) $ report (EBOwedUndecided straddling)
 
   checkSeg seg prefix = do
-    reportIfLeiosInactive prefix
+    reportIfLeiosInactive seg prefix
     reportMempoolGaps seg prefix
     let (acts, (status, detail)) = verifySegment ts seg prefix
     if status == "ok"
@@ -327,7 +373,7 @@ runSegmented report ts query = loop [] Nothing Nothing []
 
   finishSeg Nothing _ = report NothingToVerify
   finishSeg (Just seg) prefix = do
-    reportIfLeiosInactive prefix
+    reportIfLeiosInactive seg prefix
     reportMempoolGaps seg prefix
     let (acts, (status, detail)) = verifySegment ts seg prefix
     if status == "ok"
