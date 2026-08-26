@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# Twelve mempool-monitor panes in one tiled tmux session, one per node.
+# Twelve mempool-monitor panes in one tiled tmux window, one per node.
+#
+# The window is attached to a tmux session that is already running -- the current
+# one when invoked from inside tmux, otherwise the first the server reports. The
+# devnet usually already owns a session, and a second one would just hide these
+# panes behind a detach. A session is only started when no tmux server is running
+# at all, since then there is nothing to attach to.
 #
 # process-compose cannot tile: its TUI shows a process list plus one pane at a
 # time, so `is_interactive` gets you a real TTY but not twelve of them side by
@@ -14,7 +20,11 @@
 # own relays) and across a row (has it leaked to the others).
 set -euo pipefail
 
-SESSION="${SESSION:-mempool}"
+# Session to attach to, when set and it exists; otherwise one is chosen. Also the
+# name used if a session has to be started because no server is running.
+: "${SESSION:=}"
+# Window created within it. One per invocation, so several devnets can coexist.
+: "${WINDOW:=mempools}"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${WORKING_DIR:=${SOURCE_DIR}/tmp-devnet}"
 : "${MEMPOOL_MONITOR:=mempool-monitor}"
@@ -73,29 +83,53 @@ monitor_cmd() {
 		"$tsv"
 }
 
-if tmux has-session -t "$SESSION" 2>/dev/null; then
-	echo "Session '$SESSION' already exists; attaching. Kill it with:"
-	echo "  tmux kill-session -t $SESSION"
-	exec tmux attach -t "$SESSION"
+# Prefer the session the user is looking at, then an explicit SESSION, then
+# whatever the server happens to have.
+pick_session() {
+	if [ -n "${TMUX:-}" ]; then
+		tmux display-message -p '#S'
+	elif [ -n "$SESSION" ] && tmux has-session -t "$SESSION" 2>/dev/null; then
+		echo "$SESSION"
+	else
+		tmux list-sessions -F '#S' 2>/dev/null | head -1
+	fi
+}
+
+target="$(pick_session)"
+if [ -z "$target" ]; then
+	target="${SESSION:-mempool}"
+	echo "No tmux session running; starting '$target'."
+	tmux new-session -d -s "$target"
 fi
 
-tmux new-session -d -s "$SESSION" -n mempools "$(monitor_cmd "${NODES[0]}")"
-# Leave a dead monitor's output on screen rather than collapsing the pane, so a
-# failure is readable instead of just missing.
-tmux set-option -t "$SESSION" remain-on-exit on
-tmux set-option -t "$SESSION" mouse on
+if tmux list-windows -t "$target" -F '#W' 2>/dev/null | grep -qxF "$WINDOW"; then
+	echo "Window '$WINDOW' already exists in session '$target'; selecting it. Kill it with:"
+	echo "  tmux kill-window -t $target:$WINDOW"
+else
+	# The trailing colon matters: new-window's -t is a target-*window*, so a bare
+	# session name resolves to that session's current window and tries to create
+	# at its index ("index N in use"). "session:" means the session itself, and
+	# tmux picks the next free index.
+	tmux new-window -t "${target}:" -n "$WINDOW" "$(monitor_cmd "${NODES[0]}")"
+	# Leave a dead monitor's output on screen rather than collapsing the pane, so a
+	# failure is readable instead of just missing. Window-scoped: the session is
+	# not ours to reconfigure, so no session-wide options are touched.
+	tmux set-option -w -t "$target:$WINDOW" remain-on-exit on
 
-for name in "${NODES[@]:1}"; do
-	tmux split-window -t "$SESSION:mempools" "$(monitor_cmd "$name")"
-	# Re-tile as we go: splitting a pane that has become too small to halve fails.
-	tmux select-layout -t "$SESSION:mempools" tiled >/dev/null
-done
+	for name in "${NODES[@]:1}"; do
+		tmux split-window -t "$target:$WINDOW" "$(monitor_cmd "$name")"
+		# Re-tile as we go: splitting a pane that has become too small to halve fails.
+		tmux select-layout -t "$target:$WINDOW" tiled >/dev/null
+	done
 
-tmux select-layout -t "$SESSION:mempools" tiled >/dev/null
-tmux select-pane -t "$SESSION:mempools.0"
+	tmux select-layout -t "$target:$WINDOW" tiled >/dev/null
+fi
+
+tmux select-pane -t "$target:$WINDOW.0"
+tmux select-window -t "$target:$WINDOW"
 
 cat <<EOF
-Twelve monitors in tmux session '$SESSION'.
+Twelve monitors in window '$WINDOW' of tmux session '$target'.
 
   columns are groups:   bp1      bp2      bp3
                         relay11  relay21  relay31
@@ -103,11 +137,16 @@ Twelve monitors in tmux session '$SESSION'.
                         relay13  relay23  relay33
 
   zoom one pane     ctrl-b z
+  next/prev window  ctrl-b n / ctrl-b p
   detach            ctrl-b d
-  kill them all     tmux kill-session -t $SESSION
+  kill just these   tmux kill-window -t $target:$WINDOW
 
 Each pane needs about 50x10; below that the panes will be clipped, so a wide
 terminal or a smaller subset of NODES is the way.
 EOF
 
-exec tmux attach -t "$SESSION"
+# Already inside tmux, the select-window above is all that is needed; attaching
+# from within would nest a client in itself.
+if [ -z "${TMUX:-}" ]; then
+	exec tmux attach -t "$target"
+fi
