@@ -43,6 +43,7 @@ stubChainData =
     , cdStakeDistribution = [("node-0", 1000000000), ("node-1", 1000000000), ("node-2", 1000000000)]
     , cdSutIndex = 2
     , cdEpochLength = 10
+    , cdMaxRBBody = 100
     , cdNodeEpoch = 0
     }
 
@@ -139,13 +140,16 @@ praosOnly =
     <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4]
     <> ticks 5 9
 
--- | The same leader slot, but preceded by a Leios acquisition, so the gate is open
---   and forging no EB at slot 4 is a genuine abstention from an available role.
+-- | The same leader slot, but preceded by a Leios acquisition, so the gate is open;
+--   and with a mempool too large for the ranking block, so an EB really was owed and
+--   forging none at slot 4 is a genuine abstention from an available role. Both
+--   conditions are needed: the gate alone no longer makes a bare leader slot a
+--   violation, since an EB is owed only when the mempool would not have fitted.
 leiosActiveThenSilentLeader :: [ChainEvent]
 leiosActiveThenSilentLeader =
   ticks 0 1
     <> [CSlot 2, CAnnouncementAccepted "eb" 2, CEBAcquired "eb" 2, CSlot 3]
-    <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4]
+    <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4, CMempoolRange 200 200]
     <> ticks 5 9
 
 chainSegments :: Spec

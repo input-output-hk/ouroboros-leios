@@ -32,7 +32,7 @@ import Data.Aeson.Types (Parser, parseMaybe)
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import Data.List (mapAccumL)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, mapMaybe)
+import Data.Maybe (mapMaybe, maybeToList)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Read as TR
@@ -78,6 +78,13 @@ data ChainEvent
     --   advances past an announced EB that EB can no longer be certified — the
     --   verifier uses this to close the EB's voting window.
     CChainExtended !Word64
+  | -- | The (min, max) mempool size in bytes observed during one slot, aggregated
+    --   from @Mempool.AddedTx@ / @Mempool.RemoveTxs@ (both report the resulting size
+    --   absolutely, not as a delta). A range rather than a point because the node
+    --   decides from a snapshot taken at an instant the log does not pin down, so a
+    --   single reading would be a guess at what it saw. Emitted immediately before
+    --   the slot tick that closes the slot it describes.
+    CMempoolRange !Word64 !Word64
   deriving (Eq, Show, Generic)
 
 -- | Internal: one parsed line — a directly-emittable event, a linkage fact
@@ -93,41 +100,71 @@ data Raw
     RawVote !Bool !Text
   | -- | deliberate abstention: ebHash, election slot, reason. EB-keyed.
     RawNotVoted !Text !Word64 !Text
+  | -- | a mempool size reading in bytes, absolute rather than a delta.
+    RawMempool !Word64
 
--- | Vote-resolution state.
+-- | Vote-resolution state, plus the mempool readings accumulated for the slot
+--   currently in progress.
 data LinkState = LinkState
   { lsEbBySlot :: !(Map.Map Word64 Text)
   , lsSlotByRb :: !(Map.Map Text Word64)
+  , lsMemRange :: !(Maybe (Word64, Word64))
+  -- ^ (min, max) of the readings seen since the last slot tick.
+  , lsMemLast :: !(Maybe Word64)
+  -- ^ Most recent reading, which seeds the next slot's range: the mempool as it
+  --   stood when that slot began counts as one of its readings.
   }
 
 emptyLinkState :: LinkState
-emptyLinkState = LinkState Map.empty Map.empty
+emptyLinkState = LinkState Map.empty Map.empty Nothing Nothing
 
 -- | Parse a whole node.log, keeping only the Leios events and preserving order.
+--
+--   Mempool readings are aggregated rather than passed through. A busy node emits
+--   tens of thousands of them — 76,767 in one 1,000-slot run — and the verifier
+--   needs only the range per slot, so each slot tick is preceded by a single
+--   'CMempoolRange' summarising the slot just ending. Emitting it /before/ the tick
+--   matters: a tick is what closes the previous slot downstream, so the range has
+--   to arrive while that slot is still open.
 parseNodeLog :: BSL8.ByteString -> [ChainEvent]
 parseNodeLog =
-  catMaybes . snd . mapAccumL step emptyLinkState . mapMaybe parseRaw . BSL8.lines
+  concat . snd . mapAccumL step emptyLinkState . mapMaybe parseRaw . BSL8.lines
  where
-  step :: LinkState -> Raw -> (LinkState, Maybe ChainEvent)
+  step :: LinkState -> Raw -> (LinkState, [ChainEvent])
   step !st raw = case raw of
-    RawEvent ev -> (st, Just ev)
+    -- A slot tick closes the slot just ending, so flush its mempool range first,
+    -- then seed the new slot's range with the mempool as it now stands.
+    RawEvent ev@(CSlot _) ->
+      ( st{lsMemRange = (\l -> (l, l)) <$> lsMemLast st}
+      , maybe [] (\(mn, mx) -> [CMempoolRange mn mx]) (lsMemRange st) <> [ev]
+      )
+    RawEvent ev -> (st, [ev])
+    RawMempool b ->
+      ( st
+          { lsMemLast = Just b
+          , lsMemRange = Just $ case lsMemRange st of
+              Nothing -> (b, b)
+              Just (mn, mx) -> (min mn b, max mx b)
+          }
+      , []
+      )
     RawAnn slot ebHash ->
       ( st{lsEbBySlot = Map.insert slot ebHash (lsEbBySlot st)}
-      , Just (CAnnouncementAccepted ebHash slot)
+      , [CAnnouncementAccepted ebHash slot]
       )
     RawRb rbHash slot ->
       ( st{lsSlotByRb = Map.insert rbHash slot (lsSlotByRb st)}
-      , Just (CChainExtended slot)
+      , [CChainExtended slot]
       )
     RawVote ours rbHash ->
       ( st
-      , do
+      , maybeToList $ do
           slot <- Map.lookup rbHash (lsSlotByRb st)
           ebHash <- Map.lookup slot (lsEbBySlot st)
           pure $ (if ours then CVoted else CVoteAcquired) ebHash slot
       )
     RawNotVoted ebHash slot reason ->
-      (st, Just (CNotVoted ebHash slot reason))
+      (st, [CNotVoted ebHash slot reason])
 
 -- | Parse a single log line; @Nothing@ for non-JSON banners and unrelated events.
 parseRaw :: BSL8.ByteString -> Maybe Raw
@@ -157,6 +194,8 @@ pRaw = withObject "logline" $ \o -> do
       RawVote False <$> v .: "rbHash"
     "Consensus.LeiosKernel.NotVoted" ->
       RawNotVoted <$> d .: "ebHash" <*> d .: "ebSlot" <*> d .: "reason"
+    "Mempool.AddedTx" -> mempoolBytes d
+    "Mempool.RemoveTxs" -> mempoolBytes d
     -- Extending the current chain and switching to a fork are the two ways
     -- ChainDB reports adopting a new tip, and both matter twice over: the tip
     -- advance retires any EB the superseded announcer carried, and the adopted
@@ -178,6 +217,12 @@ pRaw = withObject "logline" $ \o -> do
           RawEvent <$> (CVoteAcquired <$> v .: "ebHash" <*> v .: "slot")
         _ -> fail "unhandled LeiosKernel kind"
     _ -> fail "unhandled ns"
+
+-- | The mempool size after a change, shared by the two Mempool traces.
+mempoolBytes :: Object -> Parser Raw
+mempoolBytes d = do
+  ms <- d .: "mempoolSize"
+  RawMempool <$> ms .: "bytes"
 
 -- | The newly adopted tip, shared by ChainDB's two selection-change events.
 newtip :: Object -> Parser Raw

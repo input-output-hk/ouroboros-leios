@@ -90,6 +90,26 @@ chainEvents = do
     it "maps NotVoted (a deliberate, protocol-legal abstention) with its reason" $
       parse ["{\"ns\":\"Consensus.LeiosKernel.NotVoted\",\"data\":{\"kind\":\"LeiosNotVoted\",\"ebHash\":\"eb07\",\"ebSlot\":540,\"reason\":\"chainTipDoesNotAnnounce\"}}"]
         `shouldBe` [CNotVoted "eb07" 540 "chainTipDoesNotAnnounce"]
+    -- Mempool readings are far too voluminous to pass through one per event, so they
+    -- are aggregated to one range per slot, emitted just ahead of the tick that
+    -- closes that slot. The range also carries forward: the mempool as it stood when
+    -- a slot began is one of that slot's readings, which is why slot 2's range starts
+    -- at 300 rather than at its own first reading.
+    it "aggregates mempool readings into one range per slot" $
+      parse
+        [ "{\"ns\":\"Forge.Loop.StartLeadershipCheck\",\"data\":{\"slot\":1}}"
+        , "{\"ns\":\"Mempool.AddedTx\",\"data\":{\"kind\":\"TraceMempoolAddedTx\",\"mempoolSize\":{\"bytes\":100,\"numTxs\":1},\"tx\":{\"txid\":\"a\"}}}"
+        , "{\"ns\":\"Mempool.AddedTx\",\"data\":{\"kind\":\"TraceMempoolAddedTx\",\"mempoolSize\":{\"bytes\":300,\"numTxs\":2},\"tx\":{\"txid\":\"b\"}}}"
+        , "{\"ns\":\"Forge.Loop.StartLeadershipCheck\",\"data\":{\"slot\":2}}"
+        , "{\"ns\":\"Mempool.RemoveTxs\",\"data\":{\"kind\":\"TraceMempoolRemoveTxs\",\"mempoolSize\":{\"bytes\":40,\"numTxs\":0},\"txs\":[]}}"
+        , "{\"ns\":\"Forge.Loop.StartLeadershipCheck\",\"data\":{\"slot\":3}}"
+        ]
+        `shouldBe` [ CSlot 1
+                   , CMempoolRange 100 300
+                   , CSlot 2
+                   , CMempoolRange 40 300
+                   , CSlot 3
+                   ]
     it "drops votes whose linkage is missing (truncated log prefix)" $
       parse ["{\"ns\":\"Consensus.LeiosKernel.VoteAcquired\",\"data\":{\"kind\":\"LeiosVoteAcquired\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":1}}}"]
         `shouldBe` []

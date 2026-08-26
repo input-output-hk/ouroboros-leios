@@ -30,9 +30,38 @@ stakeDist = [("node-0", 1000000000), ("node-1", 1000000000), ("node-2", 10000000
 --   Timings are the ones the chain app hardcodes — Lhdr 1, Lvote 4, Ldiff 7,
 --   validity check 3 — under which an announced EB is votable in exactly one slot,
 --   @ebSlot + (3 * Lhdr `max` validityCheckTime) == ebSlot + 3@.
+--   The ranking block's body capacity is a small round number here, and fixtures give
+--   their mempool ranges relative to it, so "an EB was owed" is legible at a glance.
+capacity :: Integer
+capacity = 100
+
+-- | A mempool that cannot fit in the ranking block, so an EB is owed.
+overflowing :: ChainEvent
+overflowing = CMempoolRange 200 200
+
+-- | A mempool that fits, so no EB is owed and abstaining is legal.
+fitting :: ChainEvent
+fitting = CMempoolRange 50 50
+
 verify :: [Integer] -> Bool -> [ChainEvent] -> Text
 verify slots authoritative evs =
-  fst (snd (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 3 slots authoritative evs 0))
+  fst
+    ( snd
+        ( verifyChainTraceFinalFromSlot
+            3
+            2
+            stakeDist
+            1
+            4
+            7
+            3
+            slots
+            authoritative
+            capacity
+            evs
+            0
+        )
+    )
 
 -- | Eligibility taken from the log, as happens for any epoch the queried schedule
 --   cannot cover.
@@ -42,7 +71,10 @@ fromLog = verify [] False
 -- | Verify from a given start slot, as a windowed verifier does for each window.
 verifyFrom :: Integer -> [ChainEvent] -> Text
 verifyFrom from evs =
-  fst (snd (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 3 [] False evs from))
+  fst
+    ( snd
+        (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 3 [] False capacity evs from)
+    )
 
 -- | An EB announced and acquired in slot 1 and voted in slot 4.
 announcedAndVoted :: [ChainEvent]
@@ -180,8 +212,20 @@ chainVerifier = do
       fromLog [CSlot 0, CEBForged "eb" 0, CSlot 1] `shouldNotBe` "ok"
     it "accepts an EB forged in a slot an authoritative schedule says was won" $
       verify [0] True [CSlot 0, CEBForged "eb" 0, CSlot 1] `shouldBe` "ok"
+    -- An EB is owed only when the mempool could not have fitted in the RB, so these
+    -- two differ purely in the mempool reading. Without one at all, nothing is shown
+    -- to be owed and abstaining is legal — the third case.
     it "rejects abstention in a slot an authoritative schedule says was won" $
-      verify [0] True [CSlot 0, CSlot 1] `shouldNotBe` "ok"
+      verify [0] True [CSlot 0, overflowing, CSlot 1] `shouldNotBe` "ok"
+    it "accepts abstention when the mempool would have fitted in the ranking block" $
+      verify [0] True [CSlot 0, fitting, CSlot 1] `shouldBe` "ok"
+    it "accepts abstention when the log carries no mempool reading" $
+      verify [0] True [CSlot 0, CSlot 1] `shouldBe` "ok"
+    -- A range straddling the capacity cannot settle the question, and is excused
+    -- rather than flagged: the node decides from a snapshot the log does not pin
+    -- down, and a false violation ends the whole session.
+    it "excuses abstention when the mempool range straddles the capacity" $
+      verify [0] True [CSlot 0, CMempoolRange 50 200, CSlot 1] `shouldBe` "ok"
 
   describe "voting" $ do
     it "accepts a vote for an announced EB in its one legal slot" $

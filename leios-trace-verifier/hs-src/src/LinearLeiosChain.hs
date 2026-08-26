@@ -50,6 +50,10 @@ data ChainData = ChainData
   --   eligibility is the CIP-0164 committee, computed from these figures.
   , cdSutIndex :: Integer
   , cdEpochLength :: Integer
+  , cdMaxRBBody :: Integer
+  -- ^ The ranking block's body capacity in bytes. Decides whether a forge without an
+  --   EB was owed one: an EB is required only when the mempool could not have fitted
+  --   into the RB.
   , cdNodeEpoch :: Integer
   -- ^ The epoch the node itself answered for. This is the epoch of the /chain tip/,
   --   not of the wall clock, so it lags whenever block production is sparse — which
@@ -86,6 +90,15 @@ data Progress
     --   at all, so EB-role enforcement is suppressed for them. Carries how many
     --   such leader slots were seen.
     LeiosInactive Int
+  | -- | Slots whose mempool range straddled the RB capacity, so whether an EB was
+    --   owed could not be settled and the slot was excused. This count is the
+    --   measure of what the rule's one-sidedness costs on a given run: small means
+    --   the EB-role check has teeth, large means it is mostly declining to look.
+    EBOwedUndecided Int
+  | -- | The prefix carried no mempool readings at all, so EB-role enforcement in
+    --   non-forging slots lapsed entirely. Expected for logs predating the Mempool
+    --   traces; on a current log it means the check is silently inactive.
+    NoMempoolReadings
   | -- | Per epoch, whether eligibility came from the queried schedule.
     Summary [(Integer, Bool)]
 
@@ -193,6 +206,7 @@ verifySegment ts seg prefix =
         (tValidityCheckTime ts)
         (fromMaybe [] (cdWinningSlots cd))
         (segAuthoritative seg)
+        (cdMaxRBBody cd)
         prefix
         (segStart seg)
 
@@ -273,8 +287,21 @@ runSegmented report ts query = loop [] Nothing []
     when (led > 0 && not (any isLeiosActivity prefix)) $
       report (LeiosInactive led)
 
+  -- An EB is owed only when the mempool could not have fitted in the ranking block,
+  -- and the reading is a range, so a range straddling the capacity leaves the
+  -- question open. Those slots are excused, which is the safe direction but is also
+  -- lost coverage — so say how much of it there is rather than let it go unseen.
+  reportMempoolGaps seg prefix = do
+    let cap = cdMaxRBBody (segCD seg)
+        ranges = [(toInteger mn, toInteger mx) | CMempoolRange mn mx <- prefix]
+        straddling = length [() | (mn, mx) <- ranges, mn <= cap, cap < mx]
+    if null ranges
+      then report NoMempoolReadings
+      else when (straddling > 0) $ report (EBOwedUndecided straddling)
+
   checkSeg seg prefix = do
     reportIfLeiosInactive prefix
+    reportMempoolGaps seg prefix
     let (acts, (status, detail)) = verifySegment ts seg prefix
     if status == "ok"
       then report (Verified (length prefix) (length acts))
@@ -283,6 +310,7 @@ runSegmented report ts query = loop [] Nothing []
   finishSeg Nothing _ = report NothingToVerify
   finishSeg (Just seg) prefix = do
     reportIfLeiosInactive prefix
+    reportMempoolGaps seg prefix
     let (acts, (status, detail)) = verifySegment ts seg prefix
     if status == "ok"
       then report (StreamEnded acts)

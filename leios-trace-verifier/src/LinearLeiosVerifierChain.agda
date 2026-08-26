@@ -37,6 +37,7 @@ module LinearLeiosVerifierChain where
     CAnnouncementAccepted : String → Word64 → ChainEvent
     CNotVoted    : String → Word64 → String → ChainEvent
     CChainExtended : Word64 → ChainEvent
+    CMempoolRange : Word64 → Word64 → ChainEvent
 
   {-# FOREIGN GHC import qualified ChainEvents #-}
   {-# COMPILE GHC ChainEvent = data ChainEvents.ChainEvent
@@ -50,6 +51,7 @@ module LinearLeiosVerifierChain where
         | ChainEvents.CAnnouncementAccepted
         | ChainEvents.CNotVoted
         | ChainEvents.CChainExtended
+        | ChainEvents.CMempoolRange
         ) #-}
 
   module _
@@ -64,6 +66,10 @@ module LinearLeiosVerifierChain where
     -- after its first evaluation.
     (winningSlots : List ℕ)
     (scheduleAuthoritative : Bool)
+    -- The ranking block's body capacity in bytes ('maxBlockBodySize'). An EB is owed
+    -- only when the mempool does not fit in the RB, so this is what separates a forge
+    -- without an EB that is a violation from one that is ordinary behaviour.
+    (maxRBBody : ℕ)
     where
 
     from-id : ℕ → Fin numberOfParties
@@ -265,6 +271,8 @@ module LinearLeiosVerifierChain where
               -- announcements can land inside a single slot, and closeSlot collapses
               -- a slot into one snapshot.
               announced   : List String
+              -- (min , max) mempool bytes observed during the slot being accumulated.
+              memRange    : Maybe (ℕ × ℕ)
               forgedEB    : Maybe EndorserBlock
               votedEB     : Maybe (EndorserBlock × ℕ)
 
@@ -316,10 +324,33 @@ module LinearLeiosVerifierChain where
             -- EB-Role checks 'toProposeEB s π ≡ just eb'. 'Base₁' has no premises,
             -- records no upkeep and only overwrites 'ToPropose', so re-emitting it
             -- each slot is idempotent.
+            --
+            -- In a slot with no forge the proposal set says whether an EB was OWED.
+            -- 'EB-Role' needs 'toProposeEB ≡ just eb', which holds exactly when the
+            -- set is non-empty, so an empty one makes the rule inapplicable and
+            -- 'Roles₂' licenses the abstention — the spec's own account of a node
+            -- with nothing to put in an EB.
+            --
+            -- Owed iff the mempool could not have fitted in the ranking block:
+            -- 'min > maxRBBody'. The reading is a range because the node decides from
+            -- a snapshot taken at an unobservable instant, and taking the minimum is
+            -- what makes the test one-sided — a range straddling the capacity is
+            -- treated as not owed, so an indeterminate slot is excused rather than
+            -- flagged. A false violation ends the whole verification session, while a
+            -- missed one costs only that slot's coverage.
+            --
+            -- No reading at all (a log without the Mempool traces) is likewise not
+            -- owed: EB-role enforcement then lapses rather than firing on a guess.
+            ebOwed : Bool
+            ebOwed = case memRange a of λ where
+              nothing          → false
+              (just (mn , _))  → maxRBBody Nat.<ᵇ mn
             mempool : List Step
             mempool = case forgedEB a of λ where
               (just eb) → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs (EndorserBlockOSig.txs eb)))) ∷ []
-              nothing   → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs synthTxs))) ∷ []
+              nothing   → if ebOwed
+                            then (Base₁-Action s , inj₂ (inj₂ (SubmitTxs synthTxs))) ∷ []
+                            else (Base₁-Action s , inj₂ (inj₂ (SubmitTxs []))) ∷ []
             -- One 'Slot₂'/'BASE-LDG' step per slot, setting the spec's 'currentRB'
             -- (the head of 'RBs') — which is what 'getCurrentEBHash', and hence the
             -- voting window and every role rule reading it, is derived from.
@@ -405,6 +436,7 @@ module LinearLeiosVerifierChain where
                   { curSlot = primWord64ToNat s
                   ; FFD-blks = []
                   ; curEB = nextEB
+                  ; memRange = nothing
                   ; forgedEB = nothing
                   ; votedEB = nothing
                   } , steps)
@@ -461,6 +493,10 @@ module LinearLeiosVerifierChain where
       -- the retirement but drives no state itself: the window is closed by the
       -- chain extension (CChainExtended) or by the deadline, both via 'currentRB'.
       traceEvent→action a (CNotVoted _ _ _) = (a , [])
+      -- The mempool range for the slot now ending; the parser emits it just ahead of
+      -- the tick that closes that slot, so 'closeSlot' sees the right one.
+      traceEvent→action a (CMempoolRange mn mx) =
+        (record a { memRange = just (primWord64ToNat mn , primWord64ToNat mx) } , [])
 
       s₀ : LeiosState
       s₀ = initLeiosState tt exampleDistr ((SUT-id , tt) ∷ [])
@@ -482,7 +518,7 @@ module LinearLeiosVerifierChain where
       n₀ : ℕ → Accumulator
       n₀ st = record
         { EB-refs = [] ; EB-received = [] ; FFD-blks = [] ; curSlot = st
-        ; started = false ; curEB = none ; announced = []
+        ; started = false ; curEB = none ; announced = [] ; memRange = nothing
         ; forgedEB = nothing ; votedEB = nothing }
 
       opaque

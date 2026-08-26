@@ -87,6 +87,20 @@ render = \case
         <> show led
         <> " slot(s) the node led. NodeIsLeader alone is Praos leadership, and only "
         <> "implies EB eligibility while Leios is actually running."
+  EBOwedUndecided n ->
+    hPutStrLn stderr $
+      "note: for "
+        <> show n
+        <> " slot(s) the mempool reading straddled the ranking block's capacity, so "
+        <> "whether an EB was owed could not be settled; those slots were excused. "
+        <> "The node decides from a snapshot the log does not pin down, so this is "
+        <> "the cost of never flagging a slot we cannot show was in breach."
+  NoMempoolReadings ->
+    hPutStrLn stderr $
+      "warning: no mempool readings in this prefix, so EB-role enforcement lapses "
+        <> "for slots without a forge — an EB can only be shown to be owed when the "
+        <> "mempool is known not to have fitted in the ranking block. Expected for "
+        <> "logs predating the Mempool traces."
   Summary entries -> summarize entries
 
 reportSchedule :: Segment -> Bool -> IO ()
@@ -196,11 +210,22 @@ failOut nEvents acts status detail = do
 
 -- * Reading from the chain via cardano-api
 
--- | Minimal view of the Shelley genesis: just the epoch length (slots/epoch).
-newtype GenesisEL = GenesisEL Integer
+-- | Minimal view of the Shelley genesis: the epoch length (slots/epoch) and the
+--   ranking block's body capacity.
+--
+--   'maxBlockBodySize' is taken from genesis rather than from the protocol-params
+--   query, so it is the network's initial value; an on-chain parameter update would
+--   leave it stale. Acceptable for now because it is used only to decide whether the
+--   mempool could have fitted in an RB, and the comparison is deliberately one-sided,
+--   but it is the value to source from 'pparams' if that ever matters.
+data GenesisEL = GenesisEL Integer Integer
 
 instance FromJSON GenesisEL where
-  parseJSON = withObject "ShelleyGenesis" $ \o -> GenesisEL <$> o .: "epochLength"
+  parseJSON = withObject "ShelleyGenesis" $ \o -> do
+    el <- o .: "epochLength"
+    pp <- o .: "protocolParams"
+    mb <- pp .: "maxBlockBodySize"
+    pure (GenesisEL el mb)
 
 -- | Which epoch's leadership schedule to query.
 data WhichEpoch = CurrentEpoch | NextEpoch
@@ -282,8 +307,10 @@ queryChainOnce LeadershipOpts{..} = do
   genesisBytes <- BS.readFile loGenesisFile
   (shelleyGenesis :: Api.ShelleyGenesis) <-
     orDie "decoding Shelley genesis" (eitherDecodeStrictText genesisBytes)
-  GenesisEL epochLength <-
-    orDie "reading epochLength from Shelley genesis" (eitherDecodeStrictText genesisBytes)
+  GenesisEL epochLength maxRBBody <-
+    orDie
+      "reading epochLength and maxBlockBodySize from Shelley genesis"
+      (eitherDecodeStrictText genesisBytes)
   let connInfo =
         Api.LocalNodeConnectInfo
           { Api.localConsensusModeParams = Api.CardanoModeParams (Api.EpochSlots 21600)
@@ -361,6 +388,7 @@ queryChainOnce LeadershipOpts{..} = do
             ( buildChainData
                 loStakePoolId
                 epochLength
+                maxRBBody
                 (toInteger (Api.unEpochNo nodeEpoch))
                 mSlots
                 stakeDistr
@@ -375,10 +403,11 @@ buildChainData ::
   (Api.Hash Api.StakePoolKey) ->
   Integer ->
   Integer ->
+  Integer ->
   Maybe [Integer] ->
   Map.Map (Api.Hash Api.StakePoolKey) Rational ->
   ChainData
-buildChainData sutPool epochLength nodeEpoch winning m =
+buildChainData sutPool epochLength maxRBBody nodeEpoch winning m =
   -- A SUT absent from the distribution (no stake at all) joins as a
   -- zero-stake party at the end: keeps the party set total for the spec
   -- side, and the committee arithmetic correctly excludes it.
@@ -404,6 +433,7 @@ buildChainData sutPool epochLength nodeEpoch winning m =
         , cdStakeDistribution = stakeDist
         , cdSutIndex = sutIdx
         , cdEpochLength = epochLength
+        , cdMaxRBBody = maxRBBody
         , cdNodeEpoch = nodeEpoch
         }
 
