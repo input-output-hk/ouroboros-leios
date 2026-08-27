@@ -125,6 +125,7 @@ export const source = `
   - [ ] Implementation
     - [ ] Announce and detect equivocations of EBs
     - [ ] Diffuse and validate EBs via TxCache
+    - [ ] Catch up on not yet certified Leios EBs
   - [?] Assurance: good enough?
 
 - Transaction cache & storage
@@ -153,9 +154,9 @@ export const source = `
   - [x] Prototype
   - [~] Design: Consensus/Leger API
   - [ ] Implementation
-    - [ ] Reject all announcements and certificates
     - [ ] Validate EB announcing and certifying blocks
     - [ ] EB fetching on chain selection
+    - [ ] Out of order fetch EBs in Genesis
   - [ ] Assurance
 
 - Node API & configuration
@@ -177,33 +178,27 @@ Staged scopes of the dimensional plan, mirroring the "Dimensional plan on
 */}
 
 export const plan = `
-- Stage 1: Dijkstra supports Leios
+- Stage 0: Dijkstra supports Leios
   - Dijkstra block definition / serialization contains Leios
     - Announcements and certifies bit in headers
     - BLS keys in block headers (?)
     - Certificates in body
     - BLS key in pool registration cert in txs
     - Protocol parameters in txs
-  - Reject all announcements and certificates
   - Generate BLS keys
   - Create and submit pool registration with BLS keys
     - Check PoP in ledger rules
-  - Query pool state showing key registration
-  - Node integration
-
-- Stage 2: Start with zero (0/0/∞/0/0)
   - Register BLS keys via block headers (?)
+  - Query pool state showing key registration
   - Stake-based committee selection
   - Committee selection at epoch boundaries
     - Committee in ledger state
-  - EB fetching on chain selection
   - Validate EB announcing and certifying blocks
     - Disallowed by protocol parameters
   - Client APIs inline certified EB txs
-  - Inert mini-protocols handlers
   - Node integration
 
-- Stage 3: Low params (1/4/7/100k/1M)
+- Stage 1: Low params (1/4/7/100k/1M)
   - Socket options
   - TxSubmisison V2-undecision
   - Double-buffered mempool
@@ -216,10 +211,11 @@ export const plan = `
   - Diffuse and validate votes
   - Store and aggregate votes
   - Forge RBs with certificates
+  - EB fetching on chain selection
   - Node accepts BLS keys
   - Node integration
 
-- Stage 4: High params
+- Stage 2: High params
   - TxSubmission param tuning
   - Incremental decoding
   - High-throughput tx submission
@@ -227,6 +223,8 @@ export const plan = `
   - Disk-backed TxCache
   - Large quantity, low latency EB storage
   - Node integration
+  - Catch up on not yet certified Leios EBs
+  - Out of order fetch EBs in Genesis
 `;
 
 # Protocol status
@@ -312,11 +310,3 @@ itself.
 :::
 
 <ReleaseStages stages={stages} source={source} plan={plan} />
-
-### Risks
-
-In general there is a higher technical risk on later stages, but that is typically mitigated by having more time to gain confidence and do quality assurance. Deployment wise, there is also risks of progressing between stages once deployed:
-
-- Stage **1 -> 2**: a new release and another hard-fork -> risk of further delay
-- Stage **2 -> 3**: a new release and a protocol parameter update -> high deployment risk as no guarantee of latest software
-- Stage **3 -> 4**: new releases and protocol parameter updates -> lower deployment risk as mostly performance differences
