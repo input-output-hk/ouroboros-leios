@@ -69,6 +69,31 @@ export WORKING_DIR=my-devnet
 ./run.sh
 ```
 
+## Bootstrapping from an archived run
+
+With mainnet parameters (k=2160, 1s slots, activeSlotsCoeff 0.05), reaching
+saturation of the LeiosDB volatile partition from genesis takes ~12 hours. To avoid
+repeating that warm-up, the working directory of a finished run can be kept
+(archived with `cp -a` or simply renamed, preserving file timestamps) and later used to
+bootstrap a new run. This allows running a saturated devnet in minutes.
+
+The following data from the `tmp-devnet` directory is required, for each node:
+
+- `genesis/` --- this is shared between nodes
+- `node/db` --- the ChainDB of each node, including `leios.db`.
+- `node/keys` --- the pool keys the archived chain was forged with.
+
+```shell
+# Archive after a long run (stop the devnet first with Ctrl-C)
+cp -a tmp-devnet devnet-run
+
+# Restore
+BOOTSTRAP_FROM=devnet-run ./run.sh
+```
+
+On restore, the byron genesis `startTime` (the consensus wall-clock anchor) is
+shifted forward.
+
 ## Traffic control
 
 Proto-devnet uses Linux network namespaces and `tc` (traffic control) to simulate realistic network conditions between nodes: a configurable rate limit and latency on each link.

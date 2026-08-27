@@ -9,6 +9,9 @@ set -eo pipefail
 set -a
 : "${WORKING_DIR:=$(pwd)/tmp-devnet}"
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+# Bootstrap from an archived working dir of a previous run instead of
+# starting from genesis
+: "${BOOTSTRAP_FROM:=}"
 : "${PORT_NODE1:=3001}"
 : "${PORT_NODE2:=3002}"
 : "${PORT_NODE3:=3003}"
@@ -118,17 +121,72 @@ export TOOL_PATH IP_BIN
 cp -r "$CONFIG_DIR/genesis" "$WORKING_DIR/genesis"
 chmod u+w -R "${WORKING_DIR}/genesis"
 
-startTimeEpoch=$(date +%s)
-startTimeIso=$(date -u -d "@$startTimeEpoch" +"%Y-%m-%dT%H:%M:%SZ")
+nodes=(1 2 3)
+if [ -n "$BOOTSTRAP_FROM" ]; then
+  # Restore from an archived working dir: reuse its genesis and chain state,
+  # but shift the genesis start time forward by the downtime so the archived
+  # tip slot maps to ~now and the nodes resume fully caught up (the chain db,
+  # leios.db and KES are all slot-based, so shifting wall-clock anchors is
+  # safe).
+  BOOTSTRAP_DIR="$(cd "$BOOTSTRAP_FROM" && pwd)"
+  if [ ! -d "$BOOTSTRAP_DIR/genesis" ]; then
+    echo "Error: $BOOTSTRAP_DIR is not an archived working dir (need genesis/)"
+    exit 1
+  fi
+  for i in "${nodes[@]}"; do
+    if [ ! -d "$BOOTSTRAP_DIR/node$i/db" ]; then
+      echo "Error: $BOOTSTRAP_DIR is missing node$i/db"
+      exit 1
+    fi
+  done
 
-jq --argjson time "$startTimeEpoch" '.startTime = $time' \
-  "$CONFIG_DIR/genesis/byron-genesis.json" >"$WORKING_DIR/genesis/byron-genesis.json"
+  # Wall time the source run was stopped. The newest file mtime under the
+  # nodes' db dirs is an upper bound on the wall time of the last block
+  # (chain db files are written as blocks arrive and mtimes are preserved
+  # when archiving with cp -a), so anchoring the shift on it guarantees the
+  # shifted tip slot ends up in the past — otherwise the nodes would reject
+  # their own chain as from-the-future. sqlite sidecar files are excluded:
+  # merely reading leios.db can (re)create them, which would inflate the
+  # anchor and leave a huge gap of empty slots.
+  harvestEpoch=$(find "$BOOTSTRAP_DIR"/node*/db -type f \
+    ! -name 'leios.db-wal' ! -name 'leios.db-shm' ! -name 'lock' \
+    -printf '%T@\n' | sort -n | tail -1 | cut -d. -f1)
 
-jq --arg time "$startTimeIso" '.systemStart = $time' \
-  "$CONFIG_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json"
+  nowEpoch=$(date +%s)
+  shiftDelta=$((nowEpoch - harvestEpoch))
+  oldByronStart=$(jq .startTime "$BOOTSTRAP_DIR/genesis/byron-genesis.json")
+  newByronStart=$((oldByronStart + shiftDelta))
+
+  # Only byron-genesis.json is rewritten: the consensus wall clock
+  # (SystemStart) is anchored on its startTime, and the byron era contains no
+  # blocks so its hash is unconstrained. The shelley genesis MUST stay
+  # byte-identical — its file hash seeds the initial Praos nonce, and any
+  # change invalidates the VRF proofs of every archived block
+  # (VRFKeyBadProof at the first volatile block).
+  cp -r "$BOOTSTRAP_DIR/genesis" "$WORKING_DIR/genesis"
+  chmod u+w -R "${WORKING_DIR}/genesis"
+
+  jq --argjson time "$newByronStart" '.startTime = $time' \
+    "$BOOTSTRAP_DIR/genesis/byron-genesis.json" >"$WORKING_DIR/genesis/byron-genesis.json"
+
+  echo "Bootstrapping from archived run: $BOOTSTRAP_DIR"
+  echo "  Downtime shift: ${shiftDelta}s, new byron startTime: $(date -u -d "@$newByronStart" +"%Y-%m-%dT%H:%M:%SZ")"
+else
+  # Copy genesis files and set start time
+  cp -r "$CONFIG_DIR/genesis" "$WORKING_DIR/genesis"
+  chmod u+w -R "${WORKING_DIR}/genesis"
+
+  startTimeEpoch=$(date +%s)
+  startTimeIso=$(date -u -d "@$startTimeEpoch" +"%Y-%m-%dT%H:%M:%SZ")
+
+  jq --argjson time "$startTimeEpoch" '.startTime = $time' \
+    "$CONFIG_DIR/genesis/byron-genesis.json" >"$WORKING_DIR/genesis/byron-genesis.json"
+
+  jq --arg time "$startTimeIso" '.systemStart = $time' \
+    "$CONFIG_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json"
+fi
 
 # Set up each node
-nodes=(1 2 3)
 for i in "${nodes[@]}"; do
   NODE_NAME="node$i"
   NODE_DIR="$WORKING_DIR/$NODE_NAME"
@@ -171,8 +229,23 @@ for i in "${nodes[@]}"; do
   ln -s "../genesis/conway-genesis.json" "$NODE_DIR/"
   ln -s "../genesis/dijkstra-genesis.json" "$NODE_DIR/"
 
-  # Copy pool keys and set permissions
-  cp -r "$POOL_DIR" "$NODE_DIR/keys"
+  if [ -n "$BOOTSTRAP_FROM" ]; then
+    # Restore the chain db (incl. leios.db) from the archived run. A stale
+    # db/lock file is harmless (the lock is advisory flock, not the file's
+    # existence), and sqlite recovers a leftover leios.db WAL on first open.
+    echo "Restoring chain db from $BOOTSTRAP_DIR/$NODE_NAME/db (this can take a while for multi-GB dbs)"
+    cp -a "$BOOTSTRAP_DIR/$NODE_NAME/db" "$NODE_DIR/db"
+    chmod -R u+w "$NODE_DIR/db"
+  fi
+
+  # Copy pool keys and set permissions; an archived run carries the keys its
+  # chain was forged with, so take those when bootstrapping
+  if [ -n "$BOOTSTRAP_FROM" ]; then
+    cp -r "$BOOTSTRAP_DIR/$NODE_NAME/keys" "$NODE_DIR/keys"
+    chmod u+w -R "$NODE_DIR/keys"
+  else
+    cp -r "$POOL_DIR" "$NODE_DIR/keys"
+  fi
   chmod 400 "$NODE_DIR/keys"/*.skey
 done
 
