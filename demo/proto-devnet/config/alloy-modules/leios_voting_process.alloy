@@ -2,13 +2,19 @@
 //
 // Chained after cardano_node_process rather than fanned: votes are a sub-kind of
 // the node stream, not a separate service, so enriching inline keeps the single
-// write. Only kind=LeiosVoted|LeiosVoteAcquired are touched; every other line
-// passes straight through to forward_to untouched, still part of the one node
-// write, never dropped.
+// write. Only the vote-decision kinds are touched; every other line passes
+// straight through to forward_to untouched, still part of the one node write,
+// never dropped.
+//
+// The facet spans the whole decision, not just the cast vote: an EB's vote is
+// scheduled, its closure validated, and then either cast or declined. Labelling
+// all five keeps the voting dashboard on one service instead of reaching back
+// into service="cardano-node" for half its panels.
 //
 //   Input  : cardano_node_process output -- body = decoded data, kind label set.
 //   Output : same line; on vote lines the service is refined and voterId indexed.
-//   Labels : service=cardano-node/leios-voting, plus voterId on vote lines.
+//   Labels : service=cardano-node/leios-voting, plus voterId on cast/acquired
+//            lines only -- the other kinds carry no vote.voterId.
 //   Metrics: voted_weight_total, votes_acquired_total.
 //   Example input:
 //     {
@@ -31,14 +37,7 @@ declare "leios_voting_process" {
 
   loki.process "enrich" {
     stage.match {
-      selector = `{kind=~"LeiosVoted|LeiosVoteAcquired"}`
-
-      stage.json {
-        expressions = {
-          voterId = "vote.voterId",
-        }
-        drop_malformed = true
-      }
+      selector = `{kind=~"LeiosVoteScheduled|LeiosEbValidated|LeiosNotVoted|LeiosVoted|LeiosVoteAcquired"}`
 
       stage.static_labels {
         values = {
@@ -46,9 +45,23 @@ declare "leios_voting_process" {
         }
       }
 
-      stage.labels {
-        values = {
-          voterId = "voterId",
+      // Only the cast/acquired lines carry vote.voterId, so the parse and the
+      // label stay scoped to them: the label is bounded by committee size, and
+      // the kinds without a voter never see a stage built for one.
+      stage.match {
+        selector = `{kind=~"LeiosVoted|LeiosVoteAcquired"}`
+
+        stage.json {
+          expressions = {
+            voterId = "vote.voterId",
+          }
+          drop_malformed = true
+        }
+
+        stage.labels {
+          values = {
+            voterId = "voterId",
+          }
         }
       }
 

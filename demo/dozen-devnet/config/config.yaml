@@ -164,6 +164,8 @@ TraceOptions:
     severity: Debug
   LedgerMetrics:
     severity: Info
+  LeiosMetrics:
+    severity: Info
   # The whole mempool add path is traced here, on purpose: a stalled add shows
   # up as an AttemptAdd with no matching AddedTx, and a LedgerNotFound storm
   # tells us the mempool is failing to acquire the ledger state it wants rather

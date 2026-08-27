@@ -371,7 +371,7 @@
       ],
       "title": "Submission vs. ingest",
       "type": "timeseries",
-      "description": "What is being offered against what each node can actually take from its peers. A node keeping up sits on the submitted line; one that cannot sits below it, and the gap is the diffusion shortfall. The node the generators target reads zero here — it ingests over node-to-client, which does not go through tx-submission at all; watch its mempool one panel to the left. Ingest is a transaction count scaled by the mean on-wire size measured from the firehose, so it needs a firehose running to render."
+      "description": "What is being offered against what each node can actually take from its peers. A node keeping up sits on the submitted line; one that cannot sits below it, and the gap is the diffusion shortfall. The node the generators target reads zero here \u2014 it ingests over node-to-client, which does not go through tx-submission at all; watch its mempool one panel to the left. Ingest is a transaction count scaled by the mean on-wire size measured from the firehose, so it needs a firehose running to render."
     },
     {
       "datasource": {
@@ -842,23 +842,24 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
+        "type": "loki",
+        "uid": "loki"
       },
+      "description": "Cache hit rate when the voting thread validates an EB's closure to decide whether to vote for it -- not the apply path that runs when a certified EB's closure is applied to the chain. Of the txs in the closure, the share the LeiosTxCache spared full validation: reapplied means the cache had already validated the tx, so only the state-dependent checks re-ran; applied means it was validated from scratch. Plotted as reapplied / (reapplied + applied).\n\nThe ratio is computed per validation, in label_format, then averaged over the Rate / avg window -- so every validation in the window contributes equally, rather than one being picked out of it. Narrow the window to see individual validations; widen it to see the trend. 0 and 1 are common and real: a closure is often entirely cached or entirely fresh.\n\nPer node, since nodes do not see the same announcement at the same time and a fleet aggregate would average over different EB sets. Narrow with the instance variable, or click a legend entry to isolate a node.\n\nA high hit rate does not imply cheap validation -- reapplyTx runs per tx either way, so validation cost tracks closure size, not this ratio. This is also the work that sits inside the vote window, so it is the cost that can make a vote too late.\n\nGaps are windows in which that node validated nothing.",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "palette-classic"
           },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "",
+            "axisLabel": "cache hit rate",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
+            "drawStyle": "points",
             "fillOpacity": 0,
             "gradientMode": "none",
             "hideFrom": {
@@ -868,12 +869,12 @@
             },
             "insertNulls": false,
             "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
+            "lineWidth": 0,
+            "pointSize": 6,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "always",
             "showValues": false,
             "spanNulls": false,
             "stacking": {
@@ -885,6 +886,9 @@
             }
           },
           "mappings": [],
+          "max": 1,
+          "min": 0,
+          "unit": "percentunit",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -893,8 +897,7 @@
                 "value": 0
               }
             ]
-          },
-          "unit": "cps"
+          }
         },
         "overrides": []
       },
@@ -908,45 +911,36 @@
       "options": {
         "legend": {
           "calcs": [
-            "max",
-            "mean"
+            "mean",
+            "last"
           ],
-          "displayMode": "list",
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
           "hideZeros": false,
           "mode": "multi",
-          "sort": "none"
+          "sort": "desc"
         }
       },
       "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
+            "type": "loki",
+            "uid": "loki"
           },
+          "direction": "backward",
           "editorMode": "code",
-          "expr": "sum by (service) (rate(leios_logmetrics_txgen_submitted_total{environment=\"leios\"}[2m]))",
-          "legendFormat": "accepted {{service}}",
+          "expr": "avg_over_time({service=\"cardano-node/leios-voting\", instance=~\"$instance\", kind=\"LeiosEbValidated\"} | json | label_format hit=`{{ divf .reapplied (addf .reapplied .applied) }}` | unwrap hit [${window}s]) by (instance)",
+          "legendFormat": "{{instance}}",
+          "queryType": "range",
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "editorMode": "code",
-          "expr": "sum(rate(leios_logmetrics_txgen_rejected_total{environment=\"leios\"}[2m]))",
-          "legendFormat": "rejected",
-          "refId": "B"
         }
       ],
-      "title": "Submitted tx/s",
-      "type": "timeseries",
-      "description": "Submitted tx rate: accepted per generator plus rejected, from the alloy txgen_* counters. Generator-agnostic (works for firehose and centrifuge)."
+      "title": "Cache hit rate for voting EB validation, per node",
+      "type": "timeseries"
     }
   ],
   "preload": false,
@@ -960,9 +954,9 @@
           "text": "30s",
           "value": "30"
         },
-        "description": "Averaging window (seconds) for the submission rates and the mempool deriv",
+        "description": "Window (seconds) for the submission and throughput rates, and for averaging the voting EB validation cache hit rate.",
         "includeAll": false,
-        "label": "Rate window",
+        "label": "Rate / avg window",
         "multi": false,
         "name": "window",
         "options": [
