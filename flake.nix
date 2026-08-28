@@ -54,7 +54,10 @@
     # Patched cardano-node — source of cardano-node, cardano-cli, and
     # tx-firehose across the repo. The tx-firehose bench/ package now
     # lives on top of leios-prototype so a single input suffices.
-    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
+    # This branch is leios-prototype plus cardano-node-eb<n>x package variants
+    # whose Leios EB Plutus budget is <n> times the RB budget; the plain
+    # cardano-node/cardano-cli packages behave exactly as on leios-prototype.
+    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=perturbing/leios-eb-exunits-factor";
   };
 
   outputs =

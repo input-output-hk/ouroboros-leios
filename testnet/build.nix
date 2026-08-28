@@ -17,8 +17,10 @@
         ];
         packages = [
           # Patched cardano-node with the Leios-prototype consensus +
-          # ledger pinned via the cardano-node-leios flake input.
-          inputs'.cardano-node-leios.packages.cardano-node
+          # ledger pinned via the cardano-node-leios flake input. The eb4x
+          # variant gives EBs 4x the RB Plutus (ExUnits) budget; switch to
+          # cardano-node (1x), -eb2x or -eb8x to benchmark other factors.
+          inputs'.cardano-node-leios.packages.cardano-node-eb4x
           # CLI to query the local node socket (e.g. tip catchup checks).
           inputs'.cardano-node-leios.packages.cardano-cli
           pkgs.process-compose
