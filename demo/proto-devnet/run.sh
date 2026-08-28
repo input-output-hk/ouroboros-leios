@@ -9,6 +9,12 @@ set -eo pipefail
 set -a
 : "${WORKING_DIR:=$(pwd)/tmp-devnet}"
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+# Reuse an existing WORKING_DIR instead of wiping it, keeping every node's
+# databases so the cluster continues the chain it was on. Genesis is left exactly
+# as it was -- moving systemStart would invalidate all persisted data -- while
+# configs, topology, compose files and observability are regenerated, so config
+# edits still take effect. Best effort: see the preflight warnings below.
+: "${RESUME:=0}"
 : "${PORT_NODE1:=3001}"
 : "${PORT_NODE2:=3002}"
 : "${PORT_NODE3:=3003}"
@@ -91,17 +97,52 @@ fi
 
 # Check if WORKING_DIR already exists
 if [ -d "$WORKING_DIR" ]; then
-  echo "Working directory already exists: $WORKING_DIR"
-  read -r -rp "Remove and re-initialize? (Y/n): " response
-  if [[ "$response" =~ ^[Yy]$ || -z "$response" ]]; then
-    chmod a+w -R "$WORKING_DIR"
-    rm -rf "$WORKING_DIR"
+  if [ "$RESUME" = "1" ]; then
+    echo "RESUME=1: keeping $WORKING_DIR"
   else
-    echo "Aborting."
-    exit 0
+    # Never destructive from a prompt: a mistyped answer would throw away a
+    # run that may have taken hours to reach the state being investigated.
+    echo "Working directory already exists: $WORKING_DIR"
+    read -r -rp "Resume from persisted data? (Y/n): " response
+    if [[ "$response" =~ ^[Yy]$ || -z "$response" ]]; then
+      RESUME=1
+    else
+      echo "Aborting. To start fresh, remove the working directory first:"
+      echo "  chmod a+w -R \"$WORKING_DIR\" && rm -rf \"$WORKING_DIR\""
+      exit 0
+    fi
   fi
+elif [ "$RESUME" = "1" ]; then
+  echo "RESUME=1 but $WORKING_DIR does not exist; initializing from scratch."
+  RESUME=0
 fi
-echo "Initializing proto-devnet in $WORKING_DIR"
+
+if [ "$RESUME" = "1" ]; then
+  # Genesis is the anchor: every persisted chain is only valid against the
+  # systemStart it was produced under, so this is the one thing a resume must
+  # not touch.
+  if [ ! -f "$WORKING_DIR/genesis/shelley-genesis.json" ]; then
+    echo "Error: RESUME=1 but $WORKING_DIR/genesis is missing -- cannot resume." >&2
+    exit 1
+  fi
+  resume_start=$(jq -r '.systemStart' "$WORKING_DIR/genesis/shelley-genesis.json")
+  echo "Resuming proto-devnet in $WORKING_DIR (systemStart $resume_start, preserved)"
+  # The Leios database has no schema migration, so a node built after a schema
+  # change cannot open one written before it. Cheap detection: the CREATE
+  # statements are stored as text in the file.
+  for db in "$WORKING_DIR"/*/db/leios.db; do
+    [ -e "$db" ] || continue
+    if ! grep -qa "ebsMissingTxs" "$db"; then
+      echo "Warning: $db predates the ebsMissingTxs schema; this node will" >&2
+      echo "         fail to start. Delete the node's db/ to let it resync." >&2
+    fi
+  done
+  # Chain state is far enough along that the firehose's own view of the UTxO may
+  # no longer match; if it wedges, that is the first thing to suspect.
+  echo "Note: resume is best effort -- tx-firehose state is not checkpointed."
+else
+  echo "Initializing proto-devnet in $WORKING_DIR"
+fi
 
 # Create working directory
 mkdir -p "$WORKING_DIR"
@@ -123,18 +164,21 @@ if [ "$TC" = "1" ]; then
 fi
 export TOOL_PATH IP_BIN
 
-# Copy genesis files and set start time
-cp -r "$CONFIG_DIR/genesis" "$WORKING_DIR/genesis"
-chmod u+w -R "${WORKING_DIR}/genesis"
+# Copy genesis files and set start time. Skipped on resume: a new systemStart
+# would orphan every persisted chain.
+if [ "$RESUME" != "1" ]; then
+  cp -r "$CONFIG_DIR/genesis" "$WORKING_DIR/genesis"
+  chmod u+w -R "${WORKING_DIR}/genesis"
 
-startTimeEpoch=$(date +%s)
-startTimeIso=$(date -u -d "@$startTimeEpoch" +"%Y-%m-%dT%H:%M:%SZ")
+  startTimeEpoch=$(date +%s)
+  startTimeIso=$(date -u -d "@$startTimeEpoch" +"%Y-%m-%dT%H:%M:%SZ")
 
-jq --argjson time "$startTimeEpoch" '.startTime = $time' \
-  "$CONFIG_DIR/genesis/byron-genesis.json" >"$WORKING_DIR/genesis/byron-genesis.json"
+  jq --argjson time "$startTimeEpoch" '.startTime = $time' \
+    "$CONFIG_DIR/genesis/byron-genesis.json" >"$WORKING_DIR/genesis/byron-genesis.json"
 
-jq --arg time "$startTimeIso" '.systemStart = $time' \
-  "$CONFIG_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json"
+  jq --arg time "$startTimeIso" '.systemStart = $time' \
+    "$CONFIG_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json"
+fi
 
 # Set up each node
 nodes=(1 2 3)
@@ -174,15 +218,18 @@ for i in "${nodes[@]}"; do
     "$CONFIG_DIR/topology.template.json" >"$NODE_DIR/topology.json"
 
   # Symlink genesis files (shared, read-only)
-  ln -s "../genesis/byron-genesis.json" "$NODE_DIR/"
-  ln -s "../genesis/shelley-genesis.json" "$NODE_DIR/"
-  ln -s "../genesis/alonzo-genesis.json" "$NODE_DIR/"
-  ln -s "../genesis/conway-genesis.json" "$NODE_DIR/"
-  ln -s "../genesis/dijkstra-genesis.json" "$NODE_DIR/"
+  ln -sf "../genesis/byron-genesis.json" "$NODE_DIR/"
+  ln -sf "../genesis/shelley-genesis.json" "$NODE_DIR/"
+  ln -sf "../genesis/alonzo-genesis.json" "$NODE_DIR/"
+  ln -sf "../genesis/conway-genesis.json" "$NODE_DIR/"
+  ln -sf "../genesis/dijkstra-genesis.json" "$NODE_DIR/"
 
-  # Copy pool keys and set permissions
-  cp -r "$POOL_DIR" "$NODE_DIR/keys"
-  chmod 400 "$NODE_DIR/keys"/*.skey
+  # Copy pool keys and set permissions. Not re-copied on resume: 'cp -r' onto
+  # an existing keys/ would nest it, and the keys are identical anyway.
+  if [ ! -d "$NODE_DIR/keys" ]; then
+    cp -r "$POOL_DIR" "$NODE_DIR/keys"
+    chmod 400 "$NODE_DIR/keys"/*.skey
+  fi
 done
 
 # tx-firehose reads its delegator payment/staking .skey files directly from
@@ -200,6 +247,7 @@ cp "${CONFIG_DIR}/alloy-modules/"*.alloy "${WORKING_DIR}/alloy-modules/"
 
 echo "Starting proto-devnet ..."
 echo "  Topology: ${TOPOLOGY}"
+echo "  Resume: RESUME=${RESUME}"
 # Traffic control integration
 TC_COMPOSE=()
 if [ "$TC" = "1" ]; then
