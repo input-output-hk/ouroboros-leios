@@ -207,12 +207,21 @@ gen_nodes_compose() {
 			echo "    log_location: \"${WORKING_DIR}/${name}/node.log\""
 			# The host reaches every node through the bridge, so the probe works in
 			# both the namespaced and the loopback case.
+			#
+			# The probe exists only so the firehoses can gate on
+			# 'condition: process_healthy'; it must never be what stops a node. A
+			# node does not listen until it has replayed, and at 60 failures the
+			# window was 5 + 60*2 = 125s -- which killed all twelve at 123s the
+			# first time a resumed cluster replayed a ten-hour chain, a ~15 minute
+			# job. The threshold is now three hours: long enough that a node
+			# replaying is never preempted, at the cost of a genuinely dead node
+			# leaving its firehose waiting instead of failing it.
 			echo "    readiness_probe:"
 			echo "      exec:"
 			echo "        command: \"bash -c ': </dev/tcp/${ip}/${PORT}'\""
 			echo "      initial_delay_seconds: 5"
 			echo "      period_seconds: 2"
-			echo "      failure_threshold: 60"
+			echo "      failure_threshold: 5400"
 			if [ "$tc" = "1" ]; then
 				echo "    depends_on:"
 				echo "      InitNamespaces:"
