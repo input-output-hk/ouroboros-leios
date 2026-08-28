@@ -54,7 +54,7 @@
     # Patched cardano-node — source of cardano-node, cardano-cli, and
     # tx-firehose across the repo. The tx-firehose bench/ package now
     # lives on top of leios-prototype so a single input suffices.
-    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
+    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=ch1bo/firehose-color";
   };
 
   outputs =

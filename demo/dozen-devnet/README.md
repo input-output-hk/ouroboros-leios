@@ -7,19 +7,12 @@ same genesis, same x-ray observability, different topology.
 ## Topology
 
 Three block producers, each with three private relays, and the nine relays
-fully meshed among themselves:
+fully meshed among themselves.
 
-```
-bp1 ── relay11 ─┐
-   ├─ relay12 ──┤
-   └─ relay13 ──┤
-bp2 ── relay21 ─┤
-   ├─ relay22 ──┼── full mesh across all nine relays
-   └─ relay23 ──┤
-bp3 ── relay31 ─┤
-   ├─ relay32 ──┤
-   └─ relay33 ──┘
-```
+![Demo diagram](./demo-dozen-devnet.excalidraw.svg)
+
+> [!TIP]
+> This is an excalidraw SVG with embedded scene so it can be loaded and edited in [https://excalidraw.com/].
 
 Why this shape:
 
@@ -82,10 +75,57 @@ Environment variables, see `run.sh` for the full list:
 | `NODE_RTS`          | (empty)              | extra per-node RTS flags, e.g. `-N4` on a big host   |
 | `WORKING_DIR`       | `$(pwd)/tmp-devnet`  | where the devnet is initialized                     |
 | `SHARED_CONFIG_DIR` | `../proto-devnet/config` | genesis, pool keys, delegators, dashboards      |
+| `COLOR1..3`         | red, blue, amber     | colour each generator tags its transactions with    |
 
 ``` shell
 TPS=1000 RATE=100Mbps DELAY=50ms ./run.sh
 ```
+
+## Mempool colouring
+
+Each generator tags its transactions with a colour (`tx-firehose --color`), and
+one `mempool-monitor` per node reports which colours that node is holding. One
+observer per node is the point: fragmentation is a statement about how mempools
+*differ*, so an aggregate would hide it.
+
+A node's `--own-color` is its own block producer's generator: `bp2` and
+`relay21..relay23` all count `COLOR2` as local. So the local share answers "how
+much of this mempool is my group's own load", which is the quantity that should
+fall with distance from an injection point.
+
+### Watching all twelve
+
+``` shell
+./mempool-panes.sh
+```
+
+A tiled tmux session, one pane per node, on demand and separate from the devnet.
+process-compose cannot tile — its TUI shows one pane at a time — so the panes
+have to live somewhere else.
+
+Twelve panes always tile as 4 rows x 3 columns — tmux grows rows and columns
+alternately until they cover the pane count, so it does not depend on terminal
+size — and the node order is set to make **each column one group**, its producer
+on top and its three relays below:
+
+```
+bp1      bp2      bp3
+relay11  relay21  relay31
+relay12  relay22  relay32
+relay13  relay23  relay33
+```
+
+Fragmentation then reads down a column (does this group's own colour dominate its
+own relays) and across a row (has it leaked to the others). Each pane wants
+roughly 50x10, so a wide terminal, or trim `NODES`.
+
+Knobs: `NODES`, `MEMPOOL_MONITOR`, `MONITOR_INTERVAL`, `COLOR1..3`, `TSV`,
+`SESSION`. Each pane also appends to `mempool-<node>.tsv` unless `TSV=0`, so a
+run is reviewable afterwards and not only while watched.
+
+The observers are not free: a drain is a round trip per transaction, cheap per
+round but not nothing. Running with and without them is how to find out what they
+cost, which at these depths deserves checking rather than assuming.
 
 ## Traffic control
 

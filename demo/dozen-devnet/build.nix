@@ -28,6 +28,8 @@
           inputs'.cardano-node-leios.packages.cardano-node
           inputs'.cardano-node-leios.packages.cardano-cli
           inputs'.cardano-node-leios.packages.tx-firehose
+          # Its observer: reads a mempool over N2C, reports whose load it holds.
+          inputs'.cardano-node-leios.packages.mempool-monitor
         ];
         # To easily interact with the relay that takes the load from within the
         # demo dir
