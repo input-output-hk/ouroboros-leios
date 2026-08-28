@@ -170,6 +170,20 @@ leiosActiveThenSilentLeader =
     <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4, CMempoolRange 200 200]
     <> ticks 5 9
 
+-- | An EB announced in slot 4 of a ten-slot epoch: its window opens at 7 and its
+--   deadline is 11, past the boundary. The vote is withheld throughout.
+--
+--   This is what makes the carry width a checked quantity rather than an asserted
+--   one. Only a carry reaching back to slot 4 puts the announcement in the second
+--   segment's prefix at all; with the previous 4-slot width that segment starts at 6,
+--   the announcement is invisible, no head is established, and the missed vote goes
+--   unreported — silently, with every other test still green.
+lateDeadlineStraddling :: [ChainEvent]
+lateDeadlineStraddling =
+  ticks 0 3
+    <> [CSlot 4, CAnnouncementAccepted "eb" 4, CEBAcquired "eb" 4]
+    <> ticks 5 13
+
 -- | The node logs no leadership check for slot 4. The spec advances one slot at a
 --   time, so verification cannot cross the gap; it must restart after it rather than
 --   reject the jump. Observed on a devnet at 30 TX/s as a single missing tick, which
@@ -293,6 +307,9 @@ chainSegments = do
       -- overlap is negligible.
       ps <- collect straddlingVoted
       segmentStarts ps `shouldBe` [0, 2]
+    it "sees an obligation whose deadline falls well past the boundary" $ do
+      ps <- collect lateDeadlineStraddling
+      violations ps `shouldNotBe` []
     it "accepts a straddling vote that was cast" $ do
       ps <- collect straddlingVoted
       violations ps `shouldBe` []
