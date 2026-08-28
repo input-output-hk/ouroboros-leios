@@ -131,14 +131,23 @@ TraceOptions:
     severity: Silence
   # One trace per UTxO read. Together these were over 40% of all log lines and
   # ~250 MB per node in twelve minutes, which makes the tracer itself a
-  # suspect in the very stalls we are measuring. The handle
-  # Create/Duplicate/Close traces are kept — they are low volume and are what
-  # shows forker churn.
+  # suspect in the very stalls we are measuring.
   ChainDB.LedgerEvent.Flavor.V2.LedgerTablesHandleRead:
     severity: Silence
   ChainDB.LedgerEvent.Flavor.V2.BackendTrace.LSM.LSMLookup:
     severity: Silence
   ChainDB.LedgerEvent.Flavor.V2.BackendTrace.LSM.LSMTrace:
+    severity: Silence
+  # These three fire per block, not per session as the volume above suggested
+  # when the handle traces were first kept for forker churn: during a replay they
+  # were 948 of 1128 log lines, 84% of the file. The one-shot
+  # LedgerTablesHandleCreateFirst and LSMOpenSession stay, and still show a
+  # backend opening.
+  ChainDB.LedgerEvent.Flavor.V2.LedgerTablesHandleCreate:
+    severity: Silence
+  ChainDB.LedgerEvent.Flavor.V2.LedgerTablesHandleDuplicate:
+    severity: Silence
+  ChainDB.LedgerEvent.Flavor.V2.BackendTrace.LSM.LSMUpdate:
     severity: Silence
   ChainDB.LedgerEvent.Forker:
     severity: Silence
