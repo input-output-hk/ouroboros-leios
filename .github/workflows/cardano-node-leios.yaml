@@ -91,11 +91,11 @@ jobs:
 
       # ----------------------------------------------------------------
       # x86_64-linux release tarball — `cardano-node-release` already
-      # strips upstream's cardano-node-linux to just cardano-node and
-      # cardano-cli and drops bundled configs (see nix/release.nix), so
-      # CI just publishes whatever nix produced. Building this also
-      # realises cardano-node-static / cardano-cli-static in the store,
-      # so the docker image below reuses those exact paths without
+      # strips upstream's cardano-node-linux to cardano-node, cardano-cli,
+      # tx-firehose and mempool-monitor, and drops bundled configs (see
+      # nix/release.nix), so CI just publishes what nix produced. Building
+      # this also realises cardano-node-static / cardano-cli-static in the
+      # store, so the docker image below reuses those exact paths without
       # rebuilding.
       # ----------------------------------------------------------------
       - name: Build x86_64-linux release tarball

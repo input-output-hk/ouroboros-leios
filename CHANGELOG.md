@@ -5,6 +5,50 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w35 - 2026-08-30
+
+Completes the Leios protocol pipeline with faster and more robust EB diffusion, transactions validated before an EB is voted for, and a Leios database that no longer stalls the node. Syncing should also get stuck far less. Plus tooling to see whose load a mempool is holding.
+
+> [!IMPORTANT]
+>
+> **Requires a state wipe:** the LeiosDb schema changed with no migration, so an existing `leios.db` is not readable by this version. Delete your local state and re-sync from genesis, or sideload from the IOG relays.
+
+> [!NOTE]
+>
+> No serialization or wire-format change, so this is not a network respin — w34 peers stay interoperable and only the local database has to go.
+
+- A syncing node no longer disconnects every peer that announces an EB it cannot date [consensus#2252](https://github.com/IntersectMBO/ouroboros-consensus/pull/2252), should fix [#998](https://github.com/input-output-hk/ouroboros-leios/issues/998)
+  - A node far behind the tip cannot place the current slot on a wall clock, and that counted against the peer, so ChainSync ran out of peers and the chain froze until a restart. Now ignored instead, and dated against the volatile tip so nearly all announcements stay usable.
+  - `TraceLeiosAnnouncementPastHorizon` reports the few that do not.
+
+- EB transactions are validated before a vote is cast for it [consensus#2235](https://github.com/IntersectMBO/ouroboros-consensus/pull/2235), closes [#1016](https://github.com/input-output-hk/ouroboros-leios/issues/1016)
+  - `TraceLeiosEbValidated` and `TraceLeiosVoteScheduled` report what it costs and how much of the window is left. Worth watching: validation is inline in the voting loop, so it eats into `L_vote`.
+  - The `L_hdr` / `L_vote` gates are now wall-clock offsets from the announcing slot rather than slot counts.
+
+- EBs are fetched more aggressively and prioritized by their certification window [consensus#2237](https://github.com/IntersectMBO/ouroboros-consensus/pull/2237), backed by a new in-memory `TxCache` [consensus#2188](https://github.com/IntersectMBO/ouroboros-consensus/pull/2188)
+  - For dashboards: new `TraceLeiosFetchDecision` and `TraceLeiosBodyHits`, a `FetchArrivalBytes` classification of what each arrival was worth, and arrival ages on `TraceLeiosBlockAcquired` / `TraceLeiosBlockTxsAcquired`.
+
+- Leios database no longer stalls the node, and its write-ahead log stays bounded [consensus#2245](https://github.com/IntersectMBO/ouroboros-consensus/pull/2245)
+  - EB body inserts were taking seconds — a median of 1.6s, up to 18s — for 90ms of actual work, and a node could die outright under lock contention, taking certification down with it for the rest of the run. Both fixed, and the write-ahead log a run writes shrank by more than an order of magnitude.
+  - New traces: `TraceLeiosDbBusyRetry`, and `TraceLeiosDbBusyStuck` at Critical severity when the database has made no progress for about half a minute.
+
+- Tools for color-coded transaction generation and mempool monitoring
+  [cardano-node#6660](https://github.com/IntersectMBO/cardano-node/pull/6660),
+  and [#1022](https://github.com/input-output-hk/ouroboros-leios/issues/1022)
+  - Use `tx-firehose --color ff0000`, or `--color auto` to derive one from the signing key, tags every transaction with an RGB colour in metadata label 1022.
+  - A new `mempool-monitor` walks one node's mempool over the node-to-client `LocalTxMonitor` protocol and reports which colours it holds — `--own-color` for the local share, `--tsv FILE` to keep the rows.
+  - Both ship in the release archive alongside `cardano-node` and `cardano-cli`, on linux and macOS.
+
+- EB announcement CDFs are only populated once the node is in sync [cardano-node#6665](https://github.com/IntersectMBO/cardano-node/pull/6665), so a syncing node no longer poisons the metric with its backlog.
+
+- `cardano-cli node issue-pop-BLS` is removed. A Dijkstra `stake-pool registration-certificate` takes `--bls-signing-key-file` and derives the verification key and proof of possession from it, so the standalone proof file had no consumer.
+
+- The workaround that repaired mishapen Dijkstra blocks on arrival is gone, now that the network has been respun past the blocks that needed it.
+
+> [!TIP]
+>
+> Stake pool operators: the `tx-firehose` and `mempool-monitor` is what the upcoming mempool-fragmentation experiment runs on — colour your own txs, point the monitor at your own node and see how it mixes (or not). Worth trying before the experiment starts.
+
 ## prototype-2026w34 - 2026-08-23
 
 Removed congestion on the mempool and on the voting logic. Plus a few tooling updates on `db-analyser` and `tx-firehose`.
