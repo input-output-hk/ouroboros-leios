@@ -96,7 +96,7 @@
               # can't silently drop each other.
               #
               # Both upstream tarballs have bin/ + share/ at the root and
-              # ship the full releaseBins set; we strip down to the two
+              # ship the full releaseBins set; we strip down to the
               # binaries we care about, drop share/, re-tar.
               cardano-node-release =
                 let
@@ -116,13 +116,16 @@
                   tar -xzf ${upstream}/*.tar.gz -C work
 
                   rm -rf work/share
-                  # Keep the two binaries and every *.dylib — on macOS the
-                  # dylibs live next to the executables (referenced as
-                  # @executable_path/libfoo) and are shared across release
-                  # bins, so we keep them all rather than computing the
-                  # exact closure. On linux this matches nothing.
+                  # The node and CLI to run a pool, plus tx-firehose and its
+                  # mempool-monitor observer for the fragmentation experiment.
+                  # Keep every *.dylib too — on macOS the dylibs live next to
+                  # the executables (referenced as @executable_path/libfoo) and
+                  # are shared across release bins, so we keep them all rather
+                  # than computing the exact closure. On linux this matches
+                  # nothing.
                   find work/bin -mindepth 1 -maxdepth 1 \
                     ! -name cardano-node ! -name cardano-cli \
+                    ! -name tx-firehose ! -name mempool-monitor \
                     ! -name '*.dylib' \
                     -exec rm {} +
 
