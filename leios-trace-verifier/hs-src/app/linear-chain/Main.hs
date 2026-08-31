@@ -258,6 +258,7 @@ data LeadershipOpts = LeadershipOpts
   , loVrfSkeyFile :: FilePath
   , loWhich :: WhichEpoch
   }
+
 --
 -- A missing schedule is not fatal: eligibility falls back to the node's own
 -- leadership record in the log, so every epoch is still verified. It is reported
@@ -391,36 +392,38 @@ queryChainOnce LeadershipOpts{..} = do
   case result of
     Left err -> die ("local state query failed: " <> show err)
     Right (eSlots, stakeDistr, nodeEpoch) ->
-      let -- Stake registered in epoch e becomes active in epoch e+2, so before
-          -- epoch 2 a pool that will have stake still reports as having none. The
-          -- error cannot tell the two apart, so the epoch decides which reading is
-          -- safe.
-          stakeCanHaveActivated = toInteger (Api.unEpochNo nodeEpoch) >= 2
-          mSlots = case eSlots of
-            -- From epoch 2 on, no active stake is a state rather than a fault: the
-            -- schedule is KNOWN empty, every production obligation is vacuous, and
-            -- an EB forge would be a genuine violation. Earlier than that the same
-            -- error means only "not snapshotted yet", so it is an unknown schedule
-            -- like any other leadership error and eligibility comes from the log —
-            -- otherwise a devnet pool forging on genesis stake in epoch 0 is
-            -- reported as violating EB-Role.
-            Left (Api.LeaderErrStakePoolHasNoStake _)
-              | stakeCanHaveActivated -> Just []
-            Left _ -> Nothing
-            Right slots -> Just (Prelude.map (toInteger . Api.unSlotNo) (Set.toList slots))
-          mErr = case eSlots of
-            Left lerr -> Just lerr
-            Right _ -> Nothing
-       in pure
-            ( buildChainData
-                loStakePoolId
-                epochLength
-                maxRBBody
-                (toInteger (Api.unEpochNo nodeEpoch))
-                mSlots
-                stakeDistr
-            , mErr
-            )
+      let
+        -- Stake registered in epoch e becomes active in epoch e+2, so before
+        -- epoch 2 a pool that will have stake still reports as having none. The
+        -- error cannot tell the two apart, so the epoch decides which reading is
+        -- safe.
+        stakeCanHaveActivated = toInteger (Api.unEpochNo nodeEpoch) >= 2
+        mSlots = case eSlots of
+          -- From epoch 2 on, no active stake is a state rather than a fault: the
+          -- schedule is KNOWN empty, every production obligation is vacuous, and
+          -- an EB forge would be a genuine violation. Earlier than that the same
+          -- error means only "not snapshotted yet", so it is an unknown schedule
+          -- like any other leadership error and eligibility comes from the log —
+          -- otherwise a devnet pool forging on genesis stake in epoch 0 is
+          -- reported as violating EB-Role.
+          Left (Api.LeaderErrStakePoolHasNoStake _)
+            | stakeCanHaveActivated -> Just []
+          Left _ -> Nothing
+          Right slots -> Just (Prelude.map (toInteger . Api.unSlotNo) (Set.toList slots))
+        mErr = case eSlots of
+          Left lerr -> Just lerr
+          Right _ -> Nothing
+       in
+        pure
+          ( buildChainData
+              loStakePoolId
+              epochLength
+              maxRBBody
+              (toInteger (Api.unEpochNo nodeEpoch))
+              mSlots
+              stakeDistr
+          , mErr
+          )
 
 -- | Turn the on-chain stake distribution (pool-id → relative stake) into the
 --   verifier's view: parties are the pools in chain (Map) order, keyed
