@@ -184,6 +184,39 @@ lateDeadlineStraddling =
     <> [CSlot 4, CAnnouncementAccepted "eb" 4, CEBAcquired "eb" 4]
     <> ticks 5 13
 
+-- | A slot tick that repeats, then one that goes backwards — the shape concatenated
+--   or overlapping logs produce. Neither is a continuation nor a gap.
+nonMonotonicTicks :: [ChainEvent]
+nonMonotonicTicks =
+  ticks 0 4 <> [CSlot 4] <> ticks 5 6 <> [CSlot 3] <> ticks 7 9
+
+-- | Two votes in one slot, for two EBs both announced and acquired, both votable at
+--   slot 6 (windows 5..9 and 6..10). Only one can be adjudicated, so the surplus must
+--   be counted rather than vanish — and the one kept has to be the head, ebB. Keeping
+--   ebA instead drops ebB's vote and then demands it again at ebB's deadline, slot 10,
+--   reporting a violation for a vote the node did cast.
+twoVotesOneSlot :: [ChainEvent]
+twoVotesOneSlot =
+  ticks 0 1
+    <> [CSlot 2, CAnnouncementAccepted "ebA" 2, CEBAcquired "ebA" 2]
+    <> [CSlot 3, CAnnouncementAccepted "ebB" 3, CEBAcquired "ebB" 3]
+    <> [CSlot 4, CSlot 5]
+    <> [CSlot 6, CVoted "ebA" 2, CVoted "ebB" 3]
+    <> ticks 7 13
+
+-- | The same, with the votes in the other order. Together the two fixtures rule out
+--   any positional rule: keeping the first loses ebB's vote here's twin, keeping the
+--   last loses it in this one. Only picking the vote that names the head works for
+--   both, because only the head is votable.
+twoVotesOneSlotHeadFirst :: [ChainEvent]
+twoVotesOneSlotHeadFirst =
+  ticks 0 1
+    <> [CSlot 2, CAnnouncementAccepted "ebA" 2, CEBAcquired "ebA" 2]
+    <> [CSlot 3, CAnnouncementAccepted "ebB" 3, CEBAcquired "ebB" 3]
+    <> [CSlot 4, CSlot 5]
+    <> [CSlot 6, CVoted "ebB" 3, CVoted "ebA" 2]
+    <> ticks 7 13
+
 -- | The node logs no leadership check for slot 4. The spec advances one slot at a
 --   time, so verification cannot cross the gap; it must restart after it rather than
 --   reject the jump. Observed on a devnet at 30 TX/s as a single missing tick, which
@@ -249,6 +282,35 @@ chainSegments = do
       violations ps `shouldBe` []
     it "raises no obligation for a head superseded before its vote window opens" $ do
       ps <- collectWith 100 supersededBeforeVotable
+      violations ps `shouldBe` []
+
+  describe "ticks that do not advance" $ do
+    it "drops them rather than restarting a segment mid-epoch" $ do
+      -- Without an explicit case these matched neither the continuation guard
+      -- (s == l + 1) nor the gap condition (s > l + 1) and fell through to the
+      -- boundary path, silently starting a new segment inside the epoch.
+      ps <- collectWith 100 nonMonotonicTicks
+      segmentStarts ps `shouldBe` [0]
+    it "reports each one" $ do
+      ps <- collectWith 100 nonMonotonicTicks
+      [(l, s) | NonMonotonicSlot l s <- ps] `shouldBe` [(4, 4), (6, 3)]
+    it "raises no violation" $ do
+      ps <- collectWith 100 nonMonotonicTicks
+      violations ps `shouldBe` []
+
+  describe "more than one vote in a slot" $ do
+    it "counts the votes it cannot adjudicate" $ do
+      ps <- collectWith 100 twoVotesOneSlot
+      sum [n | SurplusVotesInSlot n <- ps] `shouldNotBe` 0
+    it "keeps the head's vote when it arrives second" $ do
+      ps <- collectWith 100 twoVotesOneSlot
+      violations ps `shouldBe` []
+    it "keeps the head's vote when it arrives first" $ do
+      -- With the previous fixture this excludes both positional rules. Whichever of
+      -- first-wins or last-wins is chosen, one of the two drops the head's vote and
+      -- the verifier then demands it again at that EB's deadline — a violation for a
+      -- vote the node cast.
+      ps <- collectWith 100 twoVotesOneSlotHeadFirst
       violations ps `shouldBe` []
 
   describe "a gap in the slot ticks" $ do

@@ -20,6 +20,7 @@ module LinearLeiosChain (
   carryAcross,
   segmentAuthoritative,
   gateSuppressesAnObligation,
+  surplusVotesPerSlot,
   verifySegment,
   runSegmented,
 ) where
@@ -98,6 +99,12 @@ data Progress
     --   CPU load has been observed causing it, so blaming the node would be
     --   circular. Verification restarts after the gap instead.
     SlotGap Integer Integer
+  | -- | Votes beyond the first within a single slot, summed over the prefix. Only
+    --   one vote per slot can be adjudicated, so these went unexamined.
+    SurplusVotesInSlot Int
+  | -- | A slot tick that did not advance: a duplicate or out-of-order leadership
+    --   check. Carries (last seen, the tick). Dropped rather than verified across.
+    NonMonotonicSlot Integer Integer
   | -- | Slots whose mempool range straddled the RB capacity, so whether an EB was
     --   owed could not be settled and the slot was excused. This count is the
     --   measure of what the rule's one-sidedness costs on a given run: small means
@@ -242,6 +249,16 @@ gateSuppressesAnObligation cap = any owed . slotGroups
   isRBForged (CRBForged _ _) = True
   isRBForged _ = False
 
+-- | How many votes beyond the first fall in the same slot, summed over the prefix.
+--   Only one vote per slot can be adjudicated (VT-Role upkeep is per slot), so any
+--   surplus goes unexamined; this counts it so the loss is visible rather than silent.
+surplusVotesPerSlot :: [ChainEvent] -> Int
+surplusVotesPerSlot = sum . map surplus . slotGroups
+ where
+  slotGroups [] = []
+  slotGroups (e : es) = let (g, rest) = break isCSlot es in (e : g) : slotGroups rest
+  surplus g = max 0 (length [() | CVoted _ _ <- g] - 1)
+
 -- | Verify one segment's prefix against the spec.
 verifySegment :: Timings -> Segment -> [ChainEvent] -> ([Text], (Text, Text))
 verifySegment ts seg prefix =
@@ -289,6 +306,16 @@ runSegmented report ts query = loop [] Nothing Nothing []
   loop tally mseg mlast seen (ev : rest) = do
     report (Saw ev)
     case ev of
+      -- A tick that does not advance — a duplicate, or out of order, as concatenated
+      -- or overlapping logs produce. It is neither a continuation nor a gap, and
+      -- without this it fell through to the boundary path and silently restarted a
+      -- segment mid-epoch. There is nothing to verify backwards, so drop it and say
+      -- so; the segment state is left exactly as it was.
+      CSlot s
+        | Just l <- mlast
+        , toInteger s <= l -> do
+            report (NonMonotonicSlot l (toInteger s))
+            loop tally mseg mlast seen rest
       CSlot s
         | Just seg <- mseg
         , toInteger s `div` cdEpochLength (segCD seg) == segEpoch seg
@@ -315,7 +342,8 @@ runSegmented report ts query = loop [] Nothing Nothing []
             -- lost, unavoidably: there is no record of the slot to verify against.
             let gapped = maybe False (\l -> toInteger s > l + 1) mlast
                 carry
-                  | gapped = Carry{carryEvents = [], carryStart = toInteger s, carrySpans = False}
+                  -- Carrying nothing is exactly 'carryAcross' over no events.
+                  | gapped = carryAcross overlap (toInteger s) []
                   | otherwise = carryAcross overlap (toInteger s) seen
             case mlast of
               Just l | gapped -> report (SlotGap l (toInteger s))
@@ -353,10 +381,22 @@ runSegmented report ts query = loop [] Nothing Nothing []
         cap = cdMaxRBBody (segCD seg)
     when
       ( led > 0
+          -- The gate only exists on the log-derived branch: where the queried
+          -- schedule governs, eligibility never consults 'leaderSlots' at all, so
+          -- nothing is being suppressed and saying so would be simply untrue.
+          && not (segAuthoritative seg)
           && not (any isLeiosActivity prefix)
           && gateSuppressesAnObligation cap prefix
       )
       $ report (LeiosInactive led)
+
+  -- A slot can hold more than one CVoted, but the spec records VT-Role upkeep once
+  -- per slot, so only one vote per slot can ever be adjudicated. The translator keeps
+  -- the first; this counts what that leaves unexamined. Purely syntactic over the
+  -- event stream — it mirrors no spec rule.
+  reportSurplusVotes prefix = do
+    let perSlot = surplusVotesPerSlot prefix
+    when (perSlot > 0) $ report (SurplusVotesInSlot perSlot)
 
   -- An EB is owed only when the mempool could not have fitted in the ranking block,
   -- and the reading is a range, so a range straddling the capacity leaves the
@@ -372,6 +412,7 @@ runSegmented report ts query = loop [] Nothing Nothing []
 
   checkSeg seg prefix = do
     reportIfLeiosInactive seg prefix
+    reportSurplusVotes prefix
     reportMempoolGaps seg prefix
     let (acts, (status, detail)) = verifySegment ts seg prefix
     if status == "ok"
@@ -381,6 +422,7 @@ runSegmented report ts query = loop [] Nothing Nothing []
   finishSeg Nothing _ = report NothingToVerify
   finishSeg (Just seg) prefix = do
     reportIfLeiosInactive seg prefix
+    reportSurplusVotes prefix
     reportMempoolGaps seg prefix
     let (acts, (status, detail)) = verifySegment ts seg prefix
     if status == "ok"

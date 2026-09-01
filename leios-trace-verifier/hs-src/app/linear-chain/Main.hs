@@ -104,6 +104,21 @@ render = \case
         <> show to
         <> ". The spec advances one slot at a time, so a slot with no record cannot "
         <> "be verified across; obligations straddling the gap are not checked."
+  SurplusVotesInSlot n ->
+    hPutStrLn stderr $
+      "note: "
+        <> show n
+        <> " vote(s) fell in a slot that already had one. Only one vote per slot can "
+        <> "be adjudicated, the spec recording VT-Role upkeep once per slot, so the "
+        <> "first is checked and these were not."
+  NonMonotonicSlot lastSeen s ->
+    hPutStrLn stderr $
+      "warning: leadership check for slot "
+        <> show s
+        <> " arrived after slot "
+        <> show lastSeen
+        <> " — a duplicate or out-of-order tick, as concatenated or overlapping logs "
+        <> "produce. Dropped: there is nothing to verify backwards."
   EBOwedUndecided n ->
     hPutStrLn stderr $
       "note: for "

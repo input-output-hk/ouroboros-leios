@@ -262,10 +262,20 @@ module LinearLeiosVerifierChain where
       --                     drops to 'none'. Merely forgetting the hash would stop
       --                     re-announcing but never reset the spec's 'currentRB',
       --                     leaving the window (wrongly) open.
+      --   retiring        : a vote landed in the very slot the chain superseded the
+      --                     EB, so 'annRB' presented the voted EB there instead of
+      --                     de-announcing, and the de-announcement owes one slot.
+      --                     It is emitted unconditionally on the next slot — a vote
+      --                     arriving then is for an EB the chain has already moved
+      --                     past and should fail. Without this state the deferral
+      --                     renewed itself for as long as votes kept arriving, so a
+      --                     superseded EB could stay head indefinitely, which is not
+      --                     what the one-slot deferral was meant to allow.
       data EBStatus : Type where
         none       : EBStatus
         announcing : String → ℕ → EBStatus
         superseded : EBStatus
+        retiring   : EBStatus
 
       -- Accumulator threaded through the chain events. Slot obligations are
       -- flushed when the next CSlot arrives (or at end of stream).
@@ -317,6 +327,15 @@ module LinearLeiosVerifierChain where
       hashOf a h = case EB-refs a ⁉ h of λ where
         (just eb) → hash eb
         nothing   → []
+
+      -- Whether this hash is the EB the chain head currently announces. Only that EB
+      -- is votable, so where a slot holds several votes this picks the one the spec
+      -- can actually discharge.
+      isCurrentHead : String → EBStatus → Bool
+      isCurrentHead h (announcing h' _) = case h ≟ h' of λ where
+        (yes _) → true
+        (no  _) → false
+      isCurrentHead _ _ = false
 
       wasAnnounced : String → List String → Bool
       wasAnnounced h []       = false
@@ -407,18 +426,24 @@ module LinearLeiosVerifierChain where
             -- been repeatedly corrected for. Votes genuinely outside the window are
             -- still caught, by VT-Role's timing premise.
             annRB : List Step
-            annRB = case votedEB a of λ where
-              (just (eb , _)) → announceStep (just (hash eb))
-              nothing         → case curEB a of λ where
-                -- No announcement to make: leave 'currentRB' as it stands.
-                none             → []
-                -- Re-assert the announcement so the window stays open this slot.
-                (announcing h _) → announceStep (just (hashOf a h))
-                -- The chain has extended past the announcer: overwrite 'currentRB'
-                -- with a non-announcing RB so 'getCurrentEBHash ≡ nothing',
-                -- 'voteDeadline ≡ 0', and the spec's own rules close the window
-                -- (abstention becomes licensed by Roles₂, no vote is forced).
-                superseded     → announceStep nothing
+            annRB = case curEB a of λ where
+              -- The deferred de-announcement falls due, and is emitted whatever else
+              -- happened this slot: a vote arriving now is for an EB the chain has
+              -- already moved past, and should fail rather than renew the deferral.
+              retiring → announceStep nothing
+              st       → case votedEB a of λ where
+                (just (eb , _)) → announceStep (just (hash eb))
+                nothing         → case st of λ where
+                  -- No announcement to make: leave 'currentRB' as it stands.
+                  none             → []
+                  -- Re-assert the announcement so the window stays open this slot.
+                  (announcing h _) → announceStep (just (hashOf a h))
+                  -- The chain has extended past the announcer: overwrite 'currentRB'
+                  -- with a non-announcing RB so 'getCurrentEBHash ≡ nothing',
+                  -- 'voteDeadline ≡ 0', and the spec's own rules close the window
+                  -- (abstention becomes licensed by Roles₂, no vote is forced).
+                  superseded       → announceStep nothing
+                  retiring         → announceStep nothing
             ebRole : List Step
             ebRole = case forgedEB a of λ where
               (just eb) → (EB-Role-Action s eb , inj₁ FFDT.SLOT) ∷ []
@@ -458,14 +483,19 @@ module LinearLeiosVerifierChain where
                 --
                 -- Unless a vote was cast in this slot: 'annRB' presented the voted EB
                 -- instead of de-announcing, so the de-announcement has not happened
-                -- yet and 'superseded' must survive into the next slot to fire there.
-                -- Dropping to 'none' here would retire the status without ever
-                -- resetting 'currentRB', leaving the window open — the very failure
-                -- the three-state status was introduced to avoid.
+                -- yet and must fire on the next slot. Dropping to 'none' here would
+                -- retire the status without ever resetting 'currentRB', leaving the
+                -- window open — the failure the status was introduced to avoid.
+                --
+                -- It becomes 'retiring' rather than staying 'superseded', so the
+                -- deferral is spent: 'retiring' de-announces unconditionally. Staying
+                -- 'superseded' let a vote in each following slot renew the deferral,
+                -- and a superseded EB could then remain head indefinitely.
                 nextEB = case curEB a of λ where
                   superseded → case votedEB a of λ where
-                    (just _) → superseded
+                    (just _) → retiring
                     nothing  → none
+                  retiring   → none
                   st         → st
             in (record a
                   { curSlot = primWord64ToNat s
@@ -497,9 +527,24 @@ module LinearLeiosVerifierChain where
       -- Deliberately does not touch 'curEB': letting a vote establish its own
       -- precondition would make VT-Role self-justifying, hiding a node that voted for
       -- an EB its chain never announced.
+      -- 'closeSlot' emits at most one VT-Role per slot, the spec recording VT-Role
+      -- upkeep once per slot, so where a slot holds several votes only one can be
+      -- adjudicated. Which one is not arbitrary: only the chain's current head is
+      -- votable, so the vote naming the head is the one the spec can discharge, and
+      -- the others are unrepresentable whatever we do. The driver counts them.
+      --
+      -- Keeping simply the first is actively wrong. With EB A announced at 2 and B at
+      -- 3, both votable at 6, holding A leaves B's vote dropped — and at B's deadline
+      -- the verifier then demands a vote the node had in fact cast, turning a silent
+      -- loss into a false violation.
       traceEvent→action a (CVoted h s)
         with wasAnnounced h (announced a) | EB-refs a ⁉ h | EB-received a ⁉ h
-      ... | true | just eb | just slot' = (record a { votedEB = just (eb , slot') } , [])
+      ... | true | just eb | just slot' =
+              case votedEB a of λ where
+                nothing  → (record a { votedEB = just (eb , slot') } , [])
+                (just _) → if isCurrentHead h (curEB a)
+                             then (record a { votedEB = just (eb , slot') } , [])
+                             else (a , [])
       ... | _    | _       | _          = (a , [])
       traceEvent→action a (CVoteAcquired _ _) =
         (record a { FFD-blks = VT-Blk (tt ∷ []) ∷ FFD-blks a } , [])
