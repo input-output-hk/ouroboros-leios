@@ -20,7 +20,7 @@ in
   }
   # Trace verifier: separate haskell.nix project (see ./trace-verifier.nix).
   {
-    packages = repoRoot.nix.trace-verifier.packages;
+    inherit (repoRoot.nix.trace-verifier) packages;
     devShells.trace-verifier = repoRoot.nix.trace-verifier.devShell;
   }
 ]
