@@ -1,0 +1,356 @@
+# Dozen-devnet: three block producers, each with three private relays,
+# the nine relays fully meshed. Matches demo/dozen-devnet (run.sh).
+#
+# Node names are the process-compose process names, which is what the
+# Loki `process` label carries and how the visualiser keys nodes.
+#
+# Locations are mock European IXP cities, chosen so pairwise distance
+# implies an RTT near the uniform 20ms (DELAY=10ms each way) the devnet
+# actually applies with tc. Latency/bandwidth below are the real configured
+# values, not derived from the coordinates.
+nodes:
+  bp1:
+    # Dublin
+    stake: 30000000000000
+    location:
+      - 53.3498
+      - -6.2603
+    producers:
+      relay11:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay12:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay13:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+  relay11:
+    # London
+    location:
+      - 51.5074
+      - -0.1278
+    producers:
+      bp1:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay12:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay13:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay21:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay22:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay23:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay31:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay32:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay33:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+  relay12:
+    # Paris
+    location:
+      - 48.8566
+      - 2.3522
+    producers:
+      bp1:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay11:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay13:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay21:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay22:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay23:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay31:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay32:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay33:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+  relay13:
+    # Barcelona
+    location:
+      - 41.3874
+      - 2.1686
+    producers:
+      bp1:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay11:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay12:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay21:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay22:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay23:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay31:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay32:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay33:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+  bp2:
+    # Frankfurt
+    stake: 30000000000000
+    location:
+      - 50.1109
+      - 8.6821
+    producers:
+      relay21:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay22:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay23:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+  relay21:
+    # Amsterdam
+    location:
+      - 52.3676
+      - 4.9041
+    producers:
+      bp2:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay11:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay12:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay13:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay22:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay23:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay31:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay32:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay33:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+  relay22:
+    # Zurich
+    location:
+      - 47.3769
+      - 8.5417
+    producers:
+      bp2:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay11:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay12:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay13:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay21:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay23:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay31:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay32:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay33:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+  relay23:
+    # Rome
+    location:
+      - 41.9028
+      - 12.4964
+    producers:
+      bp2:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay11:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay12:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay13:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay21:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay22:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay31:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay32:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay33:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+  bp3:
+    # Warsaw
+    stake: 30000000000000
+    location:
+      - 52.2297
+      - 21.0122
+    producers:
+      relay31:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay32:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay33:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+  relay31:
+    # Stockholm
+    location:
+      - 59.3293
+      - 18.0686
+    producers:
+      bp3:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay11:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay12:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay13:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay21:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay22:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay23:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay32:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay33:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+  relay32:
+    # Vienna
+    location:
+      - 48.2082
+      - 16.3738
+    producers:
+      bp3:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay11:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay12:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay13:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay21:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay22:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay23:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay31:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay33:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+  relay33:
+    # Copenhagen
+    location:
+      - 55.6761
+      - 12.5683
+    producers:
+      bp3:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay11:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay12:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay13:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay21:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay22:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay23:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay31:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
+      relay32:
+        latency-ms: 10.0
+        bandwidth-bytes-per-second: 6250000
