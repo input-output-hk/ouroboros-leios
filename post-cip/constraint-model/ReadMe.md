@@ -1,5 +1,13 @@
 # Constraint model for Leios resource usage
 
+## Setup
+
+```bash
+nix develop
+pip install matplotlib networkx numpy ortools pulp pyyaml
+python3 main.py --help
+```
+
 ## Scenario
 
 1. The model starts at time $T_0 = 0$.
