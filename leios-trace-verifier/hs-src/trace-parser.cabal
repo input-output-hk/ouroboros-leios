@@ -80,6 +80,8 @@ test-suite test-trace-verifier
   main-is:          Spec.hs
   other-modules:    Paths_trace_parser
                     Spec.ChainEvents
+                    Spec.ChainSegments
+                    Spec.ChainVerifier
                     Spec.Generated
                     Spec.Golden
                     Spec.Scenario
@@ -108,6 +110,7 @@ library
     hs-source-dirs: src
     exposed-modules:
       LinearLeiosLib
+      LinearLeiosChain
       LeadershipSchedule
     build-depends:
       , base
