@@ -17,14 +17,17 @@
 --
 --     * election slot -> ebHash            (from @AnnouncementAccepted@; in
 --       Linear Leios the announcing RB and its EB share the election slot)
---     * rbHash -> slot                     (from @AddedToCurrentChain@)
+--     * rbHash -> slot                     (from @AddedToCurrentChain@ and
+--       @SwitchedToAFork@, the two ways ChainDB reports a new selection; both
+--       carry the adopted tip in @newtip@, and a node votes on the RB it
+--       selected however it came to select it)
 --
 --   composed at each vote event to resolve rbHash -> (ebHash, ebSlot).
 --   Unresolvable votes (linkage missing, e.g. truncated log prefix) are
 --   dropped rather than guessed.
 module ChainEvents where
 
-import Data.Aeson (Value, decode, withObject, (.:))
+import Data.Aeson (Object, Value, decode, withObject, (.:))
 import Data.Aeson.Types (Parser, parseMaybe)
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import Data.List (mapAccumL)
@@ -51,6 +54,38 @@ data ChainEvent
     CVoteAcquired !Text !Word64
   | -- | @Forge.Loop.ForgedBlock@: the SUT forged a ranking (Praos) block (hash, slot).
     CRBForged !Text !Word64
+  | -- | @Forge.Loop.NodeIsLeader@: the SUT won the Praos slot lottery (slot).
+    --   Emitted by consensus independently of anything Leios does, so it is a
+    --   non-circular record of EB-production eligibility — the spec assumes
+    --   @canProduceEB@ holds exactly when the node can make a ranking block. Unlike
+    --   the cardano-api schedule it covers every epoch the log spans, which makes it
+    --   usable as a fallback when the query cannot supply a schedule for an epoch.
+    CNodeIsLeader !Word64
+  | -- | @Consensus.LeiosKernel.AnnouncementAccepted@: the chain head now announces
+    --   this EB (ebHash, election slot). This — not acquiring the body — is what
+    --   makes an EB votable, so it is what the verifier must key voting obligations
+    --   on. Also retained internally as vote-resolution linkage.
+    CAnnouncementAccepted !Text !Word64
+  | -- | @Consensus.LeiosKernel.NotVoted@: the SUT deliberately abstained from
+    --   voting on an EB (ebHash, EB's election slot, reason). In Linear Leios an
+    --   abstention is not a fault: the reason enumerates protocol-legal causes
+    --   (@chainTipDoesNotAnnounce@ once the chain has extended past the announcer,
+    --   @tooLate@, @notOnCommittee@). Corroborates a closed voting window.
+    CNotVoted !Text !Word64 !Text
+  | -- | @ChainDB.AddBlockEvent.AddedToCurrentChain@ / @SwitchedToAFork@: the SUT's
+    --   selected chain now has this tip slot. In Linear Leios a cert is valid only
+    --   in the ranking block that directly extends the announcer, so once the tip
+    --   advances past an announced EB that EB can no longer be certified — the
+    --   verifier uses this to close the EB's voting window.
+    CChainExtended !Word64
+  | -- | @Mempool.AddedTx@ / @Mempool.RemoveTxs@: the mempool's post-change
+    --   occupancy in transactions (@mempoolSize.numTxs@). Both events carry the
+    --   size AFTER the change, so the occupancy is piecewise-constant between
+    --   them and the last-seen value is exact at any slot boundary. The verifier
+    --   uses it to decide whether an EB-less forge had anything to propose —
+    --   real occupancy, not inferred from the EB's absence, which would be
+    --   circular.
+    CMempoolSize !Word64
   deriving (Eq, Show, Generic)
 
 -- | Internal: one parsed line — a directly-emittable event, a linkage fact
@@ -59,10 +94,13 @@ data Raw
   = RawEvent !ChainEvent
   | -- | announcement accepted: election slot, ebHash
     RawAnn !Word64 !Text
-  | -- | chain linkage: rbHash, slot
+  | -- | chain linkage: rbHash, new tip slot. Records rbHash -> slot for vote
+    --   resolution AND surfaces the tip advance as 'CChainExtended'.
     RawRb !Text !Word64
   | -- | vote (True = cast by the SUT, False = acquired from a peer): rbHash
     RawVote !Bool !Text
+  | -- | deliberate abstention: ebHash, election slot, reason. EB-keyed.
+    RawNotVoted !Text !Word64 !Text
 
 -- | Vote-resolution state.
 data LinkState = LinkState
@@ -82,9 +120,13 @@ parseNodeLog =
   step !st raw = case raw of
     RawEvent ev -> (st, Just ev)
     RawAnn slot ebHash ->
-      (st{lsEbBySlot = Map.insert slot ebHash (lsEbBySlot st)}, Nothing)
+      ( st{lsEbBySlot = Map.insert slot ebHash (lsEbBySlot st)}
+      , Just (CAnnouncementAccepted ebHash slot)
+      )
     RawRb rbHash slot ->
-      (st{lsSlotByRb = Map.insert rbHash slot (lsSlotByRb st)}, Nothing)
+      ( st{lsSlotByRb = Map.insert rbHash slot (lsSlotByRb st)}
+      , Just (CChainExtended slot)
+      )
     RawVote ours rbHash ->
       ( st
       , do
@@ -92,6 +134,8 @@ parseNodeLog =
           ebHash <- Map.lookup slot (lsEbBySlot st)
           pure $ (if ours then CVoted else CVoteAcquired) ebHash slot
       )
+    RawNotVoted ebHash slot reason ->
+      (st, Just (CNotVoted ebHash slot reason))
 
 -- | Parse a single log line; @Nothing@ for non-JSON banners and unrelated events.
 parseRaw :: BSL8.ByteString -> Maybe Raw
@@ -105,6 +149,7 @@ pRaw = withObject "logline" $ \o -> do
     "Forge.Loop.StartLeadershipCheck" -> RawEvent . CSlot <$> d .: "slot"
     "Forge.Loop.ForgedBlock" ->
       RawEvent <$> (CRBForged <$> d .: "block" <*> d .: "slot")
+    "Forge.Loop.NodeIsLeader" -> RawEvent . CNodeIsLeader <$> d .: "slot"
     -- w31+ per-event namespaces
     "Consensus.LeiosKernel.BlockForged" ->
       RawEvent <$> (CEBForged <$> d .: "hash" <*> d .: "slot")
@@ -118,9 +163,18 @@ pRaw = withObject "logline" $ \o -> do
     "Consensus.LeiosKernel.VoteAcquired" -> do
       v <- d .: "vote"
       RawVote False <$> v .: "rbHash"
-    "ChainDB.AddBlockEvent.AddedToCurrentChain" -> do
-      tip <- d .: "newtip"
-      maybe (fail "unparseable newtip") (pure . uncurry RawRb) (parseTip tip)
+    "Consensus.LeiosKernel.NotVoted" ->
+      RawNotVoted <$> d .: "ebHash" <*> d .: "ebSlot" <*> d .: "reason"
+    -- Extending the current chain and switching to a fork are the two ways
+    -- ChainDB reports adopting a new tip, and both matter twice over: the tip
+    -- advance retires any EB the superseded announcer carried, and the adopted
+    -- RB is what a vote is keyed on. Ignoring the fork-switch case silently
+    -- drops every vote for an RB that arrived on a fork.
+    "ChainDB.AddBlockEvent.AddedToCurrentChain" -> newtip d
+    "ChainDB.AddBlockEvent.SwitchedToAFork" -> newtip d
+    -- Both carry the post-change size, so last-seen tracking is exact.
+    "Mempool.AddedTx" -> mempoolSize d
+    "Mempool.RemoveTxs" -> mempoolSize d
     -- pre-w31 envelope (kept for older logs)
     "Consensus.LeiosKernel.TraceLeiosKernel" -> do
       kind <- d .: "kind"
@@ -135,6 +189,18 @@ pRaw = withObject "logline" $ \o -> do
           RawEvent <$> (CVoteAcquired <$> v .: "ebHash" <*> v .: "slot")
         _ -> fail "unhandled LeiosKernel kind"
     _ -> fail "unhandled ns"
+
+-- | The mempool occupancy in txs, shared by the two size-changing mempool events.
+mempoolSize :: Object -> Parser Raw
+mempoolSize d = do
+  ms <- d .: "mempoolSize"
+  RawEvent . CMempoolSize <$> ms .: "numTxs"
+
+-- | The newly adopted tip, shared by ChainDB's two selection-change events.
+newtip :: Object -> Parser Raw
+newtip d = do
+  tip <- d .: "newtip"
+  maybe (fail "unparseable newtip") (pure . uncurry RawRb) (parseTip tip)
 
 -- | @"\<64 hex chars\>@\<decimal slot\>"@ from ChainDB's @newtip@ field.
 parseTip :: Text -> Maybe (Text, Word64)
