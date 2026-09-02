@@ -46,7 +46,7 @@ The figure below shows example results for the probability distribution of the n
 
 ## Analysis of UTxO set size and UTxO lifetime
 
-[Analysis of Cardano mainnet](../post-cip/tx-lifetime/tx-lifetime.ipynb) indicates that the number of active UTxOs has leveled off at approximately 11 million unspent transaction outputs. The data likely is not sufficient to build a statistical model to forecast the size of the UTxO set as a function of demand: a more speculative model would be needed.
+[Analysis of Cardano mainnet](./tx-lifetime/Exploratory%20analysis.ipynb) indicates that the number of active UTxOs has leveled off at approximately 11 million unspent transaction outputs. The data likely is not sufficient to build a statistical model to forecast the size of the UTxO set as a function of demand: a more speculative model would be needed.
 
 ![Size of mainnet UTxO set as a function of slot number](./tx-measurements/utxo-set.png)
 In terms of lifetime, UTxOs have a trimodal distribution:
