@@ -188,11 +188,11 @@ module LinearLeiosVerifierChain where
       --
       -- Voting eligibility is unaffected: it follows the CIP-0164 committee in
       -- Defaults, computed from the stake distribution rather than a per-slot lottery.
-      winning-slots-of : ℙ (BlockType × ℕ)
+      winning-slots-of : ℙ ℕ
       winning-slots-of =
         if scheduleAuthoritative
-          then fromList (L.map (λ s → EB , s) winningSlots)
-          else fromList (L.map (λ s → EB , s) (leaderSlots l))
+          then fromList winningSlots
+          else fromList (leaderSlots l)
 
       testParams : TestParams params
       testParams =
@@ -309,6 +309,10 @@ module LinearLeiosVerifierChain where
         Show-EBCert .show nothing  = "No EBCert"
         Show-EBCert .show (just c) = show c
 
+        Show-TxsOrEBCert : Show (List Tx ⊎ EBCert)
+        Show-TxsOrEBCert .show (inj₁ txs)  = "Txs " S.++ show txs
+        Show-TxsOrEBCert .show (inj₂ cert) = "EBCert " S.++ show cert
+
       unquoteDecl Show-EndorserBlockOSig = derive-Show [ (quote EndorserBlockOSig , Show-EndorserBlockOSig) ]
       unquoteDecl Show-RankingBlock = derive-Show [ (quote RankingBlock , Show-RankingBlock) ]
       unquoteDecl Show-Blk = derive-Show [ (quote Blk , Show-Blk) ]
@@ -398,7 +402,7 @@ module LinearLeiosVerifierChain where
             announceStep : Maybe Hash → List Step
             announceStep mh =
               (Slot₂-Action s , inj₂ (inj₁ (BaseAbstract.BASE-LDG
-                (record { txs = [] ; announcedEB = mh ; ebCert = nothing ; slot = s } ∷ [])))) ∷ []
+                (record { announcedEB = mh ; txsOrEbCert = inj₁ [] } ∷ [])))) ∷ []
             -- Which EB to present as the chain head for this slot.
             --
             -- A vote cast in this slot wins over the announcement status, because
@@ -452,9 +456,13 @@ module LinearLeiosVerifierChain where
             vtRole = case votedEB a of λ where
               (just (eb , slot')) → (VT-Role-Action s eb slot' , inj₁ FFDT.SLOT) ∷ []
               nothing             → (No-VT-Role-Action s , inj₁ FFDT.SLOT) ∷ []
+        -- 'ebRole' precedes 'Base₂': the spec's Base₂ requires the EB role to be
+        -- settled for the slot ('hasUpkeep EB-Role'), so that the RB announces the
+        -- EB actually diffused rather than 'nothing'.
         in mempool
            ++ annRB
-           ++ ((Base₂-Action s , inj₁ FFDT.SLOT) ∷ ebRole)
+           ++ ebRole
+           ++ ((Base₂-Action s , inj₁ FFDT.SLOT) ∷ [])
            ++ vtRole
            ++ ((Slot₁-Action s , inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks a)))) ∷ [])
 
