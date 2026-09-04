@@ -1,444 +1,3482 @@
 {
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
-  },
+  "uid": "cardano-leios-voting",
+  "title": "Cardano Leios - Voting",
+  "tags": [],
   "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "links": [],
-  "panels": [
+  "graphTooltip": 1,
+  "schemaVersion": 42,
+  "refresh": "1m",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timezone": "utc",
+  "annotations": {
+    "list": []
+  },
+  "links": [
     {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 3,
-      "options": {
-        "legend": {
-          "calcs": [
-            "last"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "direction": "backward",
-          "editorMode": "code",
-          "expr": "sum by(voterId) (count_over_time({service=\"cardano-node/leios-voting\", voterId=~\"$voterId\", instance=~\"$instance\", kind=\"LeiosVoteAcquired\"} | json | vote_rbHash=~\"$rbHash\" [1m]))",
-          "legendFormat": "{{voterId}}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Acquired votes per voterId (per minute)",
-      "type": "timeseries",
-      "description": "Count of LeiosVoteAcquired events grouped by voterId, over a trailing 1-minute window."
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 7
-      },
-      "id": 4,
-      "options": {
-        "legend": {
-          "calcs": [
-            "last"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "direction": "backward",
-          "editorMode": "builder",
-          "expr": "sum by(vote_rbHash) (count_over_time({service=\"cardano-node/leios-voting\", voterId=~\"$voterId\", instance=~\"$instance\", kind=\"LeiosVoteAcquired\"} | json | vote_rbHash=~\"$rbHash\" [1m]))",
-          "legendFormat": "{{vote_rbHash}}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Acquired votes per rbHash (per minute)",
-      "type": "timeseries",
-      "description": "Count of LeiosVoteAcquired events grouped by rbHash, over a trailing 1-minute window."
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "continuous-GrYlRd"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "color-text"
-            },
-            "filterable": true,
-            "footer": {
-              "reducers": []
-            },
-            "inspect": false,
-            "wrapHeaderText": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Time"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 268
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 18,
-        "w": 24,
-        "x": 0,
-        "y": 15
-      },
-      "id": 5,
-      "options": {
-        "cellHeight": "sm",
-        "enablePagination": true,
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "rbHash"
-          }
-        ]
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "direction": "backward",
-          "editorMode": "code",
-          "expr": "{service=\"cardano-node/leios-voting\", voterId=~\"$voterId\"} | json | vote_rbHash=~\"$rbHash\"",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Acquired votes",
-      "transformations": [
-        {
-          "id": "extractFields",
-          "options": {
-            "delimiter": ",",
-            "keepTime": false,
-            "replace": false,
-            "source": "Line"
-          }
-        },
-        {
-          "id": "extractFields",
-          "options": {
-            "delimiter": ",",
-            "source": "vote"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Line": true,
-              "id": true,
-              "kind": true,
-              "labelTypes": true,
-              "labels": true,
-              "tsNs": true,
-              "vote": true
-            },
-            "includeByName": {},
-            "indexByName": {},
-            "orderByMode": "manual",
-            "renameByName": {}
-          }
-        }
-      ],
-      "type": "table"
+      "type": "link",
+      "title": "Clear EB filter",
+      "tooltip": "Reset the EB drill-down filter back to all EBs",
+      "icon": "cloud",
+      "url": "/d/cardano-leios-voting/?${__url_time_range}&${instance:queryparam}&${voterId:queryparam}&${tallyInstance:queryparam}&${ebWindow:queryparam}&var-rbHash=.%2B",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": []
     }
   ],
-  "preload": false,
-  "schemaVersion": 42,
-  "tags": [],
   "templating": {
     "list": [
       {
-        "current": {
-          "text": ".*",
-          "value": ".*"
-        },
-        "includeAll": true,
-        "multi": true,
-        "name": "rbHash",
-        "options": [
-          {
-            "text": ".*",
-            "value": ".*",
-            "selected": true
-          }
-        ],
-        "query": "",
-        "type": "textbox"
-      },
-      {
-        "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "loki",
-          "uid": "loki"
-        },
-        "definition": "",
-        "includeAll": true,
-        "multi": true,
-        "name": "voterId",
-        "options": [],
-        "query": {
-          "label": "voterId",
-          "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "{service=\"cardano-node/leios-voting\"}",
-          "type": 1
-        },
-        "refresh": 1,
-        "regex": "",
-        "type": "query",
-        "allValue": ".+"
-      },
-      {
-        "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "loki",
-          "uid": "loki"
-        },
-        "definition": "",
-        "includeAll": true,
-        "multi": true,
         "name": "instance",
-        "options": [],
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
         "query": {
           "label": "instance",
           "refId": "LokiVariableQueryEditor-VariableQuery",
           "stream": "{service=\"cardano-node/leios-voting\"}",
           "type": 1
         },
-        "refresh": 1,
         "regex": "",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "voterId",
         "type": "query",
-        "allValue": ".+"
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "query": {
+          "label": "voterId",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "{service=\"cardano-node/leios-voting\"}",
+          "type": 1
+        },
+        "regex": "",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "sort": 3,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "ebWindow",
+        "type": "custom",
+        "label": "Recent EB window",
+        "description": "Lookback for the tally growth and announcement lateness panels, so they show recent EBs instead of every EB in the dashboard range. Note that 3h puts the per-EB panel near the Loki 500 series limit.",
+        "query": "5m,10m,15m,30m,1h,3h",
+        "options": [
+          {
+            "text": "5m",
+            "value": "5m",
+            "selected": false
+          },
+          {
+            "text": "10m",
+            "value": "10m",
+            "selected": true
+          },
+          {
+            "text": "15m",
+            "value": "15m",
+            "selected": false
+          },
+          {
+            "text": "30m",
+            "value": "30m",
+            "selected": false
+          },
+          {
+            "text": "1h",
+            "value": "1h",
+            "selected": false
+          },
+          {
+            "text": "3h",
+            "value": "3h",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": "10m",
+          "value": "10m"
+        },
+        "multi": false,
+        "includeAll": false
+      },
+      {
+        "name": "threshold",
+        "type": "constant",
+        "label": "Certification threshold",
+        "query": "0.75",
+        "current": {
+          "text": "0.75",
+          "value": "0.75"
+        },
+        "hide": 2
+      },
+      {
+        "name": "tallyInstance",
+        "type": "query",
+        "label": "Tally source node",
+        "description": "Single node whose tally stream feeds the seat-counting panels. Every node observes nearly the same votes, so the choice rarely matters, but switch it to cross-check a surprising number against another perspective. Only nodes emitting the tally trace are listed.",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "query": {
+          "label": "instance",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "{service=\"cardano-node/leios-voting\", kind=\"LeiosTally\"}",
+          "type": 1
+        },
+        "regex": "",
+        "refresh": 2,
+        "multi": false,
+        "includeAll": false,
+        "sort": 1
+      },
+      {
+        "name": "rbHash",
+        "type": "textbox",
+        "label": "rbHash filter",
+        "query": ".+",
+        "current": {
+          "text": ".+",
+          "value": ".+"
+        }
       }
     ]
   },
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
-  "timepicker": {},
-  "refresh": "1m",
-  "timezone": "utc",
-  "title": "Cardano Leios - Voting",
-  "uid": "cardano-leios-voting",
-  "version": 1
+  "panels": [
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Certification margin — how close did each EB get?",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Certified EBs in range",
+      "description": "Distinct EBs that reached a certificate in the range. Counted by rbHash rather than by line, since every node that certifies traces it and a raw line count would scale with fleet size. Cross-checks against the margin panels: it should equal the number of EBs whose peak tally crossed the threshold, though it can read higher over ranges longer than the tally stream has existed. Zero means nothing certified in the window.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "expr": "count(sum by (rbHash) (count_over_time({service=\"cardano-node\", instance=~\"$instance\", kind=\"LeiosCertified\"} | json rbHash=\"rbHash\" | rbHash =~ \"$rbHash\" [$__range])))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Best peak tally",
+      "description": "Highest tally any single EB reached in the range. Compare against the 0.75 threshold.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "expr": "max(max by (rbHash) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\",tally=\"tally\" | rbHash =~ \"$rbHash\" | unwrap tally [$__range])))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.72
+              },
+              {
+                "color": "green",
+                "value": 0.75
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Mean peak tally",
+      "description": "Mean across EBs of each EB peak tally. This is the honest headline next to the best-peak tile: the best EB can sit on the line while the typical one is well below it. For the full distribution rather than one number, use the margin table and sort it ascending on shortfall.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "expr": "avg(max by (rbHash) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\",tally=\"tally\" | rbHash =~ \"$rbHash\" | unwrap tally [$__range])))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.72
+              },
+              {
+                "color": "green",
+                "value": 0.75
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Mean shortfall to threshold",
+      "description": "The threshold minus the mean peak tally. This is the weight that would have to be recovered to certify the typical EB. Zero or negative means the average EB is certifying.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "expr": "$threshold - avg(max by (rbHash) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\",tally=\"tally\" | rbHash =~ \"$rbHash\" | unwrap tally [$__range])))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.01
+              },
+              {
+                "color": "red",
+                "value": 0.03
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Reachable weight observed",
+      "description": "Sum of the seat weights of every seat seen casting a vote in the range, derived from the LeiosTally weight field rather than from db-sync. Compare with the 0.75 threshold: if this sits at or below it, no EB can certify even with perfect diffusion.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "expr": "sum(max by (voterId) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\",voterId=\"voterId\",weight=\"weight\" | rbHash =~ \"$rbHash\" | unwrap weight [$__range])))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.75
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Observable participation",
+      "description": "Share of the seats known to vote that actually voted in the visible range, across every selected node. Distinct from the two other ratios on this dashboard also called participation: the seat table measures EBs per seat, and the node panels measure votes cast against votes scheduled. The denominator here is every seat observed voting over the last 24h, derived from the data rather than configured. Seats that have never once voted appear in neither number, so a silent cohort is invisible here by nature and this reads high; leios_committee in db-sync is the only source for the true committee size. Near 100% is the healthy state. A drop means seats that normally vote have stopped, but note the load generator runs a duty cycle: during an idle hour no EBs are produced and this goes blank across all seats at once rather than dropping for a subset. Most informative at ranges under 3h; wider ranges saturate as the visible window approaches the 24h denominator.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "expr": "count(sum by (voterId) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\",voterId=\"voterId\" | rbHash =~ \"$rbHash\" [$__range]))) / count(sum by (voterId) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json voterId=\"voterId\" [24h])))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.5
+              },
+              {
+                "color": "green",
+                "value": 0.9
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Best EB tally in flight (rolling)",
+      "description": "The highest tally any EB has reached at each point in time, as one series. This is a rolling envelope, not one point per EB: at every step it reports the best of whichever EBs are currently in flight, so it rarely dips and hides how the typical EB did. Use it to see whether anything at all is near the threshold, and the per-EB panel for the distribution. The y axis uses soft bounds of 0.60 to 0.80, so it stays zoomed on the region that matters but expands on its own during a genuine lull rather than clipping one. The dashed line is the certification threshold.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "max(max by (rbHash) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\",tally=\"tally\" | rbHash =~ \"$rbHash\" | unwrap tally [$__auto])))",
+          "legendFormat": "best EB in flight"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 4,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisSoftMin": 0.6,
+            "axisSoftMax": 0.8,
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.75
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Closest EBs to certification (top 10)",
+      "description": "The 10 EBs that came closest without certifying, newest first, so a time trend in the near-miss set is visible. Certified EBs are filtered out, so no bar can reach the top of its gauge: the gauge spans 0.60 to the 0.75 threshold, and a nearly full bar is a near miss while an empty one sat at or below 0.60. The tally only rises for a given EB, so its last vote is also the one that set the peak. The margin table has the full set including certified.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "targets": [
+        {
+          "refId": "peak",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "topk(10, (max by (rbShort) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\",tally=\"tally\" | rbHash =~ \"$rbHash\" | label_format rbShort=`{{ substr 0 12 .rbHash }}` | unwrap tally [$__range]))) < $threshold)"
+        },
+        {
+          "refId": "peakAt",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "max by (rbShort) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\",tally=\"tally\" | rbHash =~ \"$rbHash\" | label_format rbShort=`{{ substr 0 12 .rbHash }}` | label_format ts=`{{ __timestamp__ | unixEpochMillis }}` | unwrap ts [$__range])) and topk(10, (max by (rbShort) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\",tally=\"tally\" | rbHash =~ \"$rbHash\" | label_format rbShort=`{{ substr 0 12 .rbHash }}` | unwrap tally [$__range]))) < $threshold)"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "rbShort",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #peak": "peak tally",
+              "Value #peakAt": "last vote at",
+              "rbShort": "EB"
+            },
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true
+            },
+            "indexByName": {
+              "Value #peakAt": 0,
+              "Value #peak": 1,
+              "rbShort": 2
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "last vote at",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "peak tally"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 4
+              },
+              {
+                "id": "min",
+                "value": 0.6
+              },
+              {
+                "id": "max",
+                "value": 0.75
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.72
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.75
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last vote at"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "EB margin table — peak tally and shortfall",
+      "description": "Sortable per-EB view, newest first. Shortfall is the threshold minus the peak; sort ascending on it to find the EBs that came closest, which are the ones a diffusion fix would rescue first. The tally only ever rises for a given EB, so the last vote is also the one that set the peak. Click an rbHash to drill into which seats voted on that EB and when. seats voted is how many committee seats voted on that EB as seen from the tally source node; over a wide enough range that query exceeds Loki 500-series limit and the column drops out of the table entirely rather than degrading.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "targets": [
+        {
+          "refId": "peak",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "max by (rbHash) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\",tally=\"tally\" | rbHash =~ \"$rbHash\" | unwrap tally [$__range]))"
+        },
+        {
+          "refId": "shortfall",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "$threshold - max by (rbHash) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\",tally=\"tally\" | rbHash =~ \"$rbHash\" | unwrap tally [$__range]))"
+        },
+        {
+          "refId": "votes",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "sum by (rbHash) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json rbHash=\"rbHash\" | rbHash =~ \"$rbHash\" [$__range]))"
+        },
+        {
+          "refId": "lastSeen",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "max by (rbHash) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\" | rbHash =~ \"$rbHash\" | label_format ts=`{{ __timestamp__ | unixEpochMillis }}` | unwrap ts [$__range]))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "rbHash",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #peak": "peak tally",
+              "Value #shortfall": "shortfall",
+              "Value #votes": "seats voted",
+              "Value #lastSeen": "last vote at"
+            },
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true
+            },
+            "indexByName": {
+              "Value #lastSeen": 0,
+              "Value #peak": 1,
+              "Value #shortfall": 2,
+              "Value #votes": 3,
+              "rbHash": 4
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "last vote at",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "peak tally"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 4
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.72
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.75
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "shortfall"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 4
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last vote at"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.width",
+                "value": 190
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rbHash"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Drill down: vote arrival by seat",
+                    "url": "/d/cardano-leios-voting/?${__url_time_range}&${instance:queryparam}&${voterId:queryparam}&${tallyInstance:queryparam}&${ebWindow:queryparam}&var-rbHash=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Tally growth, recent EBs",
+      "description": "One ramp per EB from first vote to peak. This panel ignores the dashboard time range and uses the 'Recent EB window' dropdown instead, defaulting to 10m, so it shows the recent handful rather than every EB in the range. EB cadence is bursty, so the count per window varies. Paste a hash into the rbHash filter to isolate one EB, widening the window if that EB is older than it. The shape says a lot: a smooth climb that stops short is a missing-seat problem, a climb that stalls then resumes is diffusion latency.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "timeFrom": "$ebWindow",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 23
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "max by (rbHash) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\",tally=\"tally\" | rbHash =~ \"$rbHash\" | unwrap tally [$__auto]))",
+          "legendFormat": "{{rbHash}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 4,
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "lineInterpolation": "stepAfter"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.75
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "type": "heatmap",
+      "title": "Tally update distribution (Mimir histogram)",
+      "description": "Every tally update bucketed. Buckets crowd 0.75 on purpose: the question is near miss versus far miss. A band that piles up just under 0.75 with nothing above it is the signature of a certification stall.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 23
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum by (le) (rate(leios_logmetrics_leios_vote_tally_bucket{instance=~\"$instance\"}[$__rate_interval]))",
+          "format": "heatmap",
+          "legendFormat": "{{le}}"
+        }
+      ],
+      "options": {
+        "calculate": false,
+        "cellGap": 1,
+        "color": {
+          "mode": "scheme",
+          "scheme": "Turbo",
+          "steps": 64,
+          "reverse": false
+        },
+        "yAxis": {
+          "unit": "percentunit",
+          "decimals": 2
+        },
+        "legend": {
+          "show": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "yHistogram": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 200,
+      "type": "row",
+      "title": "Committee seats — derived from logs, no db-sync needed",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 20,
+      "type": "table",
+      "title": "Seat weight and activity by voterId",
+      "description": "Committee seat weights derived from the tally trace, no db-sync needed. participation is the share of EBs in the range this seat voted on and EBs voted on is its numerator, both taken from the tally source node so neither scales with the number of reporting nodes. weight lost is seat weight times (1 - participation): the weight this seat is entitled to contribute and does not. The table sorts by it so the top rows are the priority list, and the column total in the footer is the weight recoverable without touching stake, which is the figure to compare against the shortfall tile.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 41
+      },
+      "targets": [
+        {
+          "refId": "weight",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "max by (voterId) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json voterId=\"voterId\",weight=\"weight\" | unwrap weight [$__range]))"
+        },
+        {
+          "refId": "count",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "sum by (voterId) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json voterId=\"voterId\" [$__range]))"
+        },
+        {
+          "refId": "participation",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "sum by (voterId) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json voterId=\"voterId\" [$__range])) / on() group_left() count(sum by (rbHash) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json rbHash=\"rbHash\" [$__range])))"
+        },
+        {
+          "refId": "lost",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "max by (voterId) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json voterId=\"voterId\",weight=\"weight\" | unwrap weight [$__range])) * (1 - (sum by (voterId) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json voterId=\"voterId\" [$__range])) / on() group_left() count(sum by (rbHash) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json rbHash=\"rbHash\" [$__range])))))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "voterId",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #weight": "seat weight",
+              "Value #count": "EBs voted on",
+              "Value #participation": "participation",
+              "Value #lost": "weight lost"
+            },
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true
+            },
+            "indexByName": {
+              "voterId": 0,
+              "Value #lost": 1,
+              "Value #weight": 2,
+              "Value #participation": 3,
+              "Value #count": 4
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "weight lost",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "seat weight"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 5
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "max",
+                "value": 0.2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "participation"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.5
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.9
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "weight lost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.003
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.01
+                    },
+                    {
+                      "color": "red",
+                      "value": 0.02
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": true,
+          "reducer": [
+            "sum"
+          ],
+          "fields": [
+            "weight lost"
+          ],
+          "countRows": false
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Distinct seats voting over time",
+      "description": "Seats seen in the tally stream alongside the reachable weight those seats carry, on a fixed 30m lookback. A shorter window only counts seats that happened to vote in the last minute or two and sawtooths badly; a longer one starts mixing committees across epoch rotations. A step down that does not recover is a cohort dropping out. An hourly fall to nothing across every seat at once is the load generator idling between duty cycles, not a fault.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 41
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "count(sum by (voterId) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json voterId=\"voterId\" [30m])))",
+          "legendFormat": "seats seen"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(max by (voterId) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json voterId=\"voterId\",weight=\"weight\" | unwrap weight [30m])))",
+          "legendFormat": "reachable weight"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "reachable weight"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 300,
+      "type": "row",
+      "title": "Own-pool participation",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "Participation ratio per node (cast / scheduled)",
+      "description": "Every scheduled vote is an EB this node was asked to vote on, so this is the percentage it actually voted on. Counts only, not weight: use the per-node accounting table below for weight contributed. Anything under 100% is votes this cluster was entitled to cast and did not, and the shortfall is usually diffusion timing rather than misconfiguration; the declined-by-reason panel says which. Brief excursions above 100% are expected, since the two counters are rate-averaged independently and a vote scheduled just before a window boundary can be cast just after. Gaps are not bridged: when no votes are scheduled the line breaks rather than drawing a straight segment across the idle period.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 52
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum by (instance) (rate(leios_logmetrics_leios_votes_cast_total{instance=~\"$instance\"}[$__rate_interval])) / (sum by (instance) (rate(leios_logmetrics_leios_votes_scheduled_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "min"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.9
+              },
+              {
+                "color": "green",
+                "value": 0.99
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Declined votes by reason",
+      "description": "Declines per bar, as counts rather than a per-second rate, which is too small a number to read on these counters. A 2m minimum interval is set because increase() over a shorter window returns no data here. chainTipDoesNotAnnounce means the voter's chain tip had not adopted the announcing RB when its window opened, which is a diffusion timing problem rather than misconfiguration. tooLate means the window closed first.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 52
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum by (reason) (round(increase(leios_logmetrics_leios_votes_declined_total{instance=~\"$instance\"}[$__interval])))",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "sum",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            },
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "interval": "2m"
+    },
+    {
+      "id": 32,
+      "type": "table",
+      "title": "Per-node vote accounting",
+      "description": "Scheduled, cast and declined per node over the range, sorted by the weight each node fails to contribute. mean seat weight is the lifetime ratio of contributed weight to votes cast, deliberately not windowed: it is a property of the node seats, and increase() over a range longer than a counter has existed extrapolates the partial window out to full width and reads far too high. weight lost/EB is that times the windowed decline fraction, and is comparable to the per-seat column in the committee table. The three count columns use increase(), which extrapolates slightly at window edges, so treat them as accurate to a percent or two rather than exact. The seat column is the voterId this node has voted with in the last 15m, so rows match the committee seat table above. Seats rotate each epoch and the counter for a previous seat lingers, so the filter keeps only the live one; immediately after a rotation a node may briefly show no seat.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 60
+      },
+      "targets": [
+        {
+          "refId": "scheduled",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (instance) (round(increase(leios_logmetrics_leios_votes_scheduled_total{instance=~\"$instance\"}[$__range])))"
+        },
+        {
+          "refId": "cast",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (instance) (round(increase(leios_logmetrics_leios_votes_cast_total{instance=~\"$instance\"}[$__range])))"
+        },
+        {
+          "refId": "declined",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (instance) (round(increase(leios_logmetrics_leios_votes_declined_total{instance=~\"$instance\"}[$__range])))"
+        },
+        {
+          "refId": "meanweight",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (instance) (leios_logmetrics_leios_voted_weight_total{instance=~\"$instance\"}) / (sum by (instance) (leios_logmetrics_leios_votes_cast_total{instance=~\"$instance\"}) > 0)"
+        },
+        {
+          "refId": "wlost",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "instant": true,
+          "format": "table",
+          "expr": "(sum by (instance) (leios_logmetrics_leios_voted_weight_total{instance=~\"$instance\"}) / (sum by (instance) (leios_logmetrics_leios_votes_cast_total{instance=~\"$instance\"}) > 0)) * (sum by (instance) (increase(leios_logmetrics_leios_votes_declined_total{instance=~\"$instance\"}[$__range])) / (sum by (instance) (increase(leios_logmetrics_leios_votes_scheduled_total{instance=~\"$instance\"}[$__range])) > 0))"
+        },
+        {
+          "refId": "participation",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (instance) (round(increase(leios_logmetrics_leios_votes_cast_total{instance=~\"$instance\"}[$__range]))) / (sum by (instance) (round(increase(leios_logmetrics_leios_votes_scheduled_total{instance=~\"$instance\"}[$__range]))) > 0)"
+        },
+        {
+          "refId": "seat",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "instant": true,
+          "format": "table",
+          "expr": "topk by (instance) (1, sum by (instance, voterId) (increase(leios_logmetrics_leios_votes_cast_total{instance=~\"$instance\"}[15m]))) > 0"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "instance",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #scheduled": "scheduled",
+              "Value #cast": "cast",
+              "Value #declined": "declined",
+              "Value #meanweight": "mean seat weight",
+              "Value #wlost": "weight lost/EB",
+              "Value #participation": "participation",
+              "voterId": "seat"
+            },
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "Time 5": true,
+              "Time 6": true,
+              "job": true,
+              "__name__": true,
+              "Value #seat": true,
+              "Time 7": true
+            },
+            "indexByName": {
+              "instance": 0,
+              "Value #wlost": 1,
+              "Value #meanweight": 2,
+              "Value #participation": 3,
+              "Value #scheduled": 4,
+              "Value #cast": 5,
+              "Value #declined": 6,
+              "voterId": 7
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "weight lost/EB",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "participation"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.9
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.99
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mean seat weight"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "weight lost/EB"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.005
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.01
+                    },
+                    {
+                      "color": "red",
+                      "value": 0.02
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "seat"
+            },
+            "properties": [
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 400,
+      "type": "row",
+      "title": "Diffusion timing and vote propagation",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 68
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "EB announcement delay CDF",
+      "description": "Fraction of EB announcements arriving within each bucket. Late announcements convert directly into chainTipDoesNotAnnounce declines, since a voter whose tip has not adopted the announcing RB cannot vote when its window opens. Read the low buckets against lVoteWindowSlots for the network in question.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 69
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "avg by (bucket) (label_replace({__name__=~\"cardano_node_metrics_leios_eb_announcement_delay_cdf.*ms_real\", instance=~\"$instance\"}, \"bucket\", \"$1\", \"__name__\", \"cardano_node_metrics_leios_eb_announcement_delay_cdf(.*)ms_real\"))",
+          "legendFormat": "{{bucket}}ms"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": false
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 41,
+      "type": "timeseries",
+      "title": "Vote diffusion redundancy",
+      "description": "Vote arrivals divided by distinct votes added, so this tracks how many peers deliver each vote. Expect it to differ by role: low single digits on a block producer behind a few relays, an order of magnitude higher on a well-connected relay. Judge it against a node's peer count rather than an absolute number, and read a sudden drop as peers going away. Nodes emitting no tally trace are excluded rather than shown as infinity, so a node missing here is not reporting one.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 69
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum by (instance) (rate(leios_logmetrics_leios_votes_acquired_total{instance=~\"$instance\"}[$__rate_interval])) / (sum by (instance) (rate(leios_logmetrics_leios_tally_updates_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "mean"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 42,
+      "type": "timeseries",
+      "title": "Late EB announcements",
+      "description": "Rate of announcements the node considered late, per minute. Pairs with the CDF above: the CDF says how bad the tail is, this says how often it bites. Grafana shows a PromQL lint info here which is expected, due to the cardano-node _counter suffix convention rather than _total.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 77
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum by (instance) (rate(cardano_node_metrics_leios_eb_announcement_late_counter{instance=~\"$instance\"}[$__rate_interval])) * 60",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cpm",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 43,
+      "type": "timeseries",
+      "title": "Vote arrivals per seat",
+      "description": "Arrival rate broken out by committee seat. Seats that flatline while others keep arriving are the ones to chase. Note this counts arrivals, not distinct votes, so it is inflated by the redundancy factor.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 77
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum by (voterId) (rate(leios_logmetrics_leios_votes_acquired_total{instance=~\"$instance\", voterId=~\"$voterId\"}[$__rate_interval]))",
+          "legendFormat": "seat {{voterId}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 500,
+      "type": "row",
+      "title": "Explore",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 112
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 50,
+      "type": "logs",
+      "title": "Raw tally lines",
+      "description": "Filtered by the instance, voterId and rbHash variables. Each line carries the adding seat, its own weight, the running tally and the threshold, so a single line is self-contained.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 113
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json | rbHash =~ \"$rbHash\""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true
+      }
+    },
+    {
+      "id": 51,
+      "type": "table",
+      "title": "Declined votes, most recent",
+      "description": "The actual NotVoted lines with their reason, for when the counter tells you something changed and you want to see which EBs were skipped.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 113
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service=\"cardano-node/leios-voting\", kind=\"LeiosNotVoted\", instance=~\"$instance\"} | json"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": []
+      },
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "labels",
+            "replace": false
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "labels": true,
+              "tsNs": true,
+              "labelTypes": true,
+              "id": true,
+              "Line": true,
+              "kind_extracted": true,
+              "reason_extracted": true,
+              "service": true,
+              "systemd_unit": true,
+              "syslog_identifier": true,
+              "environment": true,
+              "group": true,
+              "job": true,
+              "level": true,
+              "sev": true,
+              "ns": true,
+              "kind": true,
+              "detected_level": true,
+              "service_name": true,
+              "ebSlot": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "instance": 1,
+              "reason": 2,
+              "ebHash": 3
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Time",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Per-EB peak tally over time",
+      "description": "One point per EB: the highest tally it reached, plotted at the moment it reached it. The dashed line is the certification threshold, so points below it are EBs that never certified and the vertical gap is the weight they were short. A downward drift means the margin is getting worse.",
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 12,
+          "withTransforms": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "last vote at",
+                "destinationType": "time"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "rbHash": true,
+              "shortfall": true,
+              "seats voted": true
+            },
+            "indexByName": {
+              "last vote at": 0,
+              "peak tally": 1
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "last vote at",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "lineInterpolation": "smooth",
+            "fillOpacity": 25,
+            "gradientMode": "opacityGradient",
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": true,
+            "thresholdsStyle": {
+              "mode": "dashed"
+            },
+            "axisSoftMin": 0.6,
+            "axisSoftMax": 0.8
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.75
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 600,
+      "type": "row",
+      "title": "Network view — other operators, seen from our nodes",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 85
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 60,
+      "type": "table",
+      "title": "EB announcement age by producer",
+      "description": "How long each producing pool EB announcements take to reach our nodes, from the announcementAgeSeconds field the receiving node records. This is the one view here that measures other operators directly rather than inferring them from votes. A pool whose median sits beyond the vote window cannot have its EBs voted on in time no matter what we do, so a high value here is that operator problem, not ours. Sorted slowest first. The trace count is one line per receiving node rather than per EB, so it scales with how many nodes are reporting and is a relative volume indicator, not an EB count. Live diffusion only: chain-sync discoveries are minutes old by nature and are excluded.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 86
+      },
+      "targets": [
+        {
+          "refId": "p50",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "quantile_over_time(0.5, {service=\"cardano-node\", kind=\"LeiosAnnouncementAccepted\", instance=~\"$instance\"} | json pool=\"electionPool\",age=\"announcementAgeSeconds\",src=\"source\" | src=\"receivedViaLeiosNotify\" | unwrap age [$__range]) by (pool)"
+        },
+        {
+          "refId": "p90",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "quantile_over_time(0.9, {service=\"cardano-node\", kind=\"LeiosAnnouncementAccepted\", instance=~\"$instance\"} | json pool=\"electionPool\",age=\"announcementAgeSeconds\",src=\"source\" | src=\"receivedViaLeiosNotify\" | unwrap age [$__range]) by (pool)"
+        },
+        {
+          "refId": "seen",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "sum by (pool) (count_over_time({service=\"cardano-node\", kind=\"LeiosAnnouncementAccepted\", instance=~\"$instance\"} | json pool=\"electionPool\",src=\"source\" | src=\"receivedViaLeiosNotify\" [$__range]))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "pool",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "pool": "producer pool",
+              "Value #p50": "median age",
+              "Value #p90": "p90 age",
+              "Value #seen": "announcement traces"
+            },
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true
+            },
+            "indexByName": {
+              "pool": 0,
+              "Value #p50": 1,
+              "Value #p90": 2,
+              "Value #seen": 3
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "median age",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "median age"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    },
+                    {
+                      "color": "red",
+                      "value": 2
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p90 age"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "announcement traces"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 61,
+      "type": "timeseries",
+      "title": "Announcement age, mean of per-node percentiles",
+      "description": "Spread of EB announcement arrival age, on a fixed 10m lookback. Each series is the mean across receiving nodes of that node's own percentile, not a true network percentile: Loki computes quantiles per stream and the raw samples cannot be pooled across nodes. Read it as a trend and a rough magnitude rather than an exact figure. The p99 is the one that matters for certification, since a tail beyond the vote window means some EBs are unvotable on arrival even when the median looks healthy.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 86
+      },
+      "targets": [
+        {
+          "refId": "p50",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "legendFormat": "p50",
+          "expr": "avg(quantile_over_time(0.5, {service=\"cardano-node\", kind=\"LeiosAnnouncementAccepted\", instance=~\"$instance\"} | json age=\"announcementAgeSeconds\" | unwrap age [10m]))"
+        },
+        {
+          "refId": "p90",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "legendFormat": "p90",
+          "expr": "avg(quantile_over_time(0.9, {service=\"cardano-node\", kind=\"LeiosAnnouncementAccepted\", instance=~\"$instance\"} | json age=\"announcementAgeSeconds\" | unwrap age [10m]))"
+        },
+        {
+          "refId": "p99",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "legendFormat": "p99",
+          "expr": "avg(quantile_over_time(0.99, {service=\"cardano-node\", kind=\"LeiosAnnouncementAccepted\", instance=~\"$instance\"} | json age=\"announcementAgeSeconds\" | unwrap age [10m]))"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 62,
+      "type": "timeseries",
+      "title": "Participation: our seats vs the whole committee",
+      "description": "Mean share of EBs voted on, for the seats we operate against every seat on the committee. Our cohort is derived from the LeiosVoted trace, which only fires for votes we cast, so it follows seat rotation without any configured list. Each series divides by the EB count from the same node scope as its numerator, so both stay bounded. Note the committee average includes our own seats, so it understates how far third-party seats lag: the true third-party figure is lower than the lower line.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 95
+      },
+      "targets": [
+        {
+          "refId": "ours",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "legendFormat": "our seats",
+          "expr": "avg(sum by (voterId) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosVoted\", instance=~\"$instance\"} [30m])) / on() group_left() count(sum by (rbHash) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=~\"$instance\"} | json rbHash=\"rbHash\" [30m]))))"
+        },
+        {
+          "refId": "all",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "legendFormat": "committee average",
+          "expr": "avg(sum by (voterId) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json voterId=\"voterId\" [30m])) / on() group_left() count(sum by (rbHash) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json rbHash=\"rbHash\" [30m]))))"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "min"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 63,
+      "type": "timeseries",
+      "title": "EB body arrival age, mean of per-node percentiles",
+      "description": "How long after an EB comes into existence its body becomes available locally, on a fixed 10m lookback. It shares an origin with the announcement age beside it rather than being measured from it, so it is always the larger of the two and the announcement-to-body gap is the difference between the panels. Each series is the mean across nodes of that node's own percentile, not a true network percentile, for the same reason as the panel beside it: Loki computes quantiles per stream and raw samples cannot be pooled. The p99 bounds voting just as firmly as announcement timing does, since a node cannot validate or vote on an EB until the body arrives. A rising p90 or p99 here with a flat announcement age points at fetch capacity rather than announcement diffusion.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 95
+      },
+      "targets": [
+        {
+          "refId": "p50",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "legendFormat": "p50",
+          "expr": "avg(quantile_over_time(0.5, {service=\"cardano-node\", kind=\"LeiosBlockAcquired\", instance=~\"$instance\"} | json age=\"bodyAgeSeconds\" | unwrap age [10m]))"
+        },
+        {
+          "refId": "p90",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "legendFormat": "p90",
+          "expr": "avg(quantile_over_time(0.9, {service=\"cardano-node\", kind=\"LeiosBlockAcquired\", instance=~\"$instance\"} | json age=\"bodyAgeSeconds\" | unwrap age [10m]))"
+        },
+        {
+          "refId": "p99",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "legendFormat": "p99",
+          "expr": "avg(quantile_over_time(0.99, {service=\"cardano-node\", kind=\"LeiosBlockAcquired\", instance=~\"$instance\"} | json age=\"bodyAgeSeconds\" | unwrap age [10m]))"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 17,
+      "type": "table",
+      "title": "Time to certify",
+      "description": "For each EB that crossed the threshold, how long from its first vote to the vote that took it over. Measures the margin in time rather than in weight: EBs certifying only at the last moment are fragile even when the final tally looks comfortable. EBs that never crossed are absent by construction, so a short table means few certifications, not a broken query.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 31
+      },
+      "targets": [
+        {
+          "refId": "first",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "min by (rbHash) (min_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json rbHash=\"rbHash\",voterId=\"voterId\",tally=\"tally\" | label_format ts=`{{ __timestamp__ | unixEpochMillis }}` | rbHash =~ \"$rbHash\" | unwrap ts [$__range])) and on (rbHash) (min by (rbHash) (min_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json rbHash=\"rbHash\",voterId=\"voterId\",tally=\"tally\" | label_format ts=`{{ __timestamp__ | unixEpochMillis }}` | rbHash =~ \"$rbHash\" | tally >= $threshold | unwrap ts [$__range])))"
+        },
+        {
+          "refId": "crossed",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "min by (rbHash) (min_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json rbHash=\"rbHash\",voterId=\"voterId\",tally=\"tally\" | label_format ts=`{{ __timestamp__ | unixEpochMillis }}` | rbHash =~ \"$rbHash\" | tally >= $threshold | unwrap ts [$__range]))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "rbHash",
+            "mode": "inner"
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binary",
+            "replaceFields": false,
+            "alias": "time to certify",
+            "binary": {
+              "left": "Value #crossed",
+              "operator": "-",
+              "right": "Value #first"
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #crossed": "certified at",
+              "Value #first": "first vote at",
+              "rbHash": "EB"
+            },
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true
+            },
+            "indexByName": {
+              "Value #crossed": 0,
+              "time to certify": 1,
+              "Value #first": 2,
+              "rbHash": 3
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "certified at",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "certified at"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "time to certify"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 4000
+                    },
+                    {
+                      "color": "red",
+                      "value": 10000
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "first vote at"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 18,
+      "type": "table",
+      "title": "Vote arrival by seat — set the rbHash filter",
+      "description": "A drill-down for ONE EB. Paste a hash from the EB column of the margin table into the rbHash filter, or click the EB there to jump straight here. Shows when each seat vote for that EB reached the tally source node, earliest first, so a seat that voted very late is distinguishable from one that never voted at all: late seats appear at the bottom, absent seats are missing entirely. With the filter left at its default this aggregates across every EB and is meaningless.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 33
+      },
+      "targets": [
+        {
+          "refId": "arrived",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "min by (voterId) (min_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json rbHash=\"rbHash\",voterId=\"voterId\" | label_format ts=`{{ __timestamp__ | unixEpochMillis }}` | rbHash =~ \"$rbHash\" | unwrap ts [$__range]))"
+        },
+        {
+          "refId": "weight",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "max by (voterId) (max_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json rbHash=\"rbHash\",voterId=\"voterId\",weight=\"weight\" | rbHash =~ \"$rbHash\" | unwrap weight [$__range]))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "voterId",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #arrived": "vote arrived",
+              "Value #weight": "seat weight",
+              "voterId": "seat"
+            },
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true
+            },
+            "indexByName": {
+              "Value #arrived": 0,
+              "voterId": 1,
+              "Value #weight": 2
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "vote arrived",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "vote arrived"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.width",
+                "value": 190
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "seat"
+            },
+            "properties": [
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "seat weight"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 4
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "",
+      "description": "Guard and control for the drill-down below. It counts how many EBs the rbHash filter matches: exactly one means a single EB is selected and the table beneath is meaningful, more than one means the filter is still at its default. Clicking anywhere on this panel jumps to the margin table to pick an EB, in either state; the reference to the top control is a pointer, not a second link, since a stat panel has one click action for its whole surface. Clearing from the top control re-runs only the filter-dependent panels rather than reloading the whole dashboard. Note it reads as selected whenever the range happens to contain exactly one EB, which is possible at very short ranges.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 12,
+        "x": 12,
+        "y": 31
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "expr": "count(sum by (rbHash) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosTally\", instance=\"$tallyInstance\"} | json rbHash=\"rbHash\" | rbHash =~ \"$rbHash\" [$__range])))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "EB selected  —  click to change  ·  Clear EB filter button at top to reset",
+                  "color": "green",
+                  "index": 0
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 2,
+                "to": 1000000,
+                "result": {
+                  "text": "⚠  NO EB SELECTED  —  CLICK HERE  to choose one",
+                  "color": "red",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "no EBs in range",
+                  "color": "text",
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          },
+          "noValue": "no EBs in range",
+          "links": [
+            {
+              "title": "Pick an EB in the margin table",
+              "url": "/d/cardano-leios-voting/?${__url_time_range}&${instance:queryparam}&${voterId:queryparam}&${tallyInstance:queryparam}&${ebWindow:queryparam}&${rbHash:queryparam}&viewPanel=12",
+              "targetBlank": false
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 64,
+      "type": "table",
+      "title": "Announcement lateness vs vote outcome, per EB",
+      "description": "Each row is one EB: how late its announcement arrived, which pool produced it, and how our seats then responded. This is the direct test of whether late announcements cost votes. Sorted by announcement age, so if the hypothesis holds the declines concentrate at the top. Announcements, scheduling and declines all key on ebHash, so coverage is every announced EB rather than the subset whose ranking-block hash we can resolve. Scheduled and declined counts come from our own nodes, since a node only traces its own vote decisions; on a network where we run everything that is the whole picture. Lookback is the Recent EB window variable rather than the dashboard range, because one series per EB approaches the Loki 500 series limit past roughly an hour.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 103
+      },
+      "targets": [
+        {
+          "refId": "age",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "quantile_over_time(0.5, {service=\"cardano-node\", kind=\"LeiosAnnouncementAccepted\", instance=~\"$instance\"} | json ebHash=\"ebHash\",pool=\"electionPool\",age=\"announcementAgeSeconds\" | unwrap age [$__range]) by (ebHash, pool)"
+        },
+        {
+          "refId": "scheduled",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "sum by (ebHash) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosVoteScheduled\", instance=~\"$instance\"} | json ebHash=\"ebHash\" [$__range]))"
+        },
+        {
+          "refId": "declined",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "sum by (ebHash) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosNotVoted\", instance=~\"$instance\"} | json ebHash=\"ebHash\" [$__range])) or (sum by (ebHash) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosVoteScheduled\", instance=~\"$instance\"} | json ebHash=\"ebHash\" [$__range])) * 0)"
+        },
+        {
+          "refId": "rate",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "instant",
+          "format": "table",
+          "expr": "(sum by (ebHash) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosNotVoted\", instance=~\"$instance\"} | json ebHash=\"ebHash\" [$__range])) or (sum by (ebHash) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosVoteScheduled\", instance=~\"$instance\"} | json ebHash=\"ebHash\" [$__range])) * 0)) / (sum by (ebHash) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosVoteScheduled\", instance=~\"$instance\"} | json ebHash=\"ebHash\" [$__range])) > 0)"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "ebHash",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #age": "announcement age",
+              "Value #scheduled": "seats scheduled",
+              "Value #declined": "seats declined",
+              "pool": "producer pool",
+              "ebHash": "EB",
+              "Value #rate": "decline rate"
+            },
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true
+            },
+            "indexByName": {
+              "Value #age": 0,
+              "Value #declined": 1,
+              "Value #scheduled": 2,
+              "Value #rate": 3,
+              "pool": 4,
+              "ebHash": 5
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "announcement age",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": true,
+          "reducer": [
+            "mean"
+          ],
+          "fields": [
+            "decline rate"
+          ],
+          "countRows": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "announcement age"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    },
+                    {
+                      "color": "red",
+                      "value": 2
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "decline rate"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#808080",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.1
+                    },
+                    {
+                      "color": "red",
+                      "value": 0.3
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "noValue",
+                "value": "no votes in window"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "seats declined"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "noValue",
+                "value": "0"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "seats scheduled"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "noValue",
+                "value": "0"
+              }
+            ]
+          }
+        ]
+      },
+      "timeFrom": "$ebWindow"
+    }
+  ]
 }

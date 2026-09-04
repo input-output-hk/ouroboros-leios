@@ -14,8 +14,18 @@
 //   Input  : cardano_node_process output -- body = decoded data, kind label set.
 //   Output : same line; on vote lines the service is refined and voterId indexed.
 //   Labels : service=cardano-node/leios-voting, plus voterId on cast/acquired
-//            lines only -- the other kinds carry no vote.voterId.
-//   Metrics: voted_weight_total, votes_acquired_total.
+//            lines only -- the other kinds carry no vote.voterId -- and reason
+//            on declined lines.
+//   Metrics: voted_weight_total, votes_cast_total, votes_scheduled_total,
+//            votes_declined_total, votes_acquired_total, vote_tally,
+//            tally_updates_total.
+//
+// Participation is votes_cast_total over votes_scheduled_total: every EB whose
+// vote is scheduled is one the node was asked to vote on, so the ratio is the
+// share actually cast, and it stays readable when nothing certifies. Scheduled
+// and declined lines carry no vote.voterId, so those two counters are per
+// instance while the cast counter also carries voterId. One BP hosts one pool,
+// so join them on instance rather than voterId.
 //   Example input:
 //     {
 //       "kind": "LeiosVoted",
@@ -37,7 +47,7 @@ declare "leios_voting_process" {
 
   loki.process "enrich" {
     stage.match {
-      selector = `{kind=~"LeiosVoteScheduled|LeiosEbValidated|LeiosNotVoted|LeiosVoted|LeiosVoteAcquired"}`
+      selector = `{kind=~"LeiosVoteScheduled|LeiosEbValidated|LeiosNotVoted|LeiosVoted|LeiosVoteAcquired|LeiosTally"}`
 
       stage.static_labels {
         values = {
@@ -83,6 +93,67 @@ declare "leios_voting_process" {
             source            = "weight"
             max_idle_duration = "24h"
           }
+
+          // Counted as well as weighted: a weight sum moves when the committee
+          // reweights, so only a plain count divides into votes_scheduled_total
+          // to give participation.
+          metric.counter {
+            name              = "votes_cast_total"
+            description       = "The total votes cast"
+            prefix            = "leios_logmetrics_leios_"
+            action            = "inc"
+            match_all         = true
+            max_idle_duration = "24h"
+          }
+        }
+      }
+
+      // The denominator for participation. Every scheduled vote is an EB this
+      // node was asked to vote on, whether or not the vote was later cast.
+      stage.match {
+        selector = `{kind="LeiosVoteScheduled"}`
+
+        stage.metrics {
+          metric.counter {
+            name              = "votes_scheduled_total"
+            description       = "The total votes scheduled"
+            prefix            = "leios_logmetrics_leios_"
+            action            = "inc"
+            match_all         = true
+            max_idle_duration = "24h"
+          }
+        }
+      }
+
+      // Declines are labelled by reason so a participation dip can be read
+      // straight off: chainTipDoesNotAnnounce is announcement diffusion losing
+      // the race, tooLate is the vote window closing first. The reason set is
+      // small and node-defined, so it is safe to label.
+      stage.match {
+        selector = `{kind="LeiosNotVoted"}`
+
+        stage.json {
+          expressions = {
+            reason = "reason",
+          }
+          drop_malformed = true
+        }
+
+        stage.labels {
+          values = {
+            reason = "reason",
+          }
+        }
+
+        stage.metrics {
+          metric.counter {
+            name              = "votes_declined_total"
+            description       = "The total votes scheduled but not cast, by reason"
+            prefix            = "leios_logmetrics_leios_"
+            action            = "inc"
+            match_all         = true
+            max_idle_duration = "24h"
+          }
         }
       }
 
@@ -93,6 +164,51 @@ declare "leios_voting_process" {
           metric.counter {
             name              = "votes_acquired_total"
             description       = "The total votes acquired"
+            prefix            = "leios_logmetrics_leios_"
+            action            = "inc"
+            match_all         = true
+            max_idle_duration = "24h"
+          }
+        }
+      }
+
+      // Certification margin. LeiosTally is emitted once per distinct vote, so
+      // an EB produces a rising series and the top populated bucket is roughly
+      // the best tally that point reached. That is the only view of how close a
+      // point came when it never certified, since only certified points reach
+      // the chain and so db-sync sees nothing at all.
+      //
+      // Buckets crowd 0.75 because the question is near-miss versus far-miss:
+      // stalling at 0.74 is a diffusion problem, stalling at 0.45 is structural.
+      // rbHash stays in the body, so the exact per-point maximum is a Loki
+      // `| json | max by (rbHash)` rather than a label.
+      //
+      // Absent on an unpatched node: no LeiosTally lines means this never
+      // matches and the series is simply never created, so the module is safe
+      // to deploy ahead of, or wider than, the patched node.
+      stage.match {
+        selector = `{kind="LeiosTally"}`
+
+        stage.json {
+          expressions = {
+            tally = "tally",
+          }
+          drop_malformed = true
+        }
+
+        stage.metrics {
+          metric.histogram {
+            name              = "vote_tally"
+            description       = "Running per-point vote tally, as a fraction of committee weight"
+            prefix            = "leios_logmetrics_leios_"
+            source            = "tally"
+            buckets           = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.65, 0.7, 0.72, 0.74, 0.75, 0.8, 0.9, 1.0]
+            max_idle_duration = "24h"
+          }
+
+          metric.counter {
+            name              = "tally_updates_total"
+            description       = "The total per-point tally updates, one per distinct vote added"
             prefix            = "leios_logmetrics_leios_"
             action            = "inc"
             match_all         = true
