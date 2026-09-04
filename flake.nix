@@ -18,7 +18,7 @@
 
     iogx.url = "github:input-output-hk/iogx";
 
-    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=eeb5b2da0083cf3b7a9e80d172685ae941638125";
+    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=73d61e931ebd93ea58dacf2ad3e2562dbbdc0fbe";
 
     # Trace verifier only: it links cardano-api against the Leios prototype
     # node's pins (cabal.project.trace-verifier), which need newer
