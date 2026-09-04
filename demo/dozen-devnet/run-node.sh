@@ -6,7 +6,8 @@ set -euo pipefail
 
 cd "$NODE_DIR"
 
-export LEIOS_DB_PATH="leios.db"
+export LEIOS_VOL_DB_PATH="leios.db.vol"
+export LEIOS_IMM_DB_PATH="leios.db.imm"
 
 # A socket left behind by a previous run -- which RESUME=1 guarantees -- satisfies
 # the wait below instantly. The waiter then chmods that doomed inode, the node

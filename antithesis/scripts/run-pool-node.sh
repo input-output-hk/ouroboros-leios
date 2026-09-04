@@ -25,8 +25,9 @@ fi
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
 
-# Set LEIOS_DB_PATH for the node
-export LEIOS_DB_PATH="$DATA_DIR/leios.db"
+# Set LEIOS_VOL_DB_PATH and LEIOS_IMM_DB_PATH and for the node
+export LEIOS_VOL_DB_PATH="$DATA_DIR/leios.db.vol"
+export LEIOS_IMM_DB_PATH="$DATA_DIR/leios.db.imm"
 
 # Verify required files exist
 for required_file in config.yaml topology.json shelley-genesis.json keys/vrf.skey keys/kes.skey keys/bls.skey keys/opcert.cert; do
@@ -42,7 +43,8 @@ echo "  DATA_DIR: $DATA_DIR"
 echo "  LOG_DIR: $LOG_DIR"
 echo "  PORT: $PORT"
 echo "  HOST_ADDR: $HOST_ADDR"
-echo "  LEIOS_DB_PATH: $LEIOS_DB_PATH"
+echo "  LEIOS_VOL_DB_PATH: $LEIOS_VOL_DB_PATH"
+echo "  LEIOS_IMM_DB_PATH: $LEIOS_IMM_DB_PATH"
 
 # Keep the full node log on the shared volume. Emitting it on stdout makes
 # Antithesis retain every routine node event in the test-run log stream.
