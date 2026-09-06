@@ -131,7 +131,9 @@ cardano-cli dijkstra node key-gen-VRF \
 ## BLS keys
 
 BLS keys are keys that pools use to vote on and certify endorser blocks.
-You need them to register a Leios-enabled stake pool.
+You need them to register a Leios-enabled stake pool — in Dijkstra the BLS
+key is **structural**, not optional: `stake-pool registration-certificate`
+refuses to build a certificate without one.
 
 ```shell
 # BLS key pair (Leios voting/certification key)
@@ -139,6 +141,24 @@ cardano-cli dijkstra node key-gen-BLS \
   --verification-key-file bls.vkey \
   --signing-key-file bls.skey
 ```
+
+The scheme is BLS12-381 in its *minimal signature size* variant, so the
+verification key is 96 bytes (in G2) and a signature is 48 bytes (in G1).
+You can see that in the key file's envelope type:
+
+```shell
+jq -r .type bls.vkey
+# BlsVerificationKey_bls12-381-BLS-Signature-Mininimal-Signature-Size
+```
+
+:::note You never pass the proof of possession yourself
+Registration needs a *proof of possession* — a signature over your own
+public key that stops someone registering a key they do not hold (a rogue
+key attack, which matters because Leios aggregates signatures). The CLI
+derives it for you from the **signing** key, which is why the registration
+step below takes `--bls-signing-key-file` and not the verification key.
+`issue-pop-BLS` exists if you ever need the proof on its own.
+:::
 
 ## Operational certificate
 
@@ -204,12 +224,16 @@ cardano-cli dijkstra stake-pool registration-certificate \
   --out-file pool-reg.cert
 ```
 
-:::warning BLS key included but not yet active
-The `cardano-cli` command for creating a pool registration certificate now
-requires a BLS key. The Musashi testnet does not utilize it yet at the time of
-writing, but transactions carrying it are already accepted. Reach out on the
-[Musashi Dōjō Discord](https://discord.gg/AyUXD9VHn) if you need help to
-register a pool.
+:::info What the BLS key does once it is on-chain
+The registration certificate carries your BLS verification key and its
+proof of possession (96 + 48 bytes on top of an ordinary registration).
+The ledger stores the key together with **the epoch you registered it in**,
+and that pair is what the Leios committee is drawn from — see
+[Verify your BLS key](#verify-your-bls-key) and
+[Rotate your BLS key](#rotate-your-bls-key) below.
+
+Reach out on the [Musashi Dōjō Discord](https://discord.gg/AyUXD9VHn) if
+you need help to register a pool.
 :::
 
 :::tip
@@ -318,6 +342,105 @@ cardano-cli dijkstra query stake-address-info --address "$STAKE_ADDR"
 
 If both look right, your pool is registered.
 
+## Verify your BLS key
+
+`query pool-state` reports a pool as ledger **state**, so alongside pledge,
+cost and margin you get your BLS key and the epoch it was registered in:
+
+```shell
+cardano-cli dijkstra query pool-state --stake-pool-id "$POOL_ID" \
+  | jq '.[].poolParams.spsBlsKey'
+```
+
+```json
+{
+  "bksKey": {
+    "blsPubKey": "99786f625a1c9973d15990047f23120c0c1f9fa801b31ce24144...",
+    "blsPossessionProof": "98f08ec21b63e8f7cbf042dd4df9c1527f1d14cc973c..."
+  },
+  "bksRegisteredIn": 0
+}
+```
+
+Two things to check:
+
+- `blsPubKey` matches the key you registered. Compare it against your own
+  file — `bls.vkey` stores the key CBOR-wrapped, so strip the 4-character
+  `5860` header before comparing:
+
+  ```shell
+  jq -r .cborHex bls.vkey | cut -c5-
+  ```
+
+- `bksRegisteredIn` is the epoch the ledger stamped your key with. This is
+  **not** decoration: it is what key expiry is measured from, so note it.
+
+A `null` here means the pool is registered but has **no** BLS key — it can
+win blocks but can never vote on endorser blocks.
+
+## See your pool on the Leios committee
+
+The committee is not a separate registry; it is derived from the stake
+snapshot at each epoch boundary. The rule (`selectLeiosCommittee`) is:
+
+1. take the pools in the snapshot, ordered by stake, descending
+2. keep the top `leiosCommitteeSize` of them — each gets seats weighted by
+   its stake
+3. offer a seat *its key* only while the key is still honoured, i.e. while
+   `currentEpoch < bksRegisteredIn + maxKeyAge`
+
+Step 3 is the one to remember: an aged-out key does not lose you the seat,
+it leaves you **seated but keyless** — holding committee weight you cannot
+vote with. That is worse than not being seated, because the seat is not
+reallocated to someone who could have used it.
+
+`query stake-snapshot` reports the committee itself, so none of this has
+to be reconstructed by hand:
+
+```shell
+cardano-cli dijkstra query stake-snapshot --all-stake-pools \
+  | jq '.leiosCommittee'
+```
+
+```json
+[
+  {
+    "poolId": "e0a714319812c3f773ba04ec5d6b3ffcd5aad85006805b047b082541",
+    "weight": { "numerator": 2, "denominator": 3 },
+    "key": { "bksKey": { "blsPubKey": "a5756554…", "blsPossessionProof": "8114c1b1…" },
+             "bksRegisteredIn": 191 },
+    "voting": true
+  }
+]
+```
+
+Seats appear in committee order, and a seat's position in the list is the
+index votes reference. Find yours by `poolId`:
+
+```shell
+cardano-cli dijkstra query stake-snapshot --all-stake-pools \
+  | jq --arg pool "$POOL_ID" '.leiosCommittee[] | select(.poolId == $pool)'
+```
+
+Read `key` and `voting` together — that pair is the whole point:
+
+| `key` | `voting` | meaning |
+| --- | --- | --- |
+| present | `true` | seated and voting |
+| present | `false` | **seated but keyless** — your key aged out |
+| `null` | `false` | seated, but you never registered a key |
+
+No output at all means your pool did not make the top
+`leiosCommitteeSize` by stake this epoch.
+
+:::note Which snapshot this is
+`leiosCommittee` is the committee seated on the `set` snapshot — the one
+governing the *current* epoch, which is what the network is voting with
+right now. The per-pool `stakeMark` figures in the same output are the
+snapshot taken at the start of this epoch, so they tell you where you will
+rank when the committee is next reseated.
+:::
+
 ## Restart as block producer
 
 Stop the relay and restart it with the KES key, VRF key, and operational
@@ -396,6 +519,90 @@ takes effect — roughly two epochs after registration.
 pools for staying reachable, sharing telemetry and producing blocks. If
 you did not apply before registering, you can still join by submitting an
 updated registration certificate carrying your Application Code.
+
+## Rotate your BLS key
+
+BLS keys age out. The ledger honours a key only while
+
+```
+currentEpoch < bksRegisteredIn + maxKeyAge
+```
+
+so a key you registered and never touched again eventually stops counting,
+and — as described above — your pool stays **seated but keyless**: it holds
+committee weight it cannot vote with. Nothing warns you; `bksRegisteredIn`
+simply stops being recent enough.
+
+Rotating is the same operation as registering: submit a fresh pool
+registration certificate carrying the new key. The ledger treats a
+registration for a pool that already exists as an **update**, and re-stamps
+`bksRegisteredIn` with the epoch the update takes effect in, which restarts
+the clock.
+
+```shell
+# 1. new key pair, kept beside the old one until the rotation is on-chain
+cardano-cli dijkstra node key-gen-BLS \
+  --verification-key-file bls-new.vkey \
+  --signing-key-file bls-new.skey
+
+# 2. re-register: every other field stays exactly as it was
+cardano-cli dijkstra stake-pool registration-certificate \
+  --cold-verification-key-file cold.vkey \
+  --vrf-verification-key-file vrf.vkey \
+  --bls-signing-key-file bls-new.skey \
+  --pool-pledge 1000000000 \
+  --pool-cost 170000000 \
+  --pool-margin 0.05 \
+  --pool-reward-account-verification-key-file stake.vkey \
+  --pool-owner-stake-verification-key-file stake.vkey \
+  --pool-relay-ipv4 <YOUR_PUBLIC_IP> \
+  --pool-relay-port 3010 \
+  --out-file pool-rotate.cert
+
+# 3. submit it on its own (no stake-address certificate this time)
+TXIN=$(cardano-cli dijkstra query utxo --address "$(cat payment.addr)" | jq -r 'keys[0]')
+
+cardano-cli dijkstra transaction build \
+  --tx-in "$TXIN" \
+  --change-address "$(cat payment.addr)" \
+  --certificate-file pool-rotate.cert \
+  --out-file pool-rotate.raw
+
+cardano-cli dijkstra transaction sign \
+  --tx-body-file pool-rotate.raw \
+  --signing-key-file payment.skey \
+  --signing-key-file cold.skey \
+  --out-file pool-rotate.signed
+
+cardano-cli dijkstra transaction submit --tx-file pool-rotate.signed
+```
+
+:::warning Do not swap the node's key until the rotation is seated
+The node signs votes with whatever `--shelley-bls-key` it was started
+with, and the committee is only re-drawn at an epoch boundary. Restart the
+node with `bls-new.skey` **after** the new key shows up in the committee's
+snapshot, not when the transaction is submitted. Restarting early means
+signing with a key the committee does not hold — your votes are dropped.
+:::
+
+Watch the rotation land, then cut over:
+
+```shell
+# repeat until bksRegisteredIn advances to the new epoch
+cardano-cli dijkstra query pool-state --stake-pool-id "$POOL_ID" \
+  | jq '.[].poolParams.spsBlsKey.bksRegisteredIn'
+```
+
+Once that reads the newer epoch and the following epoch boundary has
+passed, restart the node pointing `--shelley-bls-key` at `bls-new.skey`,
+and keep the old key until you have seen the node vote again.
+
+**How often?** Rotate well before `bksRegisteredIn + maxKeyAge`, not at it
+— the update takes an epoch boundary to take effect, so a rotation
+submitted in the last epoch of validity is already too late. Note that
+`maxKeyAge` is not currently exposed as a protocol parameter, so check the
+testnet's announced value rather than deriving it from
+`query protocol-parameters`.
 
 ## What to send back
 
