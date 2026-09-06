@@ -148,7 +148,7 @@ You can see that in the key file's envelope type:
 
 ```shell
 jq -r .type bls.vkey
-# BlsVerificationKey_bls12-381-BLS-Signature-Mininimal-Signature-Size
+# BlsVerificationKey_bls12-381-BLS-Signature-Minimal-Signature-Size
 ```
 
 :::note You never pass the proof of possession yourself
@@ -157,7 +157,8 @@ public key that stops someone registering a key they do not hold (a rogue
 key attack, which matters because Leios aggregates signatures). The CLI
 derives it for you from the **signing** key, which is why the registration
 step below takes `--bls-signing-key-file` and not the verification key.
-`issue-pop-BLS` exists if you ever need the proof on its own.
+There is no command that emits the proof on its own — it exists only
+inside a registration certificate.
 :::
 
 ## Operational certificate
