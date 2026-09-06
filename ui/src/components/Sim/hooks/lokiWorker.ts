@@ -28,18 +28,23 @@ export type LokiWorkerResponse =
   | { type: "EVENTS"; events: IServerMessage[] }
   | { type: "DROPPED"; count: number };
 
-// Alloy writes each cardano-node line to Loki twice: once before it promotes
-// the JSON `kind` to a stream label and once after, so every event exists in
-// both a `kind=""` stream and a `kind="..."` stream with byte-identical content.
-// The `kind=""` set is the complete one (the labelled set omits events whose
-// kind is nested, e.g. TraceSendRecv, so it never gets the label); selecting it
-// here delivers every event exactly once. That keeps the parser's stateful
-// correlation (cert -> forge -> adopt, which populates an RB's parent and
-// certified EB) from being corrupted by a duplicate forge. NB: this couples us
-// to that Alloy behaviour — if the pipeline stops emitting the pre-label copy,
-// this selector must change.
+// Selected on the line content alone, deliberately not on a `kind` label.
+//
+// Whether a cardano-node line carries a `kind` stream label is a property of
+// the Loki pipeline, not of the event: against demo/extras/x-ray, Loki promotes
+// `kind` for top-level kinds and leaves it unset only where the kind is nested
+// (TraceSendRecv and friends). A `kind=""` selector therefore drops exactly the
+// Leios events this view exists to show — measured against a live dozen-devnet,
+// it returned zero LeiosBlockAnnounced, zero TraceForgedBlock and zero
+// CompletedBlockFetch while the unconstrained selector returned all of them.
+//
+// The risk this trades against is double counting, which would corrupt the
+// parser's stateful correlation (cert -> forge -> adopt). That only arises if a
+// pipeline writes each line twice, once pre- and once post-label. Ours does not:
+// per-kind counts are identical with and without the constraint. Revisit if a
+// deployment reintroduces the duplicate write.
 const QUERY =
-  '{service="cardano-node", kind=""} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|TraceAdoptedBlock|LeiosBlockAnnounced|LeiosBlockCertified|MsgLeiosVotes|LeiosVoted"';
+  '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|TraceAdoptedBlock|LeiosBlockAnnounced|LeiosBlockCertified|MsgLeiosVotes|LeiosVoted"';
 
 const POLL_INTERVAL_MS = 1000;
 const MAX_ENTRIES = 5000;
