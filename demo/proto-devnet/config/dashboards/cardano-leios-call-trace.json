@@ -24,7 +24,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {
@@ -114,11 +114,11 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} \n      | json\n      | event=\"End\"\n      | unwrap duration [5m]\n  )\n)",
+          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"cardano-node/call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} \n      | json\n      | event=\"End\"\n      | unwrap duration [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{stack}}",
           "queryType": "range",
           "refId": "A"
@@ -130,7 +130,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {
@@ -220,11 +220,11 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "avg by(thread, stack) (\n  avg_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"}\n      | json\n      | event=\"End\"\n      | unwrap duration [5m]\n  )\n)",
+          "expr": "avg by(thread, stack) (\n  avg_over_time(\n    {service=\"cardano-node/call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"}\n      | json\n      | event=\"End\"\n      | unwrap duration [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{stack}}",
           "queryType": "range",
           "refId": "A"
@@ -236,7 +236,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {
@@ -326,11 +326,11 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} \n      | json\n      | event=\"End\"\n      | unwrap allocations [5m]\n  )\n)",
+          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"cardano-node/call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} \n      | json\n      | event=\"End\"\n      | unwrap allocations [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{stack}}",
           "queryType": "range",
           "refId": "A"
@@ -342,7 +342,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {
@@ -432,11 +432,11 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "avg by(thread, stack) (\n  avg_over_time(\n    {service=\"call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} \n      | json\n      | event=\"End\"\n      | unwrap allocations [5m]\n  )\n)",
+          "expr": "avg by(thread, stack) (\n  avg_over_time(\n    {service=\"cardano-node/call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} \n      | json\n      | event=\"End\"\n      | unwrap allocations [5m]\n  )\n)",
           "legendFormat": "[{{thread}}] $ {{stack}}",
           "queryType": "range",
           "refId": "A"
@@ -448,7 +448,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {
@@ -544,11 +544,11 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{service=\"call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} | json",
+          "expr": "{service=\"cardano-node/call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} | json",
           "legendFormat": "{{process}}",
           "queryType": "range",
           "refId": "A"
@@ -677,7 +677,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P8E80F9AEF21F6940"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {},
@@ -709,11 +709,11 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P8E80F9AEF21F6940"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{service=\"call-trace\", instance=~\"$instance\", thread=~\"$thread\"} \n  | json\n  | event=\"End\"\n  | label_format root_id=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  # Span fields\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .instance }} - {{ .thread }}`\n  | label_format spanID=`{{ .instance }} - {{ .thread }} - {{ .id }}`\n  | label_format parentSpanID=`{{ .instance }} - {{ .thread }} - {{ .parent_id }}`\n  | label_format traceID=`{{ .instance }} - {{ .thread }} - {{ .root_id }}`\n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName",
+          "expr": "{service=\"cardano-node/call-trace\", instance=~\"$instance\", thread=~\"$thread\"} \n  | json\n  | event=\"End\"\n  | label_format root_id=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  # Span fields\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .instance }} - {{ .thread }}`\n  | label_format spanID=`{{ .instance }} - {{ .thread }} - {{ .id }}`\n  | label_format parentSpanID=`{{ .instance }} - {{ .thread }} - {{ .parent_id }}`\n  | label_format traceID=`{{ .instance }} - {{ .thread }} - {{ .root_id }}`\n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName",
           "queryType": "range",
           "refId": "A"
         }
@@ -796,7 +796,7 @@
         },
         "datasource": {
           "type": "loki",
-          "uid": "P8E80F9AEF21F6940"
+          "uid": "loki"
         },
         "definition": "",
         "description": "",
@@ -808,7 +808,7 @@
         "query": {
           "label": "instance",
           "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "{service=\"call-trace\"}",
+          "stream": "{service=\"cardano-node/call-trace\"}",
           "type": 1
         },
         "refresh": 2,
@@ -826,7 +826,7 @@
         },
         "datasource": {
           "type": "loki",
-          "uid": "P8E80F9AEF21F6940"
+          "uid": "loki"
         },
         "definition": "",
         "includeAll": true,
@@ -836,7 +836,7 @@
         "query": {
           "label": "name",
           "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "{service=\"call-trace\"}",
+          "stream": "{service=\"cardano-node/call-trace\"}",
           "type": 1
         },
         "refresh": 2,
@@ -850,7 +850,7 @@
         },
         "datasource": {
           "type": "loki",
-          "uid": "P8E80F9AEF21F6940"
+          "uid": "loki"
         },
         "definition": "",
         "includeAll": true,
@@ -860,7 +860,7 @@
         "query": {
           "label": "thread",
           "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "{service=\"call-trace\"}",
+          "stream": "{service=\"cardano-node/call-trace\"}",
           "type": 1
         },
         "refresh": 2,
@@ -875,7 +875,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Call Trace",
+  "title": "Cardano Leios - Call Trace",
   "uid": "calltrace",
   "version": 1
 }
