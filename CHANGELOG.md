@@ -5,6 +5,43 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w36 - 2026-09-06
+
+Adds Leios protocol parameters, selects the Leios committee at the epoch boundary, with voting keys that expire and need to be rotated (like KES keys). Plus, a forge loop that no longer blocks unboundedly on the mempool, and a corrected BLS proof of possession.
+
+> [!IMPORTANT]
+>
+> **Requires respin:** Delete your local state and re-sync from genesis or sideload from the IOG relays, using the `musashi` network config from https://book.play.dev.cardano.org/adv-musashi.html. The respin is expected to happen in 1-2 days.
+
+- **BREAKING** Committee is selected on epoch boundary and BLS keys do expire and need to be rotated (like KES keys) [ledger#6047](https://github.com/IntersectMBO/cardano-ledger/pull/6047), [ledger#6052](https://github.com/IntersectMBO/cardano-ledger/pull/6052), [consensus#2269](https://github.com/IntersectMBO/ouroboros-consensus/pull/2269)
+  - A key is honoured for `ceil(maxKESEvolutions × slotsPerKESPeriod / epochLength) + 2` epochs after it was registered, so voting-key rotation rides along with the KES rotation pools already run.
+  - A lapsed key does not free the seat: the pool keeps its committee weight, cannot vote with it, and the seat is not reallocated.
+  - This will also lower resource usage as the committee was derived for each vote validation in previous prototypes.
+
+- **BREAKING** Committee size, quorum threshold, endorser block limits and the certification gap are read from the protocol parameters [consensus#2269](https://github.com/IntersectMBO/ouroboros-consensus/pull/2269), so governance can change them without a node release.
+  - Also fixes a node crash when resolving an endorser block's closure on a chain that contains a pool registration.
+
+- **BREAKING** The BLS proof of possession now uses the domain separation tag [draft-irtf-cfrg-bls-signature-06](https://datatracker.ietf.org/doc/draft-irtf-cfrg-bls-signature/) prescribes, so proofs from earlier releases no longer verify and registration needs the `cardano-cli` from this one. A key that fails to verify is not rejected: the pool stays seated but cannot vote, with no error to say so.
+
+- **BREAKING** Rebased onto a recent cardano-ledger [consensus#2268](https://github.com/IntersectMBO/ouroboros-consensus/pull/2268). This brings several Dijkstra block structure changes independent of Leios.
+
+> [!TIP]
+>
+> The CDDL of the currently integrated ledger can be found here: [dijsktra.cddl](https://github.com/IntersectMBO/cardano-ledger/blob/1587f21a7d1306dc590c2749a5c66232ef66aad0/eras/dijkstra/impl/cddl/data/dijkstra.cddl)
+
+- The committee and the registered keys are visible from the CLI:
+  - **First draft and likely changes again**
+  - `query pool-state` reports a pool's BLS key with its registration epoch.
+  - `query stake-snapshot` reports `leiosCommittee`: every seat with its pool, weight, registered key and the epoch it was registered in, and whether it is voting. A seat with a key and `"voting": false` has expired.
+
+- Block production no longer slows as the mempool fills [consensus#2217](https://github.com/IntersectMBO/ouroboros-consensus/pull/2217)
+  - Mempool snapshot re-computation is time-capped instead of growing with occupancy.
+  - Use the `MempoolTimeoutCapacity` as a proxy configuration -> a 10th of that value is the allowed time to re-apply the mempool snapshot.
+
+- Vote telemetry [consensus#2271](https://github.com/IntersectMBO/ouroboros-consensus/pull/2271)
+  - `LeiosVoteAcquired` carries the running `tally` and the `threshold`, which shows how close a point came even when it never certifies.
+  - The `LeiosPeer.Msg` per-vote peer trace is gone; it rendered every vote's signature bytes and dominated the log on a network with many voters. Use the `SendRecv` traces for individual message debugging.
+
 ## prototype-2026w35 - 2026-08-30
 
 Completes the Leios protocol pipeline with faster and more robust EB diffusion, transactions validated before an EB is voted for, and a Leios database that no longer stalls the node. Syncing should also get stuck far less. Plus tooling to see whose load a mempool is holding.
@@ -285,4 +322,3 @@ This is includes roughly:
 - Resolves transactions from certificates when adopting a block
 - No certificate verification whatsoever
 - Inlines transactions for the N2C chain sync server
-
