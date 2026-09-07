@@ -85,7 +85,7 @@ declare "call_trace_process" {
 					metric.counter {
 						name              = "started_total"
 						description       = "Total started calls"
-						prefix            = "leios_logmetrics_call_trace"
+						prefix            = "leios_logmetrics_call_trace_"
 						action            = "inc"
 						match_all         = true
 						max_idle_duration = "24h"
@@ -113,7 +113,7 @@ declare "call_trace_process" {
 					metric.counter {
 						name              = "ended_total"
 						description       = "Total ended calls"
-						prefix            = "leios_logmetrics_call_trace"
+						prefix            = "leios_logmetrics_call_trace_"
 						action            = "inc"
 						match_all         = true
 						max_idle_duration = "24h"
@@ -122,7 +122,7 @@ declare "call_trace_process" {
 					metric.counter {
 						name              = "duration_total_seconds"
 						description       = "Total call duration"
-						prefix            = "leios_logmetrics_call_trace"
+						prefix            = "leios_logmetrics_call_trace_"
 						action            = "add"
 						source            = "duration"
 						max_idle_duration = "24h"
@@ -131,7 +131,7 @@ declare "call_trace_process" {
 					metric.counter {
 						name              = "allocations_total_bytes"
 						description       = "Total call allocations"
-						prefix            = "leios_logmetrics_call_trace"
+						prefix            = "leios_logmetrics_call_trace_"
 						action            = "add"
 						source            = "allocations"
 						max_idle_duration = "24h"
