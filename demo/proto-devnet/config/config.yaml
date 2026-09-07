@@ -8,6 +8,11 @@ DijkstraGenesisFile: dijkstra-genesis.json
 # Lower bound, 2 * maxEBClosure (12.5MB)
 MempoolCapacityBytesOverride: 25000000
 
+MempoolTimeoutSoft: 1.0
+MempoolTimeoutHard: 1.5
+# Up from default 5, a 10th is used for the forge time cap
+MempoolTimeoutCapacity: 7.0
+
 # Needed < 10.6
 EnableP2P: true
 
