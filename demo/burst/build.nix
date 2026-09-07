@@ -5,6 +5,7 @@
       config,
       lib,
       system,
+      inputs',
       ...
     }:
     {
@@ -13,19 +14,32 @@
           name = "dev-demo-burst";
           src = ./.;
           inputsFrom = [ config.devShells.dev-demo ];
-          packages = [
-            pkgs.process-compose
-            pkgs.iproute2
-            pkgs.sqlite
-            pkgs.jq
-            config.packages.ss_http_exporter
-            (pkgs.python3.withPackages (
-              ps: with ps; [
-                pandas
-                matplotlib
-              ]
-            ))
-          ];
+          # The ouroboros-consensus tools live here rather than in dev-demo
+          # because burst is the only demo that runs them (see run.sh and
+          # scripts/). Keeping them out of the shared shell means the devnets
+          # do not build ouroboros-consensus from source just to get a shell.
+          packages =
+            (with inputs'.ouroboros-consensus.legacyPackages.hsPkgs; [
+              ouroboros-consensus.components.exes.immdb-server
+              ouroboros-consensus.components.exes.db-analyser
+              ouroboros-consensus.components.exes.db-immutaliser
+              ouroboros-consensus.components.exes.leios-schedule-gen
+            ])
+            ++ [
+              pkgs.process-compose
+              pkgs.iproute2
+              pkgs.sqlite
+              pkgs.jq
+              config.packages.ss_http_exporter
+              (pkgs.python3.withPackages (
+                ps: with ps; [
+                  pandas
+                  matplotlib
+                ]
+              ))
+            ];
+
+          IMMDB_SERVER = pkgs.lib.getExe inputs'.ouroboros-consensus.legacyPackages.hsPkgs.ouroboros-consensus.components.exes.immdb-server;
         };
       };
 
