@@ -18,6 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
+  "id": 4,
   "links": [],
   "panels": [
     {
@@ -28,7 +29,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd",
+            "mode": "palette-classic-by-name",
             "seriesBy": "max"
           },
           "custom": {
@@ -78,7 +79,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "s"
         },
         "overrides": []
       },
@@ -88,7 +90,7 @@
         "x": 0,
         "y": 0
       },
-      "id": 8,
+      "id": 4,
       "options": {
         "legend": {
           "calcs": [
@@ -97,12 +99,14 @@
           ],
           "displayMode": "table",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": true,
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
           "hideZeros": false,
           "mode": "multi",
-          "sort": "none"
+          "sort": "desc"
         }
       },
       "pluginVersion": "12.3.1",
@@ -114,14 +118,13 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "(\n  sum by(thread, stack) (\n    count_over_time({service=\"cardano-node/call-trace\", event=\"Start\", instance=~\"$instance\", name=~\"$name\"} | json [5m])\n  ) \n  - \n  sum by(thread, stack) (\n    count_over_time({service=\"cardano-node/call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} | json [5m])\n  )\n) or sum by(thread, stack) (\n  count_over_time({service=\"cardano-node/call-trace\", event=\"Start\", instance=~\"$instance\", name=~\"$name\"} | json [5m]) * 0\n)",
-          "hide": false,
-          "legendFormat": "{{thread}}: {{stack}}",
+          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"cardano-node/call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} \n      | json\n      | event=\"End\"\n      | unwrap duration [5m]\n  )\n)",
+          "legendFormat": "[{{thread}}] $ {{stack}}",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Active Calls by Thread & Call Stack [5m window]",
+      "title": "Max Duration by Thread & Call Stack [5m window]",
       "type": "timeseries"
     },
     {
@@ -132,111 +135,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd",
-            "seriesBy": "max"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
-      "id": 7,
-      "options": {
-        "legend": {
-          "calcs": [
-            "max",
-            "min"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "direction": "backward",
-          "editorMode": "code",
-          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"cardano-node/call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap allocations [5m]\n  )\n)",
-          "legendFormat": "{{thread}}: {{stack}}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Max Allocations by Thread & Call Stack [5m window]",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "continuous-GrYlRd",
+            "mode": "palette-classic-by-name",
             "seriesBy": "max"
           },
           "custom": {
@@ -295,9 +194,9 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 8
+        "y": 0
       },
-      "id": 4,
+      "id": 9,
       "options": {
         "legend": {
           "calcs": [
@@ -306,12 +205,14 @@
           ],
           "displayMode": "table",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": true,
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "hideZeros": false,
           "mode": "multi",
-          "sort": "none"
+          "sort": "desc"
         }
       },
       "pluginVersion": "12.3.1",
@@ -323,13 +224,225 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"cardano-node/call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n      | json \n      | unwrap duration [5m]\n  )\n)",
-          "legendFormat": "{{thread}}: {{stack}}",
+          "expr": "avg by(thread, stack) (\n  avg_over_time(\n    {service=\"cardano-node/call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"}\n      | json\n      | event=\"End\"\n      | unwrap duration [5m]\n  )\n)",
+          "legendFormat": "[{{thread}}] $ {{stack}}",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Max Duration by Thread & Call Stack [5m window]",
+      "title": "Average Duration by Thread & Call Stack [5m window]",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic-by-name",
+            "seriesBy": "max"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "max",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Name",
+          "sortDesc": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "max by(thread, stack) (\n  max_over_time(\n    {service=\"cardano-node/call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} \n      | json\n      | event=\"End\"\n      | unwrap allocations [5m]\n  )\n)",
+          "legendFormat": "[{{thread}}] $ {{stack}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Max Allocations by Thread & Call Stack [5m window]",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic-by-name",
+            "seriesBy": "max"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [
+            "max",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Name",
+          "sortDesc": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "avg by(thread, stack) (\n  avg_over_time(\n    {service=\"cardano-node/call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} \n      | json\n      | event=\"End\"\n      | unwrap allocations [5m]\n  )\n)",
+          "legendFormat": "[{{thread}}] $ {{stack}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Average Allocations by Thread & Call Stack [5m window]",
       "type": "timeseries"
     },
     {
@@ -393,6 +506,18 @@
                 "value": "decbytes"
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "argument"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              }
+            ]
           }
         ]
       },
@@ -423,8 +548,8 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{service=\"cardano-node/call-trace\", instance=~\"$instance\", name=~\"$name\"} | json",
-          "legendFormat": "{{instance}}",
+          "expr": "{service=\"cardano-node/call-trace\", instance=~\"$instance\", name=~\"$name\", thread=~\"$thread\"} | json",
+          "legendFormat": "{{process}}",
           "queryType": "range",
           "refId": "A"
         }
@@ -436,7 +561,22 @@
           "options": {
             "delimiter": ",",
             "format": "json",
+            "jsonPaths": [],
             "source": "Line"
+          }
+        },
+        {
+          "id": "extractFields",
+          "options": {
+            "delimiter": ",",
+            "format": "json",
+            "jsonPaths": [
+              {
+                "alias": "instance",
+                "path": "instance"
+              }
+            ],
+            "source": "labels"
           }
         },
         {
@@ -460,53 +600,70 @@
           "options": {
             "excludeByName": {
               "Line": true,
+              "allocations 1": true,
+              "allocations 2": true,
               "argument": false,
               "argument_ebHash": true,
               "argument_ebSlot": true,
+              "child_id 1": true,
+              "child_id 2": true,
               "detected_level": true,
+              "duration 1": true,
+              "duration 2": true,
               "filename": true,
               "function": true,
               "host": true,
               "id": false,
               "id 1": true,
+              "id 2": false,
+              "id 3": true,
               "kind": true,
               "kind_extracted": true,
               "labelTypes": true,
               "labels": true,
               "level": true,
+              "name_extracted": true,
               "ns": true,
+              "parent_id 1": true,
+              "parent_id 2": true,
+              "process": true,
               "ptrace_call_stack": true,
               "ptrace_event": true,
               "ptrace_function": true,
               "ptrace_thread": true,
               "replica": true,
+              "result": false,
               "service": true,
               "service_name": true,
               "sev": true,
+              "stack_extracted": true,
+              "thread_extracted": true,
               "tsNs": true,
               "type": true
             },
             "includeByName": {},
             "indexByName": {
-              "Line": 13,
+              "Line": 14,
               "Time": 1,
-              "allocations": 8,
-              "argument": 5,
-              "child_id": 10,
-              "duration": 7,
-              "event": 2,
-              "id 1": 17,
-              "id 2": 12,
-              "kind": 16,
-              "labelTypes": 15,
+              "allocations": 10,
+              "argument": 6,
+              "child_id": 13,
+              "duration": 9,
+              "event": 4,
+              "id 1": 18,
+              "id 2": 11,
+              "instance": 2,
+              "kind": 17,
+              "labelTypes": 16,
               "labels": 0,
-              "name": 4,
-              "parent_id": 11,
-              "result": 6,
-              "stack": 9,
+              "name": 5,
+              "parent_id": 12,
+              "result": 8,
+              "stack": 7,
               "thread": 3,
-              "tsNs": 14
+              "tsNs": 15
             },
+            "orderByMode": "manual",
             "renameByName": {
               "Time": "",
               "id 2": "id",
@@ -536,7 +693,7 @@
       "options": {
         "spanFilters": {
           "criticalPathOnly": false,
-          "matchesOnly": true,
+          "matchesOnly": false,
           "serviceNameOperator": "=",
           "spanNameOperator": "=",
           "tags": [
@@ -556,7 +713,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{service=\"cardano-node/call-trace\", event=\"End\", instance=~\"$instance\", name=~\"$name\"} \n  | json\n    # Span fields\n  | label_format spanID=`{{ .id }}`\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .thread }}@{{ .instance }}`\n  | label_format traceID=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  | label_format parentSpanID=`{{ .parent_id }}`\n  # Extra fields TODO: Figure out how to add this to span attributes, this breaks everything\n  # | label_format tags=`allocations=\"{{ .allocations }}\", argument=\"{{ .argument }}\", result=\"{{ .result }}\"`\n    \n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName",
+          "expr": "{service=\"cardano-node/call-trace\", instance=~\"$instance\", thread=~\"$thread\"} \n  | json\n  | event=\"End\"\n  | label_format root_id=`{{ regexReplaceAll \"^([0-9]+).*\" .id \"${1}\" }}`\n  # Span fields\n  | label_format operationName=`{{ .name }}`\n  | label_format duration_sec=`{{ .duration }}`\n  | label_format serviceName=`{{ .instance }} - {{ .thread }}`\n  | label_format spanID=`{{ .instance }} - {{ .thread }} - {{ .id }}`\n  | label_format parentSpanID=`{{ .instance }} - {{ .thread }} - {{ .parent_id }}`\n  | label_format traceID=`{{ .instance }} - {{ .thread }} - {{ .root_id }}`\n  | keep traceID, spanID, parentSpanID, operationName, duration_sec, serviceName",
           "queryType": "range",
           "refId": "A"
         }
@@ -623,7 +780,7 @@
     }
   ],
   "preload": false,
-  "refresh": "1m",
+  "refresh": "",
   "schemaVersion": 42,
   "tags": [],
   "templating": {
@@ -654,10 +811,9 @@
           "stream": "{service=\"cardano-node/call-trace\"}",
           "type": 1
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
-        "type": "query",
-        "allValue": ".+"
+        "type": "query"
       },
       {
         "current": {
@@ -680,13 +836,36 @@
         "query": {
           "label": "name",
           "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "{service=\"cardano-node/call-trace\", event=\"Start\"}",
+          "stream": "{service=\"cardano-node/call-trace\"}",
           "type": 1
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
-        "type": "query",
-        "allValue": ".+"
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "Forge",
+          "value": "Forge"
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "definition": "",
+        "includeAll": true,
+        "multi": true,
+        "name": "thread",
+        "options": [],
+        "query": {
+          "label": "thread",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "{service=\"cardano-node/call-trace\"}",
+          "type": 1
+        },
+        "refresh": 2,
+        "regex": "",
+        "type": "query"
       }
     ]
   },
@@ -695,8 +874,8 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "utc",
+  "timezone": "browser",
   "title": "Cardano Leios - Call Trace",
-  "uid": "cardano-leios-call-trace",
+  "uid": "calltrace",
   "version": 1
 }

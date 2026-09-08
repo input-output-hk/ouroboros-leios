@@ -141,6 +141,7 @@ loki.process "extract_process_compose_logs" {
 loki.process "leios_route" {
 	stage.match {
 		selector = `{process=~"Node[0-9]+"}`
+
 		stage.static_labels {
 			values = {
 				service = "cardano-node",
@@ -150,6 +151,7 @@ loki.process "leios_route" {
 
 	stage.match {
 		selector = `{process=~"TxFirehose.*"}`
+
 		stage.static_labels {
 			values = {
 				service = "tx-firehose",
@@ -159,6 +161,7 @@ loki.process "leios_route" {
 
 	stage.match {
 		selector = `{process="TxCentrifuge"}`
+
 		stage.static_labels {
 			values = {
 				service = "tx-centrifuge",

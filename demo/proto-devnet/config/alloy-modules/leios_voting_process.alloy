@@ -29,79 +29,79 @@
 // rbHash is not labelled, since it is roughly one value per block; it stays in the
 // body for `| json` as vote.rbHash, which also keeps the counters bounded.
 declare "leios_voting_process" {
-  argument "forward_to" {}
+	argument "forward_to" { }
 
-  export "receiver" {
-    value = loki.process.enrich.receiver
-  }
+	export "receiver" {
+		value = loki.process.enrich.receiver
+	}
 
-  loki.process "enrich" {
-    stage.match {
-      selector = `{kind=~"LeiosVoteScheduled|LeiosEbValidated|LeiosNotVoted|LeiosVoted|LeiosVoteAcquired"}`
+	loki.process "enrich" {
+		stage.match {
+			selector = `{kind=~"LeiosVoteScheduled|LeiosEbValidated|LeiosNotVoted|LeiosVoted|LeiosVoteAcquired"}`
 
-      stage.static_labels {
-        values = {
-          service = "cardano-node/leios-voting",
-        }
-      }
+			stage.static_labels {
+				values = {
+					service = "cardano-node/leios-voting",
+				}
+			}
 
-      // Only the cast/acquired lines carry vote.voterId, so the parse and the
-      // label stay scoped to them: the label is bounded by committee size, and
-      // the kinds without a voter never see a stage built for one.
-      stage.match {
-        selector = `{kind=~"LeiosVoted|LeiosVoteAcquired"}`
+			// Only the cast/acquired lines carry vote.voterId, so the parse and the
+			// label stay scoped to them: the label is bounded by committee size, and
+			// the kinds without a voter never see a stage built for one.
+			stage.match {
+				selector = `{kind=~"LeiosVoted|LeiosVoteAcquired"}`
 
-        stage.json {
-          expressions = {
-            voterId = "vote.voterId",
-          }
-          drop_malformed = true
-        }
+				stage.json {
+					expressions = {
+						voterId = "vote.voterId",
+					}
+					drop_malformed = true
+				}
 
-        stage.labels {
-          values = {
-            voterId = "voterId",
-          }
-        }
-      }
+				stage.labels {
+					values = {
+						voterId = "voterId",
+					}
+				}
+			}
 
-      stage.match {
-        selector = `{kind="LeiosVoted"}`
+			stage.match {
+				selector = `{kind="LeiosVoted"}`
 
-        stage.json {
-          expressions = {
-            weight = "weight",
-          }
-        }
+				stage.json {
+					expressions = {
+						weight = "weight",
+					}
+				}
 
-        stage.metrics {
-          metric.counter {
-            name              = "voted_weight_total"
-            description       = "The total accumulated voting weight"
-            prefix            = "leios_logmetrics_leios_"
-            action            = "add"
-            source            = "weight"
-            max_idle_duration = "24h"
-          }
-        }
-      }
+				stage.metrics {
+					metric.counter {
+						name              = "voted_weight_total"
+						description       = "The total accumulated voting weight"
+						prefix            = "leios_logmetrics_leios_"
+						action            = "add"
+						source            = "weight"
+						max_idle_duration = "24h"
+					}
+				}
+			}
 
-      stage.match {
-        selector = `{kind="LeiosVoteAcquired"}`
+			stage.match {
+				selector = `{kind="LeiosVoteAcquired"}`
 
-        stage.metrics {
-          metric.counter {
-            name              = "votes_acquired_total"
-            description       = "The total votes acquired"
-            prefix            = "leios_logmetrics_leios_"
-            action            = "inc"
-            match_all         = true
-            max_idle_duration = "24h"
-          }
-        }
-      }
-    }
+				stage.metrics {
+					metric.counter {
+						name              = "votes_acquired_total"
+						description       = "The total votes acquired"
+						prefix            = "leios_logmetrics_leios_"
+						action            = "inc"
+						match_all         = true
+						max_idle_duration = "24h"
+					}
+				}
+			}
+		}
 
-    forward_to = argument.forward_to.value
-  }
+		forward_to = argument.forward_to.value
+	}
 }
