@@ -16,12 +16,19 @@ import {
 
 // Helper functions
 
-// Message type priority order: RBs > EBs > Votes > TXs
+// Link-colour priority: RB > Announcement > EB > EB txs > Votes.
+//
+// FIXME: This is a second copy of the order. The one that actually colours
+// links lives in Graph/hooks/useHandlers.ts and this export has no importers,
+// so the two silently drifted -- this copy was missing Announcement entirely.
+// Delete one of them (or have useHandlers import this) so a priority change
+// cannot land in the unused half.
 const MESSAGE_PRIORITY_ORDER = [
   EMessageType.RB, // Highest priority
+  EMessageType.Announcement,
   EMessageType.EB,
-  EMessageType.Votes,
-  EMessageType.Txs, // Lowest priority
+  EMessageType.Txs, // EB txs, pulled once the EB is known
+  EMessageType.Votes, // Lowest priority
 ];
 
 export const getHighestPriorityMessageType = (
