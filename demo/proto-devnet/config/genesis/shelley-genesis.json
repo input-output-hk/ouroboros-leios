@@ -3,9 +3,9 @@
   "networkId": "Testnet",
   "networkMagic": 164,
   "slotLength": 1,
-  "activeSlotsCoeff": 0.050,
-  "securityParam": 2160,
-  "epochLength": 432000,
+  "activeSlotsCoeff": 0.05,
+  "securityParam": 40,
+  "epochLength": 3600,
   "slotsPerKESPeriod": 129600,
   "maxKESEvolutions": 60,
   "maxLovelaceSupply": 100000000000000,
@@ -37,7 +37,7 @@
       "major": 10,
       "minor": 0
     },
-    "rho": 0.0030,
+    "rho": 0.003,
     "tau": 0.2
   },
   "staking": {
