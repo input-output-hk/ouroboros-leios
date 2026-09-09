@@ -24,27 +24,25 @@
 #     is 100% of the delegated stake, which clears every DRep threshold
 #     (the highest, ppGovGroup, is 0.75).
 #
-# Not handled: parameters in the *security* group additionally need SPO votes
-# at poolVotingThresholds.ppSecurityGroup (0.51). If ratification stalls with
-# all DReps voting Yes, that is the first thing to check -- the pool cold keys
-# are in config/pools-keys/ and can vote the same way.
-#
-# Also not possible yet, and worth knowing before reaching for this script: the
-# Leios parameters cannot be changed through it. The ledger has eight of them --
-# leiosAnnouncementPeriodLength, leiosCommitteeSize, leiosDiffusionPeriodLength,
-# leiosQuorumStakeThreshold, leiosVotePeriodLength, maxEndorserBlockTxsSize,
-# maxEndorserBlockReferencesSize, maxEndorserBlockExecutionUnits (plus
-# maxRefScriptSizePerEndorserBlock), all visible in `query protocol-parameters`
-# -- but this cardano-cli exposes no create-protocol-parameters-update flag for
-# any of them. Until the CLI (really cardano-api's pparams-update type) grows
-# them, Leios parameters are genesis-only and need a respin to change.
+# The three pools vote too. Every Leios parameter is declared
+# 'PPGroups 'NetworkGroup 'SecurityGroup in Dijkstra/PParams.hs, and anything in
+# the security group needs SPO approval at poolVotingThresholds.ppSecurityGroup
+# (0.51) on top of the DRep thresholds -- DReps alone leave it sitting in the
+# queue until it expires. Their cold keys are the block producers' own, under
+# tmp-devnet/bp*/keys/, so all three voting Yes is 100% of the pool stake.
 set -euo pipefail
 
 SOURCE_DIR=${SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}
 WORKING_DIR=${WORKING_DIR:-"${SOURCE_DIR}/tmp-devnet"}
 SHARED_CONFIG_DIR=${SHARED_CONFIG_DIR:-"${SOURCE_DIR}/../proto-devnet/config"}
 : "${CARDANO_NODE_NETWORK_ID:=164}"
-: "${CARDANO_NODE_SOCKET_PATH:="${WORKING_DIR}/bp1/node.socket"}"
+# Not `:=`: the devshell exports a relative CARDANO_NODE_SOCKET_PATH pointing at
+# a relay, and this script cd's, so an inherited relative path resolves to
+# nothing. Only an absolute override is honoured.
+case "${CARDANO_NODE_SOCKET_PATH:-}" in
+  /*) ;;
+  *) CARDANO_NODE_SOCKET_PATH="${WORKING_DIR}/bp1/node.socket" ;;
+esac
 export CARDANO_NODE_NETWORK_ID CARDANO_NODE_SOCKET_PATH
 
 ERA=${ERA:-dijkstra}
@@ -62,7 +60,7 @@ ANCHOR_PORT=${ANCHOR_PORT:-8099}
 
 CLI_ARGS=()
 usage() {
-  sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   echo
   echo "Options:"
   echo "  --key-value NAME=VALUE   a pparam by its CLI flag name, e.g. maxTxSize=32768"
@@ -198,21 +196,31 @@ cardano-cli "${ERA}" transaction submit --tx-file propose.signed
 ACTION_TX=$(cardano-cli "${ERA}" transaction txid --output-text --tx-file propose.signed)
 echo "    action tx: ${ACTION_TX}"
 
-# The proposal is only queryable once its transaction is in a block.
-echo "==> waiting for the proposal to appear in gov-state"
-for _ in $(seq 60); do
-  if cardano-cli "${ERA}" query gov-state |
-      jq -e --arg id "$ACTION_TX" '[.proposals[]? | select(.actionId.txId==$id)] | length > 0' >/dev/null; then
-    break
-  fi
-  sleep 2
+# The proposal is only queryable once its transaction is in a block, and on a
+# devnet under the tx-firehose that is not prompt: the proposal queues behind
+# whatever is already in the mempool, which at 10 MB is minutes of backlog. Wait
+# in wall-clock terms rather than a fixed iteration count.
+echo "==> waiting for the proposal to appear in gov-state (up to 30 min)"
+DEADLINE=$(( SECONDS + 1800 ))
+ACTION_IX=""
+while [ "$SECONDS" -lt "$DEADLINE" ]; do
+  ACTION_IX=$(cardano-cli "${ERA}" query gov-state |
+    jq -r --arg id "$ACTION_TX" \
+      '[.proposals[]? | select(.actionId.txId==$id)][0].actionId.govActionIx // empty')
+  [ -n "$ACTION_IX" ] && break
+  sleep 10
 done
-ACTION_IX=$(cardano-cli "${ERA}" query gov-state |
-  jq -r --arg id "$ACTION_TX" '[.proposals[]? | select(.actionId.txId==$id)][0].actionId.govActionIx')
+# Voting with a null index produces an unreadable optparse error much later.
+[ -n "$ACTION_IX" ] || {
+  echo "proposal ${ACTION_TX} never reached a block; it is still in the mempool" >&2
+  echo "or was dropped. The deposit is only returned once it is on chain." >&2
+  exit 1
+}
 echo "    action index: ${ACTION_IX}"
 
-echo "==> voting Yes with all three DReps"
+echo "==> voting Yes with all three DReps and all three pools"
 VOTE_ARGS=()
+SIGN_ARGS=()
 for i in 1 2 3; do
   cardano-cli "${ERA}" governance vote create \
     --yes \
@@ -221,6 +229,16 @@ for i in 1 2 3; do
     --drep-verification-key-file "${DREP_DIR}/drep${i}/drep.vkey" \
     --out-file "drep${i}.vote"
   VOTE_ARGS+=(--vote-file "drep${i}.vote")
+  SIGN_ARGS+=(--signing-key-file "${DREP_DIR}/drep${i}/drep.skey")
+
+  cardano-cli "${ERA}" governance vote create \
+    --yes \
+    --governance-action-tx-id "$ACTION_TX" \
+    --governance-action-index "$ACTION_IX" \
+    --cold-verification-key-file "${WORKING_DIR}/bp${i}/keys/cold.vkey" \
+    --out-file "pool${i}.vote"
+  VOTE_ARGS+=(--vote-file "pool${i}.vote")
+  SIGN_ARGS+=(--signing-key-file "${WORKING_DIR}/bp${i}/keys/cold.skey")
 done
 
 cardano-cli "${ERA}" transaction build \
@@ -232,19 +250,22 @@ cardano-cli "${ERA}" transaction build \
 cardano-cli "${ERA}" transaction sign \
   --tx-body-file vote.raw \
   --signing-key-file "${UTXO_DIR}/utxo.skey" \
-  --signing-key-file "${DREP_DIR}/drep1/drep.skey" \
-  --signing-key-file "${DREP_DIR}/drep2/drep.skey" \
-  --signing-key-file "${DREP_DIR}/drep3/drep.skey" \
+  "${SIGN_ARGS[@]}" \
   --out-file vote.signed
 cardano-cli "${ERA}" transaction submit --tx-file vote.signed
 echo "    votes submitted"
 
 # Ratification is decided at the epoch boundary and enactment follows it, so the
 # change becomes visible in the pparams one boundary after the votes land.
-echo "==> waiting for enactment (epoch boundary; ~100 min at epochLength 6000)"
+echo "==> waiting for enactment (ratify at one epoch boundary, enact at the next)"
 while :; do
   EPOCH_NOW=$(cardano-cli "${ERA}" query tip | jq -r '.epoch')
   STATE=$(cardano-cli "${ERA}" query gov-state)
+  # Print the tallies: a stall here is almost always a missing voter group.
+  echo "$STATE" | jq -r --arg id "$ACTION_TX" \
+    '[.proposals[]? | select(.actionId.txId==$id)][0]
+     | select(. != null)
+     | "    epoch '"${EPOCH_NOW}"': drep=\(.dRepVotes | length) spo=\(.stakePoolVotes | length) cc=\(.committeeVotes | length)"'
   if ! echo "$STATE" | jq -e --arg id "$ACTION_TX" \
       '[.proposals[]? | select(.actionId.txId==$id)] | length > 0' >/dev/null; then
     echo "    proposal gone from the queue at epoch ${EPOCH_NOW}: enacted or expired"
