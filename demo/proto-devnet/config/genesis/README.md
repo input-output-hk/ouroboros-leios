@@ -5,13 +5,30 @@ Shared by proto-devnet and dozen-devnet (the latter reads this directory via
 are non-obvious enough to write down, because JSON cannot hold a comment and
 both look like arbitrary numbers otherwise.
 
-## Epoch geometry (shelley-genesis.json)
+## Epoch geometry (shelley-genesis.json + byron-genesis.json)
 
 ```
-securityParam    40
-epochLength    3600      # 1 hour at slotLength 1
-activeSlotsCoeff 0.05
+shelley  securityParam    40
+shelley  epochLength    3600      # 1 hour at slotLength 1
+shelley  activeSlotsCoeff 0.05
+byron    protocolConsts.k 40      # must equal securityParam
 ```
+
+**Both k values must match.** The hard-fork combinator takes Byron's:
+
+```haskell
+k = assert (kByron == kShelley) kByron     -- Cardano/Node.hs:878
+```
+
+and that assert is compiled out of a release build, so a mismatched pair starts
+happily and fails much later somewhere unrelated. It cost us a devnet: with
+kByron=2160 and kShelley=40, the ChainDB immutabilised at depth 2160 and so
+never immutabilised anything, leaving the immutable tip at Origin, while the
+Leios announcement validator forecast from that tip with a 3k/f = 2400 horizon
+derived from kShelley. At slot 2408 every announcement began failing
+`OutsideHorizon`, which by design tears down the Leios mini-protocol with that
+peer -- so all voting stopped network-wide 40 minutes in, with the chain itself
+looking perfectly healthy.
 
 Mainnet uses `epochLength = 10k/f`, but that is convention. The only rule the
 node enforces is `epochLength >= 3k/f`, in `validateGenesis`
