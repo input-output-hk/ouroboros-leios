@@ -1,0 +1,204 @@
+{
+  "nic_bw_mbit": 1000,
+  "default_duration": 120,
+  "edges": [
+    {
+      "a": 1,
+      "b": 2,
+      "bw_mbit": 1000,
+      "delay": "1ms",
+      "jitter": "0ms",
+      "loss_gemodel": null,
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 11,
+      "b": 12,
+      "bw_mbit": 8,
+      "delay": "20ms",
+      "jitter": "4ms",
+      "loss_gemodel": [0.1, 40, 70, 0.001],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 1,
+      "b": 3,
+      "bw_mbit": 384,
+      "delay": "1ms",
+      "jitter": "0ms",
+      "loss_gemodel": null,
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 10,
+      "b": 12,
+      "bw_mbit": 3,
+      "delay": "30ms",
+      "jitter": "5ms",
+      "loss_gemodel": [0.15, 35, 75, 0.005],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 1,
+      "b": 4,
+      "bw_mbit": 192,
+      "delay": "1ms",
+      "jitter": "0ms",
+      "loss_gemodel": null,
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 9,
+      "b": 12,
+      "bw_mbit": 6,
+      "delay": "5ms",
+      "jitter": "1ms",
+      "loss_gemodel": [0.05, 50, 85, 0],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 1,
+      "b": 5,
+      "bw_mbit": 128,
+      "delay": "1ms",
+      "jitter": "0ms",
+      "loss_gemodel": null,
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 8,
+      "b": 12,
+      "bw_mbit": 4,
+      "delay": "40ms",
+      "jitter": "8ms",
+      "loss_gemodel": [0.1, 30, 70, 0.005],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 1,
+      "b": 6,
+      "bw_mbit": 96,
+      "delay": "1ms",
+      "jitter": "0ms",
+      "loss_gemodel": null,
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 7,
+      "b": 12,
+      "bw_mbit": 7,
+      "delay": "15ms",
+      "jitter": "3ms",
+      "loss_gemodel": [0.08, 45, 80, 0.001],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 1,
+      "b": 7,
+      "bw_mbit": 77,
+      "delay": "1ms",
+      "jitter": "0ms",
+      "loss_gemodel": null,
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 6,
+      "b": 12,
+      "bw_mbit": 3,
+      "delay": "35ms",
+      "jitter": "6ms",
+      "loss_gemodel": [0.2, 25, 65, 0.01],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 1,
+      "b": 8,
+      "bw_mbit": 64,
+      "delay": "1ms",
+      "jitter": "0ms",
+      "loss_gemodel": null,
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 5,
+      "b": 12,
+      "bw_mbit": 12,
+      "delay": "8ms",
+      "jitter": "1ms",
+      "loss_gemodel": [0.02, 60, 90, 0],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 1,
+      "b": 9,
+      "bw_mbit": 55,
+      "delay": "1ms",
+      "jitter": "0ms",
+      "loss_gemodel": null,
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 4,
+      "b": 12,
+      "bw_mbit": 5,
+      "delay": "25ms",
+      "jitter": "4ms",
+      "loss_gemodel": [0.15, 35, 70, 0.005],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 1,
+      "b": 10,
+      "bw_mbit": 48,
+      "delay": "1ms",
+      "jitter": "0ms",
+      "loss_gemodel": null,
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 3,
+      "b": 12,
+      "bw_mbit": 8,
+      "delay": "18ms",
+      "jitter": "3ms",
+      "loss_gemodel": [0.1, 40, 75, 0.001],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 1,
+      "b": 11,
+      "bw_mbit": 43,
+      "delay": "1ms",
+      "jitter": "0ms",
+      "loss_gemodel": null,
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 2,
+      "b": 12,
+      "bw_mbit": 10,
+      "delay": "12ms",
+      "jitter": "2ms",
+      "loss_gemodel": [0.05, 50, 80, 0.001],
+      "a_pulls": false, "b_pulls": true
+    }
+  ],
+  "tuned_initcwnd": [
+    1,
+    12
+  ],
+  "node_nicknames": {
+    "1": "hub-A",
+    "2": "~0ms",
+    "3": "~250ms",
+    "4": "~500ms",
+    "5": "~750ms",
+    "6": "~1000ms",
+    "7": "~1250ms",
+    "8": "~1500ms",
+    "9": "~1750ms",
+    "10": "~2000ms",
+    "11": "~2250ms",
+    "12": "hub-B"
+  }
+}
