@@ -158,8 +158,11 @@ echo "==> creating the action: ${CLI_ARGS[*]}"
 # Every ParameterChange must name its predecessor, so that a chain of them can
 # only be enacted in order. The very first one has none, and the flags must then
 # be absent entirely -- passing them empty is a hard CLI error, not a no-op.
+# Once one has enacted, omitting them is rejected with InvalidPrevGovActionId.
+# prevGovActionIds is an object keyed by action type, not a list of tagged
+# entries, and it lives on the next enact state rather than at the top level.
 PREV=$(cardano-cli "${ERA}" query gov-state |
-  jq -r '[.prevGovActionIds[]? | select(.tag=="PParamUpdate")] | last | .value // empty')
+  jq -c '.nextRatifyState.nextEnactState.prevGovActionIds.PParamUpdate // empty')
 PREV_ARGS=()
 if [ -n "$PREV" ]; then
   PREV_ARGS=(
