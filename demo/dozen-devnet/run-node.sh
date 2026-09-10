@@ -16,11 +16,17 @@ export LEIOS_DB_PATH="leios.db"
 # so the waiter can only ever see the socket the node actually created.
 rm -f "node.socket"
 
-# Make socket accessible to non-root (node runs elevated for namespace access)
+# Make socket accessible to non-root (node runs elevated for namespace access).
+# Killed via the EXIT trap below so it doesn't outlive cardano-node: if the
+# node dies before creating node.socket (e.g. a startup crash), this loop
+# would otherwise leak as an orphan (reparented to PID 1) polling forever,
+# since the socket it's waiting for will never appear.
 (
   while [ ! -S "node.socket" ]; do sleep 0.1; done
   chmod a+rw "node.socket"
 ) &
+chmod_helper_pid=$!
+trap 'kill "$chmod_helper_pid" 2>/dev/null || true' EXIT
 
 # Only block producers have pool keys copied into keys/ by run.sh; a relay runs
 # with none of the forging arguments at all.
