@@ -5,12 +5,12 @@ AlonzoGenesisFile: alonzo-genesis.json
 ConwayGenesisFile: conway-genesis.json
 DijkstraGenesisFile: dijkstra-genesis.json
 
-MempoolCapacityBytesOverride: 5000000
+MempoolCapacityBytesOverride: 10000000
 MempoolTimeoutsEnabled: true
 MempoolTimeoutSoft: 1.0
 MempoolTimeoutHard: 1.5
-# Down from default 5, a 10th is used for the forge time cap
-MempoolTimeoutCapacity: 4.0
+# A 10th of this is the forge time cap
+MempoolTimeoutCapacity: 8.0
 
 # Needed < 10.6
 EnableP2P: true
