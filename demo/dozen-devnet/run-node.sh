@@ -47,8 +47,10 @@ if [ -n "${NODE_RTS:-}" ]; then
   RTS_ARGS=(+RTS ${NODE_RTS} -RTS)
 fi
 
-# Run cardano-node
-cardano-node run \
+# Run cardano-node. CARDANO_NODE is passed in as an absolute path by run.sh
+# (sudo/is_elevated drops PATH, same reason ip/tc are invoked by absolute
+# path); fall back to a bare PATH lookup when run without elevation (TC=0).
+"${CARDANO_NODE:-cardano-node}" run \
   --config "config.yaml" \
   --host-addr "$IP" \
   --port "$PORT" \

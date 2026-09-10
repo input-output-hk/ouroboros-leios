@@ -199,6 +199,7 @@ gen_nodes_compose() {
       # Passed inline rather than inherited: elevated processes go through
       # sudo, which drops the environment.
       echo "      NODE_RTS=\"${NODE_RTS}\" \\"
+      echo "      CARDANO_NODE=\"${CARDANO_NODE_BIN}\" \\"
       if [ "$tc" = "1" ]; then
         echo "      ${IP_BIN} netns exec ${NS_PREFIX}:${name} bash \"${SOURCE_DIR}/run-node.sh\""
       else
@@ -286,6 +287,14 @@ if [ "$TC" = "1" ]; then
   fi
 fi
 export TOOL_PATH
+
+# Same sudo-drops-the-environment problem as ip/tc above, but for cardano-node
+# itself: run-node.sh invokes it by bare name, which only resolves under a
+# PATH-only devshell build (e.g. the dependency-localisation override in
+# nix/haskell.nix) when the process is not elevated. Resolve it here, while
+# still running in the caller's own (non-elevated) shell, and pass the
+# absolute path down inline like NODE_DIR/IP/PORT/NODE_RTS.
+CARDANO_NODE_BIN=$(command -v cardano-node)
 
 # Check if WORKING_DIR already exists
 if [ -d "$WORKING_DIR" ]; then
