@@ -5,6 +5,24 @@ import { EMessageColor } from "@/utils/colors";
 import { FC, useMemo } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
+// Typed as Record over the enum, so adding a message type is a compile error
+// here rather than a row that silently goes missing from the panel.
+const MESSAGE_TYPE_LABEL: Record<EMessageType, string> = {
+  [EMessageType.Txs]: "Txs",
+  [EMessageType.Announcement]: "Announcements",
+  [EMessageType.EB]: "Endorser Blocks",
+  [EMessageType.Votes]: "Votes",
+  [EMessageType.RB]: "Blocks",
+};
+
+const MESSAGE_TYPE_COLOR: Record<EMessageType, EMessageColor> = {
+  [EMessageType.Txs]: EMessageColor.TXS,
+  [EMessageType.Announcement]: EMessageColor.ANNOUNCEMENT,
+  [EMessageType.EB]: EMessageColor.EB,
+  [EMessageType.Votes]: EMessageColor.VOTES,
+  [EMessageType.RB]: EMessageColor.RB,
+};
+
 export const NodeStats: FC = () => {
   const {
     state: {
@@ -43,17 +61,13 @@ export const NodeStats: FC = () => {
     return peers.sort((a, b) => a.peerId.localeCompare(b.peerId));
   }, [currentNode, topography.links]);
 
-  const data = [
-    { name: "Txs", ...getCounts(EMessageType.Txs), color: EMessageColor.TXS },
-    { name: "Endorser Blocks", ...getCounts(EMessageType.EB), color: EMessageColor.EB },
-    { name: "Votes", ...getCounts(EMessageType.Votes), color: EMessageColor.VOTES },
-    { name: "Blocks", ...getCounts(EMessageType.RB), color: EMessageColor.RB },
-    {
-      name: "Announcements",
-      ...getCounts(EMessageType.Announcement),
-      color: EMessageColor.ANNOUNCEMENT,
-    },
-  ];
+  // Rows follow EMessageType's declaration order, so adding a message type or
+  // changing the ordering happens in the enum alone rather than here.
+  const data = Object.values(EMessageType).map((type) => ({
+    name: MESSAGE_TYPE_LABEL[type],
+    ...getCounts(type),
+    color: MESSAGE_TYPE_COLOR[type],
+  }));
 
   return (
     <div className="border-2 border-gray-200 rounded-sm p-4 z-30 bg-white/80 backdrop-blur-xs min-w-[220px] block">

@@ -183,6 +183,7 @@
       "options": {
         "legend": {
           "calcs": [
+            "mean",
             "max"
           ],
           "displayMode": "table",
@@ -375,6 +376,367 @@
     },
     {
       "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Transactions per forged endorser block, per node, averaged over the Rate / avg window.\n\nRead the shape, not the level: a flat top means a size limit is binding, while scatter below the ceiling means the forge time budget is. The red line is the hard per-EB transaction cap, which no protocol parameter can raise.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Tx per EB",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "points",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 0,
+            "pointSize": 6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "always",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 13888
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time({service=\"cardano-node\", kind=\"LeiosBlockForged\", instance=~\"$instance\"} | json txs=\"numTxs\" | unwrap txs [${window}s]) by (instance)",
+          "legendFormat": "{{instance}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Endorser block fill",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Transactions per second referenced by newly forged endorser blocks: the throughput the EB layer offers, not what settles.\n\nA lasting gap against confirmed throughput means EBs are failing certification, so the transactions they referenced stay in the mempool and get referenced again.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Tx/s",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "points",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 0,
+            "pointSize": 6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "always",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "sum by (instance) (sum_over_time({service=\"cardano-node\", kind=\"LeiosBlockForged\", instance=~\"$instance\"} | json txs=\"numTxs\" | unwrap txs [${window}s])) / ${window}",
+          "legendFormat": "{{instance}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Endorser block tx reference rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic-by-name"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "direction": "backward",
+          "editorMode": "builder",
+          "expr": "max(last_over_time({service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockAnnounced\"} | label_format ts=`{{ __timestamp__.UnixMilli }}` | unwrap ts [1h]))",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "announced_ts",
+          "queryType": "range",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "direction": "backward",
+          "editorMode": "builder",
+          "expr": "max(last_over_time({service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockCertified\"} | label_format ts=`{{ __timestamp__.UnixMilli }}` | unwrap ts [1h]))",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "certified_ts",
+          "queryType": "range",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Time since last Leios certification or announcement",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "since last EB announced",
+            "binary": {
+              "left": "Time",
+              "operator": "-",
+              "right": "announced_ts"
+            },
+            "mode": "binary",
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "since last EB certified",
+            "binary": {
+              "left": "Time",
+              "operator": "-",
+              "right": "certified_ts"
+            },
+            "mode": "binary",
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "announced_ts": true,
+              "certified_ts": true
+            },
+            "includeByName": {},
+            "indexByName": {},
+            "renameByName": {}
+          }
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
         "type": "prometheus",
         "uid": "mimir"
       },
@@ -484,13 +846,14 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 8
+        "x": 12,
+        "y": 16
       },
       "id": 3,
       "options": {
         "legend": {
           "calcs": [
+            "mean",
             "max"
           ],
           "displayMode": "table",
@@ -521,173 +884,14 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic-by-name"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "showValues": false,
-            "spanNulls": true,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "id": 4,
-      "options": {
-        "legend": {
-          "calcs": [
-            "min",
-            "max",
-            "mean",
-            "median"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "direction": "backward",
-          "editorMode": "builder",
-          "expr": "max(last_over_time({service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockAnnounced\"} | label_format ts=`{{ __timestamp__.UnixMilli }}` | unwrap ts [1h]))",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "announced_ts",
-          "queryType": "range",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "direction": "backward",
-          "editorMode": "builder",
-          "expr": "max(last_over_time({service=\"cardano-node\", ns=\"Consensus.LeiosKernel.BlockCertified\"} | label_format ts=`{{ __timestamp__.UnixMilli }}` | unwrap ts [1h]))",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "certified_ts",
-          "queryType": "range",
-          "range": true,
-          "refId": "B"
-        }
-      ],
-      "title": "Time since last Leios certification or announcement",
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "alias": "since last EB announced",
-            "binary": {
-              "left": "Time",
-              "operator": "-",
-              "right": "announced_ts"
-            },
-            "mode": "binary",
-            "replaceFields": false
-          }
-        },
-        {
-          "id": "calculateField",
-          "options": {
-            "alias": "since last EB certified",
-            "binary": {
-              "left": "Time",
-              "operator": "-",
-              "right": "certified_ts"
-            },
-            "mode": "binary",
-            "replaceFields": false
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "announced_ts": true,
-              "certified_ts": true
-            },
-            "includeByName": {},
-            "indexByName": {},
-            "renameByName": {}
-          }
-        }
-      ],
-      "type": "timeseries"
-    },
-    {
       "id": 5,
       "type": "histogram",
       "title": "Announcement age upon arrival",
       "gridPos": {
-        "x": 0,
-        "y": 16,
         "h": 8,
-        "w": 12
+        "w": 12,
+        "x": 0,
+        "y": 24
       },
       "fieldConfig": {
         "defaults": {
@@ -905,14 +1109,14 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 16
+        "y": 24
       },
       "id": 6,
       "options": {
         "legend": {
           "calcs": [
             "mean",
-            "last"
+            "max"
           ],
           "displayMode": "table",
           "placement": "bottom",
@@ -951,8 +1155,9 @@
     "list": [
       {
         "current": {
-          "text": "30s",
-          "value": "30"
+          "selected": true,
+          "text": "20s",
+          "value": "20"
         },
         "description": "Window (seconds) for the submission and throughput rates, and for averaging the voting EB validation cache hit rate.",
         "includeAll": false,
@@ -977,6 +1182,11 @@
           },
           {
             "selected": true,
+            "text": "20s",
+            "value": "20"
+          },
+          {
+            "selected": false,
             "text": "30s",
             "value": "30"
           },
@@ -996,7 +1206,7 @@
             "value": "300"
           }
         ],
-        "query": "2s : 2, 5s : 5, 10s : 10, 30s : 30, 60s : 60, 120s : 120, 300s : 300",
+        "query": "2s : 2, 5s : 5, 10s : 10, 20s : 20, 30s : 30, 60s : 60, 120s : 120, 300s : 300",
         "skipUrlSync": false,
         "type": "custom"
       },
@@ -1039,5 +1249,6 @@
   "timezone": "utc",
   "title": "Cardano Leios - Throughput",
   "uid": "cardano-leios-throughput",
-  "version": 1
+  "version": 5,
+  "description": "Left column is absolute values, right column is the differentials and rates. Keep new panels in that order."
 }

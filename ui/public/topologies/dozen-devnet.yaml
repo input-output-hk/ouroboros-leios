@@ -6,8 +6,23 @@
 #
 # Locations are mock European IXP cities, chosen so pairwise distance
 # implies an RTT near the uniform 20ms (DELAY=10ms each way) the devnet
-# actually applies with tc. Latency/bandwidth below are the real configured
-# values, not derived from the coordinates.
+# actually applies with tc. Latency below is the real configured value, not
+# derived from the coordinates.
+#
+# Bandwidth is an approximation, deliberately. run.sh rate-limits each node's
+# single uplink (RATE=50Mbps) and tc shares that dynamically across whichever
+# peers are transmitting; this format can only state a figure per link. So each
+# entry carries the *producer's* nominal share -- 50Mbps divided equally by its
+# peer count -- because the entry describes the producer -> consumer direction
+# and egress is what RATE caps:
+#
+#   a block producer has 3 peers  ->  2083333 B/s per link
+#   a relay has 9 peers           ->   694444 B/s per link
+#
+# Two known errors follow from that. An equal split understates a link whenever
+# the node's other peers are idle (bursty EB traffic is exactly that), and the
+# figure is per-direction, so a bp <-> relay link is asymmetric here by design.
+# Modelling this properly needs a per-node uplink capacity in the schema.
 nodes:
   bp1:
     # Dublin
@@ -18,13 +33,13 @@ nodes:
     producers:
       relay11:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay12:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay13:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
   relay11:
     # London
     location:
@@ -33,31 +48,31 @@ nodes:
     producers:
       bp1:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 2083333
       relay12:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay13:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay21:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay22:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay23:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay31:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay32:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay33:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
   relay12:
     # Paris
     location:
@@ -66,31 +81,31 @@ nodes:
     producers:
       bp1:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 2083333
       relay11:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay13:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay21:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay22:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay23:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay31:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay32:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay33:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
   relay13:
     # Barcelona
     location:
@@ -99,31 +114,31 @@ nodes:
     producers:
       bp1:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 2083333
       relay11:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay12:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay21:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay22:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay23:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay31:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay32:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay33:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
   bp2:
     # Frankfurt
     stake: 30000000000000
@@ -133,13 +148,13 @@ nodes:
     producers:
       relay21:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay22:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay23:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
   relay21:
     # Amsterdam
     location:
@@ -148,31 +163,31 @@ nodes:
     producers:
       bp2:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 2083333
       relay11:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay12:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay13:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay22:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay23:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay31:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay32:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay33:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
   relay22:
     # Zurich
     location:
@@ -181,31 +196,31 @@ nodes:
     producers:
       bp2:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 2083333
       relay11:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay12:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay13:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay21:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay23:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay31:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay32:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay33:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
   relay23:
     # Rome
     location:
@@ -214,31 +229,31 @@ nodes:
     producers:
       bp2:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 2083333
       relay11:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay12:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay13:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay21:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay22:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay31:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay32:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay33:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
   bp3:
     # Warsaw
     stake: 30000000000000
@@ -248,13 +263,13 @@ nodes:
     producers:
       relay31:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay32:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay33:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
   relay31:
     # Stockholm
     location:
@@ -263,31 +278,31 @@ nodes:
     producers:
       bp3:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 2083333
       relay11:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay12:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay13:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay21:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay22:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay23:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay32:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay33:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
   relay32:
     # Vienna
     location:
@@ -296,31 +311,31 @@ nodes:
     producers:
       bp3:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 2083333
       relay11:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay12:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay13:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay21:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay22:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay23:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay31:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay33:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
   relay33:
     # Copenhagen
     location:
@@ -329,28 +344,28 @@ nodes:
     producers:
       bp3:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 2083333
       relay11:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay12:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay13:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay21:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay22:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay23:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay31:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444
       relay32:
         latency-ms: 10.0
-        bandwidth-bytes-per-second: 6250000
+        bandwidth-bytes-per-second: 694444

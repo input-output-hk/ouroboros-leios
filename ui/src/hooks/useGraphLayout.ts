@@ -101,18 +101,39 @@ function mercatorLayout(
   const rawYMin = Math.min(...rawYs);
   const rawYMax = Math.max(...rawYs);
   const nodeXSpan = nodeXMax - nodeXMin || 1;
+  const rawYSpan = rawYMax - rawYMin || 1;
 
-  // x mapping: real longitude [-180, 180] → node x range [nodeXMin, nodeXMax]
-  const xScale = nodeXSpan / 360;
-  const xOffset = nodeXMin - -180 * xScale;
+  // Scale so the *nodes* fill roughly the extent the other layouts give them,
+  // rather than fitting the whole globe into the nodes' own span. The previous
+  // mapping sent longitude [-180, 180] to the node x range, which for a
+  // same-continent topology collapsed the nodes to about a fortieth of their
+  // size elsewhere: switching to Mercator zoomed far out and left everything in
+  // a knot at the centre of a world map.
+  //
+  // The target matches circularLayout's diameter, so Mercator, circular and
+  // auto all place a topology at a comparable size and the view no longer jumps
+  // when the layout changes. The world map still extends past the nodes -- at a
+  // continental zoom that is the point, you see the coastline around them.
+  const count = projected.length || 1;
+  const targetExtent = 2 * Math.max(20, count * 1.5);
 
-  // y mapping: use same scale as x to preserve Mercator aspect ratio
-  // (raw Mercator Y is in degrees, same unit as longitude)
+  // One scale for both axes: raw Mercator Y is in degrees, the same unit as
+  // longitude, and sharing the scale is what keeps the projection conformal.
+  // The larger span governs the fit so neither axis overflows the target.
+  const xScale = targetExtent / Math.max(nodeXSpan, rawYSpan);
   const yScale = xScale;
-  // Center y on the same midpoint as x
-  const nodeYMid = (nodeXMin + nodeXMax) / 2;
-  const rawYMid = (rawYMin + rawYMax) / 2;
-  const yOffsetCentered = nodeYMid - rawYMid * yScale;
+
+  // Centre on the node centroid, which is also what circularLayout centres on,
+  // so the topology stays put across layout changes.
+  let sumLon = 0;
+  let sumRawY = 0;
+  for (const p of projected) {
+    sumLon += p.nodeLon;
+    sumRawY += p.rawY;
+  }
+  const xOffset = sumLon / count - ((nodeXMin + nodeXMax) / 2) * xScale;
+  const yOffsetCentered =
+    sumRawY / count - ((rawYMin + rawYMax) / 2) * yScale;
 
   const params: MercatorParams = {
     xOffset,

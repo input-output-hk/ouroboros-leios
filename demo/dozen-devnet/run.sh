@@ -69,8 +69,8 @@ set -a
 # than --color auto: auto derives a hue from the key, which is uniform but can
 # land two generators close enough to be hard to tell apart by eye.
 : "${COLOR1:=ff0000}"
-: "${COLOR2:=0000ff}"
-: "${COLOR3:=00ff0}"
+: "${COLOR2:=00ff00}"
+: "${COLOR3:=0000ff}"
 # Mempool observers are not devnet processes: process-compose cannot tile, so
 # twelve panes would only be viewable one at a time. See ./mempool-panes.sh.
 # Traffic control (on by default, disable with TC=0)
@@ -135,6 +135,22 @@ RELAYS=(relay11 relay12 relay13 relay21 relay22 relay23 relay31 relay32 relay33)
 NODES=("${BPS[@]}" "${RELAYS[@]}")
 
 # The Nth node in NODES gets IP_PREFIX(IP_OFFSET + N).
+#
+# FIXME: Make the addresses mean something. Because NODES is BPS followed by
+# RELAYS, the producers take .11-.13 and the relays .14-.22, so an address says
+# nothing about which producer a relay serves -- relay11 (.14) and relay33
+# (.22) look equally far from bp1 (.11). Group-aligned addressing would read
+# straight off the topology, following proto-devnet's .10/.20/.30 convention:
+#
+#   bp1 .10   relay11 .11   relay12 .12   relay13 .13
+#   bp2 .20   relay21 .21   relay22 .22   relay23 .23
+#   bp3 .30   relay31 .31   relay32 .32   relay33 .33
+#
+# i.e. producer G at (10 * G) and its relays at (10 * G + R), which also makes
+# the visualiser's HOST_PORT_TO_NODE table derivable rather than hand-written
+# (see ui/src/components/Sim/hooks/lokiParsers.ts). Changing this rewrites
+# every node's config and topology.json, so it needs a fresh devnet -- not a
+# restart -- and the UI table has to change in the same commit.
 node_ip() {
   local name="$1" i=0 n
   for n in "${NODES[@]}"; do
