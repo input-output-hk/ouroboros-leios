@@ -1155,8 +1155,9 @@
     "list": [
       {
         "current": {
-          "text": "30s",
-          "value": "30"
+          "selected": true,
+          "text": "20s",
+          "value": "20"
         },
         "description": "Window (seconds) for the submission and throughput rates, and for averaging the voting EB validation cache hit rate.",
         "includeAll": false,
@@ -1181,6 +1182,11 @@
           },
           {
             "selected": true,
+            "text": "20s",
+            "value": "20"
+          },
+          {
+            "selected": false,
             "text": "30s",
             "value": "30"
           },
@@ -1200,7 +1206,7 @@
             "value": "300"
           }
         ],
-        "query": "2s : 2, 5s : 5, 10s : 10, 30s : 30, 60s : 60, 120s : 120, 300s : 300",
+        "query": "2s : 2, 5s : 5, 10s : 10, 20s : 20, 30s : 30, 60s : 60, 120s : 120, 300s : 300",
         "skipUrlSync": false,
         "type": "custom"
       },
