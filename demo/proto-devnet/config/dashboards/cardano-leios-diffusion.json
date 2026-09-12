@@ -146,7 +146,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 9 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
       "id": 3,
       "options": {
         "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
@@ -189,7 +189,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 9 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
       "id": 4,
       "options": {
         "legend": { "calcs": ["mean", "min", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
@@ -214,7 +214,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
       "id": 200,
       "panels": [],
       "title": "Fetch scheduler — is it keeping up, and is there anything to fetch",
@@ -231,7 +231,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
       "id": 10,
       "options": {
         "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
@@ -271,7 +271,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
       "id": 11,
       "options": {
         "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
@@ -305,7 +305,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
       "id": 12,
       "options": {
         "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
@@ -345,7 +345,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
       "id": 13,
       "options": {
         "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
@@ -376,7 +376,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
       "id": 300,
       "panels": [],
       "title": "Tx cache — what it spared, measured at two points",
@@ -404,7 +404,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 33 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 35 },
       "id": 20,
       "options": {
         "colorMode": "value",
@@ -444,7 +444,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 33 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 35 },
       "id": 21,
       "options": {
         "colorMode": "value",
@@ -482,7 +482,7 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 33 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 35 },
       "id": 22,
       "options": {
         "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
@@ -522,7 +522,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 41 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 43 },
       "id": 23,
       "options": {
         "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
@@ -565,7 +565,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 51 },
       "id": 400,
       "panels": [],
       "title": "Announcement relay",
@@ -582,7 +582,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 52 },
       "id": 30,
       "options": {
         "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
@@ -617,7 +617,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 50 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 52 },
       "id": 31,
       "options": {
         "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
@@ -636,7 +636,7 @@
     },
     {
       "collapsed": true,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 58 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 60 },
       "id": 500,
       "panels": [
         {
@@ -659,7 +659,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 59 },
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 61 },
           "id": 40,
           "options": {
             "cellHeight": "sm",
