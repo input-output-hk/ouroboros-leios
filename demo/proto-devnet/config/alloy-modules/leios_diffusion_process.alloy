@@ -40,353 +40,353 @@
 // the series is never created, so this is safe to deploy ahead of any node that
 // does not emit one of the four.
 declare "leios_diffusion_process" {
-  argument "forward_to" {}
+	argument "forward_to" { }
 
-  export "receiver" {
-    value = loki.process.enrich.receiver
-  }
+	export "receiver" {
+		value = loki.process.enrich.receiver
+	}
 
-  loki.process "enrich" {
-    stage.match {
-      selector = `{kind=~"LeiosBodyHits|LeiosEbValidated|LeiosFetchDecision|LeiosPeerAnnouncement"}`
+	loki.process "enrich" {
+		stage.match {
+			selector = `{kind=~"LeiosBodyHits|LeiosEbValidated|LeiosFetchDecision|LeiosPeerAnnouncement"}`
 
-      // Refines the service on the three kinds this facet exclusively owns. The
-      // point is discovery rather than selection: Grafana's Logs Drilldown builds
-      // its browse list from this label, so the facet gets a
-      // cardano-node/leios-diffusion entry beside leios-voting and call-tracing
-      // without anyone writing a query. Nothing selects these three kinds today,
-      // so the refinement breaks no existing panel.
-      //
-      // LeiosEbValidated is deliberately excluded. It belongs to this facet and to
-      // voting, and a single valued label has to pick one owner:
-      // leios_voting_process runs earlier in the chain and stamps it, and the
-      // throughput dashboard selects it that way. The two counters this module
-      // derives from it read the kind label, which is unaffected either way.
-      stage.match {
-        selector = `{kind=~"LeiosBodyHits|LeiosFetchDecision|LeiosPeerAnnouncement"}`
+			// Refines the service on the three kinds this facet exclusively owns. The
+			// point is discovery rather than selection: Grafana's Logs Drilldown builds
+			// its browse list from this label, so the facet gets a
+			// cardano-node/leios-diffusion entry beside leios-voting and call-tracing
+			// without anyone writing a query. Nothing selects these three kinds today,
+			// so the refinement breaks no existing panel.
+			//
+			// LeiosEbValidated is deliberately excluded. It belongs to this facet and to
+			// voting, and a single valued label has to pick one owner:
+			// leios_voting_process runs earlier in the chain and stamps it, and the
+			// throughput dashboard selects it that way. The two counters this module
+			// derives from it read the kind label, which is unaffected either way.
+			stage.match {
+				selector = `{kind=~"LeiosBodyHits|LeiosFetchDecision|LeiosPeerAnnouncement"}`
 
-        stage.static_labels {
-          values = {
-            service = "cardano-node/leios-diffusion",
-          }
-        }
-      }
+				stage.static_labels {
+					values = {
+						service = "cardano-node/leios-diffusion",
+					}
+				}
+			}
 
-      // One line per upstream peer that relayed an announcement, so this is the
-      // un-deduplicated counterpart to LeiosAnnouncementAccepted. The ratio of
-      // the two is announcement fan-in, which is the diffusion redundancy the
-      // vote path can no longer show since w36 made LeiosVoteAcquired fire once
-      // per accepted vote.
-      //
-      // equivocation is labelled rather than left in the body because it is a
-      // bool and the rate of true is the signal: a peer announcing two different
-      // EBs for one election is either faulty or adversarial, and there is
-      // currently no other view of it.
-      stage.match {
-        selector = `{kind="LeiosPeerAnnouncement"}`
+			// One line per upstream peer that relayed an announcement, so this is the
+			// un-deduplicated counterpart to LeiosAnnouncementAccepted. The ratio of
+			// the two is announcement fan-in, which is the diffusion redundancy the
+			// vote path can no longer show since w36 made LeiosVoteAcquired fire once
+			// per accepted vote.
+			//
+			// equivocation is labelled rather than left in the body because it is a
+			// bool and the rate of true is the signal: a peer announcing two different
+			// EBs for one election is either faulty or adversarial, and there is
+			// currently no other view of it.
+			stage.match {
+				selector = `{kind="LeiosPeerAnnouncement"}`
 
-        stage.json {
-          expressions = {
-            equivocation = "equivocation",
-          }
-          drop_malformed = true
-        }
+				stage.json {
+					expressions = {
+						equivocation = "equivocation",
+					}
+					drop_malformed = true
+				}
 
-        stage.labels {
-          values = {
-            equivocation = "equivocation",
-          }
-        }
+				stage.labels {
+					values = {
+						equivocation = "equivocation",
+					}
+				}
 
-        stage.metrics {
-          metric.counter {
-            name              = "peer_announcements_total"
-            description       = "EB announcements relayed by an upstream peer, before deduplication"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "inc"
-            match_all         = true
-            max_idle_duration = "24h"
-          }
-        }
-      }
+				stage.metrics {
+					metric.counter {
+						name              = "peer_announcements_total"
+						description       = "EB announcements relayed by an upstream peer, before deduplication"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "inc"
+						match_all         = true
+						max_idle_duration = "24h"
+					}
+				}
+			}
 
-      // The fetch scheduler's own account of each decision round. missingBodies
-      // and offersTotal are the pair to read together: bodies wanted against
-      // bodies any peer has offered, so a gap is diffusion failing rather than
-      // the scheduler under-requesting.
-      stage.match {
-        selector = `{kind="LeiosFetchDecision"}`
+			// The fetch scheduler's own account of each decision round. missingBodies
+			// and offersTotal are the pair to read together: bodies wanted against
+			// bodies any peer has offered, so a gap is diffusion failing rather than
+			// the scheduler under-requesting.
+			stage.match {
+				selector = `{kind="LeiosFetchDecision"}`
 
-        stage.json {
-          expressions = {
-            durationSeconds      = "durationSeconds",
-            decisionRequests     = "decisionRequests",
-            decisionBodyRequests = "decisionBodyRequests",
-            decisionJobs         = "decisionJobs",
-            decisionBodyBytes    = "decisionBodyBytes",
-            decisionTxBytes      = "decisionTxBytes",
-            tracked              = "tracked",
-            missingBodies        = "missingBodies",
-            peersInflight        = "peersInflight",
-            inflightTotal        = "inflightTotal",
-            offersTotal          = "offersTotal",
-          }
-          drop_malformed = true
-        }
+				stage.json {
+					expressions = {
+						durationSeconds      = "durationSeconds",
+						decisionRequests     = "decisionRequests",
+						decisionBodyRequests = "decisionBodyRequests",
+						decisionJobs         = "decisionJobs",
+						decisionBodyBytes    = "decisionBodyBytes",
+						decisionTxBytes      = "decisionTxBytes",
+						tracked              = "tracked",
+						missingBodies        = "missingBodies",
+						peersInflight        = "peersInflight",
+						inflightTotal        = "inflightTotal",
+						offersTotal          = "offersTotal",
+					}
+					drop_malformed = true
+				}
 
-        stage.metrics {
-          // Buckets run sub-millisecond to a second: a decision round is meant
-          // to be cheap, and the interesting failure is it becoming a brake on
-          // the fetch loop rather than its typical value.
-          metric.histogram {
-            name              = "fetch_decision_duration_seconds"
-            description       = "Wall time taken by one Leios fetch decision round"
-            prefix            = "leios_logmetrics_diffusion_"
-            source            = "durationSeconds"
-            buckets           = [0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
-            max_idle_duration = "24h"
-          }
+				stage.metrics {
+					// Buckets run sub-millisecond to a second: a decision round is meant
+					// to be cheap, and the interesting failure is it becoming a brake on
+					// the fetch loop rather than its typical value.
+					metric.histogram {
+						name              = "fetch_decision_duration_seconds"
+						description       = "Wall time taken by one Leios fetch decision round"
+						prefix            = "leios_logmetrics_diffusion_"
+						source            = "durationSeconds"
+						buckets           = [0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
+						max_idle_duration = "24h"
+					}
 
-          // Gauges: each decision reports the current state of the world, so the
-          // last value is the meaningful one rather than a sum over rounds.
-          metric.gauge {
-            name              = "fetch_tracked"
-            description       = "EBs currently tracked by the fetch logic"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "set"
-            source            = "tracked"
-            max_idle_duration = "24h"
-          }
+					// Gauges: each decision reports the current state of the world, so the
+					// last value is the meaningful one rather than a sum over rounds.
+					metric.gauge {
+						name              = "fetch_tracked"
+						description       = "EBs currently tracked by the fetch logic"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "set"
+						source            = "tracked"
+						max_idle_duration = "24h"
+					}
 
-          metric.gauge {
-            name              = "fetch_missing_bodies"
-            description       = "Tracked EBs whose body has not been acquired"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "set"
-            source            = "missingBodies"
-            max_idle_duration = "24h"
-          }
+					metric.gauge {
+						name              = "fetch_missing_bodies"
+						description       = "Tracked EBs whose body has not been acquired"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "set"
+						source            = "missingBodies"
+						max_idle_duration = "24h"
+					}
 
-          metric.gauge {
-            name              = "fetch_peers_inflight"
-            description       = "Peers with at least one request in flight"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "set"
-            source            = "peersInflight"
-            max_idle_duration = "24h"
-          }
+					metric.gauge {
+						name              = "fetch_peers_inflight"
+						description       = "Peers with at least one request in flight"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "set"
+						source            = "peersInflight"
+						max_idle_duration = "24h"
+					}
 
-          metric.gauge {
-            name              = "fetch_inflight_total"
-            description       = "Total requests in flight across peers"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "set"
-            source            = "inflightTotal"
-            max_idle_duration = "24h"
-          }
+					metric.gauge {
+						name              = "fetch_inflight_total"
+						description       = "Total requests in flight across peers"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "set"
+						source            = "inflightTotal"
+						max_idle_duration = "24h"
+					}
 
-          metric.gauge {
-            name              = "fetch_offers_total"
-            description       = "Total EB offers held across peers"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "set"
-            source            = "offersTotal"
-            max_idle_duration = "24h"
-          }
+					metric.gauge {
+						name              = "fetch_offers_total"
+						description       = "Total EB offers held across peers"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "set"
+						source            = "offersTotal"
+						max_idle_duration = "24h"
+					}
 
-          // Counters: these are per-round quantities that accumulate, so add
-          // rather than set, and rate() over them gives request and byte load.
-          metric.counter {
-            name              = "fetch_requests_total"
-            description       = "Requests issued by the fetch decision logic"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "add"
-            source            = "decisionRequests"
-            max_idle_duration = "24h"
-          }
+					// Counters: these are per-round quantities that accumulate, so add
+					// rather than set, and rate() over them gives request and byte load.
+					metric.counter {
+						name              = "fetch_requests_total"
+						description       = "Requests issued by the fetch decision logic"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "add"
+						source            = "decisionRequests"
+						max_idle_duration = "24h"
+					}
 
-          metric.counter {
-            name              = "fetch_body_requests_total"
-            description       = "EB body requests issued"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "add"
-            source            = "decisionBodyRequests"
-            max_idle_duration = "24h"
-          }
+					metric.counter {
+						name              = "fetch_body_requests_total"
+						description       = "EB body requests issued"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "add"
+						source            = "decisionBodyRequests"
+						max_idle_duration = "24h"
+					}
 
-          metric.counter {
-            name              = "fetch_jobs_total"
-            description       = "Fetch jobs created"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "add"
-            source            = "decisionJobs"
-            max_idle_duration = "24h"
-          }
+					metric.counter {
+						name              = "fetch_jobs_total"
+						description       = "Fetch jobs created"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "add"
+						source            = "decisionJobs"
+						max_idle_duration = "24h"
+					}
 
-          metric.counter {
-            name              = "fetch_body_bytes_total"
-            description       = "EB body bytes requested"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "add"
-            source            = "decisionBodyBytes"
-            max_idle_duration = "24h"
-          }
+					metric.counter {
+						name              = "fetch_body_bytes_total"
+						description       = "EB body bytes requested"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "add"
+						source            = "decisionBodyBytes"
+						max_idle_duration = "24h"
+					}
 
-          metric.counter {
-            name              = "fetch_tx_bytes_total"
-            description       = "EB transaction bytes requested"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "add"
-            source            = "decisionTxBytes"
-            max_idle_duration = "24h"
-          }
-        }
-      }
+					metric.counter {
+						name              = "fetch_tx_bytes_total"
+						description       = "EB transaction bytes requested"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "add"
+						source            = "decisionTxBytes"
+						max_idle_duration = "24h"
+					}
+				}
+			}
 
-      // What an EB's closure cost to validate, and how much of it the tx cache
-      // spared. validated over txsInEb is the share that needed full validation;
-      // the rest was already tracked, already in the mempool, or reapplied.
-      stage.match {
-        selector = `{kind="LeiosBodyHits"}`
+			// What an EB's closure cost to validate, and how much of it the tx cache
+			// spared. validated over txsInEb is the share that needed full validation;
+			// the rest was already tracked, already in the mempool, or reapplied.
+			stage.match {
+				selector = `{kind="LeiosBodyHits"}`
 
-        stage.json {
-          expressions = {
-            txsInEb      = "txsInEb",
-            tracked      = "tracked",
-            acquired     = "acquired",
-            validated    = "validated",
-            mempoolHits  = "mempoolHits",
-            missedBoth   = "missedBoth",
-            cacheTxCount = "cacheTxCount",
-            cacheLoad    = "cacheLoad",
-          }
-          drop_malformed = true
-        }
+				stage.json {
+					expressions = {
+						txsInEb      = "txsInEb",
+						tracked      = "tracked",
+						acquired     = "acquired",
+						validated    = "validated",
+						mempoolHits  = "mempoolHits",
+						missedBoth   = "missedBoth",
+						cacheTxCount = "cacheTxCount",
+						cacheLoad    = "cacheLoad",
+					}
+					drop_malformed = true
+				}
 
-        stage.metrics {
-          metric.counter {
-            name              = "body_txs_total"
-            description       = "Transactions referenced by acquired EB bodies"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "add"
-            source            = "txsInEb"
-            max_idle_duration = "24h"
-          }
+				stage.metrics {
+					metric.counter {
+						name              = "body_txs_total"
+						description       = "Transactions referenced by acquired EB bodies"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "add"
+						source            = "txsInEb"
+						max_idle_duration = "24h"
+					}
 
-          metric.counter {
-            name              = "body_tracked_total"
-            description       = "EB transactions already tracked when the body arrived"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "add"
-            source            = "tracked"
-            max_idle_duration = "24h"
-          }
+					metric.counter {
+						name              = "body_tracked_total"
+						description       = "EB transactions already tracked when the body arrived"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "add"
+						source            = "tracked"
+						max_idle_duration = "24h"
+					}
 
-          metric.counter {
-            name              = "body_acquired_total"
-            description       = "EB transactions acquired for the body"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "add"
-            source            = "acquired"
-            max_idle_duration = "24h"
-          }
+					metric.counter {
+						name              = "body_acquired_total"
+						description       = "EB transactions acquired for the body"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "add"
+						source            = "acquired"
+						max_idle_duration = "24h"
+					}
 
-          metric.counter {
-            name              = "body_validated_total"
-            description       = "EB transactions that needed full validation"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "add"
-            source            = "validated"
-            max_idle_duration = "24h"
-          }
+					metric.counter {
+						name              = "body_validated_total"
+						description       = "EB transactions that needed full validation"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "add"
+						source            = "validated"
+						max_idle_duration = "24h"
+					}
 
-          metric.counter {
-            name              = "body_mempool_hits_total"
-            description       = "EB transactions already held in the mempool"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "add"
-            source            = "mempoolHits"
-            max_idle_duration = "24h"
-          }
+					metric.counter {
+						name              = "body_mempool_hits_total"
+						description       = "EB transactions already held in the mempool"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "add"
+						source            = "mempoolHits"
+						max_idle_duration = "24h"
+					}
 
-          metric.counter {
-            name              = "body_missed_both_total"
-            description       = "EB transactions found in neither the cache nor the mempool"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "add"
-            source            = "missedBoth"
-            max_idle_duration = "24h"
-          }
+					metric.counter {
+						name              = "body_missed_both_total"
+						description       = "EB transactions found in neither the cache nor the mempool"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "add"
+						source            = "missedBoth"
+						max_idle_duration = "24h"
+					}
 
-          metric.gauge {
-            name              = "tx_cache_entries"
-            description       = "Transactions currently held in the Leios tx cache"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "set"
-            source            = "cacheTxCount"
-            max_idle_duration = "24h"
-          }
+					metric.gauge {
+						name              = "tx_cache_entries"
+						description       = "Transactions currently held in the Leios tx cache"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "set"
+						source            = "cacheTxCount"
+						max_idle_duration = "24h"
+					}
 
-          metric.gauge {
-            name              = "tx_cache_load"
-            description       = "Leios tx cache load, as a fraction of its capacity"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "set"
-            source            = "cacheLoad"
-            max_idle_duration = "24h"
-          }
-        }
-      }
+					metric.gauge {
+						name              = "tx_cache_load"
+						description       = "Leios tx cache load, as a fraction of its capacity"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "set"
+						source            = "cacheLoad"
+						max_idle_duration = "24h"
+					}
+				}
+			}
 
-      // The second of the two cache measurement points, kept here beside the
-      // first so the pair is comparable. LeiosBodyHits above reports the cache
-      // at body acquisition; this reports what the cache was worth at vote time,
-      // as the split between transactions reapplied and those needing full
-      // application. reapplied over reapplied plus applied is the hit rate.
-      //
-      // The kind also belongs to the voting facet, which re-stamps its service
-      // label, and that is deliberate: voting owns the line, this owns the
-      // counters. Selecting on kind rather than service keeps the two
-      // independent, so neither module has to know the other ran.
-      //
-      // Exists to retire an expensive query rather than to add a view. The
-      // throughput dashboard computes this hit rate in LogQL today, with a
-      // label_format doing Sprig arithmetic on every matching line and then an
-      // unwrap; as two counters it becomes a Mimir ratio. No new Loki label and
-      // no new lines, so the index is untouched.
-      stage.match {
-        selector = `{kind="LeiosEbValidated"}`
+			// The second of the two cache measurement points, kept here beside the
+			// first so the pair is comparable. LeiosBodyHits above reports the cache
+			// at body acquisition; this reports what the cache was worth at vote time,
+			// as the split between transactions reapplied and those needing full
+			// application. reapplied over reapplied plus applied is the hit rate.
+			//
+			// The kind also belongs to the voting facet, which re-stamps its service
+			// label, and that is deliberate: voting owns the line, this owns the
+			// counters. Selecting on kind rather than service keeps the two
+			// independent, so neither module has to know the other ran.
+			//
+			// Exists to retire an expensive query rather than to add a view. The
+			// throughput dashboard computes this hit rate in LogQL today, with a
+			// label_format doing Sprig arithmetic on every matching line and then an
+			// unwrap; as two counters it becomes a Mimir ratio. No new Loki label and
+			// no new lines, so the index is untouched.
+			stage.match {
+				selector = `{kind="LeiosEbValidated"}`
 
-        stage.json {
-          expressions = {
-            reapplied = "reapplied",
-            applied   = "applied",
-          }
-          drop_malformed = true
-        }
+				stage.json {
+					expressions = {
+						reapplied = "reapplied",
+						applied   = "applied",
+					}
+					drop_malformed = true
+				}
 
-        stage.metrics {
-          metric.counter {
-            name              = "eb_validation_reapplied_total"
-            description       = "EB transactions reapplied from the tx cache at vote time"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "add"
-            source            = "reapplied"
-            max_idle_duration = "24h"
-          }
+				stage.metrics {
+					metric.counter {
+						name              = "eb_validation_reapplied_total"
+						description       = "EB transactions reapplied from the tx cache at vote time"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "add"
+						source            = "reapplied"
+						max_idle_duration = "24h"
+					}
 
-          metric.counter {
-            name              = "eb_validation_applied_total"
-            description       = "EB transactions needing full application at vote time"
-            prefix            = "leios_logmetrics_diffusion_"
-            action            = "add"
-            source            = "applied"
-            max_idle_duration = "24h"
-          }
-        }
-      }
-    }
+					metric.counter {
+						name              = "eb_validation_applied_total"
+						description       = "EB transactions needing full application at vote time"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "add"
+						source            = "applied"
+						max_idle_duration = "24h"
+					}
+				}
+			}
+		}
 
-    forward_to = argument.forward_to.value
-  }
+		forward_to = argument.forward_to.value
+	}
 }
