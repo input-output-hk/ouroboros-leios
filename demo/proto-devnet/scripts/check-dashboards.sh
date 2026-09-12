@@ -40,10 +40,14 @@ set -uo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 DASH_DIR="${1:-$SCRIPT_DIR/../config/dashboards}"
 
-# Datasources this deployment actually provisions, plus Grafana's two built-ins.
-# Add to this only when a datasource is genuinely provisioned, never to silence a
-# stray export.
-ALLOWED_DS='loki mimir -- Grafana -- -- Dashboard -- -- Mixed --'
+# Datasources this deployment provisions, plus Grafana's built-ins: -- Grafana --
+# for annotations, -- Dashboard -- for a panel reading another panel's result,
+# -- Mixed -- for a panel spanning datasources, and __expr__ for a server-side
+# expression such as a math over two queries.
+#
+# Add to this only when a datasource is genuinely provisioned or is a Grafana
+# built-in, never to silence a stray export.
+ALLOWED_DS='loki mimir __expr__ -- Grafana -- -- Dashboard -- -- Mixed --'
 
 # Shortest auto-refresh a dashboard here may commit to, in seconds.
 MIN_REFRESH_SECONDS=60
@@ -120,7 +124,10 @@ for f in "${files[@]}"; do
       echo "FAIL $base: datasource uid \"$ds\" is not provisioned here; expected one of: loki, mimir, or a \$variable"
       fail=$((fail + 1))
     fi
-  done < <(jq -r '[.. | objects | select(has("uid") and has("type")) | .uid] | unique | .[]' "$f")
+    # Anything under a "datasource" key, rather than any object carrying a uid.
+    # Keying on uid+type misses a bare {"uid": "..."} with no type, which is how
+    # some exports write it, and would also pick up the dashboard's own uid.
+  done < <(jq -r '[.. | objects | select(has("datasource")) | .datasource | select(type == "object") | .uid? // empty] | unique | .[]' "$f")
 
   tz=$(jq -r '.timezone // ""' "$f")
   if [ "$tz" != "utc" ]; then
