@@ -493,10 +493,10 @@
       "id": 6,
       "type": "stat",
       "title": "Observable participation",
-      "description": "Share of the seats known to vote that actually voted in the visible range, across every selected node. Distinct from the two other ratios on this dashboard also called participation: the seat table measures EBs per seat, and the node panels measure votes cast against votes scheduled. The denominator here is every seat observed voting over the last 24h, derived from the data rather than configured. Seats that have never once voted appear in neither number, so a silent cohort is invisible here by nature and this reads high; leios_committee in db-sync is the only source for the true committee size. Near 100% is the healthy state. A drop means seats that normally vote have stopped, but note the load generator runs a duty cycle: during an idle hour no EBs are produced and this goes blank across all seats at once rather than dropping for a subset. Most informative at ranges under 3h; wider ranges saturate as the visible window approaches the 24h denominator.",
+      "description": "Share of the seats known to vote that actually voted in the visible range. Near 100% is the healthy state.\n\nSet the rbHash variable to a single hash and this becomes turnout for that one ranking block.\n\nTwo things look like a drop but are not. During an idle hour of the load generator duty cycle no EBs are produced, so this blanks across every seat at once rather than falling for a subset. And seats that have never voted appear in neither number, so a permanently silent cohort is invisible here and this reads high; leios_committee in db-sync is the only source for the true committee size.\n\nSaturates as the range approaches the 24h the denominator covers. That window is max_idle_duration on votes_acquired_total in leios_voting_process, so changing it there moves this number.",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "datasource",
+        "uid": "-- Mixed --"
       },
       "gridPos": {
         "h": 4,
@@ -512,7 +512,27 @@
             "uid": "loki"
           },
           "queryType": "instant",
-          "expr": "count(sum by (voterId) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosVoteAcquired\", instance=~\"$instance\"} | json rbHash=\"vote.rbHash\",voterId=\"vote.voterId\" | rbHash =~ \"$rbHash\" [$__range]))) / count(sum by (voterId) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosVoteAcquired\", instance=~\"$instance\"} | json voterId=\"vote.voterId\" [24h])))"
+          "hide": true,
+          "expr": "count(sum by (voterId) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosVoteAcquired\", instance=~\"$instance\"} | json rbHash=\"vote.rbHash\",voterId=\"vote.voterId\" | rbHash =~ \"$rbHash\" [$__range])))"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "instant": true,
+          "hide": true,
+          "expr": "count(count by (voterId) (leios_logmetrics_leios_votes_acquired_total{instance=~\"$instance\"}))"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "$A / $B"
         }
       ],
       "options": {
