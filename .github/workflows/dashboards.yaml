@@ -1,0 +1,24 @@
+name: dashboards
+
+on:
+  pull_request:
+    paths:
+      - "demo/proto-devnet/config/dashboards/**"
+      - "demo/proto-devnet/scripts/check-dashboards.sh"
+      - ".github/workflows/dashboards.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "demo/proto-devnet/config/dashboards/**"
+      - "demo/proto-devnet/scripts/check-dashboards.sh"
+      - ".github/workflows/dashboards.yaml"
+
+jobs:
+  check-dashboards:
+    name: "Check"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check dashboard uids, ids and datasources
+        run: bash demo/proto-devnet/scripts/check-dashboards.sh
