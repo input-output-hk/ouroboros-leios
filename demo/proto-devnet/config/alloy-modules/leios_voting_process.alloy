@@ -49,7 +49,7 @@ declare "leios_voting_process" {
 
   loki.process "enrich" {
     stage.match {
-      selector = `{kind=~"LeiosVoteScheduled|LeiosEbValidated|LeiosNotVoted|LeiosVoted|LeiosVoteAcquired"}`
+      selector = `{kind=~"LeiosEbValidated|LeiosNotVoted|LeiosVoteAcquired|LeiosVoteScheduled|LeiosVoted"}`
 
       stage.static_labels {
         values = {
@@ -120,7 +120,7 @@ declare "leios_voting_process" {
       // label stay scoped to them: the label is bounded by committee size, and
       // the kinds without a voter never see a stage built for one.
       stage.match {
-        selector = `{kind=~"LeiosVoted|LeiosVoteAcquired"}`
+        selector = `{kind=~"LeiosVoteAcquired|LeiosVoted"}`
 
         stage.json {
           expressions = {
