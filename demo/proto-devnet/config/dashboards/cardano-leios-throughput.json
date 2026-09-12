@@ -845,7 +845,7 @@
         "type": "loki",
         "uid": "loki"
       },
-      "description": "Cache hit rate when the voting thread validates an EB's closure to decide whether to vote for it -- not the apply path that runs when a certified EB's closure is applied to the chain. Of the txs in the closure, the share the LeiosTxCache spared full validation: reapplied means the cache had already validated the tx, so only the state-dependent checks re-ran; applied means it was validated from scratch. Plotted as reapplied / (reapplied + applied).\n\nThe ratio is computed per validation, in label_format, then averaged over the Rate / avg window -- so every validation in the window contributes equally, rather than one being picked out of it. Narrow the window to see individual validations; widen it to see the trend. 0 and 1 are common and real: a closure is often entirely cached or entirely fresh.\n\nPer node, since nodes do not see the same announcement at the same time and a fleet aggregate would average over different EB sets. Narrow with the instance variable, or click a legend entry to isolate a node.\n\nA high hit rate does not imply cheap validation -- reapplyTx runs per tx either way, so validation cost tracks closure size, not this ratio. This is also the work that sits inside the vote window, so it is the cost that can make a vote too late.\n\nGaps are windows in which that node validated nothing.",
+      "description": "Cache hit rate when the voting thread validates an EB's closure to decide whether to vote for it -- not the apply path that runs when a certified EB's closure is applied to the chain. Of the txs in the closure, the share the LeiosTxCache spared full validation: reapplied means the cache had already validated the tx, so only the state-dependent checks re-ran; applied means it was validated from scratch. Plotted as reapplied / (reapplied + applied).\n\nThe ratio is computed per validation, in label_format, then averaged over the Rate / avg window -- so every validation in the window contributes equally, rather than one being picked out of it. Narrow the window to see individual validations; widen it to see the trend. 0 and 1 are common and real: a closure is often entirely cached or entirely fresh.\n\nPer node, since nodes do not see the same announcement at the same time and a fleet aggregate would average over different EB sets. Narrow with the instance variable, or click a legend entry to isolate a node.\n\nA high hit rate does not imply cheap validation -- reapplyTx runs per tx either way, so validation cost tracks closure size, not this ratio. This is also the work that sits inside the vote window, so it is the cost that can make a vote too late.\n\nGaps are windows in which that node validated nothing.\n\nThe panel below counts the same thing from counters instead, weighted by transaction rather than by validation, at roughly a tenth of the query cost. The two are kept side by side deliberately so the difference can be judged before either is retired.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -940,6 +940,107 @@
         }
       ],
       "title": "Cache hit rate for voting EB validation, per node",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "description": "The same cache hit rate as the panel above, counted a different way, so the two can be compared before either is retired.\n\nThat one parses LeiosEbValidated in LogQL and averages a ratio computed per validation, so every validation counts equally whatever its closure size. This one divides two counters derived from the same trace, so every transaction counts equally.\n\nThey will not agree, and neither is wrong. A node validating many small cached closures and one large fresh one reads higher above. Weighting by validation answers 'how often was a closure cached'; weighting by transaction answers 'what share of the work did the cache spare'. Which is the useful question is a call for whoever is tuning the cache.\n\nWhat this one buys: it is a Mimir query rather than a log scan, so it is roughly an order of magnitude cheaper and stays cheap as the fleet grows. What it loses: the per-validation spread. 0 and 1 are common and real above -- a closure is often entirely cached or entirely fresh -- and that texture cannot be recovered from counters.\n\nCounters come from leios_diffusion_process, so this panel is blank until that module is deployed.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "cache hit rate",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "editorMode": "code",
+          "expr": "sum by (instance) (rate(leios_logmetrics_diffusion_eb_validation_reapplied_total{instance=~\"$instance\"}[${window}s])) / (sum by (instance) (rate(leios_logmetrics_diffusion_eb_validation_reapplied_total{instance=~\"$instance\"}[${window}s]) + rate(leios_logmetrics_diffusion_eb_validation_applied_total{instance=~\"$instance\"}[${window}s])) > 0)",
+          "legendFormat": "{{instance}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Cache hit rate, counter-based (weighted by tx, not by validation)",
       "type": "timeseries"
     }
   ],
