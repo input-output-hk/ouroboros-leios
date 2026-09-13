@@ -122,14 +122,28 @@
       },
       {
         "name": "threshold",
-        "type": "constant",
+        "type": "query",
         "label": "Certification threshold",
-        "query": "0.75",
+        "description": "The Leios quorum in force, read from the vote_threshold gauge rather than hardcoded, so the margin, near-miss, shortfall and time-to-certify panels follow a protocol parameter update instead of assuming 0.75. Sourced once here because those panels interpolate it into LogQL, where a label cannot be compared against another label and the value has to be a literal. Blank if leios_voting_process is not deployed, in which case those four panels have no threshold to compare against.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "mimir"
+        },
+        "definition": "query_result(max(leios_logmetrics_leios_vote_threshold))",
+        "query": {
+          "qryType": 3,
+          "query": "query_result(max(leios_logmetrics_leios_vote_threshold))",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "regex": "/ ([0-9.]+) /",
+        "refresh": 1,
+        "sort": 0,
+        "options": [],
         "current": {
           "text": "0.75",
           "value": "0.75"
         },
-        "hide": 2
+        "hide": 0
       },
       {
         "name": "tallyInstance",

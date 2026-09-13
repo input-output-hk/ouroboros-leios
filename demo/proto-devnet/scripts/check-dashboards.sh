@@ -122,6 +122,12 @@ for f in "${files[@]}"; do
   # {"uid": "..."} with no type, which is how some exports write it, and would
   # also pick up the dashboard's own uid.
   #
+  # Three shapes are in play. The current one is an object, {"type":..,"uid":..}.
+  # Older exports write a bare string naming the datasource, and that form has to
+  # be checked too or an instance-private name slips through unseen. A null means
+  # "use the org default", which is legitimate, so it is skipped rather than
+  # reported as a bad uid.
+  #
   # Variable references like $dbsync are fine; they resolve against a
   # datasource-type template variable.
   while IFS= read -r ds; do
@@ -139,7 +145,10 @@ for f in "${files[@]}"; do
       echo "FAIL $base: datasource uid \"$ds\" is not provisioned here; expected one of: loki, mimir, or a \$variable"
       fail=$((fail + 1))
     fi
-  done < <(jq -r '[.. | objects | select(has("datasource")) | .datasource | select(type == "object") | .uid? // empty] | unique | .[]' "$f")
+  done < <(jq -r '[.. | objects | select(has("datasource")) | .datasource
+                  | if type == "object" then .uid? // empty
+                    elif type == "string" then .
+                    else empty end] | unique | .[]' "$f")
 
   tz=$(jq -r '.timezone // ""' "$f")
   if [ "$tz" != "utc" ]; then
