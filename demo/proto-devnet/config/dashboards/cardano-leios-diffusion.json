@@ -165,7 +165,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "mimir" },
-      "description": "Bytes the node actually took in, over the bytes the fetch scheduler asked for. The two come from independent sources — the numerator is a node metric, the denominator is derived from the scheduler's own decision trace — so this is a consistency check as much as a signal.\n\nAround 1 is healthy. Persistently below 1 means requests are going unfulfilled, which is peers not delivering rather than the scheduler misbehaving. Above 1 means more arrived than was asked for, which is duplicate or unsolicited delivery and should show up as extra or evicted bytes on the panels to the left. Denominators are guarded, so an idle node reads as no data rather than as a spike.",
+      "description": "Bytes a node actually took in, over the bytes its fetch scheduler asked for. The two come from independent sources, a node metric and the scheduler decision trace, so this doubles as a consistency check on both.\n\nAround 1 is healthy. Persistently below means requests going unfulfilled, which points at peers not delivering rather than at the scheduler. Above means more arrived than was asked for, and should corroborate as extra or evicted bytes on the panel to the left.\n\nPer node, and it has to be. The numerator is a node metric present on every host while the denominator only exists where leios_diffusion_process is deployed, so dividing one fleet sum by the other compares different sets of hosts and inflates the result by their ratio. Matching on instance makes hosts without the module drop out rather than skew the number. Denominators are guarded, so an idle node reads as no data.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic-by-name" },
@@ -198,14 +198,14 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "mimir" },
-          "expr": "sum(rate(cardano_node_metrics_leiosFetchBodyGoodBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyExtraBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyEvictedBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyInvalidBytes_counter{instance=~\"$instance\"}[$__rate_interval])) / (sum(rate(leios_logmetrics_diffusion_fetch_body_bytes_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
-          "legendFormat": "EB body delivered / requested",
+          "expr": "sum by (instance) (rate(cardano_node_metrics_leiosFetchBodyGoodBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyExtraBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyEvictedBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyInvalidBytes_counter{instance=~\"$instance\"}[$__rate_interval])) / (sum by (instance) (rate(leios_logmetrics_diffusion_fetch_body_bytes_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "{{instance}} EB body",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "mimir" },
-          "expr": "sum(rate(cardano_node_metrics_leiosFetchTxsGoodBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsExtraBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsEvictedBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsInvalidBytes_counter{instance=~\"$instance\"}[$__rate_interval])) / (sum(rate(leios_logmetrics_diffusion_fetch_tx_bytes_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
-          "legendFormat": "tx delivered / requested",
+          "expr": "sum by (instance) (rate(cardano_node_metrics_leiosFetchTxsGoodBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsExtraBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsEvictedBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsInvalidBytes_counter{instance=~\"$instance\"}[$__rate_interval])) / (sum by (instance) (rate(leios_logmetrics_diffusion_fetch_tx_bytes_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "{{instance}} tx",
           "refId": "B"
         }
       ],
