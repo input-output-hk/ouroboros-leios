@@ -1,5 +1,12 @@
-# Checks the Grafana dashboards in config/dashboards for the things a UI export
-# silently gets wrong.
+# Checks the proto-devnet Grafana dashboards, demo/proto-devnet/config/dashboards,
+# for the things a UI export silently gets wrong.
+#
+# Scoped to that directory on purpose. Those dashboards are also provisioned by
+# cardano-playground from this repo as a flake input, so a broken uid or a stray
+# datasource reference here lands on a second, much larger deployment as well as
+# on a local devnet. The other Grafana JSON in this repo, antithesis/config and
+# demo/extras/x-ray, is local to its own stack and is not checked: the conventions
+# below are about being portable across deployments, and those are not shared.
 #
 # Grafana's "export JSON" writes a dashboard as that Grafana instance saw it, not
 # as the repo needs it: the uid becomes whatever that instance assigned, datasource
@@ -59,15 +66,18 @@ to_seconds() {
   n=${v%%[a-z]*}
   u=${v#"$n"}
   case "$n" in
-    '' | *[!0-9]*) echo -1; return ;;
+  '' | *[!0-9]*)
+    echo -1
+    return
+    ;;
   esac
   case "$u" in
-    ms) echo $((n / 1000)) ;;
-    s) echo "$n" ;;
-    m) echo $((n * 60)) ;;
-    h) echo $((n * 3600)) ;;
-    d) echo $((n * 86400)) ;;
-    *) echo -1 ;;
+  ms) echo $((n / 1000)) ;;
+  s) echo "$n" ;;
+  m) echo $((n * 60)) ;;
+  h) echo $((n * 3600)) ;;
+  d) echo $((n * 86400)) ;;
+  *) echo -1 ;;
   esac
 }
 
@@ -107,26 +117,28 @@ for f in "${files[@]}"; do
   fi
 
   # Every datasource reference anywhere in the document, panels, targets,
-  # templating and annotations alike. Variable references like $dbsync are fine:
-  # they resolve against a datasource-type template variable.
+  # templating and annotations alike. Reads anything under a "datasource" key
+  # rather than any object carrying a uid: keying on uid+type would miss a bare
+  # {"uid": "..."} with no type, which is how some exports write it, and would
+  # also pick up the dashboard's own uid.
+  #
+  # Variable references like $dbsync are fine; they resolve against a
+  # datasource-type template variable.
   while IFS= read -r ds; do
     [ -z "$ds" ] && continue
     case "$ds" in
-      \$*) continue ;;
+    \$*) continue ;;
     esac
     found=0
     for a in $ALLOWED_DS; do [ "$ds" = "$a" ] && found=1 && break; done
     # ALLOWED_DS entries contain spaces, so re-check the multi-word ones exactly.
     case "$ds" in
-      "-- Grafana --"|"-- Dashboard --"|"-- Mixed --") found=1 ;;
+    "-- Grafana --" | "-- Dashboard --" | "-- Mixed --") found=1 ;;
     esac
     if [ "$found" -eq 0 ]; then
       echo "FAIL $base: datasource uid \"$ds\" is not provisioned here; expected one of: loki, mimir, or a \$variable"
       fail=$((fail + 1))
     fi
-    # Anything under a "datasource" key, rather than any object carrying a uid.
-    # Keying on uid+type misses a bare {"uid": "..."} with no type, which is how
-    # some exports write it, and would also pick up the dashboard's own uid.
   done < <(jq -r '[.. | objects | select(has("datasource")) | .datasource | select(type == "object") | .uid? // empty] | unique | .[]' "$f")
 
   tz=$(jq -r '.timezone // ""' "$f")
@@ -153,5 +165,5 @@ for f in "${files[@]}"; do
 done
 
 echo
-echo "check-dashboards: ${#files[@]} dashboard(s), $fail failure(s), $warn warning(s)"
+echo "check-dashboards: proto-devnet, ${#files[@]} dashboard(s), $fail failure(s), $warn warning(s)"
 [ "$fail" -eq 0 ] || exit 1
