@@ -1,0 +1,788 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Cardano Leios - Voting",
+      "tooltip": "Vote decisions and certification margin for the same window",
+      "type": "link",
+      "url": "/d/cardano-leios-voting"
+    }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "panels": [],
+      "title": "Fetch bandwidth — how much of what we pulled was worth pulling",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "EB body bytes split by what became of them. Good is bytes that ended up used. Invalid failed validation, evicted arrived but was dropped before use, extra was fetched beyond what was needed. These are node metrics rather than log-derived, so they survive any tracer severity change.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": { "group": "A", "mode": "normal" }
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(cardano_node_metrics_leiosFetchBodyGoodBytes_counter{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "good",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(cardano_node_metrics_leiosFetchBodyExtraBytes_counter{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "extra",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(cardano_node_metrics_leiosFetchBodyEvictedBytes_counter{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "evicted",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(cardano_node_metrics_leiosFetchBodyInvalidBytes_counter{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "invalid",
+          "refId": "D"
+        }
+      ],
+      "title": "EB body fetch bytes by outcome",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "The same split for transaction fetches. Read alongside the body panel: a body path that looks healthy while the tx path wastes bytes points at the tx cache rather than at diffusion.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": { "group": "A", "mode": "normal" }
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "options": {
+        "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(cardano_node_metrics_leiosFetchTxsGoodBytes_counter{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "good",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(cardano_node_metrics_leiosFetchTxsExtraBytes_counter{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "extra",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(cardano_node_metrics_leiosFetchTxsEvictedBytes_counter{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "evicted",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(cardano_node_metrics_leiosFetchTxsInvalidBytes_counter{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "invalid",
+          "refId": "D"
+        }
+      ],
+      "title": "Tx fetch bytes by outcome",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "Share of fetched bytes that did not end up used, per node. A node consistently above its peers is fetching from somewhere that keeps losing the race, or re-fetching what it already had. Denominator guarded so a quiet node reads as no data rather than as a spike.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 2, "showPoints": "never" },
+          "decimals": 3,
+          "max": 1,
+          "min": 0,
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "id": 3,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "(sum by (instance) (rate(cardano_node_metrics_leiosFetchBodyInvalidBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyEvictedBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyExtraBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsInvalidBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsEvictedBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsExtraBytes_counter{instance=~\"$instance\"}[$__rate_interval]))) / (sum by (instance) (rate(cardano_node_metrics_leiosFetchBodyGoodBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyInvalidBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyEvictedBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyExtraBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsGoodBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsInvalidBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsEvictedBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsExtraBytes_counter{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Wasted fetch bytes, share of all bytes fetched",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "Bytes a node actually took in, over the bytes its fetch scheduler asked for. The two come from independent sources, a node metric and the scheduler decision trace, so this doubles as a consistency check on both.\n\nAround 1 is healthy. Persistently below means requests going unfulfilled, which points at peers not delivering rather than at the scheduler. Above means more arrived than was asked for, and should corroborate as extra or evicted bytes on the panel to the left.\n\nPer node, and it has to be. The numerator is a node metric present on every host while the denominator only exists where leios_diffusion_process is deployed, so dividing one fleet sum by the other compares different sets of hosts and inflates the result by their ratio. Matching on instance makes hosts without the module drop out rather than skew the number. Denominators are guarded, so an idle node reads as no data.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "thresholdsStyle": { "mode": "dashed" }
+          },
+          "decimals": 2,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "text", "value": 0 },
+              { "color": "blue", "value": 1 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "id": 4,
+      "options": {
+        "legend": { "calcs": ["mean", "min", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum by (instance) (rate(cardano_node_metrics_leiosFetchBodyGoodBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyExtraBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyEvictedBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchBodyInvalidBytes_counter{instance=~\"$instance\"}[$__rate_interval])) / (sum by (instance) (rate(leios_logmetrics_diffusion_fetch_body_bytes_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "{{instance}} EB body",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum by (instance) (rate(cardano_node_metrics_leiosFetchTxsGoodBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsExtraBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsEvictedBytes_counter{instance=~\"$instance\"}[$__rate_interval]) + rate(cardano_node_metrics_leiosFetchTxsInvalidBytes_counter{instance=~\"$instance\"}[$__rate_interval])) / (sum by (instance) (rate(leios_logmetrics_diffusion_fetch_tx_bytes_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "{{instance}} tx",
+          "refId": "B"
+        }
+      ],
+      "title": "Delivered against requested bytes",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "id": 200,
+      "panels": [],
+      "title": "Fetch scheduler — is it keeping up, and is there anything to fetch",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "Bodies a node still wants against offers its peers have advertised. Read them together: missing bodies rising while offers stay flat is diffusion failing to reach that node, missing bodies rising with offers is its scheduler falling behind.\n\nPer node rather than summed. These are per-node state and nodes largely converge on the same view, so a fleet sum is close to one node value multiplied by the node count and means nothing. Narrow with the instance variable.\n\nThese gauges drop out five minutes after a node stops reporting fetch decisions, so a gap means the pipeline went quiet rather than the value holding steady. During the load generator idle hour that is every node at once.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "id": 10,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum by (instance) (leios_logmetrics_diffusion_fetch_missing_bodies{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} missing bodies",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum by (instance) (leios_logmetrics_diffusion_fetch_offers_total{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} offers held",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum by (instance) (leios_logmetrics_diffusion_fetch_tracked{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} EBs tracked",
+          "refId": "C"
+        }
+      ],
+      "title": "Missing bodies against offers held",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "Requests outstanding and how many peers they are spread across. A high inflight total on few peers is concentration, which makes body arrival hostage to one link.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "id": 11,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum by (instance) (leios_logmetrics_diffusion_fetch_inflight_total{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} requests in flight",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum by (instance) (leios_logmetrics_diffusion_fetch_peers_inflight{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} peers in flight",
+          "refId": "B"
+        }
+      ],
+      "title": "Requests in flight and peers carrying them",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "How long a decision round takes. A round is meant to be cheap; the failure worth catching is it becoming a brake on the fetch loop, so watch p99 rather than the median.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 2, "showPoints": "never" },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "id": 12,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(leios_logmetrics_diffusion_fetch_decision_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "histogram_quantile(0.9, sum by (le) (rate(leios_logmetrics_diffusion_fetch_decision_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "p90",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(leios_logmetrics_diffusion_fetch_decision_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "title": "Fetch decision round duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "Work the scheduler issued, as rates. Body requests are the subset that pull EB bodies; jobs are the units of work created to service them.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+      "id": 13,
+      "options": {
+        "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_fetch_requests_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "requests",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_fetch_body_requests_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "body requests",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_fetch_jobs_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "jobs",
+          "refId": "C"
+        }
+      ],
+      "title": "Fetch request and job rate",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "id": 300,
+      "panels": [],
+      "title": "Tx cache — what it spared, measured at two points",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "Measured at body acquisition: the share of an EB's transactions that still needed full validation once the body arrived. Lower is better. This is the LeiosBodyHits view, and it is a different question from the vote-time panel beside it — this one is about what the cache held when the body landed.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 3,
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 0.3 },
+              { "color": "red", "value": 0.6 }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 35 },
+      "id": 20,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_body_validated_total{instance=~\"$instance\"}[$__rate_interval])) / (sum(rate(leios_logmetrics_diffusion_body_txs_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "needed full validation",
+          "refId": "A"
+        }
+      ],
+      "title": "Needed full validation at body acquisition",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "Measured at vote time: the share of an EB's transactions reapplied from the cache rather than fully applied. Higher is better. This is the LeiosEbValidated view and it is the same quantity the throughput dashboard computes in LogQL, here as a counter ratio instead.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 3,
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "yellow", "value": 0.4 },
+              { "color": "green", "value": 0.7 }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 35 },
+      "id": 21,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_eb_validation_reapplied_total{instance=~\"$instance\"}[$__rate_interval])) / (sum(rate(leios_logmetrics_diffusion_eb_validation_reapplied_total{instance=~\"$instance\"}[$__rate_interval]) + rate(leios_logmetrics_diffusion_eb_validation_applied_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "reapplied",
+          "refId": "A"
+        }
+      ],
+      "title": "Cache hit rate at vote time",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "How full the tx cache is. If load sits at capacity while the validation share above is climbing, the cache is being evicted faster than it is being used and wants sizing.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
+          "decimals": 3,
+          "unit": "percentunit"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "entries" },
+            "properties": [
+              { "id": "unit", "value": "short" },
+              { "id": "custom.axisPlacement", "value": "right" }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 35 },
+      "id": 22,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "avg(leios_logmetrics_diffusion_tx_cache_load{instance=~\"$instance\"})",
+          "legendFormat": "load",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "avg(leios_logmetrics_diffusion_tx_cache_entries{instance=~\"$instance\"})",
+          "legendFormat": "entries",
+          "refId": "B"
+        }
+      ],
+      "title": "Tx cache load and size",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "The share of an EB's transactions the LeiosTxCache path handled, and where they dropped out. Nested, not a partition: the source states txsInEb >= tracked >= acquired >= validated, so each line sits at or below the one above and they must never cross.\n\nDo not expect these to approach 100%. By the time a body arrives the node already holds around 99% of its transactions in the mempool, so the cache path only ever has the remainder to account for; tracked reaching txsInEb would mean the mempool had failed to have them. Coverage is the panel to the right. Typical here is tracked around 17%.\n\nThe three often sit exactly on top of each other, which is the healthy reading: everything tracked was acquired and everything acquired was validated, so there is no attrition. Divergence is the signal, and currently only three of sixteen nodes show any.\n\nPlotted as shares rather than counts because the counts are summed across nodes and every node processes the same EB transactions, so the absolutes run at roughly the node count times the real rate. Denominators guarded, so an idle node reads as no data.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "stacking": { "group": "A", "mode": "none" }
+          },
+          "decimals": 1,
+          "max": 1,
+          "min": 0,
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 43 },
+      "id": 23,
+      "options": {
+        "legend": { "calcs": ["mean", "min"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_body_tracked_total{instance=~\"$instance\"}[$__rate_interval])) / (sum(rate(leios_logmetrics_diffusion_body_txs_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "tracked",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_body_acquired_total{instance=~\"$instance\"}[$__rate_interval])) / (sum(rate(leios_logmetrics_diffusion_body_txs_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "acquired",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_body_validated_total{instance=~\"$instance\"}[$__rate_interval])) / (sum(rate(leios_logmetrics_diffusion_body_txs_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "validated",
+          "refId": "C"
+        }
+      ],
+      "title": "EB transaction funnel, share via the cache path",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "Where an EB's transactions were found when the body arrived: already in the mempool, or in neither the cache nor the mempool. A different axis from the funnel beside it, which is why the two are separate panels; summing across both double counts.\n\nThe hit rate on the right axis is (txsInEb - missedBoth) / txsInEb, the formula the source gives for this, chosen because it avoids the double counting that comparing the nested counters would introduce. It is not the same quantity as the validation share on the stat above: that one asks how many transactions needed full validation, this one asks how many the node had never seen at all. Both are real and they differ by roughly an order of magnitude.\n\nDenominator guarded, so an idle node reads as no data.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "stacking": { "group": "A", "mode": "none" }
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "cache+mempool hit rate" },
+            "properties": [
+              { "id": "unit", "value": "percentunit" },
+              { "id": "custom.axisPlacement", "value": "right" },
+              { "id": "max", "value": 1 },
+              { "id": "min", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 43 },
+      "id": 24,
+      "options": {
+        "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_body_mempool_hits_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "mempool hits",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_body_missed_both_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "missed both",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "(sum(rate(leios_logmetrics_diffusion_body_txs_total{instance=~\"$instance\"}[$__rate_interval])) - sum(rate(leios_logmetrics_diffusion_body_missed_both_total{instance=~\"$instance\"}[$__rate_interval]))) / (sum(rate(leios_logmetrics_diffusion_body_txs_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "cache+mempool hit rate",
+          "refId": "C"
+        }
+      ],
+      "title": "Cache and mempool coverage",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 51 },
+      "id": 400,
+      "panels": [],
+      "title": "Announcement relay",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "Announcements relayed to us by upstream peers, before deduplication, per node. Compare against the deduplicated LeiosAnnouncementAccepted rate on the voting dashboard: the ratio of the two is announcement fan-in.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
+          "unit": "cps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 52 },
+      "id": 30,
+      "options": {
+        "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum by (instance) (rate(leios_logmetrics_diffusion_peer_announcements_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Peer announcement relay rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "Announcements flagged as equivocating: a peer announcing a second, different EB for an election it already announced. Expected to sit flat at zero. Anything sustained is either a faulty node or a deliberate one, and this is the only view of it.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2, "showPoints": "auto" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "red", "value": 0.001 }
+            ]
+          },
+          "unit": "cps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 52 },
+      "id": 31,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum by (instance) (rate(leios_logmetrics_diffusion_peer_announcements_total{instance=~\"$instance\", equivocation=\"true\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Equivocating announcements",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 60 },
+      "id": 500,
+      "panels": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "description": "How many upstream peers relayed each EB announcement at one node. LeiosPeerAnnouncement is emitted once per peer per newly counted announcement, so the count per ebHash is that node's fan-in.\n\nOne node at a time on purpose. Grouping by ebHash and instance together returns roughly one series per EB per node and Loki rejects it outright with \"maximum of series (500) reached\"; summing across instances instead would silently report fleet-wide relay events as though they were one node's fan-in, which is worse. Pick the node with the variable.\n\nThis is the only Loki panel here and it scans logs, so the row is collapsed by default and the query is instant rather than ranged. topk bounds the result, and an instant query only merges into a single frame in a table, not a timeseries.",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "custom": { "align": "auto", "cellOptions": { "type": "auto" } },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": 0 },
+                  { "color": "yellow", "value": 2 },
+                  { "color": "green", "value": 4 }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 61 },
+          "id": 40,
+          "options": {
+            "cellHeight": "sm",
+            "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+            "showHeader": true,
+            "sortBy": [{ "desc": true, "displayName": "Value" }]
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "expr": "topk(25, sum by (ebHash) (count_over_time({kind=\"LeiosPeerAnnouncement\", instance=\"$fanInInstance\"} | json ebHash=\"ebHash\" [$__range])))",
+              "format": "table",
+              "instant": true,
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ],
+          "title": "Announcement fan-in — distinct peers per EB (expensive, Loki)",
+          "type": "table"
+        }
+      ],
+      "title": "Announcement fan-in (collapsed — Loki, scans logs)",
+      "type": "row"
+    }
+  ],
+  "preload": false,
+  "refresh": "1m",
+  "schemaVersion": 42,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": { "text": "All", "value": "$__all" },
+        "datasource": { "type": "loki", "uid": "loki" },
+        "definition": "",
+        "includeAll": true,
+        "multi": true,
+        "name": "instance",
+        "options": [],
+        "query": {
+          "label": "instance",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "{service=\"cardano-node\"}",
+          "type": 1
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": { "type": "loki", "uid": "loki" },
+        "definition": "",
+        "description": "Single node for the announcement fan-in panel. Fan-in is a per-node quantity and grouping by ebHash across every instance exceeds Loki's series limit, so that panel picks one node rather than aggregating. Scoped to instances actually emitting LeiosPeerAnnouncement.",
+        "includeAll": false,
+        "multi": false,
+        "name": "fanInInstance",
+        "options": [],
+        "query": {
+          "label": "instance",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "{kind=\"LeiosPeerAnnouncement\"}",
+          "type": 1
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "Cardano Leios - Diffusion",
+  "uid": "cardano-leios-diffusion",
+  "version": 1
+}
