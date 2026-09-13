@@ -222,7 +222,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "mimir" },
-      "description": "Bodies the node still wants against offers any peer has advertised. Read them together: missing bodies rising while offers stay flat is diffusion failing to reach this node, missing bodies rising with offers is the scheduler falling behind. Both are gauges reported once per decision round.",
+      "description": "Bodies a node still wants against offers its peers have advertised. Read them together: missing bodies rising while offers stay flat is diffusion failing to reach that node, missing bodies rising with offers is its scheduler falling behind.\n\nPer node rather than summed. These are per-node state and nodes largely converge on the same view, so a fleet sum is close to one node value multiplied by the node count and means nothing. Narrow with the instance variable.\n\nThese gauges drop out five minutes after a node stops reporting fetch decisions, so a gap means the pipeline went quiet rather than the value holding steady. During the load generator idle hour that is every node at once.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic-by-name" },
@@ -240,20 +240,20 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "mimir" },
-          "expr": "sum(leios_logmetrics_diffusion_fetch_missing_bodies{instance=~\"$instance\"})",
-          "legendFormat": "missing bodies",
+          "expr": "sum by (instance) (leios_logmetrics_diffusion_fetch_missing_bodies{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} missing bodies",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "mimir" },
-          "expr": "sum(leios_logmetrics_diffusion_fetch_offers_total{instance=~\"$instance\"})",
-          "legendFormat": "offers held",
+          "expr": "sum by (instance) (leios_logmetrics_diffusion_fetch_offers_total{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} offers held",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "mimir" },
-          "expr": "sum(leios_logmetrics_diffusion_fetch_tracked{instance=~\"$instance\"})",
-          "legendFormat": "EBs tracked",
+          "expr": "sum by (instance) (leios_logmetrics_diffusion_fetch_tracked{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} EBs tracked",
           "refId": "C"
         }
       ],
@@ -507,7 +507,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "mimir" },
-      "description": "Where an EB's transactions came from when the body arrived, as rates. Tracked and mempool hits cost nothing; validated is the expensive path; missed both is the transactions the node had never seen, which is the share that makes EB validation slow.",
+      "description": "Where an EB's transactions came from when the body arrived, as rates. Tracked and mempool hits cost nothing; validated is the expensive path; missed both is the transactions the node had never seen, which is the share that makes EB validation slow.\n\nRead the split, not the absolute rate. Every node processes the same EB transactions, so summing across the fleet counts each one once per node and the totals run at roughly the node count times the real transaction rate. That is genuine validation work being done, and the proportions are unaffected, but it is not a network transaction rate. Kept summed because a five series stack per node is unreadable.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic-by-name" },
