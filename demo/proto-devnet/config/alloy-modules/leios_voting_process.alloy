@@ -79,7 +79,7 @@ declare "leios_voting_process" {
 			// MUST stay ahead of the voterId stage below. stage.metrics takes the
 			// entry's labels as they stand at that point in the pipeline, so moving
 			// this after voterId is applied multiplies a 14-bucket histogram by the
-			// committee seat count, currently 131 realised seats per host.
+			// committee seat count.
 			stage.match {
 				selector = `{kind="LeiosVoteAcquired"}`
 

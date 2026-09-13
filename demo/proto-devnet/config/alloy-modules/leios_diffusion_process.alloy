@@ -33,7 +33,7 @@
 // regardless. ebHash, electionPool and peer.connectionId all stay in the body.
 // connectionId in particular is per-connection and unbounded, so it must never
 // become a label; electionPool is roughly one value per pool and belongs in a query
-// aggregation, not an index. At 25 instances the whole module is order 500 series,
+// aggregation, not an index. The module is a few tens of series per host,
 // dominated by the one histogram.
 //
 // Absent kinds cost nothing: no matching lines means stage.match never fires and
@@ -81,7 +81,7 @@ declare "leios_diffusion_process" {
 			// equivocation is labelled rather than left in the body because it is a
 			// bool and the rate of true is the signal: a peer announcing two different
 			// EBs for one election is either faulty or adversarial, and there is
-			// currently no other view of it.
+			// no other view of it.
 			stage.match {
 				selector = `{kind="LeiosPeerAnnouncement"}`
 
@@ -156,9 +156,9 @@ declare "leios_diffusion_process" {
 					// window; dropping it would reset the series and break rate() across an
 					// idle period. A gauge does not: alloy keeps exposing the last value, so a
 					// stalled pipeline is indistinguishable from steady state and the panel
-					// reads as live. Five minutes is roughly fifty missed decision rounds at
-					// the observed rate, so the series drops and the panel goes honestly
-					// blank instead. The same applies to the tx cache gauges below.
+					// reads as live. Five minutes is many missed decision rounds, so the
+					// series drops and the panel goes honestly blank instead. The same
+					// applies to the tx cache gauges below.
 					metric.gauge {
 						name              = "fetch_tracked"
 						description       = "EBs currently tracked by the fetch logic"

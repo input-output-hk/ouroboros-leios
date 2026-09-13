@@ -1998,7 +1998,7 @@
       "id": 41,
       "type": "timeseries",
       "title": "Tally quantiles against the quorum threshold",
-      "description": "Where the tally distribution sits relative to the quorum actually in force. The threshold line is read from the node rather than assumed, since it is a Dijkstra protocol parameter and can move by parameter update; if it separates from 0.75 the fixed buckets on the histogram panels stop straddling it and want widening. A p90 riding just under the line with the median far below is the certification-stall signature.\n\nThis slot previously held vote diffusion redundancy, arrivals over distinct votes. That is not computable on w36: LeiosVoteAcquired now fires once per accepted vote rather than once per arrival, and no per-arrival trace remains, so the redundancy factor is no longer observable from logs at all.",
+      "description": "Where the tally distribution sits relative to the quorum in force. The threshold line is read from the node rather than assumed, since it is a Dijkstra protocol parameter and can move by parameter update; if it separates from the value the histogram buckets were chosen around, those buckets stop straddling it and want widening. A p90 riding just under the line with the median far below is the certification-stall signature.",
       "datasource": {
         "type": "prometheus",
         "uid": "mimir"
@@ -2129,7 +2129,7 @@
       "id": 43,
       "type": "timeseries",
       "title": "Accepted votes per seat",
-      "description": "Accepted vote rate broken out by committee seat. Seats that flatline while others keep voting are the ones to chase. Since w36 LeiosVoteAcquired fires once per accepted vote rather than once per arrival, so this is the distinct-vote rate and is no longer inflated by the peer redundancy factor.",
+      "description": "Accepted vote rate broken out by committee seat. Seats that flatline while others keep voting are the ones to chase. LeiosVoteAcquired fires once per accepted vote rather than once per arrival, so this is a distinct-vote rate and is not inflated by how many peers delivered each vote.",
       "datasource": {
         "type": "prometheus",
         "uid": "mimir"
