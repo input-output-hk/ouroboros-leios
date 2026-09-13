@@ -507,23 +507,82 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "mimir" },
-      "description": "Where an EB's transactions came from when the body arrived, as rates. Tracked and mempool hits cost nothing; validated is the expensive path; missed both is the transactions the node had never seen, which is the share that makes EB validation slow.\n\nRead the split, not the absolute rate. Every node processes the same EB transactions, so summing across the fleet counts each one once per node and the totals run at roughly the node count times the real transaction rate. That is genuine validation work being done, and the proportions are unaffected, but it is not a network transaction rate. Kept summed because a five series stack per node is unreadable.",
+      "description": "The share of an EB's transactions the LeiosTxCache path handled, and where they dropped out. Nested, not a partition: the source states txsInEb >= tracked >= acquired >= validated, so each line sits at or below the one above and they must never cross.\n\nDo not expect these to approach 100%. By the time a body arrives the node already holds around 99% of its transactions in the mempool, so the cache path only ever has the remainder to account for; tracked reaching txsInEb would mean the mempool had failed to have them. Coverage is the panel to the right. Typical here is tracked around 17%.\n\nThe three often sit exactly on top of each other, which is the healthy reading: everything tracked was acquired and everything acquired was validated, so there is no attrition. Divergence is the signal, and currently only three of sixteen nodes show any.\n\nPlotted as shares rather than counts because the counts are summed across nodes and every node processes the same EB transactions, so the absolutes run at roughly the node count times the real rate. Denominators guarded, so an idle node reads as no data.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic-by-name" },
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 30,
-            "lineWidth": 1,
+            "fillOpacity": 0,
+            "lineWidth": 2,
             "showPoints": "never",
-            "stacking": { "group": "A", "mode": "normal" }
+            "stacking": { "group": "A", "mode": "none" }
           },
-          "unit": "short"
+          "decimals": 1,
+          "max": 1,
+          "min": 0,
+          "unit": "percentunit"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 43 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 43 },
       "id": 23,
+      "options": {
+        "legend": { "calcs": ["mean", "min"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_body_tracked_total{instance=~\"$instance\"}[$__rate_interval])) / (sum(rate(leios_logmetrics_diffusion_body_txs_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "tracked",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_body_acquired_total{instance=~\"$instance\"}[$__rate_interval])) / (sum(rate(leios_logmetrics_diffusion_body_txs_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "acquired",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_body_validated_total{instance=~\"$instance\"}[$__rate_interval])) / (sum(rate(leios_logmetrics_diffusion_body_txs_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "validated",
+          "refId": "C"
+        }
+      ],
+      "title": "EB transaction funnel, share via the cache path",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "Where an EB's transactions were found when the body arrived: already in the mempool, or in neither the cache nor the mempool. A different axis from the funnel beside it, which is why the two are separate panels; summing across both double counts.\n\nThe hit rate on the right axis is (txsInEb - missedBoth) / txsInEb, the formula the source gives for this, chosen because it avoids the double counting that comparing the nested counters would introduce. It is not the same quantity as the validation share on the stat above: that one asks how many transactions needed full validation, this one asks how many the node had never seen at all. Both are real and they differ by roughly an order of magnitude.\n\nDenominator guarded, so an idle node reads as no data.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "stacking": { "group": "A", "mode": "none" }
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "cache+mempool hit rate" },
+            "properties": [
+              { "id": "unit", "value": "percentunit" },
+              { "id": "custom.axisPlacement", "value": "right" },
+              { "id": "max", "value": 1 },
+              { "id": "min", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 43 },
+      "id": 24,
       "options": {
         "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
@@ -531,36 +590,24 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "mimir" },
-          "expr": "sum(rate(leios_logmetrics_diffusion_body_tracked_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "already tracked",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "mimir" },
           "expr": "sum(rate(leios_logmetrics_diffusion_body_mempool_hits_total{instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "mempool hits",
-          "refId": "B"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "mimir" },
-          "expr": "sum(rate(leios_logmetrics_diffusion_body_acquired_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "acquired",
-          "refId": "C"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "mimir" },
-          "expr": "sum(rate(leios_logmetrics_diffusion_body_validated_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "fully validated",
-          "refId": "D"
+          "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "mimir" },
           "expr": "sum(rate(leios_logmetrics_diffusion_body_missed_both_total{instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "missed both",
-          "refId": "E"
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "(sum(rate(leios_logmetrics_diffusion_body_txs_total{instance=~\"$instance\"}[$__rate_interval])) - sum(rate(leios_logmetrics_diffusion_body_missed_both_total{instance=~\"$instance\"}[$__rate_interval]))) / (sum(rate(leios_logmetrics_diffusion_body_txs_total{instance=~\"$instance\"}[$__rate_interval])) > 0)",
+          "legendFormat": "cache+mempool hit rate",
+          "refId": "C"
         }
       ],
-      "title": "EB transaction disposition on body arrival",
+      "title": "Cache and mempool coverage",
       "type": "timeseries"
     },
     {
