@@ -149,13 +149,23 @@ declare "leios_diffusion_process" {
 
 					// Gauges: each decision reports the current state of the world, so the
 					// last value is the meaningful one rather than a sum over rounds.
+					//
+					// These carry a much shorter max_idle_duration than the counters around
+					// them, and the difference is deliberate. A counter degrades honestly when
+					// its source stops, since its rate falls to zero, so it wants a long
+					// window; dropping it would reset the series and break rate() across an
+					// idle period. A gauge does not: alloy keeps exposing the last value, so a
+					// stalled pipeline is indistinguishable from steady state and the panel
+					// reads as live. Five minutes is roughly fifty missed decision rounds at
+					// the observed rate, so the series drops and the panel goes honestly
+					// blank instead. The same applies to the tx cache gauges below.
 					metric.gauge {
 						name              = "fetch_tracked"
 						description       = "EBs currently tracked by the fetch logic"
 						prefix            = "leios_logmetrics_diffusion_"
 						action            = "set"
 						source            = "tracked"
-						max_idle_duration = "24h"
+						max_idle_duration = "5m"
 					}
 
 					metric.gauge {
@@ -164,7 +174,7 @@ declare "leios_diffusion_process" {
 						prefix            = "leios_logmetrics_diffusion_"
 						action            = "set"
 						source            = "missingBodies"
-						max_idle_duration = "24h"
+						max_idle_duration = "5m"
 					}
 
 					metric.gauge {
@@ -173,7 +183,7 @@ declare "leios_diffusion_process" {
 						prefix            = "leios_logmetrics_diffusion_"
 						action            = "set"
 						source            = "peersInflight"
-						max_idle_duration = "24h"
+						max_idle_duration = "5m"
 					}
 
 					metric.gauge {
@@ -182,7 +192,7 @@ declare "leios_diffusion_process" {
 						prefix            = "leios_logmetrics_diffusion_"
 						action            = "set"
 						source            = "inflightTotal"
-						max_idle_duration = "24h"
+						max_idle_duration = "5m"
 					}
 
 					metric.gauge {
@@ -191,7 +201,7 @@ declare "leios_diffusion_process" {
 						prefix            = "leios_logmetrics_diffusion_"
 						action            = "set"
 						source            = "offersTotal"
-						max_idle_duration = "24h"
+						max_idle_duration = "5m"
 					}
 
 					// Counters: these are per-round quantities that accumulate, so add
@@ -324,7 +334,7 @@ declare "leios_diffusion_process" {
 						prefix            = "leios_logmetrics_diffusion_"
 						action            = "set"
 						source            = "cacheTxCount"
-						max_idle_duration = "24h"
+						max_idle_duration = "5m"
 					}
 
 					metric.gauge {
@@ -333,7 +343,7 @@ declare "leios_diffusion_process" {
 						prefix            = "leios_logmetrics_diffusion_"
 						action            = "set"
 						source            = "cacheLoad"
-						max_idle_duration = "24h"
+						max_idle_duration = "5m"
 					}
 				}
 			}
