@@ -12,10 +12,10 @@
 // into service="cardano-node" for half its panels.
 //
 //   Input  : cardano_node_process output -- body = decoded data, kind label set.
-//   Output : same line; on vote lines the service is refined and voterId indexed.
-//   Labels : service=cardano-node/leios-voting, plus voterId on cast/acquired
-//            lines only -- the other kinds carry no vote.voterId -- and reason
-//            on declined lines.
+//   Output : same line; on vote lines the service is refined.
+//   Labels : service=cardano-node/leios-voting, plus voterId on cast lines only,
+//            where it is bounded by the pools this node votes for, and reason on
+//            declined lines.
 //   Metrics: voted_weight_total, votes_cast_total, votes_scheduled_total,
 //            votes_declined_total, votes_acquired_total, vote_tally,
 //            vote_threshold.
@@ -24,8 +24,8 @@
 // vote is scheduled is one the node was asked to vote on, so the ratio is the
 // share actually cast, and it stays readable when nothing certifies. Scheduled
 // and declined lines carry no vote.voterId, so those two counters are per
-// instance while the cast counter also carries voterId. One BP hosts one pool,
-// so join them on instance rather than voterId.
+// instance while the cast counter also carries voterId. Join them on instance,
+// which holds however many pools a node votes for.
 //   Example input:
 //     {
 //       "kind": "LeiosVoteAcquired",
@@ -116,11 +116,15 @@ declare "leios_voting_process" {
 				}
 			}
 
-			// Only the cast/acquired lines carry vote.voterId, so the parse and the
-			// label stay scoped to them: the label is bounded by committee size, and
-			// the kinds without a voter never see a stage built for one.
+			// Scoped to the cast line, where voterId is bounded by the pools this node
+			// votes for. LeiosVoteAcquired is written once per accepted vote, so one
+			// line per voting committee seat per node, and labelling it multiplies
+			// both streams and every counter declared below by the seat count.
+			// voterId stays in the body on every vote line, so committee-wide per
+			// seat views are a query time `| json voterId="vote.voterId"`, which is
+			// how the dashboard already reads them.
 			stage.match {
-				selector = `{kind=~"LeiosVoteAcquired|LeiosVoted"}`
+				selector = `{kind="LeiosVoted"}`
 
 				stage.json {
 					expressions = {

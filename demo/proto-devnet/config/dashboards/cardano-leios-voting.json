@@ -54,25 +54,12 @@
       },
       {
         "name": "voterId",
-        "type": "query",
-        "datasource": {
-          "type": "loki",
-          "uid": "loki"
-        },
-        "query": {
-          "label": "voterId",
-          "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "{service=\"cardano-node/leios-voting\"}",
-          "type": 1
-        },
-        "regex": "",
-        "refresh": 2,
-        "multi": true,
-        "includeAll": true,
-        "sort": 3,
+        "type": "textbox",
+        "label": "seat filter",
+        "query": ".+",
         "current": {
-          "text": "All",
-          "value": "$__all"
+          "text": ".+",
+          "value": ".+"
         }
       },
       {
@@ -507,7 +494,7 @@
       "id": 6,
       "type": "stat",
       "title": "Observable participation",
-      "description": "Share of the seats known to vote that actually voted in the visible range. Near 100% is the healthy state.\n\nSet the rbHash variable to a single hash and this becomes turnout for that one ranking block.\n\nTwo things look like a drop but are not. During an idle hour of the load generator duty cycle no EBs are produced, so this blanks across every seat at once rather than falling for a subset. And seats that have never voted appear in neither number, so a permanently silent cohort is invisible here and this reads high; leios_committee in db-sync is the only source for the true committee size.\n\nSaturates as the range approaches the 24h the denominator covers. That window is max_idle_duration on votes_acquired_total in leios_voting_process, so changing it there moves this number.",
+      "description": "Share of the seats known to vote that actually voted in the visible range. Near 100% is the healthy state.\n\nSet the rbHash variable to a single hash and this becomes turnout for that one ranking block.\n\nTwo things look like a drop but are not. During an idle hour of the load generator duty cycle no EBs are produced, so this blanks across every seat at once rather than falling for a subset. And seats that have never voted appear in neither number, so a permanently silent cohort is invisible here and this reads high; leios_committee in db-sync is the only source for the true committee size.\n\nSaturates as the range approaches the fixed 24h window the denominator covers. Both numbers read voterId out of the line body, so they count seats seen voting rather than seats seated.",
       "datasource": {
         "type": "datasource",
         "uid": "-- Mixed --"
@@ -532,12 +519,12 @@
         {
           "refId": "B",
           "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
+            "type": "loki",
+            "uid": "loki"
           },
-          "instant": true,
+          "queryType": "instant",
           "hide": true,
-          "expr": "count(count by (voterId) (leios_logmetrics_leios_votes_acquired_total{instance=~\"$instance\"}))"
+          "expr": "count(sum by (voterId) (count_over_time({service=\"cardano-node/leios-voting\", kind=\"LeiosVoteAcquired\", instance=~\"$instance\"} | json voterId=\"vote.voterId\" [24h])))"
         },
         {
           "refId": "C",
@@ -2129,7 +2116,7 @@
       "id": 43,
       "type": "timeseries",
       "title": "Accepted votes per seat",
-      "description": "Accepted vote rate broken out by committee seat. Seats that flatline while others keep voting are the ones to chase. LeiosVoteAcquired fires once per accepted vote rather than once per arrival, so this is a distinct-vote rate and is not inflated by how many peers delivered each vote.",
+      "description": "Accepted vote rate broken out by committee seat. Seats that flatline while others keep voting are the ones to chase. LeiosVoteAcquired fires once per accepted vote rather than once per arrival, so this is a distinct-vote rate and is not inflated by how many peers delivered each vote.\n\nOne series per seat, so narrow it with the seat filter on a large committee. Loki caps how many series a query may return.",
       "datasource": {
         "type": "prometheus",
         "uid": "mimir"
@@ -2144,10 +2131,10 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
+            "type": "loki",
+            "uid": "loki"
           },
-          "expr": "sum by (voterId) (rate(leios_logmetrics_leios_votes_acquired_total{instance=~\"$instance\", voterId=~\"$voterId\"}[$__rate_interval]))",
+          "expr": "sum by (voterId) (rate({service=\"cardano-node/leios-voting\", kind=\"LeiosVoteAcquired\", instance=~\"$instance\"} | json voterId=\"vote.voterId\" | voterId =~ \"$voterId\" [$__rate_interval]))",
           "legendFormat": "seat {{voterId}}"
         }
       ],
