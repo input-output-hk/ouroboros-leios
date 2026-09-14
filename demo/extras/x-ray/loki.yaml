@@ -4,6 +4,9 @@ limits_config:
   volume_enabled: true
   max_streams_per_user: 100000
   max_label_names_per_series: 20
+  # Raised from the loki default of 500 as leiosCommitteeSize is 900 and the
+  # voting dashboard returns a series per seat, or per rbHash on the EB panels.
+  max_query_series: 2000
 server:
   http_listen_port: 3100
   log_level: info
