@@ -525,7 +525,7 @@ Ad-hoc runs on a local twelve-node devnet, not a published benchmark, suggest th
 
 Two points of interpretation matter for the design. First, nothing in the protocol makes a large Mempool expensive; it is expensive because the implementation still performs work proportional to Mempool contents while a block is being produced, which converts depth into forging latency. Holding more transactions is precisely what fills endorser blocks, and the shallower configuration paid for its stability with a measurable throughput loss at low load. The objective is therefore not a small Mempool but a cheap large one, with a capacity chosen for memory and fairness rather than one that silently keeps forging affordable. Second, if the work on the critical path cannot be made sufficiently sublinear, an explicit governor is preferable to a capacity limit that happens to serve as one.
 
-The solution is a threefold design: removing the lock contention so that accepting, diffusing and forging proceed concurrently (the *double-buffered mempool*), exploiting transaction validity ranges to make advancing the slot cheap, and keeping ready-to-forge views so that block production never re-applies the whole mempool on the critical path. The data structures and function names below track the `ouroboros-consensus` implementation and may evolve.
+The solution is a threefold design: removing the lock contention so that accepting, diffusing and forging proceed concurrently (the *double-buffered mempool*), making the mempool *time-aware* so that advancing the slot is free, and keeping ready-to-forge views so that block production never re-applies the whole mempool on the critical path. The data structures and function names below track the `ouroboros-consensus` implementation and may evolve.
 
 ![](./mempool-component-diagram.svg)
 
@@ -578,15 +578,22 @@ The result is still correct: the on-screen state is identical to re-applying all
 
 One mutation breaks the purely additive picture the converging loop relies on. `Remove` force-drops a given set of transactions *even though they are still valid*. It exists only for a rare inconsistency: the node forged a block the ledger then rejected, so those transactions must leave the Mempool or they would be forged into the same rejected block again. A `Sync` cannot stand in for it, since re-application would find the transactions valid (that is how they entered a block in the first place) and, the block having not been adopted, there is no new `base` to sync. Because `Remove` deletes rather than appends, an in-flight `Sync` that snapshotted before it would resurrect the deleted transactions when it flips. The double-buffer keeps the loop additive by **preempting**: a `Remove` commits on screen and restarts any in-flight `Sync` from a fresh, post-removal snapshot. This is cheap precisely because `Remove` is a rare recovery action, never the normal way forged transactions leave the Mempool (that is an ordinary `Sync` once the node adopts its own block); were removals to become frequent, replaying an additions-and-removals log during the sync would be preferable to restarting it.
 
-#### Cheap ticking
+#### Time-aware mempool
 
 > [!WARNING]
 >
-> TODO: Not yet implemented and incomplete design. How will this exactly result in less checking in the forge loop? Shouldn't we incorporate knowledge of the leader schedule?
+> TODO: Not yet implemented. The `interval` invariant and its admission rule are
+> designed, but nothing maintains them yet.
 
 A transaction is applicable only over a **validity range** of slots: its own validity interval (`invalidBefore`/`invalidHereafter`), together with the era and protocol parameters that govern how it is validated. So advancing the slot, not only changing the `base`, can invalidate a transaction.
 
-Two facts keep this cheap to track. The era and protocol parameters change only at **epoch boundaries**, so within an epoch the validation rules are fixed. And the mempool commits to an `interval` of its own, a window reaching to the next expected block or the epoch boundary, admitting only transactions valid across the whole of it:
+The tempting move is to *check* the validity ranges when a snapshot is asked for at a later slot: keep whatever is still applicable and re-apply the rest. That does not work at Leios mempool depths, and it is worth saying why, because the reason is structural rather than a matter of implementation.
+
+Re-application cannot be localised to the transactions that expired. Removing a transaction from the middle of an ordered, validated sequence can invalidate arbitrary later ones, and not only through the UTxO set: a later transaction may delegate a stake key an earlier one registered, vote on a governance action an earlier one proposed, use a reference script in an output an earlier one created, or withdraw rewards whose permitted amount an earlier withdrawal changed. Nothing in the ledger interface exposes the read and write sets that would decide this without running the rules, so the only sound answer is to re-apply everything ordered after the first transaction that left.
+
+That makes the cost depend on *where* the earliest expiry falls, and expiries are sprinkled through the sequence rather than clustered at its end. Mainnet's validity-interval distribution says how often this happens: [about 14% of transactions set no `invalidHereafter` at all](https://kleioscan.com/#/mainnet/analytics/validity), and only 0.59% of all transactions are included with 100 slots or less of headroom before their deadline. Taking one block's advance as roughly 20 slots, on the order of 0.1% of the mempool expires per advance. That is a small number that behaves badly at depth: keeping the sequence whole requires *every* transaction to survive, so the probability of that falls off as $(1-p)^{n}$ — around 30% at a thousand transactions, and indistinguishable from zero at ten thousand. And the earliest expiry then sits about $1/p$ transactions in, so a prefix-keeping scheme retains under a tenth of the mempool. Checking turns a rare per-transaction event into a near-certain whole-mempool one.
+
+The design therefore does not check the ranges. It **maintains an invariant** that makes the question unnecessary. Two facts let it. The era and protocol parameters change only at **epoch boundaries**, so within an epoch the validation rules are fixed. And the mempool commits to an `interval` of its own, a window covering the Leios pipeline and the next expected block, admitting only transactions valid across the whole of it:
 
 ```haskell
 data MempoolState = MempoolState
@@ -596,7 +603,29 @@ data MempoolState = MempoolState
   }
 ```
 
-A third operation, `Tick`, advances the current slot as a cheap **intersection**: as long as the new slot stays within `interval`, nothing observable to the transactions changes and nothing is re-applied. Leaving the `interval`, at the latest at an epoch boundary, forces a re-apply (and a re-validate on a new era). Since `interval` is roughly a 20-slot window, from the current tip or epoch start to the next expected block or epoch end, maintaining it lets the node advance many slots between the bigger, base-changing rebases without ever touching `txs`. The trade-off is that a transaction whose own validity range is narrower than `interval` cannot be admitted, which is acceptable for the performance win.
+A third operation, `Tick`, advances the current slot as a cheap **intersection**: as long as the new slot stays within `interval`, no transaction in the mempool can have expired — that is what admission guaranteed — so nothing is checked and nothing is re-applied. This is the property block production needs: the forge asks for a snapshot at its own slot, which lies inside the interval, and pays nothing for the slot having moved. It is constant-time because it is an invariant, not because a scan was made fast.
+
+The work does not disappear; it moves off the critical path. When the interval rolls forward, transactions that fall outside the new one have to go, and their departure forces the re-application described above. But the interval rolls forward when a new block arrives, which is when `Sync` runs anyway — and `Sync` is already the operation the double buffer keeps off screen. Expiry handling is thereby folded into work that is already `O(|txs|)` and already off the path readers and block production depend on.
+
+The trade-off is at admission: a transaction whose own validity range is narrower than `interval` cannot be accepted. The mainnet distribution prices it, and the price depends entirely on how wide the interval is:
+
+| `interval` width | transactions refused |
+| --- | --- |
+| 20 slots (one expected block) | 0.1% |
+| 100 slots | 0.6% |
+| 1k slots (~17 min) | 17% |
+| 10k slots (~2.8 h) | 62% |
+| epoch (432k slots) | 79% |
+
+So the interval has to be **block-scale**, where the admission loss stays a fraction of a percent — a good trade for making block production independent of mempool depth. The cost climbs steeply beyond that — mainnet's transactions cluster in the 1k–10k slot range, so an interval of an hour already refuses most of them. Reaching to the epoch boundary, as an earlier formulation of this design did, would refuse four transactions in five and is not an option.
+
+The interval is **derived, not configured**. It is the answer to "how much headroom must a transaction carry to be relayed", so it has to be the same everywhere: per-node values would fragment the mempool by construction, a transaction propagating only through the subgraph of nodes whose interval it happens to satisfy, and would leave no figure a wallet could rely on. `minCertificationGap` is already that quantity, and already computed from protocol parameters as `(3·L_hdr + L_vote + L_diff) / slotLength`, so every node agrees without a new parameter and the interval follows governance changes to the Leios timings.
+
+Under Leios that floor is a correctness requirement rather than a cost saving. A transaction taken into an EB reaches the ledger only when the `CertRB` certifying that EB is adopted, up to `G` later. If it expires in between, the EB's closure no longer applies, voters cannot validate what they are voting on, and the EB fails to certify — so a single transaction admitted with too little headroom can cost a whole EB's throughput. Admission therefore has to cover the pipeline plus margin for the advance to the forging slot, which at current parameters is around 34 slots and refuses roughly 0.2% of mainnet traffic.
+
+Two things remain open. The mainnet figures measure headroom at *inclusion*, and a deeper mempool means a longer wait, so transactions will sit closer to their deadlines under Leios than these numbers suggest; the refused fraction is a floor. And a refusal has to be distinguishable to the submitting client, so that a wallet retries with a longer `invalidHereafter` instead of seeing a generic failure.
+
+Consensus can already read what this needs: `LedgerSupportsMempool` reports a validated transaction's slot interval (`txValiditySlots`) and which rules a ticked state validates under (`txValidationRegime`, the epoch in Cardano), with the per-era detail — Shelley's time-to-live versus the later eras' validity interval — behind `ShelleyBasedEra`.
 
 #### Ready-to-forge views
 
@@ -611,12 +640,12 @@ For forging, a block producer works against not one `base` but two. Under Leios 
 - one where the preceding endorsement is **not** being certified, so all mempool transactions are available to forge and announce;
 - one where it **is** being certified, so the transactions of that now-settled EB are already in the ledger and must be excluded.
 
-Which base applies is only decided at forge time, once it is known whether enough votes for the preceding EB have arrived. The Mempool therefore keeps **two ready-to-forge views**, one per base, pre-computed so that neither outcome pays a re-application on the critical path. At forge time the block producer just picks the matching view, selects transactions, and performs the cheap slot-dependent checks (see [cheap ticking](#cheap-ticking)).
+Which base applies is only decided at forge time, once it is known whether enough votes for the preceding EB have arrived. The Mempool therefore keeps **two ready-to-forge views**, one per base, pre-computed so that neither outcome pays a re-application on the critical path. At forge time the block producer just picks the matching view, selects transactions, and performs the cheap slot-dependent checks (see [time-aware mempool](#time-aware-mempool)).
 
 For that to hold, forging must stay a cheap *read* of a view and never turn into a fresh computation. Two mechanisms keep it so, each with a concrete form in the `cardano-node`:
 
 - an **optimistic view** keeps forging off the rebase path: the block producer reads the matching ready-to-forge view as it stands, just as any other reader is served from the on-screen buffer, rather than first synchronising it to the very latest base. A tip that arrived moments earlier is picked up on the next block-production opportunity.
-- a **capped forging snapshot** bounds whatever reconciliation is still unavoidable: advancing the chosen view to the forging slot is free while it stays within the `interval` (cheap ticking), and any residual re-application against the base (today `getSnapshotFor` can trigger a full one) is time- and size-bounded, so producing the snapshot cannot stall behind a large re-apply.
+- a **capped forging snapshot** bounds whatever reconciliation is still unavoidable: advancing the chosen view to the forging slot is free while it stays within the `interval` (see [time-aware mempool](#time-aware-mempool)), and any residual re-application against the base (today `getSnapshotFor` can trigger a full one) is time- and size-bounded, so producing the snapshot cannot stall behind a large re-apply.
 
 Of the two, the cap is the harder guarantee, because it is what bounds the case the optimistic view does not cover. Reconciliation, not the selection of transactions, dominates the cost of producing a block, and a view that is free when it is current but unbounded when it is not still puts seconds into a leader slot. Bounding the expected cost is therefore not sufficient; the bound has to hold precisely when the view must be brought forward, which at Leios Mempool depths is a common enough case to dominate the distribution.
 
