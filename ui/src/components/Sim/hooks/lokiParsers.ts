@@ -41,13 +41,71 @@ const HOST_PORT_TO_NODE: Record<string, string> = {
   "127.2.0.1:3001": "Node1",
   "127.2.0.2:3002": "Node2",
   "127.2.0.3:3003": "Node3",
+  // demo-dozen-devnet. Unlike the demos above, every node listens on the same
+  // port, and addresses come from run.sh as IP_PREFIX(IP_OFFSET + N) over
+  // NODES=(BPS RELAYS) with N starting at 1 -- so the block producers take the
+  // first three addresses and the nine relays follow in group order.
+  //
+  // FIXME: These twelve entries exist only because that ordering makes an
+  // address meaningless: relay11 (.14) is no closer to bp1 (.11) than relay33
+  // (.22) is. run.sh carries the matching FIXME for group-aligned addressing
+  // (bp1 .10 / relay11 .11 ...); with that in place the whole table collapses
+  // into a rule over the topology's group structure, and the TODO above is
+  // finally actionable. Until then a new devnet shape means another dozen
+  // hand-written lines here.
+  // With TC: IP_PREFIX=172.29.0. IP_OFFSET=10
+  "172.29.0.11:3001": "bp1",
+  "172.29.0.12:3001": "bp2",
+  "172.29.0.13:3001": "bp3",
+  "172.29.0.14:3001": "relay11",
+  "172.29.0.15:3001": "relay12",
+  "172.29.0.16:3001": "relay13",
+  "172.29.0.17:3001": "relay21",
+  "172.29.0.18:3001": "relay22",
+  "172.29.0.19:3001": "relay23",
+  "172.29.0.20:3001": "relay31",
+  "172.29.0.21:3001": "relay32",
+  "172.29.0.22:3001": "relay33",
+  // Without TC: IP_PREFIX=127.3.0. IP_OFFSET=0
+  "127.3.0.1:3001": "bp1",
+  "127.3.0.2:3001": "bp2",
+  "127.3.0.3:3001": "bp3",
+  "127.3.0.4:3001": "relay11",
+  "127.3.0.5:3001": "relay12",
+  "127.3.0.6:3001": "relay13",
+  "127.3.0.7:3001": "relay21",
+  "127.3.0.8:3001": "relay22",
+  "127.3.0.9:3001": "relay23",
+  "127.3.0.10:3001": "relay31",
+  "127.3.0.11:3001": "relay32",
+  "127.3.0.12:3001": "relay33",
+};
+
+// Endpoints this map does not know about, reported once each. A miss used to
+// yield `undefined` node names, which animate nothing and draw no edge while
+// every endpoint-independent counter keeps rising -- the graph looks idle even
+// though events are streaming. Naming the unmapped endpoint turns that into an
+// obvious symptom.
+const unmappedEndpoints = new Set<string>();
+
+const lookupNode = (endpoint: string): string => {
+  const node = HOST_PORT_TO_NODE[endpoint];
+  if (node) return node;
+  if (!unmappedEndpoints.has(endpoint)) {
+    unmappedEndpoints.add(endpoint);
+    console.warn(
+      `No node name for endpoint ${endpoint}; add it to HOST_PORT_TO_NODE. ` +
+        `Messages on this connection cannot be animated.`,
+    );
+  }
+  return "UNKNOWN";
 };
 
 const getNodesFromConnection = (connectionId: string): [string, string] => {
   if (connectionId) {
     const endpoints = connectionId.split(" ");
     if (endpoints.length === 2) {
-      return [HOST_PORT_TO_NODE[endpoints[0]], HOST_PORT_TO_NODE[endpoints[1]]];
+      return [lookupNode(endpoints[0]), lookupNode(endpoints[1])];
     }
   }
   return ["UNKNOWN", "UNKNOWN"];
@@ -442,10 +500,24 @@ const parseAnnouncementReceived = (
   return null;
 };
 
+// An EB's txs, keyed so a Send and its matching Recv agree. `MsgLeiosBlockTxs`
+// carries bitmaps naming which txs of the EB the message covers;
+// `MsgLeiosBlockTxsOffer` carries none, and offers the closure whole.
 const txsId = (msg: any): string => {
-  const bitmapStr = (msg.bitmaps || []).join(",");
-  return `txs-${msg.ebHash}-${bitmapStr}`;
+  const bitmaps = msg.bitmaps || [];
+  return bitmaps.length
+    ? `txs-${msg.ebHash}-${bitmaps.join(",")}`
+    : `txs-${msg.ebHash}`;
 };
+
+// The EB-txs traffic this devnet actually emits is the LeiosNotify offer; the
+// LeiosFetch payload message only appears when a node has to pull a closure it
+// does not already hold, which never happened across an 80MB window here (4998
+// offers, zero payloads -- every node already had the txs from its mempool).
+// Both kinds are accepted so the row populates either way, but note an offer
+// names the EB without carrying tx counts or bytes.
+const isBlockTxsMsg = (kind?: string): boolean =>
+  kind === "MsgLeiosBlockTxs" || kind === "MsgLeiosBlockTxsOffer";
 
 const parseTxsSent = (
   timestamp: number,
@@ -457,7 +529,7 @@ const parseTxsSent = (
     if (
       (log.direction || log.kind) === "Send" &&
       log.msg &&
-      log.msg.kind === "MsgLeiosBlockTxs"
+      isBlockTxsMsg(log.msg.kind)
     ) {
       const [sender, recipient] = getNodesFromConnection(
         log.peer?.connectionId || log.connectionId,
@@ -488,7 +560,7 @@ const parseTxsReceived = (
   try {
     const log = JSON.parse(logLine);
 
-    if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlockTxs") {
+    if (log.kind === "Recv" && log.msg && isBlockTxsMsg(log.msg.kind)) {
       const [recipient, sender] = getNodesFromConnection(
         log.peer?.connectionId || log.connectionId,
       );

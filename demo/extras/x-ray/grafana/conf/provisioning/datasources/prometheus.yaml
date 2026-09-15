@@ -7,3 +7,8 @@ datasources:
     type: prometheus
     url: http://localhost:9090
     isDefault: true
+    jsonData:
+      # Match Alloy's 1s scrape. Without this Grafana assumes 15s, which floors
+      # $__rate_interval at 60s and the min step at 15s -- so a 20s window is
+      # not expressible, however the panel is configured.
+      timeInterval: 1s

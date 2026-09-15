@@ -2,12 +2,19 @@ import { IServerMessage, ITransformedNodeMap, IVote } from "@/components/Sim/typ
 import { Dispatch, RefObject } from "react";
 
 // Types of messages submitted between nodes
+// Declaration order is display order: panels iterate the enum rather than
+// listing types themselves, so this is the one place that decides it. Ordered
+// along the Leios pipeline -- an EB is announced, the EB itself follows, its
+// txs are pulled, votes elect it, and an RB certifies it.
+//
+// This is not the link-colouring priority, which ranks RB first; that order
+// lives in MESSAGE_PRIORITY_ORDER.
 export enum EMessageType {
+  Announcement = "announcement",
   EB = "eb",
-  RB = "rb",
   Txs = "txs",
   Votes = "votes",
-  Announcement = "announcement",
+  RB = "rb",
 }
 
 export enum ActivityAction {

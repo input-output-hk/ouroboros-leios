@@ -43,8 +43,14 @@ export type LokiWorkerResponse =
 // pipeline writes each line twice, once pre- and once post-label. Ours does not:
 // per-kind counts are identical with and without the constraint. Revisit if a
 // deployment reintroduces the duplicate write.
+// The selector is a regex, not an exact match, because the x-ray pipeline
+// labels some traces with a sub-service: vote creation arrives as
+// service="cardano-node/leios-voting" while everything else is plain
+// "cardano-node". An exact match dropped every LeiosVoted line before the line
+// filter below ever ran -- votes appeared to be sent and received but never
+// created. Matching the prefix also picks up any future cardano-node/* stream.
 const QUERY =
-  '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|TraceAdoptedBlock|LeiosBlockAnnounced|LeiosBlockCertified|MsgLeiosVotes|LeiosVoted"';
+  '{service=~"cardano-node.*"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|TraceAdoptedBlock|LeiosBlockAnnounced|LeiosBlockCertified|MsgLeiosVotes|LeiosVoted"';
 
 const POLL_INTERVAL_MS = 1000;
 const MAX_ENTRIES = 5000;
