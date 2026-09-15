@@ -40,8 +40,8 @@ SHARED_CONFIG_DIR=${SHARED_CONFIG_DIR:-"${SOURCE_DIR}/../proto-devnet/config"}
 # a relay, and this script cd's, so an inherited relative path resolves to
 # nothing. Only an absolute override is honoured.
 case "${CARDANO_NODE_SOCKET_PATH:-}" in
-  /*) ;;
-  *) CARDANO_NODE_SOCKET_PATH="${WORKING_DIR}/bp1/node.socket" ;;
+/*) ;;
+*) CARDANO_NODE_SOCKET_PATH="${WORKING_DIR}/bp1/node.socket" ;;
 esac
 export CARDANO_NODE_NETWORK_ID CARDANO_NODE_SOCKET_PATH
 
@@ -100,27 +100,54 @@ kv_to_flag() {
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --key-value) read -r -a pair <<<"$(kv_to_flag "$2")"; CLI_ARGS+=("${pair[@]}"); shift 2 ;;
-    --cli-arg) read -r -a pair <<<"$2"; CLI_ARGS+=("${pair[@]}"); shift 2 ;;
-    --show) cardano-cli "${ERA}" query protocol-parameters; exit 0 ;;
-    -h | --help) usage ;;
-    *) echo "unknown option: $1" >&2; usage 1 ;;
+  --key-value)
+    read -r -a pair <<<"$(kv_to_flag "$2")"
+    CLI_ARGS+=("${pair[@]}")
+    shift 2
+    ;;
+  --cli-arg)
+    read -r -a pair <<<"$2"
+    CLI_ARGS+=("${pair[@]}")
+    shift 2
+    ;;
+  --show)
+    cardano-cli "${ERA}" query protocol-parameters
+    exit 0
+    ;;
+  -h | --help) usage ;;
+  *)
+    echo "unknown option: $1" >&2
+    usage 1
+    ;;
   esac
 done
 
-[ ${#CLI_ARGS[@]} -gt 0 ] || { echo "nothing to change; pass --key-value or --cli-arg" >&2; usage 1; }
+[ ${#CLI_ARGS[@]} -gt 0 ] || {
+  echo "nothing to change; pass --key-value or --cli-arg" >&2
+  usage 1
+}
 
 for f in "${UTXO_DIR}/utxo.skey" "${DREP_DIR}/drep1/drep.skey"; do
-  [ -f "$f" ] || { echo "missing key: $f" >&2; exit 1; }
+  [ -f "$f" ] || {
+    echo "missing key: $f" >&2
+    exit 1
+  }
 done
-[ -S "$CARDANO_NODE_SOCKET_PATH" ] || { echo "no node socket at $CARDANO_NODE_SOCKET_PATH" >&2; exit 1; }
+[ -S "$CARDANO_NODE_SOCKET_PATH" ] || {
+  echo "no node socket at $CARDANO_NODE_SOCKET_PATH" >&2
+  exit 1
+}
 
 mkdir -p "$WORK"
 cd "$WORK"
 
 # Serve the anchor over loopback so `transaction build` can fetch and verify it.
 ANCHOR_PID=""
-cleanup() { [ -n "$ANCHOR_PID" ] && kill "$ANCHOR_PID" 2>/dev/null || true; }
+cleanup() {
+  if [ -n "$ANCHOR_PID" ]; then
+    kill "$ANCHOR_PID" 2>/dev/null
+  fi
+}
 trap cleanup EXIT
 
 if [ -z "$ANCHOR_URL" ]; then
@@ -139,7 +166,10 @@ EOF
     curl -fsS "$ANCHOR_URL" >/dev/null 2>&1 && break
     sleep 0.25
   done
-  curl -fsS "$ANCHOR_URL" >/dev/null || { echo "anchor server did not come up on ${ANCHOR_PORT}" >&2; exit 1; }
+  curl -fsS "$ANCHOR_URL" >/dev/null || {
+    echo "anchor server did not come up on ${ANCHOR_PORT}" >&2
+    exit 1
+  }
 fi
 ANCHOR_HASH=${ANCHOR_HASH:-$(cardano-cli hash anchor-data --url "$ANCHOR_URL")}
 echo "anchor: ${ANCHOR_URL} (${ANCHOR_HASH})"
@@ -188,7 +218,7 @@ echo "==> submitting"
 cardano-cli "${ERA}" transaction build \
   --change-address "$UTXO_ADDR" \
   --tx-in "$(cardano-cli "${ERA}" query utxo --address "$UTXO_ADDR" --output-json |
-      jq -r 'to_entries | max_by(.value.value.lovelace) | .key')" \
+    jq -r 'to_entries | max_by(.value.value.lovelace) | .key')" \
   --proposal-file pparam-update.action \
   --out-file propose.raw
 cardano-cli "${ERA}" transaction sign \
@@ -204,7 +234,7 @@ echo "    action tx: ${ACTION_TX}"
 # whatever is already in the mempool, which at 10 MB is minutes of backlog. Wait
 # in wall-clock terms rather than a fixed iteration count.
 echo "==> waiting for the proposal to appear in gov-state (up to 30 min)"
-DEADLINE=$(( SECONDS + 1800 ))
+DEADLINE=$((SECONDS + 1800))
 ACTION_IX=""
 while [ "$SECONDS" -lt "$DEADLINE" ]; do
   ACTION_IX=$(cardano-cli "${ERA}" query gov-state |
@@ -247,7 +277,7 @@ done
 cardano-cli "${ERA}" transaction build \
   --change-address "$UTXO_ADDR" \
   --tx-in "$(cardano-cli "${ERA}" query utxo --address "$UTXO_ADDR" --output-json |
-      jq -r 'to_entries | max_by(.value.value.lovelace) | .key')" \
+    jq -r 'to_entries | max_by(.value.value.lovelace) | .key')" \
   "${VOTE_ARGS[@]}" \
   --out-file vote.raw
 cardano-cli "${ERA}" transaction sign \
@@ -270,7 +300,7 @@ while :; do
      | select(. != null)
      | "    epoch '"${EPOCH_NOW}"': drep=\(.dRepVotes | length) spo=\(.stakePoolVotes | length) cc=\(.committeeVotes | length)"'
   if ! echo "$STATE" | jq -e --arg id "$ACTION_TX" \
-      '[.proposals[]? | select(.actionId.txId==$id)] | length > 0' >/dev/null; then
+    '[.proposals[]? | select(.actionId.txId==$id)] | length > 0' >/dev/null; then
     echo "    proposal gone from the queue at epoch ${EPOCH_NOW}: enacted or expired"
     break
   fi
