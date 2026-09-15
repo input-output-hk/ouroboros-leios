@@ -18,7 +18,7 @@
 //     written exactly once, carrying whatever the facets added.
 //
 //   extract ─┬─(raw process-compose)────────────────────────────────► loki.write.loki
-//            └─► leios_route ─┬─► cardano_node_process ─► leios_voting ─► call_trace ─► loki.write.loki
+//            └─► leios_route ─┬─► cardano_node_process ─► leios_voting ─► leios_diffusion ─► call_trace ─► loki.write.loki
 //                             ├─► tx_firehose_process ───────────────────────► loki.write.loki
 //                             └─► tx_centrifuge_process (dormant here) ───────► loki.write.loki
 
@@ -183,13 +183,17 @@ import.file "mod" {
 	filename = "${WORKING_DIR}/alloy-modules"
 }
 
-// Node chain: cardano_node_process -> voting -> call-trace -> terminal write. Wiring lives
-// here, not inside the modules.
+// Node chain: cardano_node_process -> voting -> diffusion -> call-trace -> terminal
+// write. Wiring lives here, not inside the modules.
 mod.cardano_node_process "node" {
 	forward_to = [mod.leios_voting_process.vote.receiver]
 }
 
 mod.leios_voting_process "vote" {
+	forward_to = [mod.leios_diffusion_process.diffusion.receiver]
+}
+
+mod.leios_diffusion_process "diffusion" {
 	forward_to = [mod.call_trace_process.call.receiver]
 }
 
