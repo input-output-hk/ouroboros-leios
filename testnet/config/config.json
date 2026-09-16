@@ -24,7 +24,8 @@
   },
   "LeiosDbConfig": {
     "Backend": "SQLite",
-    "Filepath": "leios.db"
+    "VolatileFilepath": "leios.db.vol",
+    "ImmutableFilepath": "leios.db.imm"
   },
   "MempoolCapacityBytesOverride": 500000,
   "MinNodeVersion": "11.1.0-prototype-2026w32",
