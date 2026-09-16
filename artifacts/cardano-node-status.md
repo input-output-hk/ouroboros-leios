@@ -43,6 +43,10 @@ Feature work stages on personal-prefix branches before merging, visible in each 
 - `geo2a/*` (node — LeiosDB work), `nfrisby/*` (network — `leios-prototype-plus-matchedBlock`, demo branches), `karknu/*` and `mw/*` (network — mux demo, `mw/hello-smol-world`).
 - ouroboros-network's bare `leios-prototype` being ~2.5 months quiet while `karknu/*` moved through August suggests networking work is staging via personal branches (or in the mux-demo / smol-world line) rather than that it has stopped ❓🤖 — worth confirming with Marcin Szamotulski or Karl Knutsson whether the branch's staleness is meaningful.
 
+## Deep dive
+
+The mempool and LeiosTxCache machinery on these branches is mapped in detail (types, functions, permalinks pinned to this snapshot's SHAs) in [leios-node-mempool-txcache.md](./leios-node-mempool-txcache.md).
+
 ## How to re-verify (the durable part)
 
 ```bash
