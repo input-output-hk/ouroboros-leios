@@ -55,7 +55,7 @@
 
   <rect x="470" y="150" width="600" height="88" rx="8" class="mem"/>
   <text x="482" y="172" class="bt">Mempool &#8212; Praos mempool + Leios extensions</text>
-  <text x="482" y="190" class="tx">capacity 2&#215; block capacity; CIP-0164 requires &#8805; 2 &#215; (maxBlockBodySize + S_EB-tx)</text>
+  <text x="482" y="190" class="tx">default 2&#215; block measure (byte-overridable); CIP &#8805; 2&#215;(RB+EB) pending ouroboros-consensus#2280</text>
   <text x="482" y="206" class="code">Leios tx index: isLeiosTxIndex &#183; getLeiosTxIndex</text>
   <text x="482" y="222" class="code">per-tx hash: validatedTxLeiosHash &#8592; leiosTxHashOfGenTx</text>
 
@@ -68,7 +68,7 @@
 
   <polygon points="680,303 850,345 680,387 510,345" class="forge"/>
   <text x="680" y="341" text-anchor="middle" class="code" font-weight="bold">decideLeiosCertify</text>
-  <text x="680" y="359" text-anchor="middle" class="tx">certificate quorum for the announced EB?</text>
+  <text x="680" y="359" text-anchor="middle" class="tx">tip announcement + gap elapsed + closure + cert?</text>
 
   <path class="flow" d="M510,345 H330 V412"/>
   <text x="340" y="337" class="lbl">no &#8212; forge a TxRB</text>
@@ -77,7 +77,7 @@
 
   <rect x="40" y="415" width="580" height="110" rx="8" class="forge"/>
   <text x="52" y="436" class="bt">TxRB branch &#8212; the RB carries transactions</text>
-  <text x="52" y="455" class="code">snap &#8592; getSnapshotFor (one snapshot)</text>
+  <text x="52" y="455" class="code">snap &#8592; getSnapshotFor (cached, else reapplyUntilTimeout-capped compute)</text>
   <text x="52" y="471" class="code">RB body &#8592; snapshotTake snap rbCap</text>
   <text x="52" y="487" class="code">EB &#8592; snapshotTake snap (rbCap &#8853; ebCap) &#8722; RB prefix</text>
   <text x="52" y="503" class="tx">forgeLeiosEb; the announcement (EB hash, size) goes into the RB header</text>
@@ -98,7 +98,7 @@
 
   <rect x="200" y="575" width="440" height="64" rx="8" class="chain"/>
   <text x="212" y="596" class="bt">RB &#8594; Praos diffusion (ChainSync / BlockFetch)</text>
-  <text x="212" y="614" class="tx">the header carries the EB announcement; a CertRB's wire body is empty</text>
+  <text x="212" y="614" class="tx">the header carries the EB announcement; a CertRB carries no RB txs on the wire</text>
 
   <rect x="730" y="575" width="520" height="64" rx="8" class="db"/>
   <text x="742" y="596" class="bt">EB body &#8594; local LeiosDb + LeiosTxCache</text>
@@ -112,21 +112,22 @@
   <path class="flow" d="M460,639 V700 H240 V712"/>
   <text x="470" y="668" class="lbl">announcement relayed via LeiosNotify</text>
   <path class="flow" d="M990,639 V700 H750 V712"/>
-  <text x="1000" y="668" class="lbl">body pulled freshest-first</text>
+  <text x="1000" y="662" class="lbl">fetch tiers: fresh window oldest-first,</text>
+  <text x="1000" y="676" class="lbl">stale freshest-first</text>
 
   <rect x="40" y="712" width="440" height="76" rx="8" class="net"/>
   <text x="52" y="733" class="bt">Announcement arrives &#8212; LeiosNotify</text>
   <text x="52" y="751" class="tx">the (EB hash, size) field of the RB header, signed by the electee;</text>
-  <text x="52" y="767" class="tx">relayed promptly onward (L_hdr &#8776; 1 s budget)</text>
+  <text x="52" y="767" class="tx">urgent relay; enqueue needs peer credit (CIP L_hdr &#8776; 1 s)</text>
 
   <path class="flow" d="M240,788 V808"/>
 
   <rect x="40" y="808" width="440" height="94" rx="8" class="net"/>
   <text x="52" y="829" class="bt">Validate &amp; track equivocation</text>
-  <text x="52" y="848" class="code">validateAnnouncementHeader &#8212; header rules only,</text>
-  <text x="52" y="862" class="code">forecast from the immutable tip (out-of-order arrivals)</text>
-  <text x="52" y="880" class="tx">ElBimap: &#8804; 2 announcements per election;</text>
-  <text x="52" y="894" class="tx">a 3rd or a repeat &#8658; disconnect the peer</text>
+  <text x="52" y="848" class="code">validateAnnouncementHeader &#8212; protocol + envelope limits,</text>
+  <text x="52" y="862" class="code">forecast from immutable tip; chain-extension checks skipped</text>
+  <text x="52" y="880" class="tx">per-peer PeerState/ElState: &#8804; 2 per election;</text>
+  <text x="52" y="894" class="tx">3rd/repeat &#8658; disconnect; ElBimap gates downstream relay</text>
 
   <path class="flow" d="M240,902 V926"/>
 
@@ -166,12 +167,12 @@
 
   <rect x="506" y="1088" width="798" height="46" rx="6" class="net"/>
   <text x="518" y="1106" class="bt" font-size="11.5">d. Fetch the rest &#8212; LeiosFetch MsgLeiosBlockTxs</text>
-  <text x="518" y="1124" class="code">missedBoth &#8594; LeiosJobPool (JobRootHash; demo caps maxJobBytesSize / maxJobTxCount = 20000)</text>
+  <text x="518" y="1124" class="code">missedBoth &#8594; LeiosJobPool (JobRootHash; demo caps: 64 KiB / 20000 txs per job)</text>
 
   <rect x="506" y="1144" width="798" height="62" rx="6" class="db"/>
   <text x="518" y="1162" class="bt" font-size="11.5">e. Arrivals &amp; completion</text>
-  <text x="518" y="1180" class="code">withLockedInsertUnappliedTx (TxArrivalPrior buckets) &#8594; tx bytes into LeiosDb txs; missingTxCount &#8594; 0</text>
-  <text x="518" y="1196" class="tx">serve-only-when-secured: the body is offered to peers only once its closure is complete</text>
+  <text x="518" y="1180" class="code">withLockedInsertUnappliedTx (TxArrivalPrior) &#8594; bytes into LeiosDb txs; missingTxCount hits 0, stored as &#8722;1 (notified)</text>
+  <text x="518" y="1196" class="tx">offer gating: MsgLeiosBlockOffer fires on body acquisition; MsgLeiosBlockTxsOffer only once the closure completes</text>
 
   <text x="506" y="1224" class="lbl">(insertBody is a no-op if the announcement was already evicted &#8212; a backstop classifies arrivals via withLookupTx)</text>
 
@@ -181,7 +182,7 @@
   <line x1="40" y1="1295" x2="1320" y2="1295" class="rule"/>
 
   <path class="flow" d="M905,1236 V1262 H350 V1310"/>
-  <text x="560" y="1256" class="lbl">closure complete &#8658; vote within L_vote (4 slots)</text>
+  <text x="560" y="1256" class="lbl">closure complete + tip still announcing &#8658; check at announced-slot onset +3 s (immediate if past); deadline +7 s (stubs)</text>
 
   <rect x="40" y="1310" width="620" height="104" rx="8" class="cache"/>
   <text x="52" y="1331" class="bt">validateEbClosure (LeiosVoting.hs)</text>
@@ -196,8 +197,9 @@
   <rect x="730" y="1310" width="590" height="104" rx="8" class="net"/>
   <text x="742" y="1331" class="bt">LeiosVoteState &#8212; votes to certificate</text>
   <text x="742" y="1350" class="code">addVote: validate &#183; dedup &#183; tally per announcing-RB point</text>
-  <text x="742" y="1366" class="tx">quorum &#964; = 0.75 of the wFA^LS committee &#8658; certificate assembled eagerly</text>
+  <text x="742" y="1366" class="tx">quorum vtThreshold from committee params &#8658; certificate assembled eagerly</text>
   <text x="742" y="1382" class="code">aggregateLeiosCert   (FIXME: no vote-state GC yet)</text>
+  <text x="742" y="1398" class="lbl">design tier (CIP-0164, not pinned source): &#964; = 0.75, wFA^LS committee</text>
 
   <!-- Stage 5 -->
   <circle cx="52" cy="1451" r="12" fill="#0f172a"/><text x="52" y="1456" text-anchor="middle" font-size="12" font-weight="bold" fill="#ffffff">5</text>
@@ -205,22 +207,22 @@
   <line x1="40" y1="1469" x2="1320" y2="1469" class="rule"/>
 
   <path class="flow" d="M1030,1414 V1440 H500 V1488"/>
-  <text x="540" y="1434" class="lbl">certificate ready at the next election won by any pool</text>
+  <text x="540" y="1434" class="lbl">next election extending the announcing RB, with gap elapsed + closure + cert local</text>
 
   <rect x="40" y="1488" width="620" height="90" rx="8" class="forge"/>
   <text x="52" y="1509" class="bt">Next elected producer &#8212; decideLeiosCertify (Forge.hs)</text>
   <text x="52" y="1528" class="code">reads the tip announcement (protocolStateLeiosAnnouncement); closure must be in LeiosDb</text>
-  <text x="52" y="1544" class="tx">minimum certification gap: 10 slots on musashi (CIP-0164 cadence: 14)</text>
-  <text x="52" y="1560" class="tx">queries the cert &#8658; forges the CertRB (empty wire body + certificate)</text>
+  <text x="52" y="1544" class="tx">min gap from ledger params; forge-enforced only &#8212; follower validity check: FIXME</text>
+  <text x="52" y="1560" class="tx">musashi gap 10 slots per Slack (CIP 14); cert found &#8658; CertRB (cert, no RB txs)</text>
 
   <path class="flow" d="M660,1533 H730"/>
   <text x="695" y="1523" text-anchor="middle" class="lbl">CertRB</text>
   <text x="695" y="1550" text-anchor="middle" class="lbl">(Praos)</text>
 
   <rect x="730" y="1488" width="590" height="90" rx="8" class="chain"/>
-  <text x="742" y="1509" class="bt">Followers adopt &#8212; resolveAndApplyLeiosClosure</text>
-  <text x="742" y="1528" class="code">splice the closure from the LeiosDb: applyLeiosClosure on the unticked parent,</text>
-  <text x="742" y="1544" class="code">then tickThenApply the CertRB</text>
+  <text x="742" y="1509" class="bt">Followers &#8212; park, then resolveAndApplyLeiosClosure</text>
+  <text x="742" y="1528" class="code">closure absent &#8658; CertRB parked outside chain selection (ignoreUnacquiredCertRB);</text>
+  <text x="742" y="1544" class="code">AcquiredEbTxs &#8658; reprocess; then applyLeiosClosure (unticked parent) + tickThenApply</text>
   <text x="742" y="1560" class="tx">&#8658; the EB's transactions are on chain</text>
 
   <!-- Stage 6 -->
@@ -234,13 +236,13 @@
   <rect x="40" y="1640" width="620" height="94" rx="8" class="mem"/>
   <text x="52" y="1661" class="bt">Mempool drainage</text>
   <text x="52" y="1680" class="tx">Sync after adoption removes on-chain txs (TxRB body or certified closure);</text>
-  <text x="52" y="1695" class="tx">the remainder is revalidated, time-bounded by reapplyUntilTimeout.</text>
-  <text x="52" y="1712" class="tx">A tx in a skipped EB is not lost &#8212; it stays eligible for the next RB / EB.</text>
+  <text x="52" y="1695" class="tx">remainder reapplied off-lock, converging (256-tx under-lock target; 8-round safety valve).</text>
+  <text x="52" y="1712" class="tx">EB-only txs stay in the producer's mempool; followers hold fetched txs in LeiosDb/cache only.</text>
 
   <rect x="700" y="1640" width="620" height="94" rx="8" class="chain"/>
   <text x="712" y="1661" class="bt">Skipped EBs</text>
-  <text x="712" y="1680" class="tx">No certificate within the gap &#8658; the EB is orphaned; expected skip rate</text>
-  <text x="712" y="1695" class="tx">&#8776; 1 &#8722; 0.95&#185;&#8304; &#8776; 40% at musashi's 10-slot gap (&#8776; 50% at the CIP's 14);</text>
+  <text x="712" y="1680" class="tx">a successor RB inside the min gap cannot certify &#8658; the EB is stranded;</text>
+  <text x="712" y="1695" class="tx">modeled: 1 &#8722; 0.95&#185;&#8304; &#8776; 40% at gap 10, &#8776; 51% at 14 (f = 0.05 model, not code) &#10067;&#129302;</text>
   <text x="712" y="1712" class="tx">orphaned EBs and their unreferenced txs become GC candidates.</text>
 
   <rect x="40" y="1750" width="620" height="94" rx="8" class="cache"/>
@@ -251,8 +253,8 @@
 
   <rect x="700" y="1750" width="620" height="94" rx="8" class="db"/>
   <text x="712" y="1771" class="bt">LeiosDb GC (v2)</text>
-  <text x="712" y="1790" class="tx">EB status: 0 volatile &#8594; 1 certified-pinned &#8594; 2 copied-to-immutable &#8594; 3 GC-marked;</text>
-  <text x="712" y="1805" class="tx">certified closures archived &#8212; deep Praos forks keep closures live 12&#8211;36 h;</text>
+  <text x="712" y="1790" class="tx">EB status: certified 0&#8594;1&#8594;2; cleanup 0&#8594;3 and 2&#8594;3; promotion rescues 3&#8594;1;</text>
+  <text x="712" y="1805" class="tx">certified closures archived; 12&#8211;36 h liveness is design analysis (ImpactAnalysis), not code;</text>
   <text x="712" y="1822" class="tx">gcTxCandidates sweeps orphaned transactions.</text>
 
   <!-- Footer -->

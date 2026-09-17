@@ -8,7 +8,7 @@ A living reference for the protocols, mechanisms, and terms this effort touches.
 
 > [!NOTE]
 >
-> Empty as of 2026-09-16. This is a deliberate stub: the file exists so that the maintenance rule has somewhere to write, and so that documents can link to it. Populate it from the first assessment or journal entry that introduces a term — starting with the Leios block classes and stage structure, which every other document will assume.
+> First populated 2026-09-17 from the transaction-lifecycle work (the block classes, certification mechanics, and the prototype's three stores). The Ouroboros Family, Comparators, Protocol Parameters, and Baselines sections remain stubs.
 
 ---
 
@@ -18,7 +18,51 @@ A living reference for the protocols, mechanisms, and terms this effort touches.
 
 ## Leios Mechanisms
 
-*(To be populated: the block classes and their roles, the pipeline and its stages, voting and certificates, diffusion policy, the parameter set.)*
+Implementation statements below are pinned to the `leios-prototype` snapshot of 2026-09-16 (`ouroboros-consensus@b56977b`, `cardano-node@7e33674`); design statements cite [CIP-0164](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md). See the [transaction-lifecycle diagram](./leios-node-tx-lifecycle.svg) for how these fit together.
+
+### Ranking block (RB)
+
+The ordinary Praos block, renamed in Leios to distinguish it from endorser blocks: it is still produced by VRF leader election and still carries the chain's ordering and security. In Linear Leios an RB additionally either announces a new endorser block (a TxRB) or certifies the previously announced one (a CertRB). Throughput scales because most transaction data moves in endorser blocks, while RBs stay small and diffuse on the unchanged Praos path. Source: [CIP-0164 § Specification](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#specification).
+
+### Endorser block (EB)
+
+A block of transaction *references* (32 bytes each, body up to 512 kB in the CIP design) produced alongside a TxRB by the same elected pool, holding the transactions that overflow the RB's own capacity. An EB contributes throughput only if a later RB certifies it; its transactions then enter the ledger as if they had been in that RB. The set of referenced transaction bytes is the EB's *closure*, which nodes assemble from their mempools and by fetching. Source: [CIP-0164 § Endorser blocks](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#specification); implementation: `forgeLeiosEb` ([`Shelley/Ledger/Forge.hs`](https://github.com/IntersectMBO/ouroboros-consensus/blob/b56977baae0740f563060a8a9171c78be865b357/ouroboros-consensus-cardano/src/shelley/Ouroboros/Consensus/Shelley/Ledger/Forge.hs)).
+
+### EB announcement
+
+A signed (EB hash, size) field inside the announcing RB's header, adjacent to the election proof — so every announcement has a slot, an author, and Praos authentication. Peers relay announcements urgently over LeiosNotify (best-effort per peer: the enqueue is dropped for a peer with no protocol credit) and also fold them in from ChainSync headers. An election admits at most two distinct announcements per upstream peer (equivocation evidence); a third or a repeat disconnects that peer. Implementation: [`LeiosDemoLogic/Announcements.hs`](https://github.com/IntersectMBO/ouroboros-consensus/blob/b56977baae0740f563060a8a9171c78be865b357/ouroboros-consensus/src/ouroboros-consensus/LeiosDemoLogic/Announcements.hs) (pinned snapshot).
+
+### TxRB versus CertRB
+
+The two roles an RB can play. A TxRB carries its own transactions and announces a fresh EB from the mempool overflow. A CertRB carries **no regular transactions on the wire — its body holds the Leios certificate**; at validation time the certified EB's closure is spliced in from local storage and applied before the CertRB itself. A follower that lacks the closure parks the CertRB outside chain selection until the closure arrives, then reprocesses it. Implementation: `mkBody`/`partitionMempool` and the ChainDB cert-filter ([`ChainSel.hs`](https://github.com/IntersectMBO/ouroboros-consensus/blob/b56977baae0740f563060a8a9171c78be865b357/ouroboros-consensus/src/ouroboros-consensus/Ouroboros/Consensus/Storage/ChainDB/Impl/ChainSel.hs), pinned snapshot); design: [CIP-0164 § Certification](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#specification).
+
+### Votes, quorum, and certificates
+
+A sortition-selected committee validates an announced EB's closure and votes within a bounded window; votes are tallied per announcing RB, and a compact certificate is assembled the moment the tally crosses the quorum threshold. The threshold and committee arrive from ledger state in the implementation; the concrete values (quorum fraction τ = 0.75, the "weighted Fait Accompli" wFA^LS committee scheme) are CIP-0164 design parameters, not pinned-source constants. Voting timing in the prototype is wall-clock-stubbed: the window opens 3 s after the announced slot's onset and closes 4 s later. Implementation: [`LeiosVoteState.hs`](https://github.com/IntersectMBO/ouroboros-consensus/blob/b56977baae0740f563060a8a9171c78be865b357/ouroboros-consensus/src/ouroboros-consensus/LeiosVoteState.hs), [`LeiosVoting.hs`](https://github.com/IntersectMBO/ouroboros-consensus/blob/b56977baae0740f563060a8a9171c78be865b357/ouroboros-consensus/src/ouroboros-consensus/LeiosVoting.hs); design: [CIP-0164 § Votes and certificates](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#specification).
+
+### Minimum certification gap
+
+The number of slots that must elapse after an EB's announcement before any RB may certify it — a *minimum wait* that gives the network time to fetch and validate the closure. Because certification must happen in the announcing RB's direct successor (the "linear" in Linear Leios), a successor RB elected *inside* the gap can never certify the pending EB and strands it; this — not "no certificate arriving in time" — is the dominant skip mechanism. At the pinned snapshot only the honest forge enforces the gap; follower block validation does not yet check it (an open `FIXME`). Configured gap: 10 slots on the musashi testnet (per Slack) versus the CIP's 14-slot cadence. Implementation: `decideLeiosCertify` ([`Forge.hs`](https://github.com/IntersectMBO/ouroboros-consensus/blob/b56977baae0740f563060a8a9171c78be865b357/ouroboros-consensus-diffusion/src/ouroboros-consensus-diffusion/Ouroboros/Consensus/NodeKernel/Forge.hs#L288)).
+
+### Stage lengths (L_hdr, L_vote, L_diff)
+
+CIP-0164's timing budgets: L_hdr (announcement diffusion, 1 slot), L_vote (voting window, 4 slots), L_diff (body diffusion, 7 slots), giving the certification cadence 3·L_hdr + L_vote + L_diff = 14 slots. The prototype hard-codes stand-ins (with TODOs to move them into ledger protocol parameters) and uses L to split fetch priority: EBs younger than L are fetched oldest-first, staler ones freshest-first. Design: [CIP-0164](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md); implementation constants: [`LeiosDemoTypes.hs`](https://github.com/IntersectMBO/ouroboros-consensus/blob/b56977baae0740f563060a8a9171c78be865b357/ouroboros-consensus/src/ouroboros-consensus/LeiosDemoTypes.hs#L911).
+
+### LeiosNotify and LeiosFetch
+
+The two new node-to-node mini-protocols (numbers 18 and 19). LeiosNotify pushes announcements, EB-body offers, and votes to each peer through a credit-based queue; LeiosFetch pulls EB bodies (`MsgLeiosBlock`) and batches of missing transactions (`MsgLeiosBlockTxs`). A node offers a body as soon as it holds it, but offers the transaction closure only once complete — the CIP's serve-when-secured rule, realized as two distinct LeiosDb notifications. At the pinned snapshot both protocols live on the consensus branch as `LeiosDemoOnlyTestNotify.hs` / `LeiosDemoOnlyTestFetch.hs`. Implementation: [`NodeToNode.hs`](https://github.com/IntersectMBO/ouroboros-consensus/blob/b56977baae0740f563060a8a9171c78be865b357/ouroboros-consensus-diffusion/src/ouroboros-consensus-diffusion/Ouroboros/Consensus/Network/NodeToNode.hs); design: [CIP-0164 § Network](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#network).
+
+### Mempool (Leios changes)
+
+Still the Praos mempool — full `applyTx` admission, pull-based TxSubmission, default capacity twice the block measure (byte-overridable) — extended with a transaction-hash index (`getLeiosTxIndex`) so EB closures can be assembled from it, a no-cache snapshot path for the certifying forge (whose rebased ledger state invalidates the cached snapshot), and bounded revalidation: snapshot computation is time-capped (`reapplyUntilTimeout`) and post-adoption `Sync` converges off-lock to a small under-lock residual. The CIP's larger capacity formula (≥ 2 × (RB + EB measure)) is pending `ouroboros-consensus#2280`. Implementation: [`Ouroboros/Consensus/Mempool/`](https://github.com/IntersectMBO/ouroboros-consensus/blob/b56977baae0740f563060a8a9171c78be865b357/ouroboros-consensus/src/ouroboros-consensus/Ouroboros/Consensus/Mempool); design: [CIP-0164 § Mempool design](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#mempool-design).
+
+### LeiosTxCache
+
+A bounded in-memory *index* (not a byte store) over the transactions referenced by recently announced EBs, recording per transaction whether its bytes are acquired and whether it has been validated — so voting can cheaply re-apply already-validated transactions and fetch logic can skip disk lookups. It is windowed to the 128 freshest announcements with reference-counted eviction, and its ordering contract (index evicts before the database prunes) prevents false hits. The production handle is a SipHash-based open-addressing hash table sized for ~2M entries, property-tested against a pure reference. Implementation: [`LeiosTxCache.hs`](https://github.com/IntersectMBO/ouroboros-consensus/blob/b56977baae0740f563060a8a9171c78be865b357/ouroboros-consensus/src/ouroboros-consensus/LeiosTxCache.hs) and submodules (pinned snapshot).
+
+### LeiosDb
+
+The on-disk (SQLite; in-memory for tests) store of EB points, bodies, and transaction bytes, split volatile/immutable with reference-counting garbage collection. Rows track closure completeness (`missingTxCount`: NULL = body absent, >0 = missing, 0 = just completed, −1 = completion notified) and a status byte (0 volatile, 1 certified-pinned, 2 copied-to-immutable, 3 GC-marked; certified rows go 0→1→2, cleanup marks 0→3 or 2→3, and a late promotion can rescue 3→1). Completion events drive both downstream offers and the reprocessing of parked CertRBs. Implementation: [`LeiosDemoDb/`](https://github.com/IntersectMBO/ouroboros-consensus/blob/b56977baae0740f563060a8a9171c78be865b357/ouroboros-consensus/src/ouroboros-consensus/LeiosDemoDb) (pinned snapshot).
 
 ## Comparators
 
