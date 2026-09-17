@@ -199,7 +199,7 @@
   <text x="742" y="1350" class="code">addVote: validate &#183; dedup &#183; tally per announcing-RB point</text>
   <text x="742" y="1366" class="tx">quorum vtThreshold from committee params &#8658; certificate assembled eagerly</text>
   <text x="742" y="1382" class="code">aggregateLeiosCert   (FIXME: no vote-state GC yet)</text>
-  <text x="742" y="1398" class="lbl">design tier (CIP-0164, not pinned source): &#964; = 0.75, wFA^LS committee</text>
+  <text x="742" y="1398" class="lbl">params: &#964; = ppLeiosQuorumStakeThreshold, committee = top-N_c pools by stake (musashi: 0.75 / 900)</text>
 
   <!-- Stage 5 -->
   <circle cx="52" cy="1451" r="12" fill="#0f172a"/><text x="52" y="1456" text-anchor="middle" font-size="12" font-weight="bold" fill="#ffffff">5</text>
@@ -213,7 +213,7 @@
   <text x="52" y="1509" class="bt">Next elected producer &#8212; decideLeiosCertify (Forge.hs)</text>
   <text x="52" y="1528" class="code">reads the tip announcement (protocolStateLeiosAnnouncement); closure must be in LeiosDb</text>
   <text x="52" y="1544" class="tx">min gap from ledger params; forge-enforced only &#8212; follower validity check: FIXME</text>
-  <text x="52" y="1560" class="tx">musashi gap 10 slots per Slack (CIP 14); cert found &#8658; CertRB (cert, no RB txs)</text>
+  <text x="52" y="1560" class="tx">gap = &#8968;(3A+V+D)/slot&#8969; = 14 on musashi genesis (&#10067; Slack 8/26: 10); cert &#8658; CertRB</text>
 
   <path class="flow" d="M660,1533 H730"/>
   <text x="695" y="1523" text-anchor="middle" class="lbl">CertRB</text>
@@ -242,7 +242,7 @@
   <rect x="700" y="1640" width="620" height="94" rx="8" class="chain"/>
   <text x="712" y="1661" class="bt">Skipped EBs</text>
   <text x="712" y="1680" class="tx">a successor RB inside the min gap cannot certify &#8658; the EB is stranded;</text>
-  <text x="712" y="1695" class="tx">modeled: 1 &#8722; 0.95&#185;&#8304; &#8776; 40% at gap 10, &#8776; 51% at 14 (f = 0.05 model, not code) &#10067;&#129302;</text>
+  <text x="712" y="1695" class="tx">modeled: 1 &#8722; 0.95^g (f = 0.05): &#8776; 51% at g = 14 (musashi genesis), 40% at g = 10 &#10067;&#129302;</text>
   <text x="712" y="1712" class="tx">orphaned EBs and their unreferenced txs become GC candidates.</text>
 
   <rect x="40" y="1750" width="620" height="94" rx="8" class="cache"/>

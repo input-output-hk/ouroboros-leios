@@ -1,0 +1,286 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1510" viewBox="0 0 1440 1510" font-family="Helvetica, Arial, sans-serif">
+<defs>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+  <pattern id="hatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+    <rect width="7" height="7" fill="#fee2e2"/><line x1="0" y1="0" x2="0" y2="7" stroke="#f0a3a3" stroke-width="2.2"/></pattern>
+  <pattern id="hatchAmber" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+    <rect width="7" height="7" fill="#fef3c7"/><line x1="0" y1="0" x2="0" y2="7" stroke="#e5be6a" stroke-width="2.2"/></pattern>
+</defs>
+<style>
+  .h1{font-size:23px;font-weight:bold;fill:#0f172a}
+  .sub{font-size:12.5px;fill:#5b6b80}
+  .pin{font-size:10.5px;fill:#5b6b80;font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace}
+  .grp{font-size:13px;font-weight:bold;fill:#0f172a;letter-spacing:.04em}
+  .lane{font-size:11.5px;font-weight:bold;fill:#1e293b}
+  .laneSub{font-size:9.5px;fill:#64748b}
+  .tx{font-size:11px;fill:#1e293b}
+  .cell{font-size:10.5px;fill:#1e293b}
+  .code{font-size:10px;font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;fill:#334155}
+  .lbl{font-size:10px;fill:#475569;font-style:italic}
+  .slot{font-size:9.5px;fill:#475569;font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace}
+  .slotB{font-size:9.5px;fill:#0f172a;font-weight:bold;font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace}
+  .red{font-size:10px;fill:#b91c1c}
+  .redB{font-size:11px;font-weight:bold;fill:#b91c1c}
+  .legend{font-size:10.5px;fill:#334155}
+  .th{font-size:10px;font-weight:bold;fill:#0f172a;letter-spacing:.03em}
+  .axis{stroke:#475569;stroke-width:1.3}
+  .tick{stroke:#94a3b8;stroke-width:1}
+  .grid{stroke:#eef1f6;stroke-width:1}
+  .rule{stroke:#e2e8f0;stroke-width:1}
+  .dHash{fill:#e2e8f0;stroke:#94a3b8;stroke-width:1.2}
+  .ok{fill:#dcfce7;stroke:#16a34a;stroke-width:1.4}
+  .stub{fill:url(#hatchAmber);stroke:#d97706;stroke-width:1.4}
+  .no{fill:url(#hatch);stroke:#dc2626;stroke-width:1.4}
+  .chain{fill:#dbeafe;stroke:#2563eb;stroke-width:1.4}
+  .panel{fill:#f8fafc;stroke:#cbd5e1;stroke-width:1.2}
+  .row{fill:#ffffff;stroke:#e2e8f0;stroke-width:1}
+  .cipBox{fill:#f0fdf4;stroke:#16a34a;stroke-width:1.4}
+  .dashR{stroke:#b91c1c;stroke-width:1.5;stroke-dasharray:5 3}
+  .dashG{stroke:#16a34a;stroke-width:1.5;stroke-dasharray:5 3}
+</style>
+<rect width="1440" height="1510" fill="#ffffff"/>
+<text x="36" y="44" class="h1" text-anchor="start">The Leios timing inequalities, as implemented</text>
+<text x="36" y="66" class="sub" text-anchor="start">Every timing rule that decides whether an endorser block gets voted on and certified: the CIP-0164 design constraints, the deployed parameters, and which of the inequalities the prototype node actually enforces.</text>
+<text x="36" y="85" class="pin" text-anchor="start">ouroboros-consensus @ b56977b &#183; cardano-ledger @ 1587f21 &#183; cardano-base @ fbfb3f0 &#183; musashi genesis fetched 2026-09-17 &#183; CIP-0164 @ master</text>
+<rect x="36.0" y="98" width="15.0" height="13" rx="3" class="dHash"/>
+<text x="57" y="108" class="legend" text-anchor="start">design tier (&#916; network characteristics) &#8212; no code checks these</text>
+<rect x="465.5" y="98" width="15.0" height="13" rx="3" class="ok"/>
+<text x="486" y="108" class="legend" text-anchor="start">enforced in source, from ledger parameters</text>
+<rect x="724.5" y="98" width="15.0" height="13" rx="3" class="stub"/>
+<text x="746" y="108" class="legend" text-anchor="start">enforced with a caveat: a hard-coded constant, or off by one</text>
+<rect x="1082.5" y="98" width="15.0" height="13" rx="3" class="no"/>
+<text x="1104" y="108" class="legend" text-anchor="start">specified by CIP-0164, not enforced</text>
+<line x1="36" y1="128" x2="1404" y2="128" class="rule"/>
+<line x1="240.0" y1="172" x2="240.0" y2="184" class="tick"/>
+<line x1="240.0" y1="188" x2="240.0" y2="646" class="grid"/>
+<text x="240" y="166" class="slotB" text-anchor="middle">s</text>
+<text x="240" y="198" class="slot" text-anchor="middle">0s</text>
+<line x1="294.0" y1="172" x2="294.0" y2="184" class="tick"/>
+<line x1="294.0" y1="188" x2="294.0" y2="646" class="grid"/>
+<text x="294" y="166" class="slot" text-anchor="middle">s+1</text>
+<text x="294" y="198" class="slot" text-anchor="middle">1s</text>
+<line x1="348.0" y1="172" x2="348.0" y2="184" class="tick"/>
+<line x1="348.0" y1="188" x2="348.0" y2="646" class="grid"/>
+<text x="348" y="166" class="slot" text-anchor="middle">s+2</text>
+<text x="348" y="198" class="slot" text-anchor="middle">2s</text>
+<line x1="402.0" y1="172" x2="402.0" y2="184" class="tick"/>
+<line x1="402.0" y1="188" x2="402.0" y2="646" class="grid"/>
+<text x="402" y="166" class="slot" text-anchor="middle">s+3</text>
+<text x="402" y="198" class="slot" text-anchor="middle">3s</text>
+<line x1="456.0" y1="172" x2="456.0" y2="184" class="tick"/>
+<line x1="456.0" y1="188" x2="456.0" y2="646" class="grid"/>
+<text x="456" y="166" class="slot" text-anchor="middle">s+4</text>
+<text x="456" y="198" class="slot" text-anchor="middle">4s</text>
+<line x1="510.0" y1="172" x2="510.0" y2="184" class="tick"/>
+<line x1="510.0" y1="188" x2="510.0" y2="646" class="grid"/>
+<text x="510" y="166" class="slot" text-anchor="middle">s+5</text>
+<text x="510" y="198" class="slot" text-anchor="middle">5s</text>
+<line x1="564.0" y1="172" x2="564.0" y2="184" class="tick"/>
+<line x1="564.0" y1="188" x2="564.0" y2="646" class="grid"/>
+<text x="564" y="166" class="slot" text-anchor="middle">s+6</text>
+<text x="564" y="198" class="slot" text-anchor="middle">6s</text>
+<line x1="618.0" y1="172" x2="618.0" y2="184" class="tick"/>
+<line x1="618.0" y1="188" x2="618.0" y2="646" class="grid"/>
+<text x="618" y="166" class="slot" text-anchor="middle">s+7</text>
+<text x="618" y="198" class="slot" text-anchor="middle">7s</text>
+<line x1="672.0" y1="172" x2="672.0" y2="184" class="tick"/>
+<line x1="672.0" y1="188" x2="672.0" y2="646" class="grid"/>
+<text x="672" y="166" class="slot" text-anchor="middle">s+8</text>
+<text x="672" y="198" class="slot" text-anchor="middle">8s</text>
+<line x1="726.0" y1="172" x2="726.0" y2="184" class="tick"/>
+<line x1="726.0" y1="188" x2="726.0" y2="646" class="grid"/>
+<text x="726" y="166" class="slot" text-anchor="middle">s+9</text>
+<text x="726" y="198" class="slot" text-anchor="middle">9s</text>
+<line x1="780.0" y1="172" x2="780.0" y2="184" class="tick"/>
+<line x1="780.0" y1="188" x2="780.0" y2="646" class="grid"/>
+<text x="780" y="166" class="slot" text-anchor="middle">s+10</text>
+<text x="780" y="198" class="slot" text-anchor="middle">10s</text>
+<line x1="834.0" y1="172" x2="834.0" y2="184" class="tick"/>
+<line x1="834.0" y1="188" x2="834.0" y2="646" class="grid"/>
+<text x="834" y="166" class="slot" text-anchor="middle">s+11</text>
+<text x="834" y="198" class="slot" text-anchor="middle">11s</text>
+<line x1="888.0" y1="172" x2="888.0" y2="184" class="tick"/>
+<line x1="888.0" y1="188" x2="888.0" y2="646" class="grid"/>
+<text x="888" y="166" class="slot" text-anchor="middle">s+12</text>
+<text x="888" y="198" class="slot" text-anchor="middle">12s</text>
+<line x1="942.0" y1="172" x2="942.0" y2="184" class="tick"/>
+<line x1="942.0" y1="188" x2="942.0" y2="646" class="grid"/>
+<text x="942" y="166" class="slot" text-anchor="middle">s+13</text>
+<text x="942" y="198" class="slot" text-anchor="middle">13s</text>
+<line x1="996.0" y1="172" x2="996.0" y2="184" class="tick"/>
+<line x1="996.0" y1="188" x2="996.0" y2="646" class="grid"/>
+<text x="996" y="166" class="slotB" text-anchor="middle">s+14</text>
+<text x="996" y="198" class="slot" text-anchor="middle">14s</text>
+<line x1="1050.0" y1="172" x2="1050.0" y2="184" class="tick"/>
+<line x1="1050.0" y1="188" x2="1050.0" y2="646" class="grid"/>
+<text x="1050" y="166" class="slotB" text-anchor="middle">s+15</text>
+<text x="1050" y="198" class="slot" text-anchor="middle">15s</text>
+<line x1="1104.0" y1="172" x2="1104.0" y2="184" class="tick"/>
+<line x1="1104.0" y1="188" x2="1104.0" y2="646" class="grid"/>
+<text x="1104" y="166" class="slot" text-anchor="middle">s+16</text>
+<text x="1104" y="198" class="slot" text-anchor="middle">16s</text>
+<line x1="1158.0" y1="172" x2="1158.0" y2="184" class="tick"/>
+<line x1="1158.0" y1="188" x2="1158.0" y2="646" class="grid"/>
+<text x="1158" y="166" class="slot" text-anchor="middle">s+17</text>
+<text x="1158" y="198" class="slot" text-anchor="middle">17s</text>
+<line x1="240.0" y1="178" x2="1174.0" y2="178" class="axis" marker-end="url(#ar)"/>
+<text x="205" y="170" class="lane" text-anchor="end">Slot / wall clock</text>
+<text x="205" y="183" class="laneSub" text-anchor="end">slotLength = 1 s here,</text>
+<text x="205" y="196" class="laneSub" text-anchor="end">so one slot = one second</text>
+<text x="36" y="216" class="grp" text-anchor="start">NETWORK CHARACTERISTICS &#8212; the measured quantities the parameters are calibrated against</text>
+<rect x="240.0" y="232" width="54.0" height="24" rx="4" class="dHash"/>
+<text x="304" y="248" class="tx" font-weight="bold">&#916;<tspan baseline-shift='-22%' font-size='8.5'>hdr</tspan></text>
+<text x="346" y="248" class="tx" text-anchor="start">&lt; 1 s</text>
+<text x="394" y="248" class="lbl" text-anchor="start">a constant-size RB header (&lt; 1,500 B) reaches the whole network</text>
+<text x="205" y="247" class="lane" text-anchor="end">&#916; header</text>
+<rect x="240.0" y="270" width="162.0" height="24" rx="4" class="dHash"/>
+<text x="412" y="286" class="tx" font-weight="bold">&#916;<tspan baseline-shift='-22%' font-size='8.5'>EB</tspan><tspan baseline-shift='30%' font-size='8.5'>O</tspan></text>
+<text x="454" y="286" class="tx" text-anchor="start">1&#8211;3 s</text>
+<text x="502" y="286" class="lbl" text-anchor="start">optimistic EB diffusion: transmission + full processing</text>
+<text x="205" y="285" class="lane" text-anchor="end">&#916; EB optimistic</text>
+<rect x="240.0" y="308" width="810.0" height="24" rx="4" class="dHash"/>
+<text x="250" y="324" class="tx" font-weight="bold">&#916;<tspan baseline-shift='-22%' font-size='8.5'>EB</tspan><tspan baseline-shift='30%' font-size='8.5'>W</tspan></text>
+<text x="292" y="324" class="tx" text-anchor="start">15&#8211;20 s</text>
+<text x="348" y="324" class="lbl" text-anchor="start">worst-case transmission of a certified EB, from &gt; 25% stake coverage</text>
+<text x="205" y="323" class="lane" text-anchor="end">&#916; EB worst case</text>
+<text x="205" y="336" class="laneSub" text-anchor="end">measured from EB origin</text>
+<text x="240" y="352" class="red" text-anchor="start">&#916;<tspan baseline-shift='-22%' font-size='8.5'>EB</tspan><tspan baseline-shift='30%' font-size='8.5'>W</tspan> = 15 s outruns the 14 s gap; the security inequality below closes the difference with (&#916;<tspan baseline-shift='-22%' font-size='8.5'>RB</tspan> &#8722; &#916;<tspan baseline-shift='-22%' font-size='8.5'>applyTxs</tspan>) = 4 s of RB-processing slack.</text>
+<text x="36" y="388" class="grp" text-anchor="start">PROTOCOL PERIODS &#8212; the governed ledger parameters, which compose the certification gap</text>
+<rect x="240.0" y="406" width="162.0" height="34" rx="4" class="ok"/>
+<text x="321" y="421" class="tx" text-anchor="middle" font-weight="bold">3 &#215; L<tspan baseline-shift='-22%' font-size='8.5'>hdr</tspan> = 3 s</text>
+<text x="321" y="434" class="lbl" text-anchor="middle">equivocation-detection window</text>
+<rect x="402.0" y="406" width="216.0" height="34" rx="4" class="ok"/>
+<text x="510" y="421" class="tx" text-anchor="middle" font-weight="bold">L<tspan baseline-shift='-22%' font-size='8.5'>vote</tspan> = 4 s</text>
+<text x="510" y="434" class="lbl" text-anchor="middle">voting period</text>
+<rect x="618.0" y="406" width="378.0" height="34" rx="4" class="ok"/>
+<text x="807" y="421" class="tx" text-anchor="middle" font-weight="bold">L<tspan baseline-shift='-22%' font-size='8.5'>diff</tspan> = 7 s</text>
+<text x="807" y="434" class="lbl" text-anchor="middle">diffusion period</text>
+<text x="205" y="422" class="lane" text-anchor="end">Periods</text>
+<text x="205" y="435" class="laneSub" text-anchor="end">ppLeios*PeriodLength (ms)</text>
+<line x1="402.0" y1="440" x2="402.0" y2="450" class="tick"/>
+<text x="402" y="462" class="tx" text-anchor="middle">vote window opens</text>
+<line x1="618.0" y1="440" x2="618.0" y2="450" class="tick"/>
+<text x="618" y="462" class="tx" text-anchor="middle">vote deadline</text>
+<path d="M240.0,474 V483 H996.0 V474" fill="none" stroke="#475569" stroke-width="1.3"/>
+<line x1="618.0" y1="483" x2="618.0" y2="490" stroke="#475569" stroke-width="1.3"/>
+<text x="618" y="505" class="tx" text-anchor="middle" font-weight="bold">gap = &#8968;(3&#183;L<tspan baseline-shift='-22%' font-size='8.5'>hdr</tspan> + L<tspan baseline-shift='-22%' font-size='8.5'>vote</tspan> + L<tspan baseline-shift='-22%' font-size='8.5'>diff</tspan>) / slotLength&#8969; = &#8968;14,000 ms / 1,000 ms&#8969; = 14 slots</text>
+<text x="618" y="519" class="lbl" text-anchor="middle">rounded UP &#8212; rounding down would admit a certificate before the security durations had elapsed</text>
+<text x="36" y="550" class="grp" text-anchor="start">DECISION THRESHOLDS &#8212; who may certify, and when the EB is lost instead</text>
+<rect x="220.0" y="568" width="40.0" height="28" rx="4" class="chain"/>
+<text x="240" y="586" class="tx" text-anchor="middle" font-weight="bold">RB</text>
+<text x="270" y="580" class="lbl" text-anchor="start">slot s: the header announces (EB hash, size) and the pool forges the EB body.</text>
+<text x="270" y="592" class="lbl" text-anchor="start">The EB's own point carries this same slot, so every deadline below is measured from here.</text>
+<text x="205" y="585" class="lane" text-anchor="end">Announcement</text>
+<rect x="269.7" y="608" width="750.6" height="32" rx="4" class="no"/>
+<text x="645" y="622" class="redB" text-anchor="middle">an RB elected in ANY of the 14 slots s+1 &#8212; s+14 becomes the successor, cannot certify, and strands this EB</text>
+<text x="645" y="635" class="red" text-anchor="middle">P(stranded) = 1 &#8722; (1&#8722;f)<tspan baseline-shift='30%' font-size='8.5'>14</tspan> = 1 &#8722; 0.95<tspan baseline-shift='30%' font-size='8.5'>14</tspan> &#8776; 51.2% at f = 0.05 &#8212; a model, not a code constant &#10067;&#129302;</text>
+<text x="205" y="625" class="lane" text-anchor="end">Stranding risk</text>
+<text x="205" y="638" class="laneSub" text-anchor="end">14 at-risk slots</text>
+<line x1="996.0" y1="640" x2="996.0" y2="662" class="dashG"/>
+<line x1="1050.0" y1="640" x2="1050.0" y2="662" class="dashR"/>
+<rect x="704.0" y="662" width="288.0" height="44" rx="4" class="cipBox"/>
+<text x="716" y="680" class="cell" text-anchor="start">CIP-0164, step 5: RB&#8242; may carry the certificate</text>
+<text x="716" y="695" class="code" text-anchor="start">iff slot(RB&#8242;) &#8722; s &#8805; 14</text>
+<rect x="1058.0" y="662" width="346.0" height="44" rx="4" class="no"/>
+<text x="1070" y="680" class="redB" text-anchor="start">implementation: certifies iff elapsed &gt; minGap,</text>
+<text x="1070" y="695" class="red" text-anchor="start">i.e. slot(RB&#8242;) &#8722; s &#8805; 15 &#8212; one slot stricter</text>
+<text x="205" y="684" class="lane" text-anchor="end">Certification</text>
+<text x="205" y="697" class="laneSub" text-anchor="end">the chain rule</text>
+<text x="36" y="732" class="code" text-anchor="start">The guard reads `elapsed &#8804; minGap &#8594; pure Nothing`, so the CIP's own boundary slot is rejected. That shifts the arithmetic too: under the CIP's rule only 13 slots are at risk</text>
+<text x="36" y="746" class="code" text-anchor="start">(P &#8776; 48.7%), and the CIP quotes 0.95<tspan baseline-shift='30%' font-size='8.5'>13</tspan> &#8776; 51% as the probability an EB SURVIVES &#8212; the complement of the 51% skip figure our own notes carry. The two 51%s in</text>
+<text x="36" y="760" class="code" text-anchor="start">circulation are therefore different quantities. Whether the extra slot is deliberate conservatism or an off-by-one is not recorded anywhere in the source. &#10067;&#129302;</text>
+<line x1="36" y1="780" x2="1404" y2="780" class="rule"/>
+<rect x="36.0" y="796" width="1368.0" height="216" rx="6" class="panel"/>
+<text x="52" y="818" class="grp" text-anchor="start">WHY THESE NUMBERS &#8212; the CIP-0164 design inequalities. The whole tier is design rationale: no code checks any of it, on any node.</text>
+<text x="52" y="844" class="tx" font-weight="bold">3&#183;L<tspan baseline-shift='-22%' font-size='8.5'>hdr</tspan> &#8805; 3&#183;&#916;<tspan baseline-shift='-22%' font-size='8.5'>hdr</tspan></text>
+<text x="474" y="844" class="lbl" text-anchor="start">Equivocation detection: a second announcement for the same slot must be observable before anyone votes. The research paper needed 5&#183;&#916;<tspan baseline-shift='-22%' font-size='8.5'>hdr</tspan>;</text>
+<text x="474" y="857" class="lbl" text-anchor="start">announcing EBs directly from RBs cut the requirement to 3.</text>
+<text x="52" y="884" class="tx" font-weight="bold">3&#183;L<tspan baseline-shift='-22%' font-size='8.5'>hdr</tspan> + L<tspan baseline-shift='-22%' font-size='8.5'>vote</tspan> &gt; &#916;<tspan baseline-shift='-22%' font-size='8.5'>EB</tspan><tspan baseline-shift='30%' font-size='8.5'>O</tspan></text>
+<text x="474" y="884" class="lbl" text-anchor="start">Every honest committee member needs time to receive the EB AND fully validate it. 3 + 4 = 7 s &gt; 3 s &#10003;</text>
+<text x="52" y="911" class="tx" font-weight="bold">L<tspan baseline-shift='-22%' font-size='8.5'>diff</tspan> &#8805; &#916;<tspan baseline-shift='-22%' font-size='8.5'>EB</tspan><tspan baseline-shift='30%' font-size='8.5'>W</tspan> + &#916;<tspan baseline-shift='-22%' font-size='8.5'>reapply</tspan> &#8722; &#916;<tspan baseline-shift='-22%' font-size='8.5'>RB</tspan> &#8722; 3&#183;L<tspan baseline-shift='-22%' font-size='8.5'>hdr</tspan> &#8722; L<tspan baseline-shift='-22%' font-size='8.5'>vote</tspan></text>
+<text x="474" y="911" class="lbl" text-anchor="start">A certified EB must reach every honest party before any RB&#8242; carrying its certificate needs processing.</text>
+<text x="474" y="924" class="lbl" text-anchor="start">15 + 1 &#8722; 5 &#8722; 3 &#8722; 4 = 4 s minimum; the CIP takes 7 s for margin.</text>
+<text x="52" y="951" class="tx" font-weight="bold">&#916;<tspan baseline-shift='-22%' font-size='8.5'>EB</tspan><tspan baseline-shift='30%' font-size='8.5'>W</tspan> &lt; 3&#183;L<tspan baseline-shift='-22%' font-size='8.5'>hdr</tspan> + L<tspan baseline-shift='-22%' font-size='8.5'>vote</tspan> + L<tspan baseline-shift='-22%' font-size='8.5'>diff</tspan> + (&#916;<tspan baseline-shift='-22%' font-size='8.5'>RB</tspan> &#8722; &#916;<tspan baseline-shift='-22%' font-size='8.5'>applyTxs</tspan>)</text>
+<text x="474" y="951" class="lbl" text-anchor="start">Praos security: certifying must not slow RB processing. 15 &lt; 14 + (5 &#8722; 1) = 18 &#10003;. Separately &#916;<tspan baseline-shift='-22%' font-size='8.5'>reapply</tspan> &lt; &#916;<tspan baseline-shift='-22%' font-size='8.5'>applyTxs</tspan>, so reapplying a</text>
+<text x="474" y="964" class="lbl" text-anchor="start">certified EB is cheaper than validating those txs would have been.</text>
+<text x="52" y="991" class="tx" font-weight="bold">0.5 &lt; &#964; &lt; &#963;(N<tspan baseline-shift='-22%' font-size='8.5'>c</tspan>)</text>
+<text x="474" y="991" class="lbl" text-anchor="start">Quorum safety. The honest remainder &#964; &#8722; &#963;<tspan baseline-shift='-22%' font-size='8.5'>a</tspan> (&gt; 25% at &#964; = 0.75 against 50% adversarial stake) is what makes the &#916;<tspan baseline-shift='-22%' font-size='8.5'>EB</tspan><tspan baseline-shift='30%' font-size='8.5'>W</tspan></text>
+<text x="474" y="1004" class="lbl" text-anchor="start">assumption hold at all. No code checks either bound when governance moves &#964;. &#10067;&#129302;</text>
+<rect x="36.0" y="1036" width="1368.0" height="406" rx="6" class="panel"/>
+<text x="52" y="1058" class="grp" text-anchor="start">ENFORCEMENT &#8212; every timing rule in CIP-0164's protocol flow, against what the pinned source actually does with it</text>
+<text x="52" y="1078" class="th" text-anchor="start">RULE</text>
+<text x="462" y="1078" class="th" text-anchor="start">WHERE IT LIVES IN SOURCE</text>
+<text x="906" y="1078" class="th" text-anchor="start">PARAMETER SOURCE</text>
+<text x="1222" y="1078" class="th" text-anchor="start">STATUS</text>
+<line x1="44" y1="1085" x2="1396" y2="1085" class="rule"/>
+<rect x="44.0" y="1091" width="1352.0" height="28" rx="3" class="row"/>
+<text x="52" y="1109" class="cell" text-anchor="start">Voting may not begin before 3&#183;L<tspan baseline-shift='-22%' font-size='8.5'>hdr</tspan> after the announced slot's onset</text>
+<text x="462" y="1109" class="code" text-anchor="start">LeiosVoting.newVoteTimers: voteAt = onset + lHdrWait</text>
+<text x="906" y="1109" class="code" text-anchor="start">hard-coded 3 s; ledger L_hdr not read</text>
+<rect x="1214.0" y="1097" width="150.0" height="17" rx="3" class="stub"/>
+<text x="1289" y="1109" class="cell" text-anchor="middle" font-weight="bold">STUB</text>
+<rect x="44.0" y="1123" width="1352.0" height="28" rx="3" class="row"/>
+<text x="52" y="1141" class="cell" text-anchor="start">Vote is cast only before 3&#183;L<tspan baseline-shift='-22%' font-size='8.5'>hdr</tspan> + L<tspan baseline-shift='-22%' font-size='8.5'>vote</tspan> &#8195;(CIP vote condition 3)</text>
+<text x="462" y="1141" class="code" text-anchor="start">goVote: checked twice &#8212; before the forker, and after validation</text>
+<text x="906" y="1141" class="code" text-anchor="start">hard-coded 4 s; ledger L_vote not read</text>
+<rect x="1214.0" y="1129" width="150.0" height="17" rx="3" class="stub"/>
+<text x="1289" y="1141" class="cell" text-anchor="middle" font-weight="bold">STUB</text>
+<rect x="44.0" y="1155" width="1352.0" height="28" rx="3" class="row"/>
+<text x="52" y="1173" class="cell" text-anchor="start">EB is the one announced by the voter's own chain tip &#8195;(condition 4)</text>
+<text x="462" y="1173" class="code" text-anchor="start">goVote: tipAnnouncerFor, on the volatile-tip header state</text>
+<text x="906" y="1173" class="code" text-anchor="start">chain state</text>
+<rect x="1214.0" y="1161" width="150.0" height="17" rx="3" class="ok"/>
+<text x="1289" y="1173" class="cell" text-anchor="middle" font-weight="bold">ENFORCED</text>
+<rect x="44.0" y="1187" width="1352.0" height="28" rx="3" class="row"/>
+<text x="52" y="1205" class="cell" text-anchor="start">EB's txs are a valid extension of the announcing RB &#8195;(condition 5)</text>
+<text x="462" y="1205" class="code" text-anchor="start">validateEbClosure (reapply on cache hit, else full applyTx)</text>
+<text x="906" y="1205" class="code" text-anchor="start">ledger rules</text>
+<rect x="1214.0" y="1193" width="150.0" height="17" rx="3" class="ok"/>
+<text x="1289" y="1205" class="cell" text-anchor="middle" font-weight="bold">ENFORCED</text>
+<rect x="44.0" y="1219" width="1352.0" height="28" rx="3" class="row"/>
+<text x="52" y="1237" class="cell" text-anchor="start">Certificate only in an RB&#8242; at least `gap` slots after the announcer</text>
+<text x="462" y="1237" class="code" text-anchor="start">decideLeiosCertify, on the forge side only</text>
+<text x="906" y="1237" class="code" text-anchor="start">ledger periods + slotLength</text>
+<rect x="1214.0" y="1225" width="150.0" height="17" rx="3" class="stub"/>
+<text x="1289" y="1237" class="cell" text-anchor="middle" font-weight="bold">OFF BY ONE</text>
+<rect x="44.0" y="1251" width="1352.0" height="28" rx="3" class="row"/>
+<text x="52" y="1269" class="cell" text-anchor="start">&#8230; that same rule when accepting somebody else's block</text>
+<text x="462" y="1269" class="code" text-anchor="start">Forker.applyBlock &#8212; FIXME:618; Praos.hs TODO LeiosCertTooYoung</text>
+<text x="906" y="1269" class="code" text-anchor="start">&#8212;</text>
+<rect x="1214.0" y="1257" width="150.0" height="17" rx="3" class="no"/>
+<text x="1289" y="1269" class="cell" text-anchor="middle" font-weight="bold">NOT ENFORCED</text>
+<rect x="44.0" y="1283" width="1352.0" height="28" rx="3" class="row"/>
+<text x="52" y="1301" class="cell" text-anchor="start">Received votes respect the voting window</text>
+<text x="462" y="1301" class="code" text-anchor="start">LeiosVoteState.addVote: dedup, seat, signature &#8212; never time</text>
+<text x="906" y="1301" class="code" text-anchor="start">not expressible: a vote carries no slot</text>
+<rect x="1214.0" y="1289" width="150.0" height="17" rx="3" class="no"/>
+<text x="1289" y="1301" class="cell" text-anchor="middle" font-weight="bold">NOT ENFORCED</text>
+<rect x="44.0" y="1315" width="1352.0" height="28" rx="3" class="row"/>
+<text x="52" y="1333" class="cell" text-anchor="start">The RB header arrived within L<tspan baseline-shift='-22%' font-size='8.5'>hdr</tspan> &#8195;(CIP vote condition 1)</text>
+<text x="462" y="1333" class="code" text-anchor="start">arrival delay is passed to processAnnouncementCentrally</text>
+<text x="906" y="1333" class="code" text-anchor="start">telemetry only, by its own haddock</text>
+<rect x="1214.0" y="1321" width="150.0" height="17" rx="3" class="no"/>
+<text x="1289" y="1333" class="cell" text-anchor="middle" font-weight="bold">NOT ENFORCED</text>
+<rect x="44.0" y="1347" width="1352.0" height="28" rx="3" class="row"/>
+<text x="52" y="1365" class="cell" text-anchor="start">No equivocating RB header seen for the slot &#8195;(condition 2)</text>
+<text x="462" y="1365" class="code" text-anchor="start">PeerState/ElState detect + disconnect; goVote never consults it</text>
+<text x="906" y="1365" class="code" text-anchor="start">the 3 s window exists; finding is traced</text>
+<rect x="1214.0" y="1353" width="150.0" height="17" rx="3" class="no"/>
+<text x="1289" y="1365" class="cell" text-anchor="middle" font-weight="bold">NOT ENFORCED</text>
+<rect x="44.0" y="1379" width="1352.0" height="28" rx="3" class="row"/>
+<text x="52" y="1397" class="cell" text-anchor="start">The EB contains at least one transaction &#8195;(condition 6)</text>
+<text x="462" y="1397" class="code" text-anchor="start">leiosDbInsertEbBody: error "empty EB body (programmer error)"</text>
+<text x="906" y="1397" class="code" text-anchor="start">incidental: drops that peer, off the fetch thread</text>
+<rect x="1214.0" y="1385" width="150.0" height="17" rx="3" class="stub"/>
+<text x="1289" y="1397" class="cell" text-anchor="middle" font-weight="bold">INCIDENTAL</text>
+<rect x="44.0" y="1411" width="1352.0" height="28" rx="3" class="row"/>
+<text x="52" y="1429" class="cell" text-anchor="start">Fetch-priority window L = 3&#183;L<tspan baseline-shift='-22%' font-size='8.5'>hdr</tspan> + L<tspan baseline-shift='-22%' font-size='8.5'>vote</tspan> + L<tspan baseline-shift='-22%' font-size='8.5'>diff</tspan></text>
+<text x="462" y="1429" class="code" text-anchor="start">fetchPriorityTiers, via LeiosFetchStaticEnv</text>
+<text x="906" y="1429" class="code" text-anchor="start">hard-coded 10 slots; musashi's L is 14</text>
+<rect x="1214.0" y="1417" width="150.0" height="17" rx="3" class="stub"/>
+<text x="1289" y="1429" class="cell" text-anchor="middle" font-weight="bold">STUB</text>
+<text x="36" y="1470" class="pin" text-anchor="start">How to read it: the design tier fixes what the parameters must satisfy; the periods are what musashi actually deploys; the enforcement table is what a Byzantine peer is held to.</text>
+<text x="36" y="1485" class="pin" text-anchor="start">The pattern is one-sided. The honest producer's and honest voter's rules are implemented (two of them from constants rather than the ledger parameters that already exist), while</text>
+<text x="36" y="1500" class="pin" text-anchor="start">most acceptance-side timing rules remain open FIXME/TODO. Provenance: &#129302; generated from the pinned sources; derivations and permalinks in artifacts/leios-node-protocol-parameters.md.</text>
+</svg>
