@@ -1,0 +1,260 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1360" height="1900" viewBox="0 0 1360 1900" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+  </defs>
+  <style>
+    .h1    { font-size: 22px; font-weight: bold; fill: #0f172a; }
+    .sub   { font-size: 12px; fill: #64748b; }
+    .stage { font-size: 15px; font-weight: bold; fill: #0f172a; }
+    .bt    { font-size: 12.5px; font-weight: bold; fill: #0f172a; }
+    .tx    { font-size: 11px; fill: #1e293b; }
+    .code  { font-size: 10.5px; font-family: Menlo, Consolas, "DejaVu Sans Mono", monospace; fill: #334155; }
+    .lbl   { font-size: 10.5px; fill: #475569; font-style: italic; }
+    .legend{ font-size: 11px; fill: #334155; }
+    .flow  { stroke: #475569; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+    .flowd { stroke: #475569; stroke-width: 1.4; fill: none; marker-end: url(#arrow); stroke-dasharray: 4 3; }
+    .rule  { stroke: #e2e8f0; stroke-width: 1; }
+    .mem   { fill: #dbeafe; stroke: #2563eb; stroke-width: 1.4; }
+    .cache { fill: #fef3c7; stroke: #d97706; stroke-width: 1.4; }
+    .db    { fill: #dcfce7; stroke: #16a34a; stroke-width: 1.4; }
+    .net   { fill: #ede9fe; stroke: #7c3aed; stroke-width: 1.4; }
+    .forge { fill: #fee2e2; stroke: #dc2626; stroke-width: 1.4; }
+    .chain { fill: #e2e8f0; stroke: #475569; stroke-width: 1.4; }
+    .cont  { fill: #ffffff; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 6 4; }
+    .plain { fill: #ffffff; stroke: #94a3b8; stroke-width: 1.2; }
+  </style>
+  <rect width="1360" height="1900" fill="#ffffff"/>
+
+  <!-- Header -->
+  <text x="40" y="46" class="h1">Transaction lifecycle in the Leios prototype node</text>
+  <text x="40" y="68" class="sub">Pinned snapshot 2026-09-16: ouroboros-consensus @ b56977b &#183; cardano-node @ 7e33674 &#8212; fast-moving code; all names are permalinked in artifacts/leios-node-mempool-txcache.md</text>
+
+  <!-- Legend -->
+  <rect x="40" y="84" width="14" height="14" rx="3" class="mem"/><text x="60" y="95" class="legend">Mempool</text>
+  <rect x="150" y="84" width="14" height="14" rx="3" class="cache"/><text x="170" y="95" class="legend">LeiosTxCache</text>
+  <rect x="280" y="84" width="14" height="14" rx="3" class="db"/><text x="300" y="95" class="legend">LeiosDb</text>
+  <rect x="390" y="84" width="14" height="14" rx="3" class="net"/><text x="410" y="95" class="legend">Mini-protocols / network</text>
+  <rect x="580" y="84" width="14" height="14" rx="3" class="forge"/><text x="600" y="95" class="legend">Forge / block production</text>
+  <rect x="760" y="84" width="14" height="14" rx="3" class="chain"/><text x="780" y="95" class="legend">Chain &amp; ledger</text>
+
+  <!-- Stage 1 -->
+  <circle cx="52" cy="124" r="12" fill="#0f172a"/><text x="52" y="129" text-anchor="middle" font-size="12" font-weight="bold" fill="#ffffff">1</text>
+  <text x="74" y="129" class="stage">Submission &amp; mempool admission (any node)</text>
+  <line x1="40" y1="142" x2="1320" y2="142" class="rule"/>
+
+  <rect x="40" y="156" width="340" height="78" rx="8" class="net"/>
+  <text x="52" y="178" class="bt">Wallet / peer submission</text>
+  <text x="52" y="196" class="tx">TxSubmission mini-protocol, unchanged from</text>
+  <text x="52" y="212" class="tx">Praos (pull-based); LocalTxSubmission locally</text>
+
+  <path class="flow" d="M380,196 H470"/>
+  <text x="425" y="186" text-anchor="middle" class="code">applyTx</text>
+  <text x="425" y="212" text-anchor="middle" class="lbl">full validation</text>
+
+  <rect x="470" y="150" width="600" height="88" rx="8" class="mem"/>
+  <text x="482" y="172" class="bt">Mempool &#8212; Praos mempool + Leios extensions</text>
+  <text x="482" y="190" class="tx">capacity 2&#215; block capacity; CIP-0164 requires &#8805; 2 &#215; (maxBlockBodySize + S_EB-tx)</text>
+  <text x="482" y="206" class="code">Leios tx index: isLeiosTxIndex &#183; getLeiosTxIndex</text>
+  <text x="482" y="222" class="code">per-tx hash: validatedTxLeiosHash &#8592; leiosTxHashOfGenTx</text>
+
+  <!-- Stage 2 -->
+  <circle cx="52" cy="264" r="12" fill="#0f172a"/><text x="52" y="269" text-anchor="middle" font-size="12" font-weight="bold" fill="#ffffff">2</text>
+  <text x="74" y="269" class="stage">Block production on the elected node &#8212; partitionMempool (Forge.hs)</text>
+  <line x1="40" y1="282" x2="1320" y2="282" class="rule"/>
+
+  <path class="flow" d="M680,238 V300"/>
+
+  <polygon points="680,303 850,345 680,387 510,345" class="forge"/>
+  <text x="680" y="341" text-anchor="middle" class="code" font-weight="bold">decideLeiosCertify</text>
+  <text x="680" y="359" text-anchor="middle" class="tx">certificate quorum for the announced EB?</text>
+
+  <path class="flow" d="M510,345 H330 V412"/>
+  <text x="340" y="337" class="lbl">no &#8212; forge a TxRB</text>
+  <path class="flow" d="M850,345 H1020 V412"/>
+  <text x="860" y="337" class="lbl">yes &#8212; forge a CertRB</text>
+
+  <rect x="40" y="415" width="580" height="110" rx="8" class="forge"/>
+  <text x="52" y="436" class="bt">TxRB branch &#8212; the RB carries transactions</text>
+  <text x="52" y="455" class="code">snap &#8592; getSnapshotFor (one snapshot)</text>
+  <text x="52" y="471" class="code">RB body &#8592; snapshotTake snap rbCap</text>
+  <text x="52" y="487" class="code">EB &#8592; snapshotTake snap (rbCap &#8853; ebCap) &#8722; RB prefix</text>
+  <text x="52" y="503" class="tx">forgeLeiosEb; the announcement (EB hash, size) goes into the RB header</text>
+
+  <rect x="730" y="415" width="590" height="110" rx="8" class="forge"/>
+  <text x="742" y="436" class="bt">CertRB branch &#8212; the RB body carries only the certificate</text>
+  <text x="742" y="455" class="code">resolveAndApplyLeiosClosure &#8212; apply the certified EB's closure from the LeiosDb</text>
+  <text x="742" y="471" class="code">mempool rebase: getSnapshotForNoCache (parent &#8853; closure &#8853; tick)</text>
+  <text x="742" y="487" class="tx">a fresh EB is filled from the rebased snapshot</text>
+  <text x="742" y="503" class="tx">(same tip/slot but different ledger state &#8658; cache unusable &#8212; issue #838)</text>
+
+  <path class="flow" d="M330,525 V575"/>
+  <text x="345" y="552" class="lbl">RB</text>
+  <path class="flow" d="M1020,525 V575"/>
+  <text x="1035" y="552" class="lbl">EB</text>
+  <path class="flow" d="M560,525 V556 H900 V575"/>
+  <path class="flow" d="M780,525 V548 H480 V575"/>
+
+  <rect x="200" y="575" width="440" height="64" rx="8" class="chain"/>
+  <text x="212" y="596" class="bt">RB &#8594; Praos diffusion (ChainSync / BlockFetch)</text>
+  <text x="212" y="614" class="tx">the header carries the EB announcement; a CertRB's wire body is empty</text>
+
+  <rect x="730" y="575" width="520" height="64" rx="8" class="db"/>
+  <text x="742" y="596" class="bt">EB body &#8594; local LeiosDb + LeiosTxCache</text>
+  <text x="742" y="614" class="tx">served to peers via LeiosFetch; forged bodies skip the peer-arrival checks</text>
+
+  <!-- Stage 3 -->
+  <circle cx="52" cy="671" r="12" fill="#0f172a"/><text x="52" y="676" text-anchor="middle" font-size="12" font-weight="bold" fill="#ffffff">3</text>
+  <text x="74" y="676" class="stage">Diffusion at a following node</text>
+  <line x1="40" y1="689" x2="1320" y2="689" class="rule"/>
+
+  <path class="flow" d="M460,639 V700 H240 V712"/>
+  <text x="470" y="668" class="lbl">announcement relayed via LeiosNotify</text>
+  <path class="flow" d="M990,639 V700 H750 V712"/>
+  <text x="1000" y="668" class="lbl">body pulled freshest-first</text>
+
+  <rect x="40" y="712" width="440" height="76" rx="8" class="net"/>
+  <text x="52" y="733" class="bt">Announcement arrives &#8212; LeiosNotify</text>
+  <text x="52" y="751" class="tx">the (EB hash, size) field of the RB header, signed by the electee;</text>
+  <text x="52" y="767" class="tx">relayed promptly onward (L_hdr &#8776; 1 s budget)</text>
+
+  <path class="flow" d="M240,788 V808"/>
+
+  <rect x="40" y="808" width="440" height="94" rx="8" class="net"/>
+  <text x="52" y="829" class="bt">Validate &amp; track equivocation</text>
+  <text x="52" y="848" class="code">validateAnnouncementHeader &#8212; header rules only,</text>
+  <text x="52" y="862" class="code">forecast from the immutable tip (out-of-order arrivals)</text>
+  <text x="52" y="880" class="tx">ElBimap: &#8804; 2 announcements per election;</text>
+  <text x="52" y="894" class="tx">a 3rd or a repeat &#8658; disconnect the peer</text>
+
+  <path class="flow" d="M240,902 V926"/>
+
+  <rect x="40" y="926" width="440" height="84" rx="8" class="cache"/>
+  <text x="52" y="947" class="bt">Index the announcement</text>
+  <text x="52" y="966" class="code">insertAnnouncement &#8594; LeiosTxCache</text>
+  <text x="52" y="984" class="tx">window &#8804; maxAnnouncementCount = 128;</text>
+  <text x="52" y="998" class="tx">overflow evicts the oldest (cascade)</text>
+
+  <path class="flowd" d="M480,935 H506"/>
+
+  <rect x="520" y="712" width="460" height="62" rx="8" class="net"/>
+  <text x="532" y="733" class="bt">EB body arrives &#8212; LeiosFetch MsgLeiosBlock</text>
+  <text x="532" y="751" class="tx">validated on arrival: size / hash / duplicate tx hashes (size vs peer's own offer)</text>
+
+  <path class="flow" d="M750,774 V800"/>
+
+  <rect x="490" y="800" width="830" height="436" rx="10" class="cont"/>
+  <text x="506" y="822" class="bt">processLeiosBlock &#8212; EB body ingest (LeiosDemoLogic.hs)</text>
+
+  <rect x="506" y="836" width="798" height="46" rx="6" class="db"/>
+  <text x="518" y="854" class="bt" font-size="11.5">a. Persist to the LeiosDb first</text>
+  <text x="518" y="872" class="code">leiosDbInsertEbPoint &#183; leiosDbInsertEbBody (ebs, ebTxs) &#8212; DB insert strictly before cache index (invariant)</text>
+
+  <rect x="506" y="892" width="798" height="46" rx="6" class="cache"/>
+  <text x="518" y="910" class="bt" font-size="11.5">b. Index in the LeiosTxCache &#8212; insertBody</text>
+  <text x="518" y="928" class="code">bump per-tx refcounts; the same pass folds out the misses (offset &#8594; TxHash, bytes)</text>
+
+  <rect x="506" y="948" width="798" height="88" rx="6" class="mem"/>
+  <text x="518" y="966" class="bt" font-size="11.5">c. Mempool pull &#8212; look up all the EB's txs in getLeiosTxIndex, then partition</text>
+  <text x="530" y="986" class="code">mempoolNotCache &#8594; full ingest (bytes to DB; cache marks Applied)</text>
+  <text x="530" y="1002" class="code">mempoolAndCache &#8594; mark Applied only (bytes already persisted)</text>
+  <text x="530" y="1018" class="code">missedBoth = cache misses &#8745; not-in-mempool &#8594; the fetch set</text>
+
+  <rect x="506" y="1046" width="798" height="32" rx="6" class="plain"/>
+  <text x="518" y="1066" class="code">TraceLeiosBodyHits &#8594; funnel: txsInEb &#8805; tracked &#8805; acquired &#8805; validated (+ mempoolHits, missedBoth)</text>
+
+  <rect x="506" y="1088" width="798" height="46" rx="6" class="net"/>
+  <text x="518" y="1106" class="bt" font-size="11.5">d. Fetch the rest &#8212; LeiosFetch MsgLeiosBlockTxs</text>
+  <text x="518" y="1124" class="code">missedBoth &#8594; LeiosJobPool (JobRootHash; demo caps maxJobBytesSize / maxJobTxCount = 20000)</text>
+
+  <rect x="506" y="1144" width="798" height="62" rx="6" class="db"/>
+  <text x="518" y="1162" class="bt" font-size="11.5">e. Arrivals &amp; completion</text>
+  <text x="518" y="1180" class="code">withLockedInsertUnappliedTx (TxArrivalPrior buckets) &#8594; tx bytes into LeiosDb txs; missingTxCount &#8594; 0</text>
+  <text x="518" y="1196" class="tx">serve-only-when-secured: the body is offered to peers only once its closure is complete</text>
+
+  <text x="506" y="1224" class="lbl">(insertBody is a no-op if the announcement was already evicted &#8212; a backstop classifies arrivals via withLookupTx)</text>
+
+  <!-- Stage 4 -->
+  <circle cx="52" cy="1277" r="12" fill="#0f172a"/><text x="52" y="1282" text-anchor="middle" font-size="12" font-weight="bold" fill="#ffffff">4</text>
+  <text x="74" y="1282" class="stage">Voting (committee members)</text>
+  <line x1="40" y1="1295" x2="1320" y2="1295" class="rule"/>
+
+  <path class="flow" d="M905,1236 V1262 H350 V1310"/>
+  <text x="560" y="1256" class="lbl">closure complete &#8658; vote within L_vote (4 slots)</text>
+
+  <rect x="40" y="1310" width="620" height="104" rx="8" class="cache"/>
+  <text x="52" y="1331" class="bt">validateEbClosure (LeiosVoting.hs)</text>
+  <text x="52" y="1350" class="code">closure &#8592; resolveLeiosClosure (LeiosDb); resolve input UTxOs</text>
+  <text x="52" y="1366" class="code">per tx via withLookupTx: TxAlreadyValidated &#8658; reapplyTx, else full applyTx</text>
+  <text x="52" y="1382" class="tx">"the tag is the evidence" &#8212; static checks skipped on cache-validated txs</text>
+  <text x="52" y="1398" class="tx">CIP-0164 set-S validation-flag reuse; verdict: EbClosureVerdict</text>
+
+  <path class="flow" d="M660,1362 H730"/>
+  <text x="695" y="1352" text-anchor="middle" class="lbl">valid &#8658; vote</text>
+
+  <rect x="730" y="1310" width="590" height="104" rx="8" class="net"/>
+  <text x="742" y="1331" class="bt">LeiosVoteState &#8212; votes to certificate</text>
+  <text x="742" y="1350" class="code">addVote: validate &#183; dedup &#183; tally per announcing-RB point</text>
+  <text x="742" y="1366" class="tx">quorum &#964; = 0.75 of the wFA^LS committee &#8658; certificate assembled eagerly</text>
+  <text x="742" y="1382" class="code">aggregateLeiosCert   (FIXME: no vote-state GC yet)</text>
+
+  <!-- Stage 5 -->
+  <circle cx="52" cy="1451" r="12" fill="#0f172a"/><text x="52" y="1456" text-anchor="middle" font-size="12" font-weight="bold" fill="#ffffff">5</text>
+  <text x="74" y="1456" class="stage">Certification &amp; ledger adoption</text>
+  <line x1="40" y1="1469" x2="1320" y2="1469" class="rule"/>
+
+  <path class="flow" d="M1030,1414 V1440 H500 V1488"/>
+  <text x="540" y="1434" class="lbl">certificate ready at the next election won by any pool</text>
+
+  <rect x="40" y="1488" width="620" height="90" rx="8" class="forge"/>
+  <text x="52" y="1509" class="bt">Next elected producer &#8212; decideLeiosCertify (Forge.hs)</text>
+  <text x="52" y="1528" class="code">reads the tip announcement (protocolStateLeiosAnnouncement); closure must be in LeiosDb</text>
+  <text x="52" y="1544" class="tx">minimum certification gap: 10 slots on musashi (CIP-0164 cadence: 14)</text>
+  <text x="52" y="1560" class="tx">queries the cert &#8658; forges the CertRB (empty wire body + certificate)</text>
+
+  <path class="flow" d="M660,1533 H730"/>
+  <text x="695" y="1523" text-anchor="middle" class="lbl">CertRB</text>
+  <text x="695" y="1550" text-anchor="middle" class="lbl">(Praos)</text>
+
+  <rect x="730" y="1488" width="590" height="90" rx="8" class="chain"/>
+  <text x="742" y="1509" class="bt">Followers adopt &#8212; resolveAndApplyLeiosClosure</text>
+  <text x="742" y="1528" class="code">splice the closure from the LeiosDb: applyLeiosClosure on the unticked parent,</text>
+  <text x="742" y="1544" class="code">then tickThenApply the CertRB</text>
+  <text x="742" y="1560" class="tx">&#8658; the EB's transactions are on chain</text>
+
+  <!-- Stage 6 -->
+  <circle cx="52" cy="1603" r="12" fill="#0f172a"/><text x="52" y="1608" text-anchor="middle" font-size="12" font-weight="bold" fill="#ffffff">6</text>
+  <text x="74" y="1608" class="stage">Drainage, eviction, and garbage collection</text>
+  <line x1="40" y1="1621" x2="1320" y2="1621" class="rule"/>
+
+  <path class="flow" d="M1030,1578 V1594 H500 V1640"/>
+  <text x="540" y="1590" class="lbl">Mempool Sync removes the adopted txs</text>
+
+  <rect x="40" y="1640" width="620" height="94" rx="8" class="mem"/>
+  <text x="52" y="1661" class="bt">Mempool drainage</text>
+  <text x="52" y="1680" class="tx">Sync after adoption removes on-chain txs (TxRB body or certified closure);</text>
+  <text x="52" y="1695" class="tx">the remainder is revalidated, time-bounded by reapplyUntilTimeout.</text>
+  <text x="52" y="1712" class="tx">A tx in a skipped EB is not lost &#8212; it stays eligible for the next RB / EB.</text>
+
+  <rect x="700" y="1640" width="620" height="94" rx="8" class="chain"/>
+  <text x="712" y="1661" class="bt">Skipped EBs</text>
+  <text x="712" y="1680" class="tx">No certificate within the gap &#8658; the EB is orphaned; expected skip rate</text>
+  <text x="712" y="1695" class="tx">&#8776; 1 &#8722; 0.95&#185;&#8304; &#8776; 40% at musashi's 10-slot gap (&#8776; 50% at the CIP's 14);</text>
+  <text x="712" y="1712" class="tx">orphaned EBs and their unreferenced txs become GC candidates.</text>
+
+  <rect x="40" y="1750" width="620" height="94" rx="8" class="cache"/>
+  <text x="52" y="1771" class="bt">LeiosTxCache eviction</text>
+  <text x="52" y="1790" class="tx">count-driven: insertAnnouncement cascade beyond the 128-announcement window;</text>
+  <text x="52" y="1805" class="tx">tip-driven: evictOlderThan, wired into the ChainDB's GC.</text>
+  <text x="52" y="1822" class="tx">ORDERING CONTRACT: the index evicts before the DB prunes &#8212; never after.</text>
+
+  <rect x="700" y="1750" width="620" height="94" rx="8" class="db"/>
+  <text x="712" y="1771" class="bt">LeiosDb GC (v2)</text>
+  <text x="712" y="1790" class="tx">EB status: 0 volatile &#8594; 1 certified-pinned &#8594; 2 copied-to-immutable &#8594; 3 GC-marked;</text>
+  <text x="712" y="1805" class="tx">certified closures archived &#8212; deep Praos forks keep closures live 12&#8211;36 h;</text>
+  <text x="712" y="1822" class="tx">gcTxCandidates sweeps orphaned transactions.</text>
+
+  <!-- Footer -->
+  <text x="40" y="1876" class="sub">Sources: artifacts/leios-node-mempool-txcache.md (every function permalinked at the pinned SHAs) &#183; CIP-0164 &#183; Leios design document. Provenance: &#129302; generated from the pinned source snapshot.</text>
+</svg>

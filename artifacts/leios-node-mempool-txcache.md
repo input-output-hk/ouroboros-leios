@@ -3,7 +3,7 @@
 **Created:** 2026-09-16
 **Status:** Draft for review.
 **Provenance:** 🤖 (LLM-generated from source reading of the `leios-prototype` branches, pending human review)
-**Companion documents:** [Leios production staging branches](./cardano-node-status.md) (where these branches live) · [Simulation/model catalog](./leios-simulation-model-catalog.md) (the models these structures are compared against, esp. the [mempool table](./leios-simulation-model-catalog.md#mempool-and-transaction-cache-representations))
+**Companion documents:** [Leios production staging branches](./cardano-node-status.md) (where these branches live) · [Simulation/model catalog](./leios-simulation-model-catalog.md) (the models these structures are compared against, esp. the [mempool table](./leios-simulation-model-catalog.md#mempool-and-transaction-cache-representations)) · [Transaction-lifecycle diagram](./leios-node-tx-lifecycle.svg) (SVG overview of §§ 1–4)
 
 > [!WARNING]
 >

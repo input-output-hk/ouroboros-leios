@@ -2,6 +2,12 @@
 
 Reverse-chronological log. Newest date sections first; newest entries first within a date. See [AGENTS.md](../AGENTS.md) § Repository Blueprint for the format rules.
 
+## 2026-09-17
+
+### Diagrammed the prototype transaction lifecycle 🤖
+
+Drew [artifacts/leios-node-tx-lifecycle.svg](../artifacts/leios-node-tx-lifecycle.svg), a six-stage SVG of a transaction's path through the `leios-prototype` node at the pinned 2026-09-16 snapshot: submission/admission, the forge's `decideLeiosCertify` TxRB/CertRB split, diffusion at a following node (`processLeiosBlock` with the DB-before-index invariant, mempool pull, and the telemetry funnel), voting via `validateEbClosure`, CertRB certification/adoption, and drainage/eviction/GC end states. Boxes are color-coded by store (Mempool / LeiosTxCache / LeiosDb / network / forge / chain); every label is a function or type permalinked in [the mempool/TxCache map](../artifacts/leios-node-mempool-txcache.md), which now links the diagram.
+
 ## 2026-09-16
 
 ### Wrote the mempool-alignment quantity mapping 🤖
