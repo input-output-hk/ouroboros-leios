@@ -45,7 +45,7 @@ Feature work stages on personal-prefix branches before merging, visible in each 
 
 ## Deep dive
 
-The mempool and LeiosTxCache machinery on these branches is mapped in detail (types, functions, permalinks pinned to this snapshot's SHAs) in [leios-node-mempool-txcache.md](./leios-node-mempool-txcache.md).
+The mempool and LeiosTxCache machinery on these branches is mapped in detail (types, functions, permalinks pinned to this snapshot's SHAs) in [leios-node-mempool-txcache.md](./leios-node-mempool-txcache.md). Three further documents read the same snapshot from other angles: [the protocol parameters and admission inequalities](./leios-node-protocol-parameters.md) (which parameters gate block, vote, and certificate creation and acceptance, and which of those checks are actually implemented — it also pins `cardano-ledger` and `cardano-base`), and the [transaction-lifecycle](./leios-node-tx-lifecycle.svg) and [timing-inequalities](./leios-timing-inequalities.svg) diagrams.
 
 ## How to re-verify (the durable part)
 

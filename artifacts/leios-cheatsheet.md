@@ -8,7 +8,7 @@ A living reference for the protocols, mechanisms, and terms this effort touches.
 
 > [!NOTE]
 >
-> First populated 2026-09-17 from the transaction-lifecycle work (the block classes, certification mechanics, and the prototype's three stores). The Ouroboros Family, Comparators, Protocol Parameters, and Baselines sections remain stubs.
+> First populated 2026-09-17 from the transaction-lifecycle and protocol-parameter work: the block classes, certification mechanics, the prototype's three stores, and the Leios parameter set with its deployed musashi values. The Ouroboros Family, Comparators, and Baselines sections remain stubs.
 
 ---
 

@@ -213,7 +213,7 @@
   <text x="52" y="1509" class="bt">Next elected producer &#8212; decideLeiosCertify (Forge.hs)</text>
   <text x="52" y="1528" class="code">reads the tip announcement (protocolStateLeiosAnnouncement); closure must be in LeiosDb</text>
   <text x="52" y="1544" class="tx">min gap from ledger params; forge-enforced only &#8212; follower validity check: FIXME</text>
-  <text x="52" y="1560" class="tx">gap = &#8968;(3A+V+D)/slot&#8969; = 14 on musashi genesis (&#10067; Slack 8/26: 10); cert &#8658; CertRB</text>
+  <text x="52" y="1560" class="tx">gap = &#8968;(3A+V+D)/slot&#8969; = 14 on musashi; SCRUTINY: Slack 8/26 said 10; cert &#8658; CertRB</text>
 
   <path class="flow" d="M660,1533 H730"/>
   <text x="695" y="1523" text-anchor="middle" class="lbl">CertRB</text>
@@ -242,7 +242,7 @@
   <rect x="700" y="1640" width="620" height="94" rx="8" class="chain"/>
   <text x="712" y="1661" class="bt">Skipped EBs</text>
   <text x="712" y="1680" class="tx">a successor RB inside the min gap cannot certify &#8658; the EB is stranded;</text>
-  <text x="712" y="1695" class="tx">modeled: 1 &#8722; 0.95^g (f = 0.05): &#8776; 51% at g = 14 (musashi genesis), 40% at g = 10 &#10067;&#129302;</text>
+  <text x="712" y="1695" class="tx">model: 1 &#8722; 0.95^g (f = 0.05): &#8776;51% at g=14; 40% at g=10 &#8212; SCRUTINY: not code</text>
   <text x="712" y="1712" class="tx">orphaned EBs and their unreferenced txs become GC candidates.</text>
 
   <rect x="40" y="1750" width="620" height="94" rx="8" class="cache"/>
@@ -258,5 +258,5 @@
   <text x="712" y="1822" class="tx">gcTxCandidates sweeps orphaned transactions.</text>
 
   <!-- Footer -->
-  <text x="40" y="1876" class="sub">Sources: artifacts/leios-node-mempool-txcache.md (every function permalinked at the pinned SHAs) &#183; CIP-0164 &#183; Leios design document. Provenance: &#129302; generated from the pinned source snapshot.</text>
+  <text x="40" y="1876" class="sub">Sources: artifacts/leios-node-mempool-txcache.md (every function permalinked at the pinned SHAs) &#183; CIP-0164 &#183; Leios design document. Provenance: LLM-generated from the pinned source snapshot.</text>
 </svg>
