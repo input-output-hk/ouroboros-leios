@@ -174,6 +174,49 @@ export const clearLatencyCache = () => {
   latencyCache.clear();
 };
 
+// Received-time index: `family|id|sender|recipient` -> earliest received time.
+// Populated once per ingested batch (same lifecycle as the events array), so
+// the per-frame aggregation pass can pair a Sent with its Received by lookup
+// instead of scanning ahead through the event array — that scan was quadratic
+// in event density and dominated the per-frame cost on vote-heavy runs.
+const receivedAtIndex = new Map<string, number>();
+
+const messageFamily = (type: string): string =>
+  type.replace(/(Sent|Received)$/, "");
+
+const transitKey = (
+  type: string,
+  id: string,
+  sender: string,
+  recipient: string,
+): string => `${messageFamily(type)}|${id}|${sender}|${recipient}`;
+
+// Index the Received events of a freshly ingested batch. First write wins:
+// duplicate delivery of the same message keeps the earliest arrival, matching
+// the old scan-ahead behaviour.
+export const indexReceivedEvents = (events: IServerMessage[]) => {
+  for (const event of events) {
+    const message = event.message as any;
+    if (!message.type.endsWith("Received")) continue;
+    if (!message.id || !message.sender || !message.recipient) continue;
+    const key = transitKey(
+      message.type,
+      message.id,
+      message.sender,
+      message.recipient,
+    );
+    const existing = receivedAtIndex.get(key);
+    if (existing === undefined || event.time_s < existing) {
+      receivedAtIndex.set(key, event.time_s);
+    }
+  }
+};
+
+// Clear alongside the events array (scenario switch, timeline reset).
+export const clearReceivedIndex = () => {
+  receivedAtIndex.clear();
+};
+
 const createMessageAnimation = (
   result: ISimulationAggregatedDataState,
   messageType: EMessageType,
@@ -335,15 +378,27 @@ export const computeAggregatedDataAtTime = (
 
   const calculateTravelTime = (
     event: IServerMessage,
-    eventIndex: number,
     fallbackTime: number,
   ): number => {
     const { sender, recipient } = getMessageParticipants(event);
     const sentTime = event.time_s;
 
-    // First: Try to find matching received event
-    const receivedTime = findMatchingReceivedEvent(event, eventIndex);
-    if (receivedTime) {
+    // First: the received-time index built at ingestion. Bounded like the old
+    // scan-ahead: a match from the past (a re-send of the same message) or
+    // implausibly far out falls through to the estimates below.
+    const receivedTime = receivedAtIndex.get(
+      transitKey(
+        event.message.type,
+        (event.message as any).id,
+        sender,
+        recipient,
+      ),
+    );
+    if (
+      receivedTime !== undefined &&
+      receivedTime >= sentTime &&
+      receivedTime <= sentTime + MAX_LOOKAHEAD_TIME
+    ) {
       return receivedTime - sentTime;
     }
 
@@ -355,52 +410,6 @@ export const computeAggregatedDataAtTime = (
 
     // Third: Use message-type specific fallback
     return fallbackTime;
-  };
-
-  // Helper function to look ahead for matching received event within time limit
-  const findMatchingReceivedEvent = (
-    sentEvent: IServerMessage,
-    startIndex: number,
-  ): number | null => {
-    const messageType = sentEvent.message.type;
-    const { sender, recipient } = getMessageParticipants(sentEvent);
-    const sentTime = sentEvent.time_s;
-    const messageId = (sentEvent.message as any).id;
-
-    for (let j = startIndex + 1; j < events.length; j++) {
-      const futureEvent = events[j];
-
-      // Stop looking if we've gone beyond our time limit or target time
-      if (futureEvent.time_s > sentTime + MAX_LOOKAHEAD_TIME) {
-        break;
-      }
-
-      // Check if this is a matching received event
-      const isMatchingReceived =
-        (messageType === EServerMessageType.TxsSent &&
-          futureEvent.message.type ===
-            EServerMessageType.TxsReceived) ||
-        (messageType === EServerMessageType.EBSent &&
-          futureEvent.message.type === EServerMessageType.EBReceived) ||
-        (messageType === EServerMessageType.RBSent &&
-          futureEvent.message.type === EServerMessageType.RBReceived) ||
-        (messageType === EServerMessageType.VotesSent &&
-          futureEvent.message.type === EServerMessageType.VotesReceived) ||
-        (messageType === EServerMessageType.AnnouncementSent &&
-          futureEvent.message.type ===
-            EServerMessageType.AnnouncementReceived);
-
-      if (
-        isMatchingReceived &&
-        (futureEvent.message as any).id === messageId &&
-        (futureEvent.message as any).sender === sender &&
-        (futureEvent.message as any).recipient === recipient &&
-        futureEvent.time_s >= sentTime
-      ) {
-        return futureEvent.time_s; // Return the received time
-      }
-    }
-    return null; // No matching received event found within time window
   };
 
   // Votes whose target RB / EB hadn't been observed yet when the vote was
@@ -461,7 +470,6 @@ export const computeAggregatedDataAtTime = (
         // Calculate travel time with 3-tier fallback
         const travelTime = calculateTravelTime(
           event,
-          i,
           0.05, // fallback for TX
         );
 
@@ -553,7 +561,6 @@ export const computeAggregatedDataAtTime = (
         // Calculate travel time with 3-tier fallback
         const travelTime = calculateTravelTime(
           event,
-          i,
           1.0, // fallback for EB
         );
 
@@ -622,7 +629,6 @@ export const computeAggregatedDataAtTime = (
         // Calculate travel time with 3-tier fallback
         const travelTime = calculateTravelTime(
           event,
-          i,
           0.3, // fallback for a lightweight announcement
         );
 
@@ -732,7 +738,6 @@ export const computeAggregatedDataAtTime = (
         // Calculate travel time with 3-tier fallback
         const travelTime = calculateTravelTime(
           event,
-          i,
           0.1, // fallback for RB
         );
 
@@ -835,7 +840,6 @@ export const computeAggregatedDataAtTime = (
         // Calculate travel time with 3-tier fallback
         const travelTime = calculateTravelTime(
           event,
-          i,
           0.2, // fallback for Votes
         );
 

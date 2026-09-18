@@ -8,6 +8,8 @@ import {
   buildChainAtTime,
   computeAggregatedDataAtTime,
   clearLatencyCache,
+  clearReceivedIndex,
+  indexReceivedEvents,
 } from "@/utils/timelineAggregation";
 
 export const reducer = (
@@ -35,6 +37,7 @@ export const reducer = (
       if (!scenario) {
         return state;
       }
+      clearReceivedIndex();
       return {
         ...state,
         aggregatedData: defaultAggregatedData,
@@ -140,6 +143,9 @@ export const reducer = (
       // list in O(n + m); a full re-sort each batch would be O(n log n),
       // untenable once a demo reaches hundreds of thousands of events.
       const incoming = [...action.payload].sort((a, b) => a.time_s - b.time_s);
+      // Pair Sent with Received once, at ingestion; the per-frame aggregation
+      // then finds travel times by lookup instead of scanning ahead.
+      indexReceivedEvents(incoming);
       const prev = state.events;
       const merged: typeof prev = new Array(prev.length + incoming.length);
       let pi = 0;
@@ -236,6 +242,7 @@ export const reducer = (
       };
 
     case "RESET_TIMELINE":
+      clearReceivedIndex();
       return {
         ...state,
         events: [],
