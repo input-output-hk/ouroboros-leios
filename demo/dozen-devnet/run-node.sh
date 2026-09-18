@@ -24,15 +24,19 @@ rm -f "node.socket"
 ) &
 
 # Only block producers have pool keys copied into keys/ by run.sh; a relay runs
-# with none of the forging arguments at all.
+# with none of the forging arguments at all. The BLS key is separate: under
+# VOTERS it is a JSON array bundling the pool's own key with its share of the
+# generated voter keys, and a producer without one forges but does not vote.
 FORGE_ARGS=()
 if [ -f "keys/vrf.skey" ]; then
   FORGE_ARGS=(
     --shelley-vrf-key "keys/vrf.skey"
     --shelley-kes-key "keys/kes.skey"
-    --shelley-bls-key "keys/bls.skey"
     --shelley-operational-certificate "keys/opcert.cert"
   )
+  if [ -f "keys/bls.skey" ]; then
+    FORGE_ARGS+=(--shelley-bls-key "keys/bls.skey")
+  fi
 fi
 
 # Extra RTS options, appended after the ones baked into the binary
