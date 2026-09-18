@@ -527,21 +527,23 @@ for NODE_NAME in "${NODES[@]}"; do
       cp -r "$SHARED_CONFIG_DIR/pools-keys/pool${NODE_NAME#bp}" "$NODE_DIR/keys"
       chmod 400 "$NODE_DIR/keys"/*.skey
     fi
-    # The BLS key is settled after the copy (and again on resume) so changing
-    # VOTERS between fresh runs always converges to the requested layout. With
+    # The BLS key is settled after the copy (and again on resume). The
+    # WORKING DIR, not the environment, says whether this devnet has voters:
+    # their pools are baked into the genesis, so the bundles have to match it
+    # even when a resume does not repeat VOTERS on the command line. With
     # voters, bp N votes with its own key plus every third voter's (bp1 gets
     # voters 1,4,7,…) — the bundle is a JSON array of key envelopes, which
     # --shelley-bls-key accepts in place of a single one.
+    actualVoters=$(find "$WORKING_DIR/voters" -maxdepth 1 -name 'voter[0-9]*' -type d 2>/dev/null | wc -l)
+    if [ "$VOTERS" -gt 0 ] && [ "$VOTERS" != "$actualVoters" ]; then
+      echo "Warning: VOTERS=$VOTERS but $WORKING_DIR/voters holds $actualVoters" >&2
+      echo "         voter key sets; the genesis is fixed, using the $actualVoters." >&2
+    fi
     rm -f "$NODE_DIR/keys/bls.skey"
-    if [ "$VOTERS" -gt 0 ]; then
-      if [ ! -d "$WORKING_DIR/voters" ]; then
-        echo "Error: VOTERS=$VOTERS but $WORKING_DIR/voters is missing (a resume" >&2
-        echo "       of a working dir that was initialized without voters?)." >&2
-        exit 1
-      fi
+    if [ "$actualVoters" -gt 0 ]; then
       n="${NODE_NAME#bp}"
       voter_keys=()
-      for i in $(seq "$n" 3 "$VOTERS"); do
+      for i in $(seq "$n" 3 "$actualVoters"); do
         voter_keys+=("$WORKING_DIR/voters/voter$i/bls.skey")
       done
       jq -s '.' "$SHARED_CONFIG_DIR/pools-keys/pool${n}/bls.skey" "${voter_keys[@]}" \
