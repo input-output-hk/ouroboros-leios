@@ -31,11 +31,11 @@
   "leiosDiffusionPeriodLength": 7000,
   "leiosCommitteeSize": 900,
   "leiosQuorumStakeThreshold": 0.75,
-  "maxEndorserBlockReferencesSize": 600000,
-  "maxEndorserBlockTxsSize": 5000000,
+  "maxEndorserBlockReferencesSize": 100000,
+  "maxEndorserBlockTxsSize": 1000000,
   "maxEndorserBlockExecutionUnits": {
-    "memory": 4000000000,
-    "steps": 1000000000000
+    "memory": 310000000,
+    "steps": 100000000000
   },
   "maxRefScriptSizePerEndorserBlock": 4000000
 }

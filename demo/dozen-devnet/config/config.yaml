@@ -6,7 +6,7 @@ ConwayGenesisFile: conway-genesis.json
 DijkstraGenesisFile: dijkstra-genesis.json
 
 # 5MB is a bit below the timeout capacity default ceiling
-MempoolCapacityBytesOverride: 5000000
+# MempoolCapacityBytesOverride: 5000000
 # Defaults
 # MempoolTimeoutsEnabled: true
 # MempoolTimeoutSoft: 1.0
