@@ -37,8 +37,9 @@ set -a
 # edits still take effect. Best effort: see the preflight warnings below.
 : "${RESUME:=0}"
 # Add VOTERS extra committee members: that many freshly generated key sets land
-# in $WORKING_DIR/voters and their pools go into the shelley genesis with a
-# small constant stake, so all of them hold committee seats from epoch 0. Their
+# in $WORKING_DIR/voters and their pools go into the shelley genesis holding
+# 10% of the delegated stake in equal parts (the producers keep 90%), so all
+# of them hold weighted committee seats from epoch 0. Their
 # BLS signing keys are partitioned round-robin into three bundles, and each
 # block producer votes with its own key plus its share — with VOTERS=100 that is
 # 100 extra votes per EB across bp1/bp2/bp3. Exercises the multi-key
@@ -390,9 +391,19 @@ if [ "$RESUME" != "1" ]; then
     VOTERS_DIR="$WORKING_DIR/voters"
     rm -rf "$VOTERS_DIR"
     mkdir -p "$VOTERS_DIR"
-    # Enough for a committee seat, negligible against the producers' stake so
-    # leader election and the certification quorum stay with bp1/bp2/bp3.
-    VOTER_STAKE=1000000000
+    # 90/10 stake split: the producers keep what they have, and the voters
+    # together get one ninth of it — 10% of the resulting total — in equal
+    # parts, so committee seat weights are real and the vote tally climbs in
+    # ~(10/VOTERS)% steps instead of thirds (smoother CDFs on the voting
+    # dashboard). Certification stays with bp1/bp2/bp3 (90% > the 0.75
+    # quorum), but their pools never forge, so ~10% of leader slots go empty.
+    # Delegated stake = the initialFunds whose address (00 | payment | stake)
+    # carries a stake key hash that staking.stake delegates.
+    delegatedStake=$(jq '
+      .staking.stake as $delegs
+      | [.initialFunds | to_entries[] | select($delegs[.key[58:114]]) | .value]
+      | add' "$WORKING_DIR/genesis/shelley-genesis.json")
+    VOTER_STAKE=$((delegatedStake / 9 / VOTERS))
     MAGIC=$(jq .networkMagic "$WORKING_DIR/genesis/shelley-genesis.json")
     echo "Generating $VOTERS voter key sets in $VOTERS_DIR"
     for i in $(seq 1 "$VOTERS"); do
