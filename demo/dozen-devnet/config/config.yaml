@@ -96,29 +96,12 @@ TraceOptions:
     maxFrequency: 2.0
   ChainDB.CopyToImmutableDBEvent.CopiedBlockToImmutableDB:
     maxFrequency: 2.0
-  ChainDB.LedgerEvent.Flavor.V1.OnDisk.BackingStoreEvent:
-    severity: Silence
-  # One trace per UTxO read. Together these were over 40% of all log lines and
-  # ~250 MB per node in twelve minutes, which makes the tracer itself a
-  # suspect in the very stalls we are measuring.
-  ChainDB.LedgerEvent.Flavor.V2.LedgerTablesHandleRead:
-    severity: Silence
-  ChainDB.LedgerEvent.Flavor.V2.BackendTrace.LSM.LSMLookup:
-    severity: Silence
-  ChainDB.LedgerEvent.Flavor.V2.BackendTrace.LSM.LSMTrace:
-    severity: Silence
-  # These three fire per block, not per session as the volume above suggested
-  # when the handle traces were first kept for forker churn: during a replay they
-  # were 948 of 1128 log lines, 84% of the file. The one-shot
-  # LedgerTablesHandleCreateFirst and LSMOpenSession stay, and still show a
-  # backend opening.
-  ChainDB.LedgerEvent.Flavor.V2.LedgerTablesHandleCreate:
-    severity: Silence
-  ChainDB.LedgerEvent.Flavor.V2.LedgerTablesHandleDuplicate:
-    severity: Silence
-  ChainDB.LedgerEvent.Flavor.V2.BackendTrace.LSM.LSMUpdate:
-    severity: Silence
-  ChainDB.LedgerEvent.Forker:
+  # The whole subtree traces per UTxO read, per handle operation or per block
+  # (handle reads alone were 40% of all log lines; the leaf-by-leaf silences
+  # this replaces kept missing spouts like LedgerTablesHandleClose, still the
+  # top producer at 500 voters). Nothing downstream reads any of it: not the
+  # dashboards, not the alloy modules, not the visualizer's query filter.
+  ChainDB.LedgerEvent:
     severity: Silence
   ChainDB.ReplayBlock.LedgerReplay:
     severity: Notice
