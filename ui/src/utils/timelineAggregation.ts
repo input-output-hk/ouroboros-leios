@@ -217,6 +217,12 @@ export const clearReceivedIndex = () => {
   receivedAtIndex.clear();
 };
 
+// Animations only: a real transit on this devnet is 10-20 ms — shorter than
+// one rendered frame — so an accurate travel time makes the dot invisible.
+// Stretch the *displayed* transit to at least this long; counters and stats
+// are unaffected (they never read travel times).
+const MIN_DISPLAY_TRANSIT_S = 0.2;
+
 const createMessageAnimation = (
   result: ISimulationAggregatedDataState,
   messageType: EMessageType,
@@ -229,6 +235,7 @@ const createMessageAnimation = (
   sizeBytes: number,
   extra?: { slot?: number; votes?: IVote[]; numTxs?: number },
 ) => {
+  travelTime = Math.max(travelTime, MIN_DISPLAY_TRANSIT_S);
   const estimatedReceiveTime = sentTime + travelTime;
 
   // Create edge key for consistent lookup
