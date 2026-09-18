@@ -104,7 +104,6 @@ if [ "$TC" = "1" ]; then
   # binds fixed ports).
   : "${IP_HOST:=172.29.0.1}"
   : "${IP_PREFIX:=172.29.0.}"
-  : "${IP_OFFSET:=10}"
 else
   # Use distinct loopback aliases so each node's --host-addr (which
   # ouroboros-network also uses as the source IP for outbound sockets) does
@@ -115,7 +114,6 @@ else
   # range avoids the collision entirely. 127.3/16 leaves proto-devnet's
   # 127.2/16 alone.
   : "${IP_PREFIX:=127.3.0.}"
-  : "${IP_OFFSET:=0}"
 fi
 # X-ray observability (on by default, disable with XRAY=0)
 : "${XRAY:=1}"
@@ -145,32 +143,30 @@ BPS=(bp1 bp2 bp3)
 RELAYS=(relay11 relay12 relay13 relay21 relay22 relay23 relay31 relay32 relay33)
 NODES=("${BPS[@]}" "${RELAYS[@]}")
 
-# The Nth node in NODES gets IP_PREFIX(IP_OFFSET + N).
-#
-# FIXME: Make the addresses mean something. Because NODES is BPS followed by
-# RELAYS, the producers take .11-.13 and the relays .14-.22, so an address says
-# nothing about which producer a relay serves -- relay11 (.14) and relay33
-# (.22) look equally far from bp1 (.11). Group-aligned addressing would read
-# straight off the topology, following proto-devnet's .10/.20/.30 convention:
+# Group-aligned addressing that reads straight off the topology: producer G
+# sits at IP_PREFIX(10 * G) and its relays at IP_PREFIX(10 * G + R):
 #
 #   bp1 .10   relay11 .11   relay12 .12   relay13 .13
 #   bp2 .20   relay21 .21   relay22 .22   relay23 .23
 #   bp3 .30   relay31 .31   relay32 .32   relay33 .33
 #
-# i.e. producer G at (10 * G) and its relays at (10 * G + R), which also makes
-# the visualiser's HOST_PORT_TO_NODE table derivable rather than hand-written
-# (see ui/src/components/Sim/hooks/lokiParsers.ts). Changing this rewrites
-# every node's config and topology.json, so it needs a fresh devnet -- not a
-# restart -- and the UI table has to change in the same commit.
+# The visualiser's HOST_PORT_TO_NODE table
+# (ui/src/components/Sim/hooks/lokiParsers.ts) mirrors this scheme and has to
+# change with it. Addresses land in every node's config and topology.json, so
+# a change takes a re-render of the working dir (RESUME=1 ./run.sh or fresh).
 node_ip() {
-  local name="$1" i=0 n
-  for n in "${NODES[@]}"; do
-    i=$((i + 1))
-    if [ "$n" = "$name" ]; then
-      echo "${IP_PREFIX}$((IP_OFFSET + i))"
-      return 0
-    fi
-  done
+  local name="$1" gr
+  case "$name" in
+  bp[0-9])
+    echo "${IP_PREFIX}$((10 * ${name#bp}))"
+    return 0
+    ;;
+  relay[0-9][0-9])
+    gr="${name#relay}"
+    echo "${IP_PREFIX}$((10 * ${gr:0:1} + ${gr:1:1}))"
+    return 0
+    ;;
+  esac
   echo "unknown node: $name" >&2
   return 1
 }
