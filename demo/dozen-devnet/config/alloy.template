@@ -111,9 +111,25 @@ loki.process "extract_process_compose_logs" {
 	}
 
 	forward_to = [
-		loki.write.loki.receiver,
+		loki.process.raw_residue.receiver,
 		loki.process.leios_route.receiver,
 	]
+}
+
+// The raw copy, reduced to its purpose: the service modules parse each body
+// with drop_malformed, so crash output, RTS messages and sudo prompts survive
+// ONLY here — but every JSON-bodied line from a routed process is written
+// once, enriched, by its module, and duplicating it raw was >90% of Loki
+// ingest at 500 voters (~2.6 MiB/s of 2.9). Keep the raw write for whatever
+// the modules cannot represent.
+loki.process "raw_residue" {
+	stage.match {
+		selector = `{process=~"(bp|relay)[0-9]+|TxFirehose.*|TxCentrifuge"}`
+		stage.drop {
+			expression = "^\\s*\\{"
+		}
+	}
+	forward_to = [loki.write.loki.receiver]
 }
 
 // FRONT-END stage 2 (the router): overwrite `service` from process-compose to the
