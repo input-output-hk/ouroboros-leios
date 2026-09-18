@@ -3,6 +3,11 @@ limits_config:
   allow_structured_metadata: true
   volume_enabled: true
   max_streams_per_user: 100000
+  # The limit the "maximum active stream limit exceeded" 429 actually enforces
+  # (default 5000). Streams are keyed per node by kind/ns/sev plus voterId on
+  # cast votes, so a 500-voter committee sails past the default; alloy then
+  # drops batches after retries and ingestion stalls behind the failing batch.
+  max_global_streams_per_user: 100000
   max_label_names_per_series: 20
   # Raised from the loki default of 500 as leiosCommitteeSize is 900 and the
   # voting dashboard returns a series per seat, or per rbHash on the EB panels.
