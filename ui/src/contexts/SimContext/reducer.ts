@@ -8,6 +8,7 @@ import {
   buildChainAtTime,
   computeAggregatedDataAtTime,
   clearLatencyCache,
+  clearAggregationCache,
   clearReceivedIndex,
   indexReceivedEvents,
 } from "@/utils/timelineAggregation";
@@ -38,6 +39,7 @@ export const reducer = (
         return state;
       }
       clearReceivedIndex();
+      clearAggregationCache();
       return {
         ...state,
         aggregatedData: defaultAggregatedData,
@@ -243,6 +245,7 @@ export const reducer = (
 
     case "RESET_TIMELINE":
       clearReceivedIndex();
+      clearAggregationCache();
       return {
         ...state,
         events: [],
