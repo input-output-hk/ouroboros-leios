@@ -215,6 +215,33 @@ export const indexReceivedEvents = (events: IServerMessage[]) => {
 // Clear alongside the events array (scenario switch, timeline reset).
 export const clearReceivedIndex = () => {
   receivedAtIndex.clear();
+  lastReceivedPruneAt = 0;
+};
+
+// Retention support: the reducer evicts events older than its horizon from
+// the FRONT of the (sorted) events array. Evicted events were already folded,
+// and the monotone accumulators keep their contribution, so the fold cache
+// survives by shifting its cursor; only a cut into the unfolded tail (a
+// playhead further behind live than the horizon) forces a refold of the
+// retained window.
+export const noteEventsEvicted = (count: number) => {
+  if (foldCache === null || count === 0) return;
+  if (count > foldCache.index) {
+    foldCache = null;
+    return;
+  }
+  foldCache.index -= count;
+};
+
+// Drop received-time entries older than the horizon. O(index size), so calls
+// are throttled here rather than trusting the caller.
+let lastReceivedPruneAt = 0;
+export const pruneReceivedIndex = (cutoff: number) => {
+  if (cutoff - lastReceivedPruneAt < 60) return;
+  lastReceivedPruneAt = cutoff;
+  for (const [key, t] of receivedAtIndex) {
+    if (t < cutoff) receivedAtIndex.delete(key);
+  }
 };
 
 const createMessageAnimation = (

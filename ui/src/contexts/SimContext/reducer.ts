@@ -11,7 +11,16 @@ import {
   clearAggregationCache,
   clearReceivedIndex,
   indexReceivedEvents,
+  noteEventsEvicted,
+  pruneReceivedIndex,
 } from "@/utils/timelineAggregation";
+
+// How much history the timeline keeps. Anything older than this behind the
+// newest event is evicted at ingestion: the memory behind events grows without
+// bound on a long-running live devnet otherwise, and the view never needs to
+// show more. Applies to loaded trace files the same way. Scrubbing below the
+// horizon is not possible; aggregate counters still include the evicted past.
+const RETENTION_S = 1800;
 
 export const reducer = (
   state: ISimContextState,
@@ -162,14 +171,29 @@ export const reducer = (
       }
       while (pi < prev.length) merged[mi++] = prev[pi++];
       while (ii < incoming.length) merged[mi++] = incoming[ii++];
-      const newEvents = merged;
 
-      if (newEvents.length === 0) {
+      if (merged.length === 0) {
         return {
           ...state,
-          events: newEvents,
+          events: merged,
         };
       }
+
+      // Evict everything older than the retention horizon behind the newest
+      // event. `merged` is sorted, so the cut point is a binary search and the
+      // eviction a single slice; the aggregation caches are told how many
+      // folded events left the front so their cursors stay aligned.
+      const cutoff = merged[merged.length - 1].time_s - RETENTION_S;
+      let lo = 0;
+      let hi = merged.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (merged[mid].time_s < cutoff) lo = mid + 1;
+        else hi = mid;
+      }
+      const newEvents = lo > 0 ? merged.slice(lo) : merged;
+      noteEventsEvicted(lo);
+      pruneReceivedIndex(cutoff);
 
       // `newEvents` is sorted, so the bounds are its endpoints — O(1), and
       // avoids `Math.min(...timestamps)` overflowing the call stack at large
@@ -177,11 +201,11 @@ export const reducer = (
       const minEventTime = newEvents[0].time_s;
       const maxEventTime = newEvents[newEvents.length - 1].time_s;
 
-      // Update timeline bounds and clamp current time
+      // The horizon moves with the newest event, so minTime only ever grows.
       const newMinTime =
         state.minTime == 0
           ? minEventTime
-          : Math.min(state.minTime, minEventTime);
+          : Math.max(state.minTime, minEventTime);
       const newMaxTime = Math.max(state.maxTime, maxEventTime);
 
       const clampedCurrentTime = Math.max(
