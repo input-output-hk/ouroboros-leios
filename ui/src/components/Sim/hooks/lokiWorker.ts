@@ -55,8 +55,12 @@ const QUERY =
 const POLL_INTERVAL_MS = 1000;
 const MAX_ENTRIES = 5000;
 const NS_PER_SEC = 1_000_000_000n;
-// How far back the first poll reaches (backfill on connect).
-const INITIAL_LOOKBACK_NS = 1800n * NS_PER_SEC;
+// How far back the first poll reaches (backfill on connect). Kept short on
+// purpose: this is a live view, and against a long-running devnet the matched
+// line volume makes deep backfills page for minutes before the view reaches
+// "now" (a 500-seat committee produces ~750 matching lines/s, i.e. a 30min
+// lookback was ~270 pages). History beyond this belongs to Grafana.
+const INITIAL_LOOKBACK_NS = 120n * NS_PER_SEC;
 // Overlap re-scanned each poll so entries ingested late (Alloy scrapes files
 // every 5s) are still picked up; dedup drops the repeats.
 const OVERLAP_NS = 15n * NS_PER_SEC;
