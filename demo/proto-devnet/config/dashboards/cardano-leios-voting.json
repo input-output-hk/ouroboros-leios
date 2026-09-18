@@ -2116,7 +2116,7 @@
       "id": 43,
       "type": "timeseries",
       "title": "Accepted votes per seat",
-      "description": "Accepted vote rate broken out by committee seat. Seats that flatline while others keep voting are the ones to chase. LeiosVoteAcquired fires once per accepted vote rather than once per arrival, so this is a distinct-vote rate and is not inflated by how many peers delivered each vote.\n\nOne series per seat, so narrow it with the seat filter on a large committee. Loki caps how many series a query may return.",
+      "description": "Accepted vote rate broken out by committee seat. Seats that flatline while others keep voting are the ones to chase. LeiosVoteAcquired fires once per accepted vote rather than once per arrival, so this is a distinct-vote rate and is not inflated by how many peers delivered each vote.",
       "datasource": {
         "type": "prometheus",
         "uid": "mimir"
