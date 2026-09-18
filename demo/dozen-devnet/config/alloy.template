@@ -202,6 +202,10 @@ prometheus.scrape "alloy_pipeline_metrics" {
 		"environment" = "leios",
 		"group"       = "dozen-devnet",
 	}]
+	// Keep the pipeline-supplied labels (instance=bp1..., voterId) rather than
+	// renaming them to exported_*: the voting dashboard selects the derived
+	// counters by per-node instance. Target labels still fill in where absent.
+	honor_labels    = true
 	forward_to      = [prometheus.remote_write.prometheus.receiver]
 	scrape_timeout  = "1s"
 	scrape_interval = "1s"
