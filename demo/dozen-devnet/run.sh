@@ -36,6 +36,16 @@ set -a
 # configs, topology, compose files and observability are regenerated, so config
 # edits still take effect. Best effort: see the preflight warnings below.
 : "${RESUME:=0}"
+# Add VOTERS extra committee members: that many freshly generated key sets land
+# in $WORKING_DIR/voters and their pools go into the shelley genesis with a
+# small constant stake, so all of them hold committee seats from epoch 0. Their
+# BLS signing keys are partitioned round-robin into three bundles, and each
+# block producer votes with its own key plus its share — with VOTERS=100 that is
+# 100 extra votes per EB across bp1/bp2/bp3. Exercises the multi-key
+# --shelley-bls-key; needs a node built with key bundle support. Voter keys are
+# part of the genesis, so like it they are preserved on RESUME=1 and the value
+# of VOTERS must not change across a resume.
+: "${VOTERS:=0}"
 # All nodes listen on the same ports; they are told apart by IP address. That
 # keeps the node count out of the port bookkeeping entirely.
 : "${PORT:=3001}"
@@ -371,6 +381,83 @@ if [ "$RESUME" != "1" ]; then
 
   jq --arg time "$startTimeIso" '.systemStart = $time' \
     "$SHARED_CONFIG_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json"
+
+  # Generate the VOTERS extra committee members and put their pools into the
+  # shelley genesis. Each voter is a complete key set; the pool never forges
+  # (nobody runs its VRF/KES), it exists to hold a committee seat whose BLS
+  # key one of the block producers votes with (see the bundle assembly below).
+  if [ "$VOTERS" -gt 0 ]; then
+    VOTERS_DIR="$WORKING_DIR/voters"
+    rm -rf "$VOTERS_DIR"
+    mkdir -p "$VOTERS_DIR"
+    # Enough for a committee seat, negligible against the producers' stake so
+    # leader election and the certification quorum stay with bp1/bp2/bp3.
+    VOTER_STAKE=1000000000
+    MAGIC=$(jq .networkMagic "$WORKING_DIR/genesis/shelley-genesis.json")
+    echo "Generating $VOTERS voter key sets in $VOTERS_DIR"
+    for i in $(seq 1 "$VOTERS"); do
+      d="$VOTERS_DIR/voter$i"
+      mkdir -p "$d"
+      cardano-cli address key-gen \
+        --verification-key-file "$d/payment.vkey" --signing-key-file "$d/payment.skey"
+      cardano-cli dijkstra stake-address key-gen \
+        --verification-key-file "$d/stake.vkey" --signing-key-file "$d/stake.skey"
+      cardano-cli node key-gen \
+        --cold-verification-key-file "$d/cold.vkey" --cold-signing-key-file "$d/cold.skey" \
+        --operational-certificate-issue-counter-file "$d/opcert.counter"
+      cardano-cli node key-gen-VRF \
+        --verification-key-file "$d/vrf.vkey" --signing-key-file "$d/vrf.skey"
+      cardano-cli dijkstra node key-gen-BLS \
+        --verification-key-file "$d/bls.vkey" --signing-key-file "$d/bls.skey"
+      # The BLS proof of possession exists only inside a registration
+      # certificate, so build one offline and fish it out: the PoP is the only
+      # 48-byte string in there (0x5830 = CBOR bytes(48)).
+      cardano-cli dijkstra stake-pool registration-certificate \
+        --cold-verification-key-file "$d/cold.vkey" \
+        --vrf-verification-key-file "$d/vrf.vkey" \
+        --bls-signing-key-file "$d/bls.skey" \
+        --pool-pledge 0 --pool-cost 0 --pool-margin 0 \
+        --pool-reward-account-verification-key-file "$d/stake.vkey" \
+        --pool-owner-stake-verification-key-file "$d/stake.vkey" \
+        --pool-relay-ipv4 127.0.0.1 --pool-relay-port 3001 \
+        --testnet-magic "$MAGIC" \
+        --out-file "$d/pool-reg.cert"
+      pop=$(jq -r .cborHex "$d/pool-reg.cert" | grep -oE '5830[0-9a-f]{96}' || true)
+      if [ "$(grep -c . <<<"$pop")" != 1 ]; then
+        echo "Error: expected exactly one 48-byte string (the BLS PoP) in $d/pool-reg.cert" >&2
+        exit 1
+      fi
+      blsPub=$(jq -r .cborHex "$d/bls.vkey")
+      jq -n \
+        --arg poolId "$(cardano-cli dijkstra stake-pool id --cold-verification-key-file "$d/cold.vkey" --output-hex)" \
+        --arg vrf "$(cardano-cli node key-hash-VRF --verification-key-file "$d/vrf.vkey")" \
+        --arg stakeHash "$(cardano-cli dijkstra stake-address key-hash --stake-verification-key-file "$d/stake.vkey")" \
+        --arg payHash "$(cardano-cli address key-hash --payment-verification-key-file "$d/payment.vkey")" \
+        --arg blsPubKey "${blsPub#5860}" \
+        --arg blsPossessionProof "${pop#5830}" \
+        '$ARGS.named' >"$d/voter.json"
+    done
+    jq -s '.' "$VOTERS_DIR"/voter*/voter.json >"$VOTERS_DIR/voters.json"
+
+    # One pool, one delegation and one funded base address (00 | payment key
+    # hash | stake key hash, testnet) per voter — the stake behind the seat.
+    jq --slurpfile voters "$VOTERS_DIR/voters.json" --argjson stake "$VOTER_STAKE" '
+      reduce $voters[0][] as $v (.;
+        .staking.pools[$v.poolId] =
+          { cost: 0, margin: 0, metadata: null, owners: [], pledge: 0
+          , publicKey: $v.poolId, relays: []
+          , rewardAccount: {credential: {keyHash: $v.stakeHash}, network: "Testnet"}
+          , vrf: $v.vrf
+          , blsKey: {blsPubKey: $v.blsPubKey, blsPossessionProof: $v.blsPossessionProof}
+          }
+        | .staking.stake[$v.stakeHash] = $v.poolId
+        | .initialFunds["00" + $v.payHash + $v.stakeHash] = $stake)
+      # The stock initialFunds already add up to exactly maxLovelaceSupply, so
+      # grow the supply by what the voters bring or the reserves go negative.
+      | .maxLovelaceSupply += $stake * ($voters[0] | length)
+    ' "$WORKING_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json.tmp"
+    mv "$WORKING_DIR/genesis/shelley-genesis.json.tmp" "$WORKING_DIR/genesis/shelley-genesis.json"
+  fi
 fi
 
 # Set up each node
@@ -423,6 +510,29 @@ for NODE_NAME in "${NODES[@]}"; do
       cp -r "$SHARED_CONFIG_DIR/pools-keys/pool${NODE_NAME#bp}" "$NODE_DIR/keys"
       chmod 400 "$NODE_DIR/keys"/*.skey
     fi
+    # The BLS key is settled after the copy (and again on resume) so changing
+    # VOTERS between fresh runs always converges to the requested layout. With
+    # voters, bp N votes with its own key plus every third voter's (bp1 gets
+    # voters 1,4,7,…) — the bundle is a JSON array of key envelopes, which
+    # --shelley-bls-key accepts in place of a single one.
+    rm -f "$NODE_DIR/keys/bls.skey"
+    if [ "$VOTERS" -gt 0 ]; then
+      if [ ! -d "$WORKING_DIR/voters" ]; then
+        echo "Error: VOTERS=$VOTERS but $WORKING_DIR/voters is missing (a resume" >&2
+        echo "       of a working dir that was initialized without voters?)." >&2
+        exit 1
+      fi
+      n="${NODE_NAME#bp}"
+      voter_keys=()
+      for i in $(seq "$n" 3 "$VOTERS"); do
+        voter_keys+=("$WORKING_DIR/voters/voter$i/bls.skey")
+      done
+      jq -s '.' "$SHARED_CONFIG_DIR/pools-keys/pool${n}/bls.skey" "${voter_keys[@]}" \
+        >"$NODE_DIR/keys/bls.skey"
+    else
+      cp "$SHARED_CONFIG_DIR/pools-keys/pool${NODE_NAME#bp}/bls.skey" "$NODE_DIR/keys/bls.skey"
+    fi
+    chmod 400 "$NODE_DIR/keys/bls.skey"
     ;;
   esac
 done
