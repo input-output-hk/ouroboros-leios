@@ -433,19 +433,25 @@ if [ "$RESUME" != "1" ]; then
         --pool-relay-ipv4 127.0.0.1 --pool-relay-port 3001 \
         --testnet-magic "$MAGIC" \
         --out-file "$d/pool-reg.cert"
-      pop=$(jq -r .cborHex "$d/pool-reg.cert" | grep -oE '5830[0-9a-f]{96}' || true)
-      if [ "$(grep -c . <<<"$pop")" != 1 ]; then
-        echo "Error: expected exactly one 48-byte string (the BLS PoP) in $d/pool-reg.cert" >&2
+      # The PoP is the 48-byte string right after the pubkey in the cert
+      # (5860 <pubkey> 5830 <pop>). Anchor on the known pubkey: a bare
+      # `5830[0-9a-f]{96}` also matches byte sequences inside other fields
+      # (about once every ~200 certs, at arbitrary hex offsets).
+      blsPub=$(jq -r .cborHex "$d/bls.vkey")
+      blsPub=${blsPub#5860}
+      pop=$(jq -r .cborHex "$d/pool-reg.cert" | grep -oE "5860${blsPub}5830[0-9a-f]{96}" || true)
+      if [ -z "$pop" ]; then
+        echo "Error: did not find the BLS pubkey followed by its PoP in $d/pool-reg.cert" >&2
         exit 1
       fi
-      blsPub=$(jq -r .cborHex "$d/bls.vkey")
+      pop=${pop: -96}
       jq -n \
         --arg poolId "$(cardano-cli dijkstra stake-pool id --cold-verification-key-file "$d/cold.vkey" --output-hex)" \
         --arg vrf "$(cardano-cli node key-hash-VRF --verification-key-file "$d/vrf.vkey")" \
         --arg stakeHash "$(cardano-cli dijkstra stake-address key-hash --stake-verification-key-file "$d/stake.vkey")" \
         --arg payHash "$(cardano-cli address key-hash --payment-verification-key-file "$d/payment.vkey")" \
-        --arg blsPubKey "${blsPub#5860}" \
-        --arg blsPossessionProof "${pop#5830}" \
+        --arg blsPubKey "$blsPub" \
+        --arg blsPossessionProof "$pop" \
         '$ARGS.named' >"$d/voter.json"
     done
     jq -s '.' "$VOTERS_DIR"/voter*/voter.json >"$VOTERS_DIR/voters.json"
