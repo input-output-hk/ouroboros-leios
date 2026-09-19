@@ -48,7 +48,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
       "id": 1,
       "options": {
-        "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "legend": { "calcs": ["last", "mean"], "displayMode": "table", "placement": "right", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
@@ -100,7 +100,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
       "id": 2,
       "options": {
-        "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "legend": { "calcs": ["last", "mean"], "displayMode": "table", "placement": "right", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
@@ -149,7 +149,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
       "id": 3,
       "options": {
-        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "legend": { "calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
@@ -192,7 +192,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
       "id": 4,
       "options": {
-        "legend": { "calcs": ["mean", "min", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "legend": { "calcs": ["last", "mean", "min", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
@@ -222,19 +222,27 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "mimir" },
-      "description": "Bodies a node still wants against offers its peers have advertised, per node. Read them together: missing bodies rising while offers stay flat is diffusion failing to reach that node, missing bodies rising with offers is its scheduler falling behind. Narrow with the instance variable.\n\nEach node carries its own view of this, so the series are per node rather than a fleet total.\n\nThe gauges expire five minutes after a node stops reporting fetch decisions, so a gap means its pipeline went quiet rather than a value holding steady. During a load generator idle period that is every node at once.",
+      "description": "Bodies a node still wants against offers its peers have advertised, per node. Read them together: missing bodies rising while offers stay flat is diffusion failing to reach that node, missing bodies rising with offers is its scheduler falling behind. Narrow with the instance variable.\n\nEach node carries its own view of this, so the series are per node rather than a fleet total.\n\nEBs tracked is context for how much work is queued rather than part of that comparison, and it runs orders of magnitude above the pair, so it is drawn unfilled and thin to keep the two readable. It also must not be stacked with them: a body can only be missing for an EB that is tracked, so missing bodies is a subset of tracked and stacking nested series counts the same EBs twice.\n\nThe gauges expire five minutes after a node stops reporting fetch decisions, so a gap means its pipeline went quiet rather than a value holding steady. During a load generator idle period that is every node at once.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic-by-name" },
           "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*EBs tracked" },
+            "properties": [
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "custom.lineWidth", "value": 1 }
+            ]
+          }
+        ]
       },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
       "id": 10,
       "options": {
-        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "legend": { "calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
@@ -274,7 +282,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
       "id": 11,
       "options": {
-        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "legend": { "calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
@@ -308,7 +316,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
       "id": 12,
       "options": {
-        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "legend": { "calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
@@ -348,7 +356,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
       "id": 13,
       "options": {
-        "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "legend": { "calcs": ["last", "mean"], "displayMode": "table", "placement": "right", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
@@ -485,7 +493,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 35 },
       "id": 22,
       "options": {
-        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "legend": { "calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
@@ -528,7 +536,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 43 },
       "id": 23,
       "options": {
-        "legend": { "calcs": ["mean", "min"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "legend": { "calcs": ["last", "mean", "min"], "displayMode": "table", "placement": "right", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
@@ -584,7 +592,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 43 },
       "id": 24,
       "options": {
-        "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "legend": { "calcs": ["last", "mean"], "displayMode": "table", "placement": "right", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
@@ -632,7 +640,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 52 },
       "id": 30,
       "options": {
-        "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "legend": { "calcs": ["last", "mean"], "displayMode": "table", "placement": "right", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
@@ -667,7 +675,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 52 },
       "id": 31,
       "options": {
-        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "legend": { "calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
@@ -682,8 +690,148 @@
       "type": "timeseries"
     },
     {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 76 },
+      "id": 450,
+      "panels": [],
+      "title": "Diffusion timing — when the body and its tx closure actually landed",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "How long diffusion took, from the EB's slot to the moment the node had the data. Body is the EB body download completing; closure is the last referenced transaction arriving, so it is never earlier than the body. The gap between the two curves is what the tx fetch path costs on top of the body.\n\nBoth kinds report the latency already computed, as bodyAgeSeconds and closureAgeSeconds, so these are histograms over a reported field rather than a timestamp join across streams.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 77 },
+      "id": 45,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(leios_logmetrics_diffusion_body_age_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "body p50",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "histogram_quantile(0.9, sum by (le) (rate(leios_logmetrics_diffusion_body_age_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "body p90",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(leios_logmetrics_diffusion_body_age_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "body p99",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(leios_logmetrics_diffusion_closure_age_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "closure p50",
+          "refId": "D"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "histogram_quantile(0.9, sum by (le) (rate(leios_logmetrics_diffusion_closure_age_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "closure p90",
+          "refId": "E"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(leios_logmetrics_diffusion_closure_age_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "closure p99",
+          "refId": "F"
+        }
+      ],
+      "title": "EB body and tx closure age percentiles",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "description": "Share of tx closures complete within each age, read straight off the histogram buckets rather than from a quantile, so it answers how often diffusion beat a deadline rather than where the median sits.\n\nA closure arriving late is a vote not cast, so a falling 2s or 3s share is the shape to watch. Thresholds are bucket boundaries, matched on le as an exact string. alloy renders a whole-number bound with its decimal, so the bound 2.0 is le=\"2.0\" and le=\"2\" would match nothing and plot an empty series. Changing a threshold means changing the buckets in leios_diffusion_process and writing the bound here the same way it appears there.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "max": 1,
+          "min": 0,
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 77 },
+      "id": 46,
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "min"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_closure_age_seconds_bucket{instance=~\"$instance\", le=\"1.5\"}[$__rate_interval])) / sum(rate(leios_logmetrics_diffusion_closure_age_seconds_count{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "within 1.5s",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_closure_age_seconds_bucket{instance=~\"$instance\", le=\"2.0\"}[$__rate_interval])) / sum(rate(leios_logmetrics_diffusion_closure_age_seconds_count{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "within 2s",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_closure_age_seconds_bucket{instance=~\"$instance\", le=\"3.0\"}[$__rate_interval])) / sum(rate(leios_logmetrics_diffusion_closure_age_seconds_count{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "within 3s",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir" },
+          "expr": "sum(rate(leios_logmetrics_diffusion_closure_age_seconds_bucket{instance=~\"$instance\", le=\"5.0\"}[$__rate_interval])) / sum(rate(leios_logmetrics_diffusion_closure_age_seconds_count{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "within 5s",
+          "refId": "D"
+        }
+      ],
+      "title": "Tx closure complete within deadline",
+      "type": "timeseries"
+    },
+    {"datasource":{"type":"prometheus","uid":"mimir"},"description":"How long an EB announcement takes to reach a node, from the announcementAgeSeconds the receiver records. Per-node percentiles then averaged, so one busy node cannot dominate the line — the same reading the retired Loki panel gave, from a histogram that survives Loki retention.\n\nLate announcements convert directly into chainTipDoesNotAnnounce declines, so this is the leading indicator for that reason code on the voting dashboard.","fieldConfig":{"defaults":{"color":{"mode":"palette-classic-by-name"},"custom":{"drawStyle":"line","fillOpacity":0,"lineWidth":2,"showPoints":"never"},"unit":"s"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":0,"y":60},"id":47,"options":{"legend":{"calcs":["last","mean","max"],"displayMode":"table","placement":"right","showLegend":true},"tooltip":{"mode":"multi","sort":"desc"}},"targets":[{"datasource":{"type":"prometheus","uid":"mimir"},"expr":"avg(histogram_quantile(0.5, sum by (le, instance) (rate(leios_logmetrics_diffusion_announcement_age_seconds_bucket{instance=~\"$instance\"}[$__rate_interval]))))","legendFormat":"p50","refId":"A"},{"datasource":{"type":"prometheus","uid":"mimir"},"expr":"avg(histogram_quantile(0.9, sum by (le, instance) (rate(leios_logmetrics_diffusion_announcement_age_seconds_bucket{instance=~\"$instance\"}[$__rate_interval]))))","legendFormat":"p90","refId":"B"},{"datasource":{"type":"prometheus","uid":"mimir"},"expr":"avg(histogram_quantile(0.99, sum by (le, instance) (rate(leios_logmetrics_diffusion_announcement_age_seconds_bucket{instance=~\"$instance\"}[$__rate_interval]))))","legendFormat":"p99","refId":"C"}],"title":"Announcement age, mean of per-node percentiles","type":"timeseries"},
+    {"id":49,"type":"timeseries","title":"EB announcement delay CDF","description":"Fraction of EB announcements arriving within each bucket. Late announcements convert directly into chainTipDoesNotAnnounce declines, since a voter whose tip has not adopted the announcing RB cannot vote when its window opens. Read the low buckets against lVoteWindowSlots for the network in question.","datasource":{"type":"prometheus","uid":"mimir"},"gridPos":{"h":8,"w":12,"x":12,"y":60},"targets":[{"refId":"A","datasource":{"type":"prometheus","uid":"mimir"},"expr":"avg by (bucket) (label_replace({__name__=~\"cardano_node_metrics_leios_eb_announcement_delay_cdf.*ms_real\", instance=~\"$instance\"}, \"bucket\", \"$1\", \"__name__\", \"cardano_node_metrics_leios_eb_announcement_delay_cdf(.*)ms_real\"))","legendFormat":"{{bucket}}ms"}],"options":{"legend":{"displayMode":"table","placement":"right","showLegend":true,"calcs":["last"],"sortBy":"Last *","sortDesc":false},"tooltip":{"mode":"multi","sort":"desc"}},"fieldConfig":{"defaults":{"unit":"percentunit","min":0,"max":1,"custom":{"drawStyle":"line","lineWidth":1,"fillOpacity":0,"showPoints":"never","spanNulls":true}},"overrides":[]}},
+    {"id":52,"type":"timeseries","title":"Late EB announcements","description":"Rate of announcements the node considered late, per minute. Pairs with the CDF above: the CDF says how bad the tail is, this says how often it bites. Grafana shows a PromQL lint info here which is expected, due to the cardano-node _counter suffix convention rather than _total.","datasource":{"type":"prometheus","uid":"mimir"},"gridPos":{"h":8,"w":12,"x":0,"y":68},"targets":[{"refId":"A","datasource":{"type":"prometheus","uid":"mimir"},"expr":"sum by (instance) (rate(cardano_node_metrics_leios_eb_announcement_late_counter{instance=~\"$instance\"}[$__rate_interval])) * 60","legendFormat":"{{instance}}"}],"options":{"legend":{"displayMode":"table","placement":"right","showLegend":true,"calcs":["last","mean","max"]},"tooltip":{"mode":"multi","sort":"desc"}},"fieldConfig":{"defaults":{"unit":"cpm","decimals":2,"custom":{"drawStyle":"line","lineWidth":1,"fillOpacity":10,"showPoints":"never","spanNulls":false}},"overrides":[]}},
+    {"id":53,"type":"table","title":"EB announcement age by producer","description":"How long each producing pool EB announcements take to reach our nodes, from the announcementAgeSeconds field the receiving node records. This is the one view here that measures other operators directly rather than inferring them from votes. A pool whose median sits beyond the vote window cannot have its EBs voted on in time no matter what we do, so a high value here is that operator problem, not ours. Sorted slowest first. The trace count is one line per receiving node rather than per EB, so it scales with how many nodes are reporting and is a relative volume indicator, not an EB count. Live diffusion only: chain-sync discoveries are minutes old by nature and are excluded.","datasource":{"type":"loki","uid":"loki"},"gridPos":{"h":8,"w":12,"x":12,"y":68},"targets":[{"refId":"p50","datasource":{"type":"loki","uid":"loki"},"queryType":"instant","format":"table","expr":"quantile_over_time(0.5, {kind=\"LeiosAnnouncementAccepted\", instance=~\"$instance\"} | json pool=\"electionPool\",age=\"announcementAgeSeconds\",src=\"source\" | src=\"receivedViaLeiosNotify\" | unwrap age [$__range]) by (pool)"},{"refId":"p90","datasource":{"type":"loki","uid":"loki"},"queryType":"instant","format":"table","expr":"quantile_over_time(0.9, {kind=\"LeiosAnnouncementAccepted\", instance=~\"$instance\"} | json pool=\"electionPool\",age=\"announcementAgeSeconds\",src=\"source\" | src=\"receivedViaLeiosNotify\" | unwrap age [$__range]) by (pool)"},{"refId":"seen","datasource":{"type":"loki","uid":"loki"},"queryType":"instant","format":"table","expr":"sum by (pool) (count_over_time({kind=\"LeiosAnnouncementAccepted\", instance=~\"$instance\"} | json pool=\"electionPool\",src=\"source\" | src=\"receivedViaLeiosNotify\" [$__range]))"}],"transformations":[{"id":"joinByField","options":{"byField":"pool","mode":"outer"}},{"id":"organize","options":{"renameByName":{"pool":"producer pool","Value #p50":"median age","Value #p90":"p90 age","Value #seen":"announcement traces"},"excludeByName":{"Time":true,"Time 1":true,"Time 2":true,"Time 3":true},"indexByName":{"pool":0,"Value #p50":1,"Value #p90":2,"Value #seen":3}}},{"id":"sortBy","options":{"fields":{},"sort":[{"field":"median age","desc":true}]}}],"options":{"showHeader":true,"cellHeight":"sm"},"fieldConfig":{"defaults":{"custom":{"align":"auto","filterable":true}},"overrides":[{"matcher":{"id":"byName","options":"median age"},"properties":[{"id":"unit","value":"s"},{"id":"decimals","value":2},{"id":"custom.cellOptions","value":{"type":"color-background","mode":"gradient"}},{"id":"thresholds","value":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"orange","value":1},{"color":"red","value":2}]}}]},{"matcher":{"id":"byName","options":"p90 age"},"properties":[{"id":"unit","value":"s"},{"id":"decimals","value":2}]},{"matcher":{"id":"byName","options":"announcement traces"},"properties":[{"id":"decimals","value":0},{"id":"custom.width","value":150}]}]}},
+    {"datasource":{"type":"prometheus","uid":"mimir"},"description":"The largest age actually observed, which the histograms cannot report: histogram_quantile is capped at the top finite bucket, so an outlier beyond it reads as that bound and disappears. These gauges carry the last observed value per node, so max_over_time recovers a real peak.\n\nThey sample rather than record: these kinds arrive at a rate comparable to the scrape interval, so a given spike can fall between scrapes. Read them for tail behaviour over a window, not as a guarantee about any single EB.","fieldConfig":{"defaults":{"color":{"mode":"palette-classic-by-name"},"custom":{"drawStyle":"line","fillOpacity":0,"lineWidth":2,"showPoints":"never"},"unit":"s"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":0,"y":85},"id":48,"options":{"legend":{"calcs":["last","mean","max"],"displayMode":"table","placement":"right","showLegend":true},"tooltip":{"mode":"multi","sort":"desc"}},"targets":[{"datasource":{"type":"prometheus","uid":"mimir"},"expr":"max(max_over_time(leios_logmetrics_diffusion_announcement_age_last_seconds{instance=~\"$instance\"}[$__interval]))","legendFormat":"announcement peak","refId":"A"},{"datasource":{"type":"prometheus","uid":"mimir"},"expr":"max(max_over_time(leios_logmetrics_diffusion_body_age_last_seconds{instance=~\"$instance\"}[$__interval]))","legendFormat":"body peak","refId":"B"},{"datasource":{"type":"prometheus","uid":"mimir"},"expr":"max(max_over_time(leios_logmetrics_diffusion_closure_age_last_seconds{instance=~\"$instance\"}[$__interval]))","legendFormat":"closure peak","refId":"C"}],"title":"Peak age reached — true maxima from the last-value gauges","type":"timeseries"},
+    {"id":54,"type":"heatmap","title":"Tx closure age distribution","description":"Every closure completion bucketed, rather than reduced to percentiles. This is the panel that shows shape: percentile lines average away a split population, so a fleet where local peers land fast and remote ones land slow reads as one healthy middle. Two bands here and a p50 sitting between them is that case.\n\nClosure rather than body because closure is what gates a vote: the body alone is not enough to validate an EB.\n\nCell values are observations per second rather than counts, because the buckets are read as a rate and differenced against the bucket below. Multiply by 60 for closures per minute, so 0.0167 is one per minute. A small decimal is expected and is not a sign of missing data.","datasource":{"type":"prometheus","uid":"mimir"},"gridPos":{"h":8,"w":12,"x":12,"y":85},"targets":[{"refId":"A","datasource":{"type":"prometheus","uid":"mimir"},"expr":"sum by (le) (rate(leios_logmetrics_diffusion_closure_age_seconds_bucket{instance=~\"$instance\"}[$__rate_interval]))","format":"heatmap","legendFormat":"{{le}}"}],"options":{"calculate":false,"cellGap":1,"color":{"mode":"scheme","scheme":"Turbo","steps":64,"reverse":false},"yAxis":{"unit":"s","decimals":2},"legend":{"show":true},"tooltip":{"mode":"single","yHistogram":true}},"fieldConfig":{"defaults":{},"overrides":[]}},
+    {
       "collapsed": true,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 60 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 93 },
       "id": 500,
       "panels": [
         {
