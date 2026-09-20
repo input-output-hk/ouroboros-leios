@@ -5,6 +5,32 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w38 - 2026-09-20
+
+Continues the LeiosDb work from w35 with a proper single-writer redesign, sizes the mempool from the protocol parameters, and lets a producer vote with more than one BLS key at once.
+
+> [!IMPORTANT]
+>
+> **Requires a state wipe:** the LeiosDb is now two partitions under new names, so the old `leios.db` is not picked up and a chain that already holds certified blocks dies on the missing closures (`resolveAndApplyLeiosClosure: failed to resolve closure LeiosClosureMissing`). Delete the chain database along with the old `leios.db` and re-sync from genesis, or sideload from the IOG relays.
+
+> [!NOTE]
+>
+> No serialization or wire-format change, so this is not a network respin — only the local state has to go.
+
+- LeiosDb improvements: separate volatile and immutable partitions [consensus#2261](https://github.com/IntersectMBO/ouroboros-consensus/pull/2261) and all writes are done on a single connection [consensus#2298](https://github.com/IntersectMBO/ouroboros-consensus/pull/2298)
+  - `LeiosDbConfig` with `Backend: SQLite` no longer takes any paths: each partition now follows the node's own database path the way the VolatileDB and ImmutableDB do, so a `Filepath`/`VolatileFilepath`/`ImmutableFilepath` key is ignored if given.
+    - `leios.vol.db` lands next to `volatile/`, `leios.imm.db` next to `immutable/`.
+    - With a single `--database-path` both sit in that directory. With `--immutable-database-path` and `--volatile-database-path` they follow their own volume, so the partition that only grows stays off the performant one.
+  - `volatileEbs`/`immutableEbs`/`walBytes` are exposed as node metrics.
+  - Removes the writer-lock contention that could previously stall or even kill the node under load.
+
+- The mempool is now sized from the protocol parameters, including the endorser block limits [consensus#2280](https://github.com/IntersectMBO/ouroboros-consensus/pull/2280)
+  - Any `MempoolCapacityBytesOverride` in the configuration file can be dropped; it was only needed to stop the mempool bounding endorser block fill.
+
+- A producer can vote with more than one BLS key at once
+  - `--shelley-bls-key` now also accepts a file holding a JSON array of key envelopes, in addition to a single one; the node casts one vote per committee seat any of the keys holds.
+  - Lets a rotation pair keep a pool voting across the epoch boundary where its key was rotated — only the currently-registered key matches a seat, so the old key alone would go dark there. Further lets a bundle of many pools' keys vote for every seat they collectively hold, useful for load-testing with many synthetic committee members.
+
 ## prototype-2026w36 - 2026-09-06
 
 Adds Leios protocol parameters, selects the Leios committee at the epoch boundary, with voting keys that expire and need to be rotated (like KES keys). Plus, a forge loop that no longer blocks unboundedly on the mempool, and a corrected BLS proof of possession.
