@@ -530,7 +530,7 @@ for NODE_NAME in "${NODES[@]}"; do
     # voters, bp N votes with its own key plus every third voter's (bp1 gets
     # voters 1,4,7,…) — the bundle is a JSON array of key envelopes, which
     # --shelley-bls-key accepts in place of a single one.
-    actualVoters=$(find "$WORKING_DIR/voters" -maxdepth 1 -name 'voter[0-9]*' -type d 2>/dev/null | wc -l)
+    actualVoters=$({ find "$WORKING_DIR/voters" -maxdepth 1 -name 'voter[0-9]*' -type d 2>/dev/null || true; } | wc -l)
     if [ "$VOTERS" -gt 0 ] && [ "$VOTERS" != "$actualVoters" ]; then
       echo "Warning: VOTERS=$VOTERS but $WORKING_DIR/voters holds $actualVoters" >&2
       echo "         voter key sets; the genesis is fixed, using the $actualVoters." >&2
