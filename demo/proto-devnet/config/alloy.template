@@ -127,9 +127,25 @@ loki.process "extract_process_compose_logs" {
 	}
 
 	forward_to = [
-		loki.write.loki.receiver,
+		loki.process.raw_residue.receiver,
 		loki.process.leios_route.receiver,
 	]
+}
+
+// The raw copy, reduced to its purpose: the service modules parse each body
+// with drop_malformed, so crash output, RTS messages and sudo prompts survive
+// ONLY here — but every JSON-bodied line from a routed process is written
+// once, enriched, by its module, and duplicating it raw was >90% of Loki
+// ingest at 500 voters (~2.6 MiB/s of 2.9). Keep the raw write for whatever
+// the modules cannot represent.
+loki.process "raw_residue" {
+	stage.match {
+		selector = `{process=~"(bp|relay)[0-9]+|Node[0-9]+|TxFirehose.*|TxCentrifuge"}`
+		stage.drop {
+			expression = "^\\s*\\{"
+		}
+	}
+	forward_to = [loki.write.loki.receiver]
 }
 
 // FRONT-END stage 2 (the router): overwrite `service` from process-compose to the
@@ -226,6 +242,10 @@ prometheus.scrape "alloy_pipeline_metrics" {
 		"environment" = "leios",
 		"group"       = "proto-devnet",
 	}]
+	// Keep the pipeline-supplied labels (instance=bp1..., voterId) rather than
+	// renaming them to exported_*: the voting dashboard selects the derived
+	// counters by per-node instance. Target labels still fill in where absent.
+	honor_labels    = true
 	forward_to      = [prometheus.remote_write.prometheus.receiver]
 	scrape_timeout  = "1s"
 	scrape_interval = "1s"

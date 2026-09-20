@@ -36,6 +36,17 @@ set -a
 # configs, topology, compose files and observability are regenerated, so config
 # edits still take effect. Best effort: see the preflight warnings below.
 : "${RESUME:=0}"
+# Add VOTERS extra committee members: that many freshly generated key sets land
+# in $WORKING_DIR/voters and their pools go into the shelley genesis holding
+# 10% of the delegated stake in equal parts (the producers keep 90%), so all
+# of them hold weighted committee seats from epoch 0. Their
+# BLS signing keys are partitioned round-robin into three bundles, and each
+# block producer votes with its own key plus its share — with VOTERS=100 that is
+# 100 extra votes per EB across bp1/bp2/bp3. Exercises the multi-key
+# --shelley-bls-key; needs a node built with key bundle support. Voter keys are
+# part of the genesis, so like it they are preserved on RESUME=1 and the value
+# of VOTERS must not change across a resume.
+: "${VOTERS:=0}"
 # All nodes listen on the same ports; they are told apart by IP address. That
 # keeps the node count out of the port bookkeeping entirely.
 : "${PORT:=3001}"
@@ -93,7 +104,6 @@ if [ "$TC" = "1" ]; then
   # binds fixed ports).
   : "${IP_HOST:=172.29.0.1}"
   : "${IP_PREFIX:=172.29.0.}"
-  : "${IP_OFFSET:=10}"
 else
   # Use distinct loopback aliases so each node's --host-addr (which
   # ouroboros-network also uses as the source IP for outbound sockets) does
@@ -104,7 +114,6 @@ else
   # range avoids the collision entirely. 127.3/16 leaves proto-devnet's
   # 127.2/16 alone.
   : "${IP_PREFIX:=127.3.0.}"
-  : "${IP_OFFSET:=0}"
 fi
 # X-ray observability (on by default, disable with XRAY=0)
 : "${XRAY:=1}"
@@ -134,32 +143,30 @@ BPS=(bp1 bp2 bp3)
 RELAYS=(relay11 relay12 relay13 relay21 relay22 relay23 relay31 relay32 relay33)
 NODES=("${BPS[@]}" "${RELAYS[@]}")
 
-# The Nth node in NODES gets IP_PREFIX(IP_OFFSET + N).
-#
-# FIXME: Make the addresses mean something. Because NODES is BPS followed by
-# RELAYS, the producers take .11-.13 and the relays .14-.22, so an address says
-# nothing about which producer a relay serves -- relay11 (.14) and relay33
-# (.22) look equally far from bp1 (.11). Group-aligned addressing would read
-# straight off the topology, following proto-devnet's .10/.20/.30 convention:
+# Group-aligned addressing that reads straight off the topology: producer G
+# sits at IP_PREFIX(10 * G) and its relays at IP_PREFIX(10 * G + R):
 #
 #   bp1 .10   relay11 .11   relay12 .12   relay13 .13
 #   bp2 .20   relay21 .21   relay22 .22   relay23 .23
 #   bp3 .30   relay31 .31   relay32 .32   relay33 .33
 #
-# i.e. producer G at (10 * G) and its relays at (10 * G + R), which also makes
-# the visualiser's HOST_PORT_TO_NODE table derivable rather than hand-written
-# (see ui/src/components/Sim/hooks/lokiParsers.ts). Changing this rewrites
-# every node's config and topology.json, so it needs a fresh devnet -- not a
-# restart -- and the UI table has to change in the same commit.
+# The visualiser's HOST_PORT_TO_NODE table
+# (ui/src/components/Sim/hooks/lokiParsers.ts) mirrors this scheme and has to
+# change with it. Addresses land in every node's config and topology.json, so
+# a change takes a re-render of the working dir (RESUME=1 ./run.sh or fresh).
 node_ip() {
-  local name="$1" i=0 n
-  for n in "${NODES[@]}"; do
-    i=$((i + 1))
-    if [ "$n" = "$name" ]; then
-      echo "${IP_PREFIX}$((IP_OFFSET + i))"
-      return 0
-    fi
-  done
+  local name="$1" gr
+  case "$name" in
+  bp[0-9])
+    echo "${IP_PREFIX}$((10 * ${name#bp}))"
+    return 0
+    ;;
+  relay[0-9][0-9])
+    gr="${name#relay}"
+    echo "${IP_PREFIX}$((10 * ${gr:0:1} + ${gr:1:1}))"
+    return 0
+    ;;
+  esac
   echo "unknown node: $name" >&2
   return 1
 }
@@ -371,6 +378,99 @@ if [ "$RESUME" != "1" ]; then
 
   jq --arg time "$startTimeIso" '.systemStart = $time' \
     "$SHARED_CONFIG_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json"
+
+  # Generate the VOTERS extra committee members and put their pools into the
+  # shelley genesis. Each voter is a complete key set; the pool never forges
+  # (nobody runs its VRF/KES), it exists to hold a committee seat whose BLS
+  # key one of the block producers votes with (see the bundle assembly below).
+  if [ "$VOTERS" -gt 0 ]; then
+    VOTERS_DIR="$WORKING_DIR/voters"
+    rm -rf "$VOTERS_DIR"
+    mkdir -p "$VOTERS_DIR"
+    # 90/10 stake split: the producers keep what they have, and the voters
+    # together get one ninth of it — 10% of the resulting total — in equal
+    # parts, so committee seat weights are real and the vote tally climbs in
+    # ~(10/VOTERS)% steps instead of thirds (smoother CDFs on the voting
+    # dashboard). Certification stays with bp1/bp2/bp3 (90% > the 0.75
+    # quorum), but their pools never forge, so ~10% of leader slots go empty.
+    # Delegated stake = the initialFunds whose address (00 | payment | stake)
+    # carries a stake key hash that staking.stake delegates.
+    delegatedStake=$(jq '
+      .staking.stake as $delegs
+      | [.initialFunds | to_entries[] | select($delegs[.key[58:114]]) | .value]
+      | add' "$WORKING_DIR/genesis/shelley-genesis.json")
+    VOTER_STAKE=$((delegatedStake / 9 / VOTERS))
+    MAGIC=$(jq .networkMagic "$WORKING_DIR/genesis/shelley-genesis.json")
+    echo "Generating $VOTERS voter key sets in $VOTERS_DIR"
+    for i in $(seq 1 "$VOTERS"); do
+      d="$VOTERS_DIR/voter$i"
+      mkdir -p "$d"
+      cardano-cli address key-gen \
+        --verification-key-file "$d/payment.vkey" --signing-key-file "$d/payment.skey"
+      cardano-cli dijkstra stake-address key-gen \
+        --verification-key-file "$d/stake.vkey" --signing-key-file "$d/stake.skey"
+      cardano-cli node key-gen \
+        --cold-verification-key-file "$d/cold.vkey" --cold-signing-key-file "$d/cold.skey" \
+        --operational-certificate-issue-counter-file "$d/opcert.counter"
+      cardano-cli node key-gen-VRF \
+        --verification-key-file "$d/vrf.vkey" --signing-key-file "$d/vrf.skey"
+      cardano-cli dijkstra node key-gen-BLS \
+        --verification-key-file "$d/bls.vkey" --signing-key-file "$d/bls.skey"
+      # The BLS proof of possession exists only inside a registration
+      # certificate, so build one offline and fish it out: the PoP is the only
+      # 48-byte string in there (0x5830 = CBOR bytes(48)).
+      cardano-cli dijkstra stake-pool registration-certificate \
+        --cold-verification-key-file "$d/cold.vkey" \
+        --vrf-verification-key-file "$d/vrf.vkey" \
+        --bls-signing-key-file "$d/bls.skey" \
+        --pool-pledge 0 --pool-cost 0 --pool-margin 0 \
+        --pool-reward-account-verification-key-file "$d/stake.vkey" \
+        --pool-owner-stake-verification-key-file "$d/stake.vkey" \
+        --pool-relay-ipv4 127.0.0.1 --pool-relay-port 3001 \
+        --testnet-magic "$MAGIC" \
+        --out-file "$d/pool-reg.cert"
+      # The PoP is the 48-byte string right after the pubkey in the cert
+      # (5860 <pubkey> 5830 <pop>). Anchor on the known pubkey: a bare
+      # `5830[0-9a-f]{96}` also matches byte sequences inside other fields
+      # (about once every ~200 certs, at arbitrary hex offsets).
+      blsPub=$(jq -r .cborHex "$d/bls.vkey")
+      blsPub=${blsPub#5860}
+      pop=$(jq -r .cborHex "$d/pool-reg.cert" | grep -oE "5860${blsPub}5830[0-9a-f]{96}" || true)
+      if [ -z "$pop" ]; then
+        echo "Error: did not find the BLS pubkey followed by its PoP in $d/pool-reg.cert" >&2
+        exit 1
+      fi
+      pop=${pop: -96}
+      jq -n \
+        --arg poolId "$(cardano-cli dijkstra stake-pool id --cold-verification-key-file "$d/cold.vkey" --output-hex)" \
+        --arg vrf "$(cardano-cli node key-hash-VRF --verification-key-file "$d/vrf.vkey")" \
+        --arg stakeHash "$(cardano-cli dijkstra stake-address key-hash --stake-verification-key-file "$d/stake.vkey")" \
+        --arg payHash "$(cardano-cli address key-hash --payment-verification-key-file "$d/payment.vkey")" \
+        --arg blsPubKey "$blsPub" \
+        --arg blsPossessionProof "$pop" \
+        '$ARGS.named' >"$d/voter.json"
+    done
+    jq -s '.' "$VOTERS_DIR"/voter*/voter.json >"$VOTERS_DIR/voters.json"
+
+    # One pool, one delegation and one funded base address (00 | payment key
+    # hash | stake key hash, testnet) per voter — the stake behind the seat.
+    jq --slurpfile voters "$VOTERS_DIR/voters.json" --argjson stake "$VOTER_STAKE" '
+      reduce $voters[0][] as $v (.;
+        .staking.pools[$v.poolId] =
+          { cost: 0, margin: 0, metadata: null, owners: [], pledge: 0
+          , publicKey: $v.poolId, relays: []
+          , rewardAccount: {credential: {keyHash: $v.stakeHash}, network: "Testnet"}
+          , vrf: $v.vrf
+          , blsKey: {blsPubKey: $v.blsPubKey, blsPossessionProof: $v.blsPossessionProof}
+          }
+        | .staking.stake[$v.stakeHash] = $v.poolId
+        | .initialFunds["00" + $v.payHash + $v.stakeHash] = $stake)
+      # The stock initialFunds already add up to exactly maxLovelaceSupply, so
+      # grow the supply by what the voters bring or the reserves go negative.
+      | .maxLovelaceSupply += $stake * ($voters[0] | length)
+    ' "$WORKING_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json.tmp"
+    mv "$WORKING_DIR/genesis/shelley-genesis.json.tmp" "$WORKING_DIR/genesis/shelley-genesis.json"
+  fi
 fi
 
 # Set up each node
@@ -423,6 +523,31 @@ for NODE_NAME in "${NODES[@]}"; do
       cp -r "$SHARED_CONFIG_DIR/pools-keys/pool${NODE_NAME#bp}" "$NODE_DIR/keys"
       chmod 400 "$NODE_DIR/keys"/*.skey
     fi
+    # The BLS key is settled after the copy (and again on resume). The
+    # WORKING DIR, not the environment, says whether this devnet has voters:
+    # their pools are baked into the genesis, so the bundles have to match it
+    # even when a resume does not repeat VOTERS on the command line. With
+    # voters, bp N votes with its own key plus every third voter's (bp1 gets
+    # voters 1,4,7,…) — the bundle is a JSON array of key envelopes, which
+    # --shelley-bls-key accepts in place of a single one.
+    actualVoters=$({ find "$WORKING_DIR/voters" -maxdepth 1 -name 'voter[0-9]*' -type d 2>/dev/null || true; } | wc -l)
+    if [ "$VOTERS" -gt 0 ] && [ "$VOTERS" != "$actualVoters" ]; then
+      echo "Warning: VOTERS=$VOTERS but $WORKING_DIR/voters holds $actualVoters" >&2
+      echo "         voter key sets; the genesis is fixed, using the $actualVoters." >&2
+    fi
+    rm -f "$NODE_DIR/keys/bls.skey"
+    if [ "$actualVoters" -gt 0 ]; then
+      n="${NODE_NAME#bp}"
+      voter_keys=()
+      for i in $(seq "$n" 3 "$actualVoters"); do
+        voter_keys+=("$WORKING_DIR/voters/voter$i/bls.skey")
+      done
+      jq -s '.' "$SHARED_CONFIG_DIR/pools-keys/pool${n}/bls.skey" "${voter_keys[@]}" \
+        >"$NODE_DIR/keys/bls.skey"
+    else
+      cp "$SHARED_CONFIG_DIR/pools-keys/pool${NODE_NAME#bp}/bls.skey" "$NODE_DIR/keys/bls.skey"
+    fi
+    chmod 400 "$NODE_DIR/keys/bls.skey"
     ;;
   esac
 done

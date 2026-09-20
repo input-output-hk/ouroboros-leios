@@ -41,44 +41,34 @@ const HOST_PORT_TO_NODE: Record<string, string> = {
   "127.2.0.1:3001": "Node1",
   "127.2.0.2:3002": "Node2",
   "127.2.0.3:3003": "Node3",
-  // demo-dozen-devnet. Unlike the demos above, every node listens on the same
-  // port, and addresses come from run.sh as IP_PREFIX(IP_OFFSET + N) over
-  // NODES=(BPS RELAYS) with N starting at 1 -- so the block producers take the
-  // first three addresses and the nine relays follow in group order.
-  //
-  // FIXME: These twelve entries exist only because that ordering makes an
-  // address meaningless: relay11 (.14) is no closer to bp1 (.11) than relay33
-  // (.22) is. run.sh carries the matching FIXME for group-aligned addressing
-  // (bp1 .10 / relay11 .11 ...); with that in place the whole table collapses
-  // into a rule over the topology's group structure, and the TODO above is
-  // finally actionable. Until then a new devnet shape means another dozen
-  // hand-written lines here.
-  // With TC: IP_PREFIX=172.29.0. IP_OFFSET=10
-  "172.29.0.11:3001": "bp1",
-  "172.29.0.12:3001": "bp2",
-  "172.29.0.13:3001": "bp3",
-  "172.29.0.14:3001": "relay11",
-  "172.29.0.15:3001": "relay12",
-  "172.29.0.16:3001": "relay13",
-  "172.29.0.17:3001": "relay21",
-  "172.29.0.18:3001": "relay22",
-  "172.29.0.19:3001": "relay23",
-  "172.29.0.20:3001": "relay31",
-  "172.29.0.21:3001": "relay32",
-  "172.29.0.22:3001": "relay33",
-  // Without TC: IP_PREFIX=127.3.0. IP_OFFSET=0
-  "127.3.0.1:3001": "bp1",
-  "127.3.0.2:3001": "bp2",
-  "127.3.0.3:3001": "bp3",
-  "127.3.0.4:3001": "relay11",
-  "127.3.0.5:3001": "relay12",
-  "127.3.0.6:3001": "relay13",
-  "127.3.0.7:3001": "relay21",
-  "127.3.0.8:3001": "relay22",
-  "127.3.0.9:3001": "relay23",
-  "127.3.0.10:3001": "relay31",
-  "127.3.0.11:3001": "relay32",
-  "127.3.0.12:3001": "relay33",
+  // demo-dozen-devnet: group-aligned addressing (run.sh node_ip) -- producer G
+  // at last octet 10*G, its relays at 10*G + R, every node on port 3001.
+  // With TC: IP_PREFIX=172.29.0.
+  "172.29.0.10:3001": "bp1",
+  "172.29.0.11:3001": "relay11",
+  "172.29.0.12:3001": "relay12",
+  "172.29.0.13:3001": "relay13",
+  "172.29.0.20:3001": "bp2",
+  "172.29.0.21:3001": "relay21",
+  "172.29.0.22:3001": "relay22",
+  "172.29.0.23:3001": "relay23",
+  "172.29.0.30:3001": "bp3",
+  "172.29.0.31:3001": "relay31",
+  "172.29.0.32:3001": "relay32",
+  "172.29.0.33:3001": "relay33",
+  // Without TC: IP_PREFIX=127.3.0.
+  "127.3.0.10:3001": "bp1",
+  "127.3.0.11:3001": "relay11",
+  "127.3.0.12:3001": "relay12",
+  "127.3.0.13:3001": "relay13",
+  "127.3.0.20:3001": "bp2",
+  "127.3.0.21:3001": "relay21",
+  "127.3.0.22:3001": "relay22",
+  "127.3.0.23:3001": "relay23",
+  "127.3.0.30:3001": "bp3",
+  "127.3.0.31:3001": "relay31",
+  "127.3.0.32:3001": "relay32",
+  "127.3.0.33:3001": "relay33",
 };
 
 // Endpoints this map does not know about, reported once each. A miss used to
