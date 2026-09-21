@@ -37,9 +37,19 @@ This document enumerates the requirements that Leios must satisfy as implemented
 20. A heterogeneous network of conforming implementations interoperates: any node satisfying these requirements can peer with any other, with no reliance on behaviour of the reference implementation beyond what CIP-164 specifies. [C, T]
 21. Implementations emit execution traces conforming to the implementation-independent trace semantics, sufficient for the conformance verification of the items above. [T]
 
+**Stake Pool operations**
+
+22. An SPO should be able to generate BLS keys with their proof of possession, and build the registering certificate, offline on an air-gapped machine. [T]
+23. An SPO should be able to register their BLS keys in a dedicated certificate, at the first registration and at every rotation. The initial release registers BLS keys in the pool registration certificate; the dedicated certificate arrives at pv13 in an intra-era hard fork. [T]
+24. An SPO should know at submission the epoch from which a registered key becomes active. A pool has at most one active BLS key per epoch, and the time to live leaves room for a full rotation within the published cadence. [C, T]
+25. An SPO should be able to start the node with the active BLS key and the next one, so that the node changes over at the epoch boundary without a restart and without missing a block or a vote. [T]
+26. The node signs each vote with the pool's active BLS key for that epoch, which it identifies from the active stake distribution. [C, T]
+27. An SPO should be able to query a local node for which key is active, its expiration epoch, which key is next when one has been registered, and from which epoch the new key will be active. [T]
+28. Every condition that stops a pool's votes from counting reaches the SPO as a named error: a proof of possession that fails, a key still pending, an expired key, or an active BLS key the node does not hold. [T]
+
 ## Notation
 
-- Items are cited by number as "R1" … "R21"; the category headings group them but carry no significance beyond presentation.
+- Items are cited by number as "R1" … "R28"; the category headings group them but carry no significance beyond presentation.
 - Proposed assurance routes are suggested for each item, and are preferred but not exclusive. **P** and **S** are protocol-level and discharge once for all implementations; **C**, **B** and **T** are per-implementation and must be produced for each implementation claiming to implement Leios.
     - **P** — proof obligation (Agda formal spec)
     - **S** — simulation or statistical analysis
@@ -48,6 +58,14 @@ This document enumerates the requirements that Leios must satisfy as implemented
     - **T** — test suite (property, integration, testnet)
 - What must be demonstrated is adherence to these requirements. Conformance (**C**) is one pillar of that: it establishes that an implementation realises the formal specification, and so carries weight only in composition with the proofs (**P**) and statistical analyses (**S**) establishing that the specification itself satisfies the requirement.
 - Every test set, proof obligation, model-checking result, or statistical analysis report produced by the project must cite the requirement identifier(s) it discharges (e.g. "R2"); every requirement must eventually be discharged by at least one such artefact.
-- These requirements are implementation-neutral: they constrain the observable behaviour of a node implementation — at its network interfaces, in the on-chain artefacts it produces, and in its resource consumption.
-- Requirements are stated relative to a protocol parameterisation ($L_\text{hdr}$, $L_\text{vote}$, $L_\text{diff}$, $\tau$, committee size $n$, size limits $S_\text{RB}$, $S_\text{EB}$, $S_\text{EB-tx}$); verification artefacts must state the parameter ranges over which they hold.
+- These requirements are implementation-neutral: they constrain the observable behaviour of a node implementation at its network interfaces, at the operator-facing interfaces through which a stake pool is configured and queried, in the on-chain artefacts it produces, and in its resource consumption.
+- Requirements are stated relative to a protocol parameterisation ($L_\text{hdr}$, $L_\text{vote}$, $L_\text{diff}$, $\tau$, committee size $n$, size limits $S_\text{RB}$, $S_\text{EB}$, $S_\text{EB-tx}$, the BLS key time to live and the activation delay); verification artefacts must state the parameter ranges over which they hold.
 - "SPO-grade hardware" (R6, R10) means hardware meeting the SPO recommendations published for Cardano mainnet at the time of assessment, allowing at most a stated, bounded uplift; an uplift that would exclude currently viable SPOs fails this definition. Artefacts must state the exact specification they measured against.
+- BLS key lifecycle (R22 to R28), one phase per requirement:
+    - *Generation*: creating the key pair with its proof of possession, on the cold machine.
+    - *Registration*: the on-chain act binding a key to a pool. A key is registered once the transaction carrying it is accepted.
+    - *Activation*: the epoch boundary at which a registered key becomes the pool's *active* key, the one its committee seat signs with. The *activation delay* is the number of boundaries from acceptance to activation.
+    - *Installation*: placing a signing key on the block-producing node.
+    - *Changeover*: the node's switch from the outgoing active key to the incoming one.
+    - *Rotation*: one full cycle of the above. The *published cadence* is how often operators are told to complete one.
+    - A registered key is *pending* before activation and *active* after it, until a successor activates or it *expires*, once past its *time to live*, the number of epochs a registered key is honoured for.

@@ -1,6 +1,6 @@
 # Leios Assurance Report
 
-This report is the companion to the [Leios requirements](./requirements.md). Where the requirements document states *what* must be demonstrated and mandates that every verification artefact cite the requirement identifiers it discharges, this report maintains the reverse index: for each requirement R1–R21, the artefacts that currently bear on it, the assurance route each provides, and an honest statement of how far the requirement is discharged.
+This report is the companion to the [Leios requirements](./requirements.md). Where the requirements document states *what* must be demonstrated and mandates that every verification artefact cite the requirement identifiers it discharges, this report maintains the reverse index: for each requirement R1–R28, the artefacts that currently bear on it, the assurance route each provides, and an honest statement of how far the requirement is discharged.
 
 This is a living document. It reflects the artefact landscape as first surveyed on 2026-09-08 and last revised on **2026-09-15**; it must be revised as artefacts land, are superseded, or are found wanting.
 
@@ -99,8 +99,29 @@ One table. Each requirement (bold row, with its proposed assurance routes) is sp
 | **R21** | **Implementations emit conforming execution traces** [T] | | |
 | R21.1 | trace schema fixed and CI-validated | Discharged | C-SCHEMA. |
 | R21.2 | node-emitted traces gated in CI | Open | *Needed, promoting C-CHAIN: `linear-chain` into the maintained `hs-src` tree (spec · S); a CI gate streaming testnet-harness node logs through it (infra · M); long-trace performance confirmed post-#1063 (spec · S).* |
+| **R22** | **BLS keys generated and the certificate built offline** [T] | | |
+| R22.1 | key pair and proof of possession generated offline | Open |  |
+| R22.2 | registering certificate built in the same session | Open |  |
+| **R23** | **BLS keys registered in a dedicated certificate** [T] | | |
+| R23.1 | dedicated certificate exists | Open |  |
+| R23.2 | the initial-release vehicle cannot change parameters silently | Open |  |
+| **R24** | **Activation epoch known at submission, one active key per epoch** [C, T] | | |
+| R24.1 | activation delay settled and applied deterministically | Open |  |
+| R24.2 | one active BLS key per pool per epoch | Open |  |
+| **R25** | **Node starts with both keys and changes over without a restart** [T] | | |
+| R25.1 | node accepts both keys at startup | Open |  |
+| R25.2 | no duty missed across the boundary | Open |  |
+| **R26** | **Votes signed with the active BLS key, matched from chain state** [C, T] | | |
+| R26.1 | selection rule follows chain state | Open |  |
+| R26.2 | conformance evidence | Open |  |
+| **R27** | **Key states and expiration epoch queryable** [T] | | |
+| R27.1 | active key, next key and expiration epoch reported | Open |  |
+| R27.2 | time-to-live margin stated for the deployed parameterisation | Open |  |
+| **R28** | **Every non-voting condition named to the operator** [T] | | |
+| R28.1 | invalid proof of possession surfaced | Open |  |
+| R28.2 | pending, expired and missing keys surfaced | Open |  |
 
-Across the 21 requirements: 56 sub-items — **18 discharged, 33 open, 5 failing**. At requirement level (worst sub-item): 0 discharged, 16 open, 5 failing (R7, R10, R12, R13, R15). The failing rows are the assurance machinery doing its job: each names its counter-evidence and its fix.
+Across the 28 requirements: 70 sub-items — **18 discharged, 47 open, 5 failing**. At requirement level (worst sub-item): 0 discharged, 23 open, 5 failing (R7, R10, R12, R13, R15). The failing rows are the assurance machinery doing its job: each names its counter-evidence and its fix. The artefact column for R22 to R28 is not yet filled in.
 
 The needed artefacts, tallied from Table 1:
 
@@ -183,7 +204,7 @@ The current Rust simulator lives out-of-repo (`input-output-hk/leios-tools`); ca
 
 ### T — test suites
 
-Implementation test suites largely ride inside the artefacts above (C-EXTRACT's golden tests, B-CRYPTO's correctness tests, B-ANTI's metric-parser tests, the Haskell simulator's config/topology suite). No standalone T artefact currently discharges a requirement on its own; R17–R19 await the E2E and upgrade suites planned in D-IMPACT.
+Implementation test suites largely ride inside the artefacts above (C-EXTRACT's golden tests, B-CRYPTO's correctness tests, B-ANTI's metric-parser tests, the Haskell simulator's config/topology suite). No standalone T artefact currently discharges a requirement on its own; R17–R19 await the E2E and upgrade suites planned in D-IMPACT, and the artefacts for R22–R28 are not yet characterised.
 
 ### D — design and methodology documents (context, not evidence)
 
