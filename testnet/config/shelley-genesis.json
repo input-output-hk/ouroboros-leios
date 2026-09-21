@@ -4,49 +4,49 @@
   "extraConfig": {
     "initialFunds": {
       "data": {
-        "0066878003c80c68e610236f87f742f06c53f30e4b051720faeff49f855e81366cb6f3c0d14837614afcea669d51b8be9519eaec4a237504f8": 900000000,
-        "60318277a23738a860d7b8f727b113236b2cd11cc413a5db0938241a27": 30000000000000000
+        "002ac6275715d4fcc740134a578e619876752821c786cb4701c5756ee7dda643b05c248cbff2d80fd45dff2b4cb260cd03ea6fa299da3955ef": 900000000,
+        "605d11c3d8a44b5aeb60831099a6d122a408ea33ca1faa1102bd4a80cc": 30000000000000000
       }
     },
     "stakeCredentials": {
       "data": {
-        "5e81366cb6f3c0d14837614afcea669d51b8be9519eaec4a237504f8": "747aca09f322d2dfc56243b839e2d573ab92287684e5e37d66ec0f87"
+        "dda643b05c248cbff2d80fd45dff2b4cb260cd03ea6fa299da3955ef": "fd32267bc1c702ad9b530d4e9f9939ce93bbb99f55f31fbe4989ea88"
       }
     },
     "stakePools": {
       "data": {
-        "747aca09f322d2dfc56243b839e2d573ab92287684e5e37d66ec0f87": {
+        "fd32267bc1c702ad9b530d4e9f9939ce93bbb99f55f31fbe4989ea88": {
           "accountAddress": {
             "credential": {
-              "keyHash": "bc2b888f42c68e4e118a4fa16ada52db896bffb61ceea51a58301bf6"
+              "keyHash": "c002c1f5bccc09b7d2865b8ba5bc6fb280b2f5f0e63cb11da79f413e"
             },
             "network": "Testnet"
           },
+          "blsKey": null,
           "cost": 0,
-          "leiosKey": null,
           "margin": 0,
           "metadata": null,
           "owners": [],
           "pledge": 0,
-          "poolId": "747aca09f322d2dfc56243b839e2d573ab92287684e5e37d66ec0f87",
+          "poolId": "fd32267bc1c702ad9b530d4e9f9939ce93bbb99f55f31fbe4989ea88",
           "relays": [],
-          "vrf": "d8252bd637a90ba4dbd2cf63afda20a19888b7895ede067081ce7fb7411a972b"
+          "vrf": "f8eb3533e40984adc744cb326fd410c200dab831f915224c8515a06cedaabdc5"
         }
       }
     }
   },
   "genDelegs": {
-    "12d894311704be0bcbbf3c802d1df931c1042f165118b5950c38c4fb": {
-      "delegate": "28e61504346b2321a7474e84bb868d20282ecca551fa195b474134cd",
-      "vrf": "815dfe31669dec6dae261a0c38009d6c195cb746b6f1053a12bb29fd585228bd"
+    "61ea81e1fd86abda4d7a7ff121c1bfb1adac5dccc9c7404607617cc4": {
+      "delegate": "f9793fbe27f8e0e39c9639541a54f5e7497e67d466ef35c355ab8dc8",
+      "vrf": "faf3d0cbaee3c3a5f318d9e94541176c49ef378e59c71eaa6984ceac1c1c6958"
     },
-    "293a1d21af16b2a6c4553e5a587c6518c7ed13aecf6d467a276c5f5b": {
-      "delegate": "aa43125599455749e209b6ac89f87f4b2b7829b951b278914ff41da7",
-      "vrf": "ea3081e44ca2429c22bc1f8e09756a722ca76d9f89a1a637bac363d2d5fddefe"
+    "a73f3402e8446167e4afb58ffb67c38ff56e7f4ec7b5ffeb19f3daf0": {
+      "delegate": "50e36145f8f1d341db28e0de7d9fd03910b7d6f41525e8b9c3fef98e",
+      "vrf": "c498894835eac25f40f4a499d4178a6e94dc07ed059215f28713110d97855f1e"
     },
-    "aa57d73d4b8790ac4fd195c2cfb0aefb82abb828893f4203e5eaf223": {
-      "delegate": "3c633d470ebb66763f598b92366c034daf87bd32f5619d9be7421281",
-      "vrf": "e431849e1f74782bde85e4030abebfbae6a5cd6c18c20ca35068d1c449287064"
+    "f0f861ac2b7443b2f3551c1d7e1956bf942abe9877e557d6e8d8e790": {
+      "delegate": "df00aad70d876011b5677c54a3fd2ab45f465b72f8007c72308421eb",
+      "vrf": "0de8a7a8318f9e9fbe0ea1b28a5cff25ff41f71d82f475c17287f7155efee471"
     }
   },
   "initialFunds": {},
@@ -85,6 +85,6 @@
     "pools": {},
     "stake": {}
   },
-  "systemStart": "2026-08-07T00:00:00Z",
+  "systemStart": "2026-09-07T00:00:00Z",
   "updateQuorum": 3
 }
