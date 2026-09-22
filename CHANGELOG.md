@@ -5,7 +5,30 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w38a - 2026-09-22
+
+A patch release on w38: reverts a ledger incompatibility, and stops unbounded memory growth when syncing a node.
+
+> [!NOTE]
+>
+> No state wipe and no respin: schema and wire formats are unchanged from w38. A w38 database is picked up as it is, and a node w38 had stranded carries on.
+
+- Fixes ledger validation for `musashi` which errored with `ValidationTagMismatch Phase2Valid (FailedUnexpectedly (PlutusFailure))`.
+  - The integrated ledger had begun evaluating sub-transaction Plutus scripts and charging their execution units, for every protocol version ([ledger@309978c4](https://github.com/IntersectMBO/cardano-ledger/commit/309978c46b)). Reverted here; it needs to be gated by a hard fork or respin before it can come back.
+
+- Fixes memory usage when syncing [consensus@fdd31732](https://github.com/IntersectMBO/ouroboros-consensus/commit/fdd31732d)
+  - Making a block immutable awaited the LeiosDb writer queue once per certified block, so copying lagged chain selection without bound and the LedgerDB held a ledger state per block not yet immutable. 
+  - Endorser blocks are pinned one batch per copying pass now.
+  - The copier keeps up as a result, so `leios.vol.db` no longer grows for the whole sync.
+
+- Fixes the LeiosDb copier erroring with `UNIQUE constraint failed: ebs.ebSlot, ebs.ebHashBytes` after an unclean shutdown [consensus@fdd31732](https://github.com/IntersectMBO/ouroboros-consensus/commit/fdd31732d)
+  - The copy is idempotent now, so a database already wedged repairs itself on the first pass after the upgrade.
+
 ## prototype-2026w38 - 2026-09-20
+
+> [!CAUTION]
+>
+> :warning: This release brought in ledger changes that turned out to be incompatible with the musashi dojo network at time of release. Use **prototype-2026w38a** instead :warning:
 
 Continues the LeiosDb work from w35 with a proper single-writer redesign, sizes the mempool from the protocol parameters, and lets a producer vote with more than one BLS key at once.
 
