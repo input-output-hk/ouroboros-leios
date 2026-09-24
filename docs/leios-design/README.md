@@ -884,7 +884,7 @@ Note that the PoP checks probably are done at the certificate level, and that th
 
 ### Node-to-client
 
- Leios changes what an on-chain block looks like, but the N2C design must keep that change hidden by default. Clients will receive Praos-shaped blocks and are only exposed to new behavior when they _explicitly_ ask for it.
+ Leios changes what an on-chain block looks like, but the N2C design must keep that change hidden by default. Apart from supporting the new Dijkstra era, as with any hard fork, clients will receive Praos-shaped blocks and are only exposed to new behavior when they _explicitly_ ask for it.
 
 - **REQ-N2CBackwardCompatible** A client that negotiates any existing N2C version up to [`NodeToClientV_23`](https://github.com/IntersectMBO/ouroboros-network/blob/4b3ab7664f609a1aee0f0c24dcfcfd0ab899fc42/cardano-diffusion/api/lib/Cardano/Network/NodeToClient/Version.hs#L71) must see no wire-format change on any N2C mini-protocol.
 - **REQ-N2CInlineCertifiedEbs** `LocalChainSync` must serve each CertRB with the transactions of the EB it certifies inlined into the block body, as specified in [CIP-164's "Clients" section](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#clients).
@@ -905,14 +905,14 @@ The N2C mini-protocols are bundled in `ouroboros-network` (`cardano-diffusion/li
 
 #### Inlining certified EB transactions in LocalChainSync
 
-Adding a CertRB's transactions to the block before sending it, is the only N2C change clients will notice.
+By default, adding a CertRB's transactions to the block before sending it is the only N2C change clients will notice.
 
 On-chain, a CertRB holds only a certificate. Its transactions are stored separately, in the EB it certifies. Before the node's `LocalChainSync` server (**UPD-LeiosN2cChainSyncServer**) sends a CertRB to a client, it copies the EB's transactions into the block. The client receives a normal Praos-shaped block (`transaction_bodies`, `transaction_witness_sets`, `auxiliary_data_set`, `invalid_transactions`). All other blocks are sent unchanged.
 
 The server always has the EB's transactions when it sends a CertRB, because **a node never adds a CertRB to its chain until it has all of the EB's transactions** (see **NEW-LeiosCertRbStagingArea** in [Chain selection](#chain-selection)). So:
 
 - A client never receives a CertRB without its transactions.
-- A client never sees transactions from an EB that wasn't certified.
+- Unless it opts in (see [Announced (uncertified) EBs](#announced-uncertified-ebs)), a client never sees transactions from an EB that wasn't certified.
 - `RollBackward` still just means the node switched to a different chain. Rolling back a CertRB removes its transactions, the same as for any Praos block today.
 
 > [!IMPORTANT]
@@ -921,7 +921,7 @@ The server always has the EB's transactions when it sends a CertRB, because **a 
 
 > [!WARNING]
 >
-> TODO: The prototype `cardano-node-leios` already does this ([#898](https://github.com/input-output-hk/ouroboros-leios/issues/898); `chainSyncBlocksServer` in `ouroboros-consensus` [`1820edf`](https://github.com/IntersectMBO/ouroboros-consensus/commit/1820edf5e496fbec5aa230a8bee56397c76f474b)). Items to harden before it leaves the prototype:
+> TODO: The prototype `cardano-node-leios` already adds CertRB transactions this way ([#898](https://github.com/input-output-hk/ouroboros-leios/issues/898); `chainSyncBlocksServer` in `ouroboros-consensus` [`1820edf`](https://github.com/IntersectMBO/ouroboros-consensus/commit/1820edf5e496fbec5aa230a8bee56397c76f474b)). Items to harden before it leaves the prototype:
 >
 > | Problem | How to solve |
 > |---|---|
@@ -931,7 +931,7 @@ The server always has the EB's transactions when it sends a CertRB, because **a 
 
 #### Message sizes
 
-Because CertRBs are served with their EB's transactions added, a block over N2C can be up to about 12.5 MB, roughly 140x today's 90 kB limit ([ImpactAnalysis](../ImpactAnalysis.md#client-interfaces)). The wire format doesn't change and the node needs no changes. A code read of `ogmios`, Pallas, `db-sync` and `cardano-wallet` found no size limit or timeout that such a block would hit (see [n2c-client-block-size-notes.md](./n2c-client-block-size-notes.md)). The remaining risk is memory while catching up: clients fetch ahead by a number of blocks (50 to 1000), not by bytes, so a run of maximum-size CertRBs could mean a gigabyte or more in memory.
+Because CertRBs are served with their EB's transactions added, a block over N2C can be up to about 12.5 MB, roughly 140x today's 90 kB limit ([ImpactAnalysis](../ImpactAnalysis.md#client-interfaces)). The wire format doesn't change, and the node needs no changes for the size: N2C mini-protocols run without per-message size limits or timeouts (`runPeer` in `ouroboros-consensus`'s `Network/NodeToClient.hs`), and the mux accepts up to `0xffffffff` bytes per mini-protocol (`maximumMiniProtocolLimits` in `ouroboros-network`). The risk is on the client side, in memory while catching up: clients fetch ahead by a number of blocks (50 to 1000), not by bytes, so a run of maximum-size CertRBs could mean a gigabyte or more in memory.
 
 > [!WARNING]
 >
@@ -939,11 +939,11 @@ Because CertRBs are served with their EB's transactions added, a block over N2C 
 
 #### Announced (uncertified) EBs
 
-CIP-164 only covers certified blocks. By default (**REQ-N2CCertifiedOnlyByDefault**), no N2C mini-protocol exposes an EB's transactions before the EB is certified, so existing clients never have to walk back an EB that fails to certify. Clients that want to act early can opt in per connection (**NEW-LeiosN2cAnnouncedEbs**), with an understanding that an announced EB is not a commitment and may never certify. The opt-in will only offered from the new N2C version (see [Versioning](#versioning-and-rollout)).
+CIP-164 only covers certified blocks. By default (**REQ-N2CCertifiedOnlyByDefault**), no N2C mini-protocol exposes an EB's transactions before the EB is certified, so existing clients never have to walk back an EB that fails to certify. Clients that want to act early can opt in per connection (**NEW-LeiosN2cAnnouncedEbs**), with an understanding that an announced EB is not a commitment and may never certify. The opt-in will only be offered from the new N2C version (see **UPD-LeiosN2cVersion** in [Impact per mini-protocol](#impact-per-mini-protocol)).
 
 > [!WARNING]
 >
-> TODO: Decide the opt-in mechanism. 
+> TODO: Decide the opt-in mechanism.
 
 
 ### Feature flags and configuration
