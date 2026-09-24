@@ -886,7 +886,7 @@ Note that the PoP checks probably are done at the certificate level, and that th
 
  Leios changes what an on-chain block looks like, but the N2C design must keep that change hidden by default. Clients will receive Praos-shaped blocks and are only exposed to new behavior when they _explicitly_ ask for it.
 
-- **REQ-N2CBackwardCompatible** A client that negotiates any existing N2C version (up to [`NodeToClientV_23`]()https://github.com/IntersectMBO/ouroboros-network/blob/4b3ab7664f609a1aee0f0c24dcfcfd0ab899fc42/cardano-diffusion/api/lib/Cardano/Network/NodeToClient/Version.hs#L71) must see no wire-format change on any N2C mini-protocol.
+- **REQ-N2CBackwardCompatible** A client that negotiates any existing N2C version up to [`NodeToClientV_23`](https://github.com/IntersectMBO/ouroboros-network/blob/4b3ab7664f609a1aee0f0c24dcfcfd0ab899fc42/cardano-diffusion/api/lib/Cardano/Network/NodeToClient/Version.hs#L71) must see no wire-format change on any N2C mini-protocol.
 - **REQ-N2CInlineCertifiedEbs** `LocalChainSync` must serve each CertRB with the transactions of the EB it certifies inlined into the block body, as specified in [CIP-164's "Clients" section](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#clients).
 - **REQ-N2CCertifiedOnlyByDefault** Unless a client opts in, no N2C mini-protocol may expose transactions from an EB that has not been certified on the node's selected chain.
 
@@ -915,7 +915,7 @@ This relies on one rule: **a node doesn't add a CertRB to its chain until it has
 
 > [!IMPORTANT]
 >
-> For a CertRB, the header's `block_body_hash` is computed over the on-chain body (certificate, no transactions), not over the inlined body the client receives. CIP-164 states this explicitly: "Re-verifying clients should note that for cert blocks the header's `block_body_hash` is computed over the on-chain (empty) body, not the inlined body served over N2C." A client that checks the body against the header will fail on every CertRB. This is expected, not a bug; see also [ImpactAnalysis](../ImpactAnalysis.md#client-interfaces). Mithril reads blocks through `LocalChainSync` but never compares the body with the header's `block_body_hash`, so this mismatch doesn't affect Mithril.
+> For a CertRB, the header's `block_body_hash` is computed over the on-chain body (certificate, no transactions), not over the inlined body the client receives. A client that checks the body against the header will therefore fail on every CertRB. This is expected behavior specified by [CIP-164](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#clients), not a bug; see also [ImpactAnalysis](../ImpactAnalysis.md#client-interfaces). Mithril is unaffected: it reads blocks through `LocalChainSync` but never makes this check.
 
 > [!WARNING]
 >
