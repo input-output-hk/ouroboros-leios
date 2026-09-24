@@ -884,9 +884,9 @@ Note that the PoP checks probably are done at the certificate level, and that th
 
 ### Node-to-client
 
- Leios changes what an on-chain block looks like, but the N2C design must keep that change hidden by default. Apart from supporting the new Dijkstra era, as with any hard fork, clients will receive Praos-shaped blocks and are only exposed to new behavior when they _explicitly_ ask for it.
+Leios changes what an on-chain block looks like, but the N2C design must keep that change hidden by default. Apart from supporting the new Dijkstra era, as with any hard fork, clients will receive Praos-shaped blocks and are only exposed to new behavior when they _explicitly_ ask for it.
 
-- **REQ-N2CBackwardCompatible** A client that negotiates any existing N2C version up to [`NodeToClientV_23`](https://github.com/IntersectMBO/ouroboros-network/blob/4b3ab7664f609a1aee0f0c24dcfcfd0ab899fc42/cardano-diffusion/api/lib/Cardano/Network/NodeToClient/Version.hs#L71) must see no wire-format change on any N2C mini-protocol.
+- **REQ-N2CBackwardCompatible** A client that negotiates any existing N2C version up to [`NodeToClientV_23`](https://github.com/IntersectMBO/ouroboros-network/blob/4b3ab7664f609a1aee0f0c24dcfcfd0ab899fc42/cardano-diffusion/api/lib/Cardano/Network/NodeToClient/Version.hs#L71) must see no Leios-specific wire-format change on any N2C mini-protocol, beyond the new Dijkstra era.
 - **REQ-N2CInlineCertifiedEbs** `LocalChainSync` must serve each CertRB with the transactions of the EB it certifies inlined into the block body, as specified in [CIP-164's "Clients" section](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#clients).
 - **REQ-N2CCertifiedOnlyByDefault** Unless a client opts in, no N2C mini-protocol may expose transactions from an EB that has not been certified on the node's selected chain.
 
@@ -929,22 +929,13 @@ The server always has the EB's transactions when it sends a CertRB, because **a 
 > | **Race on `setPrev`.** A code comment warns that after a `RollBack`, the block at the rollback point could be garbage-collected before `setPrev` looks it up, so the next CertRB would be sent without its transactions. This can't happen: the lookup falls back to the ImmutableDB, which already holds any block garbage-collected from the VolatileDB (`getAnyBlockComponent` in `Storage/ChainDB/Impl/Query.hs`). | Remove the misleading comment. Treat a `Nothing` result as a bug and fail loudly, instead of silently sending a CertRB without its transactions. |
 > | **Cost per client.** Every CertRB is decoded, has its transactions added, and is re-encoded once for each connected client. With many local clients (for example, a relay serving several indexers), this work is repeated for each one. | Cache the inlined encoding of each CertRB so it is built once and shared across clients. |
 
-#### Message sizes
-
-Because CertRBs are served with their EB's transactions added, a block over N2C can be up to about 12.5 MB, roughly 140x today's 90 kB limit ([ImpactAnalysis](../ImpactAnalysis.md#client-interfaces)). The wire format doesn't change, and the node needs no changes for the size: N2C mini-protocols run without per-message size limits or timeouts (`runPeer` in `ouroboros-consensus`'s `Network/NodeToClient.hs`), and the mux accepts up to `0xffffffff` bytes per mini-protocol (`maximumMiniProtocolLimits` in `ouroboros-network`). The risk is on the client side, in memory while catching up: clients fetch ahead by a number of blocks (50 to 1000), not by bytes, so a run of maximum-size CertRBs could mean a gigabyte or more in memory.
-
-> [!WARNING]
->
-> TODO: Add a devnet test that serves a run of maximum-size CertRBs to each client and measures memory while catching up.
-
 #### Announced (uncertified) EBs
 
-CIP-164 only covers certified blocks. By default (**REQ-N2CCertifiedOnlyByDefault**), no N2C mini-protocol exposes an EB's transactions before the EB is certified, so existing clients never have to walk back an EB that fails to certify. Clients that want to act early can opt in per connection (**NEW-LeiosN2cAnnouncedEbs**), with an understanding that an announced EB is not a commitment and may never certify. The opt-in will only be offered from the new N2C version (see **UPD-LeiosN2cVersion** in [Impact per mini-protocol](#impact-per-mini-protocol)).
+CIP-164's Clients section only covers certified blocks. By default (**REQ-N2CCertifiedOnlyByDefault**), no N2C mini-protocol exposes an EB's transactions before the EB is certified, so existing clients never have to walk back an EB that fails to certify. Clients that want to act early can opt in per connection (**NEW-LeiosN2cAnnouncedEbs**), with an understanding that an announced EB is not a commitment and may never certify. The opt-in will only be offered from the new N2C version (see **UPD-LeiosN2cVersion** in [Impact per mini-protocol](#impact-per-mini-protocol)).
 
 > [!WARNING]
 >
 > TODO: Decide the opt-in mechanism.
-
 
 ### Feature flags and configuration
 
