@@ -884,11 +884,56 @@ Note that the PoP checks probably are done at the certificate level, and that th
 
 ### Node-to-client
 
+ Leios changes what an on-chain block looks like, but the N2C design must keep that change hidden by default. Clients will receive Praos-shaped blocks and are only exposed to new behavior when they _explicitly_ ask for it.
+
+- **REQ-N2CBackwardCompatible** A client that negotiates any existing N2C version (up to [`NodeToClientV_23`]()https://github.com/IntersectMBO/ouroboros-network/blob/4b3ab7664f609a1aee0f0c24dcfcfd0ab899fc42/cardano-diffusion/api/lib/Cardano/Network/NodeToClient/Version.hs#L71) must see no wire-format change on any N2C mini-protocol.
+- **REQ-N2CInlineCertifiedEbs** `LocalChainSync` must serve each CertRB with the transactions of the EB it certifies inlined into the block body, as specified in [CIP-164's "Clients" section](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#clients).
+- **REQ-N2CCertifiedOnlyByDefault** Unless a client opts in, no N2C mini-protocol may expose transactions from an EB that has not been certified on the node's selected chain.
+
+The code references below are to the revisions pinned by the prototype `cardano-node-leios` input ([flake.nix](../../flake.nix), `cardano-node` `6a540bd`), which pins `ouroboros-consensus` `1820edf` and `ouroboros-network` `4b3ab76`.
+
+#### Impact per mini-protocol
+
+The N2C mini-protocols are bundled in `ouroboros-network` (`cardano-diffusion/lib/Cardano/Network/NodeToClient.hs`) and served by `ouroboros-consensus` (`ouroboros-consensus-diffusion/src/ouroboros-consensus-diffusion/Ouroboros/Consensus/Network/NodeToClient.hs`, `mkApps`).
+
+| Mini-protocol | Num | Leios change | Component |
+|---|---|---|---|
+| `LocalChainSync` | 5 | CertRBs served with the certified EB's transactions inlined; bodies can be much larger | **UPD-LeiosN2cChainSyncServer** |
+| `LocalTxSubmission` | 6 | None | — |
+| `LocalStateQuery` | 7 | Possibly new queries; see [LocalStateQuery additions](#localstatequery-additions) | **UPD-LeiosN2cQueries** |
+| `LocalTxMonitor` | 9 | None | — |
+| Handshake | 0 | New `NodeToClientVersion` to gate the opt-in and any new queries | **UPD-LeiosN2cVersion** |
+| *(opt-in for announced EBs)* | new? | Either a new mini-protocol or a `LocalChainSync` variant; not yet decided | **NEW-LeiosN2cAnnouncedEbs** |
+
+#### Inlining certified EB transactions in LocalChainSync
+
+On-chain, a CertRB's body carries a certificate and no transactions; they live in the certified EB's closure in the LeiosDB. The N2C ChainSync server (**UPD-LeiosN2cChainSyncServer**) puts them back into the body before serving the block, so the client receives an ordinary Praos-shaped block (`transaction_bodies`, `transaction_witness_sets`, `auxiliary_data_set`, `invalid_transactions`). The prototype already does this (tracked in [#898](https://github.com/input-output-hk/ouroboros-leios/issues/898)).
+
+At `ouroboros-consensus` [`1820edf`](https://github.com/IntersectMBO/ouroboros-consensus/commit/1820edf5e496fbec5aa230a8bee56397c76f474b), the server (`chainSyncBlocksServer` in `MiniProtocol/ChainSync/Server.hs`) remembers the EB announced by the previous block it sent, recovering it after a rollback from the rollback point's header (`setPrev`). When a header says the block carries a certificate, it fetches that EB's transactions (`resolveLeiosClosure`) and adds them to the body. All other blocks are sent unchanged.
+
+This relies on one rule: **a node doesn't add a CertRB to its chain until it has stored all of the certified EB's transactions** (see **NEW-LeiosCertRbStagingArea** in [Chain selection](#chain-selection)). `RollBackward` keeps its meaning (a switch to a different chain): an uncertified EB is never shown, and rolling back a CertRB rolls back its transactions like any Praos block.
+
+> [!IMPORTANT]
+>
+> For a CertRB, the header's `block_body_hash` is computed over the on-chain body (certificate, no transactions), not over the inlined body the client receives. CIP-164 states this explicitly: "Re-verifying clients should note that for cert blocks the header's `block_body_hash` is computed over the on-chain (empty) body, not the inlined body served over N2C." A client that checks the body against the header will fail on every CertRB. This is expected, not a bug; see also [ImpactAnalysis](../ImpactAnalysis.md#client-interfaces). Mithril reads blocks through `LocalChainSync` but never compares the body with the header's `block_body_hash`, so this mismatch doesn't affect Mithril.
+
 > [!WARNING]
 >
-> TODO: concrete discussion on how the `cardano-node` will need to change on the N2C interface, based on [client interfaces](#client-interfaces)
+> TODO: Items to harden in `ouroboros-consensus` before this leaves the prototype:
 >
-> - Mithril, for example, does use N2C `LocalChainSync`, but does not check hash consistency and thus would be compatible with our plans.
+> | Problem | How to solve |
+> |---|---|
+> | **Missing closure.** If a CertRB's EB transactions aren't in the LeiosDB, `resolveLeiosClosure` throws and the client is disconnected with no explanation. The rule above (a node only adds a CertRB to its chain once it has stored the EB's transactions) should prevent this, but nothing tests it. | Add a test that the rule holds. If it ever does happen, log the failure so it doesn't show up as an unexplained disconnect. |
+> | **Race on `setPrev`.** A code comment warns that after a `RollBack`, the block at the rollback point could be garbage-collected before `setPrev` looks it up, so the next CertRB would be sent without its transactions. This can't happen: the lookup falls back to the ImmutableDB, which already holds any block garbage-collected from the VolatileDB (`getAnyBlockComponent` in `Storage/ChainDB/Impl/Query.hs`). | Remove the misleading comment. Treat a `Nothing` result as a bug and fail loudly, instead of silently sending a CertRB without its transactions. |
+> | **Cost per client.** Every CertRB is decoded, has its transactions added, and is re-encoded once for each connected client. With many local clients (for example, a relay serving several indexers), this work is repeated for each one. | Cache the inlined encoding of each CertRB so it is built once and shared across clients. |
+
+#### Message sizes
+
+Because CertRBs are served with their EB's transactions added, a block over N2C can be up to about 12.5 MB, roughly 140x today's 90 kB limit ([ImpactAnalysis](../ImpactAnalysis.md#client-interfaces)). The wire format doesn't change and the node needs no changes. A code read of `ogmios`, Pallas, `db-sync` and `cardano-wallet` found no size limit or timeout that such a block would hit (see [n2c-client-block-size-notes.md](./n2c-client-block-size-notes.md)). The remaining risk is memory while catching up: clients fetch ahead by a number of blocks (50 to 1000), not by bytes, so a run of maximum-size CertRBs could mean a gigabyte or more in memory.
+
+> [!WARNING]
+>
+> TODO: Add a devnet test that serves a run of maximum-size CertRBs to each client and measures memory while catching up.
 
 ### Feature flags and configuration
 
