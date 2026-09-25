@@ -5,6 +5,18 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w39 - 2026-09-25
+
+> [!NOTE]
+>
+> No state wipe and no respin: schema and wire formats are unchanged from the previous version.
+
+This weeks release fixes some contention bugs introduced in w38 and improves Mempool performance by enabling lock-free reads
+- Reduce WAL footprint [ouroboros-consensus#2332](https://github.com/IntersectMBO/ouroboros-consensus/pull/2332)
+- Fix LeiosDB contention in block application [ouroboros-consensus#2315](https://github.com/IntersectMBO/ouroboros-consensus/pull/2315)
+- Lock-free Mempool reads [ouroboros-consensus#2308](https://github.com/IntersectMBO/ouroboros-consensus/pull/2308)
+- Close the LeiosDb handle, and stop the copier taking the caller down with it [ouroboros-consensus#2314](https://github.com/IntersectMBO/ouroboros-consensus/pull/2314)
+
 ## prototype-2026w38a - 2026-09-22
 
 A patch release on w38: reverts a ledger incompatibility, and stops unbounded memory growth when syncing a node.
