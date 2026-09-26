@@ -42,6 +42,7 @@ processes:
       NODE_DIR="${WORKING_DIR}/node1" \
       IP="${IP_NODE1}" \
       PORT="${PORT_NODE1}" \
+      CARDANO_NODE="${CARDANO_NODE_BIN}" \
       ${IP_BIN} netns exec proto-devnet:node1 bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node1/node.log"
     depends_on:
@@ -54,6 +55,7 @@ processes:
       NODE_DIR="${WORKING_DIR}/node2" \
       IP="${IP_NODE2}" \
       PORT="${PORT_NODE2}" \
+      CARDANO_NODE="${CARDANO_NODE_BIN}" \
       ${IP_BIN} netns exec proto-devnet:node2 bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node2/node.log"
     depends_on:
@@ -66,6 +68,7 @@ processes:
       NODE_DIR="${WORKING_DIR}/node3" \
       IP="${IP_NODE3}" \
       PORT="${PORT_NODE3}" \
+      CARDANO_NODE="${CARDANO_NODE_BIN}" \
       ${IP_BIN} netns exec proto-devnet:node3 bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node3/node.log"
     depends_on:
