@@ -47,7 +47,7 @@ Ouroboros Leios introduces **high-throughput** as a third fundamental property, 
 
 As was the case for the [Praos variant of Ouroboros](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf#subsection.5.1), the specification embodied in the published and peer-reviewed [research paper for Ouroboros Leios](https://eprint.iacr.org/2025/1115.pdf) was not intended to be directly implementable. Initial research and development studies confirmed this expectation, identifying several unsolved problems with the fully concurrent block production design when considering the concrete Cardano ledger and what consequences this would have (TODO: cite suitable R&D reports, [Tech Report #2](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md#conflicts-ledger-and-incentives), [Impact analysis survey](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/ImpactAnalysis.md#full-survey)); further research is needed before those parts can be implemented.
 
-The design presented in [CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md), also known as "Linear Leios", focuses on the core insight of utilizing the unused network bandwidth and computational resources during the necessary and eponymous "calm periods" of the Praos protocol. This approach provides an immediately implementable design that can deliver orders of magnitude higher throughput while preserving the security guarantees that make Cardano valuable.
+The design presented in [CIP-164](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164), also known as "Linear Leios", focuses on the core insight of utilizing the unused network bandwidth and computational resources during the necessary and eponymous "calm periods" of the Praos protocol. This approach provides an immediately implementable design that can deliver orders of magnitude higher throughput while preserving the security guarantees that make Cardano valuable.
 
 The Linear Leios protocol operates by allowing a second, bigger type of block to be produced in the same block production opportunity. Block producers can produce and announce an endorser block (EB), which endorses additional transactions that would not fit within the Praos block. EBs are distributed through the network and subjected to validation by a committee of stake pools, who vote on their transaction data closure's availability and validity. Only EBs that achieve a high threshold of stake-weighted votes become certified and can be included in the ledger through exclusive anchoring of a certificate in the subsequent block - now called a ranking block (RB). This mechanism allows for significantly higher transaction throughput while maintaining the security properties of the underlying Praos consensus. See the CIP for more details on the protocol specification and rationale itself.
 
@@ -79,7 +79,7 @@ Leios significantly expands this concurrency model by introducing new responsibi
 - Endorser block and closure diffusion: receiving, validating, and transmitting EBs and their transaction closures.
 - Voting and vote diffusion: receiving, validating, and transmitting own and foreign votes on EBs.
 
-Given the [proposed Leios mini-protocols](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#leios-mini-protocols), this would result in:
+Given the [proposed Leios mini-protocols](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#leios-mini-protocols), this would result in:
 
 - 4 pipelined + 3 non-pipelined per upstream peers => 11 threads per upstream peer;
 - 1 pipelined + 6 non-pipelined per downstream peer => 8 threads per downstream peer
@@ -88,7 +88,7 @@ With these two additional functionalities, each across many peers, the node set 
 
 ## Designing for the worst-case
 
-Related to the principle of [optimizing for the worst case](https://cardano-scaling.github.io/cardano-blueprint/principles/index.html#optimise-only-for-the-worst-case), the security argument for Leios protocol depends critically on worst-case diffusion characteristics. Endorser blocks and their transaction closures must be "small enough" that the difference between optimistic diffusion (leading to successful certification) and worst-case diffusion remains bounded by the protocol parameter $L_\text{diff}$ according to the [protocol's security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security).
+Related to the principle of [optimizing for the worst case](https://cardano-scaling.github.io/cardano-blueprint/principles/index.html#optimise-only-for-the-worst-case), the security argument for Leios protocol depends critically on worst-case diffusion characteristics. Endorser blocks and their transaction closures must be "small enough" that the difference between optimistic diffusion (leading to successful certification) and worst-case diffusion remains bounded by the protocol parameter $L_\text{diff}$ according to the [protocol's security argument](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#protocol-security).
 
 If the optimistic, average-case performance is improved with suitable algorithms, data structures and optimizations, but the worst-case scenario is not, more conservative parameter choices would be required to maintain security guarantees. This would negate the anticipated benefits of the optimizations in the first place. Therefore, the implementation must prioritize ensuring that even in adverse network conditions or under attack, the diffusion of EBs and their closures remains within acceptable bounds.
 
@@ -109,7 +109,7 @@ The following chapters detail the specific risks that inform architectural decis
 
 The implementation of Ouroboros Leios represents a substantial evolution of the Cardano consensus protocol, introducing high throughput as a third key property alongside the existing persistence and liveness guarantees. The path from protocol specification to production deployment requires careful validation of assumptions, progressive refinement through multiple system readiness levels, and continuous demonstration of correctness and performance characteristics. This chapter outlines the strategy for maturing the Leios protocol design through systematic application of formal methods, simulation, prototyping, and testing techniques.
 
-The result is an implementation plan that not only covers the ["path to active" of CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#path-to-active), but also serves as a rationale for what concrete steps will be taken on our [product roadmap](https://leios.cardano-scaling.org/docs/roadmap/) of realizing Ouroboros Leios.
+The result is an implementation plan that not only covers the ["path to active" of CIP-164](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#path-to-active), but also serves as a rationale for what concrete steps will be taken on our [product roadmap](https://leios.cardano-scaling.org/docs/roadmap/) of realizing Ouroboros Leios.
 
 > [!WARNING]
 >
@@ -150,7 +150,7 @@ The formal specification must be maintained as a living artifact throughout impl
 
 ## Simulation and protocol validation
 
-Simulations provide a very controlled environment for exploring protocol behavior before deploying to real infrastructure. Two complementary simulation approaches have been used so far to [validate the proposed protocol in CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#simulation-results), each with distinct strengths and even using different implementation languages.
+Simulations provide a very controlled environment for exploring protocol behavior before deploying to real infrastructure. Two complementary simulation approaches have been used so far to [validate the proposed protocol in CIP-164](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#simulation-results), each with distinct strengths and even using different implementation languages.
 
 A discrete event simulation implemented in Rust, models Leios message exchanges between nodes, abstracting lower-level details for speed—running orders of magnitude faster than real time to enable statistical analysis over thousands of runs with complete observability and arbitrary adversarial behavior injection. This validates security arguments by systematically exploring protocol behavior under varying loads, expected data diffusion in small to medium sized network topologies, or adversarial scenarios like data withholding, and exploration of protocol parameters before testnet deployment.
 
@@ -224,7 +224,7 @@ The relationship between Ouroboros Leios and Ouroboros Peras presents both oppor
 
 **Resource contention and prioritization** emerges as the most immediate coordination challenge. Both protocols introduce additional network traffic that competes with existing Praos communication. The [resource management](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/ImpactAnalysis.md#resource-management) requirements for Leios - prioritizing Praos traffic above fresh Leios traffic above stale Leios traffic - must be extended to also accommodate Peras network messages. Any prioritization scheme requires careful analysis of the timing constraints for each protocol to ensure that neither compromises the other's security guarantees. Current understanding is that Peras traffic should be prioritized above both, stale and fresh Leios traffic, such that Leios protocol burst attacks may not force Peras into a cooldown period.
 
-**Vote diffusion protocols** present a potential area for code reuse, though this opportunity comes with important caveats. The Leios implementation will initially evaluate the vote diffusion protocols [specified in CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#leios-mini-protocols) for their resilience against protocol burst attacks and general performance characteristics. Once the Peras [object diffusion mini-protocol](https://tweag.github.io/cardano-peras/peras-design.pdf#section.2.5) becomes available, it should also be evaluated for applicability to Leios vote diffusion. However, the distinct performance requirements and timing constraints of the two protocols may ultimately demand separate implementations despite structural similarities.
+**Vote diffusion protocols** present a potential area for code reuse, though this opportunity comes with important caveats. The Leios implementation will initially evaluate the vote diffusion protocols [specified in CIP-164](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#leios-mini-protocols) for their resilience against protocol burst attacks and general performance characteristics. Once the Peras [object diffusion mini-protocol](https://tweag.github.io/cardano-peras/peras-design.pdf#section.2.5) becomes available, it should also be evaluated for applicability to Leios vote diffusion. However, the distinct performance requirements and timing constraints of the two protocols may ultimately demand separate implementations despite structural similarities.
 
 **Cryptographic infrastructure** offers the most promising near-term synergy. Both protocols are based on signature schemes using BLS12-381 keys, creating an opportunity for shared cryptographic infrastructure. If key material can be shared across protocols, stake pool operators would need to generate and register only one additional key pair rather than separate keys for each protocol. This shared approach would significantly simplify the bootstrapping process for whichever protocol deploys second.
 
@@ -282,7 +282,7 @@ The following threats have been selected for detailed analysis based on their po
 ### Data withholding
 
 In a data withholding attack (**ATK-LeiosDataWithholding**, see also [threat vectors #20, #21 and #22](../threat-model.md#data-withholding)), the adversary deliberately prevents the diffusion of endorser block transaction closures to disrupt certification and degrade network throughput.
-This attack exploits the fundamental dependency between transaction availability and EB certification, targeting the gap between optimistic and worst-case diffusion scenarios that underlies Leios' [security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security).
+This attack exploits the fundamental dependency between transaction availability and EB certification, targeting the gap between optimistic and worst-case diffusion scenarios that underlies Leios' [security argument](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#protocol-security).
 
 The attack operates by manipulating timing and availability of transaction data required for EB validation.
 When an EB is announced via an RB header, voting committee members must acquire and validate the complete transaction closure before casting votes.
@@ -818,7 +818,7 @@ Where possible, `reapplyTx` is used when we know that the transaction has been f
 
 - **REQ-LedgerTxNoValidation** The ledger should provide a way to update the ledger state by just applying a transaction without validation.
 
-This third way of updating a ledger state would be used when we have a valid certificate about endorsed transactions in a ranking block. To avoid delaying diffusion of ranking blocks, we do want to do the minimal work necessary once an EB is certified and ease the [protocol security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security) with:
+This third way of updating a ledger state would be used when we have a valid certificate about endorsed transactions in a ranking block. To avoid delaying diffusion of ranking blocks, we do want to do the minimal work necessary once an EB is certified and ease the [protocol security argument](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#protocol-security) with:
 
 - **REQ-LedgerCheapReapply** Updating the ledger state without validation must be significantly cheaper than even reapplying a transaction is today.
 
@@ -831,7 +831,21 @@ CIP-164 introduces several new protocol parameters that may be updated via on-ch
 - **REQ-LedgerProtocolParameterAccess** The ledger must provide access to all new protocol parameters via existing interfaces.
 - **REQ-LedgerProtocolParameterUpdate** The ledger must be able to update all new protocol parameters via on-chain governance.
 
-Concretely, this means defining the `PParams` and `PParamsUpdate` types for the `Dijkstra` era to include the new parameters, as well as providing access via the `DijkstraPParams` and other type classes.
+Concretely, this means defining the `PParams` and `PParamsUpdate` types for the `Dijkstra` era to include the new parameters, as well as providing access via the `DijkstraPParams` and other type classes. The parameters, their `protocol_param_update` keys and the `PParams` lenses the ledger exposes them through are:
+
+| Key | Parameter                           | Symbol            | Type            |
+|-----|-------------------------------------|-------------------|-----------------|
+| 40  | `ppLeiosAnnouncementPeriodLength`   | $L_\text{hdr}$    | `Milliseconds32` |
+| 41  | `ppLeiosVotePeriodLength`           | $L_\text{vote}$   | `Milliseconds32` |
+| 42  | `ppLeiosDiffusionPeriodLength`      | $L_\text{diff}$   | `Milliseconds32` |
+| 43  | `ppLeiosCommitteeSize`              | $N_c$             | `uint .size 2`  |
+| 44  | `ppLeiosQuorumStakeThreshold`       | $\tau$            | `unit_interval` |
+| 45  | `ppMaxEndorserBlockReferencesSize`  | $S_\text{EB}$     | `uint .size 4`  |
+| 46  | `ppMaxEndorserBlockTxsSize`         | $S_\text{EB-tx}$  | `uint .size 4`  |
+| 47  | `ppMaxEndorserBlockExUnits`         | -                 | `ex_units`      |
+| 48  | `ppMaxRefScriptSizePerEndorserBlock`| $S_\text{EB-ref}$ | `uint .size 4`  |
+
+Note that the three timing parameters are reasoned about in seconds throughout CIP-164 — that is the unit the protocol's timing arguments use — but are encoded in milliseconds so that sub-second values stay expressible independently of `slotLength`. $L_\text{hdr}$ is the *announcement* period: an RB header is the announcement, so $L_\text{hdr}$ is the time one announcement needs to travel the network and $3 L_\text{hdr}$ is the window that rules out equivocation. The per-EB Plutus step and memory budgets share a single `ex_units` pair, mirroring the existing `maxTxExUnits` and `maxBlockExUnits`.
 
 ### Key registration and rotation
 
@@ -853,6 +867,10 @@ Unlike a KES key, which takes effect immediately on the chain it is used to buil
 
 - **REQ-RotateBLSKeys** A registered BLS key must be rotatable by re-registration and activated at an epoch boundary
 
+**Expiry.** Rotation is only a cadence if something enforces it, so a registered key is honoured for a bounded number of epochs after its registration and the pool falls back to a keyless seat once it lapses. The bound is *derived*, not governed: `maxKeyAgeEpochs = ceil(slotsPerKESPeriod * maxKESEvolutions / epochLength) + 2`, i.e. the KES key lifetime rounded up to whole epochs plus the two epochs of activation delay, which evaluates to **21 epochs** on mainnet. Deriving it from the KES setup already fixed in genesis keeps voting-key and operational-key rotation on one schedule by construction, with no second knob that could drift out of step; retuning the cadence means changing the KES setup, which requires a hard fork anyway. Expiry is judged against the epoch the committee is selected *for*, not the epoch its snapshot was taken in, so an epoch's committee has a stable set of usable keys throughout. This is already implemented: `maxKeyAgeEpochs` in `Cardano.Ledger.Dijkstra.Rules.Snap` derives the bound from `Globals` and seats the committee from the rotating mark snapshot, and `honouredBlsKey` in the [formal ledger specification](https://github.com/IntersectMBO/formal-ledger-specifications/pull/1300) is its specification counterpart.
+
+- **REQ-ExpireBLSKeys** A registered BLS key must stop being honoured `maxKeyAgeEpochs` epochs after its registration, taking effect at an epoch boundary, with the bound derived from the genesis KES parameters rather than governed.
+
 Aligning BLS activation with VRF is a deliberate choice rather than a necessity, and BLS could in fact activate sooner. VRF keys are held back for two epochs precisely so that the leader-election nonce cannot be ground; BLS keys carry no such concern, so a registered BLS key could become active a full epoch earlier — as soon as the mark stake snapshot it appears in has stabilised (after the `3k/f` stability window), taking effect the next epoch. We forgo that earlier activation and instead pin BLS to VRF's two-epoch schedule, because activation is not only an on-chain event: the operator must place the newly-active signing key on the hot, block-producing machine for the epoch in which it takes effect. If BLS activated an epoch before VRF, an SPO that rotated both keys in epoch `e` would face two separate hot-key swaps — the BLS key in `e+1` and the VRF key in `e+2`. Aligning the two collapses this to a single swap in `e+2`; we accept the longer dead time — the BLS key sits registered but inactive for an extra epoch — in exchange for the more convenient, single-event key handling.
 
 Either way, a freshly registered or rotated key is not eligible to vote until the snapshot in which it appears becomes the active stake distribution. A committee that must be live from the very first epoch (e.g. a fresh devnet) therefore needs the key seeded into the initial snapshots directly.
@@ -869,15 +887,15 @@ The committee is **materialized once per epoch and stored in the ledger state**,
 
 **Committee representation.** A committee is an ordered sequence of _seats_, indexed `0..N-1`. Each seat records the pool's relative stake (its voting weight) and its `StrictMaybe BlsKey`. The seat index is the `voter_id` a vote carries and the bit position addressed by a certificate's signer bitfield, so the ordering must be canonical: pools are ordered by descending stake, ties broken by pool id. A seat's index is thereby a deterministic function of `PoolDistr` alone.
 
-**Selection.** Sorts the `PoolDistr` entries descending by stake and admits pools until a stopping condition on a [protocol parameter](#new-protocol-parameters) is met. The scheme in [CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#committee-structure) uses a cumulative-stake coverage target — for example 99% of active stake was found feasible. On the current mainnet stake distribution this is a strongly concentrated, long-tailed curve: of the ~2,700 registered pools, roughly 900 already cover 99% of active stake (and ~580 cover 95%), while the remaining long tail contributes the last percent.
+**Selection.** Sorts the `PoolDistr` entries descending by stake, breaking ties by ascending pool id, and seats the first `leiosCommitteeSize` of them (or all pools, if fewer are registered). The parameter is a plain seat count $N_c$ — [CIP-164](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#committee-structure) governs the committee by size rather than by a cumulative-stake coverage target, and the ledger carries it as protocol parameter 43. On the current mainnet stake distribution the curve is strongly concentrated and long-tailed: of the ~2,700 registered pools, roughly 900 already cover 99% of active stake (and ~580 cover 95%), while the remaining long tail contributes the last percent. A feasible value for $N_c$ is therefore around 900 seats, which is also what CIP-164 records as the feasible value.
 
 ![](./mainnet-stake-distribution-e657.png)
 
-> [!WARNING]
+> [!NOTE]
 >
-> TODO: Switch to committee size or hybrid parameterization? Not yet decided — the shape of the parameter (cumulative-stake coverage vs. a fixed committee size vs. a hybrid cap) is still open; see the effect of stake-distribution changes below.
+> The shape of this parameter was an open question — cumulative-stake coverage vs. a fixed committee size vs. a hybrid cap. It is settled: a fixed committee size. See the effect of stake-distribution changes below for what that choice does and does not cost.
 
-**Effect of stake-distribution changes.** Because votes are stake-weighted and each seat's weight is recorded, certification always evaluates the _actual_ signed stake — the sum of the weights of the seats whose bits are set — against the quorum threshold. There is therefore no under-representation in the sortition sense: the committee cannot misrepresent how much stake voted, whatever its size. A shift in the stake distribution changes only the committee's _shape_. Under a cumulative-stake coverage parameter a flatter distribution admits more pools, so there are more (individually lighter) votes to diffuse and more signatures must accumulate to reach the threshold stake; a more concentrated distribution gives a smaller committee with heavier votes. A fixed committee-size parameter would instead pin the vote count and let the represented stake float with the distribution. This is exactly the open trade-off above — vote-diffusion load versus how tightly the committee's stake tracks the network's active stake — and neither choice risks under-representing the stake that actually signed.
+**Effect of stake-distribution changes.** Because votes are stake-weighted and each seat's weight is recorded, certification always evaluates the _actual_ signed stake — the sum of the weights of the seats whose bits are set — against the quorum threshold. There is therefore no under-representation in the sortition sense: the committee cannot misrepresent how much stake voted, whatever its size. A shift in the stake distribution changes only how much stake the committee _covers_. Under the chosen fixed committee size the vote count per EB is pinned and the covered stake $\sigma(N_c)$ floats with the distribution: a flatter distribution means the top $N_c$ pools hold less of the total, a more concentrated one means they hold more. (A cumulative-stake coverage parameter would trade this the other way, pinning covered stake and letting the vote count float.) This makes $N_c$ a **liveness** parameter, not a safety-critical one: if $\sigma(N_c)$ drifts below the quorum threshold $\tau$, no certificate can be formed even with unanimous support, but no certificate can ever be formed that misstates the stake behind it. Governance must therefore keep $\sigma(N_c) > \tau$ with headroom for members that are offline, keyless, or too slow to vote within $L_\text{vote}$.
 
 **Keyless seats.** Committee membership is by stake, independent of key registration: a stake-selected pool whose `individualPoolStakeBls` is `SNothing` still occupies a seat, but that seat is _keyless_ — it holds a weight yet has no key to sign with. A keyless seat can never contribute to a valid certificate, and a certificate whose signer bitfield sets a keyless seat's bit must be rejected. Because keyless seats fall out of the same deterministic derivation from `PoolDistr`, every node agrees on exactly which seats are keyless; a divergence would make honest certificates appear invalid (the `SignerWithoutKey` failure).
 
@@ -1166,7 +1184,7 @@ Each stage is a cardano-node release scope that could be considered to hard-fork
 > [!WARNING]
 > TODO: Use pandoc-compatible citations https://pandoc.org/MANUAL.html#citation-syntax
 
-1. **CIP-164**: Ouroboros Linear Leios - Greater transaction throughput https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md
+1. **CIP-164**: Ouroboros Linear Leios - Greater transaction throughput https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164
 
 1. **Leios Impact Analysis**: High-level component design https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/ImpactAnalysis.md
 
