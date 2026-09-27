@@ -54,7 +54,10 @@
     # Patched cardano-node — source of cardano-node, cardano-cli, and
     # tx-firehose across the repo. The tx-firehose bench/ package now
     # lives on top of leios-prototype so a single input suffices.
-    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
+    # jl/leios-w39 is leios-prototype 8bb6b68d with the ouroboros-network SRP
+    # repointed at a bounded inbound-governor MuxFinished await. Diagnostic for
+    # the relay wedge; revert to ref=leios-prototype when the test concludes.
+    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=jl/leios-w39";
   };
 
   outputs =
