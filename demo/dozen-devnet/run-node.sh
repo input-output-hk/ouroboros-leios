@@ -6,7 +6,16 @@ set -euo pipefail
 
 cd "$NODE_DIR"
 
-export LEIOS_DB_PATH="leios.db"
+export LEIOS_VOL_DB_PATH="leios.db.vol"
+export LEIOS_IMM_DB_PATH="leios.db.imm"
+
+# A socket left behind by a previous run -- which RESUME=1 guarantees -- satisfies
+# the wait below instantly. The waiter then chmods that doomed inode, the node
+# unlinks it on startup and binds its own at the node's 0755, and nothing ever
+# makes the real one writable. Connecting to a unix socket needs write
+# permission, so every non-root client then fails with EACCES. Remove it first,
+# so the waiter can only ever see the socket the node actually created.
+rm -f "node.socket"
 
 # Make socket accessible to non-root (node runs elevated for namespace access)
 (
@@ -15,15 +24,19 @@ export LEIOS_DB_PATH="leios.db"
 ) &
 
 # Only block producers have pool keys copied into keys/ by run.sh; a relay runs
-# with none of the forging arguments at all.
+# with none of the forging arguments at all. The BLS key is separate: under
+# VOTERS it is a JSON array bundling the pool's own key with its share of the
+# generated voter keys, and a producer without one forges but does not vote.
 FORGE_ARGS=()
 if [ -f "keys/vrf.skey" ]; then
   FORGE_ARGS=(
     --shelley-vrf-key "keys/vrf.skey"
     --shelley-kes-key "keys/kes.skey"
-    --shelley-bls-key "keys/bls.skey"
     --shelley-operational-certificate "keys/opcert.cert"
   )
+  if [ -f "keys/bls.skey" ]; then
+    FORGE_ARGS+=(--shelley-bls-key "keys/bls.skey")
+  fi
 fi
 
 # Extra RTS options, appended after the ones baked into the binary

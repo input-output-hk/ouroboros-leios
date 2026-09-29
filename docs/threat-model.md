@@ -4,6 +4,7 @@ status: Draft
 version: 0.4
 author:
   - Sebastian Nagel <sebastian.nagel@iohk.io>
+  - Giorgos Panagiotakos <giorgos.panagiotakos@iohk.io>
 ---
 
 A threat model for the Leios consensus change for Cardano as proposed in [CIP-164](https://github.com/cardano-foundation/CIPs/pull/1078). This model is considered in the [Leios design document](./leios-design), which holds more more details on the implementation plan and technical design decisions.
@@ -250,25 +251,32 @@ A particularly dangerous and sophisticated variant targets blockchain safety its
 > [!NOTE]
 > This is also a [key threat informing the Leios technical design](./leios-design#protocol-bursts)
 
-Adversaries can withhold large numbers of EBs and their transaction closures over extended periods, then release them simultaneously to create concentrated bursts of network traffic. This attack exploits Leios' requirement that nodes must attempt to acquire any EB correctly announced even if it arrives too late for the node to vote on it, since the EB might still be certified by other nodes and required for future chain selection.
+Leios requires that nodes must attempt to acquire any EB correctly announced even if it arrives too late for the node to vote on it, since the EB might still be certified by other nodes and required for future chain selection. Symmetrically, nodes should offer any EBs they receive to other nodes to accommodate this requirement. This need for fast EB diffusion, leads to a number of attack vectors related to bursts and increased resource consumption.
 
-The attack magnitude depends on the adversary's stake proportion and EB size parameters, reaching hundreds of megabytes or even gigabytes of data to be fetched. An adversary controlling 1/3 stake could accumulate approximately 720 EBs over 12 hours, potentially totaling over 9 gigabytes if each EB contains maximum-sized transaction sets. When released simultaneously, this creates sustained bandwidth pressure that can degrade network performance even for nodes that validate only a small subset of the burst.
+A first line of attack occurs when adversaries withhold large numbers of EBs and their transaction closures over extended periods, then release them simultaneously to create concentrated bursts of network traffic. The attack magnitude depends on the adversary's stake proportion and EB size parameters, reaching hundreds of megabytes or even gigabytes of data to be fetched. An adversary controlling 1/3 stake could accumulate approximately 720 EBs over 12 hours, potentially totaling over 9 gigabytes if each EB contains maximum-sized transaction sets. When released simultaneously, this creates sustained bandwidth pressure that can degrade network performance even for nodes that validate only a small subset of the burst.
 
-**Impact**: Protocol bursts target network resources and can escalate from operational issues to safety threats if traffic prioritization is insufficient. While the protocol requires Praos traffic to be prioritized over Leios traffic, imperfect prioritization during large bursts can delay Praos block diffusion beyond the critical timing parameter Δ, potentially compromising blockchain safety. The sheer bandwidth utilization is problematic even when honest nodes validate only a fraction of the burst data. Infrastructure limitations like cloud provider throttling, router buffer saturation, and asymmetric CPU/memory costs amplify the impact and make perfect prioritization challenging.
+A second line of attack is due to an attacker attempting to drain the network's upload resources at the time of an EB burst by creating multiple "fake" connections to honest nodes, and requesting the same EBs from multiple parties. As long as EB requests are treated equally, the attacker can make honest nodes consume all their available upload capacity, effectively degrading their quality-of-service to honest nodes. Notably, the attacker only needs to hide behind many different (and possibly changing) IPs to launch this attack and with only limited resource consumption on its side. 
+
+**Impact**: Protocol bursts target network resources and can escalate from operational issues to safety threats if traffic prioritization is insufficient. While the protocol requires Praos traffic to be prioritized over Leios traffic, imperfect prioritization during large bursts of activity can delay Praos block diffusion beyond the critical timing parameter Δ, potentially compromising blockchain safety. The sheer bandwidth utilization is problematic even when honest nodes validate only a fraction of the burst data. Infrastructure limitations like cloud provider throttling, router buffer saturation, and asymmetric CPU/memory costs amplify the impact and make perfect prioritization challenging.
 
 **Assets Affected**: Operational Sustainability, High Throughput, Blockchain Safety (if prioritization fails)
 
 **Mitigation**: The primary defense is traffic prioritization implementing freshest-first delivery semantics - Praos traffic must be preferred over Leios traffic, and fresh Leios traffic over stale traffic. However, some infrastructural resources cannot be prioritized perfectly, including CPU, memory, disk bandwidth, and network router buffers. The attack's magnitude is bounded by the adversary's stake proportion, but ultimately requires engineering solutions for effective prioritization during burst conditions.
 
+A second line of defense is through making connection initiation "verifiable". Currently, a fraction of the upstream connections initiated by a node make use of stake-based sampling, i.e., the node samples which nodes to connect to from a public list of "large" peers. Using the VRF mechanism for verifiably correct sampling, and communicating the related proof at the time of connection creation, ensures that each node only gets to serve a number of verifiable downstream connections proportional to each stake. Further, serving these connections with priority, ensures that QoS does not degrade against an attacker that creates a disproportionately to its stake number of connections and block requests.
+
+
+
 | #   | Method                                    | Effect                                                                     | Resources                      | Mitigation                                      |
 |-----|-------------------------------------------|----------------------------------------------------------------------------|--------------------------------|-------------------------------------------------|
 | T23 | Withhold then release large number of EBs | Bandwidth saturation, processing delays, potential Praos timing disruption | Stake (proportional magnitude) | Freshest-first delivery, traffic prioritization |
+| ? | Creating many "fake" downstream connections and requesting the same EB multiple times | Bandwidth saturation, processing delays, potential Praos timing disruption | Connection initiation from multiple IPs | Verifiable stake-based connection initiation, traffic prioritization |
 
 ### Transaction-Based Denial of Service
 
 Adversaries can degrade network performance and waste resources by submitting problematic transactions that consume processing capacity while providing minimal throughput value. These attacks exploit the transaction validation and mempool management overhead, forcing nodes to spend resources on transactions that either fail validation or conflict with each other. Unlike data withholding or protocol bursts, these attacks use normal transaction submission mechanisms, making them difficult to distinguish from legitimate network congestion.
 
-The attack surface includes multiple vectors with varying resource requirements. Simple variants involve submitting duplicate, invalid, or conflicting transactions as regular client nodes. Network-level variants like mempool partitioning require control over network positioning to segment transaction propagation, creating inconsistent views across block producers.
+The attack surface includes multiple vectors with varying resource requirements. Simple variants involve submitting duplicate, invalid, or conflicting transactions as regular client nodes. Network-level variants like mempool partitioning require control over network positioning to segment transaction propagation, creating inconsistent views across block producers. 
 
 An interesting economic variant involves honeypot contracts that entice many users to submit conflicting transactions by offering attractive rewards, using the ledger's intended functionality to generate artificial traffic. For example:
 1. Lock a lot of ADA into a script that allows anyone to take `amount` while the remainder must be kept in the script.
@@ -277,13 +285,13 @@ An interesting economic variant involves honeypot contracts that entice many use
     a. If attacker is successful, only transaction fees were spent and `amount` can go back into the honey pot.
     b. Continue until funds run out.
 
-Mempool partitioning differs from eclipse attacks on voting/diffusion in that it targets transactions flowing upstream rather than blocks propagating downstream: transactions propagate from clients to block producers, while block data flows from producers to voters and the broader network. This directional difference means that partitioning transaction pools requires different network positioning and currently lacks specific mitigation mechanisms.
+Mempool partitioning differs from eclipse attacks on voting/diffusion in that it targets transactions flowing upstream rather than blocks propagating downstream: transactions propagate from clients to block producers, while block data flows from producers to voters and the broader network. This directional difference means that partitioning transaction pools requires different network positioning and currently lacks specific mitigation mechanisms. More sophisticated versions of this attack include creating high mempool consistency to only local parts of the network to aid EB certification, e.g., by sharing a bunch of transactions with enough nodes to guarantee certification just before releasing a new EB containing exactly this set of transactions, while taking advantage of the global mempool inconsistency to ensure the delayed delivery of the certified EB.
 
 **Impact**: These attacks primarily reduce effective transaction throughput while wasting computational and network resources. Invalid transactions consume validation cycles before being discarded. Conflicting transactions force nodes to process multiple alternatives when only one can succeed. Mempool partitioning can create scenarios where different block producers have inconsistent transaction views, potentially leading to conflicting EBs that don't reach quorum (in time) wasting voting resources. The honeypot variant creates artificial high-volume traffic that appears legitimate but provides low practical utility.
 
 **Assets Affected**: High Throughput, Operational Sustainability
 
-**Mitigation**: Transaction validation and fee mechanisms provide primary defense against invalid submissions. Pull-based transaction diffusion and strict mempool limits help contain resource consumption. Linear Leios' design prevents conflicting transactions from reaching permanent storage, limiting long-term impact. Additionally, endorsed transactions extend the mempool view through block diffusion, which is significantly harder to eclipse than upstream transaction propagation. However, mempool partitioning currently lacks specific countermeasures due to the directional nature of transaction flow. Detection of artificial transaction patterns is challenging since legitimate congestion can appear similar to attack traffic.
+**Mitigation**: Transaction validation and fee mechanisms provide primary defense against invalid submissions. Pull-based transaction diffusion and strict mempool limits help contain resource consumption. Linear Leios' design prevents conflicting transactions from reaching permanent storage, limiting long-term impact. Additionally, endorsed transactions extend the mempool view through block diffusion, which is significantly harder to eclipse than upstream transaction propagation. However, mempool partitioning currently lacks specific countermeasures due to the directional nature of transaction flow. Detection of artificial transaction patterns is challenging since legitimate congestion can appear similar to attack traffic. Attacks that depend on localized mempool consistency conditions can mitigated by appropriately parameterizing L_diff so that it can accommodate the diffusion of fully unknown EBs.
 
 > [!NOTE]
 > Linear Leios prevents conflicting transactions from reaching permanent storage, so impact is limited to temporary and mostly local resource waste. This is not the case for protocol variants with decoupled, concurrent block production (of EBs or IBs) where conflicting transactions would largely be "unpaid".
@@ -293,7 +301,7 @@ Mempool partitioning differs from eclipse attacks on voting/diffusion in that it
 | T24 | Submit duplicate transactions                | Resource waste                             | Network bandwidth                      | Pull-based diffusion, validation          |
 | T25 | Submit invalid transactions                  | Resource waste                             | Network bandwidth                      | Validation before propagation             |
 | T26 | Submit conflicting transactions              | Processing waste, only one succeeds        | Transaction fees per conflict          | Linear Leios design                       |
-| T27 | Mempool partitioning via network control     | Inconsistent mempools, conflicting EBs     | Network infrastructure control         | Limited: directional flow difference      |
+| T27 | Mempool partitioning via network control     | Inconsistent mempools, conflicting EBs, delayed certified EB delivery     | Network infrastructure control         | Limited: directional flow difference, worst-case L_diff parameterization      |
 | T28 | Honeypot contract creating transaction races | Artificial high-volume conflicting traffic | Contract deployment costs / incentives | Limited: attacker pays for some conflicts |
 
 ### System operation and Governance
@@ -371,7 +379,7 @@ block producer is incentivized to include both the transactions and the certific
 | #   | Method                                           | Effect                                                   | Resources                              | Mitigation                                |
 |-----|--------------------------------------------------|----------------------------------------------------------|----------------------------------------|-------------------------------------------|
 | T34 | Create a forking chain to extract MEV             | Praos safety violation                                  | Stake-based adversary                   |  ?                                 |
-| T35 | Do not include EB certificate in RB               | Reduced throughput                                      | Block producing party                   | tx inclusion into RBs with EB certificates, tx-to-RB signalling            |
+| T35 | Do not include EB certificate in RB               | Reduced throughput                                      | Block producing party                   | Tx inclusion into RBs with EB certificates, tx-to-RB signalling            |
 
 
 

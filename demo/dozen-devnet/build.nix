@@ -30,6 +30,26 @@
           inputs'.cardano-node-leios.packages.tx-firehose
           # Its observer: reads a mempool over N2C, reports whose load it holds.
           inputs'.cardano-node-leios.packages.mempool-monitor
+          # Eventlog analysis, for forge-loop investigations. Arm a node with
+          # NODE_RTS="-l"; the vanilla RTS is enough, no profiling build.
+          #
+          # eventlog2html is a *heap* profile renderer: without -hT it has almost
+          # nothing to draw, and it never draws GC pause bars. Add -hT (heap by
+          # closure type, also vanilla-RTS) to see what the forge loop allocates.
+          # For "where are the GCs", use threadscope (per-capability timeline,
+          # GC as bars) or ghc-events (raw events with timestamps, greppable).
+          # Cheapest of all and needing none of these: NODE_RTS="-S" writes a
+          # line per GC to stderr, which lands in node.log interleaved with the
+          # forge traces, so the correlation is direct.
+          #
+          # hs-speedscope is the one that needs a profiled build: it turns the
+          # cost-centre samples written under "-l -p" into a speedscope profile,
+          # which beats a static flamegraph because you can filter to the slow
+          # interval.
+          pkgs.haskellPackages.eventlog2html
+          pkgs.haskellPackages.hs-speedscope
+          pkgs.haskellPackages.ghc-events
+          pkgs.haskellPackages.threadscope
         ];
         # To easily interact with the relay that takes the load from within the
         # demo dir

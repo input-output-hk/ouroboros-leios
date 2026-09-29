@@ -80,7 +80,10 @@ module LinearLeiosVerifier where
     SUT : String
     SUT = to-nodeId sutId
 
-    winningSlot : TraceEvent → Maybe (BlockType × ℕ)
+    -- EB-production winning slots harvested from the trace.  Voting slots are
+    -- not collected: 'winning-slots' governs EB production only, since VT
+    -- eligibility is the CIP-0164 committee rather than a per-slot lottery.
+    winningSlot : TraceEvent → Maybe ℕ
     winningSlot record { message = Slot _ _ }                     = nothing
     winningSlot record { message = Cpu _ _ _ _ }                  = nothing
     winningSlot record { message = NoIBGenerated _ _ }            = nothing
@@ -103,12 +106,9 @@ module LinearLeiosVerifier where
     winningSlot record { message = TXGenerated _ _ }              = nothing
     winningSlot record { message = EBGenerated p _ s _ _ _ _ _ }
       with p ≟ SUT
-    ... | yes _ = just (EB , primWord64ToNat s)
+    ... | yes _ = just (primWord64ToNat s)
     ... | no _  = nothing
-    winningSlot record { message = VTBundleGenerated p _ s _ _ _ }
-      with p ≟ SUT
-    ... | yes _ = just (VT , primWord64ToNat s)
-    ... | no _  = nothing
+    winningSlot record { message = VTBundleGenerated _ _ _ _ _ _ }  = nothing
     winningSlot record { message = RBGenerated _ _ _ _ _ _ _ _ _ }  = nothing
 
     EventLog = List TraceEvent
@@ -140,11 +140,11 @@ module LinearLeiosVerifier where
       -- Voting (VT) eligibility is NOT taken from here: it follows the
       -- deterministic, epoch-fixed committee of CIP-0164 (see Defaults.sortition),
       -- computed from the stake distribution rather than a per-slot lottery.
-      winning-slots-of : ℙ (BlockType × ℕ)
+      winning-slots-of : ℙ ℕ
       winning-slots-of =
         if L.null leadershipSchedule
           then fromList (L.catMaybes (L.map winningSlot l))
-          else fromList (L.map (λ s → EB , s) leadershipSchedule)
+          else fromList leadershipSchedule
 
       testParams : TestParams params
       testParams =
@@ -187,6 +187,10 @@ module LinearLeiosVerifier where
         Show-EBCert : Show (Maybe EBCert)
         Show-EBCert .show nothing  = "No EBCert"
         Show-EBCert .show (just c) = show c
+
+        Show-TxsOrEBCert : Show (List Tx ⊎ EBCert)
+        Show-TxsOrEBCert .show (inj₁ txs)  = "Txs " S.++ show txs
+        Show-TxsOrEBCert .show (inj₂ cert) = "EBCert " S.++ show cert
 
       unquoteDecl Show-EndorserBlockOSig = derive-Show [ (quote EndorserBlockOSig , Show-EndorserBlockOSig) ]
       unquoteDecl Show-RankingBlock = derive-Show [ (quote RankingBlock , Show-RankingBlock) ]
@@ -285,11 +289,11 @@ module LinearLeiosVerifier where
 
       -- RBs
       traceEvent→action l record { message = RBGenerated p i s _ eb _ _ _ txs } =
-        let rb = record
-                   { txs = map primWord64ToNat txs
-                   ; announcedEB = nothing -- this is set in EBReceived
-                   ; ebCert = unwrap eb >>= λ b → EB-refs l ⁉ BlockRef.id (Endorsement.eb b) >>= λ eb' → return (hash eb')
-                   ; slot = primWord64ToNat s
+        let ebCert = unwrap eb >>= λ b → EB-refs l ⁉ BlockRef.id (Endorsement.eb b) >>= λ eb' → return (hash eb')
+            rb = record
+                   { announcedEB = nothing -- this is set in EBReceived
+                   -- An RB carries either a certificate or transactions, never both.
+                   ; txsOrEbCert = maybe inj₂ (inj₁ (map primWord64ToNat txs)) ebCert
                    }
         in record l { RB-refs = (i , rb) ∷ RB-refs l } , []
 

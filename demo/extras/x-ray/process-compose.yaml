@@ -30,11 +30,6 @@ processes:
     command: |
       set -exuo pipefail;
 
-      if [ -d "$WORKING_DIR/loki" ]; then
-        rm -fr "$WORKING_DIR/loki";
-        echo "Removed old Loki state $WORKING_DIR/loki"
-      fi;
-
       loki -config.expand-env=true -config.file="$LOKI_CONFIG";
 
     availability:

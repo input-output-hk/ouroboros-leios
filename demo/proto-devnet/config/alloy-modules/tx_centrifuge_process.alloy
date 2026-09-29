@@ -31,66 +31,66 @@
 // Centrifuge has no real submitted-byte size unlike firehose, so only the submitted
 // count is emitted; a bytes estimate is a dashboard concern, count x avg-size.
 declare "tx_centrifuge_process" {
-  argument "forward_to" {}
+	argument "forward_to" { }
 
-  export "receiver" {
-    value = loki.process.enrich.receiver
-  }
+	export "receiver" {
+		value = loki.process.enrich.receiver
+	}
 
-  loki.process "enrich" {
-    stage.match {
-      selector = `{service!="tx-centrifuge"}`
-      action   = "drop"
-    }
+	loki.process "enrich" {
+		stage.match {
+			selector = `{service!="tx-centrifuge"}`
+			action   = "drop"
+		}
 
-    stage.json {
-      expressions = {
-        at   = "at",
-        sev  = "sev",
-        ns   = "ns",
-        data = "data",
-      }
-      drop_malformed = true
-    }
+		stage.json {
+			expressions = {
+				at   = "at",
+				sev  = "sev",
+				ns   = "ns",
+				data = "data",
+			}
+			drop_malformed = true
+		}
 
-    stage.timestamp {
-      source = "at"
-      format = "RFC3339"
-    }
+		stage.timestamp {
+			source = "at"
+			format = "RFC3339"
+		}
 
-    stage.labels {
-      values = {
-        level = "sev",
-        sev   = "sev",
-        ns    = "ns",
-      }
-    }
+		stage.labels {
+			values = {
+				level = "sev",
+				sev   = "sev",
+				ns    = "ns",
+			}
+		}
 
-    stage.static_labels {
-      values = {
-        service = "tx-centrifuge",
-      }
-    }
+		stage.static_labels {
+			values = {
+				service = "tx-centrifuge",
+			}
+		}
 
-    stage.output {
-      source = "data"
-    }
+		stage.output {
+			source = "data"
+		}
 
-    stage.match {
-      selector = `{ns="TxCentrifuge.Builder.NewTx"}`
+		stage.match {
+			selector = `{ns="TxCentrifuge.Builder.NewTx"}`
 
-      stage.metrics {
-        metric.counter {
-          name              = "txgen_submitted_total"
-          description       = "Total txs created for submission"
-          prefix            = "leios_logmetrics_"
-          action            = "inc"
-          match_all         = true
-          max_idle_duration = "24h"
-        }
-      }
-    }
+			stage.metrics {
+				metric.counter {
+					name              = "txgen_submitted_total"
+					description       = "Total txs created for submission"
+					prefix            = "leios_logmetrics_"
+					action            = "inc"
+					match_all         = true
+					max_idle_duration = "24h"
+				}
+			}
+		}
 
-    forward_to = argument.forward_to.value
-  }
+		forward_to = argument.forward_to.value
+	}
 }

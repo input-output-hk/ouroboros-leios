@@ -25,96 +25,96 @@
 // approach main's dashboard uses; the ingest-time txgen_bytes_total is emitted too,
 // so both panel styles can be compared.
 declare "tx_firehose_process" {
-  argument "forward_to" {}
+	argument "forward_to" { }
 
-  export "receiver" {
-    value = loki.process.enrich.receiver
-  }
+	export "receiver" {
+		value = loki.process.enrich.receiver
+	}
 
-  loki.process "enrich" {
-    stage.match {
-      selector = `{service!="tx-firehose"}`
-      action   = "drop"
-    }
+	loki.process "enrich" {
+		stage.match {
+			selector = `{service!="tx-firehose"}`
+			action   = "drop"
+		}
 
-    stage.json {
-      expressions = {
-        at   = "at",
-        sev  = "sev",
-        ns   = "ns",
-        data = "data",
-      }
-      drop_malformed = true
-    }
+		stage.json {
+			expressions = {
+				at   = "at",
+				sev  = "sev",
+				ns   = "ns",
+				data = "data",
+			}
+			drop_malformed = true
+		}
 
-    stage.timestamp {
-      source = "at"
-      format = "RFC3339"
-    }
+		stage.timestamp {
+			source = "at"
+			format = "RFC3339"
+		}
 
-    stage.labels {
-      values = {
-        level = "sev",
-        sev   = "sev",
-        ns    = "ns",
-      }
-    }
+		stage.labels {
+			values = {
+				level = "sev",
+				sev   = "sev",
+				ns    = "ns",
+			}
+		}
 
-    stage.static_labels {
-      values = {
-        service = "tx-firehose",
-      }
-    }
+		stage.static_labels {
+			values = {
+				service = "tx-firehose",
+			}
+		}
 
-    stage.output {
-      source = "data"
-    }
+		stage.output {
+			source = "data"
+		}
 
-    stage.match {
-      selector = `{ns="TxFirehose.Submit.Success"}`
+		stage.match {
+			selector = `{ns="TxFirehose.Submit.Success"}`
 
-      stage.json {
-        expressions = {
-          size = "size",
-        }
-      }
+			stage.json {
+				expressions = {
+					size = "size",
+				}
+			}
 
-      stage.metrics {
-        metric.counter {
-          name              = "txgen_submitted_total"
-          description       = "Total txs accepted on submission"
-          prefix            = "leios_logmetrics_"
-          action            = "inc"
-          match_all         = true
-          max_idle_duration = "24h"
-        }
+			stage.metrics {
+				metric.counter {
+					name              = "txgen_submitted_total"
+					description       = "Total txs accepted on submission"
+					prefix            = "leios_logmetrics_"
+					action            = "inc"
+					match_all         = true
+					max_idle_duration = "24h"
+				}
 
-        metric.counter {
-          name              = "txgen_bytes_total"
-          description       = "Total submitted tx bytes"
-          prefix            = "leios_logmetrics_"
-          action            = "add"
-          source            = "size"
-          max_idle_duration = "24h"
-        }
-      }
-    }
+				metric.counter {
+					name              = "txgen_bytes_total"
+					description       = "Total submitted tx bytes"
+					prefix            = "leios_logmetrics_"
+					action            = "add"
+					source            = "size"
+					max_idle_duration = "24h"
+				}
+			}
+		}
 
-    stage.match {
-      selector = `{ns="TxFirehose.Submit.Reject"}`
+		stage.match {
+			selector = `{ns="TxFirehose.Submit.Reject"}`
 
-      stage.metrics {
-        metric.counter {
-          name              = "txgen_rejected_total"
-          description       = "Total txs rejected on submission"
-          prefix            = "leios_logmetrics_"
-          action            = "inc"
-          match_all         = true
-          max_idle_duration = "24h"
-        }
-      }
-    }
+			stage.metrics {
+				metric.counter {
+					name              = "txgen_rejected_total"
+					description       = "Total txs rejected on submission"
+					prefix            = "leios_logmetrics_"
+					action            = "inc"
+					match_all         = true
+					max_idle_duration = "24h"
+				}
+			}
+		}
 
-    forward_to = argument.forward_to.value
-  }
+		forward_to = argument.forward_to.value
+	}
 }

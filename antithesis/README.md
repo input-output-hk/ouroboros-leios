@@ -319,7 +319,7 @@ The `testnets/` compose files are adapted for the Antithesis environment:
 | TX firehose | Continuous stream | Randomized loop (varying tps and duration) |
 
 Both Compose stacks accept `TOPOLOGY=line`. In that mode the pool nodes use
-pool2 as the bridge between pool1 and pool3; Dingo also joins through pool2.
+pool2 as the bridge between pool1 and pool3.
 
 ### Randomized TX Generator
 

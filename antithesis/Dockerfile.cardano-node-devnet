@@ -50,7 +50,6 @@ COPY demo/proto-devnet/config/pools-keys/pool3/ /app/pools-keys/pool3/
 COPY demo/proto-devnet/config/stake-delegators/delegator1/ /app/stake-delegators/delegator1/
 
 COPY antithesis/scripts/init-pool-node.sh /app/scripts/
-COPY antithesis/scripts/init-dingo-node.sh /app/scripts/
 COPY antithesis/scripts/run-pool-node.sh /app/scripts/
 COPY antithesis/scripts/run-tx-firehose.sh /app/scripts/
 COPY antithesis/scripts/run-tx-firehose-loop.sh /app/scripts/

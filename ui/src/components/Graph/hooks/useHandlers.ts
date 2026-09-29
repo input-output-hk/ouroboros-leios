@@ -10,10 +10,10 @@ const getHighestPriorityMessageType = (counts: {
 }): EMessageType | null => {
   const MESSAGE_PRIORITY_ORDER = [
     EMessageType.RB, // Highest priority
-    EMessageType.EB,
     EMessageType.Announcement,
-    EMessageType.Votes,
-    EMessageType.Txs, // Lowest priority
+    EMessageType.EB,
+    EMessageType.Txs, // EB txs, pulled once the EB is known
+    EMessageType.Votes, // Lowest priority
   ];
 
   for (const messageType of MESSAGE_PRIORITY_ORDER) {
@@ -284,34 +284,77 @@ export const useHandlers = () => {
       // Other message types: draw as oriented rectangles scaled by bandwidth
       const rectHeight = Math.min((0.8 / canvasScale) * 6, 0.8);
 
-      // Scale length by transmission time relative to travel time:
-      // transmissionTime = sizeBytes / bandwidth, fraction = transmissionTime / travelTime
+      // Bulk messages are drawn as the span of wire they occupy, between a
+      // leading and a trailing edge rather than as one sliding block:
+      //
+      //   lead  leaves the sender at sentTime, arrives one latency later
+      //   tail  leaves once the last byte is out (sizeBytes / bandwidth),
+      //         and likewise arrives a latency after that
+      //
+      // So the frontier crosses first, the span behind it grows while the
+      // sender is still transmitting -- a big message simply loads the whole
+      // link -- and the tail then follows and drains it. A message far larger
+      // than its pipe saturates the edge for the duration, which is what
+      // 345ms of transmission against 10ms of flight actually means.
       const linkIds = [message.sender, message.recipient].sort();
       const linkKey = `${linkIds[0]}|${linkIds[1]}`;
       const link = topography.links.get(linkKey);
       const bandwidth = link?.bandwidthBytesPerSecond;
-      const travelTime = message.receivedTime - message.sentTime;
 
-      // Visual length as fraction of edge length
       const dx = recipientNode.fx - senderNode.fx;
       const dy = recipientNode.fy - senderNode.fy;
       const edgeLength = Math.sqrt(dx * dx + dy * dy);
-
-      let rectLength = rectHeight;
-      if (message.sizeBytes > 0 && bandwidth && bandwidth > 0 && travelTime > 0) {
-        const transmissionFraction = message.sizeBytes / bandwidth / travelTime;
-        rectLength = Math.max(rectHeight, edgeLength * transmissionFraction);
-      }
-
-      // Orient rectangle along travel direction, clipped to edge bounds
       const angle = Math.atan2(dy, dx);
-      // Clip so the rectangle doesn't extend past sender or recipient nodes
-      const halfForward = Math.min(rectLength / 2, (1.0 - message.progress) * edgeLength);
-      const halfBackward = Math.min(rectLength / 2, message.progress * edgeLength);
+
+      // The measurement decides the duration; the configured values only
+      // decide the shape. `progress` already spans the observed sent -> received
+      // interval, so the span is expressed as fractions *of that interval*:
+      // configured latency and bandwidth say how much of it is the frontier
+      // crossing versus the sender still pushing bytes, and nothing more.
+      //
+      // Consequences worth having: the span always starts empty and finishes
+      // drained exactly when the observed transfer ends, so a model that
+      // disagrees with the trace cannot leave a marker parked at the recipient
+      // or make one vanish mid-transfer. Where the link has no configured
+      // bandwidth, or the message no size, it degenerates to pure propagation
+      // -- a marker riding the frontier, which is the honest depiction of
+      // "we know when it left and when it landed, nothing more".
+      const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+      const u = clamp01(message.progress);
+
+      const latencySeconds = link?.latencyMs ? link.latencyMs / 1000 : 0;
+      const transmissionSeconds =
+        message.sizeBytes > 0 && bandwidth && bandwidth > 0
+          ? message.sizeBytes / bandwidth
+          : 0;
+      const modelSeconds = latencySeconds + transmissionSeconds;
+
+      // Shares of the observed interval, not absolute times.
+      const latencyShare = modelSeconds > 0 ? latencySeconds / modelSeconds : 1;
+      const transmissionShare =
+        modelSeconds > 0 ? transmissionSeconds / modelSeconds : 0;
+
+      const lead = latencyShare > 0 ? clamp01(u / latencyShare) : 1;
+      const tail =
+        latencyShare > 0
+          ? clamp01((u - transmissionShare) / latencyShare)
+          : clamp01(u);
+
+      // Keep a minimum extent so a message far smaller than its pipe stays
+      // visible as a marker at the frontier instead of a zero-width sliver.
+      const spanLength = Math.max(rectHeight, (lead - tail) * edgeLength);
+      const leadDistance = lead * edgeLength;
+      const startDistance = Math.max(0, leadDistance - spanLength);
+
       context.save();
-      context.translate(x, y);
+      context.translate(senderNode.fx, senderNode.fy);
       context.rotate(angle);
-      context.fillRect(-halfBackward, -rectHeight / 2, halfForward + halfBackward, rectHeight);
+      context.fillRect(
+        startDistance,
+        -rectHeight / 2,
+        leadDistance - startDistance,
+        rectHeight,
+      );
       context.restore();
     });
 

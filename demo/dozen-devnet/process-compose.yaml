@@ -26,7 +26,7 @@ processes:
       relay11:
         condition: process_healthy
     availability:
-      restart: on_failure
+      restart: always
       # Wait between restarts so the mempool has time to clear a
       # descendant tx from a prior tx-firehose incarnation that would
       # otherwise cause every fresh submit to be rejected as
@@ -41,7 +41,6 @@ processes:
   # delegator2's key, so neither the tx chain nor the entry point overlaps with
   # TxFirehose1 and the two never fight over the same UTxO.
   TxFirehose2:
-    disabled: true
     working_dir: ${WORKING_DIR}
     command: >
       ${TX_FIREHOSE:-tx-firehose}
@@ -58,7 +57,7 @@ processes:
       relay21:
         condition: process_healthy
     availability:
-      restart: on_failure
+      restart: always
       backoff_seconds: 30
 
   # Third generator, giving bp3's relay group an origin too. Without it bp3 is
@@ -67,7 +66,6 @@ processes:
   # against 511-520 for the relays, which each peer with two origins).
   # delegator3's key, so its tx chain is independent of the other two.
   TxFirehose3:
-    disabled: true
     working_dir: ${WORKING_DIR}
     command: >
       ${TX_FIREHOSE:-tx-firehose}
@@ -84,7 +82,7 @@ processes:
       relay31:
         condition: process_healthy
     availability:
-      restart: on_failure
+      restart: always
       backoff_seconds: 30
 
   # A block producer and one relay, to see whether the two ends of the network

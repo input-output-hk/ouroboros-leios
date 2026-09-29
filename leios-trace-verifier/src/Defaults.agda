@@ -78,8 +78,8 @@ sutStake = TotalMap.lookup stakeDistribution sutId
 -- supplied through the 'winning-slots' oracle. Voting (VT) eligibility does
 -- not go through the VRF at all: it is the explicit CIP-0164 stake-truncation
 -- committee, `inVotingCommittee` in Leios.Config.
-sortition : BlockType → ℕ → ℕ
-sortition b n with (b , n) ∈? winning-slots
+sortition : ℕ → ℕ
+sortition n with n ∈? winning-slots
 ... | yes _ = 0
 ... | no _ = sutStake
 
@@ -90,7 +90,7 @@ d-VRF =
     ; vrf        =
         record
           { isKeyPair = λ _ _ → ⊤
-          ; eval      = λ (b , _) y → sortition b y , tt
+          ; eval      = λ _ y → sortition y , tt
           ; verify    = λ _ _ _ _ → ⊤
           ; verify?   = λ _ _ _ _ → yes tt
           }
@@ -236,9 +236,11 @@ instance
   hpe : Hashable PreEndorserBlock Hash
   hpe .hash = EndorserBlockOSig.txs
 
-  -- Votes sign the announcing RB's hash: slot plus announced-EB payload.
+  -- Votes sign the announcing RB's hash: body payload plus announced-EB hash.
   hrb : Hashable RankingBlock Hash
-  hrb .hash rb = RankingBlock.slot rb ∷ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+  hrb .hash rb = case RankingBlock.txsOrEbCert rb of λ where
+    (inj₁ txs)  → txs  ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+    (inj₂ cert) → cert ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
 
 record FFDBuffers : Type where
   field inEBs : List EndorserBlock

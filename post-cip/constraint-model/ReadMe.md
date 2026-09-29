@@ -1,5 +1,13 @@
 # Constraint model for Leios resource usage
 
+## Setup
+
+```bash
+nix develop
+pip install matplotlib networkx numpy ortools pulp pyyaml
+python3 main.py --help
+```
+
 ## Scenario
 
 1. The model starts at time $T_0 = 0$.
@@ -253,7 +261,7 @@ options:
   --abs-gap ABS_GAP     Absolute gap tolerance in microseconds
 ```
 
-The output YAML file contains the schedule of all operations, and the Chrome Trace JSON formats that for use in the [Perfetto Viewer](https://ui.perfetto.dev "null"). Beware that producing a Gantt chart for a large block takes a long time. The CSV output file can be imported into [Grafana](https://grafana.com/ "null").
+The output YAML file contains the schedule of all operations, and the Chrome Trace JSON formats that for use in the [Perfetto Viewer](https://ui.perfetto.dev "null"). Beware that producing a Gantt chart for a large block takes a long time. The CSV output file can be imported into [Grafana](https://grafana.com/ "null"). Also note that Perfetto reports `slice_spill_overlapping_complete_event` messages when importing the file because it is not a true Chrome trace but was instead generated outside of Chrome in a manner that doesn't precisely adhere to a Chrome trace's conventions.
 
 Two scenarios are provided, but `python main.py --generate-dummy` will create a small example.
 

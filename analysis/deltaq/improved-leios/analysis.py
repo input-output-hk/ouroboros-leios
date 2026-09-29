@@ -19,6 +19,7 @@ This mirrors the "Discretized" numerical backend described in the README
 as an alternative to the piecewise-polynomial and Sampled backends.
 """
 
+import functools
 import math
 import numpy as np
 from scipy import stats
@@ -1474,6 +1475,587 @@ def plot_network_model_comparison(fname: str = "network_model_comparison.svg"):
     fig.savefig(path, format="svg", bbox_inches="tight")
     plt.close(fig)
     print(f"  Saved {path}")
+
+
+# ---------------------------------------------------------------------------
+# FULL CLOSURE DIFFUSION CONDITIONAL ON CERTIFICATION
+#
+# Ported from the yveshauser/improved-deltaq-notebook branch's analysis.ipynb
+# (§5.7 / §5.7.1); see conditional_certification_diffusion.md for the full
+# derivation.  Answers: given that an EB certified, what's the probability
+# that ALL honest nodes have completed the EB CLOSURE (not just the body) by
+# a given time -- and how does an adversarial committee bias that estimate.
+# ---------------------------------------------------------------------------
+
+
+def cdf_process_eb_closure(s_eb_tx_kb: float, reapply_only: bool = False) -> np.ndarray:
+    """
+    CPU cost of processing a full EB closure of size s_eb_tx_kb.
+
+      reapply_only=False -> committee-VOTER validation law: same TxCache
+                             hit/miss mixture of applyTx/reapplyTx as
+                             validate_eb_closure_cdf.
+      reapply_only=True  -> already-certified-EB APPLY law: every tx in the
+                             closure is reapplied (scripts skipped, no
+                             TxCache misses) -- the all-honest-nodes
+                             diffusion term used below.
+    """
+    if reapply_only:
+        n_txs = _n_txs_in_eb_closure(s_eb_tx_kb)
+        return _fixed_n_cdf(n_txs, REAPPLY_MU_S, REAPPLY_SIGMA_S)
+    return validate_eb_closure_cdf(s_eb_tx_kb)
+
+
+def cdf_closure_completion(
+    s_eb_tx_kb: float, include_validation: bool = True, reapply_only: bool = False
+) -> np.ndarray:
+    """
+    Per-node EB-CLOSURE completion CDF G(t): the time for a node to receive
+    the EB body, fetch the missing closure transactions (1-hop), and --
+    when include_validation=True -- process the whole closure (CPU).
+
+      include_validation=True  -> readiness    (body + missing-tx fetch + CPU)
+      include_validation=False -> delivery only (body + missing-tx fetch)
+    """
+    if include_validation:
+        return cdf_sequential(
+            cdf_sequential(
+                cdf_fetch_eb_body(),
+                cdf_fetch_missing_eb_closure(s_eb_tx_kb, use_1hop=True),
+            ),
+            cdf_process_eb_closure(s_eb_tx_kb, reapply_only=reapply_only),
+        )
+    return cdf_sequential(
+        cdf_fetch_eb_body(),
+        cdf_fetch_missing_eb_closure(s_eb_tx_kb, use_1hop=False),
+    )
+
+
+@functools.lru_cache(maxsize=None)
+def _committee_moments(n_nodes: int = 2500, stake_cover: float = 0.99):
+    """
+    (M, M2, S_active) for the canonical CIP-0164 stake-truncated voting
+    committee: a DETERMINISTIC, stake-based truncation.  Order SPOs by
+    active stake (descending) and select until their cumulative stake
+    reaches the target stake_cover (= sigma_c); the set is fixed for the
+    epoch -- no sortition.  Each member votes with weight w_i = s_i, so the
+    on-time vote total V(p) is a weighted Binomial with mean M*p and
+    variance M2*p*(1-p), where M = Sum_cmte w_i (committee weight) and M2 =
+    Sum_cmte w_i^2 (its second moment).  S_active is the TOTAL active stake
+    in the same units; the quorum threshold is tau*S_active = tau*M/sigma_c
+    (the committee holds only a sigma_c fraction of total stake).  Weights
+    are renormalised so Sum w = K (committee node count), putting M in
+    member-equivalent units; the quorum probability is scale-invariant in
+    the weights, so this changes no probability.
+    """
+    stakes = _stake_distribution(n_nodes)
+    s = np.sort(stakes)[::-1]  # largest stake first
+    total = float(np.sum(s))
+    k = int(np.searchsorted(np.cumsum(s), stake_cover * total, side="left")) + 1
+    k = min(k, len(s))
+    w = s[:k]  # committee weights w_i = s_i
+    w = w * (k / float(np.sum(w)))  # renormalise Sum w = K
+    M = float(np.sum(w))
+    M2 = float(np.sum(w * w))
+    return M, M2, M / stake_cover  # S_active = M / sigma_c
+
+
+def _committee_label(n_nodes: int = 2500, stake_cover: float = 0.99) -> str:
+    """Human-readable committee description, incl. the effective number of
+    equal-weight votes M_eff = M^2/M2 (inverse Herfindahl: < K when a few
+    large SPOs dominate the stake-weighted vote)."""
+    M, M2, _ = _committee_moments(n_nodes, stake_cover)
+    m_eff = M * M / M2
+    stakes = _stake_distribution(n_nodes)
+    s = np.sort(stakes)[::-1]
+    k = (
+        int(np.searchsorted(np.cumsum(s), stake_cover * float(np.sum(s)), side="left"))
+        + 1
+    )
+    return (
+        f"CIP top-stake cover sigma_c={stake_cover:.0%} "
+        f"(K={k} of {n_nodes} nodes, M_eff={m_eff:.0f})"
+    )
+
+
+def _quorum_sf(mu, var, threshold):
+    """Normal-approx upper tail P(votes >= threshold) for a stake-weighted
+    vote count with mean `mu` and variance `var` (== compute_p_certified's
+    p_quorum, generalised to an arbitrary committee).  Vectorised over
+    array-valued mu / var."""
+    mu = np.asarray(mu, dtype=float)
+    sig = np.sqrt(np.clip(np.asarray(var, dtype=float), 0.0, None))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        p = stats.norm.sf((threshold - mu) / sig)
+    # sigma ~ 0 -> degenerate vote count: step function at the mean.
+    return np.where(sig < 1e-12, (mu >= threshold).astype(float), p)
+
+
+def _quorum_given_honest_ontime(p, n_nodes, tau, beta, adversary, stake_cover=0.99):
+    """Q(p): P(certify) when each honest committee member is on time with
+    probability `p`.  Honest weight is a (1-beta) fraction of the
+    committee; an *active* adversary adds its beta-fraction of committee
+    weight as always-on-time (p=1) votes, a *silent* adversary adds none.
+    The CIP-0164 quorum threshold is tau * total active stake
+    (tau*S_active = tau*M/sigma_c).  Vectorised over `p`."""
+    M, M2, S_active = _committee_moments(n_nodes, stake_cover)
+    f_h = 1.0 - beta
+    if adversary == "active":
+        mu_a, var_a = beta * M, 0.0  # beta*M deterministic seats (p=1)
+    elif adversary == "silent":
+        mu_a = var_a = 0.0  # votes withheld
+    else:
+        raise ValueError("adversary must be 'active' or 'silent'")
+    p = np.asarray(p, dtype=float)
+    mu = f_h * (M * p) + mu_a
+    var = f_h * (M2 * p * (1.0 - p)) + var_a
+    return _quorum_sf(mu, var, tau * S_active)
+
+
+def _full_diffusion_given_cert_from_G(
+    G: np.ndarray,
+    G_apply: np.ndarray = None,
+    n_nodes: int = 2500,
+    tau: float = 0.75,
+    t_vote: float = 7.0,
+    beta: float = 0.0,
+    adversary: str = "active",
+    stake_cover: float = 0.99,
+) -> np.ndarray:
+    """
+    Core conditional CDF for an *arbitrary* per-node arrival CDF G on the
+    global TIMES grid:
+
+        F_{full|C}(t) = G_apply(t)^{N_h} * Q(min(G(t_v)/G(t), 1)) / Q(G(t_v))
+
+    where Q(p) is the stake-weighted quorum probability given honest
+    on-time probability p, and N_h is the honest node count (all honest
+    nodes -- the diffusion target).  The committee / quorum argument never
+    touches G, so the same engine serves both the honest (beta=0) and
+    adversarial (beta>0) treatment -- only the stake-weighted quorum Q
+    changes.  See conditional_certification_diffusion.md for the
+    derivation.
+
+    G is the VOTER / certification arrival law (full-validation CPU): it
+    feeds g_tv = G(t_v), P(C) and the voter factor.  G_apply is the APPLY
+    arrival law (reapply-only CPU) used for the all-honest-nodes diffusion
+    power term; it defaults to G.  Mixing two laws in a closed form derived
+    for one is a first-order approximation -- the coupling ratio
+    min(G(t_v)/G(t),1) keeps the validation law G.
+    """
+    if G_apply is None:
+        G_apply = G
+    g_tv = success_within(G, t_vote)
+    N_h = int(round((1.0 - beta) * n_nodes))
+
+    def Q(p):
+        return _quorum_given_honest_ontime(
+            p, n_nodes, tau, beta, adversary, stake_cover=stake_cover
+        )
+
+    # P(C): marginal certification probability (honest on-time prob = G(t_v)).
+    pC = float(Q(g_tv))
+    if pC <= 0.0:
+        return np.zeros_like(G)
+
+    # G_apply(t)^N_h in log space to avoid underflow for large N_h: all
+    # honest nodes APPLY the already-certified closure (reapply-only CPU).
+    with np.errstate(divide="ignore"):
+        log_G = np.where(G_apply > 0, np.log(np.clip(G_apply, 1e-300, 1.0)), -np.inf)
+    G_pow_N = np.exp(N_h * log_G)
+
+    # Voter factor: quorum given "no slow honest node", i.e. honest on-time
+    # prob P(T <= t_v | T <= t) = min(G(t_v)/G(t), 1).
+    safe_G = np.where(G > 0, G, 1.0)
+    p_fast_given_arrived = np.clip(g_tv / safe_G, 0.0, 1.0)
+    voter_factor = Q(p_fast_given_arrived)
+
+    out = G_pow_N * voter_factor / pC
+    out = np.clip(out, 0.0, 1.0)
+    # F_{full|C} is analytically a CDF (non-decreasing in t), but this
+    # closed form mixes two different arrival laws (G for the voter
+    # factor, G_apply for the diffusion power term) as a first-order
+    # approximation. In extreme-tail regimes (e.g. a near-infeasible
+    # silent-adversary quorum, pC ~ 1e-8) that mismatch can make the raw
+    # product dip before recovering; enforce the known monotonicity
+    # constraint rather than plot the approximation artifact.
+    return np.maximum.accumulate(out)
+
+
+def cdf_full_closure_diffusion_given_cert(
+    s_eb_tx_kb: float,
+    n_nodes: int = 2500,
+    tau: float = 0.75,
+    t_vote: float = 7.0,
+    beta: float = 0.0,
+    adversary: str = "active",
+    stake_cover: float = 0.99,
+    include_validation: bool = True,
+) -> np.ndarray:
+    """
+    Conditional CDF F_{full|C}(t) = P(all honest nodes hold the validated EB
+    CLOSURE by t | EB certified), parameterised by the closure size S_EB_tx
+    (kB).  beta=0 is the all-honest committee; beta>0 the adversarial
+    treatment (see _quorum_given_honest_ontime).
+    """
+    G = cdf_closure_completion(s_eb_tx_kb, include_validation=include_validation)
+    # All-honest-nodes diffusion term G_apply(t)^N_h: those nodes APPLY the
+    # already-certified closure (reapplyTx throughout, scripts skipped);
+    # the voter / certification factors keep the full-validation law G.
+    G_apply = cdf_closure_completion(
+        s_eb_tx_kb, include_validation=include_validation, reapply_only=True
+    )
+    return _full_diffusion_given_cert_from_G(
+        G,
+        G_apply,
+        n_nodes=n_nodes,
+        tau=tau,
+        t_vote=t_vote,
+        beta=beta,
+        adversary=adversary,
+        stake_cover=stake_cover,
+    )
+
+
+def cdf_full_closure_diffusion_unconditional(
+    s_eb_tx_kb: float, n_nodes: int = 2500, include_validation: bool = True
+) -> np.ndarray:
+    """Unconditional baseline for max_j T_j under the closure model: G(t)^N."""
+    G = cdf_closure_completion(s_eb_tx_kb, include_validation=include_validation)
+    with np.errstate(divide="ignore"):
+        log_G = np.where(G > 0, np.log(np.clip(G, 1e-300, 1.0)), -np.inf)
+    return np.exp(n_nodes * log_G)
+
+
+def print_full_closure_diffusion_summary(
+    sizes_kb=(1024, 4096, 12288),
+    n_nodes=2500,
+    tau=0.75,
+    t_vote=7.0,
+    t_diff_end=14.0,
+    stake_cover=0.99,
+    include_validation=True,
+):
+    M, _, S_active = _committee_moments(n_nodes, stake_cover)
+    print(f"  committee: {_committee_label(n_nodes, stake_cover)}")
+    print(
+        f"  quorum threshold = tau * total active stake = {tau * S_active:.0f} "
+        f"(committee weight M = {M:.0f})"
+    )
+    print("  S_EB_tx   G(t_v)  G(t_f)  P(C)     F_{full|C}(t_f)  G(t_f)^N")
+    print("  " + "-" * 70)
+    rows = []
+    for s_kb in sizes_kb:
+        G = cdf_closure_completion(s_kb, include_validation)
+        g_tv = success_within(G, t_vote)
+        g_tf = success_within(G, t_diff_end)
+        pC = float(
+            _quorum_given_honest_ontime(
+                g_tv, n_nodes, tau, 0.0, "active", stake_cover=stake_cover
+            )
+        )
+        f_cl = success_within(
+            cdf_full_closure_diffusion_given_cert(
+                s_kb,
+                n_nodes=n_nodes,
+                tau=tau,
+                t_vote=t_vote,
+                stake_cover=stake_cover,
+                include_validation=include_validation,
+            ),
+            t_diff_end,
+        )
+        f_uncond = g_tf**n_nodes
+        rows.append(
+            dict(
+                s_eb_tx_kb=s_kb,
+                g_tv=g_tv,
+                g_tf=g_tf,
+                pC=pC,
+                f_cl=f_cl,
+                f_uncond=f_uncond,
+            )
+        )
+        print(
+            f"  {s_kb / 1024:>5.0f} MB  {g_tv:.4f}     {g_tf:.4f}     {pC:.4f}   "
+            f"{f_cl:.4f}            {f_uncond:.3e}"
+        )
+    return rows
+
+
+def plot_full_closure_diffusion_given_cert(
+    sizes_kb=(1024, 4096, 12288),
+    n_nodes=2500,
+    tau=0.75,
+    t_vote=7.0,
+    t_diff_end=14.0,
+    stake_cover=0.99,
+    include_validation=True,
+    fname="full_closure_diffusion_given_cert.svg",
+):
+    """
+    F_{full|C}(t) under the closure model for several S_EB_tx sizes, with
+    the single-node closure CDF G(t) and the unconditional all-nodes
+    baseline G(t)^N at the largest size as reference curves.  Annotates
+    F_{full|C}(t_diff_end) at the L_diff deadline.
+    """
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+    cmap = plt.cm.plasma(np.linspace(0.15, 0.85, len(sizes_kb)))
+
+    for s_kb, color in zip(sizes_kb, cmap):
+        cdf_cond = cdf_full_closure_diffusion_given_cert(
+            s_kb,
+            n_nodes=n_nodes,
+            tau=tau,
+            t_vote=t_vote,
+            stake_cover=stake_cover,
+            include_validation=include_validation,
+        )
+        ax.plot(
+            TIMES,
+            cdf_cond,
+            lw=2.2,
+            color=color,
+            label=f"$F_{{full|C}}(t)$, closure = {s_kb / 1024:.0f} MB",
+        )
+
+        f_at_deadline = success_within(cdf_cond, t_diff_end)
+        ax.scatter([t_diff_end], [f_at_deadline], color=color, zorder=5, s=40)
+        ax.annotate(
+            f"{f_at_deadline:.3f}",
+            xy=(t_diff_end, f_at_deadline),
+            xytext=(t_diff_end + 0.4, f_at_deadline - 0.04),
+            fontsize=8,
+            color=color,
+        )
+
+    # Reference: single-node closure-completion CDF at the largest size
+    # (optimistic lower bound on "any single node by t").
+    ax.plot(
+        TIMES,
+        cdf_closure_completion(max(sizes_kb), include_validation),
+        ls="--",
+        lw=1.2,
+        color="gray",
+        label=f"$G(t)$ single-node, {max(sizes_kb) / 1024:.0f} MB (reference)",
+    )
+
+    # Reference: unconditional all-honest-nodes baseline G(t)^N at the
+    # largest size, built from the full-validation law G -- the naive
+    # independence baseline F_{full|C} is compared against in the text
+    # (conditioning on certification barely moves this number at the
+    # largest size / L_diff deadline). NOTE: this is NOT quite the same
+    # model as F_{full|C}'s diffusion term, which uses the faster
+    # reapply-only law G_apply post-certification -- see the prose note
+    # below the plot.
+    ax.plot(
+        TIMES,
+        cdf_full_closure_diffusion_unconditional(
+            max(sizes_kb), n_nodes=n_nodes, include_validation=include_validation
+        ),
+        ls="-.",
+        lw=1.2,
+        color="dimgray",
+        label=(
+            f"$G(t)^N$ full-validation, {max(sizes_kb) / 1024:.0f} MB "
+            "(upper-bound reference)"
+        ),
+    )
+
+    ax.axvline(
+        t_vote,
+        color="orange",
+        ls=":",
+        lw=1,
+        alpha=0.7,
+        label=f"$t_v = {t_vote:g}$s (voter deadline)",
+    )
+    ax.axvline(
+        t_diff_end,
+        color="red",
+        ls="--",
+        lw=1,
+        alpha=0.7,
+        label=f"$t_f = {t_diff_end:g}$s (end of L_diff)",
+    )
+
+    ax.set_xlim(0, 20)
+    ax.set_ylim(0, 1.02)
+    ax.grid(alpha=0.3)
+    ax.set_xlabel("Time (seconds)")
+    ax.set_ylabel("CDF")
+    ax.set_title(
+        "Conditional full-closure-diffusion CDF given EB certification\n"
+        f"(N={n_nodes}, "
+        f"committee={_committee_label(n_nodes, stake_cover)}, "
+        f"tau={tau}, network model = {NETWORK_MODEL})"
+    )
+    ax.legend(loc="lower right", fontsize=8)
+    fig.tight_layout()
+    path = os.path.join(PLOT_DIR, fname)
+    fig.savefig(path, format="svg")
+    plt.close(fig)
+    print(f"  Saved {path}")
+
+
+def _adv_configs(beta):
+    """(plot-label, beta, adversary, linestyle); active first to emphasise it."""
+    return [
+        ("active " + r"$\beta$=" + f"{beta:g}", beta, "active", "-"),
+        ("honest", 0.0, "active", "--"),
+        ("silent " + r"$\beta$=" + f"{beta:g}", beta, "silent", ":"),
+    ]
+
+
+def print_full_diffusion_adversarial_summary(
+    sizes_kb=(1024, 4096, 12288),
+    beta=0.25,
+    n_nodes=2500,
+    tau=0.75,
+    t_vote=7.0,
+    t_diff_end=14.0,
+    stake_cover=0.99,
+):
+    # active listed first (security-relevant); honest and silent as references.
+    configs = [
+        ("active", beta, "active"),
+        ("honest", 0.0, "active"),
+        ("silent", beta, "silent"),
+    ]
+    M, _, S_active = _committee_moments(n_nodes, stake_cover)
+    print(f"  committee: {_committee_label(n_nodes, stake_cover)}")
+    print(
+        f"  M={M:.0f}, tau={tau}, beta={beta}, t_f={t_diff_end}s, "
+        f"network={NETWORK_MODEL}"
+    )
+    print(
+        f"  quorum threshold = tau * total active stake = {tau * S_active:.0f}; "
+        f"active adversary adds ~beta*M = {beta * M:.0f} votes"
+    )
+    print(f"  {'S_EB_tx':<6s}  model    P(C)        F_full|C(t_f)")
+    print("  " + "-" * 50)
+    rows = []
+    for s_kb in sizes_kb:
+        G = cdf_closure_completion(s_kb)
+        g_tv = success_within(G, t_vote)
+        for label, b, adv in configs:
+            pC = float(
+                _quorum_given_honest_ontime(
+                    g_tv, n_nodes, tau, b, adv, stake_cover=stake_cover
+                )
+            )
+            cdf_cond = cdf_full_closure_diffusion_given_cert(
+                s_kb,
+                n_nodes=n_nodes,
+                tau=tau,
+                t_vote=t_vote,
+                beta=b,
+                adversary=adv,
+                stake_cover=stake_cover,
+            )
+            f_cond = success_within(cdf_cond, t_diff_end)
+            rows.append(dict(s_eb_tx_kb=s_kb, model=label, pC=pC, f_cond=f_cond))
+            print(f"  {s_kb / 1024:>4.0f}MB  {label:<6s}  {pC:.3e}   {f_cond:.4f}")
+    return rows
+
+
+def plot_full_diffusion_adversarial(
+    sizes_kb=(1024, 12288),
+    beta=0.25,
+    n_nodes=2500,
+    tau=0.75,
+    t_vote=7.0,
+    t_diff_end=14.0,
+    stake_cover=0.99,
+    fname="full_diffusion_adversarial.svg",
+):
+    """
+    Overlay F_{full|C}(t) for the security-relevant ACTIVE adversary against
+    the honest baseline and the benign silent-adversary case, for several
+    closure sizes.
+
+    Active adversaries vote without diffusing (their beta*M stake-weighted
+    seats lower the honest quorum requirement) -> curve sits BELOW honest:
+    the certificate is a weaker witness of honest diffusion.
+    Silent adversaries withhold votes (honest stake alone must reach the
+    quorum tau*S_active, feasible only while (1-beta) >= tau/sigma_c) ->
+    curve sits ABOVE honest (benign).
+    """
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+    cmap = plt.cm.viridis(np.linspace(0.15, 0.7, len(sizes_kb)))
+
+    for s_kb, color in zip(sizes_kb, cmap):
+        for label, b, adv, ls in _adv_configs(beta):
+            cdf_cond = cdf_full_closure_diffusion_given_cert(
+                s_kb,
+                n_nodes=n_nodes,
+                tau=tau,
+                t_vote=t_vote,
+                beta=b,
+                adversary=adv,
+                stake_cover=stake_cover,
+            )
+            lw = 2.6 if label.startswith("active") else 1.8
+            ax.plot(
+                TIMES,
+                cdf_cond,
+                lw=lw,
+                color=color,
+                ls=ls,
+                label=f"{s_kb / 1024:.0f} MB, {label}",
+            )
+            f_at = success_within(cdf_cond, t_diff_end)
+            ax.scatter([t_diff_end], [f_at], color=color, zorder=5, s=30)
+
+    ax.axvline(
+        t_vote, color="orange", ls=":", lw=1, alpha=0.7, label=f"$t_v={t_vote:g}$s"
+    )
+    ax.axvline(
+        t_diff_end,
+        color="red",
+        ls="--",
+        lw=1,
+        alpha=0.7,
+        label=f"$t_f={t_diff_end:g}$s",
+    )
+    ax.set_xlim(0, 20)
+    ax.set_ylim(0, 1.02)
+    ax.grid(alpha=0.3)
+    ax.set_xlabel("Time (seconds)")
+    ax.set_ylabel("CDF")
+    ax.set_title(
+        "Conditional full-diffusion CDF under an active adversary -- EB closure\n"
+        f"(active = solid; N={n_nodes}, "
+        f"committee={_committee_label(n_nodes, stake_cover)}, "
+        + r"$\tau$="
+        + f"{tau}, "
+        + r"$\beta$="
+        + f"{beta:g}, "
+        f"network={NETWORK_MODEL})"
+    )
+    ax.legend(loc="lower right", fontsize=7.5)
+    fig.tight_layout()
+    path = os.path.join(PLOT_DIR, fname)
+    fig.savefig(path, format="svg")
+    plt.close(fig)
+    print(f"  Saved {path}")
+
+
+def run_conditional_certification_diffusion(model_label: str):
+    """
+    Run the §5.7/§5.7.1 conditional-certification-diffusion analysis under
+    the currently active network model, saving plots to PLOT_DIR (should
+    already be set to plots/<model_label>/) and returning the honest and
+    adversarial summary rows.
+    """
+    print(f"\n[Conditional certification diffusion, {model_label.upper()}]")
+    print(" Honest committee (beta=0):")
+    honest_rows = print_full_closure_diffusion_summary()
+    plot_full_closure_diffusion_given_cert()
+    print(" Adversarial committee (beta=0.25):")
+    adv_rows = print_full_diffusion_adversarial_summary()
+    plot_full_diffusion_adversarial()
+    return dict(honest=honest_rows, adversarial=adv_rows)
 
 
 # ---------------------------------------------------------------------------

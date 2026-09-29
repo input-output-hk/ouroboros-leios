@@ -108,7 +108,7 @@ alternately until they cover the pane count, so it does not depend on terminal
 size — and the node order is set to make **each column one group**, its producer
 on top and its three relays below:
 
-```
+```text
 bp1      bp2      bp3
 relay11  relay21  relay31
 relay12  relay22  relay32

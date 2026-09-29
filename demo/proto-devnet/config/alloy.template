@@ -18,7 +18,7 @@
 //     written exactly once, carrying whatever the facets added.
 //
 //   extract ─┬─(raw process-compose)────────────────────────────────► loki.write.loki
-//            └─► leios_route ─┬─► cardano_node_process ─► leios_voting ─► call_trace ─► loki.write.loki
+//            └─► leios_route ─┬─► cardano_node_process ─► leios_voting ─► leios_diffusion ─► call_trace ─► loki.write.loki
 //                             ├─► tx_firehose_process ───────────────────────► loki.write.loki
 //                             └─► tx_centrifuge_process (dormant here) ───────► loki.write.loki
 
@@ -127,9 +127,25 @@ loki.process "extract_process_compose_logs" {
 	}
 
 	forward_to = [
-		loki.write.loki.receiver,
+		loki.process.raw_residue.receiver,
 		loki.process.leios_route.receiver,
 	]
+}
+
+// The raw copy, reduced to its purpose: the service modules parse each body
+// with drop_malformed, so crash output, RTS messages and sudo prompts survive
+// ONLY here — but every JSON-bodied line from a routed process is written
+// once, enriched, by its module, and duplicating it raw was >90% of Loki
+// ingest at 500 voters (~2.6 MiB/s of 2.9). Keep the raw write for whatever
+// the modules cannot represent.
+loki.process "raw_residue" {
+	stage.match {
+		selector = `{process=~"(bp|relay)[0-9]+|Node[0-9]+|TxFirehose.*|TxCentrifuge"}`
+		stage.drop {
+			expression = "^\\s*\\{"
+		}
+	}
+	forward_to = [loki.write.loki.receiver]
 }
 
 // FRONT-END stage 2 (the router): overwrite `service` from process-compose to the
@@ -141,6 +157,7 @@ loki.process "extract_process_compose_logs" {
 loki.process "leios_route" {
 	stage.match {
 		selector = `{process=~"Node[0-9]+"}`
+
 		stage.static_labels {
 			values = {
 				service = "cardano-node",
@@ -150,6 +167,7 @@ loki.process "leios_route" {
 
 	stage.match {
 		selector = `{process=~"TxFirehose.*"}`
+
 		stage.static_labels {
 			values = {
 				service = "tx-firehose",
@@ -159,6 +177,7 @@ loki.process "leios_route" {
 
 	stage.match {
 		selector = `{process="TxCentrifuge"}`
+
 		stage.static_labels {
 			values = {
 				service = "tx-centrifuge",
@@ -180,13 +199,17 @@ import.file "mod" {
 	filename = "${WORKING_DIR}/alloy-modules"
 }
 
-// Node chain: cardano_node_process -> voting -> call-trace -> terminal write. Wiring lives
-// here, not inside the modules.
+// Node chain: cardano_node_process -> voting -> diffusion -> call-trace -> terminal
+// write. Wiring lives here, not inside the modules.
 mod.cardano_node_process "node" {
 	forward_to = [mod.leios_voting_process.vote.receiver]
 }
 
 mod.leios_voting_process "vote" {
+	forward_to = [mod.leios_diffusion_process.diffusion.receiver]
+}
+
+mod.leios_diffusion_process "diffusion" {
 	forward_to = [mod.call_trace_process.call.receiver]
 }
 
@@ -219,6 +242,10 @@ prometheus.scrape "alloy_pipeline_metrics" {
 		"environment" = "leios",
 		"group"       = "proto-devnet",
 	}]
+	// Keep the pipeline-supplied labels (instance=bp1..., voterId) rather than
+	// renaming them to exported_*: the voting dashboard selects the derived
+	// counters by per-node instance. Target labels still fill in where absent.
+	honor_labels    = true
 	forward_to      = [prometheus.remote_write.prometheus.receiver]
 	scrape_timeout  = "1s"
 	scrape_interval = "1s"

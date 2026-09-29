@@ -37,12 +37,6 @@
               inputs'.cardano-node-leios.packages.cardano-node
               inputs'.cardano-node-leios.packages.cardano-tracer
             ]
-            ++ (with inputs'.ouroboros-consensus.legacyPackages.hsPkgs; [
-              ouroboros-consensus.components.exes.immdb-server
-              ouroboros-consensus.components.exes.db-analyser
-              ouroboros-consensus.components.exes.db-immutaliser
-              ouroboros-consensus.components.exes.leios-schedule-gen
-            ])
             ++ (with pkgs.python3Packages; [
 
               python
@@ -74,7 +68,6 @@
             ];
 
           CARDANO_NODE = pkgs.lib.getExe inputs'.cardano-node-leios.packages.cardano-node;
-          IMMDB_SERVER = pkgs.lib.getExe inputs'.ouroboros-consensus.legacyPackages.hsPkgs.ouroboros-consensus.components.exes.immdb-server;
         };
       };
 
