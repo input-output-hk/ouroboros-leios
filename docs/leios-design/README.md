@@ -722,6 +722,26 @@ This component therefore stores EBs on disk just as the ChainDB already does for
 
 The first version of LeiosEbStore can just be two bog standard key-value stores, one for immutable and one for volatile. A second version maybe instead integrates certified EBs into the existing ImmDB? That integration seems like a good fit. It has other benefits (eg saves a disk roundtrip and exhibits linear disk reads for driver prefetching/etc), but those seem unimportant so far.
 
+**An EB's row is created by its announcement, not by its body.** The size an EB will occupy is declared by the announcing RB header, and that is the only declaration anyone signed — an offer of a body is the offering peer's word and vouches for nothing beyond the sender having it. The body-arrival path could not write the row in any case: it knows the EB but not which header announced the copy it is carrying, and by the time a body lands several headers may have announced the same EB. So the announcement writes the row and the arrival only fills it in.
+
+- **REQ-AnnouncementCreatesEbRow** An EB announcement, from either the LeiosNotify or the ChainSync path, must create the EB's store entry; body arrival must not.
+
+Note "announced" rather than "received over LeiosNotify": announcements are authenticated on both paths. A LeiosNotify announcement carries the RB header and is validated like any other, election proof and signature included; only the bare body offer carries no header at all.
+
+The row is therefore **per announcement**, keyed by announcer as well as by EB: one EB may be announced by several headers, and two headers equivocating a single election may announce the same EB, so a key of (slot, EB hash) alone would conflate them. This is the same key the in-memory announcement index uses, which is what lets the two be checked against each other — the index's entries are expected to be backed by store entries.
+
+- **REQ-EbRowPerAnnouncement** The EB store must distinguish announcements of the same EB by different headers.
+
+**Announcements are not kept for their own sake.** They are actionable for roughly the certification window and no longer; nothing recovers them across a restart, and a node joining late does not go looking for the ones it missed (see [late join](#catching-up) — re-fetching announcements on join is deliberately out of scope for the first version). What the durable row buys is what outlives the window: the arrival path's precondition that the EB is known, and the store's notion of how old an entry is, which is what makes eviction possible.
+
+This is worth stating because the obvious alternative is wrong: the ChainDB is *not* a durable record of announcements. Announcements diffuse independently of ChainSync precisely so they can outrun it, so headers on forks the node never selects, headers equivocating an election, and headers announcing EBs the node never fetches need not reach block storage at all.
+
+**Equivocation withdraws an announcement's claim.** Once a second announcement is seen for one election, no honest node will vote for either EB, so neither body is worth fetching and both are dropped from the fetch set — both, because which of the pair is the impostor is not knowable and the adversary chooses the order they arrive in. This is safe to do eagerly: if one of them is certified anyway, the certifying block's roll-forward re-establishes it, reading the size out of the chain-dep state.
+
+- **REQ-StopFetchingEquivocated** Detecting an equivocated election must stop the node fetching the bodies it announced.
+
+**Writer lifetime.** The store's writer is opened once per peer connection and held for the life of that client, not taken per write. A writer handle is cheap — it submits to a single shared write queue, which is what keeps the store single-writer — but *closing* one flushes that queue and waits, and that must not happen on the announcement relay path, which has to finish within the announcement period. The write itself is not awaited either: nothing downstream needs the entry durable yet, because the in-memory index is what answers fetch decisions.
+
 ### Transaction cache
 
 > [!WARNING]
