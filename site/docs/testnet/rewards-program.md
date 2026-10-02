@@ -17,7 +17,7 @@ keywords:
 
 # Musashi Testnet Rewards Program
 
-**Last updated: 10 August 2026.** We may update this page, and every update is published here.
+**Last updated: 28 September 2026.** We may update this page, and every update is published here.
 
 :::tip Apply to the Rewards Program
 
@@ -80,6 +80,8 @@ recorded, and show where the time went: distance, load, peer topology, or the no
    [faucet](https://faucet.leios.play.dev.cardano.org/basic-faucet) delegate widget takes your
    bech32 pool id and delegates 1M test ada.
 6. **Wait for the stake snapshot**, roughly two epochs, after which your pool starts forging.
+7. **Set up metsuke.** Run the data collection program against your node, from the
+   [metsuke landing page for SPOs](https://metsuke-leios.play.dev.cardano.org/).
 
 Those steps take you through the join criteria in the next section. From then on, what keeps you
 qualifying each month is the monthly criteria, which we are still finalising.
@@ -119,6 +121,7 @@ Submitting an application on its own does not qualify you for a reward. The crit
 | A3 | **Reconciliation.** The on-chain Application Code matches an application, and the pool id you claimed matches the pool registration certificate | Chain and application |
 | A4 | BLS key registered | Chain |
 | A5 | **Faucet delegation requested.** 1M test ada, which makes your pool eligible for block production in every epoch and a member of the voting committee once one is established | Chain |
+| A6 | **Metsuke set up.** The [data collection program](https://metsuke-leios.play.dev.cardano.org/) is running and reporting from your node | metsuke |
 
 You can apply at any point in the application period. Applying part way through a month leaves less
 of that month in which to qualify.
@@ -133,7 +136,8 @@ Application Codes are reusable.
 
 The monthly criteria are still being worked out, including which telemetry we ask for and how it is
 measured. They will be published on this page once settled, and announced in
-[`#musashi-testnet` on Discord](https://discord.gg/AyUXD9VHn).
+[`#musashi-testnet` on Discord](https://discord.gg/AyUXD9VHn). Telemetry is collected through
+[metsuke](https://metsuke-leios.play.dev.cardano.org/).
 
 :::
 
@@ -155,6 +159,9 @@ does not guarantee rewards. Being early helps!
 ## What we collect
 
 This data is the Program's deliverable. We analyse it, and we do not disqualify anyone on it.
+
+Collection runs through **metsuke**, the Program's data collection program. Set it up against your
+node from the [metsuke landing page for SPOs](https://metsuke-leios.play.dev.cardano.org/).
 
 Examples of the kind of data we expect to ask for:
 
