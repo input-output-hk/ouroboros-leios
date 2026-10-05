@@ -722,6 +722,16 @@ This component therefore stores EBs on disk just as the ChainDB already does for
 
 The first version of LeiosEbStore can just be two bog standard key-value stores, one for immutable and one for volatile. A second version maybe instead integrates certified EBs into the existing ImmDB? That integration seems like a good fit. It has other benefits (eg saves a disk roundtrip and exhibits linear disk reads for driver prefetching/etc), but those seem unimportant so far.
 
+**What justifies fetching an EB.** An election or a certification does; a peer's offer does not. An offer says only which peers can serve what, so nothing is listed to fetch on the strength of a claim the node has not verified, and the set of bodies it will pursue is bounded by elections rather than by what peers assert. Offers are correspondingly constrained: a peer may offer only the parts of an EB it has itself announced to this node, at most once per part, and never for an EB older than the node's immutable tip.
+
+- **REQ-FetchJustifiedByElection** The node must fetch an EB because an election or a certification calls for it, never because a peer offered it.
+
+A corollary worth stating, because the obvious assumption is wrong: the ChainDB is *not* a durable record of announcements. Announcements diffuse independently of ChainSync, precisely so they can outrun it, so a header on a fork the node never selects, a header equivocating an election, or a header announcing an EB the node never fetches need not reach block storage at all.
+
+**A wrong declared size is not an attack to punish.** If an announcement declares a size the EB does not have, the node simply never counts that closure as complete — so it neither relays the closure nor votes for the announcement. Nobody is disconnected over it: the issuer is not a peer, and the peer that relayed the announcement may be perfectly honest.
+
+**An equivocated election is resolved by certification, not by guessing.** Two announcements for one election leave the node unable to say which EB the chain will settle on. Rather than choose, it follows the certificate: a verified certificate names an EB, and that is what makes the node pursue that body — including the case where an equivocation had previously pointed it at the other one.
+
 ### Transaction cache
 
 > [!WARNING]
