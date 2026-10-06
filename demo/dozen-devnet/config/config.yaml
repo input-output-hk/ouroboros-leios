@@ -269,6 +269,12 @@ TraceOptions:
   LeiosNotify.Remote:
     severity: Debug
     maxFrequency: 0
+  # These two are 40% of a node's log volume at mainnet level vote traffic. Only
+  # turn them on when debugging LeiosNotify
+  LeiosNotify.Remote.Send.RequestNext:
+    severity: Silence
+  LeiosNotify.Remote.Receive.RequestNext:
+    severity: Silence
   LeiosFetch.Remote:
     severity: Debug
     maxFrequency: 0
