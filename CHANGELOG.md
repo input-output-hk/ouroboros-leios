@@ -5,6 +5,43 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w40 - 2026-10-04
+
+A small release with internal changes. The node stores endorser block
+transactions a new way so that keeping up with the chain costs it less, and the
+Leios decoders now reject malformed data from a peer instead of trusting it. No
+ledger change, and no change to any network protocol.
+
+> [!IMPORTANT]
+>
+> **Requires a state wipe.** The LeiosDb schema changed and there is no migration, so a node started on an existing database exits at once with
+>
+> ```
+> cardano-node: ErrorError: "no such table: ebTxBytes"
+> ```
+>
+> Delete the chain database along with `leios.vol.db` and `leios.imm.db`, then re-sync from genesis or sideload from the IOG relays.
+>
+> Deleting only the two `leios.*.db` files is not enough: a chain that already holds certified blocks then fails to resolve their closures, the same way it did in w38.
+
+> [!NOTE]
+>
+> No respin. Wire formats and header codecs are unchanged, so w39 and w40 nodes still talk to each other.
+
+- Endorser block transactions are stored per endorser block instead of by transaction hash [consensus#2334](https://github.com/IntersectMBO/ouroboros-consensus/pull/2334)
+  - Storing an endorser block is now a sequential write and discarding one is a single delete, so the database keeps pace with chain selection more easily.
+  - A transaction that several endorser blocks reference is stored once for each of them. That costs disk space in exchange for the cheaper writes.
+  - A transaction the node already holds is reused when a later endorser block references it, rather than being downloaded a second time.
+  - A peer that disconnects while the endorser block it sent is still being written can no longer leave that block stranded, neither held nor fetchable.
+- A peer can no longer make the node allocate memory on a claim the node has not checked [consensus#2358](https://github.com/IntersectMBO/ouroboros-consensus/pull/2358)
+  - Closes LEI-004, LEI-005 and LEI-009 from the Anastasia Labs audit.
+  - Transaction and endorser block hashes are fixed at 32 bytes, so a peer sending any other length is rejected rather than stored.
+  - Every count a peer declares is now checked before the node allocates for it.
+  - A reply whose transaction count disagrees with what was asked for is rejected, as are requests with empty, out-of-range or repeated indices.
+- A peer that encodes a transaction request with a definite CBOR length is no longer refused; both encodings are accepted [consensus#2358](https://github.com/IntersectMBO/ouroboros-consensus/pull/2358)
+- A database written by an older build that holds a malformed hash, or more transactions for an endorser block than can be served, now fails with a `LeiosDbException` naming the problem instead of being read past [consensus#2358](https://github.com/IntersectMBO/ouroboros-consensus/pull/2358)
+- A Praos header announcing an endorser block whose hash is not 32 bytes no longer decodes. No honest node produces one, so this only matters if a malicious block producer is on the network.
+
 ## prototype-2026w39 - 2026-09-25
 
 > [!NOTE]
