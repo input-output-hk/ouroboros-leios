@@ -5,6 +5,14 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## prototype-2026w40a - 2026-10-06
+
+Purely internal change that (memory) bounds the voting state.
+
+- Bound the vote state to the most recent 128 points - [ouroboros-consensus#2367](https://github.com/IntersectMBO/ouroboros-consensus/pull/2367)
+
+Users should see improvements in memory retention.
+
 ## prototype-2026w40 - 2026-10-04
 
 A small release with internal changes. The node stores endorser block
