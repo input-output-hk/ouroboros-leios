@@ -45,6 +45,63 @@ ${SCRAPE_TARGETS}
 	forward_to = [prometheus.remote_write.prometheus.receiver]
 }
 
+// Total bytes each node sends and receives, read off the host end of its veth.
+// Nothing else measures this: the node's own Stat_netWr/Stat_netRd are always
+// 0, and the leiosFetch*Bytes counters cover fetch alone -- no ChainSync,
+// BlockFetch, TxSubmission or votes.
+//
+// init-namespaces.sh gives every node a veth pair, p-<name> inside its
+// namespace and v-<name> on the bridge, so a node's EGRESS arrives here as
+// receive on v-<name> and its ingress leaves as transmit. Alloy runs in the
+// host namespace and sees all of them; no privileges and no namespace entry.
+//
+// TC=0 leaves the nodes on loopback with no veths, and this yields nothing.
+prometheus.exporter.unix "host_net" {
+	set_collectors = ["netdev"]
+
+	netdev {
+		device_include = "^v-.+$"
+	}
+}
+
+prometheus.scrape "host_net" {
+	targets  = prometheus.exporter.unix.host_net.targets
+	job_name = "integrations/host-net"
+
+	scrape_timeout  = "1s"
+	scrape_interval = "1s"
+
+	forward_to = [prometheus.relabel.veth_to_instance.receiver]
+}
+
+// Carry the same labels as every other per-node series, so the veth counters
+// select by instance alongside them.
+prometheus.relabel "veth_to_instance" {
+	rule {
+		source_labels = ["device"]
+		regex         = "v-(.+)"
+		target_label  = "instance"
+
+		// The capture reference is doubled because this file goes through
+		// envsubst, which is a8m/envsubst and -- unlike GNU's -- expands
+		// digit-named references too. Undoubled it substitutes to the empty
+		// string, which deletes the label instead of setting it.
+		replacement = "$$1"
+	}
+
+	rule {
+		target_label = "environment"
+		replacement  = "leios"
+	}
+
+	rule {
+		target_label = "group"
+		replacement  = "dozen-devnet"
+	}
+
+	forward_to = [prometheus.remote_write.prometheus.receiver]
+}
+
 loki.write "loki" {
 	endpoint {
 		url        = "http://localhost:3100/loki/api/v1/push"
