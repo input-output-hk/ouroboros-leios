@@ -1024,7 +1024,11 @@ The N2C mini-protocols are bundled in `ouroboros-network` (`cardano-diffusion/li
 
 By default, adding a CertRB's transactions to the block before sending it is the only N2C change clients will notice.
 
-On-chain, a CertRB holds only a certificate. Its transactions are stored separately, in the EB it certifies. Before the node's `LocalChainSync` server (**UPD-LeiosN2cChainSyncServer**) sends a CertRB to a client, it copies the EB's transactions into the block. The client receives the block in CIP-164's [`ranking_block`](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#ranking-block-cddl) shape, with the EB's transactions in the usual segments (`transaction_bodies`, `transaction_witness_sets`, `auxiliary_data_set`, `invalid_transactions`). All other blocks are sent unchanged.
+On-chain, a CertRB holds only a certificate. Its transactions are stored separately, in the EB it certifies. Before the node's `LocalChainSync` server (**UPD-LeiosN2cChainSyncServer**) sends a CertRB to a client, it copies the EB's transactions into the block. The client receives a normal Dijkstra block: the EB's transactions go into the body's transaction list, and the certificate stays in the body ([`block_body`](https://github.com/IntersectMBO/cardano-ledger/blob/d93c654699c8f10c883a625168f65dd387abc695/eras/dijkstra/impl/cddl/data/dijkstra.cddl#L109-L113) in the Dijkstra ledger CDDL, `[transactions, leios_certificate / nil, peras_certificate / nil]`). All other blocks are sent unchanged.
+
+> [!WARNING]
+>
+> TODO: CIP-164 still describes the block in its old Conway shape ([`ranking_block`](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#ranking-block-cddl) and the "Clients" section). The Dijkstra ledger changed the block body in [cardano-ledger#5872](https://github.com/IntersectMBO/cardano-ledger/pull/5872), and the prototype follows the ledger: clients receive `[header, [transactions, certificate, null]]`. Client libraries such as gouroboros already follow the ledger too, so nothing breaks. Updating the CIP is a low-priority docs fix, so new client authors aren't misled.
 
 The server always has the EB's transactions when it sends a CertRB, because **a node never adds a CertRB to its chain until it has all of the EB's transactions** (see **NEW-LeiosCertRbStagingArea** in [Chain selection](#chain-selection)). So:
 
@@ -1038,14 +1042,13 @@ The server always has the EB's transactions when it sends a CertRB, because **a 
 
 > [!WARNING]
 >
-> TODO: The prototype `cardano-node-leios` already adds CertRB transactions this way ([#898](https://github.com/input-output-hk/ouroboros-leios/issues/898); `chainSyncBlocksServer` in `ouroboros-consensus` [`7db3f7c`](https://github.com/IntersectMBO/ouroboros-consensus/commit/7db3f7c02b291fc5434b56bc3ea0fbefc372ffab), pinned by `cardano-node` `8bb6b68`, release `prototype-2026w39`). Items to harden before it leaves the prototype:
+> TODO: The prototype `cardano-node-leios` already adds CertRB transactions this way ([#898](https://github.com/input-output-hk/ouroboros-leios/issues/898); `chainSyncBlocksServer` in `ouroboros-consensus` [`d7db769`](https://github.com/IntersectMBO/ouroboros-consensus/commit/d7db769047e7cb3fcb5f63685944fb68d68ae8d2), pinned by `cardano-node` `8206f9f`, release `prototype-2026w40`). Items to harden before it leaves the prototype:
 >
 > | Problem | How to solve |
 > |---|---|
 > | **Missing closure.** If a CertRB's EB transactions can't be read from the LeiosDB, `resolveLeiosClosure` returns an error and the server sends the CertRB as stored on-chain, without the EB's transactions, and logs nothing ("Serve what we have rather than dying on a closure we cannot read"). The client gets a block that looks valid but is missing transactions. The rule above (a node only adds a CertRB to its chain once it has stored the EB's transactions) should prevent this, but nothing tests it. | Add a test that the rule holds. If it ever does happen, fail loudly and log it, as for the `setPrev` and decode-failure cases, instead of silently sending a CertRB without its transactions. |
 > | **Race on `setPrev`.** A code comment warns that after a `RollBack`, the block at the rollback point could be garbage-collected before `setPrev` looks it up, so the next CertRB would be sent without its transactions. This can't happen: the lookup falls back to the ImmutableDB, which already holds any block garbage-collected from the VolatileDB (`getAnyBlockComponent` in `Storage/ChainDB/Impl/Query.hs`). | Remove the misleading comment. Treat a `Nothing` result as a bug and fail loudly, instead of silently sending a CertRB without its transactions. |
 > | **Decode failure.** If the server can't decode a CertRB (`Left _ -> pure sblk` in `chainSyncBlocksServer`), it sends the block as stored on-chain, without the EB's transactions, and logs nothing. | Treat it like the `setPrev` case: fail loudly instead of silently sending a CertRB without its transactions. |
-> | **Wire shape differs from CIP-164.** The prototype's `inlineLeiosClosure` only replaces the body's transaction list (`txSeqBlockBodyL`). A client following a local proto-devnet over N2C receives `[header, [transactions, certificate, null]]` with `prototype-2026w39` (`prototype-2026w35` sent `[header, [null, transactions, certificate, null]]`): one list of whole transactions, with the certificate still in the body. CIP-164's `ranking_block` has the four separate segments plus an optional `eb_certificate`. Clients written against the CIP won't decode what the prototype sends. | Decide which shape is correct, and make the CIP-164 CDDL and the Dijkstra block encoding agree. |
 > | **Cost per client.** Every CertRB is decoded, has its transactions added, and is re-encoded once for each connected client. With many local clients (for example, a relay serving several indexers), this work is repeated for each one. | Cache the inlined encoding of each CertRB so it is built once and shared across clients. |
 
 #### Announced (uncertified) EBs
@@ -1119,16 +1122,17 @@ The opt-in is gated behind one new N2C version (**UPD-LeiosN2cVersion**). A clie
 
 #### Status on the Musashi testnet
 
-Musashi, the public Leios testnet, runs IOG's `cardano-node-testnet` image, which IOG republishes when the testnet is reset. These observations are from the `prototype-2026w35` image (`cardano-node` `6a540bd`); images up to `prototype-2026w39` (`8bb6b68`, the current pin) have been published since. What works there over N2C:
+Musashi, the public Leios testnet, runs IOG's `cardano-node-testnet` image, which IOG republishes when the testnet is reset. These observations are from the `prototype-2026w35` image (`cardano-node` `6a540bd`); images up to `prototype-2026w40` (`8206f9f`, the current pin) have been published since. What works there over N2C:
 
 - **`cardano-cli`** from the same release can query the tip and UTxO (`LocalStateQuery`), build transactions (protocol parameters also come through `LocalStateQuery`) and submit them (`LocalTxSubmission`). This shows those protocols working unchanged with a Dijkstra-aware client. It doesn't show that older clients work.
-- **The usual API layers can't read Musashi's blocks yet**: Ogmios, Kupo and Blockfrost. None of them is hosted for the testnet, so applications have to use `cardano-cli` on the node's host. This is the client-side gap in the table below: Dijkstra decoding, and possibly the [wire-shape mismatch](#inlining-certified-eb-transactions-in-localchainsync) with CIP-164.
+- **The usual API layers can't read Musashi's blocks yet**: Ogmios, Kupo and Blockfrost. None of them is hosted for the testnet, so applications have to use `cardano-cli` on the node's host. This is the client-side gap in the table below: decoding Dijkstra blocks. Clients should follow the Dijkstra ledger CDDL, not CIP-164's out-of-date block description (see [above](#inlining-certified-eb-transactions-in-localchainsync)).
 
 #### Changes by repository
 
 | Repository | Change | Status |
 |---|---|---|
-| `ouroboros-consensus` | Inline certified EB transactions in the N2C ChainSync server (`chainSyncBlocksServer`, `ResolveLeiosBlock`) | Done in prototype, and seen working on a local proto-devnet with `prototype-2026w35` and `prototype-2026w39` (CertRBs of up to 6,603 transactions, 1.8 MB, received by a Pallas client). Hardening TODOs above, including the wire-shape mismatch with CIP-164 |
+| `ouroboros-consensus` | Inline certified EB transactions in the N2C ChainSync server (`chainSyncBlocksServer`, `ResolveLeiosBlock`) | Done in prototype, and seen working on a local proto-devnet with `prototype-2026w35` and `prototype-2026w39` (CertRBs of up to 6,603 transactions, 1.8 MB, received by a Pallas client). Hardening TODOs above |
+| CIP-164 (`cardano-foundation/CIPs`) | Update `ranking_block` and the "Clients" section to the Dijkstra ledger's block format | Not filed; low priority, since client libraries already follow the ledger |
 | `ouroboros-consensus` | New Shelley/Cardano N2C versions; opt-in server; any new queries | Waiting for maintainers to confirm option A (recommended), and on the query list |
 | `ouroboros-network` | `NodeToClientV_24`; option A mini-protocol or option B `NodeToClientVersionData` field | Waiting for maintainers to confirm option A (recommended) |
 | `cardano-node` | Dependency pin bumps only | After the above |
