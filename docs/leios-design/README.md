@@ -1041,9 +1041,9 @@ The server always has the EB's transactions when it sends a CertRB, because **a 
 > | Problem | How to solve |
 > |---|---|
 > | **Missing closure.** `resolveLeiosClosure` can't read the EB's transactions from the LeiosDB. The rule above should prevent this, but nothing tests it. | Add a test that the rule holds; fail loudly if it ever happens. |
-> | **`setPrev` lookup.** A code comment warns that after a `RollBack` the block at the rollback point could be garbage-collected before `setPrev` looks it up. This can't happen: the lookup falls back to the ImmutableDB (`getAnyBlockComponent` in `Storage/ChainDB/Impl/Query.hs`). | Remove the misleading comment; fail loudly on a `Nothing` result. |
+> | **`setPrev` lookup.** A code comment warns that, after a rollback, `setPrev` might not find the block it looks up. It always will: the lookup also checks the ImmutableDB (`getAnyBlockComponent` in `Storage/ChainDB/Impl/Query.hs`). | Remove the misleading comment; fail loudly on a `Nothing` result. |
 > | **Decode failure.** The server can't decode the CertRB (`Left _ -> pure sblk`). | Fail loudly. |
-> | **Cost per client.** Every CertRB is decoded, filled in and re-encoded once per connected client, so a node serving several indexers repeats the work. | Cache each inlined CertRB once and share it across clients. |
+> | **Cost per client.** A node with several clients (indexers) builds the same CertRB again for each one: for every client, it decodes the stored block, adds the EB's transactions and encodes it again. | Cache each inlined CertRB once and share it across clients. |
 
 #### Announced (uncertified) EBs
 
@@ -1090,8 +1090,8 @@ Changes needed:
 
 Costs outside the node:
 
-- **Transactions in the wrong block.** When the EB is certified, the CertRB would have to be sent without its transactions, or opted-in clients would get them twice. So opted-in clients would see the transactions in the announcing RB, while everyone else (and the chain itself) has them in the CertRB. Two clients of the same node would then disagree on which block a transaction is in, and one block hash would stand for two different block contents. Indexers and wallets that store data by block hash would record the wrong block.
-- **Every client library pays for the handshake change.** The new field changes the version data encoding from the new version onward, in both directions of the handshake. Unless the encoding lets the field be left out, any client that wants the new version for another reason (such as new `LocalStateQuery` queries) must handle the new shape even if it never sets the flag. For independent implementations such as Pallas and gouroboros, that means implementing it; Haskell clients such as `ogmios` and `cardano-api` get it from ouroboros-network and only need to set the new field.
+- **Transactions in the wrong block.** Opted-in clients would get an EB's transactions in the announcing RB, so the CertRB would have to reach them without the transactions, or they'd get them twice. Everyone else gets the transactions in the CertRB, where the ledger applies them. So two clients of the same node would disagree on which block a transaction is in, and indexers and wallets that store data by block hash would record different blocks. For opted-in clients, the announcing RB's body would also no longer match its header's `block_body_hash`.
+- **Every client library pays for the handshake change.** From the new version on, the handshake's version data has a new field, both in what the client sends and in what the node sends back. Unless the field can be left out, any client that wants the new version, for whatever feature, must handle the new shape even if it never opts in. Independent implementations such as Pallas and gouroboros have to implement it; Haskell clients such as `ogmios` and `cardano-api` get it from `ouroboros-network`.
 
 | | Option A: new mini-protocol | Option B: handshake flag |
 |---|---|---|
@@ -1099,8 +1099,9 @@ Costs outside the node:
 | "EB failed to certify" | Its own message (`MsgEBExpired`) | A `RollBackward`, which looks like a chain switch |
 | Shown data taken back | Only on the new stream, when the chain switches | Yes, for opted-in clients |
 | Block holding the EB's transactions | CertRB, for everyone | Announcing RB if opted in, CertRB otherwise |
-| Handshake change | New version number only | New version data shape; Pallas and gouroboros must implement it |
-| Work in `cardano-node` / `ogmios` | A whole new protocol | A smaller change to an existing one |
+| Body no longer matches `block_body_hash` | CertRBs only, as without the opt-in | CertRBs, plus announcing RBs for opted-in clients |
+| Handshake change | New version number only | New version data shape, which Pallas and gouroboros must implement unless the field can be left out |
+| Work in `ouroboros-network` / `ouroboros-consensus` / `ogmios` | A whole new protocol | A smaller change to an existing one |
 | For clients | Two streams to match up, arriving in either order | One stream |
 | Old clients | Never start it | Never set the flag |
 | Adding it after the hard fork | Easy: a new protocol, nothing existing changes | Possible, but adds a second behavior to an existing protocol |
@@ -1110,7 +1111,7 @@ Costs outside the node:
 The opt-in is gated behind one new N2C version (**UPD-LeiosN2cVersion**). A client can only use it against a node that offers that version in the handshake. Older clients negotiate an older version and see only certified-only behavior. The plan, by repository:
 
 1. **`ouroboros-network`**: add `NodeToClientV_24` after `NodeToClientV_23` in `cardano-diffusion/api/lib/Cardano/Network/NodeToClient/Version.hs`, with its encode and decode cases. For option A, also register the new mini-protocol for `>= NodeToClientV_24`. For option B, also add the `NodeToClientVersionData` field and its version-dependent codec.
-2. **`ouroboros-consensus`**: add `ShelleyNodeToClientVersion16` (`Shelley/Ledger/NetworkProtocolVersion.hs`) and `CardanoNodeToClientVersion20` (`Cardano/Node.hs`), mapped to `NodeToClientV_24`. Keep `latestReleasedNodeVersion` at `NodeToClientV_23` until the Dijkstra release. Then implement the opt-in server and any queries.
+2. **`ouroboros-consensus`**: add `ShelleyNodeToClientVersion16` (`Shelley/Ledger/NetworkProtocolVersion.hs`) and `CardanoNodeToClientVersion20` (`Cardano/Node.hs`), mapped to `NodeToClientV_24`. Keep `latestReleasedNodeVersion` at `NodeToClientV_23` until the Dijkstra release; until then, only nodes with `ExperimentalProtocolsEnabled: true` in their config offer `NodeToClientV_24` (proto-devnet already sets it), so no new feature flag is needed for testnets. Then implement the opt-in server and any queries.
 3. **`cardano-node`**: bump the `ouroboros-network` and `ouroboros-consensus` pins in `cabal.project`. There is no N2C protocol logic in `cardano-node` itself; it only wires the LeiosDB configuration through.
 4. **`ogmios`**: bump the same pins; implement the opt-in and any new queries.
 
