@@ -114,7 +114,7 @@ export const source = `
   - [~] Implementation
     - [~] Size mempool via pparams
     - [~] Forge and store EBs
-    - [ ] Forge RBs with certificates
+    - [~] Forge RBs with certificates
     - [ ] Pre-apply certificates
   - [ ] Assurance
 
@@ -123,10 +123,12 @@ export const source = `
   - [~] Prototype: fetching policies, egress scheduling
   - [?] Design: Settle policies
   - [~] Implementation
-    - [ ] Announce and detect equivocations of EBs
-    - [ ] Diffuse and validate EBs via TxCache
+    - [~] Announce and detect equivocations of EBs
+    - [~] Diffuse and validate EBs via TxCache
     - [~] Egress scheduling
-    - [ ] Basic fetching policy
+    - [~] Basic fetching policy (not full hedging)
+    - [ ] Efficient serving
+    - [ ] Incremental offers
     - [ ] Advanced fetching policy
     - [ ] Catch up on not yet certified Leios EBs
   - [?] Assurance: good enough?
@@ -136,7 +138,7 @@ export const source = `
   - [x] Prototype: schema improvements
   - [x] Design
   - [~] Implementation
-    - [ ] Disk-backed TxCache
+    - [~] Disk-backed TxCache
     - [~] Volatile/Immutable LeiosDB
     - [ ] Fully optimised LeiosDB
   - [ ] Assurance
@@ -157,7 +159,7 @@ export const source = `
   - [x] Prototype
   - [~] Design: Consensus/Leger API
   - [ ] Implementation
-    - [ ] Validate EB announcing and certifying blocks
+    - [~] Validate EB announcing and certifying blocks
     - [ ] EB fetching on chain selection
     - [ ] Out of order fetch EBs in Genesis
   - [ ] Assurance
@@ -170,7 +172,7 @@ export const source = `
     - [x] Query pool state showing key registration
     - [ ] Query committee details
     - [~] Client APIs inline certified EB txs
-    - [ ] Node accepts BLS keys
+    - [~] Node accepts BLS keys
   - [~] Assurance: Kleioscan, SPO tools
 `;
 
@@ -199,7 +201,7 @@ export const plan = `
   - Client APIs inline certified EB txs
   - Node integration 11.2
 
-- Stage 1: Low params (1/4/7/100k/1M)
+- Stage 1: Low params (1/4/7/40K/260K+?/500 seats/...)
   - Socket options
   - TxSubmisison V2-undecision
   - Double-buffered mempool
@@ -209,8 +211,9 @@ export const plan = `
   - Disk-backed TxCache
   - Announce and detect equivocations of EBs
   - Diffuse and validate EBs via TxCache
-  - Basic fetching policy
-  - Egress scheduling
+  - Basic fetching policy (not full hedging)
+  - Incremental offers
+  - Efficient serving
   - Voting logic
   - Diffuse and validate votes
   - Store and aggregate votes
@@ -220,7 +223,8 @@ export const plan = `
   - Node accepts BLS keys
   - Node integration 11.3
 
-- Stage 2: High params
+- Stage 2: High params (900 seats)
+  - Egress scheduling
   - Pull-based vote diffusion
   - Pre-apply certificates
   - TxSubmission param tuning
