@@ -1136,66 +1136,6 @@ Furthermore, this phase will see custom benchmarks that can scale individual asp
 parameter), so that the observed change in performance metrics can be clearly correlated to a specific protocol change. This also paves the way for testing hypotheses about the effect of protocol settings or changes based
 on evidence rather than a model.
 
-
-
-# Dimensional plan on hard-fork readiness
-
-> [!WARNING]
->
-> TODO: Link back to the implementation plan, dependencies and risks to introduce the need of a dimensional plan (hard fork coordination being a main driver and source of "dead time"). Also, what is a dimensional plan?
-
-Each stage is a cardano-node release scope that could be considered to hard-fork mainnet. Each release in composition, but also each item individually requires "high confidence". That is, quality assurance through testing, formal methods, statistical analysis and adersarial testing.
-
-> [!WARNING]
->
-> TODO: motivate the scope cutting this way
-
-## Stage 1: Dijkstra supports Leios
-
-- Dijkstra block definition / serialization contains Leios
-  - Announcements in headers
-  - BLS keys in block headers (?)
-  - Certificates in body
-  - BLS key registration in pool registration cert in txs
-  - Protocol parameters in txs
-- Constitution guard rails can reference Leios protocol parameters
-- Generate BLS keys
-- Create and submit pool registration with BLS keys
-- Query pool state showing key registration
-
-## Stage 2: Start with zero (0/0/∞/0/0)
-
-- Register BLS keys via block headers (?)
-- Committee selection at epoch boundaries
-  - Committee in ledger state
-- Validate EB announcing and/or certifying blocks
-  - Disallowed by protocol parameters
-- Client APIs inline certified EB txs
-- No-op mini-protocols (?)
-- ...?
-
-## Stage 3: Low params (1/4/7/100k/1M)
-
-- Double-buffered mempool
-- Capped forge loop
-- Forge and store EBs
-- Small quantity EB storage
-- Announce and detect equivocations of EBs
-- Diffuse and validate EBs via TxCache
-- EB fetching on chain selection
-- Vote and aggregate certificates
-- Forge RBs with certificates 
-- ...?
-
-## Stage 4: High params
-
-- High-throughput tx submission
-- Efficient forge loop
-- Disk-backed TxCache
-- Large quantity, low latency EB storage
-- ...?
-
-
 # Glossary
 
 | Term                       | Definition                                                            |
