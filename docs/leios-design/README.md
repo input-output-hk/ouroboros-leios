@@ -1001,137 +1001,43 @@ Note that the PoP checks probably are done at the certificate level, and that th
 
 ### Node-to-client
 
-Leios changes what an on-chain block looks like, but the N2C design must keep that change hidden by default. Apart from supporting the new Dijkstra era, as with any hard fork, clients will receive blocks with their transactions in the block body, as today, and are only exposed to new behavior when they _explicitly_ ask for it.
+Leios changes what an on-chain block looks like. Clients must not notice, apart from the new Dijkstra era that comes with any hard fork.
 
-- **REQ-N2CBackwardCompatible** A client that negotiates any existing N2C version up to [`NodeToClientV_23`](https://github.com/IntersectMBO/ouroboros-network/blob/4b3ab7664f609a1aee0f0c24dcfcfd0ab899fc42/cardano-diffusion/api/lib/Cardano/Network/NodeToClient/Version.hs#L71) must see no Leios-specific wire-format change on any N2C mini-protocol, beyond the new Dijkstra era.
-- **REQ-N2CInlineCertifiedEbs** When `LocalChainSync` sends a CertRB to a client, it must include the transactions of the EB that the CertRB certifies in the block body, as specified in [CIP-164's "Clients" section](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#clients).
-- **REQ-N2CCertifiedOnlyByDefault** Unless a client opts in, no N2C mini-protocol may expose transactions from an EB that has not been certified on the node's selected chain.
+- **REQ-N2CBackwardCompatible** A client on any existing N2C version sees no Leios-specific wire-format change, beyond the new Dijkstra era.
+- **REQ-N2CInlineCertifiedEbs** Once an EB is certified on the node's selected chain, `LocalChainSync` delivers its transactions in the body of the RB that announced the EB, after that RB's own transactions. This is where the ledger applies them (**REQ-LedgerUntickedEBValidation**), not at the CertRB's slot.
+- **REQ-N2CCertifiedOnly** No N2C mini-protocol exposes transactions from an EB that is not certified on the node's selected chain.
 
-#### Impact per mini-protocol
+#### Inlining certified EB transactions
 
-The N2C mini-protocols are bundled in `ouroboros-network` (`cardano-diffusion/lib/Cardano/Network/NodeToClient.hs`) and served by `ouroboros-consensus` (`ouroboros-consensus-diffusion/src/ouroboros-consensus-diffusion/Ouroboros/Consensus/Network/NodeToClient.hs`, `mkApps`).
+The only required change is in the `LocalChainSync` server (**UPD-LeiosN2cChainSyncServer**). It sends the CertRB unchanged, and sends the RB that announced the EB with the EB's transactions appended. We call this augmented block **RB⁺**; plain **RB** means the block as it appears on chain.
 
-| Mini-protocol | Leios change | Component |
-|---|---|---|
-| `LocalChainSync` | CertRBs served with the certified EB's transactions inlined; see [below](#inlining-certified-eb-transactions-in-localchainsync) | **UPD-LeiosN2cChainSyncServer** |
-| `LocalTxSubmission` | None | — |
-| `LocalStateQuery` | TODO: possibly new queries; see [LocalStateQuery additions](#localstatequery-additions) | **UPD-LeiosN2cQueries** |
-| `LocalTxMonitor` | None | — |
-| Handshake | TODO: new `NodeToClientVersion` to gate the opt-in and any new queries; depends on the `LocalStateQuery` and opt-in decisions | **UPD-LeiosN2cVersion** |
-| *(opt-in for announced EBs)* | TODO: a new mini-protocol (recommended) or a `LocalChainSync` variant; see [Announced (uncertified) EBs](#announced-uncertified-ebs) | **NEW-LeiosN2cAnnouncedEbs** |
+At the tip, the client already has RB when the certificate arrives, because RB can't carry uncertified transactions.
 
-#### Inlining certified EB transactions in LocalChainSync
+**Decision: use `RollBackward` / `RollForward`.** This needs no wire-format change and no change in client libraries. The alternative, a new field in the CertRB for the transactions, would change the wire format, and older clients would still need rollbacks.
 
-On-chain, a CertRB holds only a certificate. Its transactions are stored separately, in the EB it certifies. Before the node's `LocalChainSync` server (**UPD-LeiosN2cChainSyncServer**) sends a CertRB to a client, it copies the EB's transactions into the block. The client receives a normal Dijkstra block: the EB's transactions go into the body's transaction list, and the certificate stays in the body ([`block_body`](https://github.com/IntersectMBO/cardano-ledger/blob/d93c654699c8f10c883a625168f65dd387abc695/eras/dijkstra/impl/cddl/data/dijkstra.cddl#L109-L113) in the Dijkstra ledger CDDL, `[transactions, leios_certificate / nil, peras_certificate / nil]`). All other blocks are sent unchanged.
+The server:
 
-> [!WARNING]
->
-> TODO: CIP-164 still describes the block in its old Conway shape ([`ranking_block`](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#ranking-block-cddl) and the "Clients" section). The Dijkstra ledger changed the block body in [cardano-ledger#5872](https://github.com/IntersectMBO/cardano-ledger/pull/5872), and the prototype and client libraries such as gouroboros follow the ledger, so nothing breaks. Updating the CIP is a low-priority docs fix, so new client authors aren't misled.
+1. **Sends RB⁺ directly when it can.** If the next block is already on the node's chain, the server sends RB⁺ when that block certifies RB's EB, and RB otherwise. Clients catching up see no extra rollback.
+2. **Rolls back when the certificate comes later.** If the client has RB and the next block is its CertRB, the server rolls the client back to RB's parent, then sends RB⁺ and the CertRB.
+3. **Rolls back one block deeper on a chain switch or reconnection.** In two cases the server rolls back to RB's parent and sends RB or RB⁺ again:
+   - the node switches to a chain that keeps RB but changes whether its EB is certified. Such rollbacks can reach k + 1 blocks.
+   - a client reconnects at an RB that announced an EB. The node can't tell whether the client has RB or RB⁺.
 
-The server always has the EB's transactions when it sends a CertRB, because **a node never adds a CertRB to its chain until it has all of the EB's transactions** (see **NEW-LeiosCertRbStagingArea** in [Chain selection](#chain-selection)). So `RollBackward` keeps its meaning, a switch to a different chain: rolling back a CertRB removes its transactions, as for any block today.
+The node always has the EB's transactions when it sends RB⁺, because it never adopts a CertRB without them (**NEW-LeiosCertRbStagingArea**, see [Chain selection](#chain-selection)).
+
+The cost: at the tip, clients see a one-block rollback for each CertRB, which under load can be every other block. Clients that alert on rollbacks, or do costly work on them (such as `db-sync`), will notice.
 
 > [!IMPORTANT]
 >
-> A block's header contains a hash of its body (`block_body_hash`). For a CertRB, that hash is of the body stored on-chain, which holds only the certificate. The body a client receives also holds the EB's transactions, so it no longer matches the hash. A client that checks the body against the header will see a mismatch on every CertRB. [CIP-164](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#clients) says this is expected. Mithril is not affected: it reads blocks through `LocalChainSync` but doesn't do this check.
+> The header's `block_body_hash` is a hash of the on-chain body, so it doesn't match RB⁺. Clients that check it will see a mismatch on every RB⁺. CertRBs match. Mithril doesn't do this check.
 
 > [!WARNING]
 >
-> TODO: The prototype `cardano-node-leios` already adds CertRB transactions this way ([#898](https://github.com/input-output-hk/ouroboros-leios/issues/898); `chainSyncBlocksServer` in `ouroboros-consensus` [`cbd1003`](https://github.com/IntersectMBO/ouroboros-consensus/commit/cbd100331abaf65d20e9362c75039db0ff50c080), pinned by `cardano-node` `83c0b07`, release `prototype-2026w40a`). Items to harden before it leaves the prototype. In the first three, the server sends the CertRB as stored on-chain, without the EB's transactions, and logs nothing. The client gets a block that looks valid, matches its header hash, and is missing transactions. Each should fail loudly instead:
->
-> | Problem | How to solve |
-> |---|---|
-> | **Missing closure.** `resolveLeiosClosure` can't read the EB's transactions from the LeiosDB. The rule above should prevent this, but nothing tests it. | Add a test that the rule holds; fail loudly if it ever happens. |
-> | **`setPrev` lookup.** A code comment warns that, after a rollback, `setPrev` might not find the block it looks up. It always will: the lookup also checks the ImmutableDB (`getAnyBlockComponent` in `Storage/ChainDB/Impl/Query.hs`). | Remove the misleading comment; fail loudly on a `Nothing` result. |
-> | **Decode failure.** The server can't decode the CertRB (`Left _ -> pure sblk`). | Fail loudly. |
-> | **Cost per client.** A node with several clients (indexers) builds the same CertRB again for each one: for every client, it decodes the stored block, adds the EB's transactions and encodes it again. | Cache each inlined CertRB once and share it across clients. |
+> TODO: [CIP-164's "Clients" section](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#clients) puts the EB's transactions in the CertRB. Update it to this design.
 
 #### Announced (uncertified) EBs
 
-CIP-164's Clients section only covers certified blocks, and by default clients only see those (**REQ-N2CCertifiedOnlyByDefault**). Clients that want to act early can opt in per connection (**NEW-LeiosN2cAnnouncedEbs**), knowing an announced EB may never be certified. The opt-in comes with a new N2C version; see [Versioning and rollout](#versioning-and-rollout).
-
-> [!WARNING]
->
-> TODO: Confirm the opt-in mechanism with the `ouroboros-network`, `ouroboros-consensus` and `ogmios` maintainers. Option A is recommended; see the comparison table after option B.
-
-**Option A: a new, optional mini-protocol.** Add an N2C mini-protocol (example: `LocalLeiosNotify`) that streams announced EBs and what later happens to each one. A client that wants announced EBs runs it alongside `LocalChainSync`, which keeps its certified-only meaning. Message sketch:
-
-| Message | Direction | Payload |
-|---|---|---|
-| `MsgRequestNext` | client → server | — |
-| `MsgEBAnnounced` | server → client | announcing RB point, EB hash, transactions |
-| `MsgEBCertified` | server → client | EB hash, point of the CertRB |
-| `MsgEBExpired` | server → client | EB hash (can no longer be certified on the selected chain) |
-| `MsgDone` | client → server | — |
-
-Changes needed:
-
-- `ouroboros-network`:
-  - Define the new protocol: its message types, how they are encoded (codec), and their CDDL.
-  - Give it a new protocol number (`MiniProtocolNum`) in `cardano-diffusion/lib/Cardano/Network/NodeToClient.hs`, and add it to `NodeToClientProtocols`, switched on only for the new N2C version.
-  - Today `nodeToClientProtocols` runs the same protocols for every version (it ignores its `_version` argument), so it needs to start picking protocols based on the version.
-  - It can't reuse `LeiosNotify`'s number 18, because N2C protocol numbers are kept separate from node-to-node ones (see the comment above `nodeToClientProtocols`).
-- `ouroboros-consensus`:
-  - Add a server for the new protocol in `mkApps`, and its codec to `Codecs`.
-  - Much of the server can copy the prototype's node-to-node `LeiosNotify` (`LeiosDemoOnlyTestNotify`). It works the same way (the client asks for the next update, gets one reply, and says when it's done), and it's driven by the same "new EB announced" events (`LeiosDemoLogic`).
-  - Its messages can't be reused, though: they only say an EB is available, without its transactions, and have nothing for "certified" or "expired".
-- `ogmios` and cardano-blueprint: support and document the new protocol.
-
-To resolve in the protocol design:
-
-- **Forks.** If the node switches to a different chain, an EB's status can change after the client was told about it. An EB reported as expired can become certified, if the new chain has a block that certifies it. An EB reported as certified stops being certified, if the block that certified it is rolled back. The protocol either needs a message to tell clients about these changes, or a rule that clients only trust `LocalChainSync` to tell them whether an EB is certified.
-- **Ordering between streams.** `LocalChainSync` and the new protocol aren't ordered relative to each other. A client may see a CertRB on `LocalChainSync` before or after `MsgEBCertified`, and must handle both.
-
-**Option B: a handshake flag on `LocalChainSync`.** Add a field to `NodeToClientVersionData` (e.g. `leiosAnnouncedEBs :: Bool`). When a client sets it, `LocalChainSync` inlines an announced EB's transactions as soon as the announcing RB is served, and takes them back with `RollBackward` if the EB doesn't certify.
-
-Changes needed:
-
-- `ouroboros-network`: add the field to `NodeToClientVersionData` and make `nodeToClientCodecCBORTerm` version-dependent. Today it ignores the version and always encodes `[networkMagic, query]`, so the new field must only be encoded from the new version onward. Also decide how `Acceptable` combines the field; `query` today uses `local || remote`.
-- `ouroboros-consensus`: a second mode in `chainSyncBlocksServer` that inlines at the announcing RB and synthesises a `RollBackward` / `RollForward` pair when that EB expires. The per-client encoding cache from the hardening table above would need a variant for each mode.
-
-Costs outside the node:
-
-- **Transactions in the wrong block.** Opted-in clients would get an EB's transactions in the announcing RB, so the CertRB would have to reach them without the transactions, or they'd get them twice. Everyone else gets the transactions in the CertRB, where the ledger applies them. So two clients of the same node would disagree on which block a transaction is in, and indexers and wallets that store data by block hash would record different blocks. For opted-in clients, the announcing RB's body would also no longer match its header's `block_body_hash`.
-- **Every client library pays for the handshake change.** From the new version on, the handshake's version data has a new field, both in what the client sends and in what the node sends back. Unless the field can be left out, any client that wants the new version, for whatever feature, must handle the new shape even if it never opts in. Independent implementations such as Pallas and gouroboros have to implement it; Haskell clients such as `ogmios` and `cardano-api` get it from `ouroboros-network`.
-
-| | Option A: new mini-protocol | Option B: handshake flag |
-|---|---|---|
-| What `LocalChainSync` means | Always certified-only | Depends on the flag: two behaviors to specify and test |
-| "EB failed to certify" | Its own message (`MsgEBExpired`) | A `RollBackward`, which looks like a chain switch |
-| Shown data taken back | Only on the new stream, when the chain switches | Yes, for opted-in clients |
-| Block holding the EB's transactions | CertRB, for everyone | Announcing RB if opted in, CertRB otherwise |
-| Body no longer matches `block_body_hash` | CertRBs only, as without the opt-in | CertRBs, plus announcing RBs for opted-in clients |
-| Handshake change | New version number only | New version data shape, which Pallas and gouroboros must implement unless the field can be left out |
-| Work in `ouroboros-network` / `ouroboros-consensus` / `ogmios` | A whole new protocol | A smaller change to an existing one |
-| For clients | Two streams to match up, arriving in either order | One stream |
-| Old clients | Never start it | Never set the flag |
-| Adding it after the hard fork | Easy: a new protocol, nothing existing changes | Possible, but adds a second behavior to an existing protocol |
-
-#### Versioning and rollout
-
-The opt-in is gated behind one new N2C version (**UPD-LeiosN2cVersion**). A client can only use it against a node that offers that version in the handshake. Older clients negotiate an older version and see only certified-only behavior. The plan, by repository:
-
-1. **`ouroboros-network`**: add `NodeToClientV_24` after `NodeToClientV_23` in `cardano-diffusion/api/lib/Cardano/Network/NodeToClient/Version.hs`, with its encode and decode cases. For option A, also register the new mini-protocol for `>= NodeToClientV_24`. For option B, also add the `NodeToClientVersionData` field and its version-dependent codec.
-2. **`ouroboros-consensus`**: add `ShelleyNodeToClientVersion16` (`Shelley/Ledger/NetworkProtocolVersion.hs`) and `CardanoNodeToClientVersion20` (`Cardano/Node.hs`), mapped to `NodeToClientV_24`. Keep `latestReleasedNodeVersion` at `NodeToClientV_23` until the Dijkstra release; until then, only nodes with `ExperimentalProtocolsEnabled: true` in their config offer `NodeToClientV_24` (proto-devnet already sets it), so no new feature flag is needed for testnets. Then implement the opt-in server and any queries.
-3. **`cardano-node`**: bump the `ouroboros-network` and `ouroboros-consensus` pins in `cabal.project`. There is no N2C protocol logic in `cardano-node` itself; it only wires the LeiosDB configuration through.
-4. **`ogmios`**: bump the same pins; implement the opt-in and any new queries.
-
-#### Status on the Musashi testnet
-
-Musashi, the public Leios testnet, runs IOG's `cardano-node-testnet` image, which IOG republishes when the testnet is reset. These observations are from the `prototype-2026w35` image (`cardano-node` `6a540bd`); images up to `prototype-2026w40a` (`83c0b07`, the current pin) have been published since. What works there over N2C:
-
-- **`cardano-cli`** from the same release can query the tip and UTxO (`LocalStateQuery`), build transactions (protocol parameters also come through `LocalStateQuery`) and submit them (`LocalTxSubmission`). This shows those protocols working unchanged with a Dijkstra-aware client. It doesn't show that older clients work.
-- **The usual API layers can't read Musashi's blocks yet**: Ogmios, Kupo and Blockfrost. None of them is hosted for the testnet, so applications have to use `cardano-cli` on the node's host. They don't decode Dijkstra blocks yet; see the clients row in the table below.
-
-#### Changes by repository
-
-| Repository | Change | Status |
-|---|---|---|
-| `ouroboros-consensus` | Inline certified EB transactions in the N2C ChainSync server (`chainSyncBlocksServer`, `ResolveLeiosBlock`) | Done in prototype, and seen working on a local proto-devnet with `prototype-2026w35` and `prototype-2026w39` (CertRBs of up to 6,603 transactions, 1.8 MB, received by a Pallas client). Hardening TODOs above |
-| CIP-164 (`cardano-foundation/CIPs`) | Update `ranking_block` and the "Clients" section to the Dijkstra ledger's block format | Not filed; low priority, since client libraries already follow the ledger |
-| `ouroboros-consensus` | New Shelley/Cardano N2C versions; opt-in server; any new queries | Waiting for maintainers to confirm option A (recommended), and on the query list |
-| `ouroboros-network` | `NodeToClientV_24`; option A mini-protocol or option B `NodeToClientVersionData` field | Waiting for maintainers to confirm option A (recommended) |
-| `cardano-node` | Dependency pin bumps only | After the above |
-| `ogmios`, Kupo, Pallas, `db-sync`, `cardano-wallet` | Decode Dijkstra blocks; handle large CertRBs; `ogmios` implements the opt-in | Dijkstra decoding (October 2026): Pallas has it on its unreleased `dijkstra` branch ([pallas#800](https://github.com/txpipe/pallas/pull/800); EBs in [#816](https://github.com/txpipe/pallas/pull/816)), `cardano-wallet` is working on it ([#5209](https://github.com/cardano-foundation/cardano-wallet/issues/5209)), `db-sync` has `leios-prototype` branches, `ogmios` and Kupo haven't started. Large blocks: reading the source of `ogmios`, Pallas, `db-sync` and `cardano-wallet` (September 2026) found no size limit or timeout a large CertRB would hit; still to test with maximum-size CertRBs |
+Out of scope for now; certified transactions come first. A later N2C version can add them, as a new optional mini-protocol or a `LocalChainSync` option, without changing what existing clients see.
 
 ### Feature flags and configuration
 
