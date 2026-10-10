@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Linear Leios Tuner</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 960px; margin: 2em auto; padding: 0 1em; color: #222; line-height: 1.45; }
+  h1 { margin-bottom: 0.2em; }
+  .lede { color: #555; margin-top: 0; }
+  .tuner-block { border: 1px solid #ddd; border-radius: 6px; padding: 1em 1.25em; margin: 1.5em 0; background: #fafafa; }
+  .tuner-block h2 { margin-top: 0; }
+  .controls { margin: 0.5em 0 0.75em 0; }
+  .controls label { font-weight: 600; margin-right: 0.5em; }
+  .controls input[type="number"] { width: 5em; padding: 0.2em 0.4em; font-size: 1em; }
+  .controls input[type="range"] { vertical-align: middle; margin-left: 0.75em; width: 16em; }
+  .readout { font-size: 0.9em; color: #555; margin-top: 0.5em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .rx { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #224080; }
+  /* Each named input docks to the top-right of the viewport once the user scrolls past it.
+     Positioning is managed by JS (see StickyInputs) so the dock persists no matter how far
+     past — CSS `position: sticky` is bounded by the input's containing block (its <p>), which
+     isn't enough. The high-visibility border makes the input obviously interactive. */
+  .sticky-input {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 0.1em 0.4em;
+    border: 2px solid #CCF20C;
+    border-radius: 4px;
+    white-space: nowrap;
+    backdrop-filter: blur(2px);
+  }
+  .sticky-input.stuck { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); }
+  .sticky-input input[type="range"] { width: 12em; }
+  .big-result { font-size: 2em; font-weight: 600; color: #224080; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin: 0.25em 0; }
+  .warn { color: #b04020; }
+  .plot { width: 100%; height: 400px; }
+  /* {hr} macro — typographic section break: three muted dots, centered, with breathing room. */
+  .section-break {
+    text-align: center;
+    font-size: 1.6em;
+    color: #aaa;
+    letter-spacing: 0.6em;
+    margin: 2.5em 0 2em;
+    user-select: none;
+  }
+</style>
+</head>
+<body>
+
+<h1>Linear Leios Tuner</h1>
+
+<p>This page visualizes the consequences of different values of <span class="sticky-input">L = <input id="L" type="number" min="2" max="200" step="1" value="14"> <input id="L-slider" type="range" min="2" max="200" step="1" value="14" aria-label="L slider"></span> between 2 and 200.
+L is the sum 3&times;L<sub>hdr</sub> + L<sub>vote</sub> + L<sub>diff</sub> from the Linear Leios specification.</p>
+
+<p>One calculation we've often considered is the probability of the leader schedule itself preventing an EB from succeeding: Linear Leios allows an EB to be certified only by the subsequent RB and only if that RB arises at least L slots later.
+Before we introduce the math, a corresponding clarification is due.</p>
+
+<p>While we do often refer to the "leader schedule" as the limiting factor, that habit tacitly assumes the adversary is not attacking Praos.
+In other words, it assumes that the density of the RBs on the best Praos chain are determined by the leader schedule.
+The relevant parameter is f = 5%, the Praos <em>active slot coefficient</em>.</p>
+
+<p>When not under attack, f causes the Praos chain to grow by one block every 1/f=20 seconds, on average.
+When under attack, however, the honest parties will be unable to communicate as effectively, and so some of their elections in the leader schedule will be wasted on short forks instead of them all contributing as growth of the best single chain.
+We introduce a variable <span class="sticky-input">g = <input id="g" type="number" min="1" max="5" step="0.1" value="5"> <input id="g-slider" type="range" min="1" max="5" step="0.1" value="5" aria-label="g slider"></span> between 1% and f=5% to model this.
+When g = f = 5%, the adversary is not interfering with Praos.
+When g &lt; f, they are, and the difference determines the degree of their success&mdash;this numeric quantity is ad-hoc, but useful enough for our other calculations in this memo.</p>
+
+<p>P(too dense | L=<span class="rx" id="rx-L1"></span>) = 1 &minus; (1 &minus; g)<sup>L</sup> = 1 &minus; <span class="rx" id="rx-pow"></span> = <span class="rx" id="rx-prev"></span>.</p>
+
+<p>A g-chain will, on average, need to announce N = (1 &minus; g)<sup>&minus;L</sup> = <span class="rx" id="rx-N1"></span> EBs for g to allow one of them to succeed. That's the N for which N &times; (1 &minus; P(too dense | L=<span class="rx" id="rx-L2"></span>)) = 1.</p>
+
+<p>A g-chain will, on average, announce one EB per 1/g=<span class="rx" id="rx-1overG"></span> seconds.
+Therefore, on average, there will be N &divide; g = <span class="rx" id="rx-NoverG"></span> seconds between EBs not prevented by g.</p>
+
+<p>Beyond just the average N &divide; g, we can also calculate the whole probability mass function of that duration.
+The model is tosses of a (1&minus;g):g biased coin, where every run of at least L heads terminated by a tails is an EB that g didn't prevent, which is a "jump" in that <a href="https://en.wikipedia.org/wiki/Renewal_theory">"renewal process"</a> and therefore delineates the "holding time" since the previous jump.
+Here it's shown for the shortest durations whose cumulative probability is at least 95% along with select quantiles.</p>
+
+<div id="rungap-plot" class="plot"></div>
+
+<div class="section-break" aria-hidden="true">·&nbsp;·&nbsp;·</div>
+
+<p>For a given positive maximum EB size <span class="sticky-input">MaxSize = <input id="MaxSize" type="number" min="1" step="1" value="12000"></span>, we can calculate the throughput capacity offered by the successful EBs on an average g-chain.
+If we optimistically assume that every EB that g doesn't prevent is both successful and full, then the average capacity will be MaxSize &divide; (N &divide; g) = <span class="rx" id="rx-cap"></span> bytes per second.
+Here it's shown for possible values of L from 0 to &lceil;L&times;4&divide;3&rceil;.</p>
+
+<div id="throughput-plot" class="plot"></div>
+
+<p>Also shown in orange is the average rate at which EBs are announced.
+Note that as L increases or g decreases, the capacity decreases but the amount of announcements doesn't change&mdash;it's still one per 1/f=20 seconds.
+MaxSize can be increased to bring the capacity back up, but that also proportionally increases the size of each announced EB.
+It's therefore important to acknowledge that adversarial RBs are able to announce any EB they want, and the whole network will diffuse it&mdash;they can choose to always announce full EBs, even if no EB has succeeded for a long while.</p>
+
+<p>Suppose the adversary controls a percentage of the total stake <span class="sticky-input">A = <input id="A" type="number" min="0" max="50" step="1" value="33"> <input id="A-slider" type="range" min="0" max="50" step="1" value="33" aria-label="A slider"></span> between 0 and 50%.
+(If A is large, the adversary could severely reduce g well below f=5%, for example, by simply withholding their own blocks. But whether to do so is that adversary's prerogative, and so the variables can be tuned independently.)
+This adversary leads each slot with a probability of &phi;<sub>f</sub>(A) = 1 &minus; (1 &minus; f)<sup>A</sup> = <span class="rx" id="rx-pA"></span>.
+Thus, the ratio of the network utilization the adversary can steadily cause versus the average g-chain capacity is (N &divide; g) &divide; (1 &divide; &phi;<sub>f</sub>(A)) = <span class="rx" id="rx-advRatio"></span>&mdash;and that's even assuming the adversary is choosing to include certs in its RBs.
+If they instead omit Leios certs from their RBs, then the ratio worsens by some factor like 1 &divide; (1 &minus; A) to <span class="rx" id="rx-advRatioOmit"></span>.</p>
+
+<p>If the adversary is causing mempool fragmentation, then the <em>honest</em> announced EBs could also be full even when no EBs are succeeding.
+In the most extreme case, the ratio would worsen to (N &divide; g) &divide; (1 &divide; f) = <span class="rx" id="rx-frag"></span> or even something like 1 &divide; (1 &minus; A) times worse at <span class="rx" id="rx-fragOmit"></span> if the adversary omits Leios certs in their RBs.</p>
+
+<p>Three caveats.</p>
+<ul>
+  <li>The 1 &divide; (1 &minus; A) is a crude guesstimate. The actual multiplier depends on how much of the g-chain consists of adversarial blocks..</li>
+  <li>The above inefficiency ratio calculations exclude the network utilization necessary for the EBs themselves (distinct from the transactions to which they refer) and the votes. Those exclusions are much smaller than full EBs, but not totally negligible&mdash;that is a forgivable shortcoming of the current draft.</li>
+  <li>The above also ignores the fact that every SPO elected in a multi-leader slot announces an EB. That's an additional ~2.5% inefficiency excluded in the above calculations.</li>
+</ul>
+
+<div class="section-break" aria-hidden="true">·&nbsp;·&nbsp;·</div>
+
+<p>Finally, a question related to how quickly the Mempools would need to be able to refill.
+If EBs are succeeding too quickly, back-to-back, then TxSubmission might not be able to replenish the Mempools to saturate the unusually high density of successful EBs on the g-chain.</p>
+
+<p>The following plot has x-axis from k=0 to k=30&times;L.
+It plots the probability that there will be at most M additional EBs allowed by g within the k slots starting immediately after some jump.</p>
+
+<div id="mempool-plot" class="plot"></div>
+
+<p>CIP-0164 recommends a Mempool containing enough transactions for two full EBs.
+Thus, the M=1 line captures the probability that a Mempool that was full before the initiating EB would suffice even if it wasn't refilled at all.
+The M=2 line, therefore, indicates how soon the Mempool would need to refill one EB's worth of transactions to avoid not being able to fill the thirrd EB in a short timeframe. The higher M curves would demand that much faster refilling.</p>
+
+<script>
+"use strict";
+
+const Utils = {
+  truncateAtQuantile(pmf, threshold) {
+    let acc = 0;
+    for (let i = 0; i < pmf.length; i++) {
+      acc += pmf[i];
+      if (acc > threshold) return i;
+    }
+    return pmf.length - 1;
+  },
+  meanFromPMF(pmf) {
+    let m = 0;
+    for (let i = 0; i < pmf.length; i++) m += i * pmf[i];
+    return m;
+  },
+  // For each q in `qs` (assumed sorted ascending), return the smallest x with CDF(x) >= q.
+  quantiles(pmf, qs) {
+    const out = new Array(qs.length).fill(pmf.length - 1);
+    let qi = 0, acc = 0;
+    for (let x = 0; x < pmf.length && qi < qs.length; x++) {
+      acc += pmf[x];
+      while (qi < qs.length && acc >= qs[qi]) { out[qi++] = x; }
+    }
+    return out;
+  },
+  // Nice round step (1/2/5 × 10^k) targeting ~`targetCount` ticks across `span`.
+  niceTickStep(span, targetCount = 8) {
+    if (!isFinite(span) || span <= 0) return 1;
+    const raw = span / targetCount;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / pow;
+    const nice = norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10;
+    return Math.max(1, Math.round(nice * pow));
+  },
+  // Like niceTickStep, but for real-valued ranges (does not clamp to integer).
+  niceFloatStep(span, targetCount = 6) {
+    if (!isFinite(span) || span <= 0) return 1;
+    const raw = span / targetCount;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / pow;
+    const nice = norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10;
+    return nice * pow;
+  },
+};
+
+const RunGapPmfBlock = (() => {
+  // p and q are derived from the user-controlled g (q = g, p = 1 − g); each recompute reads
+  // the current g and passes p,q into computePMF/monteCarlo so the renewal-coin tracks the
+  // input rather than being pinned to the original 19:1 ratio.
+  const RELEVANCYQUANTILE = 0.95;
+  const MAX_STEPS = 5_000_000;
+
+  // Holding-time PMF for the renewal process that jumps at each T which terminates an H-run of
+  // length >= L. Derivation (no recurrent-event machinery needed):
+  //
+  // 1. Decompose the toss sequence following a renewal T into i.i.d. "cycles". A cycle starts
+  //    just after a T and ends at (and includes) the next T. The i.i.d. property is immediate:
+  //    each cycle starts in the same state (the state immediately following a T) and tosses are
+  //    i.i.d. Bernoulli.
+  //
+  // 2. Each cycle has the form (H-run of length R >= 0) followed by exactly one T, so its total
+  //    length is W = R + 1. Counting,
+  //      P(R = m) = p^m * q,   m = 0, 1, 2, ...
+  //    A cycle "fires" (its terminating T is a renewal of our process) iff R >= L. Hence
+  //      P(fire) = sum_{m >= L} p^m * q = p^L,    and    P(not fire) = 1 - p^L.
+  //
+  // 3. Let K = first cycle index that fires; K ~ Geometric(p^L) on {1, 2, 3, ...}.
+  //    The holding time is G = W_1 + W_2 + ... + W_K, with W_1, ..., W_{K-1} i.i.d. as
+  //    (W | not fire) and W_K independent of those, distributed as (W | fire).
+  //
+  // 4. The two "tagged" PGFs (writing alpha = q * p^L):
+  //      A(z) := E[z^W * 1{not fire}]
+  //            = sum_{m=0}^{L-1} z^{m+1} * p^m * q
+  //            = z * q * (1 - (p*z)^L) / (1 - p*z)
+  //      B(z) := E[z^W * 1{fire}]
+  //            = sum_{m=L}^{infty} z^{m+1} * p^m * q
+  //            = alpha * z^{L+1} / (1 - p*z)
+  //    Summing the stopped sum over K is a geometric series in A(z):
+  //      phi_G(z) = sum_{k>=1} P(K=k) * (A(z)/(1-p^L))^{k-1} * B(z)/p^L ...
+  //    which collapses (after the (1-p^L) and p^L normalizers cancel) to
+  //      phi_G(z) = B(z) / (1 - A(z))
+  //               = alpha * z^{L+1} / (1 - z + alpha * z^{L+1}).
+  //
+  // 5. Coefficient matching on phi_G(z) * (1 - z + alpha * z^{L+1}) = alpha * z^{L+1} gives a
+  //    second-order (shift by L+1) linear recurrence:
+  //      f(g) = 0                              for g <= L
+  //      f(L+1) = alpha
+  //      f(g) = f(g-1) - alpha * f(g-L-1)      for g >= L+2
+  //    O(1) per step, exact in double precision (verified to ~1e-16 against the Markov
+  //    steady-state computation this replaced).
+  //
+  // 6. We iterate the recurrence in place until the cumulative mass first exceeds RELEVANCYQUANTILE,
+  //    and return that index as the x-axis truncation point.
+  function computePMF(L, p, q) {
+    const alpha = q * Math.pow(p, L);
+    const pmf = new Array(L + 1).fill(0);
+    pmf.push(alpha);
+    let cumulative = alpha;
+    let truncatedAt = null;
+    let hitCap = false;
+    if (cumulative > RELEVANCYQUANTILE) {
+      truncatedAt = L + 1;
+    } else {
+      // Inner loop's `i` is the holding-time index — renamed from the original `g` to avoid
+      // shadowing the user-input "g" semantically used outside this function.
+      for (let i = L + 2; i <= MAX_STEPS; i++) {
+        const v = pmf[i - 1] - alpha * pmf[i - L - 1];
+        pmf.push(v);
+        cumulative += v;
+        if (cumulative > RELEVANCYQUANTILE) { truncatedAt = i; break; }
+        if (i === MAX_STEPS) hitCap = true;
+      }
+    }
+    if (truncatedAt === null) truncatedAt = pmf.length - 1;
+    return { pmf, truncatedAt, cumulative, hitCap };
+  }
+
+  function monteCarlo(L, p, numTosses, truncatedAt) {
+    // Record positions of T's that end H-runs of length >= L (the renewal jumps).
+    const jumps = [];
+    let runLen = 0;
+    for (let t = 1; t <= numTosses; t++) {
+      const isH = Math.random() < p;
+      if (isH) {
+        runLen++;
+      } else {
+        if (runLen >= L) jumps.push(t);
+        runLen = 0;
+      }
+    }
+    if (jumps.length < 2) return { n: 0, mean: NaN, cdfAtTrunc: NaN };
+    let sum = 0, le = 0;
+    for (let i = 1; i < jumps.length; i++) {
+      const h = jumps[i] - jumps[i - 1];
+      sum += h;
+      if (h <= truncatedAt) le++;
+    }
+    const n = jumps.length - 1;
+    return { n, mean: sum / n, cdfAtTrunc: le / n };
+  }
+
+  function init() {
+    document.getElementById("L").addEventListener("input", recompute);
+    document.getElementById("g").addEventListener("input", recompute);
+    recompute();
+  }
+
+  const MAX_PLOT_POINTS = 5000;
+
+  function recompute() {
+    const rawL = Number(document.getElementById("L").value);
+    const L = Math.min(200, Math.max(2, Math.floor(Number.isFinite(rawL) ? rawL : 2)));
+    // g is displayed to the user as a percentage (1..5); every formula uses the fraction (0.01..0.05).
+    const rawG = Number(document.getElementById("g").value);
+    const g = Math.min(0.05, Math.max(0.01, (Number.isFinite(rawG) ? rawG : 5) / 100));
+    const p = 1 - g;
+    const q = g;
+
+    const { pmf, truncatedAt, cumulative, hitCap } = computePMF(L, p, q);
+
+    // Plot data, downsampled by a uniform stride if the PMF is longer than ~MAX_PLOT_POINTS,
+    // so SVG render time stays roughly constant with L. The PMF here decays smoothly (no
+    // high-frequency wiggles), so a stride-based subsample faithfully traces its shape.
+    let xs, ys;
+    const fullLen = truncatedAt + 1;
+    if (fullLen <= MAX_PLOT_POINTS) {
+      xs = Array.from({ length: fullLen }, (_, i) => i);
+      ys = pmf.slice(0, fullLen);
+    } else {
+      const stride = Math.ceil(fullLen / MAX_PLOT_POINTS);
+      xs = []; ys = [];
+      for (let i = 0; i <= truncatedAt; i += stride) { xs.push(i); ys.push(pmf[i]); }
+      if (xs[xs.length - 1] !== truncatedAt) { xs.push(truncatedAt); ys.push(pmf[truncatedAt]); }
+    }
+
+    const quantilePcts = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95];
+    const quantileXs = Utils.quantiles(pmf, quantilePcts.map(p => p / 100));
+    const quantileSizes = quantilePcts.map(p => 12 * (1 + (0 == p % 25 ? 1 : 0) + (0 == p % 50 ? 1 : 0)));
+
+    Plotly.react("rungap-plot", [
+      {
+        x: xs, y: ys, type: "scatter", mode: "lines",
+        line: { color: "#3060c0", shape: "hv" },
+        fill: "tozeroy",
+        fillcolor: "rgba(48, 96, 192, 0.12)",
+        hovertemplate: "x=%{x}<br>P=%{y:.4g}<extra></extra>",
+        showlegend: false,
+      },
+      {
+        x: quantileXs,
+        y: quantileXs.map(() => 0),
+        type: "scatter",
+        mode: "markers",
+        marker: { symbol: "line-ns-open", size: quantileSizes, color: "#c04020", line: { width: 1.5, color: "#c04020" } },
+        text: quantilePcts.map(p => `${p}%`),
+        hovertemplate: "quantile %{text}: x=%{x}<extra></extra>",
+        showlegend: false,
+      },
+    ], {
+      xaxis: (() => {
+        const step = Utils.niceTickStep(truncatedAt + 1);
+        const tickInts = [];
+        for (let i = 0; i <= truncatedAt; i += step) tickInts.push(i);
+        return {
+          title: "x (holding time)",
+          tickvals: tickInts.map(i => i + 0.5),
+          ticktext: tickInts.map(i => i.toString()),
+          range: [-0.5, truncatedAt + 0.5],
+          showgrid: false,
+        };
+      })(),
+      yaxis: { title: "P(holding time = x)", rangemode: "tozero" },
+      title: { text: "Arrival rate of inter-RB gaps ≥ L on a g-chain", font: { size: 14 } },
+      margin: { l: 70, r: 30, t: 40, b: 50 },
+      annotations: [{
+        x: (L + 1) * 0.95 + truncatedAt * 0.05,
+        y: pmf[L + 1] / 3,
+          text: `⌈Q(0.95)⌉ = ${truncatedAt}`,
+        showarrow: false,
+        xanchor: "left",
+        yanchor: "middle",
+        font: { size: 20 },
+      }],
+    }, { displayModeBar: false, responsive: true });
+
+    if (new URLSearchParams(location.search).get("debug") === "1") {
+      const theoreticalMean = 1 / (q * Math.pow(p, L));
+      const mc = monteCarlo(L, p, 200000, truncatedAt);
+      const meanWithinTruncation = Utils.meanFromPMF(pmf);
+      console.log(`[rungap L=${L} g=${g}] analytic mean (within truncation)=${meanWithinTruncation.toFixed(2)}, theoretical=${theoreticalMean.toFixed(2)}, MC mean (n=${mc.n})=${mc.mean.toFixed(2)}`);
+      console.log(`[rungap L=${L} g=${g}] analytic CDF at x=${truncatedAt}=${cumulative.toFixed(4)}, MC CDF=${mc.cdfAtTrunc.toFixed(4)}`);
+      if (hitCap) console.warn(`[rungap L=${L} g=${g}] hit ${MAX_STEPS.toLocaleString()}-step cap before reaching 95%; result is partial`);
+    }
+  }
+
+  return { init };
+})();
+
+const ThroughputBlock = (() => {
+  // f is the Praos active slot coefficient (constant); it drives the *announcement*
+  // bandwidth and so the orange reference line. g is the on-chain growth coefficient
+  // (user-controlled, ≤ f); it drives the *successful-EB* capacity curve.
+  const f = 0.05;
+
+  function recompute() {
+    const L = Math.max(1, Math.floor(Number(document.getElementById("L").value) || 1));
+    const MaxSize = Math.max(1, Math.floor(Number(document.getElementById("MaxSize").value) || 1));
+    const rawG = Number(document.getElementById("g").value);
+    const g = Math.min(0.05, Math.max(0.01, (Number.isFinite(rawG) ? rawG : 5) / 100));
+    const p = 1 - g;
+
+    const kLo = 0;
+    const kHi = Math.ceil(L * 4 / 3);
+
+    const ks = [];
+    const ratios = [];
+    for (let k = kLo; k <= kHi; k++) {
+      ks.push(k);
+      ratios.push(MaxSize * g * Math.pow(p, k));
+    }
+    // Duplicate the final value so the rightmost step has a horizontal segment.
+    const xPlot = [...ks, kHi + 1];
+    const yPlot = [...ratios, ratios[ratios.length - 1]];
+
+    const ratioAtL = MaxSize * g * Math.pow(p, L);
+
+    // Build y-axis tick positions once, then mirror them on the right axis as percentages
+    // (y2 = y1 / MaxSize × 100%). Identical range + tickvals → tick rows align by construction.
+    const yMax = ratios[0]; // ratios is decreasing in k, so the max is at kLo.
+    const yLine = f * MaxSize; // the orange reference line at y2 = f = 5% per second.
+    const yPeak = Math.max(yMax, yLine);
+    const yUpper = yPeak * 1.05;
+    const yStep = Utils.niceFloatStep(yPeak);
+    const yTicks = [];
+    for (let v = 0; v <= yUpper + yStep * 0.001; v += yStep) yTicks.push(v);
+    const fmtPct = v => {
+      const pct = v / MaxSize * 100;
+      const rounded = Number(pct.toFixed(2));
+      return rounded + "%";
+    };
+
+    Plotly.react("throughput-plot", [
+      {
+        x: xPlot, y: yPlot, type: "scatter", mode: "lines",
+        line: { color: "#3060c0", shape: "hv" },
+        customdata: yPlot.map(v => v / MaxSize * 100),
+        hovertemplate: "k=%{x}<br>MaxSize ÷ mean = %{y:.4g} (%{customdata:.3g}% per sec)<extra></extra>",
+        showlegend: false,
+      },
+      {
+        x: [kLo - 0.5, kHi + 1.5], y: [yLine, yLine],
+        type: "scatter", mode: "lines",
+        line: { color: "#ff7f0e", width: 2 },
+        hovertemplate: "5% per sec — worst-case network utilization<extra></extra>",
+        showlegend: false,
+      },
+      {
+        x: [L + 0.5], y: [ratioAtL], customdata: [[L, ratioAtL / MaxSize * 100]],
+        type: "scatter", mode: "markers",
+        marker: { symbol: "circle", size: 10, color: "#c04020" },
+        hovertemplate: "k=L=%{customdata[0]}<br>MaxSize ÷ mean = %{y:.4g} (%{customdata[1]:.3g}% per sec)<extra></extra>",
+        showlegend: false,
+      },
+      // Zero-width trace anchored to yaxis2 so Plotly actually renders the right-side axis.
+      {
+        x: [kLo, kHi + 1], y: [0, 0], yaxis: "y2",
+        type: "scatter", mode: "lines",
+        line: { width: 0 },
+        hoverinfo: "skip",
+        showlegend: false,
+      },
+    ], {
+      xaxis: (() => {
+        const step = Utils.niceTickStep(kHi - kLo + 1);
+        const labeled = ks.filter(k => (k - kLo) % step === 0);
+        return {
+          title: "k (minimum heads-run length)",
+          tickvals: labeled.map(k => k + 0.5),
+          ticktext: labeled.map(k => k.toString()),
+          range: [kLo - 0.5, kHi + 1.5],
+          showgrid: false,
+        };
+      })(),
+      yaxis: {
+        title: "MaxSize ÷ mean holding time",
+        range: [0, yUpper],
+        tickvals: yTicks,
+      },
+      yaxis2: {
+        title: "% of MaxSize per second",
+        overlaying: "y",
+        side: "right",
+        range: [0, yUpper],
+        tickvals: yTicks,
+        ticktext: yTicks.map(fmtPct),
+        showgrid: false,
+      },
+      title: { text: "Theoretical average capacity (with 100% stake participating, max EBs, succeed if L gap)", font: { size: 14 } },
+      margin: { l: 70, r: 70, t: 40, b: 50 }
+    }, { displayModeBar: false, responsive: true });
+  }
+
+  function init() {
+    document.getElementById("MaxSize").addEventListener("input", recompute);
+    document.getElementById("L").addEventListener("input", recompute);
+    document.getElementById("g").addEventListener("input", recompute);
+    recompute();
+  }
+
+  return { init };
+})();
+
+// Plot 3 — "How quickly do Mempools need to refill?". For each k in 0..30·L, six curves
+// give P(at most M jumps in the k tosses following an arbitrary jump) for M = 0..5.
+// Computed with a 2-D Markov chain whose state is (h, j): consecutive-H count (saturated at
+// L) and jump-count-so-far (saturated at Jmax = 6, so cell j=6 represents "≥ 6 jumps" — the
+// extra row above M=5 lets cells 0..5 each hold an *exact* j=M probability, which we then
+// cumulate ascending to get P(j ≤ M)).
+// Initial state is (h=0, j=0) — the chain re-enters right after the conditioning jump.
+// Each toss: H → h := min(h+1, L), j unchanged; T → if h = L emit a jump (j := min(j+1, Jmax))
+// then h := 0, else just h := 0.
+const MempoolPlotBlock = (() => {
+  function recompute() {
+    const rawL = Number(document.getElementById("L").value);
+    const L = Math.min(200, Math.max(2, Math.floor(Number.isFinite(rawL) ? rawL : 14)));
+    const rawG = Number(document.getElementById("g").value);
+    const g = Math.min(0.05, Math.max(0.01, (Number.isFinite(rawG) ? rawG : 5) / 100));
+    const p = 1 - g;
+    const q = g;
+
+    const K = 30 * L;
+    const Jmax = 6; // saturate at 6, so cells j = 0..5 stay as *exact* counts.
+
+    let state = Array.from({ length: L + 1 }, () => new Array(Jmax + 1).fill(0));
+    state[0][0] = 1;
+
+    // probs[M][k] = P(j ≤ M at toss k). Plotted for M = 0..5.
+    // At k = 0 we're at the conditioning jump (j = 0), so P(j ≤ M) = 1 for every M.
+    const probs = Array.from({ length: 6 }, () => new Array(K + 1).fill(0));
+    for (let M = 0; M <= 5; M++) probs[M][0] = 1;
+
+    for (let k = 1; k <= K; k++) {
+      const next = Array.from({ length: L + 1 }, () => new Array(Jmax + 1).fill(0));
+      for (let h = 0; h <= L; h++) {
+        const row = state[h];
+        const newHheads = h === L ? L : h + 1;
+        for (let j = 0; j <= Jmax; j++) {
+          const v = row[j];
+          if (v === 0) continue;
+          next[newHheads][j] += v * p;
+          if (h === L) {
+            const newJ = j === Jmax ? Jmax : j + 1;
+            next[0][newJ] += v * q;
+          } else {
+            next[0][j] += v * q;
+          }
+        }
+      }
+      state = next;
+      // Marginals: column-sum each j, then accumulate ascending to get P(j ≤ M).
+      let s0 = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0, s5 = 0;
+      for (let h = 0; h <= L; h++) {
+        const r = state[h];
+        s0 += r[0]; s1 += r[1]; s2 += r[2]; s3 += r[3]; s4 += r[4]; s5 += r[5];
+      }
+      probs[0][k] = s0;
+      probs[1][k] = probs[0][k] + s1;
+      probs[2][k] = probs[1][k] + s2;
+      probs[3][k] = probs[2][k] + s3;
+      probs[4][k] = probs[3][k] + s4;
+      probs[5][k] = probs[4][k] + s5;
+    }
+
+    const xs = Array.from({ length: K + 1 }, (_, i) => i);
+    // ColorBrewer-style sequential blue ramp, light → dark for M = 0..5.
+    const colors = ["#c6dbef", "#9ecae1", "#6baed6", "#3182bd", "#08519c", "#08306b"];
+    // Plot each curve as fill-to-zero, in *descending* M. The largest band (M=5) goes down
+    // first and is then progressively overwritten by smaller bands (M=4, M=3, …) drawn on
+    // top. The net effect is contiguous stacked bands: [0, P(j≤0)] = c0, [P(j≤0), P(j≤1)] =
+    // c1, …, [P(j≤4), P(j≤5)] = c5. legendrank keeps the legend in the natural M=0..5 order.
+    const traces = [];
+    for (let M = 5; M >= 0; M--) {
+      traces.push({
+        x: xs, y: probs[M], type: "scatter", mode: "lines",
+        line: { color: "#000", shape: "hv", width: 1 },
+        fill: "tozeroy",
+        fillcolor: colors[M],
+        name: `M = ${M}`,
+        legendrank: M,
+        hovertemplate: `k=%{x}<br>P(≤ ${M} jumps) = %{y:.4g}<extra></extra>`,
+      });
+    }
+
+    Plotly.react("mempool-plot", traces, {
+      xaxis: (() => {
+        const step = Utils.niceTickStep(K + 1);
+        const tickInts = [];
+        for (let i = 0; i <= K; i += step) tickInts.push(i);
+        return {
+          title: "k (tosses since previous jump)",
+          tickvals: tickInts.map(i => i + 0.5),
+          ticktext: tickInts.map(i => i.toString()),
+          range: [-0.5, K + 0.5],
+          showgrid: false,
+        };
+      })(),
+      yaxis: { title: "P(at most M jumps)", range: [0, 1] },
+      title: { text: "How quickly do Mempools need to refill, given L and g?", font: { size: 14 } },
+      margin: { l: 70, r: 30, t: 40, b: 50 },
+      legend: { x: 0.99, y: 0.5, xanchor: "right", yanchor: "middle", bgcolor: "rgba(255,255,255,0.7)" },
+    }, { displayModeBar: false, responsive: true });
+  }
+
+  function init() {
+    document.getElementById("L").addEventListener("input", recompute);
+    document.getElementById("g").addEventListener("input", recompute);
+    recompute();
+  }
+
+  return { init };
+})();
+
+// Inline reactive values for the prose ({eval ...} macros in the spec).
+// Recomputed on any input change; each .rx span is rewritten with the current value.
+const ReactiveText = (() => {
+  function fmt(v, frac = 4) {
+    return v.toLocaleString(undefined, { maximumFractionDigits: frac });
+  }
+  function setText(id, txt) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = txt;
+  }
+  function recompute() {
+    const L = Math.min(200, Math.max(2, Math.floor(Number(document.getElementById("L").value) || 14)));
+    const MaxSize = Math.max(1, Math.floor(Number(document.getElementById("MaxSize").value) || 12000));
+    // A is shown to the reader as a percentage (0..50) but every formula treats it as a
+    // fraction (0..0.5); otherwise (1 − A) would go negative. A = 0 is a legal input, so we
+    // can't use `|| 33` for the default — `0 || 33` would clobber zero. Treat NaN as default.
+    const rawA = Number(document.getElementById("A").value);
+    const A = Math.min(50, Math.max(0, Math.floor(Number.isFinite(rawA) ? rawA : 33))) / 100;
+    // g is shown as a percentage (1..5); formulas use the fraction (0.01..0.05).
+    const rawG = Number(document.getElementById("g").value);
+    const g = Math.min(0.05, Math.max(0.01, (Number.isFinite(rawG) ? rawG : 5) / 100));
+    const f = 0.05; // Praos active slot coefficient — constant; used only for φ_f(A).
+    const powL = Math.pow(1 - g, L);
+    const N = Math.pow(1 - g, -L); // {eval let N be (1 − g)^(−L)}
+    const pA = 1 - Math.pow(1 - f, A); // {eval let pA be 1 - 0.95^A} — φ_f(A) = 1 − (1−f)^A
+    setText("rx-L1", L);
+    setText("rx-L2", L);
+    setText("rx-pow", fmt(powL));
+    setText("rx-prev", fmt(1 - powL));
+    setText("rx-N1", fmt(N));
+    setText("rx-1overG", fmt(1 / g, 2));
+    setText("rx-NoverG", fmt(N / g, 2));
+    setText("rx-cap", fmt(MaxSize / (N / g), 2));
+    setText("rx-pA", fmt(pA));
+    setText("rx-advRatio", fmt((N / g) / (1 / pA)));
+    setText("rx-advRatioOmit", fmt(((N / g) / (1 - A)) / (1 / pA)));
+    const frag = (N / g) / (1 / f); // {let frag be (N ÷ g) ÷ (1 ÷ f)}
+    setText("rx-frag", fmt(frag));
+    setText("rx-fragOmit", fmt(frag / (1 - A)));
+  }
+  function init() {
+    document.getElementById("L").addEventListener("input", recompute);
+    document.getElementById("MaxSize").addEventListener("input", recompute);
+    document.getElementById("A").addEventListener("input", recompute);
+    document.getElementById("g").addEventListener("input", recompute);
+    recompute();
+  }
+  return { init };
+})();
+
+// Manage `.sticky-input` docking. CSS `position: sticky` only sticks within each input's
+// containing block (its <p>), so it scrolls away as soon as that paragraph is gone. To make
+// the inputs stay docked throughout the entire page (and stack as more pile up), we switch
+// each one to `position: fixed` once its natural top scrolls above the cumulative top of
+// previously-stuck siblings, leaving an inline placeholder of the same size in the prose.
+const StickyInputs = (() => {
+  let items = [];
+  function unstickAll() {
+    for (const it of items) {
+      if (it.stuck) {
+        it.el.style.position = "";
+        it.el.style.top = "";
+        it.el.style.right = "";
+        it.el.style.zIndex = "";
+        it.placeholder.remove();
+        it.stuck = false;
+      }
+    }
+  }
+  function measure() {
+    unstickAll();
+    items = Array.from(document.querySelectorAll(".sticky-input")).map(el => {
+      const rect = el.getBoundingClientRect();
+      const placeholder = document.createElement("span");
+      placeholder.style.display = "inline-block";
+      placeholder.style.width = rect.width + "px";
+      placeholder.style.height = rect.height + "px";
+      placeholder.style.visibility = "hidden";
+      return {
+        el, placeholder,
+        naturalTop: rect.top + window.scrollY,
+        height: rect.height,
+        stuck: false,
+      };
+    });
+  }
+  function update() {
+    let offset = 0;
+    for (const it of items) {
+      if (window.scrollY + offset >= it.naturalTop) {
+        if (!it.stuck) {
+          it.el.parentNode.insertBefore(it.placeholder, it.el);
+          it.el.style.position = "fixed";
+          it.el.style.right = "1em";
+          it.el.style.zIndex = "10";
+          it.el.classList.add("stuck");
+          it.stuck = true;
+        }
+        it.el.style.top = offset + "px";
+        offset += it.height;
+      } else if (it.stuck) {
+        it.el.style.position = "";
+        it.el.style.top = "";
+        it.el.style.right = "";
+        it.el.style.zIndex = "";
+        it.el.classList.remove("stuck");
+        it.placeholder.remove();
+        it.stuck = false;
+      }
+    }
+  }
+  function init() {
+    measure();
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", () => { measure(); update(); });
+  }
+  return { init };
+})();
+
+document.addEventListener("DOMContentLoaded", () => {
+  // Couple the L number input and its slider so each mirrors the other. Both blocks
+  // listen for "input" on the number element; moving the slider dispatches that event,
+  // so the block listeners need no special-casing.
+  const couple = (numId, sliderId) => {
+    const num = document.getElementById(numId);
+    const slider = document.getElementById(sliderId);
+    num.addEventListener("input", () => { if (slider.value !== num.value) slider.value = num.value; });
+    slider.addEventListener("input", () => {
+      if (num.value !== slider.value) {
+        num.value = slider.value;
+        num.dispatchEvent(new Event("input"));
+      }
+    });
+  };
+  couple("L", "L-slider");
+  couple("g", "g-slider");
+  couple("A", "A-slider");
+
+  ReactiveText.init();
+  RunGapPmfBlock.init();
+  ThroughputBlock.init();
+  MempoolPlotBlock.init();
+  StickyInputs.init();
+});
+</script>
+</body>
+</html>
