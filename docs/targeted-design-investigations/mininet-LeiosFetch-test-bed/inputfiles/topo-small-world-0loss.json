@@ -1,0 +1,102 @@
+{
+  "nic_bw_mbit": 1000,
+  "edges": [
+    {
+      "a": 1,
+      "b": 2,
+      "bw_mbit": 50,
+      "delay": "50ms",
+      "jitter": "5ms",
+      "loss_gemodel": null,
+      "a_pulls": true, "b_pulls": true
+    },
+    {
+      "a": 1,
+      "b": 3,
+      "bw_mbit": 50,
+      "delay": "50ms",
+      "jitter": "5ms",
+      "loss_gemodel": null,
+      "a_pulls": true, "b_pulls": true
+    },
+    {
+      "a": 1,
+      "b": 7,
+      "bw_mbit": 18,
+      "delay": "3ms",
+      "jitter": "1ms",
+      "loss_gemodel": null,
+      "a_pulls": true, "b_pulls": true
+    },
+    {
+      "a": 2,
+      "b": 3,
+      "bw_mbit": 500,
+      "delay": "1ms",
+      "jitter": "0ms",
+      "loss_gemodel": null,
+      "a_pulls": true, "b_pulls": true
+    },
+    {
+      "a": 2,
+      "b": 4,
+      "bw_mbit": 50,
+      "delay": "125ms",
+      "jitter": "10ms",
+      "loss_gemodel": null,
+      "a_pulls": true, "b_pulls": true
+    },
+    {
+      "a": 3,
+      "b": 5,
+      "bw_mbit": 50,
+      "delay": "115ms",
+      "jitter": "9ms",
+      "loss_gemodel": null,
+      "a_pulls": true, "b_pulls": true
+    },
+    {
+      "a": 4,
+      "b": 5,
+      "bw_mbit": 75,
+      "delay": "53ms",
+      "jitter": "4ms",
+      "loss_gemodel": null,
+      "a_pulls": true, "b_pulls": true
+    },
+    {
+      "a": 1,
+      "b": 6,
+      "bw_mbit": 50,
+      "delay": "65ms",
+      "jitter": "6ms",
+      "loss_gemodel": null,
+      "a_pulls": true, "b_pulls": true
+    },
+    {
+      "a": 4,
+      "b": 6,
+      "bw_mbit": 40,
+      "delay": "155ms",
+      "jitter": "12ms",
+      "loss_gemodel": null,
+      "a_pulls": true, "b_pulls": true
+    }
+  ],
+  "tuned_initcwnd": [
+    1,
+    2,
+    4,
+    7
+  ],
+  "node_nicknames": {
+    "1": "Chicago",
+    "2": "Frankfurt",
+    "3": "Frankfurt",
+    "4": "Sydney",
+    "5": "Tokyo",
+    "6": "Quito",
+    "7": "Chicago (res.)"
+  },
+  "default_duration": 60
+}
