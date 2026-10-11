@@ -5,6 +5,49 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## rc-2026w41 - 2026-10-11
+
+A release candidate that moves the prototype onto the latest cardano-node 11.2. This includes upstreaming of several prototype components already. On top come hardened endorser block diffusion, a higher endorser block ceiling and Leios mini-protocols that shut down gracefully.
+
+> [!IMPORTANT]
+>
+> **Requires respin.** Header, block and Leios mini-protocol wire formats all changed, so a w41 node can neither talk to an earlier one nor read its chain. Delete the chain database along with `leios.vol.db` and `leios.imm.db`, and sync the respun network from genesis with its new configuration:
+>
+> - The Dijkstra genesis needs eight new keys: `perasMinCandidateBlockAge`, `perasHealingFactor`, `perasCertBoost`, `perasTargetCommitteeSize`, `perasBootstrapRound`, `perasQuorumThresholdSafetyMargin`, `refInputsCostPerMultiAssetPolicy` and `refInputsCostPerDatumByte`. The node does not start on a genesis without them.
+> - The node configuration needs `LeiosMinOfferLead` for "low k" networks or no endorser block is ever relayed and nothing gets certified (see below).
+
+- Dijkstra runs on upstream `Praos2` [consensus#2400](https://github.com/IntersectMBO/ouroboros-consensus/pull/2400)
+  - Eras before Dijkstra use the unchanged Praos header codecs again; the Leios fields only start with Dijkstra [consensus#2282](https://github.com/IntersectMBO/ouroboros-consensus/pull/2282).
+  - Invalid Leios headers are rejected with upstream's `LeiosEbTooBig`, `LeiosCertWithoutAnnouncement` and `LeiosCertTooYoung`.
+  - The LeiosDb now lives in upstream's `Storage.LeiosDB` modules, keeping the prototype's schema, file names and configuration.
+- Fixes a node whose chain was still in Conway rejecting every Dijkstra header that announced an endorser block with `LeiosEbTooBig`, and disconnecting honest peers with `ExnInvalidLeiosAnnouncement` [consensus#2400](https://github.com/IntersectMBO/ouroboros-consensus/pull/2400)
+- Endorser block diffusion follows the rules of the design [consensus#2282](https://github.com/IntersectMBO/ouroboros-consensus/pull/2282), [ledger#6064](https://github.com/IntersectMBO/cardano-ledger/pull/6064)
+  - A node fetches an endorser block only for an election it saw or a certificate it verified. A peer's offer only says who can serve it.
+  - A peer offering an endorser block it never announced, offering one twice, or offering one older than our immutable tip loses the connection with `ExnLeiosInvalidOffer`.
+  - An announcement giving the wrong size for its endorser block is neither relayed nor voted for.
+  - A certificate is checked as soon as its block arrives, against the committee forecast from the block before it.
+  - The LeiosFetch server disconnects a request it cannot answer, or one asking for more than an honest client would, instead of replying with what it found.
+- New node configuration `LeiosMinOfferLead`: how many slots younger than the node's immutable tip an endorser block must be for the node to relay it [consensus#2282](https://github.com/IntersectMBO/ouroboros-consensus/pull/2282)
+  - The default of 3600 slots suits mainnet but suppresses every offer on a network whose immutable tip trails the selection by less, so test networks set their own. For devnets we used 30.
+- The endorser block ceiling rises from 512 KiB to 600 kB [consensus#2392](https://github.com/IntersectMBO/ouroboros-consensus/pull/2392)
+  - A node refuses to run with `maxEndorserBlockReferencesSize` above it, failing with `maxEndorserBlockReferencesSize (…) exceeds the LeiosFetch message limit (600000)`.
+- LeiosNotify gained `MsgQuit` and `MsgCanceled`, so demoting a peer from hot to warm no longer drops the connection for lack of Leios traffic [consensus#2344](https://github.com/IntersectMBO/ouroboros-consensus/pull/2344)
+  - The messages of both Leios mini-protocols are renumbered from zero [consensus#2363](https://github.com/IntersectMBO/ouroboros-consensus/pull/2363).
+
+> [!TIP]
+>
+> The latest network mini-protocols of this version are documented on this branch of the [cardano-blueprint](https://cardano-scaling.github.io/cardano-blueprint/pr-preview/pr-67/network/node-to-node/leios-notify/index.html?leios=on).
+
+From the upstream releases, the changes noticeable on a Leios network:
+
+- `cardano-cli` no longer byte-reverses the IPv4 address of a pool relay, neither in the registration certificate nor in `query pool-state` [cli#1451](https://github.com/IntersectMBO/cardano-cli/pull/1451)
+- A node only accepts node-to-client connections from `NodeToClientV_23` onwards. Tools built against an older node stack fail to connect, so use the `cardano-cli` from this release.
+- A ledger snapshot delay or rate limit at least as long as the snapshot interval is reported at startup as an `ImplausibleSnapshotPolicy` warning. Short slots make this likely on a testnet whose snapshot settings came from mainnet.
+- `db-truncater --leios` truncates `leios.vol.db` and `leios.imm.db` along with the ImmutableDB.
+- `slotsMissed_int` no longer counts the slots that pass while forging is disabled.
+
+Integrated with [ledger#6166](https://github.com/IntersectMBO/cardano-ledger/pull/6166), [network#5449](https://github.com/IntersectMBO/ouroboros-network/pull/5449), [consensus#2400](https://github.com/IntersectMBO/ouroboros-consensus/pull/2400), [api#1375](https://github.com/IntersectMBO/cardano-api/pull/1375), [cli#1459](https://github.com/IntersectMBO/cardano-cli/pull/1459) and [node#6733](https://github.com/IntersectMBO/cardano-node/pull/6733).
+
 ## prototype-2026w40a - 2026-10-06
 
 Purely internal change that (memory) bounds the voting state.
