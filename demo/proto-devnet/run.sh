@@ -60,6 +60,16 @@ fi
 # with no direct Node1<->Node3 edge, so Node2 is the only path between the
 # ends). Opt in with TOPOLOGY=line.
 : "${TOPOLOGY:=mesh}"
+# Which cardano-node each node runs, e.g. CARDANO_NODE_2=/path/to/cardano-node
+# to swap one node for another implementation.
+: "${CARDANO_NODE_1:=$(command -v cardano-node || true)}"
+: "${CARDANO_NODE_2:=$(command -v cardano-node || true)}"
+: "${CARDANO_NODE_3:=$(command -v cardano-node || true)}"
+# Nodes that run without pool keys, e.g. RELAY_NODES="2". Their pool keeps its
+# stake and committee seat, but neither forges nor votes.
+: "${RELAY_NODES:=}"
+# Further process-compose files to merge in, space separated.
+: "${EXTRA_COMPOSE:=}"
 set +a
 
 # Check for required commands
@@ -69,7 +79,6 @@ REQUIRED_COMMANDS=(
   "jq"
   "yq"
   "envsubst"
-  "cardano-node"
   "cardano-cli"
   "tx-firehose"
 )
@@ -82,6 +91,11 @@ for cmd in "${REQUIRED_COMMANDS[@]}"; do
   if ! command -v "$cmd" &>/dev/null; then
     MISSING_COMMANDS+=("$cmd")
   fi
+done
+
+for i in 1 2 3; do
+  bin="CARDANO_NODE_$i"
+  [ -x "${!bin}" ] || MISSING_COMMANDS+=("$bin (${!bin:-not found})")
 done
 
 if [ ${#MISSING_COMMANDS[@]} -gt 0 ]; then
@@ -226,7 +240,9 @@ for i in "${nodes[@]}"; do
 
   # Copy pool keys and set permissions. Not re-copied on resume: 'cp -r' onto
   # an existing keys/ would nest it, and the keys are identical anyway.
-  if [ ! -d "$NODE_DIR/keys" ]; then
+  if [[ " $RELAY_NODES " == *" $i "* ]]; then
+    rm -rf "$NODE_DIR/keys"
+  elif [ ! -d "$NODE_DIR/keys" ]; then
     cp -r "$POOL_DIR" "$NODE_DIR/keys"
     chmod 400 "$NODE_DIR/keys"/*.skey
   fi
@@ -247,6 +263,12 @@ cp "${CONFIG_DIR}/alloy-modules/"*.alloy "${WORKING_DIR}/alloy-modules/"
 
 echo "Starting proto-devnet ..."
 echo "  Topology: ${TOPOLOGY}"
+for i in 1 2 3; do
+  bin="CARDANO_NODE_$i"
+  role=producer
+  [[ " $RELAY_NODES " == *" $i "* ]] && role=relay
+  echo "  Node$i: $role, ${!bin}"
+done
 echo "  Resume: RESUME=${RESUME}"
 # Traffic control integration
 TC_COMPOSE=()
@@ -270,7 +292,12 @@ if [ "$XRAY" = "1" ]; then
 else
   echo "  X-ray observability: disabled XRAY=${XRAY}"
 fi
+EXTRA_COMPOSE_ARGS=()
+for f in $EXTRA_COMPOSE; do
+  EXTRA_COMPOSE_ARGS+=(-f "$f")
+done
 process-compose --no-server \
   -f "${SOURCE_DIR}/process-compose.yaml" \
   "${TC_COMPOSE[@]}" \
-  "${XRAY_COMPOSE[@]}"
+  "${XRAY_COMPOSE[@]}" \
+  "${EXTRA_COMPOSE_ARGS[@]}"
