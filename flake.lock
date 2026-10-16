@@ -588,11 +588,11 @@
         "utils": "utils_2"
       },
       "locked": {
-        "lastModified": 1792157603,
-        "narHash": "sha256-iHamTqX3D6g36dpP4gR1rLaj5TYrKhHkyFGDZYElHGU=",
+        "lastModified": 1792173117,
+        "narHash": "sha256-IJkmnmLgkJdDKIaloYVCKmodtHgEhjEmEt2Dzncoums=",
         "owner": "intersectmbo",
         "repo": "cardano-node",
-        "rev": "b8b78b8e6597a6dfb8f7063a7f9d5917cc9c7a00",
+        "rev": "2d6a2a66415cc1d58c18ed3ee83ce719713fc97d",
         "type": "github"
       },
       "original": {

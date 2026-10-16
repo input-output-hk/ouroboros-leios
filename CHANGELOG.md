@@ -13,6 +13,10 @@ Ships all the good things that happened since `11.2` on ledger, api and cli `mas
 >
 > **Requires respin.** Endorser blocks reference and carry their transactions in a new encoding, so a w42 node can neither exchange endorser blocks with an earlier one nor read its chain. Delete the chain database along with `leios.vol.db` and `leios.imm.db`, and sync the respun network from genesis. As w41 was not yet used on a public testnet, see below for more changes that are coming with this.
 
+> [!IMPORTANT]
+>
+> **Certification is one slot earlier.** A block producer now certifies an endorser block as soon as the announcement, voting and diffusion periods have elapsed (14 slots on the default parameters), where earlier releases waited one slot more. This matches CIP-164 and the header check of the upstream node, so prototype and production-grade nodes agree on when a block may certify.
+
 - Fixes a transaction whose Plutus script fails spending the script's outputs once its endorser block is certified [consensus#2410](https://github.com/IntersectMBO/ouroboros-consensus/pull/2410)
   - Change the `LeiosFetch` network message format to use the ledger's block encoding of a transaction, which always carries the `is_valid` flag.
   - A node remembers which protocol version it validated a transaction under, and validates it again before voting under another.
@@ -20,6 +24,11 @@ Ships all the good things that happened since `11.2` on ledger, api and cli `mas
 - An endorser block can no longer be certified across an epoch boundary [consensus#2415](https://github.com/IntersectMBO/ouroboros-consensus/pull/2415)
   - A header that does is rejected with `LeiosCertWithoutAnnouncement`.
   - A block producer does not certify an endorser block announced in the previous epoch.
+
+- `LeiosFetch` messages follow [consensus#2416](https://github.com/IntersectMBO/ouroboros-consensus/pull/2416), as proposed for upstream
+  - `MsgLeiosBlockTxs` carries only the transactions, no longer echoing the request's point and bitmaps.
+  - Each transaction is CBOR-in-CBOR, `#6.24(bytes .cbor block_transaction)`, where it was a plain byte string.
+  - The [cardano-blueprint](https://cardano-scaling.github.io/cardano-blueprint/network/node-to-node/leios-fetch/index.html?leios=on) specifies the new message and the transactions' block encoding.
 
 - The ledger is on cardano-ledger `master` at [07d904eb](https://github.com/IntersectMBO/cardano-ledger/commit/07d904eb2c1e3fb6ea4d1787012b0786ceffaa2e)
   - Sub-transactions are validated as upstream again, undoing the revert from w38a. Their Plutus scripts are evaluated along with those of the enclosing transaction, and their execution units count towards the transaction and block limits and the minimum fee.
