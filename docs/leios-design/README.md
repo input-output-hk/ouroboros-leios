@@ -892,9 +892,10 @@ It also makes it obvious that this state can be trimmed as the immutable tip adv
 - For EB diffusion, for each downstream peer, the node must track:
     - The difference between the number of notifications sent (SN) and number of notifications requested (RN).
       (If it's too great, the node disconnects, so this isn't unbounded.)
-    - Which volatile announcements---i.e. announcements for a volatile election---the node has relayed to this peer.
-      This varies per peer for two reasons: peers connect at different times and even a connected peer might not have had sent an unconsumed notification request when this node relayed the announcement.
+    - How far this peer has read the node's log of notifications (see [Relaying notifications](#relaying-notifications)).
+      What the node has relayed to a peer varies per peer for two reasons: peers connect at different times and even a connected peer might not have had sent an unconsumed notification request when this node accepted the announcement.
       In particular, if the node was unable to send its first-seen announcement to a downstream peer, then it should also not send an equivocating announcement to that peer, since the peer would incorrectly interpret it as the node's first-seen announcement for that election.
+      The cursor suffices: the peer reads every entry in the order the node accepted them, and both announcements of an election leave the log together.
 
 - For EB diffusion, for each upstream peer, the node must track:
     - Which requests the node has sent to this peer.
@@ -998,6 +999,40 @@ A new storage component (**NEW-LeiosVoteStorage**) will store all votes received
 Once enough votes have been collected for an EB, a certificate can be formed and included in a ranking block:
 
 - **REQ-IncludeLeiosCertificates** The node must include a certificate in each RB it issues if it has seen enough votes supporting the EB announced by the preceding RB. (TODO excluding empty or very nearly empty EBs?)
+
+#### Relaying notifications
+
+The node relays three kinds of LeiosNotify notifications: announcements, offers and votes.
+Rather than keeping a queue per downstream peer, the node keeps one log of the notifications worth relaying, in the order it accepted them (**NEW-NotifyLog**).
+Each downstream peer's LeiosNotify server reads that log through its own cursor, and sends the next entry whenever the peer has a request outstanding.
+
+- Each notification is stored once, however many downstream peers it goes to, so the log's size depends on the rate of notifications and how long they are worth relaying, not on the number of downstream peers.
+- A slow peer merely falls behind in the log, rather than piling up a queue of its own.
+- A peer that connects late starts at the log's oldest entry, so it still receives everything worth relaying.
+
+Whoever appends an entry has already decided it is worth relaying, and the log drops each entry once it no longer is.
+An announcement or offer is worth relaying until its election is 5 minutes old, a vote until its diffusion period has ended, 3 $L_\text{hdr}$ + $L_\text{vote}$ + $L_\text{diff}$ after its election began.
+A vote is cast only within its voting period, but keeps diffusing after it, as the certificate needs it only once the diffusion period has passed.
+A downstream peer tolerates more than that, so the log can be pruned on a coarse tick without ever relaying something too late.
+Because each entry's lifetime is tied to its election, rather than to when it was appended, no offer or vote outlives the announcement it depends on, and a peer reading the log in order always receives an announcement before the offers and votes for it.
+A cursor that falls behind pruning merely skips what was pruned.
+
+A downstream peer holds the node to the same rules that the node holds its upstream peers to: no announcement twice, no third announcement in an election, no offer or vote for an announcement it was not sent, and at most one vote per seat in an election.
+Each LeiosNotify client enforces these rules only on its own upstream peer, while the node relays what it accepts from all of them.
+So central components decide, once for all upstream peers, what is appended to the log:
+
+- **NEW-AnnounceState** keeps the announcements the node accepted from any peer, per election.
+  It appends an announcement to the log only if it is the first or second of its election, its OCIN is fresh, and its election is still young enough to relay.
+- **NEW-LeiosVoteStorage** (`VoteState`) keeps the votes the node accepted from any peer, per election and seat.
+  It appends a vote to the log only if it is the first valid vote of its seat in its election, and the node has relayed the announcement the vote is for, which AnnounceState tracks.
+  It verifies a vote's signature only if it does not already have a vote of that seat, so a copy of a known vote costs only its bytes.
+  It records only valid votes, so a badly signed vote cannot shadow a valid vote of the same seat, and it disconnects the peer that sent one, since an honest peer verifies what it relays.
+  The vote is verified outside of the transaction that records it, since a BLS verification is too expensive to repeat when a transaction retries.
+- Offers will be appended once the node has acquired an EB body or closure.
+
+AnnounceState is pruned as the immutable tip advances.
+VoteState instead keeps the votes of only a fixed number of the latest election slots, far more than have votes still within their diffusion period.
+Once full, it ignores a vote for a slot older than all those it keeps, so it never relays a vote it has forgotten a second time.
 
 ### Chain selection
 
