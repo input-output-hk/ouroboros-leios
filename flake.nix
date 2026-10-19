@@ -54,7 +54,10 @@
     # Patched cardano-node — source of cardano-node, cardano-cli, and
     # tx-firehose across the repo. The tx-firehose bench/ package now
     # lives on top of leios-prototype so a single input suffices.
-    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
+    # jl/leios-w42 adds the ouroboros-network inbound-governor mitigation
+    # to the W42 node: bound the MuxFinished await to 60 seconds so a stale
+    # event cannot wedge the governor indefinitely.
+    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=jl/leios-w42";
   };
 
   outputs =
