@@ -1028,6 +1028,7 @@ So central components decide, once for all upstream peers, what is appended to t
   It verifies a vote's signature only if it does not already have a vote of that seat, so a copy of a known vote costs only its bytes.
   It records only valid votes, so a badly signed vote cannot shadow a valid vote of the same seat, and it disconnects the peer that sent one, since an honest peer verifies what it relays.
   The vote is verified outside of the transaction that records it, since a BLS verification is too expensive to repeat when a transaction retries.
+  It appends a vote that arrived before its voting window opened, which a client accepts within its clock skew, only once the window opens by the node's own clock, as a downstream peer whose clock is behind would otherwise reject it.
 - Offers will be appended once the node has acquired an EB body or closure.
 
 AnnounceState is pruned as the immutable tip advances.
