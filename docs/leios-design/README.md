@@ -1011,7 +1011,7 @@ Each downstream peer's LeiosNotify server reads that log through its own cursor,
 - A peer that connects late starts at the log's oldest entry, so it still receives everything worth relaying.
 
 Whoever appends an entry has already decided it is worth relaying, and the log drops each entry once it no longer is.
-An announcement or offer is worth relaying until its election is 5 minutes old, a vote until its diffusion period has ended, 3 $L_\text{hdr}$ + $L_\text{vote}$ + $L_\text{diff}$ after its election began.
+An announcement or offer is worth relaying until its election is 5 minutes old, a vote until its diffusion period has ended, 3 $L_\text{hdr}$ + $L_\text{vote}$ + $L_\text{diff}$ after its election began, or its announcement is no longer worth relaying, whichever comes first, so no peer receives a vote without its announcement.
 A vote is cast only within its voting period, but keeps diffusing after it, as the certificate needs it only once the diffusion period has passed.
 A downstream peer tolerates more than that, so the log can be pruned on a coarse tick without ever relaying something too late.
 Because each entry's lifetime is tied to its election, rather than to when it was appended, no offer or vote outlives the announcement it depends on, and a peer reading the log in order always receives an announcement before the offers and votes for it.
