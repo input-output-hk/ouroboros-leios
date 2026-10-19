@@ -7,7 +7,7 @@ both look like arbitrary numbers otherwise.
 
 ## Epoch geometry (shelley-genesis.json + byron-genesis.json)
 
-```
+```text
 shelley  securityParam    40
 shelley  epochLength    3600      # 1 hour at slotLength 1
 shelley  activeSlotsCoeff 0.05
@@ -57,7 +57,7 @@ restarting nodes without the chain outrunning them.
 
 ## Governance (conway-genesis.json)
 
-```
+```text
 committeeMinSize  0
 committee         { members: {}, threshold: 0 }
 initialDReps      3 keys, held in ../drep-keys/
