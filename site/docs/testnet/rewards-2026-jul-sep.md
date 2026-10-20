@@ -49,7 +49,7 @@ Block counts come from KleioScan (kleioscan.com) for the MusashiNet networks tha
 | 17 | `pool15at6zpa4jrswwx6r7rzztnwjtf8653ppdkzamqr3d3xp260ay3n` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks; Sep data shared in October, counted for September |
 | 18 | `pool15chcuzu7rsdvm7z9qpplflh0k94vt465jw6wve3947x26e7zx7g` | ✅ | ❌ | ❌ | ✅ | ❌ | 0 | Jul: no blocks; Aug: no blocks; Sep: no Metsuke data |
 | 19 | `pool15dxt6c98u3l0zqr95r8yk64573n0fgxc83tlh37l0vclyuz9n6y` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks |
-| 20 | `pool15mlfwa82pzqhmayx4ydne3nnfyrnsmcgyrfl3z69acxuklqtquy` | ❌ | ❌ | ✅ | ✅ | ❌ | 0 | KYC not completed |
+| 20 | `pool15mlfwa82pzqhmayx4ydne3nnfyrnsmcgyrfl3z69acxuklqtquy` | ✅ | ❌ | ✅ | ✅ | ❌ | 100 | Jul: no blocks; Sep: no Metsuke data |
 | 21 | `pool15svjdp7tnrju6qrdrgslmutrtcl5ys25avnqv4csukh2zgvgvex` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks; Aug: shared relay 109.228.52.195:3010 with pool1gfgvkyd… for 0.1 h; relay 109.228.52.195:3010 with pool1qvh8lse… for 0.1 h, under the 48-hour limit; no deduction |
 | 22 | `pool15y5lrrm3fyvrtllpn85kxate0x3q6e7d6rdzqpsp88275m6jhup` | ✅ | ❌ | ❌ | ❌ | ❌ | 0 | Replaced in its registration by pool17hcgfm4…, the pool the operator ran with the same application code; not paid |
 | 23 | `pool16ag9njq9yqus5y0pz0nmzmxa0ep6kuaufatltmrljlaev548pyu` | ❌ | ❌ | ❌ | ✅ | ❌ | 0 | KYC not completed; Sep: shared relay 178.168.53.97:3010 with pool1gjymgja… for 45 h, under the 48-hour limit; no deduction |
@@ -80,7 +80,7 @@ Block counts come from KleioScan (kleioscan.com) for the MusashiNet networks tha
 | 48 | `pool1fdn7sfg604fvqgjl0k2ppmntkcrak8vcmrgag39k6fmhzmvz262` | ✅ | ❌ | ✅ | ❌ | ❌ | 0 | Replaced in its registration by pool1as25z5l…, the pool the operator ran with the same application code; not paid |
 | 49 | `pool1flmxn959lazu4nsrxyaxj6wa3yz7pjd3y7dam5xmg3zqytc779f` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks |
 | 50 | `pool1fqgsajsa8ekrcg2d46wtuwhufrefae2mqnyzmdhnshe9xq7wce9` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks |
-| 51 | `pool1fxe345ex6mdsxgfsts2w6f8rxhfazdtn8geuz93fqwsgjj3dz2s` | ❌ | ❌ | ✅ | ✅ | ❌ | 0 | KYC not completed |
+| 51 | `pool1fxe345ex6mdsxgfsts2w6f8rxhfazdtn8geuz93fqwsgjj3dz2s` | ✅ | ❌ | ✅ | ✅ | ❌ | 100 | Jul: no blocks; Sep: no Metsuke data |
 | 52 | `pool1g9h4y4x4u7jhyn6cv6fegt8gp79trkk34f0g7lqat8ms5r5c8au` | ✅ | ❌ | ✅ | ✅ | ✅ | 0 | Jul: no blocks; Aug: shared relay 62.84.177.82:3010 with pool1zfeup8l… for 161 h; relay 62.84.177.82:3010 with pool1vrnkhhh… for 161 h, over the 48-hour limit; not paid, pool1zfeup8l… paid instead as the pool with most blocks; Sep data shared in October, counted for September; Sep: shared relay 62.84.177.82:3010 with pool1zfeup8l… for 709 h; relay 62.84.177.82:3010 with pool1vrnkhhh… for 228 h, over the 48-hour limit; not paid, pool1zfeup8l… paid instead as the pool with most blocks |
 | 53 | `pool1gcerdtrqfurel2qjvdt98fpxazxxvvx77xnz9g22husc2frzfa2` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks; Sep data shared in October, counted for September |
 | 54 | `pool1gfeygmd86hgcg2dft2g3vx7u824rl29m2llzy9rl0mhcc2nh8s4` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks; Sep data shared in October, counted for September |
@@ -148,7 +148,7 @@ Block counts come from KleioScan (kleioscan.com) for the MusashiNet networks tha
 | 116 | `pool1yezmm2y8thts9xfv29nyj5ns200r4lx6wlc8ckz2ra79kj5zah3` | ✅ | ✅ | ✅ | ✅ | ❌ | 200 | Sep: no Metsuke data |
 | 117 | `pool1yhqrvnu6n935n4wu99mfjavc6htc70l0sfyjj9mn43lzc32vq5h` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks |
 | 118 | `pool1ylvm3dapszd2lvyn6d2kd0c5swfhtkrz4fea8v8qe7glge2hda0` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks |
-| 119 | `pool1za7357m9wvxs7rpnfdy37jv3hlup0xswapnrw67qrveycx03spcb` | ❌ | ❌ | ❌ | ❌ | ❌ | 0 | KYC not completed |
+| 119 | `pool1za7357m9wvxs7rpnfdy37jv3hlup0xswapnrw67qrveycx03spcb` | ✅ | ❌ | ❌ | ❌ | ❌ | 0 | Jul: no blocks; Aug: no blocks; Sep: no blocks |
 | 120 | `pool1ze5yvl9gmzg5rxwzuzvvdz4vtclmqy5fdujvugm09sjg64ufwqt` | ❌ | ❌ | ❌ | ❌ | ❌ | 0 | KYC not completed |
 | 121 | `pool1zfeup8ljzutv584um75vqjsr75jx3cr6zkm9xm42empl67yfw8f` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks; Aug: shared relay 62.84.177.82:3010 with pool1vrnkhhh… for 161 h; relay 62.84.177.82:3010 with pool1g9h4y4x… for 161 h, over the 48-hour limit; paid as the pool with most blocks, pool1vrnkhhh…, pool1g9h4y4x… not paid; Sep: shared relay 62.84.177.82:3010 with pool1vrnkhhh… for 228 h; relay 62.84.177.82:3010 with pool1g9h4y4x… for 709 h, over the 48-hour limit; paid as the pool with most blocks, pool1vrnkhhh…, pool1g9h4y4x… not paid |
 | 122 | `pool1zmgyrcwsvxq84g7yt4w9fjwj4g52njvtu96xt28rqmvzs5k5q64` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks |
