@@ -113,8 +113,6 @@ TraceOptions:
     maxFrequency: 2.0
   ChainDB.CopyToImmutableDBEvent.CopiedBlockToImmutableDB:
     maxFrequency: 2.0
-  ChainDB.LedgerEvent.Flavor.V1.OnDisk.BackingStoreEvent:
-    severity: Silence
   ChainDB.LedgerEvent.Forker:
     severity: Silence
   ChainDB.ReplayBlock.LedgerReplay:
@@ -143,10 +141,6 @@ TraceOptions:
     severity: Debug
   Mempool.AttemptAdd:
     severity: Silence
-  Mempool.LedgerFound:
-    severity: Silence
-  Mempool.LedgerNotFound:
-    severity: Silence
   Mempool.SyncNotNeeded:
     severity: Silence
   Mempool.Synced:
@@ -163,12 +157,6 @@ TraceOptions:
     severity: Silence
   Net.DNSResolver:
     severity: Notice
-  Net.ErrorPolicy:
-    severity: Info
-  Net.ErrorPolicy.Local:
-    severity: Debug
-  Net.ErrorPolicy.Remote:
-    severity: Debug
   Net.Handshake.Local:
     severity: Silence
   Net.Handshake.Remote:
@@ -200,8 +188,6 @@ TraceOptions:
     severity: Debug
   Net.Peers.Ledger:
     severity: Debug
-  Net.Peers.List:
-    severity: Notice
   Net.Peers.LocalRoot:
     severity: Debug
   Net.Peers.PublicRoot:
@@ -209,10 +195,6 @@ TraceOptions:
   Net.Server.Local:
     severity: Silence
   Net.Server.Remote:
-    severity: Debug
-  Net.Subscription.DNS:
-    severity: Debug
-  Net.Subscription.IP:
     severity: Debug
   NodeState:
     severity: Notice
