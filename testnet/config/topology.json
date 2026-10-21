@@ -20,5 +20,5 @@
       "advertise": false
     }
   ],
-  "useLedgerAfterSlot": 151200
+  "useLedgerAfterSlot": 1000
 }
