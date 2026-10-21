@@ -1287,32 +1287,22 @@ Note that the PoP checks probably are done at the certificate level, and that th
 Leios changes what an on-chain block looks like. Clients keep receiving normal blocks with their transactions in the body, as today.
 
 - **REQ-N2CBackwardCompatible** A client on any existing N2C version sees no Leios-specific change to the message format, beyond the new Dijkstra era.
-- **REQ-N2CInlineCertifiedEbs** Once an EB is certified on the node's selected chain, `LocalChainSync` delivers its transactions in the body of the RB that announced the EB, after that RB's own transactions. This is where the ledger applies them (**REQ-LedgerUntickedEBValidation**), not at the CertRB's slot.
+- **REQ-N2CInlineCertifiedEbs** When `LocalChainSync` sends a CertRB, it puts the certified EB's transactions in the CertRB's body. All other blocks are sent as they are on chain.
 - **REQ-N2CCertifiedOnly** No N2C mini-protocol exposes transactions from an EB that is not certified on the node's selected chain.
 
 #### Inlining certified EB transactions
 
-The only required change is in the `LocalChainSync` server (**UPD-LeiosN2cChainSyncServer**). It sends the CertRB unchanged. In place of the RB that announced the EB, it sends **RB⁺**: RB with the EB's transactions added (**REQ-N2CInlineCertifiedEbs**). Plain **RB** means the block as it is on chain.
+A change is needed in the `LocalChainSync` server (**UPD-LeiosN2cChainSyncServer**). Before it sends a CertRB, it adds the EB's transactions to the block. The client gets a normal Dijkstra block: the EB's transactions are in the body's transaction list, and the certificate stays in the body ([`block_body`](https://github.com/IntersectMBO/cardano-ledger/blob/3c222f0aebbdff62a2db6e8664e4be2d7db8107d/eras/dijkstra/impl/cddl/data/dijkstra.cddl#L113-L117): `[transactions, leios_certificate / nil, peras_certificate / nil]`).
 
-The server:
+- **The server always has the transactions.** A node never adopts a CertRB without the EB's transactions (**NEW-LeiosCertRbStagingArea**, see [Chain selection](#chain-selection)).
+- **No extra rollbacks.** The EB's transactions are sent once, with the CertRB. When an EB is certified, the client doesn't have to undo any block it already has. `RollBackward` is still only used for chain reorgs.
+- **Apply the EB's transactions before the tick.** A CertRB has no transactions of its own. The committee checked the EB's transactions against the ledger state after the announcing RB, which is the block just before the CertRB. So the ledger applies them to that same state first, then ticks to the CertRB's slot (**REQ-LedgerUntickedEBValidation**). Clients that run their own ledger must do the same. Clients that only index transactions will see them at the CertRB's slot; this is expected.
 
-1. **Sends RB⁺ directly when it can.** If the next block is already on the node's chain, the server sends RB⁺ if that block certifies RB's EB, and RB otherwise. Clients catching up see no extra rollback.
-2. **Rolls back when the certificate comes later.** At the tip, the server sends RB before the next block exists. If the next block turns out to be the CertRB, the server rolls the client back to RB's parent, then sends RB⁺ and the CertRB.
-3. **Rolls back one block deeper on a chain switch or reconnection.** In these cases the server rolls back to RB's parent and sends RB or RB⁺ again:
-   - The node switches to a chain that keeps RB but changes whether its EB is certified. These rollbacks can reach k + 1 blocks.
-   - A client reconnects at an RB that announced an EB. The node can't tell whether the client has RB or RB⁺.
-
-The node always has the EB's transactions when it sends RB⁺, because it never adopts a CertRB without them (**NEW-LeiosCertRbStagingArea**, see [Chain selection](#chain-selection)).
-
-The cost: at the tip, clients see a one-block rollback (rule 2) for each CertRB, [about half of all blocks under load](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#feasible-protocol-parameters). A client can spot these: the block sent after the rollback has the same header hash as the block removed, since [a block's hash is its header's hash](https://github.com/IntersectMBO/ouroboros-consensus/blob/e847decf2a22584b1f67137449aba4781e7c5717/ouroboros-consensus-cardano/src/shelley/Ouroboros/Consensus/Shelley/Ledger/Block.hs#L180-L184). Clients that alert on rollbacks, or do costly work on them (such as `db-sync`), should handle this case.
-
-> [!IMPORTANT]
+> [!NOTE]
 >
-> The header's `block_body_hash` covers only the on-chain body, so it doesn't match RB⁺. Clients that check it will see a mismatch on every RB⁺; CertRBs are unaffected. Mithril doesn't do this check.
-
-> [!WARNING]
+> The header's `block_body_hash` covers only the on-chain body, so it matches every block except a CertRB. N2C is a trusted local connection: the node has already validated the block, so clients don't need to recheck the hash. Mithril doesn't check it.
 >
-> TODO: [CIP-164's "Clients" section](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#clients) puts the EB's transactions in the CertRB. Update it to this design.
+> For the same reason, a CertRB sent over N2C has both a certificate and transactions. On chain, a block can't have both: consensus rejects it ([`blockMatchesHeader`](https://github.com/IntersectMBO/ouroboros-consensus/blob/ca727c68bea65277ecf0c573a24e6eb92c581cc7/ouroboros-consensus-cardano/src/shelley/Ouroboros/Consensus/Shelley/Ledger/Block.hs#L224-L236)), and so will the ledger once [cardano-ledger#6202](https://github.com/IntersectMBO/cardano-ledger/pull/6202) is merged. Clients that re-validate blocks must skip these checks for CertRBs.
 
 #### Announced (uncertified) EBs
 
