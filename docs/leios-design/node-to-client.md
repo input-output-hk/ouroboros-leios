@@ -57,20 +57,17 @@ If one does happen, the server should fail loudly, not hide it.
 
 ### Context
 
-[CIP-164's "Clients" section](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#clients) already puts the EB's transactions in the CertRB, which matches this design. Two gaps remain:
+[CIP-164's "Clients" section](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#clients) already puts the EB's transactions in the CertRB, which matches this design. Three gaps remain:
 
 - Its [`ranking_block`](https://github.com/cardano-foundation/CIPs/blob/master/CIP-0164/README.md#ranking-block-cddl) CDDL predates the Dijkstra block format, changed in [cardano-ledger#5872](https://github.com/IntersectMBO/cardano-ledger/pull/5872). The prototype and client libraries such as gouroboros already follow the ledger.
 - It doesn't say that the EB's transactions are applied before the tick to the CertRB's slot.
-
-### Open question
-
-Can a CertRB certify an EB announced in the previous epoch? If so, clients that index transactions by block count them in the wrong epoch (see "Epoch" in #4). The CIP should either rule it out or tell clients how to attribute them.
+- It doesn't say that an EB can't be certified across an epoch boundary. The prototype enforces this: ticking into a new epoch clears the announcement ([`PolyPraos.hs`](https://github.com/IntersectMBO/ouroboros-consensus/blob/840e789b1cd112e161820a20d30d4546f30e6209/ouroboros-consensus-protocol/src/ouroboros-consensus-protocol/Ouroboros/Consensus/Protocol/PolyPraos.hs#L568-L587)). So the announcing RB and the CertRB are always in the same epoch, and clients that see the EB's transactions at the CertRB count them in the right epoch.
 
 ### Acceptance criteria
 
 - [ ] `ranking_block` matches the Dijkstra ledger CDDL.
 - [ ] "Clients" says the EB's transactions are applied to the state after the announcing RB, before the tick.
-- [ ] "Clients" settles the epoch-boundary case.
+- [ ] The CIP says an EB can't be certified across an epoch boundary.
 
 ---
 
@@ -80,13 +77,12 @@ Can a CertRB certify an EB announced in the previous epoch? If so, clients that 
 
 ### Context
 
-Clients decode every block as a Dijkstra block, as usual. A CertRB is different in five ways:
+Clients decode every block as a Dijkstra block, as usual. A CertRB is different in four ways:
 
 - **Large blocks.** A CertRB with its EB's transactions can be much larger than any block today.
 - **`block_body_hash`.** The header's hash covers only the on-chain body, so it doesn't match a CertRB.
 - **Certificate and transactions together.** On chain a block can't have both ([`blockMatchesHeader`](https://github.com/IntersectMBO/ouroboros-consensus/blob/840e789b1cd112e161820a20d30d4546f30e6209/ouroboros-consensus-cardano/src/shelley/Ouroboros/Consensus/Shelley/Ledger/Block.hs#L224-L236) in consensus; [cardano-ledger#6202](https://github.com/IntersectMBO/cardano-ledger/pull/6202), still open, in the ledger), but a CertRB sent over N2C does.
 - **Order.** Clients that run their own ledger must apply the EB's transactions before ticking to the CertRB's slot. Otherwise a transaction whose validity interval ends between the two slots fails for the client but not for the node.
-- **Epoch.** If the announcing RB and the CertRB are in different epochs, the ledger applies the EB's transactions in the earlier epoch. A client that attributes them to the CertRB's epoch counts delegations, withdrawals, deposits and governance actions in the wrong one. See the open question in #3.
 
 ### Acceptance criteria
 
@@ -96,4 +92,3 @@ For each client:
 - [ ] Handles maximum-size CertRBs, tested on a devnet.
 - [ ] Doesn't check `block_body_hash` or reject cert-plus-transactions for CertRBs.
 - [ ] If it runs a ledger, applies the EB's transactions before the tick.
-- [ ] If it tracks epochs, attributes a CertRB's transactions as settled in #3.
