@@ -606,3 +606,30 @@ blockquote {
 .blog-wrapper article > header .avatar.margin-bottom--sm {
   margin-bottom: 0 !important;
 }
+
+/* Rewards results tables: pool ID stays visible while the table scrolls. */
+.rewards-table table {
+  font-size: 0.85rem;
+}
+.rewards-table td:last-child {
+  min-width: 18rem;
+}
+@media (min-width: 997px) {
+  .rewards-table th:nth-child(-n + 2),
+  .rewards-table td:nth-child(-n + 2) {
+    position: sticky;
+    z-index: 1;
+    background-color: var(--ifm-background-color);
+  }
+  .rewards-table th:first-child,
+  .rewards-table td:first-child {
+    left: 0;
+    min-width: 3rem;
+    max-width: 3rem;
+  }
+  .rewards-table th:nth-child(2),
+  .rewards-table td:nth-child(2) {
+    left: 3rem;
+    box-shadow: inset -1px 0 0 var(--ifm-table-border-color);
+  }
+}

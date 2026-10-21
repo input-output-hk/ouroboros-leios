@@ -41,6 +41,7 @@ const sidebars: SidebarsConfig = {
         "testnet/getting-started",
         "testnet/register-stake-pool",
         "testnet/rewards-program",
+        "testnet/rewards-2026-jul-sep",
       ],
     },
   ],

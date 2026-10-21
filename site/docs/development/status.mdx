@@ -53,7 +53,7 @@ export const source = `
 - Serialization
   - [x] CIP
   - [x] Prototype
-  - [x] Design: no key rotation via headers, no dedicated cert
+  - [x] Design: no dedicated cert
   - [x] Implementation
     - [x] Announcements and certifies bit in headers
     - [x] Certificates in body
@@ -68,7 +68,7 @@ export const source = `
   - [~] Implementation
     - [~] Socket options
     - [ ] Incremental decoding
-  - [?] Assurance: good enough?
+  - [~] Assurance: load testing
 
 - Key registration & rotation @130,200
   - [x] CIP
@@ -77,7 +77,7 @@ export const source = `
   - [x] Implementation
     - [x] Generate BLS keys
     - [x] Create and submit pool registration with BLS keys
-  - [~] Assurance: on testnet
+  - [~] Assurance: auditing rc-w41
 
 - Committee selection @230,320
   - [x] CIP
@@ -86,7 +86,7 @@ export const source = `
   - [x] Implementation
     - [x] Stake-based committee selection
     - [x] Committee selection at epoch boundaries
-  - [~] Assurance: on testnet
+  - [~] Assurance: auditing rc-w41
 
 - High-throughput Tx submission @400,25
   - [x] CIP
@@ -95,7 +95,7 @@ export const source = `
   - [~] Implementation
     - [x] TxSubmisison V2-undecision
     - [ ] TxSubmission param tuning
-  - [~] Assurance
+  - [~] Assurance: load testing
 
 - High-throughput mempool @680,25
   - [x] CIP
@@ -105,62 +105,64 @@ export const source = `
     - [x] Double-buffered mempool
     - [x] Capped forging
     - [ ] Pre-flight forging
-  - [~] Assurance
+  - [~] Assurance: first audit ok
 
 - Block production @450,170
   - [x] CIP
   - [x] Prototype
-  - [~] Design: Pre-application vs. mempool
+  - [x] Design: pre-application vs. mempool
   - [~] Implementation
     - [~] Size mempool via pparams
     - [~] Forge and store EBs
-    - [ ] Forge RBs with certificates
+    - [~] Forge RBs with certificates
     - [ ] Pre-apply certificates
-  - [ ] Assurance
+  - [~] Assurance: auditing on rc-w41
 
 - EB diffusion @480,280
   - [x] CIP: update mini-protocols
-  - [~] Prototype: fetching policies, egress scheduling
-  - [?] Design: Settle policies
+  - [~] Prototype: policies, egress scheduling
+  - [?] Design: settle policies, good enough?
   - [~] Implementation
-    - [ ] Announce and detect equivocations of EBs
-    - [ ] Diffuse and validate EBs via TxCache
+    - [~] Announce and detect equivocations of EBs
+    - [~] Diffuse and validate EBs via TxCache
     - [~] Egress scheduling
-    - [ ] Basic fetching policy
+    - [~] Basic fetching policy (not full hedging)
+    - [ ] Efficient serving
+    - [ ] Incremental offers
     - [ ] Advanced fetching policy
     - [ ] Catch up on not yet certified Leios EBs
-  - [?] Assurance: good enough?
+  - [~] Assurance: auditing on rc-w41
 
 - Transaction cache & storage
   - [x] CIP
   - [x] Prototype: schema improvements
   - [x] Design
   - [~] Implementation
-    - [ ] Disk-backed TxCache
+    - [~] Disk-backed TxCache
     - [~] Volatile/Immutable LeiosDB
     - [ ] Fully optimised LeiosDB
-  - [ ] Assurance
+  - [~] Assurance: auditing on rc-w41
 
 - Voting & certification @580,400
   - [x] CIP: update mini-protocols
   - [x] Prototype
-  - [?] Design: Definite vote mini-protocol
+  - [x] Design: keep push-based voting
   - [ ] Implementation
     - [ ] Voting logic
     - [ ] Diffuse and validate votes
     - [ ] Store and aggregate votes
     - [ ] Pull-based vote diffusion
-  - [ ] Assurance
+  - [~] Assurance: auditing on rc-w41
 
 - Block validation & adoption @985,70
   - [x] CIP
   - [x] Prototype
-  - [~] Design: Consensus/Leger API
-  - [ ] Implementation
-    - [ ] Validate EB announcing and certifying blocks
+  - [x] Design: consensus/ledger API defined
+  - [~] Implementation
+    - [~] Validate EB announcing and certifying blocks
     - [ ] EB fetching on chain selection
     - [ ] Out of order fetch EBs in Genesis
-  - [ ] Assurance
+  - [~] Assurance: auditing on rc-w41
 
 - Node API & configuration
   - [x] CIP
@@ -170,7 +172,7 @@ export const source = `
     - [x] Query pool state showing key registration
     - [ ] Query committee details
     - [~] Client APIs inline certified EB txs
-    - [ ] Node accepts BLS keys
+    - [~] Node accepts BLS keys
   - [~] Assurance: Kleioscan, SPO tools
 `;
 
@@ -199,7 +201,7 @@ export const plan = `
   - Client APIs inline certified EB txs
   - Node integration 11.2
 
-- Stage 1: Low params (1/4/7/100k/1M)
+- Stage 1: Low params (1s, 4s, 7s, 40KB, 260KB, 720M mem, 200G steps, 500 seats, 75%)
   - Socket options
   - TxSubmisison V2-undecision
   - Double-buffered mempool
@@ -209,8 +211,8 @@ export const plan = `
   - Disk-backed TxCache
   - Announce and detect equivocations of EBs
   - Diffuse and validate EBs via TxCache
-  - Basic fetching policy
-  - Egress scheduling
+  - Basic fetching policy (not full hedging)
+  - Efficient serving
   - Voting logic
   - Diffuse and validate votes
   - Store and aggregate votes
@@ -220,18 +222,20 @@ export const plan = `
   - Node accepts BLS keys
   - Node integration 11.3
 
-- Stage 2: High params
-  - Pull-based vote diffusion
+- Stage 2: Higher params (1s, 4s, 7s, 100KB+, 1MB+, ..GSteps, ..GMem, 900 seats, 75%)
+  - TxSubmission param tuning
   - Pre-apply certificates
+  - Incremental offers
+  - Egress scheduling
+  - Pull-based vote diffusion
   - TxSubmission param tuning
   - Incremental decoding
-  - High-throughput tx submission
   - Pre-flight forging
   - Advanced fetching policy
   - Fully optimised LeiosDB
-  - Node integration
   - Catch up on not yet certified Leios EBs
   - Out of order fetch EBs in Genesis
+  - Node integration
 `;
 
 # Protocol status

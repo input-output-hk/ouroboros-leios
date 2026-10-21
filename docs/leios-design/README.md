@@ -47,7 +47,7 @@ Ouroboros Leios introduces **high-throughput** as a third fundamental property, 
 
 As was the case for the [Praos variant of Ouroboros](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf#subsection.5.1), the specification embodied in the published and peer-reviewed [research paper for Ouroboros Leios](https://eprint.iacr.org/2025/1115.pdf) was not intended to be directly implementable. Initial research and development studies confirmed this expectation, identifying several unsolved problems with the fully concurrent block production design when considering the concrete Cardano ledger and what consequences this would have (TODO: cite suitable R&D reports, [Tech Report #2](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md#conflicts-ledger-and-incentives), [Impact analysis survey](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/ImpactAnalysis.md#full-survey)); further research is needed before those parts can be implemented.
 
-The design presented in [CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md), also known as "Linear Leios", focuses on the core insight of utilizing the unused network bandwidth and computational resources during the necessary and eponymous "calm periods" of the Praos protocol. This approach provides an immediately implementable design that can deliver orders of magnitude higher throughput while preserving the security guarantees that make Cardano valuable.
+The design presented in [CIP-164](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164), also known as "Linear Leios", focuses on the core insight of utilizing the unused network bandwidth and computational resources during the necessary and eponymous "calm periods" of the Praos protocol. This approach provides an immediately implementable design that can deliver orders of magnitude higher throughput while preserving the security guarantees that make Cardano valuable.
 
 The Linear Leios protocol operates by allowing a second, bigger type of block to be produced in the same block production opportunity. Block producers can produce and announce an endorser block (EB), which endorses additional transactions that would not fit within the Praos block. EBs are distributed through the network and subjected to validation by a committee of stake pools, who vote on their transaction data closure's availability and validity. Only EBs that achieve a high threshold of stake-weighted votes become certified and can be included in the ledger through exclusive anchoring of a certificate in the subsequent block - now called a ranking block (RB). This mechanism allows for significantly higher transaction throughput while maintaining the security properties of the underlying Praos consensus. See the CIP for more details on the protocol specification and rationale itself.
 
@@ -79,7 +79,7 @@ Leios significantly expands this concurrency model by introducing new responsibi
 - Endorser block and closure diffusion: receiving, validating, and transmitting EBs and their transaction closures.
 - Voting and vote diffusion: receiving, validating, and transmitting own and foreign votes on EBs.
 
-Given the [proposed Leios mini-protocols](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#leios-mini-protocols), this would result in:
+Given the [proposed Leios mini-protocols](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#leios-mini-protocols), this would result in:
 
 - 4 pipelined + 3 non-pipelined per upstream peers => 11 threads per upstream peer;
 - 1 pipelined + 6 non-pipelined per downstream peer => 8 threads per downstream peer
@@ -88,7 +88,7 @@ With these two additional functionalities, each across many peers, the node set 
 
 ## Designing for the worst-case
 
-Related to the principle of [optimizing for the worst case](https://cardano-scaling.github.io/cardano-blueprint/principles/index.html#optimise-only-for-the-worst-case), the security argument for Leios protocol depends critically on worst-case diffusion characteristics. Endorser blocks and their transaction closures must be "small enough" that the difference between optimistic diffusion (leading to successful certification) and worst-case diffusion remains bounded by the protocol parameter $L_\text{diff}$ according to the [protocol's security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security).
+Related to the principle of [optimizing for the worst case](https://cardano-scaling.github.io/cardano-blueprint/principles/index.html#optimise-only-for-the-worst-case), the security argument for Leios protocol depends critically on worst-case diffusion characteristics. Endorser blocks and their transaction closures must be "small enough" that the difference between optimistic diffusion (leading to successful certification) and worst-case diffusion remains bounded by the protocol parameter $L_\text{diff}$ according to the [protocol's security argument](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#protocol-security).
 
 If the optimistic, average-case performance is improved with suitable algorithms, data structures and optimizations, but the worst-case scenario is not, more conservative parameter choices would be required to maintain security guarantees. This would negate the anticipated benefits of the optimizations in the first place. Therefore, the implementation must prioritize ensuring that even in adverse network conditions or under attack, the diffusion of EBs and their closures remains within acceptable bounds.
 
@@ -109,7 +109,7 @@ The following chapters detail the specific risks that inform architectural decis
 
 The implementation of Ouroboros Leios represents a substantial evolution of the Cardano consensus protocol, introducing high throughput as a third key property alongside the existing persistence and liveness guarantees. The path from protocol specification to production deployment requires careful validation of assumptions, progressive refinement through multiple system readiness levels, and continuous demonstration of correctness and performance characteristics. This chapter outlines the strategy for maturing the Leios protocol design through systematic application of formal methods, simulation, prototyping, and testing techniques.
 
-The result is an implementation plan that not only covers the ["path to active" of CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#path-to-active), but also serves as a rationale for what concrete steps will be taken on our [product roadmap](https://leios.cardano-scaling.org/docs/roadmap/) of realizing Ouroboros Leios.
+The result is an implementation plan that not only covers the ["path to active" of CIP-164](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#path-to-active), but also serves as a rationale for what concrete steps will be taken on our [product roadmap](https://leios.cardano-scaling.org/docs/roadmap/) of realizing Ouroboros Leios.
 
 > [!WARNING]
 >
@@ -150,7 +150,7 @@ The formal specification must be maintained as a living artifact throughout impl
 
 ## Simulation and protocol validation
 
-Simulations provide a very controlled environment for exploring protocol behavior before deploying to real infrastructure. Two complementary simulation approaches have been used so far to [validate the proposed protocol in CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#simulation-results), each with distinct strengths and even using different implementation languages.
+Simulations provide a very controlled environment for exploring protocol behavior before deploying to real infrastructure. Two complementary simulation approaches have been used so far to [validate the proposed protocol in CIP-164](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#simulation-results), each with distinct strengths and even using different implementation languages.
 
 A discrete event simulation implemented in Rust, models Leios message exchanges between nodes, abstracting lower-level details for speed—running orders of magnitude faster than real time to enable statistical analysis over thousands of runs with complete observability and arbitrary adversarial behavior injection. This validates security arguments by systematically exploring protocol behavior under varying loads, expected data diffusion in small to medium sized network topologies, or adversarial scenarios like data withholding, and exploration of protocol parameters before testnet deployment.
 
@@ -224,7 +224,7 @@ The relationship between Ouroboros Leios and Ouroboros Peras presents both oppor
 
 **Resource contention and prioritization** emerges as the most immediate coordination challenge. Both protocols introduce additional network traffic that competes with existing Praos communication. The [resource management](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/ImpactAnalysis.md#resource-management) requirements for Leios - prioritizing Praos traffic above fresh Leios traffic above stale Leios traffic - must be extended to also accommodate Peras network messages. Any prioritization scheme requires careful analysis of the timing constraints for each protocol to ensure that neither compromises the other's security guarantees. Current understanding is that Peras traffic should be prioritized above both, stale and fresh Leios traffic, such that Leios protocol burst attacks may not force Peras into a cooldown period.
 
-**Vote diffusion protocols** present a potential area for code reuse, though this opportunity comes with important caveats. The Leios implementation will initially evaluate the vote diffusion protocols [specified in CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#leios-mini-protocols) for their resilience against protocol burst attacks and general performance characteristics. Once the Peras [object diffusion mini-protocol](https://tweag.github.io/cardano-peras/peras-design.pdf#section.2.5) becomes available, it should also be evaluated for applicability to Leios vote diffusion. However, the distinct performance requirements and timing constraints of the two protocols may ultimately demand separate implementations despite structural similarities.
+**Vote diffusion protocols** present a potential area for code reuse, though this opportunity comes with important caveats. The Leios implementation will initially evaluate the vote diffusion protocols [specified in CIP-164](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#leios-mini-protocols) for their resilience against protocol burst attacks and general performance characteristics. Once the Peras [object diffusion mini-protocol](https://tweag.github.io/cardano-peras/peras-design.pdf#section.2.5) becomes available, it should also be evaluated for applicability to Leios vote diffusion. However, the distinct performance requirements and timing constraints of the two protocols may ultimately demand separate implementations despite structural similarities.
 
 **Cryptographic infrastructure** offers the most promising near-term synergy. Both protocols are based on signature schemes using BLS12-381 keys, creating an opportunity for shared cryptographic infrastructure. If key material can be shared across protocols, stake pool operators would need to generate and register only one additional key pair rather than separate keys for each protocol. This shared approach would significantly simplify the bootstrapping process for whichever protocol deploys second.
 
@@ -282,7 +282,7 @@ The following threats have been selected for detailed analysis based on their po
 ### Data withholding
 
 In a data withholding attack (**ATK-LeiosDataWithholding**, see also [threat vectors #20, #21 and #22](../threat-model.md#data-withholding)), the adversary deliberately prevents the diffusion of endorser block transaction closures to disrupt certification and degrade network throughput.
-This attack exploits the fundamental dependency between transaction availability and EB certification, targeting the gap between optimistic and worst-case diffusion scenarios that underlies Leios' [security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security).
+This attack exploits the fundamental dependency between transaction availability and EB certification, targeting the gap between optimistic and worst-case diffusion scenarios that underlies Leios' [security argument](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#protocol-security).
 
 The attack operates by manipulating timing and availability of transaction data required for EB validation.
 When an EB is announced via an RB header, voting committee members must acquire and validate the complete transaction closure before casting votes.
@@ -671,35 +671,261 @@ Furthermore, the existing `forgeBlock` method and/or the `BlockForging` interfac
 
 > [!WARNING]
 >
-> TODO: Write about announcements and equivocation detection (here or dedicated section?)
->  - announcement = signed (praos or eb?) headers, either way must include praos header hash (anchor to the chain)
->  - how to do EB equivocation detection
->
-> FIXME: write about offering and fetching of bodies and txs
 > FIXME: what kind of validation while diffusing (only size and hash checks)
->
-> TODO: write about "which EB to prioritize" -> freshest first (protocol burst) vs. oldest (protocol storm) etc.
-> TODO: write about "which peer to fetch from" -> everything from one big ledger peer, round robin from all peers?
->
-> FIXME: at least put a naiive design (fetch freshest from everyone that offers) - safe but wasteful
 
 - **REQ-DiffuseLeiosBlocks** The node must acquire and diffuse EBs and their closures (via the Network layer's new mini-protocols, see below).
 
-To satisfy **REQ-PrioritizeFreshOverStaleLeios** (freshest-first delivery), the Consensus layer must implement fetch decision logic (**NEW-LeiosFetchDecisionLogic**) that prioritizes younger EBs over older ones. This logic determines which EBs to request from which peers.
+#### The crucial attack vector
 
-Even the first version of LeiosFetch decision logic should consider EBs that are certified on peers' ChainSync candidates as available for request, as if that peer had sent both MsgLeiosBlockOffer and MsgLeiosBlockTxsOffer. A MsgRollForward implies the peer has selected the block, and the peer couldn't do that for a CertRB if it didn't already have its closure. (TODO: link to chain selection where this is relied upon)
+[Threat vector #22](../threat-model.md#data-withholding) forces this decision logic to aggressively issue hedge requests.
+The T22 attack is only mitigated if the network reliably diffuses the EB from the ~25% of stake that is honest, already has the EB, and might be geographically concentrated (for example, in Europe) to the rest of the honest stake spread around the globe in less than approximately $L_\text{diff}+\Delta$. With typical parameter values, that's 7 + 5 = 12 seconds.
+Because of the unavoidably high RTTs across the global spans, the widespread convention of packet loss as a congestion signal, and the severe consequences of loss in the prevailing TCP's CUBIC/etc congestion avoidance algorithms, that 12 seconds does not include much slack for transporting payloads upwards of 12 MB over public Internet infrastructure while tolerating a large number (but < 100%) of potentially adversarial peers.
+Moreover, Leios traffic is inherently bursty, so the common convention of resetting the congestion window during idle periods additionally reduces goodput.
+(BBR might outperform CUBIC/etc, but not by a whole order of magnitude, and BBR also carries its own risks.)
 
-> [!WARNING]
->
-> TODO: Discuss fetch decision logic for caught-up vs bulk syncing nodes, conservative pipelining depths, server-side reordering options.
->  - fetch range via points -> refer to catching up section
-> TODO: what about newly synced nodes that need to acquire all EBs up to the immutable tip, how?
->  - might demand a different mini-protocol design
->  - query points of volatile suffix and request missing subset of it (like tx submission for the mempool)
+Because the deadline is tight and adversarial peers can appear to be strong honest peers before an abrupt betrayal, timeouts are insufficient.
+No timeout will both robustly prevent a _slow loris_ attacker from wasting a problematic portion of the $L_\text{diff}+\Delta$ budget and also robustly avoid false alarms: over the public Internet, distant peers, even if honest, will exhibit unpredictable changes in RTT and/or goodput performance.
+For similar reasons, any fetching policy that relies on _promptly_ reacting to peer responsiveness is inapplicable.
 
-The first version of LeiosFetch client can assemble the EB closure entirely on disk, one transaction at a time. A second version might want to batch the writes in a pinned mutable `ByteArray` and use `withMutableByteArrayContents` and `hPutBuf` to flush each batch. Again, the possible benefit of this low-level shape would be to avoid useless GC pressure. The first version can wait for all transactions before starting to validate any. A later version could eagerly validate as the prefix arrives—comparable to eliminating one hop in the topology, in the worst-case scenario.
+The only robust mechanism is to leverage multiple peers simultaneously, akin to _hedge requests_, popularized by _The Tail at Scale_ (CACM 2013), but maybe even issuing the hedge requests without waiting for a (robust) signal that they're actually necessary.
+Timeouts alone are insufficient but still worthwhile, only for the sake of reclaiming resources from an entirely unresponsive peer on a reasonable time scale---not as a means to reactively minimize the latency of an inflight payload.
 
-The first version of LeiosFetch server simply pulls serialized transactions from the LeiosEbStore, and only sends notifications to peers that are already expecting them when the noteworthy event happens. If notification requests and responses are decoupled in a separate mini protocol _or else_ requests can be reordered (TODO or every other request supports a "MsgOutOfOrderNotificationX" loopback alternative?), then it'll be trivial for the client to always maintain a significant buffer of outstanding notification requests.
+In particular, the fetch decision logic will leverage the fact that each of its stake-sampled peers has a ≥25% probability of having T22's EB no later than the start of the $L_\text{diff}+\Delta$ duration.
+Each Cardano node maintains 5 stake-sampled upstream peers (a.k.a. "big ledger peers") (TODO confirm).
+These peers are subject to churn, which means the peers that have survived churn are not _independent_ samples of the pools.
+However, at least one of them is independent: the one sampled at the latest churn.
+A pool's block-producing node (which is also where Leios votes originate) should be running behind _at least_ 3 relays (TODO confirm).
+So, in total, a block-producing node is effectively one hop away from 15 stake-sampled peers and at least 3 of those samples are independent.
+Thus, each honest pool endangered by a T22 attack has _at least_ a 1 - (1 - 25%)^3 = 57.8% probability of being just one hop away from the certified EB at the start of the $L_\text{diff}+\Delta$ duration.
+(TODO the Fetch logic can and should give special treatment to a block-producer's own relays: they'll have a good connection and they're _trustworthy_.
+Also, the relay can start serving downstream peers even before its block-producer finishes downloading.
+Together, these justify not counting it as a "hop".)
+
+- Because the maximum pool size is 0.2% stake (i.e. `nOpt` is 500), all of those requests will be spread across more than a hundred pools (i.e. many hundreds of relays) rather than bottlenecking.
+- After that one hop, the probability of being merely one more hop away compounds; that snowball effect lets the EB diffuse within a few hops, which makes it plausible for the EB to reliably diffuse before $L_\text{diff}+\Delta$.
+
+For the sake of the LeiosFetch decision logic, the key observation is that having connections to those upstream peers is only useful if the logic actually utilizes them.
+The LeiosFetch decision logic thus requests all desired data from every stake-sampled peer that offers it, with no effort at avoiding redundant downloads among them.
+This is the only way to robustly prevent a slow loris attacker from wasting some of the precious latency budget.
+
+#### Redundant downloads
+
+The fetch logic's aggressive hedge requests incur one major downside: each node will often download multiple copies of Leios data.
+The previous section motivates that redundancy in order to prevent T22 from disrupting the base Praos protocol, which is crucial.
+Still, it is undesirable to waste the downstream peers' ingress resources and the upstream peers' egress resources.
+Some ways to lessen the redundancy have been considered.
+
+- However much of an EB has already arrived before a specific upstream peer offers that content won't be downloaded again.
+  Redundant fetches will only be sent for what hasn't already arrived.
+  Most of the time, honest upstream peers will not all simultaneously offer the EB, so the naturally gradual diffusion alone will prevent some of the possible redundancy.
+
+- One refinement would be to send best-effort cancellations, at least to the stake-sampled peers.
+  The cancellation cannot be assumed to succeed, due to the inherent race condition, but it may reach the server in time to trivialize some of its responses (e.g. merely send an empty reply).
+  (TODO note that these cancellations would need to be able to "skip the queue" on both the sending node and the receiving node to have an effect on how the preceding requests are handled. For example, that might motivate sending the cancellations via a different mini protocol than the requests.)
+
+- Another refinement could be to introduce a _small fixed_ delay before issuing any hedge requests.
+  It's not already clear whether this will waste too much of the latency budget, so it may be worth considering later.
+  Key concern: nothing prevents the adversary from being the first to _offer_ some desired data, which means the T22 attacker can always abuse this delay.
+
+- The fetch logic will also be utilizing the node's ~20 upstream peers that are sampled from PeerSharing rather than from the stake distribution.
+  With such a high valency, these peers have a higher chance of being a geographic neighbor, which correlates with significantly better RTT and bandwidth.
+  As such, these peers can transfer even a 12 MB payload very quickly despite --- in contrast to assumed-to-be-intercontinental stake-sampled peers --- a relatively tight bound on outstanding replies.
+  The intended timeline is that stake-sampled peers ensure the EB is one or two hops away from every neighborhood and then the PeerSharing-sampled peers ensure the EB spreads rapidly within each neighborhood.
+  As a result, it's more likely that the data that arrived quickly via PeerSharing-sampled peers either won't need to be requested from a stake-sampled peer at all or could be quickly cancelled.
+
+#### Utilizing PeerSharing-sampled peers
+
+Like stake-sampled peers, the fetch logic utilizes every PeerSharing-sampled peer that offers the desired data.
+However, it does bound the outstanding replies to approximately 1 MB, so that even utilizing ~20 peers does not consume an infeasible amount of in-memory buffers and other ingress resources.
+
+Due to that finite budget, the fetch logic must choose which requests to spend it on for each peer.
+The most useful scheme seems to be RarestFirst with arbitrary tiebreakers: choose one of the requests that is inflight with the fewest other peers.
+Thus, while stake-sampled peers' requests are decided entirely independently, the PeerSharing-sampled peers exhibit a small amount of interaction: their budget is always saturated regardless of other peers' state, but which particular requests are sent is dependent.
+(TODO mention that stake-sampled peers can request the closure's txs in any order, e.g. randomized?)
+
+#### Deciding among multiple offers
+
+The above is a full description of how the fetch logic would utilize all of the node's upstream peers to acquire a single EB.
+But the fetch logic must also handle multiple EBs.
+Unfortunately, Leios does allow for there to be so many EBs diffusing simultaneously that the fetch logic cannot simply repeat the above for all EBs separately.
+That'd be a truly unbounded amount of outstanding replies per stake-sampled peer and numEbsOffered×1 MB per PeerSharing-sampled peer.
+
+Instead, there is a fixed budget of how many EBs can be inflight with a peer at once, for example three for a stake-sampled peer and five for a PeerSharing-sampled peer.
+The size of outstanding replies for each PeerSharing-sampled peer would thus be at most min(5, numEbsOffered)×1 MB --- at most ~100 MB among the ~20 PeerSharing-sampled peers.
+The total is similar for the stake-sampled peers: min(3, numEbsOffered)×12 MB is ~180 MB among the five of them.
+Due to that finite budget, the fetch logic must choose which EBs to spend it on for each peer.
+For **REQ-PrioritizeFreshOverStaleLeios**, to resist **ATK-LeiosProtocolBurst**, this prioritization is FreshestFirst with arbitrary tiebreakers: choose one of the EBs that is announced in the greatest slot among the EBs offered by this peer.
+If the peer offers a higher-priority EB while this budget is saturated, the fetch logic should immediately stop sending requests for the least-prioritized of its inflight EBs (i.e. drain its replies) to rapidly make room for the new most-prioritized offer (TODO it is not obvious whether sending cancellations to possibly accelerate this drain would be effective enough to be worth the complexity/extra messages).
+
+TODO refine to FreshestLast among the most recent L slots and FreshestFirst among older slots in order to also address RSK-LeiosProtocolStorm
+
+#### Tolerating equivocation even despite $L_\text{hdr}$ violations
+
+The Leios protocol mitigates equivocation by relying on the prompt diffusion of announcements within $L_\text{hdr}$.
+The following hold when that rapid diffusion is achieved.
+
+- A node should only fetch the first announcement it sees from each _election_ (i.e. a SlotNo-PoolId pair).
+  The second and subsequent announcements it sees are proof of that election's equivocation and should otherwise be ignored.
+  Thus, honest nodes only ever fetch one EB per election.
+- The voting rules prevent the certification of any announcement from an election if that election was equivocated soon enough to risk having honest nodes disagree on which announcement was first.
+  Thus, honest nodes only ever fetch different EBs for the same election when there can be no certificate for any of that election's announcements.
+
+It is plausible that $L_\text{hdr}$ will be violated infrequently and only for a few nodes at a time.
+However, $L_\text{hdr}$ violations are definitively not impossible; no real-world networking infrastructure could perfectly mitigate that risk (for any feasible value of $L_\text{hdr}$).
+Ideally, the node can automatically recover, which requires some honest nodes to fetch a second EB for that election.
+But _never_ a third EB, because even despite $L_\text{hdr}$ violations, only a single EB could be certified for each election.
+
+This section specifies the diffusion of announcements and the recovery path for when $L_\text{hdr}$ violations cause an honest node to need to fetch a second EB for some election.
+
+On-time announcements are the most urgent Leios messages to relay.
+Fortunately, an announcement is no greater than 1 kB, and so definitely fits in a single modern TCP packet.
+Thus, the only mechanism for undue delay would be buffer bloat arising from these messages being enqueued behind bigger messages.
+The global [buffer bloat initiative](https://www.bufferbloat.net) has proceeded well, such that even public Internet infrastructure paths (which are not owned/controlled by Cardano node operators) tend to avoid excess buffering of TCP traffic.
+And the techniques described in the "Message latencies" subsection above prevent such buffers from arising within the node itself.
+Moreover, the node's own multiplexer mitigates head-of-line blocking between different protocols, which motivates relaying announcements in a separate mini protocol for any large payloads: the LeiosNotify-LeiosFetch distinction (see the mini protocols specified below).
+
+Without $L_\text{hdr}$ violations, an honest node never has reason to relay more than two announcements per election: the first because it's eligible and the second to prove equivocation (which affects the voting rules).
+Moreover, the honest node only has reason to offer to relay the EB body and EB closure of the first announcement it relayed.
+These invariants symmetrically allow the node to disconnect from an upstream peer sending junk/too many announcements and/or offers: a first announcement, possibly a second for equivocation proof, an EB body offer for the first announcement, and an EB closure offer for the first announcement.
+Nothing more needs to be sent for each election.
+
+In the case of $L_\text{hdr}$ failure, however, the node may need to offer the EB body and closure of an announcement different from the first announcement it relayed.
+One possibility would be to allow upstream peers to send a (potentially-)third announcement and also to subsequently offer its EB body and/or EB closure.
+However, the need for those additional messages cannot be validated before the recipient has validated a certificate for that third announcement.
+This suggests an alternative to a second LeiosNotify round of announcement and offers for the purpose of recovery: recover instead via ChainSync and BlockFetch, because in the Linear Leios design only BlockFetch delivers certificates.
+
+In the current design, Leios announcements are Praos headers.
+Therefore, ChainSync's MsgRollForward inherently carries announcements.
+Additionally, the current design includes a new bit in the Praos header allowing it to claim that its Praos body contains a Leios certificate for the predecessor's announcement.
+Together, this information is sufficient to enable the recovery path for the occasional node that needs to offer and/or fetch a second EB for some election.
+(TODO If we change the design so that RbHeaders are no longer announcements, then the cert bit could be expanded to include the certified announcement, in which case all the necessary values are still in MsgRollForward.)
+
+If the certified EB on a desirable Praos chain is different than the first announcement seen for that same election, then the cert-carrying Praos block (a.k.a. CertRB) will arrive before the certified EB.
+Once the node validates the certificate, it can then do the second round of fetching.
+Some of its peers may have originally offered the certified announcement's EB.
+Any peer that instead relayed a wrong announcement for this election could also offer the certified announcment's EB simply by sending the two MsgRollForwards (which it will already do for the sake of ChainSync): the first announces the EB and the second claims to have selected the CertRB, which is impossible unless the peer also has both the EB body and EB closure.
+Hence the second MsgRollForward's set cert bit is effectively an offer of the first MsgRollForward's announced EB body and closure.
+
+TODO bonus: this same mechanism also works for connections that arise _after_ the announcement was relayed
+
+TODO
+
+- > The first version of LeiosFetch server simply pulls serialized transactions from the LeiosEbStore, and only sends notifications to peers that are already expecting them when the noteworthy event happens. If notification requests and responses are decoupled in a separate mini protocol _or else_ requests can be reordered (TODO or every other request supports a "MsgOutOfOrderNotificationX" loopback alternative?), then it'll be trivial for the client to always maintain a significant buffer of outstanding notification requests.
+- That's only true if there is never _any budget whatsoever_ on outstanding requests.
+  Otherwise, merely relaying the announcement would cause the upstream peer to consume some of its budget even for EBs it can't serve (since we send requests without waiting for offers).
+
+#### Bounding incoming messages
+
+As mentioned for offers in the previous section, the node must be able to detect junk/excessive messages from its peers (**NEW-LeiosIncomingMessageBounds**).
+Otherwise, there would be trivial Denial-of-Service attack vectors.
+
+In the current design, upstream peers send the following messages for EB diffusion.
+
+- An _announcement_ from this peer causes disconnection when any of the following hold.
+    - This peer has already sent this same announcement.
+    - This peer has already sent two distinct announcements for this election, so this one would be a third.
+        - Recall: a second, distinct announcement for an election is how a peer proves that election's equivocation; there is no separate equivocation-proof message, so an honest node accepts at most two distinct announcements per election.
+    - The announcement has an invalid signature.
+        - Because CIP-0164 reuses Praos headers as EB announcements, the signature involves an operational certificate (opcert) issue number (OCIN).
+          When ChainSync validates a MsgRollForward, this OCIN is upper bounded based on the preceding header chain, since headers themselves update the OCINs.
+          In LeiosNotify, announcements are not part of a chain, and so precise validation of the OCIN isn't necessarily possible; the recipient might not have yet seen the header that increments the OCIN.
+          A sufficient compromise is to reject OCINs that are less than the OCIN recorded by immutable tip's ledger state (which all nodes must agree on), but allow _any_ OCIN at least as great.
+          As a result, opcert revocation for EB announcements is delayed until the incremented OCIN becomes immutable, after ~12 hr when Chain Growth is healthy and up to ~36 hr when it isn't.
+          That's tolerable: it just means a leaked key allows the attacker to equivocate (hence mostly nullify) the victim's EB announcements until their revocation becomes immutable.
+          Crucially, ChainSync doesn't change its behavior: it still enforces the OCIN bounds on the specific header chain, which is as precise and prompt as possible.
+        - (TODO hmm.. what if the attacker sends a _fresh_ announcement that uses the revoked OCIN _just before_ it becomes immutable?
+          That might cause some honest nodes to disconnect from other honest nodes.
+          An attacker pool could arrange for this opportunity once per header they get onto the chain, since they could increment their OCIN with every header.
+          Perhaps the honest node accepts the revoked OCIN for, say, 1 extra minute, permitting its upstream peers' imm tips to catch up?)
+    - The announcement has an invalid election proof (i.e. VRF proof).
+    - The contained Praos header doesn't actually announce an EB.
+    - The announcement's EB size is too great.
+    - The announcement's election is more than 10 minutes old; honest servers will skip relaying announcements older than 5 minutes and the extra 5 minutes accommodates transmission time and clock skew.
+    - The announcement's slot is more than clock skew (eg 2 seconds) from the future.
+      If less than that, just pause this peer's LeiosNotify client until the local wall clock reaches the onset of the announcement's slot.
+- An _offer_ from this peer causes disconnection when any of the following hold.
+    - The same content has already been offered by this peer.
+    - The offered EB has not already been announced by this peer.
+    - The offered EB has been announced by this peer but its (youngest) announcement is more than 10 minutes older than the local immutable tip; honest servers won't offer anything older than their immutable tip, and 10 minutes accommodates potential disagreements on what's immutable---unless the upstream is a syncing node, which also justifies a disconnect.
+      (A syncing honest node won't request notifications until its caught-up; see "Catching up" below.)
+- An _EB body_ from this peer causes disconnection when any of the following hold.
+    - The node didn't send a request for (this copy of) it from this peer.
+      For this revision, the corresponding request must in fact be the oldest body-or-closure request the node sent to this peer.
+      (TODO a later revision might allow the peer to send replies to out-of-order higher priority requests first, when possible.)
+    - Its contents do not match the hash and size listed in the announcement.
+- An _EB closure portion_ from this peer causes disconnection when any of the following hold.
+    - The node didn't send a request for (this copy of) it from this peer.
+      For this revision, the corresponding request must in fact be the oldest body-or-closure request the node has sent to this peer.
+      (TODO a later revision might allow the peer to send replies to out-of-order higher priority requests first, when possible.)
+    - Its contents do not match the full hashes and sizes listed in the EB body for the transactions in the corresponding request.
+
+In the current design, downstream peers send the following messages for EB diffusion.
+
+- A _notification request_ causes disconnection when any of the following hold.
+    - SN + 300 ≤ RN, where RN is the number of notification requests the node has received from this peer and SN is the number of notifications (announcements/offers) the node has sent this peer.
+    - (TODO 300 is a magic number; the "necessary" value depends on the burst size, which needs additional assessment)
+- An _EB body request_ causes disconnection when any of the following hold.
+    - This peer has sent body-or-closure requests whose cumulative own size (as opposed to the size of the corresponding replies) is obviously greater than it would ever need to be (2 MB buffer?) before this node has processed even one of them.
+    - The node doesn't currently have that EB body in our Leios storage.
+    - (Rate-limit is handled outside the node, e.g. `fail2ban`.)
+- An _EB closure portion request_ causes disconnection when any of the following hold.
+    - This peer has sent body-or-closure requests whose cumulative own size (as opposed to the size of the corresponding replies) is obviously greater than it would ever need to be (2 MB buffer?) before this node has processed even one of them.
+    - The node doesn't currently have that EB closure portion in our Leios storage.
+    - (Rate-limit is handled outside the node, e.g. `fail2ban`.
+- TODO how would cancellations be handled?
+  Especially since they could arrive after we sent our reply :grimace:
+
+#### Bounding in-memory state
+
+All of the new Leios state must require only bounded memory usage (**NEW-LeiosBoundedMemory**).
+The previous section bounds the number of incoming messages in terms of the number of upstream/downstream peers and (multiplicatively) the number of sufficiently young elections in the Praos leader schedule (which is reused as the Leios leader schedule), and the node's memory usage must also be bounded.
+
+The above requirements for detecting junk messages from upstream peers force the node to maintain state that summarizes which announcements/equivocation proofs/offers each upstream peer has already sent.
+The similar requirements for messages from downstream peers seem to only require much simpler state (merely a counter and a buffer size limit), which would be appealing because there are so many more downstream peers than upstream peers.
+Surprisingly, because of symmetry, the node must unfortunately keep some similar state for downstream peers so that it can avoid sending messages that they would consider junk.
+For example, if a downstream peer connects after some announcement becomes too old to relay but before the node acquires the EB body, the node must not offer that body to that peer, since the node never sent the corresponding announcement to that peer.
+(It may be tempting to suggest that the node could send the announcement along with the offer in this case, but the announcement might be too old for the peer to accept it and whether the announcement has already been sent is the very state in question.)
+
+Because the required state is not obvious, this subsection explicitly lists which in-memory state the above design requires.
+It also makes it obvious that this state can be trimmed as the immutable tip advances, by explicitly limiting itself to _volatile_ elections, which are the elections that are not older than the current immutable tip.
+
+- For EB diffusion, for each downstream peer, the node must track:
+    - The difference between the number of notifications sent (SN) and number of notifications requested (RN).
+      (If it's too great, the node disconnects, so this isn't unbounded.)
+    - Which volatile announcements---i.e. announcements for a volatile election---the node has relayed to this peer.
+      This varies per peer for two reasons: peers connect at different times and even a connected peer might not have had sent an unconsumed notification request when this node relayed the announcement.
+      In particular, if the node was unable to send its first-seen announcement to a downstream peer, then it should also not send an equivocating announcement to that peer, since the peer would incorrectly interpret it as the node's first-seen announcement for that election.
+
+- For EB diffusion, for each upstream peer, the node must track:
+    - Which requests the node has sent to this peer.
+    - Which announcement this peer first sent for each volatile election.
+    - Which volatile equivocation proofs---i.e. proofs of equivocation of a volatile election---this peer has sent.
+    - Which volatile EBs'---i.e. EBs announced by at least one volatile announcement---bodies and/or closures this peer has offered.
+
+The node does not need to track which equivocation proofs or offers it has relayed to each peer, because the node only sends notifications when it first acquires the equivocation proof/body/closure, which fundamentally only happens once.
+The node does, however, need to track which equivocation proofs/bodies/closures have not yet arrived centrally for that reason---and more state as well for other behaviors specified above.
+
+- For EB diffusion, the node centrally tracks:
+    - The first announcement it saw for each volatile election.
+    - The second announcement (a.k.a. equivocation proof), if any, it saw for each volatile election.
+    - Which volatile-announced EB bodies it has already acquired, so that it does not re-request bodies it already has.
+    - Which portions of volatile-announced EB closures it still needs to request, so that it does not re-request portions it already has.
+    - Which volatile-announced EB closures it has already acquired (see Chain selection below).
+    - Which RBs in the VolDB are CertRBs (see Chain selection below).
+    - Which EB, if any, each RB in the VolDB announces (see Chain selection below).
+    - Which announcement, if any, has been certified for each volatile election (see Block validation below), since that might cause this node to fetch a second EB (the certified announcement's) for an election.
+      (There cannot be more than one certified announcement per election unless the adversary controls >50% of the committee, which is already a disaster.)
+
+All of this state is obviously bounded (e.g. the difference of SN and RN) or else ultimately traceable to the set of volatile elections.
+With some care (e.g. race conditions, accounting for transport time/clock skew, etc), that makes it trivial to bound this state as time passes: whenever the immutable tip advances, drop state that's only relevant to elections older (or, e.g., at least 10 minutes older) than the new immutable tip.
+
+The number of volatile elections is stochastically bounded, so the above discharges the requirement.
+In practice, the number of such elections depends on the protocol parameters and the applicable risk tolerance.
+For Cardano mainnet, a sufficient quantity is 10,000 elections---that incurs an error probability below $10^{-30}$ even assuming a maximally old immutable tip (36 hr), a grinding adversary, a perfectly uniform infinite stake distribution, and multiple decades' worth of slots.
+
+TODO what would happen if there's 10,001 elections?
+
+TODO other non-diffusion components, such as voting, should also contribute to this list/have their own
 
 ### Endorser block storage
 
@@ -721,6 +947,16 @@ This component therefore stores EBs on disk just as the ChainDB already does for
 > TODO: interaction with mempool (here or above)
 
 The first version of LeiosEbStore can just be two bog standard key-value stores, one for immutable and one for volatile. A second version maybe instead integrates certified EBs into the existing ImmDB? That integration seems like a good fit. It has other benefits (eg saves a disk roundtrip and exhibits linear disk reads for driver prefetching/etc), but those seem unimportant so far.
+
+**What justifies fetching an EB.** An election or a certification does; a peer's offer does not. An offer says only which peers can serve what, so nothing is listed to fetch on the strength of a claim the node has not verified, and the set of bodies it will pursue is bounded by elections rather than by what peers assert. Offers are correspondingly constrained: a peer may offer only the parts of an EB it has itself announced to this node, at most once per part, and never for an EB older than the node's immutable tip.
+
+- **REQ-FetchJustifiedByElection** The node must fetch an EB because an election or a certification calls for it, never because a peer offered it.
+
+A corollary worth stating, because the obvious assumption is wrong: the ChainDB is *not* a durable record of announcements. Announcements diffuse independently of ChainSync, precisely so they can outrun it, so a header on a fork the node never selects, a header equivocating an election, or a header announcing an EB the node never fetches need not reach block storage at all.
+
+**A wrong declared size is not an attack to punish.** If an announcement declares a size the EB does not have, the node simply never counts that closure as complete — so it neither relays the closure nor votes for the announcement. Nobody is disconnected over it: the issuer is not a peer, and the peer that relayed the announcement may be perfectly honest.
+
+**An equivocated election is resolved by certification, not by guessing.** Two announcements for one election leave the node unable to say which EB the chain will settle on. Rather than choose, it follows the certificate: a verified certificate names an EB, and that is what makes the node pursue that body — including the case where an equivocation had previously pointed it at the other one.
 
 ### Transaction cache
 
@@ -765,15 +1001,44 @@ Once enough votes have been collected for an EB, a certificate can be formed and
 
 ### Chain selection
 
-> [!WARNING]
->
-> FIXME: describe at least one approach on preventing selectin of incomplete blocks + interaction with fetching logic
->
-> TODO: Discuss two alternatives: staging area vs. enhancing chain selection
+Leios does not change which chain the node prefers; it still must select the best chain it has acquired for the same definition of _best_ as today.
+Leios does, on the other hand, change the definition of whether a chain is _acquired_, because a chain that includes CertRBs is not acquired before those certified EBs are acquired.
+The existing ChainSel logic already includes a similar corner-case, because RBs might arrive out of order (at least when syncing).
+Not being able to select a CertRB because its certified EB is still missing is directly comparable to not being able to select an RB because its predecessor RB is still missing.
+That same ChainSel mechanism will be enriched to also understand EB dependencies (**UPD-LeiosChainSelAndVolDB**).
 
-Each CertRB must be buffered in a staging area (**NEW-LeiosCertRbStagingArea**) until its closure arrives, since the VolDB only contains RBs that are ready for ChainSel. (Note that a CertRB's closure will usually have arrived before it did.) (TODO Any disadvantages? For example, would it be beneficial to detect an invalid certificate before the closure arrives?) (TODO a more surgical alternative: the VolDB index could be aware of which EB closures have arrived, and the path-finding algorithm could incorporate that information. However, this means each EB arrival may need to re-trigger ChainSel.) The BlockFetch client (**UPD-LeiosRbBlockFetchClient**) must only directly insert a CertRB into the VolDB if its closure has already arrived (which should be common due to L_diff). Otherwise, the CertRB must be deposited in the CertRB staging area instead.
+- The VolDB in-memory index will also record for each RB in the VolDB whether that RB contains a Leios certificate.
+- ChainSel/VolDB will be provided access to an in-memory index of which EB closures have been acquired.
+- When ChainSel queries the VolDB for the set of candidate chains to consider for immediate selection, the VolDB will exclude CertRBs that certify an EB whose closure has not yet been acquired.
+  That filter also requires an in-memory index of which EB closure is announced by each RB in the VolDB.
+  (Note that that set of RBs might include some that were not (TODO yet?) processed as announcements by this node's Leios logic, since the Leios logic does bounded work per election.
+  Hence it seems reasonable for the VolDB itself to own and maintain that index.)
+- A new ChainSel trigger will allow the arrival of an EB closure to retrigger ChainSel for CertRBs that are unblocked by that arrival.
+  (The similar trigger for when the Genesis implementation's Limit on Eagerness (LoE) advances is a precedent.)
+
+In Block Diffusion Pipelining via Deferred Validation, the node sometimes sends the MsgRollForward for an RB's header when ChainSel begins to fully process the RB.
+In the case of a CertRB, the downstream ChainSync peers will interpret that MsgRollForward as an offer of its predecessor's EB closure.
+Note that that is safe only because ChainSel does not attempt to fully process the CertRB before it has the EB closure.
+Were that not true, then this MsgRollForward might cause an honest downstream peer to request a closure this node doesn't have, which would cause this node to disconnect from that honest peer.
 
 ### Block validation
+
+#### Prompt validation of CertRBs
+
+Because a CertRB is nothing more than the RB header paired with a certificate, that CertRB is valid if and only if its header and certificate are valid.
+The node only fetches an RB if it has already validated its header, and validating the header requires the forecasted LedgerView, so if the RB is present, then it must be within the node's LedgerView forecast range.
+(TODO that's also true for an RB the node itself issued.)
+The forecasted LedgerView is also sufficient for the validation of the certificate, since the corresponding Leios committee is fixed by one of the Ledger's `mark` or `set` snapshots.
+Thus, when a CertRB arrives, the node can immediately validate it even if the node has not yet downloaded all of the predecessor RBs and certified EBs that would be necessary to construct the CertRB's ledger state.
+A certificate may also not cross an epoch boundary: ticking into a new epoch retires the pending announcement, so a CertRB is only ever judged against the committee of its own epoch and the first RB of an epoch never carries a certificate.
+
+ChainSel cannot _completely process_ the CertRB before those blocks arrive, because ChainSel must also produce the CertRB's resulting ledger state, which requires its preceding ledger state, which requires those blocks.
+But whether or not the certificate is valid can be immediately judged.
+That's useful to do as soon as possible, because it may be the first and possibly even the only indication that allows the LeiosFetch logic to recover from having seen the wrong announcement first due to a violation of $L_\text{hdr}$ or even having seen no timely announcement at all.
+Since this validated-certificate signal can be the only thing that triggers LeiosFetch to fetch the certified EB, if the signal could not arise until that EB were already fetched, the EB would never be fetched at all.
+Validating the certificate without the EB is precisely what breaks that circularity.
+
+#### Proper application of CertRBs
 
 > [!WARNING]
 >
@@ -781,7 +1046,7 @@ Each CertRB must be buffered in a staging area (**NEW-LeiosCertRbStagingArea**) 
 >
 > FIXME: Don't inline transactions into the block for the ledger, but instead propose a design that invokes ledger (via `ApplyTx`) separately in block validation. Alternative: new ledger rule for EBBODY validation (see note below). Moved here from the former Ledger / "New block structure" section.
 
-The LedgerDB (**UPD-LeiosLedgerDb**) will need to retrieve the certified EB's closure from the LeiosEbStore when applying a CertRB. Due to **NEW-LeiosCertRbStagingArea**, it should be impossible for that retrieval to fail.
+The LedgerDB (**UPD-LeiosLedgerDb**) will need to retrieve the certified EB's closure from the LeiosEbStore when applying a CertRB. Due to **UPD-LeiosChainSelAndVolDB**, it should be impossible for that retrieval to fail.
 
 In Praos, all transactions to be verified and applied to the ledger state are included directly in the block body. In Leios, ranking blocks (RB) may not include transactions directly, but instead certificate and reference to an endorsement block (EB) that further references the actual transactions. This gives rise to the following requirements:
 
@@ -805,7 +1070,7 @@ For the first version of the LedgerDB, it need not explicitly store EB's ledger 
 
 > [!WARNING]
 >
-> TODO: Write about a more efficient way to catch up than to deal with staging area / out of order chain selection
+> TODO: Write about a more efficient way to catch up than to deal with out of order chain selection
 
 ## Ledger
 
@@ -838,7 +1103,7 @@ Where possible, `reapplyTx` is used when we know that the transaction has been f
 
 - **REQ-LedgerTxNoValidation** The ledger should provide a way to update the ledger state by just applying a transaction without validation.
 
-This third way of updating a ledger state would be used when we have a valid certificate about endorsed transactions in a ranking block. To avoid delaying diffusion of ranking blocks, we do want to do the minimal work necessary once an EB is certified and ease the [protocol security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security) with:
+This third way of updating a ledger state would be used when we have a valid certificate about endorsed transactions in a ranking block. To avoid delaying diffusion of ranking blocks, we do want to do the minimal work necessary once an EB is certified and ease the [protocol security argument](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#protocol-security) with:
 
 - **REQ-LedgerCheapReapply** Updating the ledger state without validation must be significantly cheaper than even reapplying a transaction is today.
 
@@ -851,7 +1116,21 @@ CIP-164 introduces several new protocol parameters that may be updated via on-ch
 - **REQ-LedgerProtocolParameterAccess** The ledger must provide access to all new protocol parameters via existing interfaces.
 - **REQ-LedgerProtocolParameterUpdate** The ledger must be able to update all new protocol parameters via on-chain governance.
 
-Concretely, this means defining the `PParams` and `PParamsUpdate` types for the `Dijkstra` era to include the new parameters, as well as providing access via the `DijkstraPParams` and other type classes.
+Concretely, this means defining the `PParams` and `PParamsUpdate` types for the `Dijkstra` era to include the new parameters, as well as providing access via the `DijkstraPParams` and other type classes. The parameters, their `protocol_param_update` keys and the `PParams` lenses the ledger exposes them through are:
+
+| Key | Parameter                           | Symbol            | Type            |
+|-----|-------------------------------------|-------------------|-----------------|
+| 40  | `ppLeiosAnnouncementPeriodLength`   | $L_\text{hdr}$    | `Milliseconds32` |
+| 41  | `ppLeiosVotePeriodLength`           | $L_\text{vote}$   | `Milliseconds32` |
+| 42  | `ppLeiosDiffusionPeriodLength`      | $L_\text{diff}$   | `Milliseconds32` |
+| 43  | `ppLeiosCommitteeSize`              | $N_c$             | `uint .size 2`  |
+| 44  | `ppLeiosQuorumStakeThreshold`       | $\tau$            | `unit_interval` |
+| 45  | `ppMaxEndorserBlockReferencesSize`  | $S_\text{EB}$     | `uint .size 4`  |
+| 46  | `ppMaxEndorserBlockTxsSize`         | $S_\text{EB-tx}$  | `uint .size 4`  |
+| 47  | `ppMaxEndorserBlockExUnits`         | -                 | `ex_units`      |
+| 48  | `ppMaxRefScriptSizePerEndorserBlock`| $S_\text{EB-ref}$ | `uint .size 4`  |
+
+Note that the three timing parameters are reasoned about in seconds throughout CIP-164 — that is the unit the protocol's timing arguments use — but are encoded in milliseconds so that sub-second values stay expressible independently of `slotLength`. $L_\text{hdr}$ is the *announcement* period: an RB header is the announcement, so $L_\text{hdr}$ is the time one announcement needs to travel the network and $3 L_\text{hdr}$ is the window that rules out equivocation. The per-EB Plutus step and memory budgets share a single `ex_units` pair, mirroring the existing `maxTxExUnits` and `maxBlockExUnits`.
 
 ### Key registration and rotation
 
@@ -859,19 +1138,21 @@ Leios uses a per-pool BLS12-381 key to cast votes on endorser blocks and to buil
 
 - **REQ-RegisterBLSKeys** SPOs must be able to register a BLS key so their stake can be represented on the voting committee.
 
-The registered key material is a public key together with a proof of possession, `bls_key = [bls_pubkey: G2 (96 bytes), bls_possessionproof: G1 (48 bytes)]` (using the small-signature BLS variant; the proof of possession is discussed under [Committee selection](#committee-selection)). The most direct and definitely viable way to register keys is to extend the existing stake pool registration certificate. A dedicated certificate or a header field are alternatives which were also considered. 
+The registered key material is a public key together with a proof of possession, `bls_key = [bls_pubkey: G2 (96 bytes), bls_possessionproof: G1 (48 bytes)]` (using the small-signature BLS variant; the proof of possession is discussed under [Committee selection](#committee-selection)). It is carried in an optional `bls_key` field of the existing **stake pool registration certificate**, rather than by a dedicated certificate or a block-header field.
 
-A dedicated registration certificate would also work, but it adds a new certificate type with its own ledger rules and its own registration/retirement lifecycle to specify, test and maintain. Because only stake pools sit on the committee, the BLS key is intrinsically tied to a pool's identity and stake, so it belongs with the pool's other registered key material (VRF, cold and hot keys). Extending the pool registration certificate binds the key and pool lifecycle and reuses the cold key authorization already required to register a pool, so no new certificate, rule, or witnessing scheme is needed.
+Extending the pool registration certificate binds the voting key's lifecycle to the pool's — registered, re-registered and retired together — and reuses the cold key authorization already required to register a pool, so it needs no new certificate type, ledger rule or witnessing scheme. Because only stake pools sit on the committee, the key is intrinsically tied to a pool's identity and stake, and belongs with the pool's other registered key material. A dedicated certificate was weighed against it and would also work: it restates nothing, so an operator rotating quarterly cannot silently change margin, cost, pledge or relays by omission — the one real cost of re-registering. That convenience did not outweigh a new certificate type with its own lifecycle to specify, test and maintain, so Dijkstra extends the pool certificate.
 
-> [!WARNING]
->
-> TODO: Discuss a **block-header field** carrying the key like the VRF key and signed by KES — still to be decided. Note that the ledger today processes only block bodies, so reading keys from headers would require giving the ledger access to header data it does not have today.
+Carrying the key in the **block header**, signed by the KES key the way the VRF key is, was considered and rejected. It would let rotation ride the operational-certificate path and avoid a transaction entirely, but the key and its proof cannot sit in every header — 144 bytes of dead weight on the most latency-critical object in the protocol — so headers would need two operational-certificate shapes and a rule for switching between them. It is also unclear what an invalid proof of possession should mean there: rejecting the block punishes consensus for a registration mistake, accepting it lets a header assert a registration that did not happen. It would additionally require giving the ledger access to header data it does not process today, and the premise that operators would balk at a periodic transaction did not hold.
 
 **Rotation.** A BLS key is a long-lived signing secret whose compromise is chain-safety relevant, so it must be rotated regularly. The right reference point is the KES _key rotation_ cadence (~90 days), not KES _key evolution_ (~12 hours): evolution provides forward secrecy within a single key's lifetime and is a separate mechanism that Leios does not require. A KES-like rotation cadence implies giving BLS keys a comparable time-to-live (~90 days), after which a freshly registered key must have taken over.
 
 Unlike a KES key, which takes effect immediately on the chain it is used to build, a BLS key must be slot-activated at an epoch boundary, because the committee is fixed once per epoch from the stake distribution. In this respect BLS keys behave like VRF keys: rotatable at most once per epoch and only effective after a stake snapshot delay. A rotated key becomes active for voting when the snapshot in which it appears becomes the active stake distribution.
 
 - **REQ-RotateBLSKeys** A registered BLS key must be rotatable by re-registration and activated at an epoch boundary
+
+**Expiry.** Rotation is only a cadence if something enforces it, so a registered key is honoured for a bounded number of epochs after its registration and the pool falls back to a keyless seat once it lapses. The bound is *derived*, not governed: `maxKeyAgeEpochs = ceil(slotsPerKESPeriod * maxKESEvolutions / epochLength) + 2`, i.e. the KES key lifetime rounded up to whole epochs plus the two epochs of activation delay, which evaluates to **21 epochs** on mainnet. Deriving it from the KES setup already fixed in genesis keeps voting-key and operational-key rotation on one schedule by construction, with no second knob that could drift out of step; retuning the cadence means changing the KES setup, which requires a hard fork anyway. Expiry is judged against the epoch the committee is selected *for*, not the epoch its snapshot was taken in, so an epoch's committee has a stable set of usable keys throughout. This is already implemented: `maxKeyAgeEpochs` in `Cardano.Ledger.Dijkstra.Rules.Snap` derives the bound from `Globals` and seats the committee from the rotating mark snapshot, and `honouredBlsKey` in the [formal ledger specification](https://github.com/IntersectMBO/formal-ledger-specifications/pull/1300) is its specification counterpart.
+
+- **REQ-ExpireBLSKeys** A registered BLS key must stop being honoured `maxKeyAgeEpochs` epochs after its registration, taking effect at an epoch boundary, with the bound derived from the genesis KES parameters rather than governed.
 
 Aligning BLS activation with VRF is a deliberate choice rather than a necessity, and BLS could in fact activate sooner. VRF keys are held back for two epochs precisely so that the leader-election nonce cannot be ground; BLS keys carry no such concern, so a registered BLS key could become active a full epoch earlier — as soon as the mark stake snapshot it appears in has stabilised (after the `3k/f` stability window), taking effect the next epoch. We forgo that earlier activation and instead pin BLS to VRF's two-epoch schedule, because activation is not only an on-chain event: the operator must place the newly-active signing key on the hot, block-producing machine for the epoch in which it takes effect. If BLS activated an epoch before VRF, an SPO that rotated both keys in epoch `e` would face two separate hot-key swaps — the BLS key in `e+1` and the VRF key in `e+2`. Aligning the two collapses this to a single swap in `e+2`; we accept the longer dead time — the BLS key sits registered but inactive for an extra epoch — in exchange for the more convenient, single-event key handling.
 
@@ -889,15 +1170,15 @@ The committee is **materialized once per epoch and stored in the ledger state**,
 
 **Committee representation.** A committee is an ordered sequence of _seats_, indexed `0..N-1`. Each seat records the pool's relative stake (its voting weight) and its `StrictMaybe BlsKey`. The seat index is the `voter_id` a vote carries and the bit position addressed by a certificate's signer bitfield, so the ordering must be canonical: pools are ordered by descending stake, ties broken by pool id. A seat's index is thereby a deterministic function of `PoolDistr` alone.
 
-**Selection.** Sorts the `PoolDistr` entries descending by stake and admits pools until a stopping condition on a [protocol parameter](#new-protocol-parameters) is met. The scheme in [CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#committee-structure) uses a cumulative-stake coverage target — for example 99% of active stake was found feasible. On the current mainnet stake distribution this is a strongly concentrated, long-tailed curve: of the ~2,700 registered pools, roughly 900 already cover 99% of active stake (and ~580 cover 95%), while the remaining long tail contributes the last percent.
+**Selection.** Sorts the `PoolDistr` entries descending by stake, breaking ties by ascending pool id, and seats the first `leiosCommitteeSize` of them (or all pools, if fewer are registered). The parameter is a plain seat count $N_c$ — [CIP-164](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#committee-structure) governs the committee by size rather than by a cumulative-stake coverage target, and the ledger carries it as protocol parameter 43. On the current mainnet stake distribution the curve is strongly concentrated and long-tailed: of the ~2,700 registered pools, roughly 900 already cover 99% of active stake (and ~580 cover 95%), while the remaining long tail contributes the last percent. A feasible value for $N_c$ is therefore around 900 seats, which is also what CIP-164 records as the feasible value.
 
 ![](./mainnet-stake-distribution-e657.png)
 
-> [!WARNING]
+> [!NOTE]
 >
-> TODO: Switch to committee size or hybrid parameterization? Not yet decided — the shape of the parameter (cumulative-stake coverage vs. a fixed committee size vs. a hybrid cap) is still open; see the effect of stake-distribution changes below.
+> The shape of this parameter was an open question — cumulative-stake coverage vs. a fixed committee size vs. a hybrid cap. It is settled: a fixed committee size. See the effect of stake-distribution changes below for what that choice does and does not cost.
 
-**Effect of stake-distribution changes.** Because votes are stake-weighted and each seat's weight is recorded, certification always evaluates the _actual_ signed stake — the sum of the weights of the seats whose bits are set — against the quorum threshold. There is therefore no under-representation in the sortition sense: the committee cannot misrepresent how much stake voted, whatever its size. A shift in the stake distribution changes only the committee's _shape_. Under a cumulative-stake coverage parameter a flatter distribution admits more pools, so there are more (individually lighter) votes to diffuse and more signatures must accumulate to reach the threshold stake; a more concentrated distribution gives a smaller committee with heavier votes. A fixed committee-size parameter would instead pin the vote count and let the represented stake float with the distribution. This is exactly the open trade-off above — vote-diffusion load versus how tightly the committee's stake tracks the network's active stake — and neither choice risks under-representing the stake that actually signed.
+**Effect of stake-distribution changes.** Because votes are stake-weighted and each seat's weight is recorded, certification always evaluates the _actual_ signed stake — the sum of the weights of the seats whose bits are set — against the quorum threshold. There is therefore no under-representation in the sortition sense: the committee cannot misrepresent how much stake voted, whatever its size. A shift in the stake distribution changes only how much stake the committee _covers_. Under the chosen fixed committee size the vote count per EB is pinned and the covered stake $\sigma(N_c)$ floats with the distribution: a flatter distribution means the top $N_c$ pools hold less of the total, a more concentrated one means they hold more. (A cumulative-stake coverage parameter would trade this the other way, pinning covered stake and letting the vote count float.) This makes $N_c$ a **liveness** parameter, not a safety-critical one: if $\sigma(N_c)$ drifts below the quorum threshold $\tau$, no certificate can be formed even with unanimous support, but no certificate can ever be formed that misstates the stake behind it. Governance must therefore keep $\sigma(N_c) > \tau$ with headroom for members that are offline, keyless, or too slow to vote within $L_\text{vote}$.
 
 **Keyless seats.** Committee membership is by stake, independent of key registration: a stake-selected pool whose `individualPoolStakeBls` is `SNothing` still occupies a seat, but that seat is _keyless_ — it holds a weight yet has no key to sign with. A keyless seat can never contribute to a valid certificate, and a certificate whose signer bitfield sets a keyless seat's bit must be rejected. Because keyless seats fall out of the same deterministic derivation from `PoolDistr`, every node agrees on exactly which seats are keyless; a divergence would make honest certificates appear invalid (the `SignerWithoutKey` failure).
 
@@ -912,6 +1193,8 @@ The committee is **materialized once per epoch and stored in the ledger state**,
 A CertRB that anchors a certified EB carries a Leios certificate. Concretely the Dijkstra block body gains an optional certificate (`Maybe LeiosCert`) which is set only on such a block. The certificate is compact: a **bitfield** identifying which committee seats signed, and a single **aggregate BLS signature** standing in for their individual votes for the endorser block (its exact contents and encoding are covered under [Serialization](#serialization)).
 
 Verifying a certificate requires the committee for the relevant epoch. That committee is derived deterministically from the stake distribution already held in the ledger state (see [Committee selection](#committee-selection)), so no new inputs are needed — and because keys are registered through transactions (see [Key registration and rotation](#key-registration-and-rotation)), the ledger already holds every public key in its state and does **not** need access to block headers. Being part of the ledger state, the committee is also stored in ledger snapshots (and hence on disk under Ledger-HD) and can be exposed through the existing query interfaces, which components also use to check individual votes before diffusing them.
+
+**No certification across boundaries.** What makes "the relevant epoch" above a single epoch rather than a choice is that a certificate may not cross an epoch boundary ([CIP-164 Step 5](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164#step-5-chain-inclusion)). That is a simplification rather than a safety requirement: the epoch boundary already concentrates a great deal of work, and an announcement surviving it would be one more thing to carry across — while certifying across an _era_ boundary would further oblige the announcement, the certificate and the EB to stay syntactically compatible with the very format change a new era exists to make, at real cost every time those formats do change. Era transitions fall on epoch boundaries, so the epoch rule covers both, and it costs at most one EB per boundary.
 
 - **REQ-LedgerStateVotingCommittee** The Leios voting committee must be part of the ledger state, materialized and updated on epoch boundaries, and queryable through existing interfaces.
 
@@ -1154,7 +1437,7 @@ on evidence rather than a model.
 > [!WARNING]
 > TODO: Use pandoc-compatible citations https://pandoc.org/MANUAL.html#citation-syntax
 
-1. **CIP-164**: Ouroboros Linear Leios - Greater transaction throughput https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md
+1. **CIP-164**: Ouroboros Linear Leios - Greater transaction throughput https://github.com/cardano-foundation/CIPs/tree/master/CIP-0164
 
 1. **Leios Impact Analysis**: High-level component design https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/ImpactAnalysis.md
 

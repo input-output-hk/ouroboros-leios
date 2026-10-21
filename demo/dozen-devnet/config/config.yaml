@@ -5,6 +5,25 @@ AlonzoGenesisFile: alonzo-genesis.json
 ConwayGenesisFile: conway-genesis.json
 DijkstraGenesisFile: dijkstra-genesis.json
 
+# How much younger than this node's immutable tip an endorser block must be for
+# the node to offer it onward, in slots. Without this the consensus default
+# applies: 3600, an hour of mainnet, which on a short-horizon network suppresses
+# every offer -- no peer obtains an EB it did not forge, so no election reaches
+# a quorum and nothing is ever certified.
+#
+# Small because of how a young chain reads: until k=40 blocks have been
+# selected -- about k/f = 800 slots -- the immutable tip is still at Origin,
+# which the decision reads as slot 0, so nothing at all is offered until EBs
+# reach slot 30. Afterwards the immutable tip trails the selection by roughly
+# those same 800 slots, and every EB worth offering lives in that window, so the
+# lead must stay far below it.
+#
+# The floor is how far a peer's immutable tip can run ahead of ours, since
+# offering below a peer's immutable tip costs us that connection. Blocks arrive
+# every 1/f = 20 slots on average, so 30 covers a typical one-block lag but not
+# a long gap; the cost of losing that bet on a devnet is a reconnect.
+LeiosMinOfferLead: 30
+
 # 5MB is a bit below the timeout capacity default ceiling
 # MempoolCapacityBytesOverride: 5000000
 # Defaults
