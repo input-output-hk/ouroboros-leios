@@ -137,6 +137,10 @@ const config: Config = {
           position: "right",
           items: [
             {
+              to: "/parameter-graduation",
+              label: "Parameter graduation",
+            },
+            {
               to: "https://leios.cardano-scaling.org/cost-estimator/",
               label: "Cost Estimator",
             },
