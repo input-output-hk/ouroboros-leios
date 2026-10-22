@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Reproduce tables and plots in docs/conditional-certification-diffusion.md.
 
-Run from this directory with: python3 tsc_closure_diffusion.py
+Run from this directory with: python3 closure_diffusion.py
 MB is decimal (1,000,000 bytes); analysis.py's kB is 1,000 bytes.
 """
 

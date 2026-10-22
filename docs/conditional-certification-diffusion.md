@@ -256,7 +256,7 @@ The following assumptions bound what these figures establish:
 The tables and plots use the existing
 [`analysis.py`](../analysis/deltaq/improved-leios/analysis.py) implementation,
 with `include_validation=True` and the fixed inputs above. The
-[report generator](../analysis/deltaq/improved-leios/tsc_closure_diffusion.py)
+[report generator](../analysis/deltaq/improved-leios/closure_diffusion.py)
 prints all four tables, writes the five SVG plots to
 `docs/conditional-certification-diffusion/`, and checks that the computed CDFs are bounded and
 non-decreasing, that baseline certification saturates, and that the baseline
@@ -266,7 +266,7 @@ From the repository root, in a Python environment with NumPy, SciPy, and
 Matplotlib installed:
 
 ```sh
-python3 analysis/deltaq/improved-leios/tsc_closure_diffusion.py
+python3 analysis/deltaq/improved-leios/closure_diffusion.py
 ```
 
 For the mathematical derivation and broader discussion, see the
