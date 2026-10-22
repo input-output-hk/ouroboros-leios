@@ -5,6 +5,7 @@ Run from this directory with: python3 tsc_closure_diffusion.py
 MB is decimal (1,000,000 bytes); analysis.py's kB is 1,000 bytes.
 """
 
+from io import StringIO
 from pathlib import Path
 
 import numpy as np
@@ -14,13 +15,17 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 
 
-SIZES_MB = (0.125, 0.25, 0.5, 1, 2, 4, 8, 12, 12.288)
+SIZES_MB = (0.125, 0.25, 0.26, 0.5, 1, 2, 4, 8, 12, 12.288)
 PLOT_DIR = Path(__file__).resolve().parents[3] / "docs" / "conditional-certification-diffusion"
 
 
 def save_plot(fig, name):
     PLOT_DIR.mkdir(parents=True, exist_ok=True)
-    fig.savefig(PLOT_DIR / name, format="svg", bbox_inches="tight")
+    svg = StringIO()
+    fig.savefig(svg, format="svg", bbox_inches="tight")
+    (PLOT_DIR / name).write_text(
+        "\n".join(line.rstrip() for line in svg.getvalue().splitlines()) + "\n"
+    )
     plt.close(fig)
 
 
@@ -32,7 +37,7 @@ def plot_completion_cdfs(model, rows, active=False):
         ax.plot(
             A.TIMES, cdf, color=colors[i],
             linestyle="--" if mb == 12.288 else "-",
-            label=f"{mb:g} MB" + (" (original case)" if mb == 12.288 else ""),
+            label=f"{mb:g} MB" + (" (original case)" if mb == 12.288 else " (Musashi limit)" if mb == 0.26 else ""),
         )
     for t, label in ((7, "Vote deadline"), (10, "Checkpoint"), (14, "Diffusion deadline")):
         ax.axvline(t, color="gray", linestyle=":", linewidth=1)
@@ -59,7 +64,8 @@ def plot_completion_times(results):
         ax.plot(sizes, [A.quantile_of(row[2], 0.99) for row in rows], linestyle="--", color="black", label="Active p99 (1,875 nodes)")
         ax.axhline(14, color="gray", linestyle=":", label="14 s deadline")
         ax.set_xscale("log", base=2)
-        ax.set_xticks(SIZES_MB[:-1], [f"{s:g}" for s in SIZES_MB[:-1]])
+        ticks = [s for s in SIZES_MB[:-1] if s != 0.25]
+        ax.set_xticks(ticks, [f"{s:g}" for s in ticks])
         ax.set_xlabel("Closure size (decimal MB; logarithmic scale)")
         ax.set_title(model.upper())
         ax.grid(alpha=0.25)
@@ -80,6 +86,7 @@ def percentage(p):
 
 
 def main():
+    print(A._committee_label())
     results = {}
     for model in ("mathis", "cubic"):
         rows = []

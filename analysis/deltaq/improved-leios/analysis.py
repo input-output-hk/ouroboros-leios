@@ -1532,48 +1532,45 @@ def cdf_closure_completion(
 
 
 @functools.lru_cache(maxsize=None)
-def _committee_moments(n_nodes: int = 2500, stake_cover: float = 0.99):
+def _committee_moments(n_nodes: int = 2500, committee_size: int = 900):
     """
-    (M, M2, S_active) for the canonical CIP-0164 stake-truncated voting
-    committee: a DETERMINISTIC, stake-based truncation.  Order SPOs by
-    active stake (descending) and select until their cumulative stake
-    reaches the target stake_cover (= sigma_c); the set is fixed for the
+    (M, M2, S_active) for the implementation's fixed-size top-stake voting
+    committee.  Order SPOs by active stake (descending) and select the
+    first committee_size pools (or all pools if fewer); the set is fixed for the
     epoch -- no sortition.  Each member votes with weight w_i = s_i, so the
     on-time vote total V(p) is a weighted Binomial with mean M*p and
     variance M2*p*(1-p), where M = Sum_cmte w_i (committee weight) and M2 =
     Sum_cmte w_i^2 (its second moment).  S_active is the TOTAL active stake
-    in the same units; the quorum threshold is tau*S_active = tau*M/sigma_c
-    (the committee holds only a sigma_c fraction of total stake).  Weights
+    in the same units; the quorum threshold is tau*S_active.
+    All selected seats are assumed to have usable voting keys.  Weights
     are renormalised so Sum w = K (committee node count), putting M in
     member-equivalent units; the quorum probability is scale-invariant in
     the weights, so this changes no probability.
     """
+    if not isinstance(committee_size, (int, np.integer)) or committee_size < 0:
+        raise ValueError("committee_size must be a non-negative integer")
     stakes = _stake_distribution(n_nodes)
     s = np.sort(stakes)[::-1]  # largest stake first
     total = float(np.sum(s))
-    k = int(np.searchsorted(np.cumsum(s), stake_cover * total, side="left")) + 1
-    k = min(k, len(s))
+    k = min(committee_size, len(s))
+    if k == 0:
+        return 0.0, 0.0, total
     w = s[:k]  # committee weights w_i = s_i
     w = w * (k / float(np.sum(w)))  # renormalise Sum w = K
     M = float(np.sum(w))
     M2 = float(np.sum(w * w))
-    return M, M2, M / stake_cover  # S_active = M / sigma_c
+    return M, M2, total * k / float(np.sum(s[:k]))
 
 
-def _committee_label(n_nodes: int = 2500, stake_cover: float = 0.99) -> str:
+def _committee_label(n_nodes: int = 2500, committee_size: int = 900) -> str:
     """Human-readable committee description, incl. the effective number of
     equal-weight votes M_eff = M^2/M2 (inverse Herfindahl: < K when a few
     large SPOs dominate the stake-weighted vote)."""
-    M, M2, _ = _committee_moments(n_nodes, stake_cover)
-    m_eff = M * M / M2
-    stakes = _stake_distribution(n_nodes)
-    s = np.sort(stakes)[::-1]
-    k = (
-        int(np.searchsorted(np.cumsum(s), stake_cover * float(np.sum(s)), side="left"))
-        + 1
-    )
+    M, M2, S_active = _committee_moments(n_nodes, committee_size)
+    m_eff = M * M / M2 if M2 else 0.0
+    k = min(committee_size, n_nodes)
     return (
-        f"CIP top-stake cover sigma_c={stake_cover:.0%} "
+        f"Fixed-size top-stake committee, coverage={M / S_active:.6%} "
         f"(K={k} of {n_nodes} nodes, M_eff={m_eff:.0f})"
     )
 
@@ -1591,14 +1588,15 @@ def _quorum_sf(mu, var, threshold):
     return np.where(sig < 1e-12, (mu >= threshold).astype(float), p)
 
 
-def _quorum_given_honest_ontime(p, n_nodes, tau, beta, adversary, stake_cover=0.99):
+def _quorum_given_honest_ontime(p, n_nodes, tau, beta, adversary, committee_size=900):
     """Q(p): P(certify) when each honest committee member is on time with
     probability `p`.  Honest weight is a (1-beta) fraction of the
     committee; an *active* adversary adds its beta-fraction of committee
     weight as always-on-time (p=1) votes, a *silent* adversary adds none.
     The CIP-0164 quorum threshold is tau * total active stake
-    (tau*S_active = tau*M/sigma_c).  Vectorised over `p`."""
-    M, M2, S_active = _committee_moments(n_nodes, stake_cover)
+    (tau*S_active).  Coverage is derived from the selected seats.
+    Vectorised over `p`."""
+    M, M2, S_active = _committee_moments(n_nodes, committee_size)
     f_h = 1.0 - beta
     if adversary == "active":
         mu_a, var_a = beta * M, 0.0  # beta*M deterministic seats (p=1)
@@ -1620,7 +1618,7 @@ def _full_diffusion_given_cert_from_G(
     t_vote: float = 7.0,
     beta: float = 0.0,
     adversary: str = "active",
-    stake_cover: float = 0.99,
+    committee_size: int = 900,
 ) -> np.ndarray:
     """
     Core conditional CDF for an *arbitrary* per-node arrival CDF G on the
@@ -1650,7 +1648,7 @@ def _full_diffusion_given_cert_from_G(
 
     def Q(p):
         return _quorum_given_honest_ontime(
-            p, n_nodes, tau, beta, adversary, stake_cover=stake_cover
+            p, n_nodes, tau, beta, adversary, committee_size=committee_size
         )
 
     # P(C): marginal certification probability (honest on-time prob = G(t_v)).
@@ -1689,7 +1687,7 @@ def cdf_full_closure_diffusion_given_cert(
     t_vote: float = 7.0,
     beta: float = 0.0,
     adversary: str = "active",
-    stake_cover: float = 0.99,
+    committee_size: int = 900,
     include_validation: bool = True,
 ) -> np.ndarray:
     """
@@ -1713,7 +1711,7 @@ def cdf_full_closure_diffusion_given_cert(
         t_vote=t_vote,
         beta=beta,
         adversary=adversary,
-        stake_cover=stake_cover,
+        committee_size=committee_size,
     )
 
 
@@ -1733,11 +1731,11 @@ def print_full_closure_diffusion_summary(
     tau=0.75,
     t_vote=7.0,
     t_diff_end=14.0,
-    stake_cover=0.99,
+    committee_size=900,
     include_validation=True,
 ):
-    M, _, S_active = _committee_moments(n_nodes, stake_cover)
-    print(f"  committee: {_committee_label(n_nodes, stake_cover)}")
+    M, _, S_active = _committee_moments(n_nodes, committee_size)
+    print(f"  committee: {_committee_label(n_nodes, committee_size)}")
     print(
         f"  quorum threshold = tau * total active stake = {tau * S_active:.0f} "
         f"(committee weight M = {M:.0f})"
@@ -1751,7 +1749,7 @@ def print_full_closure_diffusion_summary(
         g_tf = success_within(G, t_diff_end)
         pC = float(
             _quorum_given_honest_ontime(
-                g_tv, n_nodes, tau, 0.0, "active", stake_cover=stake_cover
+                g_tv, n_nodes, tau, 0.0, "active", committee_size=committee_size
             )
         )
         f_cl = success_within(
@@ -1760,7 +1758,7 @@ def print_full_closure_diffusion_summary(
                 n_nodes=n_nodes,
                 tau=tau,
                 t_vote=t_vote,
-                stake_cover=stake_cover,
+                committee_size=committee_size,
                 include_validation=include_validation,
             ),
             t_diff_end,
@@ -1789,7 +1787,7 @@ def plot_full_closure_diffusion_given_cert(
     tau=0.75,
     t_vote=7.0,
     t_diff_end=14.0,
-    stake_cover=0.99,
+    committee_size=900,
     include_validation=True,
     fname="full_closure_diffusion_given_cert.svg",
 ):
@@ -1808,7 +1806,7 @@ def plot_full_closure_diffusion_given_cert(
             n_nodes=n_nodes,
             tau=tau,
             t_vote=t_vote,
-            stake_cover=stake_cover,
+            committee_size=committee_size,
             include_validation=include_validation,
         )
         ax.plot(
@@ -1887,7 +1885,7 @@ def plot_full_closure_diffusion_given_cert(
     ax.set_title(
         "Conditional full-closure-diffusion CDF given EB certification\n"
         f"(N={n_nodes}, "
-        f"committee={_committee_label(n_nodes, stake_cover)}, "
+        f"committee={_committee_label(n_nodes, committee_size)}, "
         f"tau={tau}, network model = {NETWORK_MODEL})"
     )
     ax.legend(loc="lower right", fontsize=8)
@@ -1914,7 +1912,7 @@ def print_full_diffusion_adversarial_summary(
     tau=0.75,
     t_vote=7.0,
     t_diff_end=14.0,
-    stake_cover=0.99,
+    committee_size=900,
 ):
     # active listed first (security-relevant); honest and silent as references.
     configs = [
@@ -1922,8 +1920,8 @@ def print_full_diffusion_adversarial_summary(
         ("honest", 0.0, "active"),
         ("silent", beta, "silent"),
     ]
-    M, _, S_active = _committee_moments(n_nodes, stake_cover)
-    print(f"  committee: {_committee_label(n_nodes, stake_cover)}")
+    M, _, S_active = _committee_moments(n_nodes, committee_size)
+    print(f"  committee: {_committee_label(n_nodes, committee_size)}")
     print(
         f"  M={M:.0f}, tau={tau}, beta={beta}, t_f={t_diff_end}s, "
         f"network={NETWORK_MODEL}"
@@ -1941,7 +1939,7 @@ def print_full_diffusion_adversarial_summary(
         for label, b, adv in configs:
             pC = float(
                 _quorum_given_honest_ontime(
-                    g_tv, n_nodes, tau, b, adv, stake_cover=stake_cover
+                    g_tv, n_nodes, tau, b, adv, committee_size=committee_size
                 )
             )
             cdf_cond = cdf_full_closure_diffusion_given_cert(
@@ -1951,7 +1949,7 @@ def print_full_diffusion_adversarial_summary(
                 t_vote=t_vote,
                 beta=b,
                 adversary=adv,
-                stake_cover=stake_cover,
+                committee_size=committee_size,
             )
             f_cond = success_within(cdf_cond, t_diff_end)
             rows.append(dict(s_eb_tx_kb=s_kb, model=label, pC=pC, f_cond=f_cond))
@@ -1966,7 +1964,7 @@ def plot_full_diffusion_adversarial(
     tau=0.75,
     t_vote=7.0,
     t_diff_end=14.0,
-    stake_cover=0.99,
+    committee_size=900,
     fname="full_diffusion_adversarial.svg",
 ):
     """
@@ -1993,7 +1991,7 @@ def plot_full_diffusion_adversarial(
                 t_vote=t_vote,
                 beta=b,
                 adversary=adv,
-                stake_cover=stake_cover,
+                committee_size=committee_size,
             )
             lw = 2.6 if label.startswith("active") else 1.8
             ax.plot(
@@ -2026,7 +2024,7 @@ def plot_full_diffusion_adversarial(
     ax.set_title(
         "Conditional full-diffusion CDF under an active adversary -- EB closure\n"
         f"(active = solid; N={n_nodes}, "
-        f"committee={_committee_label(n_nodes, stake_cover)}, "
+        f"committee={_committee_label(n_nodes, committee_size)}, "
         + r"$\tau$="
         + f"{tau}, "
         + r"$\beta$="

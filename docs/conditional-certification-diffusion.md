@@ -1,16 +1,18 @@
 # Leios closure diffusion after certification: numerical report
 
-**Audience:** Technical Steering Committee (TSC), technically well-versed stake
-pool operators (SPOs) and dReps, hard fork working group, and node developers.
-
 ## Summary
 
 This report estimates the probability that **all honest nodes have received and
 processed an endorser block's (EB's) transaction closure, given that the EB
 certifies**. It extends the
 [conditional-certification analysis](../analysis/deltaq/improved-leios/conditional_certification_diffusion.md)
-with **125 kB, 250 kB, and 500 kB closures**, alongside 1–12 MB closures.
+with **125 kB, 250 kB, 260 kB, and 500 kB closures**, alongside 1–12 MB closures.
 Results are model estimates, including CPU processing, rather than measurements.
+
+The **260 kB case is Musashi's configured transaction-closure limit**.  At
+that size, the honest all-node p99 completion time is **8.74 s under Mathis**
+and **7.39 s under CUBIC**.  The committee selects the **900 highest-stake
+pools**, matching the current implementation and Musashi's seat-count parameter.
 
 - **At the 14-second deadline**, every closure from 0.125 to 12 decimal MB
   reaches all 2,500 honest nodes with a probability that rounds to **100.0000%**
@@ -55,10 +57,10 @@ closure-completion calculation.
 | Input | Value used |
 |:---|:---|
 | Node population | 2,500; all honest in the baseline |
-| Committee | Deterministic top-stake truncation to 99% coverage |
-| Committee size / effective equal-weight votes | 923 / approximately 466 |
+| Committee | Deterministic top-stake selection of 900 pools; synthetic stake coverage approximately 98.844483% |
+| Committee size / effective equal-weight votes | 900 / approximately 464 |
 | Stake distribution | Synthetic power-law distribution in `analysis.py`; not an observed stake snapshot |
-| Certification threshold | 75% of total active stake; approximately 75.76% of committee stake |
+| Certification threshold | 75% of total active stake; approximately 75.88% of committee stake |
 | Voting / diffusion deadline | 7 s / 14 s |
 | Missing transaction fraction | 1/6 (approximately 16.67%) |
 | Missing-transaction fetch | One hop from the peer forwarding the EB body |
@@ -69,6 +71,24 @@ closure-completion calculation.
 | Packet loss / interface cap | 0.0001 / 1 Gbit/s |
 | Short / medium / long RTT | 12 / 69 / 268 ms |
 | Numerical time grid | 10 ms, extending to 40 s |
+
+The selection rule follows the ledger's
+[`selectLeiosCommittee`](https://github.com/IntersectMBO/cardano-ledger/blob/leios-prototype/libs/cardano-ledger-core/src/Cardano/Ledger/State/LeiosCommittee.hs):
+take the configured number of pools in descending active-stake order, or all
+candidates if fewer; equal-stake ties use ascending pool ID.  The synthetic
+model carries no pool IDs, so equal-stake ties are interchangeable.  Coverage
+is an outcome of selection, not a 99% target.  All selected seats are assumed
+to have usable voting keys; the implementation can retain keyless seats when
+keys are missing, expired, or have invalid proofs of possession.
+
+The [pinned Musashi genesis](../testnet/config/dijkstra-genesis.json) sets
+`leiosCommitteeSize=900`, `maxEndorserBlockTxsSize=260000`, and the separate
+references-size limit to 40,000 bytes.  The 260 kB closure limit is a maximum,
+not a measured average; transaction supply, packing, and execution limits can
+produce smaller closures.  Its missing-transaction fetch is approximately
+43.33 kB under the assumed one-sixth miss rate.  This remains an isolated-EB,
+2,500-node model with the timing and network inputs above, rather than a full
+calibration to Musashi's population, stake snapshot, or period lengths.
 
 **Units:** throughout this report, kB = 1,000 bytes and MB = 1,000,000 bytes.
 The original note passes 1,024, 4,096, and 12,288 model kB for its “1, 4,
@@ -88,6 +108,7 @@ the 14-second column; §3 gives their more informative completion-time differenc
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 20.8333 | 99.9473% | 100.0000% | 26.7902% | 100.0000% | 100.0000% |
 | 0.25 | 41.6667 | 99.9007% | 100.0000% | 24.9030% | 100.0000% | 100.0000% |
+| 0.26 | 43.3333 | 99.8871% | 100.0000% | 24.5005% | 100.0000% | 100.0000% |
 | 0.5 | 83.3333 | 99.7777% | 100.0000% | 9.2920% | 100.0000% | 100.0000% |
 | 1 | 166.667 | 99.7759% | 100.0000% | 0.3668% | 100.0000% | 100.0000% |
 | 2 | 333.333 | 99.7293% | 100.0000% | 0.1169% | 99.6036% | 100.0000% |
@@ -102,6 +123,7 @@ the 14-second column; §3 gives their more informative completion-time differenc
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 20.8333 | 99.9971% | 100.0000% | 93.0993% | 100.0000% | 100.0000% |
 | 0.25 | 41.6667 | 99.9971% | 100.0000% | 93.0993% | 100.0000% | 100.0000% |
+| 0.26 | 43.3333 | 99.9971% | 100.0000% | 93.0993% | 100.0000% | 100.0000% |
 | 0.5 | 83.3333 | 99.9963% | 100.0000% | 91.2787% | 100.0000% | 100.0000% |
 | 1 | 166.667 | 99.9953% | 100.0000% | 90.9096% | 100.0000% | 100.0000% |
 | 2 | 333.333 | 99.9848% | 100.0000% | 68.3616% | 100.0000% | 100.0000% |
@@ -147,6 +169,7 @@ population fixed.
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 7.27 | 8.71 | 8.72 | 9.02 | 8.72 | 100.0000% |
 | 0.25 | 7.42 | 8.72 | 8.74 | 9.21 | 8.73 | 100.0000% |
+| 0.26 | 7.42 | 8.72 | 8.74 | 9.22 | 8.73 | 100.0000% |
 | 0.5 | 7.43 | 8.74 | 8.77 | 9.46 | 8.75 | 100.0000% |
 | 1 | 7.46 | 8.77 | 8.81 | 9.73 | 8.79 | 100.0000% |
 | 2 | 7.54 | 8.85 | 8.92 | 10.21 | 8.91 | 100.0000% |
@@ -161,6 +184,7 @@ population fixed.
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 6.19 | 7.36 | 7.37 | 7.67 | 7.37 | 100.0000% |
 | 0.25 | 6.28 | 7.37 | 7.39 | 7.86 | 7.38 | 100.0000% |
+| 0.26 | 6.28 | 7.37 | 7.39 | 7.87 | 7.38 | 100.0000% |
 | 0.5 | 6.29 | 7.39 | 7.42 | 8.11 | 7.40 | 100.0000% |
 | 1 | 6.32 | 7.42 | 7.46 | 8.38 | 7.44 | 100.0000% |
 | 2 | 6.40 | 7.50 | 7.70 | 8.78 | 7.69 | 100.0000% |
@@ -219,7 +243,8 @@ The following assumptions bound what these figures establish:
   the reapply-only all-node power term.
 - **Approximate quorum tails.** Certification uses a Normal approximation to
   a stake-weighted vote sum. In the original note's silent-adversary case,
-  25% withholding leaves at most 74.25% of total active stake, below the
+   25% withholding leaves at most approximately 74.13% of total active stake
+   with the current 900-seat synthetic committee, below the
   75% threshold: certification is impossible. The Normal approximation can
   nevertheless return a positive tail. No conditional completion probability
   is defined for that impossible event, so it is not tabulated here.
