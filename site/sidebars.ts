@@ -15,6 +15,12 @@ const sidebars: SidebarsConfig = {
     "what-is-leios",
     "leios-use-cases",
     "roadmap",
+    "development/status",
+    {
+      type: "link",
+      label: "Parameter graduation",
+      href: "/parameter-graduation",
+    },
     "resources",
     "monthly-reviews",
     "faq",
