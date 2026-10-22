@@ -1,5 +1,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { Line2 } from "three/examples/jsm/lines/Line2.js";
+import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { VSPAN } from "./deltaq";
 import type { Binding } from "./deltaq";
 import type { Status, Step } from "./types";
@@ -23,7 +26,6 @@ export interface LabelClasses {
   cnt: string;
   tick: string;
   done: string;
-  current: string;
 }
 
 // EB txs kB and Plutus steps G; L_diff spans 3·L_hdr .. 3·L_hdr + VSPAN.
@@ -96,6 +98,10 @@ export class GraduationScene {
   private dynGroup = new THREE.Group();
   private labels: Label[] = [];
   private anim: ((t: number) => void) | null = null;
+  // Per-frame animations of the dynamic group, rebuilt with it.
+  private tickers: ((t: number) => void)[] = [];
+  // Fat-line materials need the canvas size in pixels.
+  private trailMats: LineMaterial[] = [];
   private raf = 0;
   private pending = 0;
   private input: SceneInput | null = null;
@@ -185,12 +191,14 @@ export class GraduationScene {
     const h = this.stage.clientHeight;
     if (!w || !h) return;
     this.renderer.setSize(w, h, false);
+    this.trailMats.forEach((m) => m.resolution.set(w, h));
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
 
   private frame = (t: number) => {
     if (this.anim) this.anim(t);
+    this.tickers.forEach((f) => f(t));
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
     const w = this.stage.clientWidth;
@@ -289,11 +297,12 @@ export class GraduationScene {
     if (!input) return;
     this.clear(this.dynGroup);
     this.dropLabels(false);
+    this.tickers = [];
+    this.trailMats = [];
     const accent = this.col("--pg-accent");
     const lo = this.col("--pg-surface-lo");
     const hi = this.col("--pg-surface-hi");
     const ink = this.col("--pg-ink");
-    const ok = this.col("--pg-ok");
     const ymin = this.ymin();
     const ymax = this.ymax();
     const N = 56;
@@ -352,9 +361,9 @@ export class GraduationScene {
         if (best) this.addLabel(trim(level) + " s", new THREE.Vector3(sx(best[0]), 0.02, sz(best[1]) + 0.25), [this.cls.cnt], false);
       });
 
-    // Plan points; the path is solid up to the current step and dashed after it.
+    // Plan points; the path is a trail up to the current step and dashed after it.
     const pts: THREE.Vector3[] = [];
-    const groups = new Map<string, { names: string[]; pos: THREE.Vector3; p: Step; need: number; bind: Binding; status: Status[] }>();
+    const groups = new Map<string, { names: string[]; pos: THREE.Vector3; p: Step; status: Status[] }>();
     input.steps.forEach((p, i) => {
       const status = input.status[i];
       const cvar = p.color ? `--pg-${p.color}` : input.planColor;
@@ -378,9 +387,9 @@ export class GraduationScene {
         r.rotation.x = Math.PI / 2;
         this.dynGroup.add(r);
       }
-      // A halo marks the step active on the network.
+      // A ring in the trail colour marks the step active on the network.
       if (status === "current") {
-        const r = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.05, 10, 48), new THREE.MeshBasicMaterial({ color: ok }));
+        const r = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.04, 10, 48), new THREE.MeshBasicMaterial({ color: this.col("--pg-lava") }));
         r.position.copy(sph.position);
         r.rotation.x = Math.PI / 2;
         this.dynGroup.add(r);
@@ -399,25 +408,55 @@ export class GraduationScene {
       if (g) {
         g.names.push(p.id);
         g.status.push(status);
-      } else groups.set(key, { names: [p.id], pos: pts[pts.length - 1], p, need: ni.need, bind: ni.bind, status: [status] });
+      } else groups.set(key, { names: [p.id], pos: pts[pts.length - 1], p, status: [status] });
     });
     // One label per position; steps at the same point share it.
     groups.forEach((g) => {
-      const names = g.names.map((n, k) => (g.status[k] === "done" ? "✓ " : "") + esc(n)).join(" · ");
+      const names = g.names.map((n, k) => (g.status[k] === "done" ? "<b>✓</b> " : "") + esc(n)).join(" · ");
       const cur = g.status.includes("current") ? " <em>current</em>" : "";
-      const need = g.need === Infinity ? "> " + trim(ymax) : fmt(g.need);
       const cls = [this.cls.set];
-      if (g.status.includes("current")) cls.push(this.cls.current);
-      else if (g.status.every((s) => s === "done")) cls.push(this.cls.done);
-      const l = this.addLabel(`${names}${cur}<small>L_diff ${fmt(g.p.diff)} s, needs ${need} s (${g.bind})</small>`, g.pos, cls, false);
+      if (g.status.every((s) => s === "done")) cls.push(this.cls.done);
+      const l = this.addLabel(names + cur, g.pos, cls, false);
       l.el.style.setProperty("--c", this.css(g.p.color ? `--pg-${g.p.color}` : input.planColor));
     });
     const ci = input.status.indexOf("current");
-    for (let i = 0; i + 1 < pts.length; i++) {
-      const travelled = i + 1 <= ci;
-      const l = this.line([pts[i], pts[i + 1]], ink, travelled ? { opacity: 0.9 } : { dashed: true, opacity: 0.7 });
+    // Segments ahead of the current step; the travelled ones are the trail below.
+    for (let i = Math.max(ci, 0); i + 1 < pts.length; i++) {
+      const l = this.line([pts[i], pts[i + 1]], ink, { dashed: true, opacity: 0.7 });
       l.renderOrder = 2;
       this.dynGroup.add(l);
     }
+    if (ci > 0) this.travelled(pts.slice(0, ci + 1));
+  }
+
+  private trail(pts: THREE.Vector3[], color: THREE.Color, opts: { width: number; opacity: number; dashed: boolean }) {
+    const g = new LineGeometry();
+    g.setPositions(pts.flatMap((p) => [p.x, p.y, p.z]));
+    const m = new LineMaterial({
+      color: color.getHex(),
+      linewidth: opts.width,
+      transparent: true,
+      opacity: opts.opacity,
+      dashed: opts.dashed,
+      dashSize: 0.22,
+      gapSize: 0.14,
+      depthWrite: false,
+    });
+    m.resolution.set(this.stage.clientWidth, this.stage.clientHeight);
+    this.trailMats.push(m);
+    const l = new Line2(g, m);
+    l.computeLineDistances();
+    l.renderOrder = 2;
+    this.dynGroup.add(l);
+    return m;
+  }
+
+  // The path to the current step as a blazed trail: embers underneath, dashes marching toward the current step.
+  private travelled(pts: THREE.Vector3[]) {
+    this.trail(pts, this.col("--pg-lava-deep"), { width: 4, opacity: 0.35, dashed: false });
+    const dashes = this.trail(pts, this.col("--pg-lava"), { width: 4, opacity: 1, dashed: true });
+    this.tickers.push((t) => {
+      dashes.dashOffset = -(t / 1000) * 0.35;
+    });
   }
 }

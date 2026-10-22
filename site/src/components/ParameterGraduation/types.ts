@@ -18,9 +18,6 @@ export interface Plan {
   color: Color;
   // Id of the step active on the network; earlier steps count as accomplished.
   current?: string;
-  // Regenerates this plan from the milestones of plan `from`: outbound on one L_diff `plane`,
-  // return at the minimum L_diff plus `margin`, steps named `prefix`1, `prefix`2, ….
-  generate?: { from: string; plane: number; margin: number; prefix: string };
   steps: Step[];
 }
 

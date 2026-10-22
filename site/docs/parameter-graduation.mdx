@@ -1,21 +1,10 @@
 ---
 title: Parameter graduation
+hide_title: true
 hide_table_of_contents: true
 ---
 
 import ParameterGraduation from '@site/src/components/ParameterGraduation';
-
-# Parameter graduation
-
-The graduation plan raises the endorser block (EB) parameters step by step, first on the Musashi dojo testnet and then on mainnet. Each step is a point in three dimensions: EB transaction bytes, Plutus steps, and the diffusion period L_diff. The surface shows the minimum L_diff each point needs under the DeltaQ model; a step above it is feasible.
-
-The step marked current is the parameter set active on the network, as shown by [kleioscan](https://kleioscan.com/#/musashi/params). Earlier steps count as accomplished.
-
-:::warning DeltaQ model still being refined
-
-Timing results (needs, P(C), F_full|C) are provisional and not calibrated against testnet data.
-
-:::
 
 {/*
 Single source of truth for the plans below. Per plan:
@@ -23,11 +12,10 @@ Single source of truth for the plans below. Per plan:
   name, title       labels for the plan switch and the 3D view
   color             accent | dawn | blue | violet | ok
   current           id of the step active on the network; earlier steps are accomplished
-  generate          optional; "Regenerate" rebuilds the steps from the milestones of plan `from`
   steps             in order; txs = EB txs (kB), steps = Plutus steps (G), diff = L_diff (s),
                     optional per-step color
 
-Edits in the page are not saved. Use "Copy plans" and paste the result here to keep them.
+Edits in the page are not saved; change the plans here.
 */}
 
 export const plans = {
@@ -36,7 +24,6 @@ export const plans = {
     title: "Musashi dojo Fire phase sweep",
     color: "violet",
     current: "F1",
-    generate: { from: "mainnet", plane: 7, margin: 1, prefix: "F" },
     steps: [
       { id: "F1", txs: 260, steps: 200, diff: 7 },
       { id: "F2", txs: 2000, steps: 200, diff: 7 },
@@ -61,3 +48,15 @@ export const plans = {
 };
 
 <ParameterGraduation plans={plans} />
+
+:::warning DeltaQ model still being refined
+
+Timing results (needs, P(C), F_full|C) are provisional and not calibrated against testnet data.
+
+:::
+
+**Needs** is the minimum L_diff from the model: the smallest L_diff with P(C) at or above its target at t_v = 3·L_hdr + L_vote = L_diff, and F_full|C at or above its target at W = 2·L_diff. With L_vote = L_diff − 3·L_hdr, the certification gate is W = 3·L_hdr + L_vote + L_diff = 2·L_diff. **Opportunity** is exp(−f·W) with f = 0.05 per second.
+
+**Derived parameters:** L_hdr is fixed and L_vote = L_diff − 3·L_hdr. EB references = EB txs × 40/260. Plutus memory = Plutus steps × 0.0036. Reference scripts = 20 kB per G steps (4 MB at 200G). Bold values lead; the others follow from them.
+
+**Model:** sampled from the [conditional certification diffusion model](https://github.com/input-output-hk/ouroboros-leios/blob/yveshauser/conditional-certification-diffusion-numerical-report/docs/conditional-certification-diffusion.md) (analysis.py on that branch). The voter law is G = EB references (multi-hop) ⊗ missing txs (1 hop, π1 = 1/6) ⊗ validation CPU, with a reapply-only law for the all-nodes term. The committee is the top-stake committee of the configured seat count (900: coverage ≈ 98.84%) over a synthetic 2,500-node stake distribution, in the Normal approximation. “Plan limit” fetches EB references at the plan’s limit, EB txs × 40/260. “Report’s mix” keeps the model’s fixed 1/64/256/512 kB body for every size and reproduces the report’s tables to within 0.05 s. Voters additionally spend c · steps · f_exec on Plutus execution. Node timings are treated as independent.
