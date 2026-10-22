@@ -6,7 +6,7 @@ This report estimates the probability that **all honest nodes have received and
 processed an endorser block's (EB's) transaction closure, given that the EB
 certifies**. It extends the
 [conditional-certification analysis](../analysis/deltaq/improved-leios/conditional_certification_diffusion.md)
-with **125 kB, 250 kB, 260 kB, and 500 kB closures**, alongside 1–12 MB closures.
+with **125 kB, 260 kB, and 500 kB closures**, alongside 1–12 MB closures.
 Results are model estimates, including CPU processing, rather than measurements.
 
 The **260 kB case is Musashi's configured transaction-closure limit**.  At
@@ -107,7 +107,6 @@ the 14-second column; §3 gives their more informative completion-time differenc
 | Closure (MB) | Missing txs (kB) | Voter ready by 7 s | P(C) | All ready by 7 s, given C | All ready by 10 s, given C | All ready by 14 s, given C |
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 20.8333 | 99.9473% | 100.0000% | 26.7902% | 100.0000% | 100.0000% |
-| 0.25 | 41.6667 | 99.9007% | 100.0000% | 24.9030% | 100.0000% | 100.0000% |
 | 0.26 | 43.3333 | 99.8871% | 100.0000% | 24.5005% | 100.0000% | 100.0000% |
 | 0.5 | 83.3333 | 99.7777% | 100.0000% | 9.2920% | 100.0000% | 100.0000% |
 | 1 | 166.667 | 99.7759% | 100.0000% | 0.3668% | 100.0000% | 100.0000% |
@@ -122,7 +121,6 @@ the 14-second column; §3 gives their more informative completion-time differenc
 | Closure (MB) | Missing txs (kB) | Voter ready by 7 s | P(C) | All ready by 7 s, given C | All ready by 10 s, given C | All ready by 14 s, given C |
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 20.8333 | 99.9971% | 100.0000% | 93.0993% | 100.0000% | 100.0000% |
-| 0.25 | 41.6667 | 99.9971% | 100.0000% | 93.0993% | 100.0000% | 100.0000% |
 | 0.26 | 43.3333 | 99.9971% | 100.0000% | 93.0993% | 100.0000% | 100.0000% |
 | 0.5 | 83.3333 | 99.9963% | 100.0000% | 91.2787% | 100.0000% | 100.0000% |
 | 1 | 166.667 | 99.9953% | 100.0000% | 90.9096% | 100.0000% | 100.0000% |
@@ -168,7 +166,6 @@ population fixed.
 | Closure (MB) | Honest p50 (s) | Honest p95 (s) | Honest p99 (s) | Honest p99.9 (s) | Active p99 (s) | Active all ready by 14 s, given C |
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 7.27 | 8.71 | 8.72 | 9.02 | 8.72 | 100.0000% |
-| 0.25 | 7.42 | 8.72 | 8.74 | 9.21 | 8.73 | 100.0000% |
 | 0.26 | 7.42 | 8.72 | 8.74 | 9.22 | 8.73 | 100.0000% |
 | 0.5 | 7.43 | 8.74 | 8.77 | 9.46 | 8.75 | 100.0000% |
 | 1 | 7.46 | 8.77 | 8.81 | 9.73 | 8.79 | 100.0000% |
@@ -183,7 +180,6 @@ population fixed.
 | Closure (MB) | Honest p50 (s) | Honest p95 (s) | Honest p99 (s) | Honest p99.9 (s) | Active p99 (s) | Active all ready by 14 s, given C |
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 6.19 | 7.36 | 7.37 | 7.67 | 7.37 | 100.0000% |
-| 0.25 | 6.28 | 7.37 | 7.39 | 7.86 | 7.38 | 100.0000% |
 | 0.26 | 6.28 | 7.37 | 7.39 | 7.87 | 7.38 | 100.0000% |
 | 0.5 | 6.29 | 7.39 | 7.42 | 8.11 | 7.40 | 100.0000% |
 | 1 | 6.32 | 7.42 | 7.46 | 8.38 | 7.44 | 100.0000% |

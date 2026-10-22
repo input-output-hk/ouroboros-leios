@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 
 
-SIZES_MB = (0.125, 0.25, 0.26, 0.5, 1, 2, 4, 8, 12, 12.288)
+SIZES_MB = (0.125, 0.26, 0.5, 1, 2, 4, 8, 12, 12.288)
 PLOT_DIR = Path(__file__).resolve().parents[3] / "docs" / "conditional-certification-diffusion"
 
 
@@ -64,7 +64,7 @@ def plot_completion_times(results):
         ax.plot(sizes, [A.quantile_of(row[2], 0.99) for row in rows], linestyle="--", color="black", label="Active p99 (1,875 nodes)")
         ax.axhline(14, color="gray", linestyle=":", label="14 s deadline")
         ax.set_xscale("log", base=2)
-        ticks = [s for s in SIZES_MB[:-1] if s != 0.25]
+        ticks = SIZES_MB[:-1]
         ax.set_xticks(ticks, [f"{s:g}" for s in ticks])
         ax.set_xlabel("Closure size (decimal MB; logarithmic scale)")
         ax.set_title(model.upper())
