@@ -9,6 +9,8 @@
   --pg-blue: #2d5bff;
   --pg-violet: #7a3ce0;
   --pg-ok: #1f8a43;
+  --pg-lava: #ff6a00;
+  --pg-lava-deep: #b8260b;
   --pg-surface-lo: #fde3e1;
   --pg-surface-hi: #e52321;
   --pg-bg: var(--ifm-background-color);
@@ -26,6 +28,8 @@
   --pg-blue: #6f8dff;
   --pg-violet: #a97cff;
   --pg-ok: #4cc777;
+  --pg-lava: #ff6a1a;
+  --pg-lava-deep: #c4310a;
   --pg-surface-lo: #4a1412;
   --pg-surface-hi: #ff4a3f;
 }
@@ -69,15 +73,37 @@
   outline-offset: -1px;
 }
 
-.stage {
-  position: relative;
-  height: min(72vh, 680px);
-  min-height: 420px;
-  overflow: hidden;
+/* Lift the doc container's max width on the page holding the tool. */
+:global(.container):has(.root) {
+  max-width: none;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 600px;
+  /* Leaves room for the breadcrumbs above, so the 3D view fits on screen. */
+  min-height: max(480px, calc(100dvh - var(--ifm-navbar-height) - 6rem));
   border: 1px solid var(--pg-rule);
   border-radius: 4px;
+  overflow: hidden;
 }
+@media (max-width: 1200px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 62vh auto;
+    min-height: 0;
+  }
+}
+
+.stage {
+  position: relative;
+  min-height: 420px;
+  overflow: hidden;
+}
+/* Absolute so the canvas never sizes the grid row it sits in. */
 .stage canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -96,7 +122,7 @@
   position: absolute;
   left: 16px;
   top: 12px;
-  max-width: 420px;
+  max-width: 460px;
   pointer-events: none;
 }
 .overlay h3 {
@@ -159,7 +185,7 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--pg-ink);
-  background: color-mix(in srgb, var(--pg-bg) 80%, transparent);
+  background: color-mix(in srgb, var(--pg-bg) 45%, transparent);
   padding: 1px 6px;
   border-left: 3px solid var(--c);
 }
@@ -167,17 +193,17 @@
   font-weight: 400;
   color: var(--pg-muted);
 }
+.set b {
+  color: var(--pg-ok);
+}
 .set em {
   font-style: normal;
   font-weight: 600;
-  color: var(--pg-ok);
+  color: var(--pg-lava);
   margin-left: 4px;
 }
 .done {
   opacity: 0.6;
-}
-.current {
-  outline: 2px solid var(--pg-ok);
 }
 
 .note {
@@ -189,22 +215,34 @@
   color: var(--pg-ok);
 }
 .legendCurrent {
-  color: var(--pg-ok);
+  color: var(--pg-lava);
 }
 
-.panels {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px 32px;
-  margin-top: 16px;
+.side {
+  border-left: 1px solid var(--pg-rule);
+  padding: 16px 20px 24px;
 }
-@media (min-width: 1400px) {
-  .panels {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+@media (max-width: 1200px) {
+  .side {
+    border-left: 0;
+    border-top: 1px solid var(--pg-rule);
   }
 }
-.panels h3 {
-  margin: 20px 0 8px;
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 16px 0 8px;
+}
+.side section:first-child .head:first-child {
+  margin-top: 0;
+}
+.head h3 {
+  margin: 0;
+}
+.head .seg {
+  margin: 0;
 }
 
 .seg {
@@ -269,7 +307,7 @@
   font-weight: 600;
 }
 .need small {
-  display: block;
+  margin-left: 4px;
   color: var(--pg-muted);
   font-size: 11px;
 }
@@ -285,15 +323,18 @@
   color: var(--pg-muted);
 }
 .row_current td {
-  background: color-mix(in srgb, var(--pg-ok) 12%, transparent);
+  background: color-mix(in srgb, var(--pg-lava) 12%, transparent);
 }
 .status {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   cursor: pointer;
-  color: var(--pg-ok);
+  color: var(--pg-lava);
   font-weight: 600;
+}
+.row_done .status {
+  color: var(--pg-ok);
 }
 .status span {
   min-width: 1em;
@@ -304,20 +345,6 @@
   line-height: 1;
 }
 
-.gen {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 14px;
-  margin: 10px 0 0;
-  font-size: 13px;
-}
-.gen label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--pg-muted);
-}
 .row {
   display: flex;
   gap: 6px;
@@ -338,9 +365,4 @@
 }
 .model label span {
   color: var(--pg-muted);
-}
-.out {
-  margin: 8px 0 0;
-  font-size: 12px;
-  max-height: 320px;
 }

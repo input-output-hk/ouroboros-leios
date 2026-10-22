@@ -42,22 +42,6 @@ const fmtU = (v: number) => (v >= 1e12 ? trim(v / 1e12) + "T" : v >= 1e9 ? trim(
 const kb = (v: number) => Math.round(v / 1000).toLocaleString("en-US");
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 
-// Outbound: the first milestone, then per milestone pair (A, B): (B.txs, A.steps) and B, all on one L_diff plane.
-// Return: directly back through the milestones at the minimum L_diff plus a margin, rounded up to 0.1 s.
-function generate(ms: Step[], g: { plane: number; margin: number; prefix: string }, need: (B: number, S: number) => number, ymax: number): Step[] {
-  const at = (a: Step, b: Step) => ({ id: "", txs: a.txs, steps: b.steps, diff: g.plane });
-  const up = [at(ms[0], ms[0])];
-  for (let i = 1; i < ms.length; i++) up.push(at(ms[i], ms[i - 1]), at(ms[i], ms[i]));
-  const down = ms
-    .slice()
-    .reverse()
-    .map((m) => {
-      const n = need(m.txs, m.steps);
-      return { id: "", txs: m.txs, steps: m.steps, diff: n === Infinity ? ymax : Math.ceil((n + g.margin) * 10 - 1e-9) / 10 };
-    });
-  return up.concat(down).map((p, i) => ({ ...p, id: g.prefix + (i + 1) }));
-}
-
 function Seg<T extends string>({ value, options, onChange, label }: { value: T; options: [T, string][]; onChange: (v: T) => void; label: string }) {
   return (
     <div className={styles.seg} role="group" aria-label={label}>
@@ -84,7 +68,6 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
   const [view, setView] = useState<View>("iso");
   // Bumped on structural changes so the uncontrolled inputs pick up new values.
   const [version, setVersion] = useState(0);
-  const [out, setOut] = useState<string | null>(null);
   const [dq, setDq] = useState<DQ | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sceneReady, setSceneReady] = useState(false);
@@ -123,7 +106,6 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
         cnt: styles.cnt,
         tick: styles.tick,
         done: styles.done,
-        current: styles.current,
       });
       setSceneReady(true);
     });
@@ -172,317 +154,208 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
     if (!isFinite(v) || v <= 0) return;
     editPlan((p) => void (p.steps[i][k] = v));
   };
-  const regenerate = () => {
-    const g = plan.generate;
-    const from = g && plans[g.from];
-    if (!g || !from || !dq) return;
-    editPlan((p) => {
-      p.steps = generate(from.steps, g, (B, S) => needsInfo(dq, model, B, S).need, ymax);
-    }, true);
-  };
-  const reset = () => {
-    setPlans(clone(defaults.plans));
-    setModel(defaults.model);
-    setVersion((v) => v + 1);
-    changeView("iso");
-  };
   const changeView = (v: View) => {
     setView(v);
     sceneRef.current?.setView(v);
   };
-  const copy = async (text: string) => {
-    setOut(text);
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (_) {
-      // The text stays visible below for manual copying.
-    }
-  };
-  const copyTsv = () =>
-    copy(
-      "# plan     step  txs_B     steps_G  diff_ms\n" +
-        Object.entries(plans)
-          .map(([k, pl]) =>
-            pl.steps
-              .map(
-                (p) =>
-                  `${k.padEnd(8)} ${p.id.padEnd(5)} ${String(Math.round(p.txs * 1000)).padEnd(9)} ${String(p.steps).padEnd(8)} ${Math.round(p.diff * 1000)}`,
-              )
-              .join("\n"),
-          )
-          .join("\n") +
-        "\n",
-    );
 
   return (
     <div className={styles.root} ref={rootRef}>
-      <div className={styles.stage} ref={stageRef}>
-        <div className={styles.labels} ref={labelsRef} />
-        <div className={styles.overlay}>
-          <h3>{plan.title}</h3>
-          {!dq && <p>{error ? `Could not load the DeltaQ model: ${error}` : "Loading the DeltaQ model…"}</p>}
-        </div>
-        <div className={styles.views} role="group" aria-label="Camera presets">
-          {VIEW_LABELS.map(([v, l]) => (
-            <button key={v} type="button" aria-pressed={view === v} onClick={() => changeView(v)}>
-              {l}
-            </button>
-          ))}
-          <button type="button" aria-pressed={showSurface} onClick={() => setShowSurface((s) => !s)}>
-            Surface
-          </button>
-        </div>
-      </div>
-      <p className={styles.note}>
-        Drag to rotate, scroll or pinch to zoom, right-drag to pan. The surface is the minimum L_diff each point needs; a step
-        above it is feasible. <span className={styles.legendDone}>✓</span> accomplished, <span className={styles.legendCurrent}>●</span>{" "}
-        current, dashed path ahead.
-      </p>
-
-      <div className={styles.panels}>
-        <section>
-          <h3>Plan</h3>
-          <Seg
-            label="Plan"
-            value={active}
-            options={Object.entries(plans).map(([k, p]) => [k, p.name])}
-            onChange={(k) => {
-              setActive(k);
-              setVersion((v) => v + 1);
-            }}
-          />
-          <div className={styles.wrap}>
-            <table className={styles.table} key={`${active}-${version}`}>
-              <thead>
-                <tr>
-                  <th title="Current step on the network">Now</th>
-                  <th>Step</th>
-                  <th>EB txs kB</th>
-                  <th>Steps G</th>
-                  <th>L_diff s</th>
-                  <th>Needs</th>
-                  <th>P(C)</th>
-                  <th>F|C</th>
-                  <th>Opp.</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {plan.steps.map((p, i) => {
-                  const r = rows?.[i];
-                  const st = status[i];
-                  return (
-                    <tr key={i} className={styles[`row_${st}`]}>
-                      <td title={STATUS_TITLE[st]}>
-                        <label className={styles.status}>
-                          <input
-                            type="radio"
-                            name={`current-${active}`}
-                            checked={st === "current"}
-                            onChange={() => editPlan((pl) => void (pl.current = p.id))}
-                            aria-label={`Mark ${p.id} as current`}
-                          />
-                          <span>{STATUS_LABEL[st]}</span>
-                        </label>
-                      </td>
-                      <td className={styles.name} style={{ "--c": `var(--pg-${p.color ?? plan.color})` } as React.CSSProperties}>
-                        <i />
-                        <input type="text" defaultValue={p.id} aria-label="Step name" onChange={(e) => editStep(i, "id", e.target.value)} />
-                      </td>
-                      <td>
-                        <input type="number" min={100} max={12000} step={10} defaultValue={p.txs} aria-label={`${p.id} EB txs kB`} onChange={(e) => editStep(i, "txs", e.target.value)} />
-                      </td>
-                      <td>
-                        <input type="number" min={100} max={2000} step={10} defaultValue={p.steps} aria-label={`${p.id} steps G`} onChange={(e) => editStep(i, "steps", e.target.value)} />
-                      </td>
-                      <td>
-                        <input type="number" min={3.1} max={17} step={0.1} defaultValue={p.diff} aria-label={`${p.id} L_diff s`} onChange={(e) => editStep(i, "diff", e.target.value)} />
-                      </td>
-                      <td className={styles.need}>
-                        {r && (
-                          <>
-                            <span className={p.diff >= r.ni.need ? styles.ok : styles.bad}>
-                              {r.ni.need === Infinity ? "> " + trim(ymax) : fmt(r.ni.need)}
-                            </span>
-                            <small>{r.ni.bind}</small>
-                          </>
-                        )}
-                      </td>
-                      <td>{r && <span className={r.e.pc >= model.pc ? "" : styles.bad}>{pct(r.e.pc)}</span>}</td>
-                      <td>{r && <span className={r.e.F >= model.pf ? "" : styles.bad}>{pct(r.e.F)}</span>}</td>
-                      <td>{Math.round(100 * Math.exp(-F * 2 * p.diff))}%</td>
-                      <td>
-                        <button
-                          type="button"
-                          className={styles.rm}
-                          disabled={plan.steps.length < 2}
-                          aria-label={`Remove ${p.id}`}
-                          onClick={() => editPlan((pl) => void pl.steps.splice(i, 1), true)}
-                        >
-                          ×
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <div className={styles.app}>
+        <div className={styles.stage} ref={stageRef}>
+          <div className={styles.labels} ref={labelsRef} />
+          <div className={styles.overlay}>
+            <h3>{plan.title}</h3>
+            <p>
+              Drag to rotate, scroll or pinch to zoom, right-drag to pan. The surface is the minimum L_diff each point needs; a step
+              above it is feasible. <span className={styles.legendDone}>✓</span> accomplished,{" "}
+              <span className={styles.legendCurrent}>●</span> current, dashed path ahead.
+            </p>
+            {!dq && <p>{error ? `Could not load the DeltaQ model: ${error}` : "Loading the DeltaQ model…"}</p>}
           </div>
-          {plan.generate && (
-            <div className={styles.gen} key={`gen-${active}-${version}`}>
-              <label>
-                Outbound L_diff{" "}
-                <input type="number" min={3.1} max={17} step={0.5} defaultValue={plan.generate.plane}
-                  onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v)) editPlan((p) => void (p.generate!.plane = v)); }} />{" "}
-                s
-              </label>
-              <label>
-                Return margin{" "}
-                <input type="number" min={0} max={5} step={0.1} defaultValue={plan.generate.margin}
-                  onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v) && v >= 0) editPlan((p) => void (p.generate!.margin = v)); }} />{" "}
-                s
-              </label>
-              <button type="button" onClick={regenerate} disabled={!dq}>
-                Regenerate from {plans[plan.generate.from]?.name ?? plan.generate.from}
+          <div className={styles.views} role="group" aria-label="Camera presets">
+            {VIEW_LABELS.map(([v, l]) => (
+              <button key={v} type="button" aria-pressed={view === v} onClick={() => changeView(v)}>
+                {l}
               </button>
-            </div>
-          )}
-          <div className={styles.row}>
-            <button
-              type="button"
-              onClick={() =>
-                editPlan((pl) => {
-                  const last = pl.steps[pl.steps.length - 1];
-                  pl.steps.push({ id: "new", txs: last.txs, steps: last.steps, diff: last.diff });
-                }, true)
-              }
-            >
-              Add step
-            </button>
-            <button type="button" onClick={() => editPlan((pl) => void delete pl.current)}>
-              Clear current
-            </button>
-          </div>
-          <p className={styles.note}>
-            Needs: minimum L_diff from the model. With L_vote = L_diff − 3·L_hdr, the certification gate is W = 3·L_hdr + L_vote +
-            L_diff = 2·L_diff. Opportunity = exp(−f·W) with f = 0.05 per second. Edits here are not saved; copy the plans and paste
-            them into the page source to keep them.
-          </p>
-
-          <h3>Derived protocol parameters</h3>
-          <div className={styles.wrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Step</th>
-                  <th>L_hdr s</th>
-                  <th>L_vote s</th>
-                  <th>L_diff s</th>
-                  <th>EB refs kB</th>
-                  <th>EB txs kB</th>
-                  <th>Plutus mem</th>
-                  <th>Plutus steps</th>
-                  <th>Ref scripts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plan.steps.map((p, i) => {
-                  const B = p.txs * 1000;
-                  const S = p.steps * 1e9;
-                  return (
-                    <tr key={i} className={styles[`row_${status[i]}`]}>
-                      <td className={styles.name} style={{ "--c": `var(--pg-${p.color ?? plan.color})` } as React.CSSProperties}>
-                        <i />
-                        {p.id}
-                      </td>
-                      <td>{fmt(hdr)}</td>
-                      <td className={p.diff - 3 * hdr > 0 ? "" : styles.bad}>{fmt(p.diff - 3 * hdr)}</td>
-                      <td>
-                        <b>{fmt(p.diff)}</b>
-                      </td>
-                      <td>{kb((B * 40) / 260)}</td>
-                      <td>
-                        <b>{kb(B)}</b>
-                      </td>
-                      <td>{fmtU(S * 0.0036)}</td>
-                      <td>
-                        <b>{fmtU(S)}</b>
-                      </td>
-                      <td>{fmtB(p.steps * 20000)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <p className={styles.note}>
-            L_hdr fixed; L_vote = L_diff − 3·L_hdr. EB references = EB txs × 40/260. Plutus memory = Plutus steps × 0.0036. Reference
-            scripts = 20 kB per G steps (4 MB at 200G). Bold: leading values.
-          </p>
-        </section>
-
-        <section>
-          <h3>Model: DeltaQ</h3>
-          <Seg label="TCP model" value={model.net} options={[["mathis", "Mathis (Reno)"], ["cubic", "CUBIC"]]} onChange={(net) => setModel((m) => ({ ...m, net }))} />
-          <Seg
-            label="EB references fetch"
-            value={model.body}
-            options={[["plan", "EB refs: plan limit"], ["report", "EB refs: report’s 1–512 kB mix"]]}
-            onChange={(body) => setModel((m) => ({ ...m, body }))}
-          />
-          <div className={styles.model} key={`model-${version}`}>
-            {MODEL_FIELDS.map(([k, label, step]) => (
-              <label key={k}>
-                <span>{label}</span>
-                <input
-                  type="number"
-                  step={step}
-                  defaultValue={model[k] as number}
-                  aria-label={label}
-                  onChange={(e) => {
-                    const v = parseFloat(e.target.value);
-                    if (isFinite(v)) setModel((m) => ({ ...m, [k]: v }));
-                  }}
-                />
-              </label>
             ))}
+            <button type="button" aria-pressed={showSurface} onClick={() => setShowSurface((s) => !s)}>
+              Surface
+            </button>
           </div>
-          <p className={styles.note}>
-            Needs is the smallest L_diff with P(C) ≥ target at t_v = 3·L_hdr + L_vote = L_diff, and F_full|C ≥ target at W = 2·L_diff.
-            Sampled from the{" "}
-            <a href="https://github.com/input-output-hk/ouroboros-leios/blob/yveshauser/conditional-certification-diffusion-numerical-report/docs/conditional-certification-diffusion.md">
-              conditional certification diffusion model
-            </a>{" "}
-            (analysis.py on that branch): voter law G = EB references (multi-hop) ⊗ missing txs (1 hop, π1 = 1/6) ⊗ validation CPU;
-            reapply-only law for the all-nodes term; top-stake committee of the configured seat count (900: coverage ≈ 98.84%) over a
-            synthetic 2,500-node stake distribution, Normal approximation. “Plan limit” fetches EB references at the plan’s limit,
-            EB txs × 40/260. “Report’s mix” keeps the model’s fixed 1/64/256/512 kB body for every size and reproduces the report’s
-            tables to within 0.05 s. Voters additionally spend c · steps · f_exec on Plutus execution. Node timings are treated as
-            independent.
-          </p>
+        </div>
+        <aside className={styles.side}>
+          <section>
+            <div className={styles.head}>
+              <h3>Plan</h3>
+              <Seg
+                label="Plan"
+                value={active}
+                options={Object.entries(plans).map(([k, p]) => [k, p.name])}
+                onChange={(k) => {
+                  setActive(k);
+                  setVersion((v) => v + 1);
+                }}
+              />
+            </div>
+            <div className={styles.wrap}>
+              <table className={styles.table} key={`${active}-${version}`}>
+                <thead>
+                  <tr>
+                    <th title="Current step on the network">Now</th>
+                    <th>Step</th>
+                    <th>EB txs kB</th>
+                    <th>Steps G</th>
+                    <th>L_diff s</th>
+                    <th>Needs</th>
+                    <th>P(C)</th>
+                    <th>F|C</th>
+                    <th>Opp.</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {plan.steps.map((p, i) => {
+                    const r = rows?.[i];
+                    const st = status[i];
+                    return (
+                      <tr key={i} className={styles[`row_${st}`]}>
+                        <td title={STATUS_TITLE[st]}>
+                          <label className={styles.status}>
+                            <input
+                              type="radio"
+                              name={`current-${active}`}
+                              checked={st === "current"}
+                              onChange={() => editPlan((pl) => void (pl.current = p.id))}
+                              aria-label={`Mark ${p.id} as current`}
+                            />
+                            <span>{STATUS_LABEL[st]}</span>
+                          </label>
+                        </td>
+                        <td className={styles.name} style={{ "--c": `var(--pg-${p.color ?? plan.color})` } as React.CSSProperties}>
+                          <i />
+                          <input type="text" defaultValue={p.id} aria-label="Step name" onChange={(e) => editStep(i, "id", e.target.value)} />
+                        </td>
+                        <td>
+                          <input type="number" min={100} max={12000} step={10} defaultValue={p.txs} aria-label={`${p.id} EB txs kB`} onChange={(e) => editStep(i, "txs", e.target.value)} />
+                        </td>
+                        <td>
+                          <input type="number" min={100} max={2000} step={10} defaultValue={p.steps} aria-label={`${p.id} steps G`} onChange={(e) => editStep(i, "steps", e.target.value)} />
+                        </td>
+                        <td>
+                          <input type="number" min={3.1} max={17} step={0.1} defaultValue={p.diff} aria-label={`${p.id} L_diff s`} onChange={(e) => editStep(i, "diff", e.target.value)} />
+                        </td>
+                        <td className={styles.need}>
+                          {r && (
+                            <>
+                              <span className={p.diff >= r.ni.need ? styles.ok : styles.bad}>
+                                {r.ni.need === Infinity ? "> " + trim(ymax) : fmt(r.ni.need)}
+                              </span>
+                              <small>{r.ni.bind}</small>
+                            </>
+                          )}
+                        </td>
+                        <td>{r && <span className={r.e.pc >= model.pc ? "" : styles.bad}>{pct(r.e.pc)}</span>}</td>
+                        <td>{r && <span className={r.e.F >= model.pf ? "" : styles.bad}>{pct(r.e.F)}</span>}</td>
+                        <td>{Math.round(100 * Math.exp(-F * 2 * p.diff))}%</td>
+                        <td>
+                          <button
+                            type="button"
+                            className={styles.rm}
+                            disabled={plan.steps.length < 2}
+                            aria-label={`Remove ${p.id}`}
+                            onClick={() => editPlan((pl) => void pl.steps.splice(i, 1), true)}
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-          <h3>Export</h3>
-          <div className={styles.row}>
-            <button type="button" onClick={() => copy(JSON.stringify(plans, null, 2))}>
-              Copy plans
-            </button>
-            <button type="button" onClick={copyTsv}>
-              Copy plan3d.tsv
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                copy("# DeltaQ planning settings\n# name    value\n" + Object.entries(model).map(([k, v]) => `${k.padEnd(8)} ${v}`).join("\n") + "\n")
-              }
-            >
-              Copy model
-            </button>
-            <button type="button" onClick={reset}>
-              Reset
-            </button>
-          </div>
-          {out != null && <pre className={styles.out}>{out}</pre>}
-        </section>
+            <div className={styles.head}>
+              <h3>Derived protocol parameters</h3>
+            </div>
+            <div className={styles.wrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Step</th>
+                    <th>L_hdr s</th>
+                    <th>L_vote s</th>
+                    <th>L_diff s</th>
+                    <th>EB refs kB</th>
+                    <th>EB txs kB</th>
+                    <th>Plutus mem</th>
+                    <th>Plutus steps</th>
+                    <th>Ref scripts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {plan.steps.map((p, i) => {
+                    const B = p.txs * 1000;
+                    const S = p.steps * 1e9;
+                    return (
+                      <tr key={i} className={styles[`row_${status[i]}`]}>
+                        <td className={styles.name} style={{ "--c": `var(--pg-${p.color ?? plan.color})` } as React.CSSProperties}>
+                          <i />
+                          {p.id}
+                        </td>
+                        <td>{fmt(hdr)}</td>
+                        <td className={p.diff - 3 * hdr > 0 ? "" : styles.bad}>{fmt(p.diff - 3 * hdr)}</td>
+                        <td>
+                          <b>{fmt(p.diff)}</b>
+                        </td>
+                        <td>{kb((B * 40) / 260)}</td>
+                        <td>
+                          <b>{kb(B)}</b>
+                        </td>
+                        <td>{fmtU(S * 0.0036)}</td>
+                        <td>
+                          <b>{fmtU(S)}</b>
+                        </td>
+                        <td>{fmtB(p.steps * 20000)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section>
+            <div className={styles.head}>
+              <h3>Model: DeltaQ</h3>
+              <Seg label="TCP model" value={model.net} options={[["mathis", "Mathis (Reno)"], ["cubic", "CUBIC"]]} onChange={(net) => setModel((m) => ({ ...m, net }))} />
+              <Seg
+                label="EB references fetch"
+                value={model.body}
+                options={[["plan", "EB refs: plan limit"], ["report", "EB refs: report’s 1–512 kB mix"]]}
+                onChange={(body) => setModel((m) => ({ ...m, body }))}
+              />
+            </div>
+            <div className={styles.model} key={`model-${version}`}>
+              {MODEL_FIELDS.map(([k, label, step]) => (
+                <label key={k}>
+                  <span>{label}</span>
+                  <input
+                    type="number"
+                    step={step}
+                    defaultValue={model[k] as number}
+                    aria-label={label}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      if (isFinite(v)) setModel((m) => ({ ...m, [k]: v }));
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+          </section>
+        </aside>
       </div>
     </div>
   );
