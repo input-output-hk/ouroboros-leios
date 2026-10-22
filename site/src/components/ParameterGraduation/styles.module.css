@@ -77,6 +77,16 @@
 :global(.container):has(.root) {
   max-width: none;
 }
+/* Hide the docs sidebar column on this page; breadcrumbs and pagination stay. */
+:global(.theme-doc-sidebar-container):has(+ main .root) {
+  display: none;
+}
+main:has(.root) {
+  max-width: none !important;
+}
+:global(.theme-doc-breadcrumbs):has(~ * .root) {
+  margin-bottom: 0.8rem !important;
+}
 
 .app {
   display: grid;
