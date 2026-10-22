@@ -61,6 +61,11 @@ const config: Config = {
             from: "/docs/development/monthly-reviews",
             to: "/docs/monthly-reviews",
           },
+          // Parameter graduation tool became a doc (2026-10-22)
+          {
+            from: "/parameter-graduation",
+            to: "/docs/parameter-graduation",
+          },
           // Join the musashi dojo link used in PR (2026-06-26)
           {
             from: "/join",
@@ -137,7 +142,7 @@ const config: Config = {
           position: "right",
           items: [
             {
-              to: "/parameter-graduation",
+              to: "/docs/parameter-graduation",
               label: "Parameter graduation",
             },
             {
