@@ -24,6 +24,7 @@
     "prism-react-renderer": "^2.3.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
+    "three": "^0.170.0",
     "undici": "^7.2.3"
   },
   "devDependencies": {

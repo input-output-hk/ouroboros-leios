@@ -1,0 +1,346 @@
+.root {
+  --pg-ink: #0b0b0b;
+  --pg-muted: #5b5b5b;
+  --pg-rule: #dcdcdc;
+  --pg-soft: #f4f4f4;
+  --pg-grid: #d6d6d6;
+  --pg-accent: #e52321;
+  --pg-dawn: #ec641d;
+  --pg-blue: #2d5bff;
+  --pg-violet: #7a3ce0;
+  --pg-ok: #1f8a43;
+  --pg-surface-lo: #fde3e1;
+  --pg-surface-hi: #e52321;
+  --pg-bg: var(--ifm-background-color);
+  margin: 0 0 2rem;
+}
+
+:global([data-theme="dark"]) .root {
+  --pg-ink: #f2f2f2;
+  --pg-muted: #a3a3a3;
+  --pg-rule: #2e2e2e;
+  --pg-soft: #161616;
+  --pg-grid: #3a3a3a;
+  --pg-accent: #ff4a3f;
+  --pg-dawn: #ff8a45;
+  --pg-blue: #6f8dff;
+  --pg-violet: #a97cff;
+  --pg-ok: #4cc777;
+  --pg-surface-lo: #4a1412;
+  --pg-surface-hi: #ff4a3f;
+}
+
+.root button {
+  font: 500 13px var(--ifm-font-family-base);
+  color: var(--pg-ink);
+  background: var(--pg-bg);
+  border: 1px solid var(--pg-rule);
+  padding: 6px 10px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.root button:hover:not(:disabled) {
+  border-color: var(--pg-ink);
+}
+.root button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.root button[aria-pressed="true"] {
+  background: var(--pg-ink);
+  color: var(--pg-bg);
+  border-color: var(--pg-ink);
+}
+
+.root input[type="number"],
+.root input[type="text"] {
+  width: 64px;
+  font: 13px var(--ifm-font-family-base);
+  color: var(--pg-ink);
+  background: var(--pg-soft);
+  border: 1px solid var(--pg-rule);
+  padding: 3px 4px;
+  text-align: right;
+  border-radius: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.root input:focus {
+  outline: 2px solid var(--pg-accent);
+  outline-offset: -1px;
+}
+
+.stage {
+  position: relative;
+  height: min(72vh, 680px);
+  min-height: 420px;
+  overflow: hidden;
+  border: 1px solid var(--pg-rule);
+  border-radius: 4px;
+}
+.stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+.stage canvas:active {
+  cursor: grabbing;
+}
+.labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.overlay {
+  position: absolute;
+  left: 16px;
+  top: 12px;
+  max-width: 420px;
+  pointer-events: none;
+}
+.overlay h3 {
+  margin: 0 0 4px;
+}
+.overlay p {
+  margin: 0;
+  color: var(--pg-muted);
+  font-size: 14px;
+}
+.views {
+  position: absolute;
+  left: 16px;
+  bottom: 12px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.lbl {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--pg-muted);
+}
+.lbl small {
+  display: block;
+}
+.axis {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--pg-ink);
+  text-align: center;
+  line-height: 1.15;
+}
+.axis small {
+  font-weight: 400;
+  font-size: 11.5px;
+  color: var(--pg-muted);
+}
+.tick {
+  text-align: center;
+  line-height: 1.15;
+}
+.tick b {
+  display: block;
+  font-weight: 600;
+  color: var(--pg-ink);
+}
+.tick small {
+  font-size: 10.5px;
+}
+.cnt {
+  font-size: 11px;
+  color: var(--pg-accent);
+}
+.set {
+  transform: translate(10px, -130%);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pg-ink);
+  background: color-mix(in srgb, var(--pg-bg) 80%, transparent);
+  padding: 1px 6px;
+  border-left: 3px solid var(--c);
+}
+.set small {
+  font-weight: 400;
+  color: var(--pg-muted);
+}
+.set em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--pg-ok);
+  margin-left: 4px;
+}
+.done {
+  opacity: 0.6;
+}
+.current {
+  outline: 2px solid var(--pg-ok);
+}
+
+.note {
+  color: var(--pg-muted);
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+.legendDone {
+  color: var(--pg-ok);
+}
+.legendCurrent {
+  color: var(--pg-ok);
+}
+
+.panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 32px;
+  margin-top: 16px;
+}
+@media (min-width: 1400px) {
+  .panels {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+.panels h3 {
+  margin: 20px 0 8px;
+}
+
+.seg {
+  display: flex;
+  margin: 0 0 10px;
+}
+.seg button {
+  border-radius: 0;
+}
+.seg button + button {
+  border-left: 0;
+}
+
+.wrap {
+  overflow-x: auto;
+}
+.table {
+  display: table;
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.table tr,
+.table thead {
+  background: none;
+  border: 0;
+}
+.table th,
+.table td {
+  text-align: right;
+  padding: 4px 3px;
+  border: 0;
+  border-bottom: 1px solid var(--pg-rule);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.table th {
+  font-weight: 500;
+  color: var(--pg-muted);
+}
+.table th:first-child,
+.table td:first-child,
+.table th:nth-child(2),
+.table td.name {
+  text-align: left;
+}
+.name {
+  font-weight: 600;
+}
+.name i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--c);
+  margin-right: 6px;
+}
+.name input[type="text"] {
+  width: 58px;
+  text-align: left;
+  font-weight: 600;
+}
+.need small {
+  display: block;
+  color: var(--pg-muted);
+  font-size: 11px;
+}
+.ok {
+  color: var(--pg-ok);
+  font-weight: 600;
+}
+.bad {
+  color: var(--pg-accent);
+  font-weight: 600;
+}
+.row_done td {
+  color: var(--pg-muted);
+}
+.row_current td {
+  background: color-mix(in srgb, var(--pg-ok) 12%, transparent);
+}
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--pg-ok);
+  font-weight: 600;
+}
+.status span {
+  min-width: 1em;
+}
+.root .rm {
+  padding: 2px 6px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.gen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+.gen label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pg-muted);
+}
+.row {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.model {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+}
+.model label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.model label span {
+  color: var(--pg-muted);
+}
+.out {
+  margin: 8px 0 0;
+  font-size: 12px;
+  max-height: 320px;
+}
