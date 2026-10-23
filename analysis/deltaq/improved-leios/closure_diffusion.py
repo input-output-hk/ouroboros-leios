@@ -17,9 +17,9 @@ from matplotlib.ticker import PercentFormatter
 
 SIZES_MB = (0.125, 0.26, 0.5, 1, 2, 4, 8, 12, 12.288)
 PLOT_DIR = Path(__file__).resolve().parents[3] / "docs" / "conditional-certification-diffusion"
-# Share report.md §4.2's full blended path distribution with body diffusion.
-DEFAULT_HOP_WEIGHTS = tuple(weight / 100 for _, weight in A._HOP_PROBS)
-DEFAULT_HOP_LABEL = "Missing-batch fetch: full blended path distribution (1–5 hops)"
+# Missing batches use short paths; EB bodies retain blended diffusion.
+DEFAULT_HOP_WEIGHTS = (0.5, 0.5)
+DEFAULT_HOP_LABEL = "Missing-batch fetch: 50% one hop, 50% two hops"
 BODY_CLOSURE_RATIO = 40 / 260
 
 
