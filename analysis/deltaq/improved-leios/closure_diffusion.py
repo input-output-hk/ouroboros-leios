@@ -34,7 +34,7 @@ def save_plot(fig, name):
     plt.close(fig)
 
 
-def plot_completion_cdfs(model, rows, active=False):
+def plot_completion_cdfs(model, rows, active=False, stress=False):
     fig, ax = plt.subplots(figsize=(10, 5.5), constrained_layout=True)
     colors = plt.get_cmap("tab10").colors
     for i, (mb, honest, adversarial) in enumerate(rows):
@@ -49,7 +49,8 @@ def plot_completion_cdfs(model, rows, active=False):
         ax.axvline(t, color="gray", linestyle=":", linewidth=1)
         ax.text(t + 0.08, 0.03, f"{label}: {t} s", rotation=90, fontsize=8)
     population = "1,875 honest nodes; 25% active adversarial stake" if active else "2,500 honest nodes"
-    ax.set_title(f"{model.upper()}: full closure completion given certification\n{population}; body = closure × 40/260\n{DEFAULT_HOP_LABEL}")
+    scenario_label = "No prior availability: full-closure recovery" if stress else "Stationary-cache recovery"
+    ax.set_title(f"{model.upper()}: {scenario_label}\n{population}; body = closure × 40/260\n{DEFAULT_HOP_LABEL}")
     ax.set_xlabel("Time from EB diffusion origin (s)")
     ax.set_ylabel("P(all honest nodes ready by t | certification)")
     ax.set_xlim(0, A.TIMES[-1])
@@ -58,7 +59,7 @@ def plot_completion_cdfs(model, rows, active=False):
     ax.grid(alpha=0.25)
     ax.legend(title="Closure size (decimal MB)", fontsize=8, loc="upper left")
     scenario = "active" if active else "honest"
-    save_plot(fig, f"{model}-{scenario}-cdf.svg")
+    save_plot(fig, f"{model}-{'stress-' if stress else ''}{scenario}-cdf.svg")
 
 
 def plot_completion_times(results):
@@ -96,6 +97,8 @@ def completion_quantile(cdf, p):
 
 
 def seconds(t):
+    if np.isposinf(t):
+        return f">{A.TIMES[-1]:g}"
     return f"{t:.2f}" if np.isfinite(t) else "N/A"
 
 
@@ -107,6 +110,50 @@ def log_percentage(log_p):
     log10_percent = log_p / np.log(10) + 2
     exponent = int(np.floor(log10_percent))
     return f"{10 ** (log10_percent - exponent):.4f}e{exponent:+d}%"
+
+
+def stress_scenario(baseline):
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True, constrained_layout=True)
+    for ax, (model, base_rows) in zip(axes, baseline.items()):
+        A.set_network_model(model)
+        rows = []
+        print(f"\n## {model.upper()} no-prior-availability stress\n")
+        print("| Closure (MB) | Baseline p99 (s) | Stress p99 (s) | Stress p99.9 (s) | Stress all ready by 14 s, given C | Active stress p99 (s) | Active stress all ready by 14 s, given C |")
+        print("|---:|---:|---:|---:|---:|---:|---:|")
+        for mb, base_honest, _ in base_rows:
+            result = T.calculate(mb * 1000, mb * 1000 * BODY_CLOSURE_RATIO,
+                                 recovery_hops=DEFAULT_HOP_WEIGHTS, stress=True)
+            for cdf in (result.voter, result.completion, result.honest, result.active):
+                if cdf is not None:
+                    check_cdf(cdf)
+            rows.append((mb, result.honest, result.active))
+            times = [completion_quantile(base_honest, .99), completion_quantile(result.honest, .99),
+                     completion_quantile(result.honest, .999)]
+            ready = percentage(A.success_within(result.honest, 14)) if result.honest is not None else "N/A"
+            active_ready = percentage(A.success_within(result.active, 14)) if result.active is not None else "N/A"
+            print(f"| {mb:g} | " + " | ".join(seconds(t) for t in times)
+                  + f" | {ready} | {seconds(completion_quantile(result.active, .99))} | {active_ready} |")
+        plot_completion_cdfs(model, rows, stress=True)
+        for scenario_rows, name, color in ((base_rows, "Stationary cache", "tab:blue"),
+                                            (rows, "No prior availability", "tab:red")):
+            for p, style in ((.99, "-"), (.999, "--")):
+                values = [completion_quantile(row[1], p) for row in scenario_rows]
+                censored = [s for s, v in zip(SIZES_MB, values) if np.isposinf(v)]
+                values = [v if np.isfinite(v) else np.nan for v in values]
+                ax.plot(SIZES_MB, values, color=color, linestyle=style, marker="o", markersize=4,
+                        label=f"{name}, p{100*p:g}")
+                if censored and p == .99:
+                    ax.scatter(censored, [A.TIMES[-1]] * len(censored), color=color,
+                               marker="^", label=f"{name}: >{A.TIMES[-1]:g} s")
+        ax.set_xscale("log", base=2)
+        ax.set_xticks(SIZES_MB, [f"{mb:g}" for mb in SIZES_MB])
+        ax.set(title=model.upper(), xlabel="Closure size (decimal MB)")
+        ax.axhline(14, color="gray", linestyle=":", label="14 s deadline")
+        ax.grid(alpha=.25)
+        ax.legend(fontsize=7)
+    axes[0].set_ylabel("All-node completion time given certification (s)")
+    fig.suptitle("Full-closure recovery stress versus stationary-cache baseline\nSame phase-one certification; 50/50 one-/two-hop recovery from 7 s")
+    save_plot(fig, "stress-completion-time-percentiles.svg")
 
 
 def main():
@@ -156,6 +203,7 @@ def main():
         plot_completion_cdfs(model, rows)
         plot_completion_cdfs(model, rows, active=True)
     plot_completion_times(results)
+    stress_scenario(results)
 
 
 if __name__ == "__main__":

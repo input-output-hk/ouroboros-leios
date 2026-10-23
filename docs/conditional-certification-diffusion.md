@@ -35,6 +35,11 @@ a one-sixth probability that a node needs to fetch anything.
   certification becomes extremely rare.  Quorum probabilities use a seeded
   permutation estimate, not a Normal tail; extreme-tail values remain
   sensitive to the finite permutation sample and synthetic stake distribution.
+- **No-prior-availability stress:** §3.4 makes every node not validated by
+  7 s recover the entire closure.  At 260 kB, p99 remains **4.01 s** under
+  both models because the all-node p99 event precedes recovery.  At 2 MB,
+  Mathis p99 rises from **9.91 s to 15.85 s** and all-node completion by
+  14 s falls to **0.0135%**, conditional on the same certification event.
 
 ## 1. What the numbers mean
 
@@ -73,6 +78,7 @@ closure-completion calculation.
 | Stationary missing transaction fraction | Every node fetches 1/6 of the closure (approximately 16.67%) |
 | Phase-one missing-transaction fetch | Full blended one-to-five-hop distribution; determines voter readiness and P(C) |
 | Phase-two recovery | Begins no earlier than 7 s, conditional on certification: 50% one hop, 50% two hops; see §3.1 |
+| Stress recovery | Every node not validated by 7 s fetches the full closure; same phase one and recovery-hop mixture; see §3.4 |
 | EB-body diffusion | Full blended one-to-five-hop distribution from `report.md` §4.2 |
 | EB body | Fixed size for each closure: closure size × 40/260; 40 kB at a 260 kB closure |
 | Average transaction size | 1,000 bytes |
@@ -359,6 +365,82 @@ deterministically and each stochastic seat's weight is scaled by 75%.
 This does not identify an actual allocation of adversarial pools; the honest
 completion target remains 1,875 nodes, following the earlier comparison.
 
+### 3.4. No prior availability at remaining honest nodes: stress scenario
+
+This scenario removes the stationary-cache availability assumption from
+**recovery only**.  Phase-one fetching, validation, and the certification event
+are identical to the baseline.  A node already validated by the 7-second
+deadline remains complete.  Every other honest node is treated as holding
+none of the transactions and fetches the **entire closure**, even if it had
+previously acquired data and was still validating it.  Thus the recovery
+payload at 260 kB is **260 kB**, compared with **43.33 kB** for a baseline
+node still missing data.
+
+Using the notation from §3.2, let *R_full* transfer the full closure over
+the same 50% one-hop / 50% two-hop mixture.  The stress completion time is:
+
+$$
+D_{\mathrm{stress}}=\begin{cases}
+V, & V\le t_v,\\
+\max(B,t_v)+R_{\mathrm{full}}+Y, & V>t_v.
+\end{cases}
+$$
+
+The already-ready nodes are retained, so the same joint-readiness identity
+and quorum coefficients apply.  Both honest-baseline and active-adversary
+certification probabilities are unchanged; only conditional completion changes.
+All times below are measured from EB diffusion, not from certification.
+
+#### Mathis
+
+| Closure (MB) | Baseline p99 (s) | Stress p99 (s) | Stress p99.9 (s) | Stress all ready by 14 s, given C | Active stress p99 (s) | Active stress all ready by 14 s, given C |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.125 | 2.45 | 2.45 | 2.67 | 100.0000% | 2.45 | 100.0000% |
+| 0.26 | 4.01 | 4.01 | 4.36 | 100.0000% | 4.01 | 100.0000% |
+| 0.5 | 5.98 | 5.98 | 6.50 | 100.0000% | 5.98 | 100.0000% |
+| 1 | 8.99 | 12.09 | 12.10 | 100.0000% | 12.09 | 100.0000% |
+| 2 | 9.91 | 15.85 | 15.86 | 0.0135% | 15.85 | 0.1252% |
+| 4 | 13.76 | 26.30 | 26.33 | 0.0000% | 26.28 | 0.0000% |
+| 8 | 21.38 | >40 | >40 | 0.0000% | >40 | 0.0000% |
+| 12 | 29.75 | >40 | >40 | 0.0000% | >40 | 0.0000% |
+
+#### CUBIC
+
+| Closure (MB) | Baseline p99 (s) | Stress p99 (s) | Stress p99.9 (s) | Stress all ready by 14 s, given C | Active stress p99 (s) | Active stress all ready by 14 s, given C |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.125 | 2.45 | 2.45 | 2.67 | 100.0000% | 2.45 | 100.0000% |
+| 0.26 | 4.01 | 4.01 | 4.36 | 100.0000% | 4.01 | 100.0000% |
+| 0.5 | 5.98 | 5.98 | 6.50 | 100.0000% | 5.98 | 100.0000% |
+| 1 | 8.99 | 10.55 | 10.56 | 100.0000% | 10.55 | 100.0000% |
+| 2 | 9.75 | 11.17 | 11.18 | 100.0000% | 11.17 | 100.0000% |
+| 4 | 11.00 | 12.44 | 12.47 | 100.0000% | 12.43 | 100.0000% |
+| 8 | 13.16 | 15.58 | 15.63 | 92.0068% | 15.56 | 93.5675% |
+| 12 | 14.57 | 17.77 | 17.84 | 0.0000% | 16.42 | 0.0000% |
+
+The stress assumption has no effect on the displayed p99 and p99.9 for
+closures through 500 kB: those completion quantiles are already before 7 s,
+when the node process is identical.  It substantially increases recovery
+times for larger closures.  As throughout the report, a favourable conditional
+completion figure does not imply that the certificate is likely to form.
+
+`>40` means the percentile lies beyond the 40-second numerical horizon;
+it is not an estimate of the actual percentile.  The Mathis 8 and 12 MB
+stress CDFs have not reached the target percentile by the right edge of the
+plot.  Upward triangles at 40 s mark these censored cases in the percentile
+comparison; they are not plotted as measured 40-second completion times.
+
+![Mathis no-prior-availability stress completion CDFs](conditional-certification-diffusion/mathis-stress-honest-cdf.svg)
+
+![CUBIC no-prior-availability stress completion CDFs](conditional-certification-diffusion/cubic-stress-honest-cdf.svg)
+
+![Stationary-cache and no-prior-availability stress p99 and p99.9 comparison](conditional-certification-diffusion/stress-completion-time-percentiles.svg)
+
+This tests the effect of losing prior transaction availability outside the
+validated population.  It is not a formal adversarial worst-case bound:
+immediate serving availability, short recovery paths, independent requests,
+and no serving-capacity contention remain assumptions.  It is a separate
+stress scenario rather than a change to the stationary-cache baseline.
+
 ## 4. Interpretation and scope
 
 For the smaller sizes, **earlier readiness and timing margin** distinguish the
@@ -401,7 +483,7 @@ causal process and quorum calculation in
 inputs above.  The older mixed-readiness approximation in `analysis.py` is no
 longer used by this report.  The
 [report generator](../analysis/deltaq/improved-leios/closure_diffusion.py)
-prints four tables, writes five SVG plots to
+prints four baseline tables and two stress tables, writes eight SVG plots to
 `docs/conditional-certification-diffusion/`, and checks that the computed CDFs are bounded and
 non-decreasing, that certification probabilities are non-negative and bounded,
 and that conditional curves agree numerically with the two-phase node CDF
@@ -416,7 +498,7 @@ python3 analysis/deltaq/improved-leios/closure_diffusion.py
 ```
 
 The targeted tests cover phase timing, retained validation, late bodies,
-recovery independence of certification, small exact conditional examples,
+recovery and stress independence of certification, small exact conditional examples,
 quorum-coefficient estimation, and log-space underflow handling:
 
 ```sh

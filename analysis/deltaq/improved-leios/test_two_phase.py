@@ -27,6 +27,48 @@ class TwoPhaseTests(unittest.TestCase):
         _, completion = self.deterministic(1, 2, 2, 5, 1, 4)
         np.testing.assert_allclose(completion, A.cdf_wait(5), atol=1e-12)
 
+    def test_stress_restarts_even_when_only_validation_is_pending(self):
+        laws = [A.cdf_wait(t) for t in (1, 1, 4, 2, 1)]
+        voter, completion = T.node_completion(*laws, deadline=3, stress=True)
+        np.testing.assert_allclose(voter, A.cdf_wait(6), atol=1e-12)
+        np.testing.assert_allclose(completion, A.cdf_wait(6), atol=1e-12)
+        # Different recovery duration distinguishes restart from continued validation.
+        laws[3] = A.cdf_wait(5)
+        _, completion = T.node_completion(*laws, deadline=3, stress=True)
+        np.testing.assert_allclose(completion, A.cdf_wait(9), atol=1e-12)
+
+    def test_stress_retains_validated_nodes_and_waits_for_late_body(self):
+        laws = [A.cdf_wait(t) for t in (1, 1, .5, 5, 1)]
+        _, completion = T.node_completion(*laws, deadline=3, stress=True)
+        np.testing.assert_allclose(completion, A.cdf_wait(2.5), atol=1e-12)
+        laws[0] = A.cdf_wait(4)
+        _, completion = T.node_completion(*laws, deadline=3, stress=True)
+        np.testing.assert_allclose(completion, A.cdf_wait(10), atol=1e-12)
+
+    def test_stress_fetches_full_payload_without_changing_certification(self):
+        for model in ("mathis", "cubic"):
+            A.set_network_model(model)
+            base = T.calculate(2000, 2000 * 40 / 260)
+            with patch.object(T, "node_completion", wraps=T.node_completion) as node:
+                stress = T.calculate(2000, 2000 * 40 / 260, stress=True)
+                recovery = node.call_args.args[3]
+            np.testing.assert_allclose(recovery, .5*A.cdf_hop(2000) + .5*A.cdf_hops(2, 2000), atol=1e-12)
+            np.testing.assert_array_equal(base.voter, stress.voter)
+            self.assertEqual(base.log_pc, stress.log_pc)
+            self.assertEqual(base.log_pc_active, stress.log_pc_active)
+            np.testing.assert_array_equal(base.completion[:700], stress.completion[:700])
+
+    def test_stress_matches_enumerated_histories(self):
+        choices = ((1, 4), (1, 3), (.5, 2), (2, 3), (.25, .75))
+        laws = [A.cdf_choice(.5, A.cdf_wait(a), A.cdf_wait(b)) for a, b in choices]
+        voter, completion = T.node_completion(*laws, deadline=3, stress=True)
+        expected = np.zeros(A.N)
+        for body, fetch, validate, recovery, reapply in itertools.product(*choices):
+            ready = body + fetch + validate
+            end = ready if ready <= 3 else max(body, 3) + recovery + reapply
+            expected += A.cdf_wait(end) / 32
+        np.testing.assert_allclose(completion, expected, atol=1e-12)
+
     def test_missing_batch_recovery_starts_at_deadline(self):
         voter, completion = self.deterministic(1, 5, 1, 1, .5, 3)
         np.testing.assert_allclose(voter, A.cdf_wait(7), atol=1e-12)

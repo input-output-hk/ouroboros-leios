@@ -25,7 +25,7 @@ def sequential(left, right):
     return result
 
 
-def node_completion(body, fetch, validate, recovery, reapply, deadline):
+def node_completion(body, fetch, validate, recovery, reapply, deadline, stress=False):
     """Return (voter CDF, two-phase node-completion CDF).
 
     A node with all transaction data by deadline continues its original
@@ -34,6 +34,9 @@ def node_completion(body, fetch, validate, recovery, reapply, deadline):
     is retained; partial transaction-transfer bytes are not credited.
     The component times are independent, with a shared body arrival for both
     phases.  Phase-two serving availability is an assumption conditional on C.
+    In stress mode only already-validated nodes retain progress.  Every other
+    node runs the supplied full-closure recovery law and reapplies, including
+    nodes that had data but were still validating at the deadline.
     """
     tick = round(deadline / A.DT)
     if tick < 1 or tick >= len(body) or not np.isclose(tick * A.DT, deadline):
@@ -45,6 +48,11 @@ def node_completion(body, fetch, validate, recovery, reapply, deadline):
     known_data = data.copy()
     known_data[tick:] = data[tick - 1]
     continue_validation = sequential(known_data, validate)
+    remaining_after_body = fetch
+    if stress:
+        continue_validation = voter.copy()
+        continue_validation[tick:] = voter[tick - 1]
+        remaining_after_body = sequential(fetch, validate)
 
     # Defective distribution of recovery start times max(B, deadline).
     start_mass = np.zeros_like(body)
@@ -52,8 +60,8 @@ def node_completion(body, fetch, validate, recovery, reapply, deadline):
     for index, mass in enumerate(body_mass):
         body_tick = index + 1
         available_ticks = tick - body_tick
-        fetched = fetch[available_ticks - 1] if available_ticks > 0 else 0.0
-        start_mass[max(index, tick - 1)] += mass * (1 - fetched)
+        retained = remaining_after_body[available_ticks - 1] if available_ticks > 0 else 0.0
+        start_mass[max(index, tick - 1)] += mass * (1 - retained)
     recover = sequential(sequential(np.cumsum(start_mass), recovery), reapply)
     completion = continue_validation + recover
     # Remove only roundoff; do not repair non-monotonic conditional curves.
@@ -160,13 +168,18 @@ class Result:
     active: np.ndarray | None
 
 
-def calculate(closure_kb, body_kb, deadline=7.0, recovery_hops=(0.5, 0.5)):
+def calculate(closure_kb, body_kb, deadline=7.0, recovery_hops=(0.5, 0.5), stress=False):
     body = A.cdf_fetch_eb_body(body_kb)
     fetch = A.cdf_fetch_missing_eb_closure(closure_kb, use_1hop=False)
     validate = A.cdf_process_eb_closure(closure_kb)
-    recovery = A.cdf_fetch_missing_eb_closure(closure_kb, hop_weights=recovery_hops)
+    if stress:
+        # Full payload: do not multiply by the stationary missing fraction.
+        recovery = A.cdf_choices([(weight, A.cdf_hops(hops, closure_kb))
+                                 for hops, weight in enumerate(recovery_hops, 1) if weight > 0])
+    else:
+        recovery = A.cdf_fetch_missing_eb_closure(closure_kb, hop_weights=recovery_hops)
     reapply = A.cdf_process_eb_closure(closure_kb, reapply_only=True)
-    voter, completion = node_completion(body, fetch, validate, recovery, reapply, deadline)
+    voter, completion = node_completion(body, fetch, validate, recovery, reapply, deadline, stress=stress)
     log_pc, honest = conditional_completion(voter, completion, deadline)
     log_pc_active, active = conditional_completion(voter, completion, deadline, beta=0.25)
     return Result(voter, completion, log_pc, honest, log_pc_active, active)
