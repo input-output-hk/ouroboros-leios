@@ -474,33 +474,52 @@ def cdf_fetch_tx_rb_body() -> np.ndarray:
     return cdf_choices([(1, cdf_blended_delay(s)) for s in sizes])
 
 
-def cdf_fetch_eb_body() -> np.ndarray:
-    """EB body (up to 512kB). Uniform choice over sizes."""
+def cdf_fetch_eb_body(body_size_kb=None) -> np.ndarray:
+    """Diffuse a fixed-size EB body, or the historical uniform size mixture."""
+    if body_size_kb is not None:
+        if not np.isfinite(body_size_kb) or body_size_kb < 0:
+            raise ValueError("body_size_kb must be finite and non-negative")
+        return cdf_blended_delay(body_size_kb)
     return cdf_choices([(1, cdf_blended_delay(s)) for s in EB_BODY_SIZES_KB])
 
 
 def cdf_fetch_missing_eb_closure(
-    s_eb_tx_kb: float, use_1hop: bool = True
+    s_eb_tx_kb: float, use_1hop: bool = True, hop_weights=None
 ) -> np.ndarray:
     """
     Fetch missing EB-closure transactions.
 
-    Model: with probability π₂ (TxCache hit) the node already holds all
-    referenced transactions and incurs only a small lookup delay (1ms).
-    With probability π₁ (TxCache miss) the node must fetch a fraction
-    π₁ · S_EB_tx of the closure from its upstream peer.
+    The stationary transaction-cache miss fraction is π₁.  Every node fetches
+    a bulk batch of size π₁ · S_EB_tx; π₁ is not a second probability of
+    entering a fetch branch.  This approximates the per-node missing fraction
+    by its stationary mean rather than sampling individual transactions.
 
     The README requests a "first-order approximation": treat the fetch as
     a single bulk transfer across *one* hop (the peer that forwarded the EB
     body is expected to hold the full closure).  We expose a flag to compare
     against the conservative multi-hop version.
+
+    Optional hop_weights gives probabilities for one, two, ... sequential
+    hops of the entire missing batch.  It overrides use_1hop.
     """
     missing_kb = TX_CACHE_MISS_RATE * s_eb_tx_kb
-    if use_1hop:
+    if missing_kb == 0:
+        return cdf_wait(0.001)
+    if hop_weights is not None:
+        weights = np.asarray(hop_weights, dtype=float)
+        if (weights.ndim != 1 or not len(weights)
+                or not np.all(np.isfinite(weights)) or np.any(weights < 0)
+                or not np.isclose(weights.sum(), 1.0)):
+            raise ValueError("hop_weights must be non-negative probabilities summing to one")
+        fetch_cdf = cdf_choices([
+            (weight, cdf_hops(hops, missing_kb))
+            for hops, weight in enumerate(weights, start=1) if weight > 0
+        ])
+    elif use_1hop:
         fetch_cdf = cdf_hop(missing_kb)
     else:
         fetch_cdf = cdf_blended_delay(missing_kb)
-    return cdf_choice(TX_CACHE_HIT_RATE, cdf_wait(0.001), fetch_cdf)
+    return fetch_cdf
 
 
 def cdf_validate_eb_for_voter(s_eb_tx_kb: float) -> np.ndarray:
@@ -1507,27 +1526,32 @@ def cdf_process_eb_closure(s_eb_tx_kb: float, reapply_only: bool = False) -> np.
 
 
 def cdf_closure_completion(
-    s_eb_tx_kb: float, include_validation: bool = True, reapply_only: bool = False
+    s_eb_tx_kb: float, include_validation: bool = True, reapply_only: bool = False,
+    hop_weights=None, body_size_kb=None,
 ) -> np.ndarray:
     """
     Per-node EB-CLOSURE completion CDF G(t): the time for a node to receive
-    the EB body, fetch the missing closure transactions (1-hop), and --
+    the EB body, fetch the missing closure transactions, and --
     when include_validation=True -- process the whole closure (CPU).
 
       include_validation=True  -> readiness    (body + missing-tx fetch + CPU)
       include_validation=False -> delivery only (body + missing-tx fetch)
+
+    hop_weights optionally replaces the default fetch path with a batch-level
+    hop mixture, for both readiness and delivery-only calculations.
+    body_size_kb optionally fixes the body size instead of mixing sizes.
     """
     if include_validation:
         return cdf_sequential(
             cdf_sequential(
-                cdf_fetch_eb_body(),
-                cdf_fetch_missing_eb_closure(s_eb_tx_kb, use_1hop=True),
+                cdf_fetch_eb_body(body_size_kb),
+                cdf_fetch_missing_eb_closure(s_eb_tx_kb, use_1hop=True, hop_weights=hop_weights),
             ),
             cdf_process_eb_closure(s_eb_tx_kb, reapply_only=reapply_only),
         )
     return cdf_sequential(
-        cdf_fetch_eb_body(),
-        cdf_fetch_missing_eb_closure(s_eb_tx_kb, use_1hop=False),
+        cdf_fetch_eb_body(body_size_kb),
+        cdf_fetch_missing_eb_closure(s_eb_tx_kb, use_1hop=False, hop_weights=hop_weights),
     )
 
 
@@ -1689,6 +1713,8 @@ def cdf_full_closure_diffusion_given_cert(
     adversary: str = "active",
     committee_size: int = 900,
     include_validation: bool = True,
+    hop_weights=None,
+    body_size_kb=None,
 ) -> np.ndarray:
     """
     Conditional CDF F_{full|C}(t) = P(all honest nodes hold the validated EB
@@ -1696,12 +1722,17 @@ def cdf_full_closure_diffusion_given_cert(
     (kB).  beta=0 is the all-honest committee; beta>0 the adversarial
     treatment (see _quorum_given_honest_ontime).
     """
-    G = cdf_closure_completion(s_eb_tx_kb, include_validation=include_validation)
+    G = cdf_closure_completion(
+        s_eb_tx_kb, include_validation=include_validation, hop_weights=hop_weights,
+        body_size_kb=body_size_kb,
+    )
     # All-honest-nodes diffusion term G_apply(t)^N_h: those nodes APPLY the
     # already-certified closure (reapplyTx throughout, scripts skipped);
     # the voter / certification factors keep the full-validation law G.
     G_apply = cdf_closure_completion(
-        s_eb_tx_kb, include_validation=include_validation, reapply_only=True
+        s_eb_tx_kb, include_validation=include_validation, reapply_only=True,
+        hop_weights=hop_weights,
+        body_size_kb=body_size_kb,
     )
     return _full_diffusion_given_cert_from_G(
         G,

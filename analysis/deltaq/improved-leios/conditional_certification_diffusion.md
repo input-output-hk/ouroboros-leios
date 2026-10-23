@@ -44,6 +44,11 @@ for model in ("mathis", "cubic"):
 
 ## 1. Setup
 
+The current implementation also corrects the cache interpretation: every node
+fetches the stationary missing fraction (1/6) of the closure, rather than
+entering a fetch branch with probability 1/6.  This note's historical tables
+predate that correction; use the updated numerical report linked above.
+
 The security assumptions for Linear Leios require that a *certified EB*
 reaches almost all honest nodes by the end of $L_\text{diff}$. We are therefore
 interested in the conditional CDF
