@@ -35,9 +35,6 @@ a one-sixth probability that a node needs to fetch anything.
   certification becomes extremely rare.  Quorum probabilities use a seeded
   permutation estimate, not a Normal tail; extreme-tail values remain
   sensitive to the finite permutation sample and synthetic stake distribution.
-- **The original report's largest case is 12.288 decimal MB**, labelled there
-  as “12 MB”.  This report retains that exact size as a separate comparison
-  row, but applies the same multi-hop fetch assumption as every other row.
 
 ## 1. What the numbers mean
 
@@ -141,7 +138,6 @@ the 14-second column; §3 gives their more informative completion-time differenc
 | 4 | 615.385 | 666.667 | 55.1347% | 6.4872e-23% | 0.0000% | 0.0000% | 100.0000% |
 | 8 | 1230.77 | 1333.33 | 16.6900% | 1.7273e-278% | 0.0000% | 0.0000% | 0.0000% |
 | 12 | 1846.15 | 2000 | 4.6231% | 1.6401e-614% | 0.0000% | 0.0000% | 0.0000% |
-| 12.288 | 1890.46 | 2048 | 4.5075% | 2.5994e-621% | 0.0000% | 0.0000% | 0.0000% |
 
 ### CUBIC network model
 
@@ -155,7 +151,6 @@ the 14-second column; §3 gives their more informative completion-time differenc
 | 4 | 615.385 | 666.667 | 80.9318% | 99.6413% | 0.0000% | 0.0000% | 100.0000% |
 | 8 | 1230.77 | 1333.33 | 54.3077% | 5.9575e-25% | 0.0000% | 0.0000% | 100.0000% |
 | 12 | 1846.15 | 2000 | 36.9762% | 5.2942e-93% | 0.0000% | 0.0000% | 98.7205% |
-| 12.288 | 1890.46 | 2048 | 33.9349% | 4.8590e-111% | 0.0000% | 0.0000% | 98.7327% |
 
 A high individual voter readiness probability does not imply that every node
 is ready.  For example, at 2 MB under Mathis, individual voter readiness at
@@ -169,13 +164,12 @@ in §3.1; the 50% one-hop / 50% two-hop assumption does not enter P(C).
 
 Each curve shows the probability that all 2,500 honest nodes are ready by
 time *t*, given certification, for one closure size. Vertical dotted lines
-mark the 7, 10, and 14 s table checkpoints. The dashed size curve retains
-the original report's 12.288 MB comparison case. Colours identify the same
+mark the 7, 10, and 14 s table checkpoints.  Colours identify the same
 closure sizes in all four CDF plots.
 
-![Mathis conditional all-node closure completion CDFs for closures from 0.125 to 12.288 MB](conditional-certification-diffusion/mathis-honest-cdf.svg)
+![Mathis conditional all-node closure completion CDFs for closures from 0.125 to 12 MB](conditional-certification-diffusion/mathis-honest-cdf.svg)
 
-![CUBIC conditional all-node closure completion CDFs for closures from 0.125 to 12.288 MB](conditional-certification-diffusion/cubic-honest-cdf.svg)
+![CUBIC conditional all-node closure completion CDFs for closures from 0.125 to 12 MB](conditional-certification-diffusion/cubic-honest-cdf.svg)
 
 ## 3. Completion times and active-adversary comparison
 
@@ -203,7 +197,6 @@ population fixed.
 | 4 | 11.86 | 12.35 | 13.76 | 13.79 | 13.74 | 100.0000% |
 | 8 | 18.48 | 19.23 | 21.38 | 21.44 | 19.28 | 0.0000% |
 | 12 | 25.71 | 26.75 | 29.75 | 29.82 | 26.82 | 0.0000% |
-| 12.288 | 26.23 | 27.29 | 30.35 | 30.42 | 27.36 | 0.0000% |
 
 ### CUBIC
 
@@ -217,7 +210,6 @@ population fixed.
 | 4 | 10.43 | 10.44 | 11.00 | 11.03 | 10.99 | 100.0000% |
 | 8 | 11.38 | 11.85 | 13.16 | 13.21 | 13.14 | 100.0000% |
 | 12 | 12.64 | 13.14 | 14.57 | 14.64 | 13.22 | 99.0257% |
-| 12.288 | 12.78 | 13.28 | 14.73 | 14.80 | 13.36 | 99.0420% |
 
 At 0.5 MB, the honest p99 time leaves **8.02 s** before the 14-second
 deadline under both models.  At 4 MB, conditional p99 leaves **0.24 s under
@@ -229,8 +221,8 @@ budgets for additional traffic or implementation overhead.
 
 The percentile plot uses a logarithmic closure-size axis to keep the smaller
 sizes legible. Each panel includes the honest p50, p95, p99, and p99.9 times,
-with the active-adversary p99 shown as a dashed black line. The rightmost
-points include both 12 and 12.288 MB under both models.
+with the active-adversary p99 shown as a dashed black line.  The rightmost
+point is 12 MB under both models.
 Where certification saturates, the
 active line nearly overlaps honest p99 because the main difference is the
 smaller honest-node target.  Conditioning on rare certification also changes

@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 
 
-SIZES_MB = (0.125, 0.26, 0.5, 1, 2, 4, 8, 12, 12.288)
+SIZES_MB = (0.125, 0.26, 0.5, 1, 2, 4, 8, 12)
 PLOT_DIR = Path(__file__).resolve().parents[3] / "docs" / "conditional-certification-diffusion"
 # Pre-certification voters use blended paths; certified completion uses short paths.
 DEFAULT_HOP_WEIGHTS = (0.5, 0.5)
@@ -43,8 +43,7 @@ def plot_completion_cdfs(model, rows, active=False):
             continue  # Impossible certification has no conditional curve.
         ax.plot(
             A.TIMES, cdf, color=colors[i],
-            linestyle="--" if mb == 12.288 else "-",
-            label=f"{mb:g} MB" + (" (original case)" if mb == 12.288 else " (Musashi limit)" if mb == 0.26 else ""),
+            label=f"{mb:g} MB" + (" (Musashi limit)" if mb == 0.26 else ""),
         )
     for t, label in ((7, "Vote deadline"), (10, "Checkpoint"), (14, "Diffusion deadline")):
         ax.axvline(t, color="gray", linestyle=":", linewidth=1)
@@ -71,7 +70,7 @@ def plot_completion_times(results):
         ax.plot(sizes, [completion_quantile(row[2], 0.99) for row in rows], linestyle="--", color="black", label="Active p99 (1,875 nodes)")
         ax.axhline(14, color="gray", linestyle=":", label="14 s deadline")
         ax.set_xscale("log", base=2)
-        ticks = SIZES_MB[:-1]
+        ticks = SIZES_MB
         ax.set_xticks(ticks, [f"{s:g}" for s in ticks])
         ax.set_xlabel("Closure size (decimal MB; logarithmic scale)")
         ax.set_title(model.upper())
