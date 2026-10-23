@@ -1721,6 +1721,10 @@ def cdf_full_closure_diffusion_given_cert(
     CLOSURE by t | EB certified), parameterised by the closure size S_EB_tx
     (kB).  beta=0 is the all-honest committee; beta>0 the adversarial
     treatment (see _quorum_given_honest_ontime).
+
+    Historical mixed-readiness approximation.  The numerical report now uses
+    two_phase.py's explicit deadline-triggered recovery and joint readiness.
+
     """
     G = cdf_closure_completion(
         s_eb_tx_kb, include_validation=include_validation, hop_weights=hop_weights,

@@ -10,29 +10,31 @@ with **125 kB, 260 kB, and 500 kB closures**, alongside 1–12 MB closures.
 Results are model estimates, including CPU processing, rather than measurements.
 
 The **260 kB case is Musashi's configured transaction-closure limit**.  At
-that size, the honest all-node p99 completion time is **3.30 s under both
+that size, the honest all-node p99 completion time is **4.01 s under both
 network models**.  The committee selects the **900 highest-stake
 pools**, matching the current implementation and Musashi's seat-count parameter.
-Every table and plot uses **50% one-hop and 50% two-hop paths**
-for missing-batch fetches, and
+Every table and plot uses a **causal two-phase model**: blended fetching and
+validation before the 7-second deadline, then **50% one-hop / 50% two-hop
+recovery for nodes still missing data** on certification, with
 **EB body size = closure size × 40/260**.
-At 260 kB, the body is 40 kB and p99.9 is **3.31 s under both models**.
+At 260 kB, the body is 40 kB and p99.9 is **4.36 s under both models**.
 The stationary missing fraction is **one sixth at every node**; it is not
 a one-sixth probability that a node needs to fetch anything.
 
 - **At the 14-second deadline**, closures up to 4 MB round to **100.0000%**
-  all-node completion under both network models.  For larger closures, Mathis
-  rounds to **0.0000%**, while CUBIC rounds to **100.0000%**, conditional on
-  certification.
-  Rounded 100% does not mean zero failure probability.
+  all-node completion under both network models, with effectively certain
+  certification through 2 MB.  At 8 MB, Mathis rounds to **0.0000%** all-node
+  completion by 14 s, while CUBIC rounds to **100.0000%**, conditional on
+  certification.  Rounded 100% does not mean zero failure probability.
 - **Smaller closures finish earlier.** Reducing the closure from 4 MB to 0.5 MB
-  reduces the all-node 99th-percentile completion time from **13.74 s to 4.98 s**
-  under Mathis, and from **10.98 s to 4.98 s** under CUBIC.
-- **Certification is effectively certain through 4 MB under both models.**
-  CUBIC gives **99.9165%** certification at 8 MB, **2.6906%** at 12 MB, and
-  **2.5004%** at 12.288 MB.  For Mathis closures of 8 MB and above,
-  certification becomes an extremely rare event in the Normal approximation;
-  the conditional results there should be treated as approximation-sensitive.
+  reduces the all-node 99th-percentile completion time from **13.76 s to 5.98 s**
+  under Mathis and from **11.00 s to 5.98 s** under CUBIC.
+- **Certification is effectively certain through 2 MB under both models.**
+  CUBIC gives **99.6413%** certification at 4 MB.  For Mathis closures of
+  4 MB and above, and CUBIC closures of 8 MB and above,
+  certification becomes extremely rare.  Quorum probabilities use a seeded
+  permutation estimate, not a Normal tail; extreme-tail values remain
+  sensitive to the finite permutation sample and synthetic stake distribution.
 - **The original report's largest case is 12.288 decimal MB**, labelled there
   as “12 MB”.  This report retains that exact size as a separate comparison
   row, but applies the same multi-hop fetch assumption as every other row.
@@ -72,11 +74,13 @@ closure-completion calculation.
 | Certification threshold | 75% of total active stake; approximately 75.88% of committee stake |
 | Voting / diffusion deadline | 7 s / 14 s |
 | Stationary missing transaction fraction | Every node fetches 1/6 of the closure (approximately 16.67%) |
-| Missing-transaction fetch | 50% one hop, 50% two hops for the whole missing batch; see §3.1 |
+| Phase-one missing-transaction fetch | Full blended one-to-five-hop distribution; determines voter readiness and P(C) |
+| Phase-two recovery | Begins no earlier than 7 s, conditional on certification: 50% one hop, 50% two hops; see §3.1 |
 | EB-body diffusion | Full blended one-to-five-hop distribution from `report.md` §4.2 |
 | EB body | Fixed size for each closure: closure size × 40/260; 40 kB at a 260 kB closure |
 | Average transaction size | 1,000 bytes |
-| CPU means | Voter mixture: approximately 0.1428 ms/transaction; reapply: 0.070 ms/transaction |
+| CPU means | Initial validation: approximately 0.1428 ms/transaction; recovery reapply: 0.070 ms/transaction |
+| Quorum calculation | 50,000 seeded pool permutations (seed 164); binomial mixture evaluated in log space |
 | Network models | Mathis (Reno/AIMD) and CUBIC |
 | Packet loss / interface cap | 0.0001 / 1 Gbit/s |
 | Short / medium / long RTT | 12 / 69 / 268 ms |
@@ -115,8 +119,10 @@ the 1, 4, and 12 MB rows below therefore use slightly different inputs.
 
 Very small certification probabilities are displayed in scientific notation
 as percentages, rather than rounded to zero.
-All certification probabilities in this sweep are numerically representable,
-including the extremely small Mathis tails; every closure has a plotted curve.
+Certification and conditional probabilities are evaluated in log space; even
+the extremely small Mathis tails remain numerically representable as logs.
+Every closure size has a plotted curve.  Scientific notation does not imply
+that such extreme tails are empirically calibrated.
 
 The baseline has no adversarial nodes. All probabilities are percentages,
 rounded to four decimal places. Thus `0.0000%` and `100.0000%` are rounded
@@ -129,13 +135,13 @@ the 14-second column; §3 gives their more informative completion-time differenc
 |---:|---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 19.2308 | 20.8333 | 100.0000% | 100.0000% | 100.0000% | 100.0000% | 100.0000% |
 | 0.26 | 40 | 43.3333 | 100.0000% | 100.0000% | 100.0000% | 100.0000% | 100.0000% |
-| 0.5 | 76.9231 | 83.3333 | 100.0000% | 100.0000% | 100.0000% | 100.0000% | 100.0000% |
-| 1 | 153.846 | 166.667 | 100.0000% | 100.0000% | 100.0000% | 100.0000% | 100.0000% |
-| 2 | 307.692 | 333.333 | 99.5994% | 100.0000% | 0.0122% | 100.0000% | 100.0000% |
-| 4 | 615.385 | 666.667 | 86.7248% | 100.0000% | 0.0000% | 0.0002% | 100.0000% |
-| 8 | 1230.77 | 1333.33 | 42.6110% | 6.4035e-46% | 0.0000% | 0.0000% | 0.0000% |
-| 12 | 1846.15 | 2000 | 15.2651% | 4.4109e-287% | 0.0000% | 0.0000% | 0.0000% |
-| 12.288 | 1890.46 | 2048 | 14.9895% | 4.6512e-294% | 0.0000% | 0.0000% | 0.0000% |
+| 0.5 | 76.9231 | 83.3333 | 100.0000% | 100.0000% | 99.9967% | 100.0000% | 100.0000% |
+| 1 | 153.846 | 166.667 | 99.9800% | 100.0000% | 60.5871% | 100.0000% | 100.0000% |
+| 2 | 307.692 | 333.333 | 93.5955% | 100.0000% | 0.0000% | 100.0000% | 100.0000% |
+| 4 | 615.385 | 666.667 | 55.1347% | 6.4872e-23% | 0.0000% | 0.0000% | 100.0000% |
+| 8 | 1230.77 | 1333.33 | 16.6900% | 1.7273e-278% | 0.0000% | 0.0000% | 0.0000% |
+| 12 | 1846.15 | 2000 | 4.6231% | 1.6401e-614% | 0.0000% | 0.0000% | 0.0000% |
+| 12.288 | 1890.46 | 2048 | 4.5075% | 2.5994e-621% | 0.0000% | 0.0000% | 0.0000% |
 
 ### CUBIC network model
 
@@ -143,23 +149,23 @@ the 14-second column; §3 gives their more informative completion-time differenc
 |---:|---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 19.2308 | 20.8333 | 100.0000% | 100.0000% | 100.0000% | 100.0000% | 100.0000% |
 | 0.26 | 40 | 43.3333 | 100.0000% | 100.0000% | 100.0000% | 100.0000% | 100.0000% |
-| 0.5 | 76.9231 | 83.3333 | 100.0000% | 100.0000% | 100.0000% | 100.0000% | 100.0000% |
-| 1 | 153.846 | 166.667 | 100.0000% | 100.0000% | 100.0000% | 100.0000% | 100.0000% |
-| 2 | 307.692 | 333.333 | 99.9261% | 100.0000% | 18.6229% | 100.0000% | 100.0000% |
-| 4 | 615.385 | 666.667 | 96.0654% | 100.0000% | 0.0000% | 98.4236% | 100.0000% |
-| 8 | 1230.77 | 1333.33 | 81.5363% | 99.9165% | 0.0000% | 0.0453% | 100.0000% |
-| 12 | 1846.15 | 2000 | 71.8524% | 2.6906% | 0.0000% | 0.0000% | 100.0000% |
-| 12.288 | 1890.46 | 2048 | 71.7836% | 2.5004% | 0.0000% | 0.0000% | 100.0000% |
+| 0.5 | 76.9231 | 83.3333 | 100.0000% | 100.0000% | 99.9967% | 100.0000% | 100.0000% |
+| 1 | 153.846 | 166.667 | 99.9800% | 100.0000% | 60.5871% | 100.0000% | 100.0000% |
+| 2 | 307.692 | 333.333 | 94.9502% | 100.0000% | 0.0000% | 100.0000% | 100.0000% |
+| 4 | 615.385 | 666.667 | 80.9318% | 99.6413% | 0.0000% | 0.0000% | 100.0000% |
+| 8 | 1230.77 | 1333.33 | 54.3077% | 5.9575e-25% | 0.0000% | 0.0000% | 100.0000% |
+| 12 | 1846.15 | 2000 | 36.9762% | 5.2942e-93% | 0.0000% | 0.0000% | 98.7205% |
+| 12.288 | 1890.46 | 2048 | 33.9349% | 4.8590e-111% | 0.0000% | 0.0000% | 98.7327% |
 
 A high individual voter readiness probability does not imply that every node
 is ready.  For example, at 2 MB under Mathis, individual voter readiness at
-7 s is **99.5994%**, while all-node reapplication completion is **0.0122%**.
+7 s is **93.5955%**, while all-node completion rounds to **0.0000%**.
 Certification only requires the stake quorum, so it remains effectively certain.
 
 ### Conditional completion CDFs
 
-All plots and tables use the **50% one-hop / 50% two-hop fetch distribution**
-defined in §3.1.
+All plots and tables use the **two-phase node process** defined
+in §3.1; the 50% one-hop / 50% two-hop assumption does not enter P(C).
 
 Each curve shows the probability that all 2,500 honest nodes are ready by
 time *t*, given certification, for one closure size. Vertical dotted lines
@@ -189,33 +195,34 @@ population fixed.
 
 | Closure (MB) | Honest p50 (s) | Honest p95 (s) | Honest p99 (s) | Honest p99.9 (s) | Active p99 (s) | Active all ready by 14 s, given C |
 |---:|---:|---:|---:|---:|---:|---:|
-| 0.125 | 1.73 | 1.80 | 2.01 | 2.02 | 2.01 | 100.0000% |
-| 0.26 | 2.84 | 2.96 | 3.30 | 3.31 | 3.30 | 100.0000% |
-| 0.5 | 4.28 | 4.46 | 4.98 | 4.99 | 4.97 | 100.0000% |
-| 1 | 5.66 | 5.89 | 6.57 | 6.59 | 6.57 | 100.0000% |
-| 2 | 8.11 | 8.44 | 9.41 | 9.43 | 9.40 | 100.0000% |
-| 4 | 11.85 | 12.34 | 13.74 | 13.77 | 13.73 | 100.0000% |
-| 8 | 16.44 | 18.53 | 18.59 | 18.60 | 18.63 | 0.0000% |
-| 12 | 22.68 | 22.69 | 22.69 | 22.69 | 22.71 | 0.0000% |
-| 12.288 | 23.14 | 23.15 | 23.15 | 23.15 | 23.17 | 0.0000% |
+| 0.125 | 2.16 | 2.40 | 2.45 | 2.67 | 2.45 | 100.0000% |
+| 0.26 | 3.53 | 3.92 | 4.01 | 4.36 | 4.01 | 100.0000% |
+| 0.5 | 5.27 | 5.83 | 5.98 | 6.50 | 5.98 | 100.0000% |
+| 1 | 6.98 | 8.27 | 8.99 | 9.00 | 8.98 | 100.0000% |
+| 2 | 9.89 | 9.90 | 9.91 | 9.92 | 9.91 | 100.0000% |
+| 4 | 11.86 | 12.35 | 13.76 | 13.79 | 13.74 | 100.0000% |
+| 8 | 18.48 | 19.23 | 21.38 | 21.44 | 19.28 | 0.0000% |
+| 12 | 25.71 | 26.75 | 29.75 | 29.82 | 26.82 | 0.0000% |
+| 12.288 | 26.23 | 27.29 | 30.35 | 30.42 | 27.36 | 0.0000% |
 
 ### CUBIC
 
 | Closure (MB) | Honest p50 (s) | Honest p95 (s) | Honest p99 (s) | Honest p99.9 (s) | Active p99 (s) | Active all ready by 14 s, given C |
 |---:|---:|---:|---:|---:|---:|---:|
-| 0.125 | 1.73 | 1.80 | 2.01 | 2.02 | 2.01 | 100.0000% |
-| 0.26 | 2.84 | 2.96 | 3.30 | 3.31 | 3.30 | 100.0000% |
-| 0.5 | 4.28 | 4.46 | 4.98 | 4.99 | 4.97 | 100.0000% |
-| 1 | 5.66 | 5.89 | 6.57 | 6.59 | 6.57 | 100.0000% |
-| 2 | 7.75 | 8.07 | 9.00 | 9.02 | 8.99 | 100.0000% |
-| 4 | 9.47 | 9.86 | 10.98 | 11.01 | 10.97 | 100.0000% |
-| 8 | 11.37 | 11.83 | 13.15 | 13.19 | 13.13 | 100.0000% |
-| 12 | 12.63 | 13.10 | 13.13 | 13.14 | 14.55 | 98.9861% |
-| 12.288 | 12.77 | 13.24 | 13.27 | 13.28 | 14.71 | 98.9948% |
+| 0.125 | 2.16 | 2.40 | 2.45 | 2.67 | 2.45 | 100.0000% |
+| 0.26 | 3.53 | 3.92 | 4.01 | 4.36 | 4.01 | 100.0000% |
+| 0.5 | 5.27 | 5.83 | 5.98 | 6.50 | 5.98 | 100.0000% |
+| 1 | 6.98 | 8.27 | 8.99 | 9.00 | 8.98 | 100.0000% |
+| 2 | 9.73 | 9.74 | 9.75 | 9.76 | 9.75 | 100.0000% |
+| 4 | 10.43 | 10.44 | 11.00 | 11.03 | 10.99 | 100.0000% |
+| 8 | 11.38 | 11.85 | 13.16 | 13.21 | 13.14 | 100.0000% |
+| 12 | 12.64 | 13.14 | 14.57 | 14.64 | 13.22 | 99.0257% |
+| 12.288 | 12.78 | 13.28 | 14.73 | 14.80 | 13.36 | 99.0420% |
 
-At 0.5 MB, the honest p99 time leaves **9.02 s** before the 14-second
-deadline under both models.  At 4 MB, Mathis retains **0.26 s** and CUBIC
-retains **3.02 s**.  These are model timing margins, not measured
+At 0.5 MB, the honest p99 time leaves **8.02 s** before the 14-second
+deadline under both models.  At 4 MB, conditional p99 leaves **0.24 s under
+Mathis** and **3.00 s under CUBIC**; the Mathis certificate itself is extremely
+unlikely.  These are model timing margins, not measured
 budgets for additional traffic or implementation overhead.
 
 ### Completion-time percentiles by closure size
@@ -223,12 +230,12 @@ budgets for additional traffic or implementation overhead.
 The percentile plot uses a logarithmic closure-size axis to keep the smaller
 sizes legible. Each panel includes the honest p50, p95, p99, and p99.9 times,
 with the active-adversary p99 shown as a dashed black line. The rightmost
-points include both 12 and 12.288 MB under both network models.
+points include both 12 and 12.288 MB under both models.
 Where certification saturates, the
 active line nearly overlaps honest p99 because the main difference is the
-smaller honest-node target.  The rare-certification rows also have different
-quorum-conditioning factors; their rare-event approximation can put active
-p99 later than honest p99.
+smaller honest-node target.  Conditioning on rare certification also changes
+the distribution of nodes already ready at the deadline.  The new calculation
+does not impose monotonicity by taking a running maximum of the CDF.
 
 ![Conditional all-node completion-time percentiles versus closure size for Mathis and CUBIC](conditional-certification-diffusion/completion-time-percentiles.svg)
 
@@ -236,7 +243,7 @@ p99 later than honest p99.
 
 These use the same axes and size colours as the honest-baseline plots, but
 target all 1,875 honest nodes under the 25% active-adversary scenario.
-Both honest and active-adversary plots use the fixed fetch mixture.
+Both honest and active-adversary plots use the split fetch assumptions.
 
 ![Mathis conditional closure completion CDFs with 25% active adversarial committee stake and 1,875 honest nodes](conditional-certification-diffusion/mathis-active-cdf.svg)
 
@@ -244,17 +251,39 @@ Both honest and active-adversary plots use the fixed fetch mixture.
 
 ### 3.1. Fixed missing-transaction fetch model
 
-Every result uses the same fetch model for the **whole missing-transaction
-batch**: **50% one hop and 50% two hops**.  These weights are modelling
-assumptions, not measured mainnet frequencies:
+The model uses separate paths for the **whole missing-transaction batch**
+before and after the voting deadline:
 
-| Path length | Probability |
-|---:|---:|
-| 1 hop | 50% |
-| 2 hops | 50% |
+| Path length | Phase-one fetch | Phase-two recovery |
+|---:|---:|---:|
+| 1 hop | 0.40% | 50% |
+| 2 hops | 3.91% | 50% |
+| 3 hops | 31.06% | 0% |
+| 4 hops | 61.85% | 0% |
+| 5 hops | 2.78% | 0% |
 
-The generator sets `DEFAULT_HOP_WEIGHTS=(0.5, 0.5)` for missing batches only.
-EB bodies retain the full blended one-to-five-hop distribution from
+**Phase one:** every honest node attempts to acquire and validate the closure.
+Voter readiness and the unconditional certification probability P(C) use only
+the full blended fetch law and initial validation.  Nodes outside the committee
+also follow this initial processing law, but do not vote.
+
+**Phase two starts at 7 s, conditional on certification.**  A node already
+validated remains complete.  A node that has fetched its entire missing batch
+continues any validation still in progress.  A node still missing data uses
+the short-path recovery law, beginning at the later of 7 s and its body arrival,
+then reapplies the closure.  Already completed data fetching is retained;
+partial bytes of an unfinished batch are not credited, so that batch is
+restarted in full.  This is a deliberately coarse batch-level progress model.
+
+Certified holders are assumed to be immediately available as serving sources
+at the deadline.  There is no additional certificate-construction, delivery,
+source-discovery, or queueing delay.  Recovery does not happen on a branch
+where certification fails.  This is a fixed-deadline model, not a model of
+the earliest possible quorum time or per-node certificate arrival.
+
+The generator sets `DEFAULT_HOP_WEIGHTS=(0.5, 0.5)` for recovery only.  These
+weights are modelling assumptions, not measured mainnet frequencies.
+EB bodies retain the full blended distribution from
 [`report.md` §4.2](../analysis/deltaq/improved-leios/report.md#42-network-model),
 implemented by `cdf_blended_delay` using `analysis.py`'s `_HOP_PROBS`.
 Two-hop fetching represents data being acquired upstream before it reaches
@@ -265,7 +294,7 @@ and CPU laws are unchanged.
 
 The **stationary transaction-cache miss fraction is 1/6 at every node**.
 Each node therefore fetches a batch of size `closure / 6`, with the path
-length drawn from the equal one/two-hop mixture.  There is no additional 5/6
+length drawn from the applicable phase's distribution.  There is no additional 5/6
 probability of a full-closure cache hit.  This is a mean-fraction approximation:
 it does not sample which individual transactions are missing or model them
 taking different paths.  The model also omits peer-discovery delays,
@@ -275,12 +304,75 @@ Only the missing fraction traverses these fetch paths; this is not the
 §5.3 catastrophic pre-diffusion-failure scenario in `report.md`, in which the
 entire closure must traverse the network.
 
+### 3.2. Joint readiness and conditional completion
+
+Let *B* be body arrival, *U* the phase-one missing-batch fetch duration,
+*X* initial validation, *R* recovery duration, and *Y* reapplication.  Component
+durations are independent; both phases share the same body arrival.  Set
+*L = B + U*, *V = L + X*, and define completion *D* on a certified branch by:
+
+$$
+D = \begin{cases}
+V, & L \le t_v,\\
+\max(B,t_v)+R+Y, & L > t_v,
+\end{cases}
+\qquad t_v=7\ \mathrm{s}.
+$$
+
+Thus a node ready to vote is necessarily already complete.  For independent
+node histories, the required joint probability is known explicitly:
+
+$$
+H(t_v,t)=P(V\le t_v,D\le t)=F_V(\min(t_v,t)).
+$$
+
+Writing *A_t* for all honest nodes completing by *t*, the conditional CDF is:
+
+$$
+P(A_t\mid C)=F_D(t)^{N_h}
+\frac{Q\!\left(H(t_v,t)/F_D(t)\right)}{Q(F_V(t_v))}.
+$$
+
+This uses the actual conditional voter probability *H/F_D*, rather than the
+old substitution involving *F_V(t_v)/F_V(t)*.  The denominator and phase-one
+vote readiness do not change when the recovery-hop distribution changes.
+The identity is exact under the independent-node model with an exact *Q*;
+the report approximates *Q* using the reproducible method below.
+
+### 3.3. Stake-weighted quorum calculation
+
+For a committee of *K* seats, let *a_k* be the probability that a uniformly
+chosen subset of *k* seats carries quorum stake.  Then:
+
+$$
+Q(p)=\sum_{k=0}^{K} a_k {K\choose k}p^k(1-p)^{K-k}.
+$$
+
+The implementation estimates all *a_k* using **50,000 uniform random pool
+permutations**, with **seed 164**.  For each permutation it records the first
+prefix whose stake reaches quorum; the empirical CDF of this prefix length
+estimates *a_k*.  The same coefficients are used for the denominator and
+conditional numerator.  This is not rejection sampling of rare certification
+events, and the binomial mixture is evaluated in log space.
+
+The non-negative mixture preserves a consistent probability model: the
+conditional curves are bounded and non-decreasing without clipping excursions
+or taking a running maximum.  Roundoff at unity is trimmed only within a
+small numerical tolerance.  The quorum calculation is still a finite-sample
+approximation to the exact stake-weighted distribution; very rare tails can
+depend strongly on favourable subsets absent from the sample.
+
+For the stylised active-adversary comparison, 25% of committee weight votes
+deterministically and each stochastic seat's weight is scaled by 75%.
+This does not identify an actual allocation of adversarial pools; the honest
+completion target remains 1,875 nodes, following the earlier comparison.
+
 ## 4. Interpretation and scope
 
 For the smaller sizes, **earlier readiness and timing margin** distinguish the
 options more usefully than the rounded 14-second probability.  Reducing a
 500 kB closure to 125 kB also reduces the body from approximately 76.92 kB
-to 19.23 kB, reducing p99 by **2.97 s under both models**.  These rows model
+to 19.23 kB, reducing p99 by **3.53 s under both models**.  These rows model
 jointly smaller bodies and closures, rather than isolating closure-fetch costs.
 
 The following assumptions bound what these figures establish:
@@ -291,49 +383,52 @@ The following assumptions bound what these figures establish:
 - **Independent, stake-independent node completion times.** Shared network
   paths, correlated cache misses, and differences in SPO connectivity are not
   represented; no general direction of error is established here.
-- **Two CPU laws.** The implementation uses full voter validation for
-  certification and reapply-only processing for the all-node diffusion term.
-  Combining these in the conditional formula is a first-order approximation,
-  not the exact single-law derivation in the original note.  Where certification
-  saturates, results numerically agree with the reapply-only all-node power
-  term.  When certification does not saturate, including the largest CUBIC
-  rows and the rare-certification Mathis rows, the conditioning factor matters;
-  mixing laws and enforcing monotonicity can produce sharp steps and unstable
-  tail percentiles.  Those conditional figures are not reliable predictions
-  of operational rare-event behaviour.
-- **Approximate quorum tails.** Certification uses a Normal approximation to
-  a stake-weighted vote sum. In the original note's silent-adversary case,
-   25% withholding leaves at most approximately 74.13% of total active stake
-   with the current 900-seat synthetic committee, below the
-  75% threshold: certification is impossible. The Normal approximation can
-  nevertheless return a positive tail. No conditional completion probability
-  is defined for that impossible event, so it is not tabulated here.
+- **Idealised recovery boundary.** Immediate serving availability at 7 s and
+  independent, uncontended recovery are assumptions.  Restarting unfinished
+  missing batches ignores partial-byte progress.  Real certificate arrival,
+  fetching overlap, and shared serving capacity can alter the result.
+- **Approximate quorum coefficients.** The permutation estimate preserves
+  probability identities but is not an exact enumeration of all subsets.
+  Decimal precision is for reproducibility, not confidence in extremely rare
+  probabilities.  A silent adversary withholding 25% of committee stake would
+  leave approximately 74.13% of active stake, below quorum; such an impossible
+  event has no conditional completion distribution and is not tabulated.
 - **Discrete numerical model.** Transfer-time steps, fixed mixtures, and the
   10 ms grid produce plateaus and sharp tail changes.  For example, the
-  Mathis 14-second result changes from **100.0000% at 4 MB** to
-  a value rounding to **0.0000% at 8 MB**, while certification also becomes rare.
-  This is a model result, not a measured
-  operational cliff; displayed precision supports reproducibility rather
-  than equivalent predictive accuracy.
+  recovery onset and deterministic transfer mixtures can create plateaus and
+  sharp jumps.  Sums in the two-phase module place two positive grid durations
+  at their summed time, correcting the earlier convolution's one-bin advance
+  per composition.  This also shifts some voter-readiness figures slightly.
 
 ## 5. Reproducing the tables and plots
 
-The tables and plots use the existing
-[`analysis.py`](../analysis/deltaq/improved-leios/analysis.py) implementation,
-with `include_validation=True` and the fixed inputs above. The
+The tables and plots use the component laws in
+[`analysis.py`](../analysis/deltaq/improved-leios/analysis.py), combined by the
+causal process and quorum calculation in
+[`two_phase.py`](../analysis/deltaq/improved-leios/two_phase.py), with the fixed
+inputs above.  The older mixed-readiness approximation in `analysis.py` is no
+longer used by this report.  The
 [report generator](../analysis/deltaq/improved-leios/closure_diffusion.py)
 prints four tables, writes five SVG plots to
 `docs/conditional-certification-diffusion/`, and checks that the computed CDFs are bounded and
 non-decreasing, that certification probabilities are non-negative and bounded,
-and that conditional curves agree numerically with the reapply-only all-node
-curves when certification saturates.  Both voter and reapplication calculations
-use the same closure-scaled body size and fixed fetch-hop mixture.
+and that conditional curves agree numerically with the two-phase node CDF
+raised to the population count when certification saturates.  CDF monotonicity
+is checked without repair.
 
 From the repository root, in a Python environment with NumPy, SciPy, and
 Matplotlib installed:
 
 ```sh
 python3 analysis/deltaq/improved-leios/closure_diffusion.py
+```
+
+The targeted tests cover phase timing, retained validation, late bodies,
+recovery independence of certification, small exact conditional examples,
+quorum-coefficient estimation, and log-space underflow handling:
+
+```sh
+python3 -m unittest discover -s analysis/deltaq/improved-leios -p test_two_phase.py
 ```
 
 For the mathematical derivation and broader discussion, see the

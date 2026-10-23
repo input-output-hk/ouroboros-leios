@@ -11,15 +11,16 @@ from pathlib import Path
 import numpy as np
 
 import analysis as A
+import two_phase as T
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 
 
 SIZES_MB = (0.125, 0.26, 0.5, 1, 2, 4, 8, 12, 12.288)
 PLOT_DIR = Path(__file__).resolve().parents[3] / "docs" / "conditional-certification-diffusion"
-# Missing batches use short paths; EB bodies retain blended diffusion.
+# Pre-certification voters use blended paths; certified completion uses short paths.
 DEFAULT_HOP_WEIGHTS = (0.5, 0.5)
-DEFAULT_HOP_LABEL = "Missing-batch fetch: 50% one hop, 50% two hops"
+DEFAULT_HOP_LABEL = "Before 7 s: blended fetching; recovery from 7 s: 50% one hop, 50% two hops"
 BODY_CLOSURE_RATIO = 40 / 260
 
 
@@ -39,7 +40,7 @@ def plot_completion_cdfs(model, rows, active=False):
     for i, (mb, honest, adversarial) in enumerate(rows):
         cdf = adversarial if active else honest
         if cdf is None:
-            continue  # Certification probability underflowed; no conditional curve.
+            continue  # Impossible certification has no conditional curve.
         ax.plot(
             A.TIMES, cdf, color=colors[i],
             linestyle="--" if mb == 12.288 else "-",
@@ -99,6 +100,16 @@ def seconds(t):
     return f"{t:.2f}" if np.isfinite(t) else "N/A"
 
 
+def log_percentage(log_p):
+    if not np.isfinite(log_p):
+        return "0 (impossible)"
+    if log_p >= np.log(0.0000005):
+        return percentage(np.exp(log_p))
+    log10_percent = log_p / np.log(10) + 2
+    exponent = int(np.floor(log10_percent))
+    return f"{10 ** (log10_percent - exponent):.4f}e{exponent:+d}%"
+
+
 def main():
     print(A._committee_label())
     print(DEFAULT_HOP_LABEL)
@@ -113,26 +124,22 @@ def main():
         for mb in SIZES_MB:
             kb = mb * 1000
             body_kb = kb * BODY_CLOSURE_RATIO
-            inputs = dict(hop_weights=DEFAULT_HOP_WEIGHTS, body_size_kb=body_kb)
-            voter = A.cdf_closure_completion(kb, **inputs)
-            apply = A.cdf_closure_completion(kb, reapply_only=True, **inputs)
+            result = T.calculate(kb, body_kb, recovery_hops=DEFAULT_HOP_WEIGHTS)
+            voter = result.voter
             check_cdf(voter)
-            check_cdf(apply)
+            check_cdf(result.completion)
             gv = A.success_within(voter, 7)
-            pc = float(A._quorum_given_honest_ontime(gv, 2500, 0.75, 0, "active"))
-            pc_active = float(A._quorum_given_honest_ontime(gv, 2500, 0.75, 0.25, "active"))
-            honest = A.cdf_full_closure_diffusion_given_cert(kb, **inputs) if pc > 0 else None
-            active = A.cdf_full_closure_diffusion_given_cert(kb, beta=0.25, **inputs) if pc_active > 0 else None
+            honest, active = result.honest, result.active
             for cdf in (honest, active):
                 if cdf is not None:
                     check_cdf(cdf)
             rows.append((mb, honest, active))
-            assert 0 <= pc <= 1
-            assert 0 <= pc_active <= 1
-            # Only saturated certification reduces to the reapply-only power.
-            if pc > 1 - 1e-12:
-                assert np.allclose(honest, apply**2500, atol=1e-10, rtol=0)
-            pc_text = "underflow" if pc == 0 else f"{100 * pc:.4e}%" if pc < 0.0000005 else percentage(pc)
+            assert result.log_pc <= 0
+            assert result.log_pc_active <= 0
+            # Saturated certification reduces to the two-phase node-CDF power.
+            if result.log_pc > np.log1p(-1e-12):
+                assert np.allclose(honest, result.completion**2500, atol=1e-10, rtol=0)
+            pc_text = log_percentage(result.log_pc)
             values = [percentage(gv), pc_text]
             values += [percentage(A.success_within(honest, t)) if honest is not None else "N/A" for t in (7, 10, 14)]
             print(f"| {mb:g} | {body_kb:g} | {kb / 6:g} | " + " | ".join(values) + " |")
