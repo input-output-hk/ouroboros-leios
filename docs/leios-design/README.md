@@ -926,7 +926,11 @@ For Cardano mainnet, a sufficient quantity is 10,000 elections---that incurs an 
 
 TODO what would happen if there's 10,001 elections?
 
-TODO other non-diffusion components, such as voting, should also contribute to this list/have their own
+- For voting, the node centrally tracks:
+    - The first valid vote of each seat in each election whose deadline has not passed, and the weight they add up to per announcing RB.
+    - The certificate of each volatile announcement that reached its quorum.
+
+TODO other non-diffusion components should also contribute to this list/have their own
 
 ### Endorser block storage
 
@@ -994,7 +998,16 @@ A new thread dedicated to Leios vote production (**NEW-LeiosVoteProductionThread
 - **REQ-IssueLeiosVotes** The node must vote for EBs exactly according to the rules from the CIP.
 - **REQ-DiffuseLeiosVotes** The node must diffuse votes (via the Network layer's mini-protocols) at least until they're old enough that there remains only a negligible probability they could still enable an RB that was issued on-time to include a certificate for the EB they support.
 
-A new storage component (**NEW-LeiosVoteStorage**) will store all votes received by a node, up to some conservative age (eg ten minutes). As votes arrive, they will be grouped according to the RB they support. When enough votes have arrived for some RB, the certificate can be generated immediately, which can avoid delaying the potential subsequent issuance of a CertRB by this node. A vote for the EB announced by an RB is irrelevant once all nodes will never switch their selection away from some block that is not older than that RB. This condition is very likely to be satisfied relatively soon on Cardano mainnet, unless its Praos growth is being disrupted. Therefore, the vote storage component can simply discard votes above some conservative age, which determines a stochastic upper bound the heap size of all sufficiently-young votes.
+A new storage component (**NEW-LeiosVoteStorage**) will store the votes received by a node until their deadline: the end of their diffusion period, 3 $L_\text{hdr}$ + $L_\text{vote}$ + $L_\text{diff}$ after their election began.
+Votes are only relayed to aggregate a certificate, and the earliest RB that can include it is due in the first slot at or after the deadline.
+The protocol parameters must leave enough time for votes to diffuse and be aggregated by then.
+A vote that arrives later means they do not, so the node warns about it rather than using it.
+Such a vote could still complete a certificate for an RB that happens to be issued later, but a quorum that late is no evidence that the EB has diffused by the end of $L_\text{diff}$, which the protocol's security relies on.
+So the node deliberately gives up that throughput rather than endanger safety.
+As votes arrive, they are grouped according to the RB they support.
+When enough votes have arrived for some RB, the certificate is generated immediately, which avoids delaying the potential subsequent issuance of a CertRB by this node.
+So an RB reaches its quorum by the deadline or never, and the votes can be discarded at the deadline.
+Only the certificate is kept for longer, until the announcing RB is immutable, as the RB that includes it may well be issued after the deadline.
 
 Once enough votes have been collected for an EB, a certificate can be formed and included in a ranking block:
 
@@ -1011,7 +1024,7 @@ Each downstream peer's LeiosNotify server reads that log through its own cursor,
 - A peer that connects late starts at the log's oldest entry, so it still receives everything worth relaying.
 
 Whoever appends an entry has already decided it is worth relaying, and the log drops each entry once it no longer is.
-An announcement or offer is worth relaying until its election is 5 minutes old, a vote until its diffusion period has ended, 3 $L_\text{hdr}$ + $L_\text{vote}$ + $L_\text{diff}$ after its election began, or its announcement is no longer worth relaying, whichever comes first, so no peer receives a vote without its announcement.
+An announcement or offer is worth relaying until its election is 5 minutes old, a vote until its deadline, or its announcement is no longer worth relaying, whichever comes first, so no peer receives a vote without its announcement.
 A vote is cast only within its voting period, but keeps diffusing after it, as the certificate needs it only once the diffusion period has passed.
 A downstream peer tolerates more than that, so the log can be pruned on a coarse tick without ever relaying something too late.
 Because each entry's lifetime is tied to its election, rather than to when it was appended, no offer or vote outlives the announcement it depends on, and a peer reading the log in order always receives an announcement before the offers and votes for it.
@@ -1028,12 +1041,14 @@ So central components decide, once for all upstream peers, what is appended to t
   It verifies a vote's signature only if it does not already have a vote of that seat, so a copy of a known vote costs only its bytes.
   It records only valid votes, so a badly signed vote cannot shadow a valid vote of the same seat, and it disconnects the peer that sent one, since an honest peer verifies what it relays.
   The vote is verified outside of the transaction that records it, since a BLS verification is too expensive to repeat when a transaction retries.
+  It records and appends a vote only if it has verified it by the vote's deadline, judged by the clock when it records it.
+  Votes from one peer are verified one after another, so a vote that arrives in time can still be verified too late, behind others, and is dropped as if it arrived too late.
   It appends a vote that arrived before its voting window opened, which a client accepts within its clock skew, only once the window opens by the node's own clock, as a downstream peer whose clock is behind would otherwise reject it.
 - Offers will be appended once the node has acquired an EB body or closure.
 
 AnnounceState is pruned as the immutable tip advances.
-VoteState instead keeps the votes of only a fixed number of the latest election slots, far more than have votes still within their diffusion period.
-Once full, it ignores a vote for a slot older than all those it keeps, so it never relays a vote it has forgotten a second time.
+VoteState instead drops the votes of an election once their deadline has passed, on a coarse tick, and remembers up to when it pruned, so a vote verified meanwhile cannot bring an election back and be relayed a second time.
+It keeps the certificate of an announcement until the immutable tip has passed the announcing RB.
 
 ### Chain selection
 
