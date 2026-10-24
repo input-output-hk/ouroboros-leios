@@ -993,7 +993,12 @@ The first version of LeiosTxCache should reliably cache all relevant transaction
 >
 > FIXME: Discuss which committee to determine eligibility and validity of votes? refer to commitee selection in ledger chapter
 
-A new thread dedicated to Leios vote production (**NEW-LeiosVoteProductionThread**) will wake up when the closure of an EB is newly available. If the voting rules would require the stake pool to vote (now or soon) for this EB if it's valid, then this thread will begin validating it. Note if multiple closures arrive simultaneously, at most one of them could be eligible for a vote, since the voting rules require the EB to be announced by the tip of the node's current selection. If the validation succeeds while the voting rules still require the stake pool to vote for this EB (TODO even if it has since switched its selection?), the thread will issue that vote.
+The node votes with the BLS key of its credentials to lead, in a thread next to the one that forges with them (**NEW-LeiosVoteProductionThread**), so it follows the credentials as they are reloaded.
+When the closure of an EB is newly available, the node votes for it in a thread of its own, so that a slow validation of one EB delays no vote for another.
+If one of its keys holds a seat in the election, it waits for the tip of its selection to announce the EB, and validates the closure against the tip's ledger state right away, rather than once the window to vote opens, which leaves that window to the vote.
+Once the window opens, $3 L_\text{hdr}$ after the election began, it votes if the tip still announces the EB, it saw no other announcement of the election, and the voting period has not ended.
+Its own votes go through NEW-LeiosVoteStorage like any peer's, so they are relayed and counted towards the certificate alike.
+Until the ledger provides an EBODY rule, a closure is applied one transaction after the other, as the mempool applies them.
 
 - **REQ-IssueLeiosVotes** The node must vote for EBs exactly according to the rules from the CIP.
 - **REQ-DiffuseLeiosVotes** The node must diffuse votes (via the Network layer's mini-protocols) at least until they're old enough that there remains only a negligible probability they could still enable an RB that was issued on-time to include a certificate for the EB they support.
