@@ -1043,7 +1043,9 @@ So central components decide, once for all upstream peers, what is appended to t
   The vote is verified outside of the transaction that records it, since a BLS verification is too expensive to repeat when a transaction retries.
   It records and appends a vote only if it has verified it by the vote's deadline, judged by the clock when it records it.
   Votes from one peer are verified one after another, so a vote that arrives in time can still be verified too late, behind others, and is dropped as if it arrived too late.
-  It appends a vote that arrived before its voting window opened, which a client accepts within its clock skew, only once the window opens by the node's own clock, as a downstream peer whose clock is behind would otherwise reject it.
+  It takes a vote only once its window has opened by the node's own clock, as a downstream peer whose clock is behind would otherwise reject it.
+  A client accepts a vote that arrives earlier, within its clock skew, and waits for the window before handing it on, as ChainSync does for a header from the near future.
+  That holds up the peer that sent it, but a peer whose clock is ahead sends its announcements just as early.
 - Offers will be appended once the node has acquired an EB body or closure.
 
 AnnounceState is pruned as the immutable tip advances.
