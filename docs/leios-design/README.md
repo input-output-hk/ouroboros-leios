@@ -545,7 +545,7 @@ Ad-hoc runs on a local twelve-node devnet, not a published benchmark, suggest th
 
 Two points of interpretation matter for the design. First, nothing in the protocol makes a large Mempool expensive; it is expensive because the implementation still performs work proportional to Mempool contents while a block is being produced, which converts depth into forging latency. Holding more transactions is precisely what fills endorser blocks, and the shallower configuration paid for its stability with a measurable throughput loss at low load. The objective is therefore not a small Mempool but a cheap large one, with a capacity chosen for memory and fairness rather than one that silently keeps forging affordable. Second, if the work on the critical path cannot be made sufficiently sublinear, an explicit governor is preferable to a capacity limit that happens to serve as one.
 
-The solution is a threefold design: removing the lock contention so that accepting, diffusing and forging proceed concurrently (the *double-buffered mempool*), exploiting transaction validity ranges to make advancing the slot cheap, and keeping ready-to-forge views so that block production never re-applies the whole mempool on the critical path. The data structures and function names below track the `ouroboros-consensus` implementation and may evolve.
+The solution is a threefold design: removing the lock contention so that accepting, diffusing and forging proceed concurrently (the *double-buffered mempool*), exploiting transaction validity ranges to make advancing the slot cheap, and keeping two views of the mempool, one per base a block can be forged on, that switch when a certifying block arrives, so that neither block production nor following the chain re-applies the whole mempool on the critical path. The data structures and function names below track the `ouroboros-consensus` implementation and may evolve.
 
 ![](./mempool-component-diagram.svg)
 
@@ -600,29 +600,24 @@ One mutation breaks the purely additive picture the converging loop relies on. `
 
 #### Cheap ticking
 
-> [!WARNING]
->
-> TODO: Not yet implemented and incomplete design. How will this exactly result in less checking in the forge loop? Shouldn't we incorporate knowledge of the leader schedule?
+A transaction is applicable only over a **validity range** of slots: its own validity interval (`invalidBefore`/`invalidHereafter`, and those of any sub-transactions it carries), together with the era and protocol parameters that govern how it is validated. So advancing the slot, not only changing the `base`, can invalidate a transaction.
 
-A transaction is applicable only over a **validity range** of slots: its own validity interval (`invalidBefore`/`invalidHereafter`), together with the era and protocol parameters that govern how it is validated. So advancing the slot, not only changing the `base`, can invalidate a transaction.
-
-Two facts keep this cheap to track. The era and protocol parameters change only at **epoch boundaries**, so within an epoch the validation rules are fixed. And the mempool commits to an `interval` of its own, a window reaching to the next expected block or the epoch boundary, admitting only transactions valid across the whole of it:
+Two facts keep this cheap to track. The era and protocol parameters change only at **epoch boundaries**, so within an epoch the validation rules are fixed. And the intersection of the validity ranges of the transactions in the Mempool is cheap to maintain alongside them: it narrows when a transaction is added, and is recomputed when the transactions are re-applied anyway. Together they give each view of the Mempool an `interval` over which nothing its transactions depend on changes:
 
 ```haskell
-data MempoolState = MempoolState
-  { base     :: LedgerState
-  , interval :: (SlotNo, SlotNo)  -- slot range the whole mempool is valid over
-  , txs      :: [Tx]
+data MempoolView = MempoolView
+  { base     :: LedgerState  -- ticked to the slot after its tip
+  , txs      :: [Tx]         -- the transactions applicable on it, in order
+  , after    :: LedgerState  -- base with all of txs applied
+  , interval :: SlotRange    -- the txs' validity ranges, intersected, up to the epoch's end
   }
 ```
 
-A third operation, `Tick`, advances the current slot as a cheap **intersection**: as long as the new slot stays within `interval`, nothing observable to the transactions changes and nothing is re-applied. Leaving the `interval`, at the latest at an epoch boundary, forces a re-apply (and a re-validate on a new era). Since `interval` is roughly a 20-slot window, from the current tip or epoch start to the next expected block or epoch end, maintaining it lets the node advance many slots between the bigger, base-changing rebases without ever touching `txs`. The trade-off is that a transaction whose own validity range is narrower than `interval` cannot be admitted, which is acceptable for the performance win.
+Advancing a view to a slot within its `interval` changes nothing observable to its transactions, so nothing is re-applied: forging, which needs the transactions applicable at the forging slot, reads the view as it stands. Only leaving the `interval` forces a re-apply, when a transaction expires or at the latest at the epoch boundary (and a re-validation on a new era).
 
-#### Ready-to-forge views
+The `interval` follows from what the Mempool holds rather than being committed to up front, so admission need not reject transactions with narrow validity ranges. Such a transaction narrows the `interval`, and if it expires before the next block it costs one re-apply. Refusing transactions that would expire before the next expected block keeps the `interval` wide, but it is an admission policy, not a requirement of this design.
 
-> [!WARNING]
->
-> TODO: Not yet implemented and likely incomplete design
+#### Switching views
 
 Removing the lock contention lets forging run concurrently with ingestion and diffusion, but it does not by itself make forging fast: the block producer still needs the transactions applicable at the forging slot, and computing that naively means re-applying the mempool at that moment, the `O(|txs|)` cost we must keep off the critical path where only a fraction of a slot is available.
 
@@ -631,16 +626,28 @@ For forging, a block producer works against not one `base` but two. Under Leios 
 - one where the preceding endorsement is **not** being certified, so all mempool transactions are available to forge and announce;
 - one where it **is** being certified, so the transactions of that now-settled EB are already in the ledger and must be excluded.
 
-Which base applies is only decided at forge time, once it is known whether enough votes for the preceding EB have arrived. The Mempool therefore keeps **two ready-to-forge views**, one per base, pre-computed so that neither outcome pays a re-application on the critical path. At forge time the block producer just picks the matching view, selects transactions, and performs the cheap slot-dependent checks (see [cheap ticking](#cheap-ticking)).
+Which base applies is only decided at forge time, once it is known whether enough votes for the preceding EB have arrived. The Leios Mempool therefore holds one sequence of transactions, the relaying state that is accepted, diffused and evicted, and **two views** of it, one per base:
 
-For that to hold, forging must stay a cheap *read* of a view and never turn into a fresh computation. Two mechanisms keep it so, each with a concrete form in the `cardano-node`:
+```haskell
+data LeiosMempool = LeiosMempool
+  { txs        :: [Tx]               -- what is accepted and diffused
+  , tipView    :: MempoolView        -- txs on the selection's tip
+  , certView   :: Maybe MempoolView  -- txs on the tip plus the closure of the EB it announces
+  }
+```
 
-- an **optimistic view** keeps forging off the rebase path: the block producer reads the matching ready-to-forge view as it stands, just as any other reader is served from the on-screen buffer, rather than first synchronising it to the very latest base. A tip that arrived moments earlier is picked up on the next block-production opportunity.
-- a **capped forging snapshot** bounds whatever reconciliation is still unavoidable: advancing the chosen view to the forging slot is free while it stays within the `interval` (cheap ticking), and any residual re-application against the base (today `getSnapshotFor` can trigger a full one) is time- and size-bounded, so producing the snapshot cannot stall behind a large re-apply.
+- The **tip view** is what a new transaction is validated against (`applyTx`), and what forging a `TxRB` with its EB reads.
+- The **certifying view** holds the same transactions re-applied (`reapplyTx`) on top of the closure of the EB announced by the tip, and is what forging a `CertRB`, with the EB announced alongside it, reads. Transactions the closure includes or conflicts with simply fail to re-apply on it.
 
-Of the two, the cap is the harder guarantee, because it is what bounds the case the optimistic view does not cover. Reconciliation, not the selection of transactions, dominates the cost of producing a block, and a view that is free when it is current but unbounded when it is not still puts seconds into a leader slot. Bounding the expected cost is therefore not sufficient; the bound has to hold precisely when the view must be brought forward, which at Leios Mempool depths is a common enough case to dominate the distribution.
+Both views are kept up to date continuously, not built when needed: an admitted transaction is applied to the tip view and re-applied to the certifying view, and the certifying view is built as soon as the tip announces an EB whose closure is available. At forge time the block producer picks the view that matches its tip and decision, selects transactions, and ticks it within its `interval` (see [cheap ticking](#cheap-ticking)).
 
-Missing it costs more under Leios than under Praos, where a slow forge costs at most the slot. An endorsement can only be certified by the block succeeding the one that announced it, so the votes it needs must be produced and diffused within a single inter-block interval. A slow forge spends part of that interval before anyone else can begin: the announcement, and the EB data a voter needs in order to validate what it is voting on, are released late by however long the producer took to prepare them. Every voter's window is shortened by that delay, not just the producer's own, so votes arrive later and some arrive too late to count, taking with them the endorsement they would have certified. Forging latency therefore does not merely delay a block, it propagates into the voting round and can amplify into certification failures across the network, which argues for keeping this work off the critical path rather than merely making it faster.
+The views **switch** when the chain moves on. A `CertRB` adds nothing to its parent but the closure of the EB the parent announced, so the certifying view built for that EB *is* the Mempool on the `CertRB`: it becomes the tip view, retagged with the new tip, instead of every transaction being re-applied, and a new certifying view is built from what the `CertRB` announces. Only a `TxRB`, or a fork switch, still needs a `Sync`, since its transactions can conflict with those in the Mempool; the certifying view is then rebuilt from the new tip's announcement.
+
+Every node keeps both views, not only block producers. Switching lets each node follow certifying blocks without a full re-apply, so the ledger work of a `CertRB` is spread over the inter-block interval before it arrives rather than spent when it does. The closure application the certifying view needs is also the work voters do to validate an EB and chain selection does to adopt a `CertRB`, so sharing it between them is a natural next step.
+
+Forging thereby stays a cheap *read* of a view and never turns into a fresh computation, with one exception: neither view matches when the selection changed moments before the leader slot, or across an epoch boundary. That residual re-application against the forging base is **time-capped**, so producing the snapshot cannot stall behind a large re-apply. The cap is also what bounds forging under adversarial load, which is why the Mempool needs no capacity in validation time on top of it: its capacity is in bytes and execution units, sized for memory and fairness.
+
+Missing that bound costs more under Leios than under Praos, where a slow forge costs at most the slot. An endorsement can only be certified by the block succeeding the one that announced it, so the votes it needs must be produced and diffused within a single inter-block interval. A slow forge spends part of that interval before anyone else can begin: the announcement, and the EB data a voter needs in order to validate what it is voting on, are released late by however long the producer took to prepare them. Every voter's window is shortened by that delay, not just the producer's own, so votes arrive later and some arrive too late to count, taking with them the endorsement they would have certified. Forging latency therefore does not merely delay a block, it propagates into the voting round and can amplify into certification failures across the network, which argues for keeping this work off the critical path rather than merely making it faster.
 
 > [!WARNING]
 >
@@ -659,7 +666,7 @@ The existing block production thread must be updated to generate an EB at the sa
 
 For the block production thread to determine which transactions from a mempool snapshot can go into an RB, which overflow into an EB and how many can fit into the EB, a new capacity measure analogous to the existing `blockCapacityTxMeasure` will be needed for EBs (**NEW-LeiosEbCapacityMeasure**). The EB capacity measure must incorporate the new EB-specific block limit [protocol parameters](#new-protocol-parameters) from the ledger state, much like the existing Praos block capacity is also determined by protocol parameters.
 
-Furthermore, the existing `forgeBlock` method and/or the `BlockForging` interface must be extended (**UPD-LeiosForgeBlock**) to optionally produce an EB for a given block type (`blk`). The transactions to include are prepared by the Mempool ahead of time, see [ready-to-forge views](#ready-to-forge-views).
+Furthermore, the existing `forgeBlock` method and/or the `BlockForging` interface must be extended (**UPD-LeiosForgeBlock**) to optionally produce an EB for a given block type (`blk`). The transactions to include are prepared by the Mempool ahead of time, see [switching views](#switching-views).
 
 > [!WARNING]
 >
