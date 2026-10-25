@@ -5,6 +5,28 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## rc-2026w43 - 2026-10-25
+
+A small consensus-only release: more efficient storing and serving of endorser blocks, block producers forge certifying blocks without reapplying the mempool, and the mempool fills to its byte capacity more consistently. This improved the forge loop timings and generally result in faster release of announcements and smoother data diffusion. 
+
+> [!IMPORTANT]
+>
+> **Requires resync, not a respin.** The LeiosDb stores endorser blocks in a new layout that a w42 node's databases are not migrated to. Delete the chain database along with `leios.vol.db` and `leios.imm.db`, and sync again. Wire formats are unchanged, so nodes of both versions can talk to each other.
+
+- The LeiosDb stores each endorser block's transactions as one blob [consensus#2449](https://github.com/IntersectMBO/ouroboros-consensus/pull/2449)
+  - Serving an endorser block's transactions reads bytes and never decodes.
+  - Transactions the node already has from other endorser blocks are copied locally, and only if their bytes hash to the listed transaction. Copies that do not are traced as `FillsRejected` and fetched instead.
+- Forging no longer reapplies the whole mempool [consensus#2449](https://github.com/IntersectMBO/ouroboros-consensus/pull/2449)
+  - The mempool keeps a second view of its transactions with the announced endorser block's closure applied, so a block certifying it is forged from that view in milliseconds, which took up to 0.9s before.
+  - Adopting such a block makes that view the mempool's state instead of revalidating every transaction (`SwitchedToCertifyingView` trace).
+  - A block without a certificate is forged from the mempool's state as is, as long as no transaction's validity interval or the epoch ends before its slot.
+- The mempool no longer limits admission by the transactions' validation time
+- Fixes a `V2LSM` node segfaulting when reading more than 65,536 UTxO keys at once [consensus#2449](https://github.com/IntersectMBO/ouroboros-consensus/pull/2449)
+  - This can only be hit on really high Leios configurations, e.g. syncing a mempool with 10 MB worth of transactions
+  - `V2InMemory` nodes, were not affected.
+- Fixes the transaction cache holding on to one batch of transactions longer than needed [consensus#2436](https://github.com/IntersectMBO/ouroboros-consensus/pull/2436)
+  - A batch can be a whole endorser block's transactions. The retention was bounded, not a leak.
+
 ## rc-2026w42 - 2026-10-16
 
 Ships all the good things that happened since `11.2` on ledger, api and cli `master` branches. Consensus-wise it fixes how endorser blocks carry a transaction's script validity and an endorser block can no longer be certified across an epoch boundary, and the CLI gains a query for the Leios committee.
