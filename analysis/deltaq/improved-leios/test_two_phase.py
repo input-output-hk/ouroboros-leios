@@ -145,6 +145,16 @@ class TwoPhaseTests(unittest.TestCase):
         np.testing.assert_allclose(coefficients, exact, atol=.015)
         self.assertTrue(np.all(np.diff(coefficients) >= 0))
 
+    def test_worst_case_starts_at_deadline_and_powers_receivers(self):
+        A.set_network_model("mathis")
+        node, everyone = T.worst_case(260, 40, 620, (.8, .2))
+        tick = round(7 / A.DT)
+        self.assertTrue(np.all(node[:tick] == 0))
+        np.testing.assert_allclose(everyone, node**620)
+        self.assertTrue(np.all(np.diff(node) >= -1e-12))
+        _, slower = T.worst_case(260, 40, 620, (.5, .5))
+        self.assertGreaterEqual(A.quantile_of(slower, .99), A.quantile_of(everyone, .99))
+
 
 if __name__ == "__main__":
     unittest.main()

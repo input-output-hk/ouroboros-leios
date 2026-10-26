@@ -46,6 +46,12 @@ a one-sixth probability that a node needs to fetch anything.
   recovering node reaches a holder in one hop with probability close to
   1 − (1 − *f*)^*m*.  The timing model uses *f* = 25% and *m* = 5, the
   smallest holder stake and peer count in the sweep.
+- **Safety worst case** (§3.6): an adversary with stake σ_α approaching 50%
+  can certify while releasing the EB so late that only honest nodes with
+  τ − σ_α ≈ 25% of stake hold it at 7 s.  The remaining honest nodes then
+  reach p99 at **12.02 s** for 260 kB under both models, against **4.01 s**
+  in the honest baseline.  From 0.5 MB under Mathis and from 1 MB under
+  CUBIC, p99 exceeds the 14-second deadline.
 
 ## 1. What the numbers mean
 
@@ -185,11 +191,24 @@ closure sizes in all four CDF plots.
 
 ## 3. Completion times and active-adversary comparison
 
-The honest columns target all **2,500** nodes. The active-adversary columns
-use the original note's scenario: an adversary controls **25% of committee
-stake** and always votes on time, independently of honest diffusion. The model
-also reduces the honest node target to **1,875**, assuming the same adversarial
-fraction by node count. A stake fraction alone does not imply that node count.
+The honest columns target all **2,500** nodes.  The active-adversary columns
+follow §8 of the
+[original note](../analysis/deltaq/improved-leios/conditional_certification_diffusion.md):
+an adversary controls **25% of committee stake**, about 24.7% of total stake,
+and always votes on time, independently of honest diffusion.  The note chose
+25% for illustration, just past the approximately 24% at which an adversary
+withholding its votes could block certification; it is not derived from a
+safety requirement.  The model also reduces the honest node target to
+**1,875**, assuming the same adversarial fraction by node count.  A stake
+fraction alone does not imply that node count.
+
+These columns are not a safety analysis.  The adversary enters only through
+its votes in the certification condition and through the smaller honest
+population; adversarial nodes still relay bodies and transactions like honest
+ones, so they cannot delay diffusion.  Raising the adversarial share towards
+50% therefore changes these results by less than a second.  §3.6 instead
+models an adversary that withholds diffusion, so that only τ − σ_α of stake
+is guaranteed to help.
 
 Where certification is effectively certain, the slightly
 earlier active p99 values mainly reflect the smaller completion target;
@@ -525,6 +544,91 @@ Sampled figures are shown to two decimals.  `0.00%` means that no case was
 observed among approximately 160,000 to 480,000 receiver samples; it is not a
 zero probability.
 
+### 3.6. Late-release safety worst case
+
+Linear Leios should not weaken Praos safety, even when the adversary controls
+stake σ_α approaching 50%.  Such an adversary supplies σ_α of the τ = 75%
+quorum, so a certificate only guarantees that honest nodes with τ − σ_α of
+stake, about 25%, have the EB.  Adversarial nodes need not help anyone else.
+
+This scenario models that case as follows:
+
+1. The adversary releases the EB so late that, at the 7-second vote
+   deadline, only honest holders with exactly τ − σ_α of stake have the body
+   and closure.  Every other honest node has neither, and uses no
+   transactions from its cache.  The adversary votes on time, so
+   certification is certain and nothing is conditioned.
+2. From 7 s, each remaining honest receiver fetches the body and then the
+   full closure, each over the reachable hop distribution of §3.5 for
+   *m* = 5, holder stake τ − σ_α, and non-forwarding adversarial stake σ_α.
+   It then validates the closure in full.
+3. Receivers complete independently.  Their number is the mean count of
+   honest nonholders in the graph draws: 619 at σ_α = 25% and 620 at
+   σ_α = 50%.
+
+#### Mathis
+
+| Closure (MB) | Adversarial stake | Honest holders | Receivers | p50 (s) | p99 (s) | All ready by 14 s | All ready by 20 s |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.125 | 25% | 50% | 619 | 8.87 | 9.23 | >99.9999% | >99.9999% |
+| 0.125 | 50% | 25% | 620 | 9.35 | 10.47 | >99.9999% | >99.9999% |
+| 0.26 | 25% | 50% | 619 | 9.73 | 10.28 | >99.9999% | >99.9999% |
+| 0.26 | 50% | 25% | 620 | 10.52 | 12.02 | 99.9996% | >99.9999% |
+| 0.5 | 25% | 50% | 619 | 10.89 | 11.69 | >99.9999% | >99.9999% |
+| 0.5 | 50% | 25% | 620 | 12.09 | 14.11 | 98.7506% | >99.9999% |
+| 1 | 25% | 50% | 619 | 12.64 | 13.78 | 99.2615% | >99.9999% |
+| 1 | 50% | 25% | 620 | 14.23 | 17.39 | 39.2334% | 99.9943% |
+| 2 | 25% | 50% | 619 | 16.64 | 18.45 | 1.7544% | 99.6533% |
+| 2 | 50% | 25% | 620 | 18.92 | 24.94 | <0.0001% | 55.5751% |
+| 4 | 25% | 50% | 619 | 25.09 | 27.90 | <0.0001% | 12.5235% |
+| 4 | 50% | 25% | 620 | 28.83 | >40 | <0.0001% | <0.0001% |
+| 8 | 25% | 50% | 619 | >40 | >40 | <0.0001% | <0.0001% |
+| 8 | 50% | 25% | 620 | >40 | >40 | <0.0001% | <0.0001% |
+| 12 | 25% | 50% | 619 | >40 | >40 | <0.0001% | <0.0001% |
+| 12 | 50% | 25% | 620 | >40 | >40 | <0.0001% | <0.0001% |
+
+#### CUBIC
+
+| Closure (MB) | Adversarial stake | Honest holders | Receivers | p50 (s) | p99 (s) | All ready by 14 s | All ready by 20 s |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.125 | 25% | 50% | 619 | 8.87 | 9.23 | >99.9999% | >99.9999% |
+| 0.125 | 50% | 25% | 620 | 9.35 | 10.47 | >99.9999% | >99.9999% |
+| 0.26 | 25% | 50% | 619 | 9.73 | 10.28 | >99.9999% | >99.9999% |
+| 0.26 | 50% | 25% | 620 | 10.52 | 12.02 | 99.9996% | >99.9999% |
+| 0.5 | 25% | 50% | 619 | 10.39 | 11.12 | >99.9999% | >99.9999% |
+| 0.5 | 50% | 25% | 620 | 11.48 | 13.12 | 99.9301% | >99.9999% |
+| 1 | 25% | 50% | 619 | 11.18 | 12.09 | 99.9989% | >99.9999% |
+| 1 | 50% | 25% | 620 | 12.47 | 14.36 | 96.9992% | >99.9999% |
+| 2 | 25% | 50% | 619 | 12.33 | 13.29 | 99.8742% | >99.9999% |
+| 2 | 50% | 25% | 620 | 13.79 | 15.91 | 70.4441% | 99.9999% |
+| 4 | 25% | 50% | 619 | 13.48 | 14.45 | 97.3276% | >99.9999% |
+| 4 | 50% | 25% | 620 | 15.13 | 17.56 | 8.1191% | 99.9869% |
+| 8 | 25% | 50% | 619 | 15.55 | 17.21 | 6.5978% | 99.9989% |
+| 8 | 50% | 25% | 620 | 17.78 | 21.07 | <0.0001% | 96.4649% |
+| 12 | 25% | 50% | 619 | 17.18 | 19.09 | <0.0001% | 99.8091% |
+| 12 | 50% | 25% | 620 | 19.84 | 23.73 | <0.0001% | 60.9539% |
+
+![All-honest-node p99 completion times in the late-release worst case, against the honest baseline](conditional-certification-diffusion/safety-worst-case-percentiles.svg)
+
+At Musashi's 260 kB limit with σ_α = 50%, p99 is **12.02 s** under both
+models, compared with **4.01 s** in the honest baseline, and all honest
+nodes are ready by 14 s with probability **99.9996%**.  Under Mathis, p99
+exceeds 14 s from 0.5 MB (**14.11 s**); under CUBIC, from 1 MB
+(**14.36 s**).  At σ_α = 25%, p99 stays within 14 s up to 1 MB under Mathis
+(13.78 s) and up to 2 MB under CUBIC (13.29 s).  Most of the gap to the
+baseline is structural: receivers start only at 7 s, transfer the body and
+the whole closure, and validate it in full.
+
+This is a sketch of the worst case rather than a bound.  Starting every
+receiver at 7 s is pessimistic by the holders' own validation time, since
+honest holders forward data as soon as they have it, and so is ignoring
+cache contents.  Uncontended holder uploads are optimistic, and receivers
+with no honest route (3.41% at σ_α = 50% on the static graph of §3.5) are
+excluded.  Whether an adversary can time the release this precisely depends
+on header and EB diffusion rules not modelled here.  The safety question is
+whether these times fit within the window that L_diff allows; this report
+measures them against the 14-second deadline used throughout.
+
 ## 4. Interpretation and scope
 
 For the smaller sizes, **earlier readiness and timing margin** distinguish the
@@ -572,7 +676,7 @@ causal process and quorum calculation in
 inputs above.  The older mixed-readiness approximation in `analysis.py` is no
 longer used by this report.  The
 [report generator](../analysis/deltaq/improved-leios/closure_diffusion.py)
-prints four baseline tables, two stress tables, and the recovery-path table, writes nine SVG plots to
+prints four baseline tables, two stress tables, two safety worst-case tables, and the recovery-path table, writes ten SVG plots to
 `docs/conditional-certification-diffusion/`, and checks that the computed CDFs are bounded and
 non-decreasing, that certification probabilities are non-negative and bounded,
 and that conditional curves agree numerically with the two-phase node CDF
@@ -589,7 +693,8 @@ python3 analysis/deltaq/improved-leios/closure_diffusion.py
 The targeted tests cover phase timing, retained validation, late bodies,
 recovery and stress independence of certification, small exact conditional examples,
 quorum-coefficient estimation, log-space underflow handling, recovery-graph
-construction, path direction, adversarial transit, and the one-hop closed form:
+construction, path direction, adversarial transit, the one-hop closed form,
+and the late-release worst case:
 
 ```sh
 python3 -m unittest discover -s analysis/deltaq/improved-leios -p 'test_*.py'

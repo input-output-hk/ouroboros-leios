@@ -168,6 +168,53 @@ def stress_scenario(baseline):
     save_plot(fig, "stress-completion-time-percentiles.svg")
 
 
+# (adversarial stake, honest holder stake = tau - adversarial stake), both of total stake.
+SAFETY_SCENARIOS = ((.25, .5), (.5, .25))
+
+
+def safety_worst_case(baseline):
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True, constrained_layout=True)
+    for ax, (model, base_rows) in zip(axes, baseline.items()):
+        A.set_network_model(model)
+        print(f"\n## {model.upper()} late-release safety worst case\n")
+        print("| Closure (MB) | Adversarial stake | Honest holders | Receivers | p50 (s) | p99 (s) | All ready by 14 s | All ready by 20 s |")
+        print("|---:|---:|---:|---:|---:|---:|---:|---:|")
+        curves = {}
+        for mb in SIZES_MB:
+            for adversary, holder in SAFETY_SCENARIOS:
+                paths = G.derive_paths(holder, G.DEFAULT_PEERS, adversary)
+                receivers = round(paths.receivers / paths.trials)
+                _, everyone = T.worst_case(mb * 1000, mb * 1000 * BODY_CLOSURE_RATIO,
+                                           receivers, paths.recovery_weights())
+                check_cdf(everyone)
+                times = [completion_quantile(everyone, q) for q in (.5, .99)]
+                curves.setdefault(adversary, []).append(times[1])
+                print(f"| {mb:g} | {adversary:.0%} | {holder:.0%} | {receivers:,} | "
+                      + " | ".join(seconds(t) for t in times) + " | "
+                      + " | ".join(percentage(A.success_within(everyone, t)) for t in (14, 20)) + " |")
+        ax.plot(SIZES_MB, [completion_quantile(row[1], .99) for row in base_rows], color="tab:blue",
+                marker="o", markersize=4, label="Honest baseline, p99")
+        for (adversary, holder), color in zip(SAFETY_SCENARIOS, ("tab:orange", "tab:red")):
+            values = curves[adversary]
+            censored = [mb for mb, v in zip(SIZES_MB, values) if np.isposinf(v)]
+            ax.plot(SIZES_MB, [v if np.isfinite(v) else np.nan for v in values], color=color,
+                    marker="o", markersize=4,
+                    label=f"{adversary:.0%} adversarial stake, {holder:.0%} honest holders, p99")
+            if censored:
+                ax.scatter(censored, [A.TIMES[-1]] * len(censored), color=color, marker="^",
+                           label=f"{adversary:.0%} adversarial: >{A.TIMES[-1]:g} s")
+        ax.axhline(14, color="gray", linestyle=":", label="14 s deadline")
+        ax.set_xscale("log", base=2)
+        ax.set_xticks(SIZES_MB, [f"{mb:g}" for mb in SIZES_MB])
+        ax.set(title=model.upper(), xlabel="Closure size (decimal MB)")
+        ax.grid(alpha=.25)
+        ax.legend(fontsize=7)
+    axes[0].set_ylabel("All-honest-node completion time (s)")
+    fig.suptitle("Late-release worst case: only τ − σ_α honest stake holds the EB at 7 s\n"
+                 "Receivers fetch body and full closure over the adversary-aware graph, then validate")
+    save_plot(fig, "safety-worst-case-percentiles.svg")
+
+
 def graph_path_report():
     # Sampled frequencies: two decimals, since sampling error exceeds finer precision.
     print("\n## Graph-derived recovery paths\n")
@@ -247,6 +294,7 @@ def main():
         plot_completion_cdfs(model, rows, active=True)
     plot_completion_times(results)
     stress_scenario(results)
+    safety_worst_case(results)
     graph_path_report()
 
 

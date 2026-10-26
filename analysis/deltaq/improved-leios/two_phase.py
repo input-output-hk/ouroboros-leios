@@ -183,3 +183,26 @@ def calculate(closure_kb, body_kb, deadline=7.0, recovery_hops=(0.5, 0.5), stres
     log_pc, honest = conditional_completion(voter, completion, deadline)
     log_pc_active, active = conditional_completion(voter, completion, deadline, beta=0.25)
     return Result(voter, completion, log_pc, honest, log_pc_active, active)
+
+
+def worst_case(closure_kb, body_kb, receivers, recovery_hops, deadline=7.0):
+    """Return (node CDF, all-receiver CDF) for the late-release safety scenario.
+
+    An adversary with stake approaching half the total votes on time and
+    releases the EB so late that, at the deadline, only the minimal honest
+    holders have it.  Certification is then certain, so nothing is
+    conditioned.  Each of the remaining honest receivers fetches the body and
+    then the full closure over the recovery-hop law, starting at the deadline,
+    and validates in full.  Receivers complete independently.
+    """
+    tick = round(deadline / A.DT)
+    if tick < 1 or tick >= A.N or not np.isclose(tick * A.DT, deadline):
+        raise ValueError("deadline must be an interior positive grid time")
+    def over_paths(payload_kb):
+        return A.cdf_choices([(weight, A.cdf_hops(hops, payload_kb))
+                              for hops, weight in enumerate(recovery_hops, 1) if weight > 0])
+    node = sequential(sequential(over_paths(body_kb), over_paths(closure_kb)),
+                      A.cdf_process_eb_closure(closure_kb))
+    started = np.zeros_like(node)
+    started[tick:] = node[:-tick]
+    return started, started ** receivers
