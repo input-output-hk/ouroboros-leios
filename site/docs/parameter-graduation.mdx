@@ -28,7 +28,7 @@ export const plans = {
       { id: "F1", txs: 260, steps: 200, diff: 7 },
       { id: "F2", txs: 2000, steps: 200, diff: 7 },
       { id: "F3", txs: 2000, steps: 600, diff: 7 },
-      { id: "F4", txs: 5000, steps: 600, diff: 7 },
+      { id: "F4", txs: 5000, steps: 400, diff: 7 },
       { id: "F5", txs: 10000, steps: 1000, diff: 7 },
       { id: "F6", txs: 3000, steps: 1500, diff: 6.8 },
       { id: "F7", txs: 1000, steps: 600, diff: 4.1 },
@@ -49,14 +49,16 @@ export const plans = {
 
 <ParameterGraduation plans={plans} />
 
-:::warning DeltaQ model still being refined
+**P(C)** is the probability that an EB certifies. C is the event that enough committee stake voted for the EB by the vote deadline t_v = 3·L_hdr + L_vote = L_diff. A seat can vote once it has received the EB, fetched the transactions it was missing and validated the closure. P(C) is the chance that the seats ready in time hold at least the quorum τ of the stake. A low P(C) means the step's EBs mostly fail to certify and their throughput is lost.
 
-Timing results (needs, P(C), F_full|C) are provisional and not calibrated against testnet data.
+**F_full|C** is the probability that every honest node has the full closure, fetched and processed, by W = 2·L_diff, given that the EB certified. This is the safety condition: once a certificate is on chain, every node must be able to apply its transactions, and a node still missing data stalls. Certification is itself evidence that diffusion went well, which is why the probability is conditional on C. With L_vote = L_diff − 3·L_hdr, the certification gate is W = 3·L_hdr + L_vote + L_diff = 2·L_diff.
 
-:::
+**The surface** is an indicative minimum L_diff, not a requirement: the smallest L_diff with P(C) and F_full|C at or above their targets. A step above it meets both in the model. Where the surface rises above the 3·L_hdr floor, it is P(C) that holds it up under the current assumptions: getting votes in on time is the bottleneck, not delivering the closure to every node afterwards. **Opportunity** is exp(−f·W) with f = 0.05 per second.
 
-**Needs** is the minimum L_diff from the model: the smallest L_diff with P(C) at or above its target at t_v = 3·L_hdr + L_vote = L_diff, and F_full|C at or above its target at W = 2·L_diff. With L_vote = L_diff − 3·L_hdr, the certification gate is W = 3·L_hdr + L_vote + L_diff = 2·L_diff. **Opportunity** is exp(−f·W) with f = 0.05 per second.
+**Quorum:** each seat is ready by t_v independently with the same probability p. Let a[k] be the probability that k uniformly chosen seats reach the stake threshold; then P(C) = Σₖ a[k]·Binom(seats, k, p). The model estimates a[k] for every k at once from 50,000 seeded random seat orders, recording how many seats each order takes to cross the threshold, and evaluates the sum in log space. The sampling only limits values far below anything worth planning around.
 
-**Derived parameters:** L_hdr is fixed and L_vote = L_diff − 3·L_hdr. EB references = EB txs × 40/260. Plutus memory = Plutus steps × 0.0036. Reference scripts = 20 kB per G steps (4 MB at 200G). Bold values lead; the others follow from them.
+**Accuracy:** the quorum arithmetic is exact for its premise; the premise is the weak part. Voters wait for the same EB diffusion, so their readiness is correlated and real certification turns on less sharply than the model's. The stake distribution is synthetic, all seats are assumed to hold voting keys, and only readiness counts: vote diffusion, vote verification and the rule that only the next block can certify an EB are not modelled. Validation costs come from mainnet blocks; set them under Validation to explore other networks.
 
-**Model:** sampled from the [conditional certification diffusion model](https://github.com/input-output-hk/ouroboros-leios/blob/yveshauser/conditional-certification-diffusion-numerical-report/docs/conditional-certification-diffusion.md) (analysis.py on that branch). The voter law is G = EB references (multi-hop) ⊗ missing txs (1 hop, π1 = 1/6) ⊗ validation CPU, with a reapply-only law for the all-nodes term. The committee is the top-stake committee of the configured seat count (900: coverage ≈ 98.84%) over a synthetic 2,500-node stake distribution, in the Normal approximation. “Plan limit” fetches EB references at the plan’s limit, EB txs × 40/260. “Report’s mix” keeps the model’s fixed 1/64/256/512 kB body for every size and reproduces the report’s tables to within 0.05 s. Voters additionally spend c · steps · f_exec on Plutus execution. Node timings are treated as independent.
+**Derived parameters:** L_hdr is fixed and L_vote = L_diff − 3·L_hdr. EB references = EB txs × 40/260, capped at the 600 kB design ceiling (binding from F4 on). Plutus memory = Plutus steps × 0.0036. Reference scripts = 20 kB per G steps (4 MB at 200G). Bold values lead; the others follow from them.
+
+**Model:** a port of the [conditional certification diffusion model](https://github.com/input-output-hk/ouroboros-leios/pull/1146) (analysis.py and two_phase.py on that branch), evaluated in the browser. Before the vote deadline a node receives the EB references (multi-hop), fetches its missing sixth of the EB txs (multi-hop) and validates the closure; a node still missing data at the deadline recovers it from a certified holder (76.58% one hop, 23.41% two, 0.01% three, from a stake-weighted peer graph) and reapplies the closure. The committee is the top-stake committee of the configured seat count (900: coverage ≈ 98.84%) over a synthetic 2,500-node stake distribution, with the quorum probability from 50,000 seeded seat permutations. Voters additionally spend c · steps · f_exec on Plutus execution. Node timings are treated as independent.

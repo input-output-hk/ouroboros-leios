@@ -143,6 +143,19 @@ main:has(.root) {
   color: var(--pg-muted);
   font-size: 14px;
 }
+.warn {
+  position: absolute;
+  right: 16px;
+  top: 12px;
+  max-width: min(300px, 40%);
+  padding: 6px 10px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ifm-color-warning-contrast-foreground);
+  background: var(--ifm-color-warning-contrast-background);
+  border-left: 4px solid var(--ifm-color-warning-dark);
+  border-radius: 2px;
+}
 .views {
   position: absolute;
   left: 16px;
@@ -314,15 +327,6 @@ main:has(.root) {
 .name input[type="text"] {
   width: 58px;
   text-align: left;
-  font-weight: 600;
-}
-.need small {
-  margin-left: 4px;
-  color: var(--pg-muted);
-  font-size: 11px;
-}
-.ok {
-  color: var(--pg-ok);
   font-weight: 600;
 }
 .bad {

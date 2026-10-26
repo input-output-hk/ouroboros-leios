@@ -1,9 +1,8 @@
 import { useColorMode } from "@docusaurus/theme-common";
-import useBaseUrl from "@docusaurus/useBaseUrl";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_MODEL, VSPAN, evalPoint, makeDQ, needsInfo } from "./deltaq";
-import type { DQ, Model } from "./deltaq";
-import type { GraduationScene, View } from "./scene";
+import { DEFAULT_MODEL, evalPoint, needsInfo, refsKB } from "./deltaq";
+import type { Model } from "./deltaq";
+import type { GraduationScene, Scale, View } from "./scene";
 import styles from "./styles.module.css";
 import { statuses } from "./types";
 import type { Plan, Plans, Status, Step } from "./types";
@@ -21,6 +20,16 @@ const MODEL_FIELDS: [keyof Model, string, number][] = [
   ["c", "Plutus ms per G steps", 0.1],
   ["fexec", "steps run by voters", 0.05],
   ["h", "L_hdr (ms)", 100],
+  ["refsCap", "EB refs cap (kB)", 50],
+];
+
+const VALIDATION_FIELDS: [keyof Model, string, number][] = [
+  ["miss", "missed txs π₁", 0.01],
+  ["txBytes", "avg tx size (B)", 50],
+  ["applyMs", "applyTx ms/tx", 0.01],
+  ["applySd", "applyTx sd ms", 0.01],
+  ["reapplyMs", "reapplyTx ms/tx", 0.01],
+  ["reapplySd", "reapplyTx sd ms", 0.01],
 ];
 
 const VIEW_LABELS: [View, string][] = [
@@ -65,11 +74,10 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
   const [active, setActive] = useState<string>(() => Object.keys(initialPlans)[0]);
   const [model, setModel] = useState<Model>(defaults.model);
   const [showSurface, setShowSurface] = useState(true);
+  const [scale, setScale] = useState<Scale>("log");
   const [view, setView] = useState<View>("iso");
   // Bumped on structural changes so the uncontrolled inputs pick up new values.
   const [version, setVersion] = useState(0);
-  const [dq, setDq] = useState<DQ | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [sceneReady, setSceneReady] = useState(false);
 
   const stageRef = useRef<HTMLDivElement>(null);
@@ -77,23 +85,10 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
   const rootRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<GraduationScene | null>(null);
   const { colorMode } = useColorMode();
-  const dataUrl = useBaseUrl("/data/parameter-graduation-deltaq.json");
 
   const plan: Plan = plans[active];
   const status = useMemo(() => statuses(plan), [plan]);
   const hdr = model.h / 1000;
-  const ymax = 3 * hdr + VSPAN;
-
-  useEffect(() => {
-    let live = true;
-    fetch(dataUrl)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.statusText))))
-      .then((s) => live && setDq(makeDQ(s)))
-      .catch((e) => live && setError(String(e.message || e)));
-    return () => {
-      live = false;
-    };
-  }, [dataUrl]);
 
   useEffect(() => {
     let live = true;
@@ -117,27 +112,26 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
   }, []);
 
   useEffect(() => {
-    if (!sceneReady || !dq) return;
+    if (!sceneReady) return;
     sceneRef.current?.update({
       steps: plan.steps,
       status,
       planColor: `--pg-${plan.color}`,
       hdr,
+      refsCap: model.refsCap,
+      scale,
       showSurface,
-      needsInfo: (B, S) => needsInfo(dq, model, B, S),
+      needsInfo: (B, S) => needsInfo(model, B, S),
     });
-  }, [sceneReady, dq, plan, status, model, hdr, showSurface]);
+  }, [sceneReady, plan, status, model, hdr, scale, showSurface]);
 
   useEffect(() => {
     sceneRef.current?.retheme();
   }, [colorMode]);
 
   const rows = useMemo(
-    () =>
-      dq
-        ? plan.steps.map((p) => ({ ni: needsInfo(dq, model, p.txs, p.steps), e: evalPoint(dq, model, p.txs, p.steps, p.diff) }))
-        : null,
-    [dq, plan, model],
+    () => plan.steps.map((p) => ({ e: evalPoint(model, p.txs, p.steps, p.diff) })),
+    [plan, model],
   );
 
   const editPlan = (f: (p: Plan) => void, structural = false) => {
@@ -154,6 +148,25 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
     if (!isFinite(v) || v <= 0) return;
     editPlan((p) => void (p.steps[i][k] = v));
   };
+  const fieldGrid = (name: string, fields: [keyof Model, string, number][]) => (
+    <div className={styles.model} key={`${name}-${version}`}>
+      {fields.map(([k, label, step]) => (
+        <label key={k}>
+          <span>{label}</span>
+          <input
+            type="number"
+            step={step}
+            defaultValue={model[k] as number}
+            aria-label={label}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (isFinite(v)) setModel((m) => ({ ...m, [k]: v }));
+            }}
+          />
+        </label>
+      ))}
+    </div>
+  );
   const changeView = (v: View) => {
     setView(v);
     sceneRef.current?.setView(v);
@@ -167,11 +180,14 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
           <div className={styles.overlay}>
             <h3>{plan.title}</h3>
             <p>
-              Drag to rotate, scroll or pinch to zoom, right-drag to pan. The surface is the minimum L_diff each point needs; a step
-              above it is feasible. <span className={styles.legendDone}>✓</span> accomplished,{" "}
+              Drag to rotate, scroll or pinch to zoom, right-drag to pan. The surface is an indicative minimum L_diff from the
+              uncalibrated model. <span className={styles.legendDone}>✓</span> accomplished,{" "}
               <span className={styles.legendCurrent}>●</span> current, dashed path ahead.
             </p>
-            {!dq && <p>{error ? `Could not load the DeltaQ model: ${error}` : "Loading the DeltaQ model…"}</p>}
+          </div>
+          <div className={styles.warn} role="note">
+            <b>Preliminary.</b> The DeltaQ model is not calibrated against testnet data: compare steps, don’t read the timings as
+            requirements.
           </div>
           <div className={styles.views} role="group" aria-label="Camera presets">
             {VIEW_LABELS.map(([v, l]) => (
@@ -181,6 +197,9 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
             ))}
             <button type="button" aria-pressed={showSurface} onClick={() => setShowSurface((s) => !s)}>
               Surface
+            </button>
+            <button type="button" aria-pressed={scale === "log"} onClick={() => setScale((s) => (s === "log" ? "linear" : "log"))}>
+              Log scale
             </button>
           </div>
         </div>
@@ -207,7 +226,6 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
                     <th>EB txs kB</th>
                     <th>Steps G</th>
                     <th>L_diff s</th>
-                    <th>Needs</th>
                     <th>P(C)</th>
                     <th>F|C</th>
                     <th>Opp.</th>
@@ -216,7 +234,7 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
                 </thead>
                 <tbody>
                   {plan.steps.map((p, i) => {
-                    const r = rows?.[i];
+                    const r = rows[i];
                     const st = status[i];
                     return (
                       <tr key={i} className={styles[`row_${st}`]}>
@@ -244,16 +262,6 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
                         </td>
                         <td>
                           <input type="number" min={3.1} max={17} step={0.1} defaultValue={p.diff} aria-label={`${p.id} L_diff s`} onChange={(e) => editStep(i, "diff", e.target.value)} />
-                        </td>
-                        <td className={styles.need}>
-                          {r && (
-                            <>
-                              <span className={p.diff >= r.ni.need ? styles.ok : styles.bad}>
-                                {r.ni.need === Infinity ? "> " + trim(ymax) : fmt(r.ni.need)}
-                              </span>
-                              <small>{r.ni.bind}</small>
-                            </>
-                          )}
                         </td>
                         <td>{r && <span className={r.e.pc >= model.pc ? "" : styles.bad}>{pct(r.e.pc)}</span>}</td>
                         <td>{r && <span className={r.e.F >= model.pf ? "" : styles.bad}>{pct(r.e.F)}</span>}</td>
@@ -309,7 +317,7 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
                         <td>
                           <b>{fmt(p.diff)}</b>
                         </td>
-                        <td>{kb((B * 40) / 260)}</td>
+                        <td>{kb(refsKB(model, p.txs) * 1000)}</td>
                         <td>
                           <b>{kb(B)}</b>
                         </td>
@@ -330,30 +338,12 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
             <div className={styles.head}>
               <h3>Model: DeltaQ</h3>
               <Seg label="TCP model" value={model.net} options={[["mathis", "Mathis (Reno)"], ["cubic", "CUBIC"]]} onChange={(net) => setModel((m) => ({ ...m, net }))} />
-              <Seg
-                label="EB references fetch"
-                value={model.body}
-                options={[["plan", "EB refs: plan limit"], ["report", "EB refs: report’s 1–512 kB mix"]]}
-                onChange={(body) => setModel((m) => ({ ...m, body }))}
-              />
             </div>
-            <div className={styles.model} key={`model-${version}`}>
-              {MODEL_FIELDS.map(([k, label, step]) => (
-                <label key={k}>
-                  <span>{label}</span>
-                  <input
-                    type="number"
-                    step={step}
-                    defaultValue={model[k] as number}
-                    aria-label={label}
-                    onChange={(e) => {
-                      const v = parseFloat(e.target.value);
-                      if (isFinite(v)) setModel((m) => ({ ...m, [k]: v }));
-                    }}
-                  />
-                </label>
-              ))}
+            {fieldGrid("model", MODEL_FIELDS)}
+            <div className={styles.head}>
+              <h3>Validation</h3>
             </div>
+            {fieldGrid("validation", VALIDATION_FIELDS)}
           </section>
         </aside>
       </div>

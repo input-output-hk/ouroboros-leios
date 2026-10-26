@@ -8,6 +8,7 @@ import type { Binding } from "./deltaq";
 import type { Status, Step } from "./types";
 
 export type View = "iso" | "top" | "front" | "side";
+export type Scale = "log" | "linear";
 
 export interface SceneInput {
   steps: Step[];
@@ -15,6 +16,9 @@ export interface SceneInput {
   planColor: string;
   // L_hdr in seconds.
   hdr: number;
+  // EB references ceiling in kB.
+  refsCap: number;
+  scale: Scale;
   showSurface: boolean;
   needsInfo: (B: number, S: number) => { need: number; bind: Binding };
 }
@@ -29,24 +33,42 @@ export interface LabelClasses {
 }
 
 // EB txs kB and Plutus steps G; L_diff spans 3·L_hdr .. 3·L_hdr + VSPAN.
-const RANGE = { x: [100, 12000], z: [100, 2000] };
 const SPAN = 10;
 const YSCALE = 0.55;
 const YTOP = VSPAN * YSCALE;
-const XT = [100, 200, 500, 1000, 2000, 5000, 10000];
-const ZT = [100, 200, 500, 1000, 2000];
 
-const lg = Math.log10;
-const sx = (B: number) => ((lg(B) - lg(RANGE.x[0])) / (lg(RANGE.x[1]) - lg(RANGE.x[0]))) * SPAN;
-// Larger steps recede.
-const sz = (S: number) => SPAN - ((lg(S) - lg(RANGE.z[0])) / (lg(RANGE.z[1]) - lg(RANGE.z[0]))) * SPAN;
+// Floor axes: positions of EB txs and Plutus steps, ticks, and values at a fraction t of each axis.
+interface Axes {
+  scale: Scale;
+  xt: number[];
+  zt: number[];
+  sx: (B: number) => number;
+  sz: (S: number) => number;
+  gx: (t: number) => number;
+  gz: (t: number) => number;
+}
+
+function axes(scale: Scale): Axes {
+  const [x0, x1, z0, z1] = scale === "log" ? [100, 12000, 100, 2000] : [0, 12000, 0, 2000];
+  const f = scale === "log" ? Math.log10 : (v: number) => v;
+  const g = scale === "log" ? (a: number, b: number, t: number) => a * Math.pow(b / a, t) : (a: number, b: number, t: number) => a + (b - a) * t;
+  return {
+    scale,
+    xt: scale === "log" ? [100, 200, 500, 1000, 2000, 5000, 10000] : [0, 2000, 4000, 6000, 8000, 10000, 12000],
+    zt: scale === "log" ? [100, 200, 500, 1000, 2000] : [0, 500, 1000, 1500, 2000],
+    sx: (B) => ((f(B) - f(x0)) / (f(x1) - f(x0))) * SPAN,
+    // Larger steps recede.
+    sz: (S) => SPAN - ((f(S) - f(z0)) / (f(z1) - f(z0))) * SPAN,
+    gx: (t) => g(x0, x1, t),
+    gz: (t) => g(z0, z1, t),
+  };
+}
 
 export const fmt = (v: number) => (Math.round(v * 10) / 10).toFixed(1);
 export const trim = (x: number) => x.toFixed(2).replace(/\.?0+$/, "");
 export const fmtB = (v: number) => (v >= 1e6 ? (v / 1e6).toFixed(v % 1e6 ? 2 : 0) + " MB" : Math.round(v / 1000) + " kB");
 export const fmtU = (v: number) =>
   v >= 1e12 ? trim(v / 1e12) + "T" : v >= 1e9 ? trim(v / 1e9) + "G" : trim(v / 1e6) + "M";
-const bodyKB = (B: number) => Math.round((B * 40) / 260);
 const esc = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string);
 
@@ -106,6 +128,8 @@ export class GraduationScene {
   private pending = 0;
   private input: SceneInput | null = null;
   private hdr = -1;
+  private refsCap = -1;
+  private axes = axes("log");
   private resizeObs: ResizeObserver;
   private v = new THREE.Vector3();
 
@@ -160,7 +184,7 @@ export class GraduationScene {
     this.input = input;
     cancelAnimationFrame(this.pending);
     this.pending = requestAnimationFrame(() => {
-      if (input.hdr !== this.hdr) this.buildStatic();
+      if (input.hdr !== this.hdr || input.refsCap !== this.refsCap || input.scale !== this.axes.scale) this.buildStatic();
       this.buildDynamic();
     });
   }
@@ -253,7 +277,11 @@ export class GraduationScene {
 
   private buildStatic() {
     const hdr = this.input?.hdr ?? 1;
+    const cap = this.input?.refsCap ?? Infinity;
+    this.axes = axes(this.input?.scale ?? "log");
+    const { sx, sz, xt, zt, scale } = this.axes;
     this.hdr = hdr;
+    this.refsCap = cap;
     this.clear(this.staticGroup);
     this.dropLabels(true);
     const grid = this.col("--pg-grid");
@@ -262,12 +290,12 @@ export class GraduationScene {
     for (let v = 0; v <= VSPAN; v += 2) yt.push(this.ymin() + v);
     const a: number[] = [];
     // Floor and back wall (z = 0).
-    XT.forEach((B) => {
+    xt.forEach((B) => {
       const x = sx(B);
       a.push(x, 0, 0, x, 0, SPAN, x, 0, 0, x, YTOP, 0);
     });
     // Floor and left wall (x = 0).
-    ZT.forEach((S) => {
+    zt.forEach((S) => {
       const z = sz(S);
       a.push(0, 0, z, SPAN, 0, z, 0, 0, z, 0, YTOP, z);
     });
@@ -280,15 +308,15 @@ export class GraduationScene {
     this.staticGroup.add(this.segs(e, ink, 0.8));
     const mk = (t: string, p: THREE.Vector3, c: string) => this.addLabel(t, p, [c], true);
     const { tick, axis } = this.cls;
-    XT.forEach((B) => mk(`<b>${B}</b><small>${bodyKB(B)}</small>`, new THREE.Vector3(sx(B), 0, SPAN + 0.7), tick));
-    ZT.forEach((S) =>
+    xt.forEach((B) => mk(`<b>${B}</b><small>${Math.round(Math.min((B * 40) / 260, cap))}</small>`, new THREE.Vector3(sx(B), 0, SPAN + 0.7), tick));
+    zt.forEach((S) =>
       mk(`<b>${S}G</b><small>${fmtU(S * 1e9 * 0.0036)} · ${fmtB(S * 20000)}</small>`, new THREE.Vector3(SPAN + 0.95, 0, sz(S)), tick),
     );
     yt.forEach((v) =>
       mk(`<b>${trim(v)} s</b><small>L_vote ${trim(v - 3 * hdr)}</small>`, new THREE.Vector3(-0.7, this.sy(v), 0), tick),
     );
-    mk("EB txs (kB, log scale)<small>EB references (kB) = EB txs × 40/260</small>", new THREE.Vector3(SPAN / 2 - 1.2, 0, SPAN + 2.2), axis);
-    mk("Plutus steps (G, log scale)<small>Plutus memory · reference scripts</small>", new THREE.Vector3(SPAN + 2.3, 0, SPAN / 2), axis);
+    mk(`EB txs (kB${scale === "log" ? ", log scale" : ""})<small>EB references (kB) = EB txs × 40/260, at most ${trim(cap)}</small>`, new THREE.Vector3(SPAN / 2 - 1.2, 0, SPAN + 2.2), axis);
+    mk(`Plutus steps (G${scale === "log" ? ", log scale" : ""})<small>Plutus memory · reference scripts</small>`, new THREE.Vector3(SPAN + 2.3, 0, SPAN / 2), axis);
     mk("L_diff<small>L_vote = L_diff − 3·L_hdr</small>", new THREE.Vector3(-0.6, YTOP + 0.8, 0), axis);
   }
 
@@ -307,8 +335,9 @@ export class GraduationScene {
     const ymax = this.ymax();
     const N = 56;
     const vals = new Float32Array(N * N);
-    const gx = (i: number) => RANGE.x[0] * Math.pow(RANGE.x[1] / RANGE.x[0], i / (N - 1));
-    const gz = (j: number) => RANGE.z[0] * Math.pow(RANGE.z[1] / RANGE.z[0], j / (N - 1));
+    const { sx, sz } = this.axes;
+    const gx = (i: number) => this.axes.gx(i / (N - 1));
+    const gz = (j: number) => this.axes.gz(j / (N - 1));
     for (let j = 0; j < N; j++)
       for (let i = 0; i < N; i++) vals[j * N + i] = Math.min(input.needsInfo(gx(i), gz(j)).need, ymax + 1);
 
@@ -371,7 +400,6 @@ export class GraduationScene {
       const x = sx(p.txs);
       const z = sz(p.steps);
       const y = this.sy(p.diff);
-      const ni = input.needsInfo(p.txs, p.steps);
       const done = status === "done";
       const sph = new THREE.Mesh(
         new THREE.SphereGeometry(0.17, 24, 16),
@@ -380,13 +408,6 @@ export class GraduationScene {
       sph.position.set(x, y, z);
       sph.renderOrder = 3;
       this.dynGroup.add(sph);
-      // A red ring marks a point below the surface.
-      if (p.diff < ni.need) {
-        const r = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.025, 8, 40), new THREE.MeshBasicMaterial({ color: accent }));
-        r.position.copy(sph.position);
-        r.rotation.x = Math.PI / 2;
-        this.dynGroup.add(r);
-      }
       // A ring in the trail colour marks the step active on the network.
       if (status === "current") {
         const r = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.04, 10, 48), new THREE.MeshBasicMaterial({ color: this.col("--pg-lava") }));
