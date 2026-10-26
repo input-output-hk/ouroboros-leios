@@ -12,15 +12,22 @@ import numpy as np
 
 import analysis as A
 import two_phase as T
+import recovery_graph as G
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 
 
 SIZES_MB = (0.125, 0.26, 0.5, 1, 2, 4, 8, 12)
 PLOT_DIR = Path(__file__).resolve().parents[3] / "docs" / "conditional-certification-diffusion"
-# Pre-certification voters use blended paths; certified completion uses short paths.
-DEFAULT_HOP_WEIGHTS = (0.5, 0.5)
-DEFAULT_HOP_LABEL = "Before 7 s: blended fetching; recovery from 7 s: 50% one hop, 50% two hops"
+# Pre-certification voters use blended paths; certified completion uses the
+# graph-derived law at the worst holder stake considered in the sweep.
+DEFAULT_PATHS = G.derive_paths()
+DEFAULT_HOP_WEIGHTS = DEFAULT_PATHS.recovery_weights()
+DEFAULT_HOP_LABEL = (
+    f"Before 7 s: blended fetching; recovery from 7 s: stake-weighted graph, "
+    f"{DEFAULT_PATHS.peers} peers, {DEFAULT_PATHS.holder_stake:.0%} holder stake "
+    f"({DEFAULT_HOP_WEIGHTS[0]:.1%} one hop, {sum(DEFAULT_HOP_WEIGHTS[1:]):.1%} two or more)"
+)
 BODY_CLOSURE_RATIO = 40 / 260
 
 
@@ -89,7 +96,12 @@ def check_cdf(cdf):
 
 
 def percentage(p):
-    return f"{100 * p:.4f}%"
+    formatted = f"{100 * p:.4f}%"
+    if formatted == "0.0000%":
+        return "<0.0001%"
+    if formatted == "100.0000%":
+        return ">99.9999%"
+    return formatted
 
 
 def completion_quantile(cdf, p):
@@ -152,8 +164,39 @@ def stress_scenario(baseline):
         ax.grid(alpha=.25)
         ax.legend(fontsize=7)
     axes[0].set_ylabel("All-node completion time given certification (s)")
-    fig.suptitle("Full-closure recovery stress versus stationary-cache baseline\nSame phase-one certification; 50/50 one-/two-hop recovery from 7 s")
+    fig.suptitle("Full-closure recovery stress versus stationary-cache baseline\nSame phase-one certification and graph-derived recovery hops from 7 s")
     save_plot(fig, "stress-completion-time-percentiles.svg")
+
+
+def graph_path_report():
+    # Sampled frequencies: two decimals, since sampling error exceeds finer precision.
+    print("\n## Graph-derived recovery paths\n")
+    print("| Peers | Holder stake | Adversarial stake | One hop | Closed form | Two hops | Three+ hops | Unreachable | All reachable |")
+    print("|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    sweep = G.sweep()
+    for paths in sweep:
+        weights = paths.weights
+        values = [weights[0], G.one_hop_closed_form(paths.holder_stake, paths.peers),
+                  weights[1] if len(weights) > 1 else 0., sum(weights[2:]),
+                  paths.unreachable, paths.all_reachable]
+        print(f"| {paths.peers} | {paths.holder_stake:.0%} | {paths.adversary_stake:.0%} | "
+              + " | ".join(f"{100 * v:.2f}%" for v in values) + " |")
+    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+    grid = np.linspace(.05, .95, 91)
+    colors = plt.get_cmap("tab10").colors
+    for color, peers in zip(colors, G.PEER_COUNTS):
+        honest = [p for p in sweep if p.peers == peers and p.adversary_stake == 0]
+        ax.plot(grid, G.one_hop_closed_form(grid, peers), color=color, linestyle="--", linewidth=1)
+        ax.plot([p.holder_stake for p in honest], [p.weights[0] for p in honest], "o",
+                color=color, label=f"{peers} peers: graph sample; dashed: 1 − (1 − f)^{peers}")
+    ax.set(xlabel="Holder stake f", ylabel="P(nearest holder is one hop away)", ylim=(0, 1.02))
+    ax.xaxis.set_major_formatter(PercentFormatter(1))
+    ax.yaxis.set_major_formatter(PercentFormatter(1))
+    ax.grid(alpha=.25)
+    ax.legend(fontsize=8, loc="lower right")
+    ax.set_title(f"One-hop recovery probability, {G.N_NODES:,} nodes, stake-weighted distinct peers\n"
+                 f"No adversaries; remaining reachable receivers are two or more hops away")
+    save_plot(fig, "graph-recovery-paths.svg")
 
 
 def main():
@@ -204,6 +247,7 @@ def main():
         plot_completion_cdfs(model, rows, active=True)
     plot_completion_times(results)
     stress_scenario(results)
+    graph_path_report()
 
 
 if __name__ == "__main__":
