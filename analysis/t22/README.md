@@ -21,8 +21,6 @@ RB cannot be selected in time.
   makes a certificate evidence of at least one honest vote.
 - Two voting rules are modelled through `voteRecvOffset`: the prototype votes if the EB is held
   by the vote deadline (`3·Lhdr + Lvote`), the Agda/CIP specification requires it within `Lhdr`.
-  The theorems take the offset as a parameter; their side condition `voteRecvOffset + D ≤ certGap + Δ`
-  reduces under the prototype rule to `D ≤ Ldiff + Δ` (`12 ≤ 7 + 5` with the glossary values).
 
 ## Build
 
@@ -37,3 +35,4 @@ lake build --wfail
 | file                 | contents                                              |
 |----------------------|-------------------------------------------------------|
 | `Leios/Params.lean`  | protocol and environment parameters                   |
+| `Leios/Model.lean`   | one pipeline: parties, stake, votes, diffusion, harm  |
