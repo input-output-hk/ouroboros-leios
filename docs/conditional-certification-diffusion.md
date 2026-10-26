@@ -113,10 +113,8 @@ example, a 4 MB closure has a 615.385 kB body and a 12 MB closure has a
 larger rows extrapolate beyond Musashi's 40 kB references-size limit and
 should not be interpreted as valid Musashi configurations.
 
-**Units:** throughout this report, kB = 1,000 bytes and MB = 1,000,000 bytes.
-The original note passes 1,024, 4,096, and 12,288 model kB for its “1, 4,
-and 12 MB” rows. Those correspond to **1.024, 4.096, and 12.288 decimal MB**;
-the 1, 4, and 12 MB rows below therefore use slightly different inputs.
+**Units**: all sizes in this report use decimal units: kB = 1,000 bytes
+and MB = 1,000,000 bytes.
 
 ## 2. Certification and completion probabilities
 
