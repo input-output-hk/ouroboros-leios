@@ -63,17 +63,18 @@ export const source = `
 
 - Praos > Leios prioritization
   - [x] CIP
-  - [x] Prototype
+  - [~] Prototype: egress scheduling
   - [x] Design
   - [~] Implementation
     - [~] Socket options
+    - [~] Egress scheduling
     - [ ] Incremental decoding
   - [~] Assurance: load testing
 
 - Key registration & rotation @130,200
   - [x] CIP
   - [x] Prototype
-  - [x] Design: no key rotation via headers
+  - [x] Design: no owner signatures
   - [x] Implementation
     - [x] Generate BLS keys
     - [x] Create and submit pool registration with BLS keys
@@ -104,7 +105,7 @@ export const source = `
   - [x] Implementation
     - [x] Double-buffered mempool
     - [x] Capped forging
-    - [ ] Pre-flight forging
+    - [ ] Cheap ticking
   - [~] Assurance: first audit ok
 
 - Block production @450,170
@@ -115,19 +116,18 @@ export const source = `
     - [~] Size mempool via pparams
     - [~] Forge and store EBs
     - [~] Forge RBs with certificates
-    - [ ] Pre-apply certificates
+    - [ ] Certifying mempool view
   - [~] Assurance: auditing on rc-w41
 
 - EB diffusion @480,280
   - [x] CIP: update mini-protocols
-  - [~] Prototype: policies, egress scheduling
+  - [~] Prototype: policies
   - [?] Design: settle policies, good enough?
   - [~] Implementation
     - [~] Announce and detect equivocations of EBs
     - [~] Diffuse and validate EBs via TxCache
-    - [~] Egress scheduling
     - [~] Basic fetching policy (not full hedging)
-    - [ ] Efficient serving
+    - [~] Efficient serving
     - [ ] Incremental offers
     - [ ] Advanced fetching policy
     - [ ] Catch up on not yet certified Leios EBs
@@ -147,11 +147,12 @@ export const source = `
   - [x] CIP: update mini-protocols
   - [x] Prototype
   - [x] Design: keep push-based voting
-  - [ ] Implementation
+  - [~] Implementation
+    - [~] Diffuse and validate votes
+    - [~] Aggregate votes
     - [ ] Voting logic
-    - [ ] Diffuse and validate votes
-    - [ ] Store and aggregate votes
     - [ ] Pull-based vote diffusion
+    - [ ] Partial certification
   - [~] Assurance: auditing on rc-w41
 
 - Block validation & adoption @985,70
@@ -160,7 +161,7 @@ export const source = `
   - [x] Design: consensus/ledger API defined
   - [~] Implementation
     - [~] Validate EB announcing and certifying blocks
-    - [ ] EB fetching on chain selection
+    - [~] EB fetching on chain selection
     - [ ] Out of order fetch EBs in Genesis
   - [~] Assurance: auditing on rc-w41
 
@@ -215,26 +216,27 @@ export const plan = `
   - Efficient serving
   - Voting logic
   - Diffuse and validate votes
-  - Store and aggregate votes
+  - Aggregate votes
   - Forge RBs with certificates
+  - Certifying mempool view
   - EB fetching on chain selection
   - Validate EB announcing and certifying blocks
   - Node accepts BLS keys
   - Node integration 11.3
 
 - Stage 2: Higher params (1s, 4s, 7s, 100KB+, 1MB+, ..GSteps, ..GMem, 900 seats, 75%)
-  - TxSubmission param tuning
-  - Pre-apply certificates
-  - Incremental offers
   - Egress scheduling
+  - TxSubmission param tuning
+  - Incremental offers
   - Pull-based vote diffusion
   - TxSubmission param tuning
   - Incremental decoding
-  - Pre-flight forging
+  - Cheap ticking
   - Advanced fetching policy
   - Fully optimised LeiosDB
   - Catch up on not yet certified Leios EBs
   - Out of order fetch EBs in Genesis
+  - Partial certification
   - Node integration
 `;
 
@@ -279,8 +281,7 @@ Please read the marks below with several grains of salt:
   seeking work chapters. Open questions are indicated by `?` items, but
   visibility may be incomplete.
 - **Nothing is "done" until high confidence.** A component with everything but
-  the confidence stage marked is not ready for mainnet. That last column is the
-  gate, and it is empty nearly everywhere. Furthermore, attaining high
+  the assurance stage marked is not ready for mainnet. Furthermore, attaining high
   confidence on some components may raise issues with others and may uncover
   more work.
 
@@ -310,10 +311,9 @@ itself.
 - **The stage contents may be incomplete.** As we are continously prototyping and
   validating, implementation items are still being discovered, and an
   empty-looking stage table is not evidence of a small scope.
-- **The parameter tuples are illustrative.** Names like "0/0/∞/0/0" or
-  "1/4/7/100k/1M" sketch the intent of a stage, not agreed values; the Leios
+- **The parameter tuples are indicative.** The Leios
   protocol parameter set is still being finalized and would in any case be
-  subject to on-chain governance.
+  subject to on-chain governance. See also [parameter graduation](../parameter-graduation).
 - **Stages are scopes, not dates.** A completed stage means a release *could* be
   considered for a hard fork, not that one is planned. Hard forks require
   governance approval by DReps and stake pool operators.
