@@ -64,7 +64,7 @@ def plot_completion_cdfs(model, rows, active=False, stress=False):
     ax.set_ylim(0, 1.01)
     ax.yaxis.set_major_formatter(PercentFormatter(1))
     ax.grid(alpha=0.25)
-    ax.legend(title="Closure size (decimal MB)", fontsize=8, loc="upper left")
+    ax.legend(title="Closure size (decimal MB)", fontsize=8, loc="lower right")
     scenario = "active" if active else "honest"
     save_plot(fig, f"{model}-{'stress-' if stress else ''}{scenario}-cdf.svg")
 
