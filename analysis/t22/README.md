@@ -41,3 +41,4 @@ lake build --wfail
 | `Leios/Params.lean`  | protocol and environment parameters                   |
 | `Leios/Model.lean`   | one pipeline: parties, stake, votes, diffusion, harm  |
 | `Leios/T22.lean`     | T22 cannot happen iff `L_diff` is sized for `D`        |
+| `Leios/Prob.lean`    | probability bound when `L_diff` is `k` slots too small |
