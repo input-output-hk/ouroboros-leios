@@ -255,8 +255,9 @@ Both honest and active-adversary plots use the split fetch assumptions.
 
 ### 3.1. Fixed missing-transaction fetch model
 
-The model uses separate paths for the **whole missing-transaction batch**
-before and after the voting deadline:
+A node's **missing-transaction batch** is every closure transaction that the
+node lacks, fetched as one bulk transfer.  The model uses separate paths
+for the whole batch before and after the voting deadline, as follows:
 
 | Path length | Phase-one fetch | Phase-two recovery |
 |---:|---:|---:|
