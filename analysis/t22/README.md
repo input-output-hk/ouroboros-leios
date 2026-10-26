@@ -42,6 +42,20 @@ probability at most `1 − (1 − f)^k`, about five percent per slot of overshoo
 the timing lines up, not on the outcome of an attack the adversary launches only when it
 already knows it holds a leader slot in the window.
 
+### The failure mode is Praos with a larger `Δ`
+
+What a successful attack does to Praos is bounded too. By `recv_le_of_certified`, every honest
+node holds the EB by `s + voteRecvOffset + D`, and a certificate RB sits at `c ≥ s + certGap`,
+so the EB, and with it the certificate RB, is late at any honest node by at most `k` slots
+beyond `Δ`. In other words, a harmed slot is a slot in which the Praos delivery bound is `Δ + k`
+instead of `Δ`. Praos's guarantees (common prefix, chain growth and chain quality) are proved
+for any delivery bound, with the security parameters depending on it. So even in the worst
+case, where every pipeline is harmed, the execution is an ordinary Praos run with delivery
+bound `Δ + k`: the same guarantees hold, with the security margin that Praos has at `Δ + k`
+rather than at `Δ`. Leios does not break Praos through T22; a too-small `Ldiff` degrades the
+Praos security argument by the overshoot, and in a fraction of slots bounded by the plot
+below.
+
 ![T22 harm probability bound against the overshoot k](image.png)
 
 ## Build
