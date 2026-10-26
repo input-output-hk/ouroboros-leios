@@ -26,6 +26,24 @@ RB cannot be selected in time.
   (`12 ≤ 7 + 5` with the glossary values); `t22_cannot_happen` shows the attack fails under it
   and `t22_can_happen` builds a witness when it fails.
 
+## Conclusion
+
+T22 is a parameter-sizing question, and the model gives it a sharp edge. The attack is
+impossible exactly when the EB diffusion time fits its budget, `D ≤ Ldiff + Δ` under the
+prototype's voting rule (`t22_cannot_happen`), and possible as soon as it does not
+(`t22_can_happen`). The whole argument rests on one network assumption, `HonestDiffuse`: an EB
+held by one honest node reaches every honest node within `D` slots. Honest majority and the
+quorum are only used to show that a certificate contains at least one honest vote.
+
+When `Ldiff` is too small by `k` slots, the harm is confined to a window of `k` certificate
+slots, so per pipeline it needs the Praos lottery to elect a leader there. That happens with
+probability at most `1 − (1 − f)^k`, about five percent per slot of overshoot on mainnet
+(`f = 1/20`). The bound degrades gracefully, as the plot shows, but it is a bound on how often
+the timing lines up, not on the outcome of an attack the adversary launches only when it
+already knows it holds a leader slot in the window.
+
+![T22 harm probability bound against the overshoot k](image.png)
+
 ## Build
 
 ```sh
