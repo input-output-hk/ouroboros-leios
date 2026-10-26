@@ -8,6 +8,9 @@
       inputs',
       ...
     }:
+    let
+      plutusBenchCostModels = "${inputs'.plutus-network-bench.packages.setup-bench}/libexec/pnb/lib/costmodels-pv12.json";
+    in
     lib.optionalAttrs (system == "x86_64-linux") {
       devShells.dev-demo-proto-devnet = pkgs.mkShell {
         name = "dev-demo-proto-devnet";
@@ -29,10 +32,16 @@
           inputs'.cardano-node-leios.packages.tx-firehose
           # Its observer: reads a mempool over N2C, reports whose load it holds.
           inputs'.cardano-node-leios.packages.mempool-monitor
+          # Worst-case Plutus V3 load (PlutusBench in process-compose.yaml).
+          inputs'.plutus-network-bench.packages.setup-bench
+          inputs'.plutus-network-bench.packages.calibrate
+          inputs'.plutus-network-bench.packages.run-bench
         ];
         # To easily interact with node1 on the devnet from within the demo dir
         CARDANO_NODE_NETWORK_ID = 164;
         CARDANO_NODE_SOCKET_PATH = "tmp-devnet/node1/node.socket";
+        # The 350-entry PlutusV3 cost model EnactPlutusCostModel enacts.
+        PLUTUS_BENCH_COST_MODELS = plutusBenchCostModels;
       };
 
       packages.demo-proto-devnet = pkgs.writeShellApplication {
@@ -50,6 +59,8 @@
           SOURCE_DIR = ./.;
           XRAY_SOURCE_DIR = ../extras/x-ray;
           GRAFANA_SHARE = "${pkgs.grafana}/share/grafana";
+          PLUTUS_BENCH_COST_MODELS = plutusBenchCostModels;
+          PROPOSE_PPARAM_UPDATE = ../dozen-devnet/propose-pparam-update.sh;
         };
         text = builtins.readFile ./run.sh;
       };

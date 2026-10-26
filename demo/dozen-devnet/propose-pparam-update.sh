@@ -29,7 +29,9 @@
 # the security group needs SPO approval at poolVotingThresholds.ppSecurityGroup
 # (0.51) on top of the DRep thresholds -- DReps alone leave it sitting in the
 # queue until it expires. Their cold keys are the block producers' own, under
-# tmp-devnet/bp*/keys/, so all three voting Yes is 100% of the pool stake.
+# config/pools-keys/, so all three voting Yes is 100% of the pool stake. A change
+# outside the security group, such as a cost model, takes no pool votes: the
+# ledger refuses them as DisallowedVoters, so pass --no-spo-votes for those.
 set -euo pipefail
 
 SOURCE_DIR=${SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}
@@ -49,6 +51,7 @@ ERA=${ERA:-dijkstra}
 WORK=${WORK:-"${WORKING_DIR}/pparam-update"}
 UTXO_DIR="${SHARED_CONFIG_DIR}/utxo-keys/utxo1"
 DREP_DIR="${SHARED_CONFIG_DIR}/drep-keys"
+POOL_DIR="${SHARED_CONFIG_DIR}/pools-keys"
 
 # Anchors are mandatory on a governance action, and `transaction build` insists
 # on actually downloading one to check its hash -- unconditionally, with no
@@ -59,12 +62,14 @@ ANCHOR_URL=${ANCHOR_URL:-}
 ANCHOR_PORT=${ANCHOR_PORT:-8099}
 
 CLI_ARGS=()
+SPO_VOTES=1
 usage() {
   sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   echo
   echo "Options:"
   echo "  --key-value NAME=VALUE   a pparam by its CLI flag name, e.g. maxTxSize=32768"
   echo "  --cli-arg '--flag VALUE' pass a create-protocol-parameters-update flag verbatim"
+  echo "  --no-spo-votes           vote with the DReps only, for a change outside the security group"
   echo "  --show                   print the current pparams and exit"
   exit "${1:-0}"
 }
@@ -109,6 +114,10 @@ while [ $# -gt 0 ]; do
     read -r -a pair <<<"$2"
     CLI_ARGS+=("${pair[@]}")
     shift 2
+    ;;
+  --no-spo-votes)
+    SPO_VOTES=0
+    shift
     ;;
   --show)
     cardano-cli "${ERA}" query protocol-parameters
@@ -251,7 +260,11 @@ done
 }
 echo "    action index: ${ACTION_IX}"
 
-echo "==> voting Yes with all three DReps and all three pools"
+if [ "$SPO_VOTES" = 1 ]; then
+  echo "==> voting Yes with all three DReps and all three pools"
+else
+  echo "==> voting Yes with all three DReps"
+fi
 VOTE_ARGS=()
 SIGN_ARGS=()
 for i in 1 2 3; do
@@ -264,14 +277,15 @@ for i in 1 2 3; do
   VOTE_ARGS+=(--vote-file "drep${i}.vote")
   SIGN_ARGS+=(--signing-key-file "${DREP_DIR}/drep${i}/drep.skey")
 
+  [ "$SPO_VOTES" = 1 ] || continue
   cardano-cli "${ERA}" governance vote create \
     --yes \
     --governance-action-tx-id "$ACTION_TX" \
     --governance-action-index "$ACTION_IX" \
-    --cold-verification-key-file "${WORKING_DIR}/bp${i}/keys/cold.vkey" \
+    --cold-verification-key-file "${POOL_DIR}/pool${i}/cold.vkey" \
     --out-file "pool${i}.vote"
   VOTE_ARGS+=(--vote-file "pool${i}.vote")
-  SIGN_ARGS+=(--signing-key-file "${WORKING_DIR}/bp${i}/keys/cold.skey")
+  SIGN_ARGS+=(--signing-key-file "${POOL_DIR}/pool${i}/cold.skey")
 done
 
 cardano-cli "${ERA}" transaction build \

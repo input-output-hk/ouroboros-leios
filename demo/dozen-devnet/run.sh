@@ -68,6 +68,10 @@ set -a
 # is fixed, so the input selection has to cover fee + OUTPUTS * min-ada. 5 outputs
 # gives ~648 B transactions.
 : "${OUTPUTS:=1}"
+# Worst-case Plutus txs per second from PlutusBench (on demand, see
+# process-compose.yaml). One saturates the per-tx execution budget, so 1/s about
+# fills an EB's.
+: "${PLUTUS_TPS:=1}"
 # Which tx-firehose to run. Defaults to whatever is on PATH, which is normally the
 # nix-store build; point it at a local cabal build to iterate on the generator
 # without rebuilding the devnet:

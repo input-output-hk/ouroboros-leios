@@ -55,6 +55,12 @@
     # tx-firehose across the repo. The tx-firehose bench/ package now
     # lives on top of leios-prototype so a single input suffices.
     cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
+    # Worst-case Plutus V3 load for the demo devnets. Its cardano-cli fallback
+    # follows the Leios node, so the CLI matches and no second node is built.
+    plutus-network-bench = {
+      url = "github:cardano-scaling/plutus-network-bench";
+      inputs.cardano-node.follows = "cardano-node-leios";
+    };
   };
 
   outputs =

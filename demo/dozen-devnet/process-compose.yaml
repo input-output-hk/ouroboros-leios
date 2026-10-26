@@ -85,6 +85,50 @@ processes:
       restart: always
       backoff_seconds: 30
 
+  # The 350-entry PlutusV3 cost model PlutusBench needs for its CPU and memory
+  # dials (native multiScalarMul and replicateByte). A genesis can only carry
+  # the 251-entry model, so it is enacted on chain, two epoch boundaries after
+  # this starts. Runs on every start and does nothing once the model is there.
+  EnactPlutusCostModel:
+    working_dir: ${WORKING_DIR}
+    command: >
+      bash -c 'cardano-cli dijkstra query protocol-parameters
+      | jq -e ".costModels.PlutusV3 | length == 350" >/dev/null
+      || bash "${SOURCE_DIR}/propose-pparam-update.sh" --no-spo-votes
+      --cli-arg "--cost-model-file ${PLUTUS_BENCH_COST_MODELS}"'
+    environment:
+      - CARDANO_NODE_NETWORK_ID=164
+      - CARDANO_NODE_SOCKET_PATH=${WORKING_DIR}/bp1/node.socket
+      - WORK=${WORKING_DIR}/plutus-cost-model
+      - ANCHOR_PORT=8098
+    log_location: "${WORKING_DIR}/enact-plutus-cost-model.log"
+    depends_on:
+      bp1:
+        condition: process_healthy
+
+  # Worst-case Plutus V3 load from plutus-network-bench, on demand like
+  # TxFirehose2: start it from the TUI or with
+  #   process-compose process start PlutusBench
+  # It waits for EnactPlutusCostModel, then sets up its fixtures and calibrates
+  # once before submitting PLUTUS_TPS txs per second, each saturating the per-tx
+  # execution budget. Submits to relay21 with its own funded key (utxo2).
+  PlutusBench:
+    disabled: true
+    working_dir: ${WORKING_DIR}
+    command: bash "${SHARED_CONFIG_DIR}/plutus-bench/run.sh"
+    environment:
+      - SOCKET=${WORKING_DIR}/relay21/node.socket
+      - SKEY=${SHARED_CONFIG_DIR}/utxo-keys/utxo2/utxo.skey
+      - STATE_ROOT=${WORKING_DIR}/plutus-bench
+      - TPS=${PLUTUS_TPS}
+    log_location: "${WORKING_DIR}/plutus-bench.log"
+    depends_on:
+      relay21:
+        condition: process_healthy
+    availability:
+      restart: on_failure
+      backoff_seconds: 30
+
   # A block producer and one relay, to see whether the two ends of the network
   # agree. The remaining ten nodes are on the Grafana dashboards.
   ObserveTipBp1:

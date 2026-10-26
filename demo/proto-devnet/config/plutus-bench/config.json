@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "network": {
+    "kind": "testnet",
+    "magic": 164,
+    "era": "dijkstra"
+  },
+  "targets": {
+    "ex_steps": { "mode": "fraction", "value": 1.0 },
+    "ex_mem": { "mode": "fraction", "value": 1.0 },
+    "ref_script_bytes": { "mode": "absolute", "value": 190000 },
+    "tx_size": { "mode": "fraction", "value": 0.95 }
+  },
+  "knobs_override": null,
+  "io_setup": {
+    "n_io_ref": 12,
+    "io_param_bytes": 15000,
+    "n_datum_utxos": 4,
+    "points_per_datum": 56
+  },
+  "concurrency": {
+    "n_msm_indices": 32,
+    "corpus_size": 60,
+    "fee_ada": 60,
+    "collateral_ada": 10,
+    "collateral_pool": 16
+  },
+  "submit": {
+    "mode": "rate",
+    "tps": 1,
+    "duration_s": 60
+  },
+  "run": {
+    "namespace": "devnet"
+  }
+}

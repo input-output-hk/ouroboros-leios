@@ -76,10 +76,30 @@ Environment variables, see `run.sh` for the full list:
 | `WORKING_DIR`       | `$(pwd)/tmp-devnet`  | where the devnet is initialized                     |
 | `SHARED_CONFIG_DIR` | `../proto-devnet/config` | genesis, pool keys, delegators, dashboards      |
 | `COLOR1..3`         | red, blue, amber     | colour each generator tags its transactions with    |
+| `PLUTUS_TPS`        | `1`                  | PlutusBench worst-case Plutus tx rate               |
 
 ``` shell
 TPS=1000 RATE=100Mbps DELAY=50ms ./run.sh
 ```
+
+## Plutus load
+
+`PlutusBench` loads the devnet with worst-case Plutus V3 transactions from
+[plutus-network-bench](https://github.com/cardano-scaling/plutus-network-bench),
+each saturating the per-transaction CPU, memory, reference-script and size
+budgets. It is defined but not started; start it from the TUI or with
+
+``` shell
+process-compose process start PlutusBench
+```
+
+Its CPU and memory dials need the 350-entry PlutusV3 cost model, which a
+genesis cannot carry. `EnactPlutusCostModel` therefore puts it on chain at every
+fresh start, and it is in force two epoch boundaries later; `PlutusBench` waits
+for it. Set the rate with `PLUTUS_TPS` (default `1`, which about fills an EB's
+execution budget). The bench pays from its own genesis-funded key,
+`../proto-devnet/config/utxo-keys/utxo2`, and keeps its state in
+`$WORKING_DIR/plutus-bench`.
 
 ## Mempool colouring
 

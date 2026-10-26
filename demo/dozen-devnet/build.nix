@@ -8,6 +8,9 @@
       inputs',
       ...
     }:
+    let
+      plutusBenchCostModels = "${inputs'.plutus-network-bench.packages.setup-bench}/libexec/pnb/lib/costmodels-pv12.json";
+    in
     lib.optionalAttrs (system == "x86_64-linux") {
       devShells.dev-demo-dozen-devnet = pkgs.mkShell {
         name = "dev-demo-dozen-devnet";
@@ -30,6 +33,10 @@
           inputs'.cardano-node-leios.packages.tx-firehose
           # Its observer: reads a mempool over N2C, reports whose load it holds.
           inputs'.cardano-node-leios.packages.mempool-monitor
+          # Worst-case Plutus V3 load (PlutusBench in process-compose.yaml).
+          inputs'.plutus-network-bench.packages.setup-bench
+          inputs'.plutus-network-bench.packages.calibrate
+          inputs'.plutus-network-bench.packages.run-bench
           # Eventlog analysis, for forge-loop investigations. Arm a node with
           # NODE_RTS="-l"; the vanilla RTS is enough, no profiling build.
           #
@@ -55,6 +62,8 @@
         # demo dir
         CARDANO_NODE_NETWORK_ID = 164;
         CARDANO_NODE_SOCKET_PATH = "tmp-devnet/relay11/node.socket";
+        # The 350-entry PlutusV3 cost model EnactPlutusCostModel enacts.
+        PLUTUS_BENCH_COST_MODELS = plutusBenchCostModels;
       };
 
       packages.demo-dozen-devnet = pkgs.writeShellApplication {
@@ -75,6 +84,7 @@
           SHARED_CONFIG_DIR = ../proto-devnet/config;
           XRAY_SOURCE_DIR = ../extras/x-ray;
           GRAFANA_SHARE = "${pkgs.grafana}/share/grafana";
+          PLUTUS_BENCH_COST_MODELS = plutusBenchCostModels;
         };
         text = builtins.readFile ./run.sh;
       };

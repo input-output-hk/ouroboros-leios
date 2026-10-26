@@ -55,6 +55,23 @@ turnaround for no practical cost.
 f=0.05), and the 40-minute stability window is the slack available for
 restarting nodes without the chain outrunning them.
 
+## Protocol version and funds (shelley-genesis.json)
+
+```text
+protocolVersion   12.0
+initialFunds      three delegators 30M ADA each, utxo1 5M, utxo2 5M
+```
+
+The chain starts at protocol version 12 because the worst-case Plutus load
+(`PlutusBench`) uses builtins that only exist from there on: `multiScalarMul`
+and `replicateByte` are priced only in the 350-entry PlutusV3 cost model, which
+needs PV12 and has to be enacted on chain (`EnactPlutusCostModel`).
+
+`utxo2` is funded for that bench alone, so it never competes with the
+tx-firehoses (the delegators) or a governance action (`utxo1`) for a UTxO. The
+two share the 10M ADA `utxo1` used to hold: the initial funds already add up to
+`maxLovelaceSupply`.
+
 ## Governance (conway-genesis.json)
 
 ```text

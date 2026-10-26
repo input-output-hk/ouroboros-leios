@@ -69,6 +69,25 @@ export WORKING_DIR=my-devnet
 ./run.sh
 ```
 
+## Plutus load
+
+`PlutusBench` loads the devnet with worst-case Plutus V3 transactions from
+[plutus-network-bench](https://github.com/cardano-scaling/plutus-network-bench),
+each saturating the per-transaction CPU, memory, reference-script and size
+budgets. It is defined but not started; start it from the TUI or with
+
+``` shell
+process-compose process start PlutusBench
+```
+
+Its CPU and memory dials need the 350-entry PlutusV3 cost model, which a
+genesis cannot carry. `EnactPlutusCostModel` therefore puts it on chain at every
+fresh start, and it is in force two epoch boundaries later; `PlutusBench` waits
+for it. Set the rate with `PLUTUS_TPS` (default `1`, which about fills an EB's
+execution budget). The bench pays from its own genesis-funded key,
+`config/utxo-keys/utxo2`, and keeps its state in
+`$WORKING_DIR/plutus-bench`.
+
 ## Traffic control
 
 Proto-devnet uses Linux network namespaces and `tc` (traffic control) to simulate realistic network conditions between nodes: a configurable rate limit and latency on each link.

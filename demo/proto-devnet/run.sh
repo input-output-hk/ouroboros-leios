@@ -23,6 +23,13 @@ set -a
 : "${METRICS_PORT_NODE3:=12903}"
 # Base firehose submission rate (TxFirehose1); override with e.g. TPS=1000
 : "${TPS:=100}"
+# Worst-case Plutus txs per second from PlutusBench (on demand, see
+# process-compose.yaml). One saturates the per-tx execution budget, so 1/s about
+# fills an EB's.
+: "${PLUTUS_TPS:=1}"
+# The parameter-update script lives with dozen-devnet; EnactPlutusCostModel uses
+# it to put the bench's cost model on chain.
+: "${PROPOSE_PPARAM_UPDATE:="${SOURCE_DIR}/../dozen-devnet/propose-pparam-update.sh"}"
 # Colours the two generators tag their transactions with, so the mempool
 # observers can tell whose load each node is holding. Explicit and well
 # separated rather than --color auto, which is uniform but can put two
