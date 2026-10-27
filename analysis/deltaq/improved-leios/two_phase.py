@@ -60,7 +60,9 @@ def node_completion(body, fetch, validate, recovery, reapply, deadline, stress=F
     for index, mass in enumerate(body_mass):
         body_tick = index + 1
         available_ticks = tick - body_tick
-        retained = remaining_after_body[available_ticks - 1] if available_ticks > 0 else 0.0
+        retained = (
+            remaining_after_body[available_ticks - 1] if available_ticks > 0 else 0.0
+        )
         start_mass[max(index, tick - 1)] += mass * (1 - retained)
     recover = sequential(sequential(np.cumsum(start_mass), recovery), reapply)
     completion = continue_validation + recover
@@ -75,8 +77,14 @@ QUORUM_SEED = 164
 
 
 @lru_cache(maxsize=None)
-def quorum_coefficients(n_nodes=2500, committee_size=900, tau=0.75, beta=0.0,
-                        samples=QUORUM_SAMPLES, seed=QUORUM_SEED):
+def quorum_coefficients(
+    n_nodes=2500,
+    committee_size=900,
+    tau=0.75,
+    beta=0.0,
+    samples=QUORUM_SAMPLES,
+    seed=QUORUM_SEED,
+):
     """a[k] = P(a uniform k-seat subset reaches the stake threshold).
 
     Order seats uniformly at random and record the prefix length reaching
@@ -89,7 +97,7 @@ def quorum_coefficients(n_nodes=2500, committee_size=900, tau=0.75, beta=0.0,
     1-beta.  It is not a particular adversarial allocation of real pools.
     """
     stakes = np.sort(A._stake_distribution(n_nodes))[::-1]
-    weights = stakes[:min(committee_size, n_nodes)]
+    weights = stakes[: min(committee_size, n_nodes)]
     threshold = tau * stakes.sum() - beta * weights.sum()
     K = len(weights)
     if threshold <= 0:
@@ -119,14 +127,27 @@ def log_quorum_from_coefficients(p, coefficients):
     p = np.asarray(p, dtype=float)
     if len(k) == 0:
         return np.full_like(p, -np.inf)
-    log_weights = (np.log(coefficients[k]) + gammaln(K + 1)
-                   - gammaln(k + 1) - gammaln(K - k + 1))
-    return np.minimum(logsumexp(log_weights + xlogy(k, p[..., None])
-                               + xlogy(K - k, 1 - p[..., None]), axis=-1), 0)
+    log_weights = (
+        np.log(coefficients[k]) + gammaln(K + 1) - gammaln(k + 1) - gammaln(K - k + 1)
+    )
+    return np.minimum(
+        logsumexp(
+            log_weights + xlogy(k, p[..., None]) + xlogy(K - k, 1 - p[..., None]),
+            axis=-1,
+        ),
+        0,
+    )
 
 
-def conditional_completion(voter, completion, deadline=7.0, n_nodes=2500,
-                           committee_size=900, tau=0.75, beta=0.0):
+def conditional_completion(
+    voter,
+    completion,
+    deadline=7.0,
+    n_nodes=2500,
+    committee_size=900,
+    tau=0.75,
+    beta=0.0,
+):
     """Condition the explicit node model on the vote-deadline quorum.
 
     H(t_v,t) = F_V(min(t_v,t)): a node ready to vote is already complete.
@@ -147,9 +168,11 @@ def conditional_completion(voter, completion, deadline=7.0, n_nodes=2500,
     q = np.clip(q, 0, 1)
     honest_nodes = round((1 - beta) * n_nodes)
     with np.errstate(divide="ignore"):
-        log_result = honest_nodes * np.log(completion) + log_quorum(
-            q, n_nodes, committee_size, tau, beta
-        ) - log_pc
+        log_result = (
+            honest_nodes * np.log(completion)
+            + log_quorum(q, n_nodes, committee_size, tau, beta)
+            - log_pc
+        )
     if np.any(log_result > 1e-9):
         raise ValueError("conditional probability exceeds one")
     result = np.exp(np.minimum(log_result, 0))  # Roundoff only.
@@ -168,20 +191,31 @@ class Result:
     active: np.ndarray | None
 
 
-def calculate(closure_kb, body_kb, deadline=7.0, recovery_hops=(0.5, 0.5), stress=False):
+def calculate(
+    closure_kb, body_kb, deadline=7.0, recovery_hops=(0.5, 0.5), stress=False
+):
     body = A.cdf_fetch_eb_body(body_kb)
     fetch = A.cdf_fetch_missing_eb_closure(closure_kb, use_1hop=False)
     validate = A.cdf_process_eb_closure(closure_kb)
     if stress:
         # Full payload: do not multiply by the stationary missing fraction.
-        recovery = A.cdf_choices([(weight, A.cdf_hops(hops, closure_kb))
-                                 for hops, weight in enumerate(recovery_hops, 1) if weight > 0])
+        recovery = A.cdf_choices(
+            [
+                (weight, A.cdf_hops(hops, closure_kb))
+                for hops, weight in enumerate(recovery_hops, 1)
+                if weight > 0
+            ]
+        )
     else:
         recovery = A.cdf_fetch_missing_eb_closure(closure_kb, hop_weights=recovery_hops)
     reapply = A.cdf_process_eb_closure(closure_kb, reapply_only=True)
-    voter, completion = node_completion(body, fetch, validate, recovery, reapply, deadline, stress=stress)
+    voter, completion = node_completion(
+        body, fetch, validate, recovery, reapply, deadline, stress=stress
+    )
     log_pc, honest = conditional_completion(voter, completion, deadline)
-    log_pc_active, active = conditional_completion(voter, completion, deadline, beta=0.25)
+    log_pc_active, active = conditional_completion(
+        voter, completion, deadline, beta=0.25
+    )
     return Result(voter, completion, log_pc, honest, log_pc_active, active)
 
 
@@ -198,11 +232,20 @@ def worst_case(closure_kb, body_kb, receivers, recovery_hops, deadline=7.0):
     tick = round(deadline / A.DT)
     if tick < 1 or tick >= A.N or not np.isclose(tick * A.DT, deadline):
         raise ValueError("deadline must be an interior positive grid time")
+
     def over_paths(payload_kb):
-        return A.cdf_choices([(weight, A.cdf_hops(hops, payload_kb))
-                              for hops, weight in enumerate(recovery_hops, 1) if weight > 0])
-    node = sequential(sequential(over_paths(body_kb), over_paths(closure_kb)),
-                      A.cdf_process_eb_closure(closure_kb))
+        return A.cdf_choices(
+            [
+                (weight, A.cdf_hops(hops, payload_kb))
+                for hops, weight in enumerate(recovery_hops, 1)
+                if weight > 0
+            ]
+        )
+
+    node = sequential(
+        sequential(over_paths(body_kb), over_paths(closure_kb)),
+        A.cdf_process_eb_closure(closure_kb),
+    )
     started = np.zeros_like(node)
     started[tick:] = node[:-tick]
-    return started, started ** receivers
+    return started, started**receivers

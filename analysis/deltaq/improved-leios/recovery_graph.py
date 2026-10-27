@@ -25,9 +25,16 @@ import analysis as A
 N_NODES = 2500
 PEER_COUNTS = (5, 10, 20)
 # (holder stake, adversarial stake); honest nonholders keep the remainder.
-STAKE_SPLITS = ((.25, 0.), (.25, .25), (.25, .5), (.5, 0.), (.5, .25), (.75, 0.))
+STAKE_SPLITS = (
+    (0.25, 0.0),
+    (0.25, 0.25),
+    (0.25, 0.5),
+    (0.5, 0.0),
+    (0.5, 0.25),
+    (0.75, 0.0),
+)
 DEFAULT_PEERS = 5
-DEFAULT_HOLDER_STAKE = .25
+DEFAULT_HOLDER_STAKE = 0.25
 GRAPH_COUNT = 16
 TRIALS = 256
 SEED = 164
@@ -73,8 +80,10 @@ def build_graph(stakes, peers, rng):
         probabilities[node] = 0
         probabilities /= probabilities.sum()
         columns[node] = rng.choice(n, peers, replace=False, p=probabilities)
-    return csr_matrix((np.ones(n * peers), (np.repeat(np.arange(n), peers), columns.ravel())),
-                      shape=(n, n))
+    return csr_matrix(
+        (np.ones(n * peers), (np.repeat(np.arange(n), peers), columns.ravel())),
+        shape=(n, n),
+    )
 
 
 def holder_distances(graph, holders, honest):
@@ -89,8 +98,13 @@ def holder_distances(graph, holders, honest):
     mask = diags(honest.astype(float))
     honest_graph = (mask @ graph @ mask).tocsr()
     honest_graph.eliminate_zeros()
-    distances = dijkstra(honest_graph.T.tocsr(), directed=True, unweighted=True,
-                         indices=sources, min_only=True)
+    distances = dijkstra(
+        honest_graph.T.tocsr(),
+        directed=True,
+        unweighted=True,
+        indices=sources,
+        min_only=True,
+    )
     distances[~honest] = np.inf
     return distances
 
@@ -105,7 +119,9 @@ def assign_roles(stakes, holder_stake, adversary_stake, rng):
     adversary_end = holder_end
     if adversary_stake > 0:
         target = cumulative[holder_end - 1] + adversary_stake
-        adversary_end = min(int(np.searchsorted(cumulative, target)) + 1, len(stakes) - 1)
+        adversary_end = min(
+            int(np.searchsorted(cumulative, target)) + 1, len(stakes) - 1
+        )
     holders = np.zeros(len(stakes), dtype=bool)
     honest = np.ones(len(stakes), dtype=bool)
     holders[order[:holder_end]] = True
@@ -121,11 +137,19 @@ def graph_bank(peers, n_nodes=N_NODES, seed=SEED, count=GRAPH_COUNT):
 
 
 @lru_cache(maxsize=None)
-def derive_paths(holder_stake=DEFAULT_HOLDER_STAKE, peers=DEFAULT_PEERS, adversary_stake=0.,
-                 n_nodes=N_NODES, seed=SEED, trials=TRIALS):
+def derive_paths(
+    holder_stake=DEFAULT_HOLDER_STAKE,
+    peers=DEFAULT_PEERS,
+    adversary_stake=0.0,
+    n_nodes=N_NODES,
+    seed=SEED,
+    trials=TRIALS,
+):
     """Pool shortest-path lengths over honest nonholders, not over stake."""
     graphs, stakes = graph_bank(peers, n_nodes, seed)
-    rng = np.random.default_rng((seed, peers, round(1e4 * holder_stake), round(1e4 * adversary_stake)))
+    rng = np.random.default_rng(
+        (seed, peers, round(1e4 * holder_stake), round(1e4 * adversary_stake))
+    )
     counts = np.zeros(n_nodes + 1, dtype=np.int64)
     unreachable = receivers = complete = 0
     for trial in range(trials):
@@ -139,8 +163,16 @@ def derive_paths(holder_stake=DEFAULT_HOLDER_STAKE, peers=DEFAULT_PEERS, adversa
         receivers += len(remaining)
         complete += missed == 0
     last = max(1, int(np.flatnonzero(counts)[-1])) if counts.any() else 1
-    return Paths(peers, holder_stake, adversary_stake, tuple(counts[1:last + 1] / receivers),
-                 unreachable / receivers, complete / trials, receivers, trials)
+    return Paths(
+        peers,
+        holder_stake,
+        adversary_stake,
+        tuple(counts[1 : last + 1] / receivers),
+        unreachable / receivers,
+        complete / trials,
+        receivers,
+        trials,
+    )
 
 
 def sweep():

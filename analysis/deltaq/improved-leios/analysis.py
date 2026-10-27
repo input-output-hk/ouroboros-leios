@@ -507,14 +507,23 @@ def cdf_fetch_missing_eb_closure(
         return cdf_wait(0.001)
     if hop_weights is not None:
         weights = np.asarray(hop_weights, dtype=float)
-        if (weights.ndim != 1 or not len(weights)
-                or not np.all(np.isfinite(weights)) or np.any(weights < 0)
-                or not np.isclose(weights.sum(), 1.0)):
-            raise ValueError("hop_weights must be non-negative probabilities summing to one")
-        fetch_cdf = cdf_choices([
-            (weight, cdf_hops(hops, missing_kb))
-            for hops, weight in enumerate(weights, start=1) if weight > 0
-        ])
+        if (
+            weights.ndim != 1
+            or not len(weights)
+            or not np.all(np.isfinite(weights))
+            or np.any(weights < 0)
+            or not np.isclose(weights.sum(), 1.0)
+        ):
+            raise ValueError(
+                "hop_weights must be non-negative probabilities summing to one"
+            )
+        fetch_cdf = cdf_choices(
+            [
+                (weight, cdf_hops(hops, missing_kb))
+                for hops, weight in enumerate(weights, start=1)
+                if weight > 0
+            ]
+        )
     elif use_1hop:
         fetch_cdf = cdf_hop(missing_kb)
     else:
@@ -1526,8 +1535,11 @@ def cdf_process_eb_closure(s_eb_tx_kb: float, reapply_only: bool = False) -> np.
 
 
 def cdf_closure_completion(
-    s_eb_tx_kb: float, include_validation: bool = True, reapply_only: bool = False,
-    hop_weights=None, body_size_kb=None,
+    s_eb_tx_kb: float,
+    include_validation: bool = True,
+    reapply_only: bool = False,
+    hop_weights=None,
+    body_size_kb=None,
 ) -> np.ndarray:
     """
     Per-node EB-CLOSURE completion CDF G(t): the time for a node to receive
@@ -1545,13 +1557,17 @@ def cdf_closure_completion(
         return cdf_sequential(
             cdf_sequential(
                 cdf_fetch_eb_body(body_size_kb),
-                cdf_fetch_missing_eb_closure(s_eb_tx_kb, use_1hop=True, hop_weights=hop_weights),
+                cdf_fetch_missing_eb_closure(
+                    s_eb_tx_kb, use_1hop=True, hop_weights=hop_weights
+                ),
             ),
             cdf_process_eb_closure(s_eb_tx_kb, reapply_only=reapply_only),
         )
     return cdf_sequential(
         cdf_fetch_eb_body(body_size_kb),
-        cdf_fetch_missing_eb_closure(s_eb_tx_kb, use_1hop=False, hop_weights=hop_weights),
+        cdf_fetch_missing_eb_closure(
+            s_eb_tx_kb, use_1hop=False, hop_weights=hop_weights
+        ),
     )
 
 
@@ -1727,14 +1743,18 @@ def cdf_full_closure_diffusion_given_cert(
 
     """
     G = cdf_closure_completion(
-        s_eb_tx_kb, include_validation=include_validation, hop_weights=hop_weights,
+        s_eb_tx_kb,
+        include_validation=include_validation,
+        hop_weights=hop_weights,
         body_size_kb=body_size_kb,
     )
     # All-honest-nodes diffusion term G_apply(t)^N_h: those nodes APPLY the
     # already-certified closure (reapplyTx throughout, scripts skipped);
     # the voter / certification factors keep the full-validation law G.
     G_apply = cdf_closure_completion(
-        s_eb_tx_kb, include_validation=include_validation, reapply_only=True,
+        s_eb_tx_kb,
+        include_validation=include_validation,
+        reapply_only=True,
         hop_weights=hop_weights,
         body_size_kb=body_size_kb,
     )
