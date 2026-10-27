@@ -18,8 +18,7 @@ validation before the 7-second deadline, then **graph-derived recovery for
 nodes still missing data** on certification (76.58% one hop, 23.41% two hops,
 0.01% three hops), with **EB body size = closure size × 40/260**.
 At 260 kB, the body is 40 kB and p99.9 is **4.36 s under both models**.
-The stationary missing fraction is **one sixth at every node**; it is not
-a one-sixth probability that a node needs to fetch anything.
+The stationary missing fraction is **one sixth at every node**.
 
 - **At the 14-second deadline**, closures up to 2 MB have **>99.9999%**
   all-node completion under both network models, with effectively certain
@@ -70,12 +69,8 @@ Two different probabilities appear below:
   average node, a stake fraction, or 99% of nodes.
 
 All times are measured from the model's EB diffusion origin. The checkpoints
-are **7 s** (voting deadline), **10 s** (intermediate checkpoint), and **14 s**
-(end of the diffusion window). A p99 time is the time by which the all-node
+are **7 s** (voting deadline) and **14 s** (end of the diffusion window). A p99 time is the time by which the all-node
 completion event has probability at least 99%, conditional on certification.
-An early completion time does not mean that the certificate itself has already
-been delivered to every node: certificate propagation is not a stage of this
-closure-completion calculation.
 
 ### Fixed inputs
 
@@ -83,7 +78,6 @@ closure-completion calculation.
 |:---|:---|
 | Node population | 2,500; all honest in the baseline |
 | Committee | Deterministic top-stake selection of 900 pools; synthetic stake coverage approximately 98.844483% |
-| Committee size / effective equal-weight votes | 900 / approximately 464 |
 | Stake distribution | Synthetic power-law distribution in `analysis.py`; not an observed stake snapshot |
 | Certification threshold | 75% of total active stake; approximately 75.88% of committee stake |
 | Voting / diffusion deadline | 7 s / 14 s |
@@ -146,29 +140,29 @@ the 14-second column; §3 gives their more informative completion-time differenc
 
 ### Mathis: Reno/AIMD network model
 
-| Closure (MB) | Body (kB) | Missing txs (kB) | Voter ready by 7 s | P(C) | All ready by 7 s, given C | All ready by 10 s, given C | All ready by 14 s, given C |
-|---:|---:|---:|---:|---:|---:|---:|---:|
-| 0.125 | 19.2308 | 20.8333 | >99.9999% | >99.9999% | >99.9999% | >99.9999% | >99.9999% |
-| 0.26 | 40 | 43.3333 | >99.9999% | >99.9999% | >99.9999% | >99.9999% | >99.9999% |
-| 0.5 | 76.9231 | 83.3333 | >99.9999% | >99.9999% | 99.9967% | >99.9999% | >99.9999% |
-| 1 | 153.846 | 166.667 | 99.9800% | >99.9999% | 60.5871% | >99.9999% | >99.9999% |
-| 2 | 307.692 | 333.333 | 93.5955% | >99.9999% | <0.0001% | 99.7281% | >99.9999% |
-| 4 | 615.385 | 666.667 | 55.1347% | 6.4872e-23% | <0.0001% | <0.0001% | 99.9988% |
-| 8 | 1230.77 | 1333.33 | 16.6900% | 1.7273e-278% | <0.0001% | <0.0001% | <0.0001% |
-| 12 | 1846.15 | 2000 | 4.6231% | 1.6401e-614% | <0.0001% | <0.0001% | <0.0001% |
+| Closure (MB) | Body (kB) | Missing txs (kB) | Voter ready by 7 s | P(C) | All ready by 7 s, given C | All ready by 14 s, given C |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.125 | 19.2308 | 20.8333 | >99.9999% | >99.9999% | >99.9999% | >99.9999% |
+| 0.26 | 40 | 43.3333 | >99.9999% | >99.9999% | >99.9999% | >99.9999% |
+| 0.5 | 76.9231 | 83.3333 | >99.9999% | >99.9999% | 99.9967% | >99.9999% |
+| 1 | 153.846 | 166.667 | 99.9800% | >99.9999% | 60.5871% | >99.9999% |
+| 2 | 307.692 | 333.333 | 93.5955% | >99.9999% | <0.0001% | >99.9999% |
+| 4 | 615.385 | 666.667 | 55.1347% | 6.4872e-23% | <0.0001% | 99.9988% |
+| 8 | 1230.77 | 1333.33 | 16.6900% | 1.7273e-278% | <0.0001% | <0.0001% |
+| 12 | 1846.15 | 2000 | 4.6231% | 1.6401e-614% | <0.0001% | <0.0001% |
 
 ### CUBIC network model
 
-| Closure (MB) | Body (kB) | Missing txs (kB) | Voter ready by 7 s | P(C) | All ready by 7 s, given C | All ready by 10 s, given C | All ready by 14 s, given C |
-|---:|---:|---:|---:|---:|---:|---:|---:|
-| 0.125 | 19.2308 | 20.8333 | >99.9999% | >99.9999% | >99.9999% | >99.9999% | >99.9999% |
-| 0.26 | 40 | 43.3333 | >99.9999% | >99.9999% | >99.9999% | >99.9999% | >99.9999% |
-| 0.5 | 76.9231 | 83.3333 | >99.9999% | >99.9999% | 99.9967% | >99.9999% | >99.9999% |
-| 1 | 153.846 | 166.667 | 99.9800% | >99.9999% | 60.5871% | >99.9999% | >99.9999% |
-| 2 | 307.692 | 333.333 | 94.9502% | >99.9999% | <0.0001% | 99.8332% | >99.9999% |
-| 4 | 615.385 | 666.667 | 80.9318% | 99.6413% | <0.0001% | 0.0165% | >99.9999% |
-| 8 | 1230.77 | 1333.33 | 54.3077% | 5.9575e-25% | <0.0001% | <0.0001% | 99.9999% |
-| 12 | 1846.15 | 2000 | 36.9762% | 5.2942e-93% | <0.0001% | <0.0001% | 99.3888% |
+| Closure (MB) | Body (kB) | Missing txs (kB) | Voter ready by 7 s | P(C) | All ready by 7 s, given C | All ready by 14 s, given C |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.125 | 19.2308 | 20.8333 | >99.9999% | >99.9999% | >99.9999% | >99.9999% |
+| 0.26 | 40 | 43.3333 | >99.9999% | >99.9999% | >99.9999% | >99.9999% |
+| 0.5 | 76.9231 | 83.3333 | >99.9999% | >99.9999% | 99.9967% | >99.9999% |
+| 1 | 153.846 | 166.667 | 99.9800% | >99.9999% | 60.5871% | >99.9999% |
+| 2 | 307.692 | 333.333 | 94.9502% | >99.9999% | <0.0001% | >99.9999% |
+| 4 | 615.385 | 666.667 | 80.9318% | 99.6413% | <0.0001% | >99.9999% |
+| 8 | 1230.77 | 1333.33 | 54.3077% | 5.9575e-25% | <0.0001% | 99.9999% |
+| 12 | 1846.15 | 2000 | 36.9762% | 5.2942e-93% | <0.0001% | 99.3888% |
 
 A high individual voter readiness probability does not imply that every node
 is ready.  For example, at 2 MB under Mathis, individual voter readiness at
@@ -182,7 +176,7 @@ in §3.1; the graph-derived recovery-hop distribution does not enter P(C).
 
 Each curve shows the probability that all 2,500 honest nodes are ready by
 time *t*, given certification, for one closure size. Vertical dotted lines
-mark the 7, 10, and 14 s table checkpoints.  Colours identify the same
+mark the 7 and 14 s table checkpoints.  Colours identify the same
 closure sizes in all four CDF plots.
 
 ![Mathis conditional all-node closure completion CDFs for closures from 0.125 to 12 MB](conditional-certification-diffusion/mathis-honest-cdf.svg)
@@ -527,7 +521,8 @@ still: at *m* = 10 and *f* = 25%, 94.62% of receivers are one hop away.
 
 The three-hop tail is small but not negligible for a strict all-node target.
 The earlier 50% one-hop / 50% two-hop split excluded it.  At 2 MB under
-Mathis, it lowers all-node completion by 10 s from >99.9999% to 99.7281%,
+Mathis, it lowers the probability that all nodes are ready 10 s after the
+EB diffusion origin from >99.9999% to 99.7281%,
 although the more frequent one-hop paths reduce most completion times.
 
 **Unreachable receivers are reported, not timed.**  Without adversaries,

@@ -52,7 +52,7 @@ def plot_completion_cdfs(model, rows, active=False, stress=False):
             A.TIMES, cdf, color=colors[i],
             label=f"{mb:g} MB" + (" (Musashi limit)" if mb == 0.26 else ""),
         )
-    for t, label in ((7, "Vote deadline"), (10, "Checkpoint"), (14, "Diffusion deadline")):
+    for t, label in ((7, "Vote deadline"), (14, "Diffusion deadline")):
         ax.axvline(t, color="gray", linestyle=":", linewidth=1)
         ax.text(t + 0.08, 0.03, f"{label}: {t} s", rotation=90, fontsize=8)
     population = "1,875 honest nodes; 25% active adversarial stake" if active else "2,500 honest nodes"
@@ -254,8 +254,8 @@ def main():
         rows = []
         A.set_network_model(model)
         print(f"\n## {model.upper()}\n")
-        print("| Closure (MB) | Body (kB) | Missing txs (kB) | Voter ready by 7 s | P(C) | All ready by 7 s, given C | All ready by 10 s, given C | All ready by 14 s, given C |")
-        print("|---:|---:|---:|---:|---:|---:|---:|---:|")
+        print("| Closure (MB) | Body (kB) | Missing txs (kB) | Voter ready by 7 s | P(C) | All ready by 7 s, given C | All ready by 14 s, given C |")
+        print("|---:|---:|---:|---:|---:|---:|---:|")
         timing_rows = []
         for mb in SIZES_MB:
             kb = mb * 1000
@@ -277,7 +277,7 @@ def main():
                 assert np.allclose(honest, result.completion**2500, atol=1e-10, rtol=0)
             pc_text = log_percentage(result.log_pc)
             values = [percentage(gv), pc_text]
-            values += [percentage(A.success_within(honest, t)) if honest is not None else "N/A" for t in (7, 10, 14)]
+            values += [percentage(A.success_within(honest, t)) if honest is not None else "N/A" for t in (7, 14)]
             print(f"| {mb:g} | {body_kb:g} | {kb / 6:g} | " + " | ".join(values) + " |")
             quantiles = [completion_quantile(honest, p) for p in (0.5, 0.95, 0.99, 0.999)]
             q_active = completion_quantile(active, 0.99)
