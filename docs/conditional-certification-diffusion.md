@@ -13,10 +13,12 @@ The **260 kB case is Musashi's configured transaction-closure limit**.  At
 that size, the honest all-node p99 completion time is **4.01 s under both
 network models**.  The committee selects the **900 highest-stake
 pools**, matching the current implementation and Musashi's seat-count parameter.
-Every table and plot uses a **causal two-phase model**: blended fetching and
-validation before the 7-second deadline, then **graph-derived recovery for
-nodes still missing data** on certification (76.58% one hop, 23.41% two hops,
-0.01% three hops), with **EB body size = closure size × 40/260**.
+The baseline and active-adversary tables and plots use a **causal two-phase
+model**: blended fetching and validation before the 7-second deadline, then
+**graph-derived recovery for nodes still missing data** on certification
+(76.58% one hop, 23.41% two hops, 0.01% three hops), with **EB body size =
+closure size × 40/260**.  The stress (§3.4) and safety worst-case (§3.6)
+scenarios use modified recovery assumptions described in their sections.
 At 260 kB, the body is 40 kB and p99.9 is **4.36 s under both models**.
 The stationary missing fraction is **one sixth at every node**.
 
@@ -172,7 +174,7 @@ Certification only requires the stake quorum, so it remains effectively certain.
 ### Conditional completion CDFs
 
 All plots and tables use the **two-phase node process** defined
-in §3.1; the graph-derived recovery-hop distribution does not enter P(C).
+in §3.2; the graph-derived recovery-hop distribution does not enter P(C).
 
 Each curve shows the probability that all 2,500 honest nodes are ready by
 time *t*, given certification, for one closure size. Vertical dotted lines
@@ -528,7 +530,9 @@ although the more frequent one-hop paths reduce most completion times.
 **Unreachable receivers are reported, not timed.**  Without adversaries,
 every receiver has a route.  When adversaries neither serve nor forward, a
 receiver whose peers are all adversarial has none: about 0.25⁵ ≈ 0.1% of
-receivers at 25% adversarial stake, and 0.5⁵ ≈ 3.1% at 50%.  `All reachable`
+receivers at 25% adversarial stake, and 0.5⁵ ≈ 3.1% at 50%.  These are lower
+bounds—the `Unreachable` column also counts receivers whose only routes pass
+through adversarial nodes.  `All reachable`
 is the fraction of role draws in which every receiver has a route.  The graph
 is static, whereas real nodes replace peers that fail to deliver, so these
 figures overstate persistent unreachability.  They therefore do not enter the
@@ -537,7 +541,7 @@ reachable receivers.
 
 Sampled figures are shown to two decimals.  `0.00%` means that no case was
 observed among approximately 160,000 to 480,000 receiver samples; it is not a
-zero probability.
+zero probability.  Rounding may cause row sums to differ from 100% by 0.01%.
 
 ### 3.6. Late-release safety worst case
 
@@ -626,41 +630,49 @@ measures them against the 14-second deadline used throughout.
 
 ## 4. Interpretation and scope
 
-For the smaller sizes, **earlier readiness and timing margin** distinguish the
-options more usefully than the rounded 14-second probability.  Reducing a
-500 kB closure to 125 kB also reduces the body from approximately 76.92 kB
-to 19.23 kB, reducing p99 by **3.53 s under both models**.  These rows model
-jointly smaller bodies and closures, rather than isolating closure-fetch costs.
+### How to read the results
 
-The following assumptions bound what these figures establish:
+For smaller closures, **timing margins** are more informative than the
+rounded 14-second probabilities. For example, reducing a closure from
+500 kB to 125 kB also shrinks the EB body from ~77 kB to ~19 kB, cutting
+p99 completion time by **3.53 s under both network models**. These rows
+model jointly smaller bodies and closures, not just cheaper closure fetches.
 
-- **One EB in isolation.** Concurrent EBs, transaction traffic, and resource
-  contention are not modelled. These tables do not determine sustainable
-  throughput or a production closure-size limit.
-- **Independent, stake-independent node completion times.** Shared network
-  paths, correlated cache misses, and differences in SPO connectivity are not
-  represented; no general direction of error is established here.
-- **Idealised recovery boundary.** Immediate serving availability at 7 s and
-  independent, uncontended recovery are assumptions.  Restarting unfinished
-  missing batches ignores partial-byte progress.  Real certificate arrival,
-  fetching overlap, and shared serving capacity can alter the result.
-- **Static recovery graph.**  Peers are chosen by stake, with a fixed count
-  and no churn, peer replacement, relay multiplicity, or reverse use of
-  connections.  The active-adversary comparison reuses the adversary-free hop
-  distribution, although adversaries that do not forward shift some two-hop
-  paths to three hops or leave receivers without a route (§3.5).
-- **Approximate quorum coefficients.** The permutation estimate preserves
-  probability identities but is not an exact enumeration of all subsets.
-  Decimal precision is for reproducibility, not confidence in extremely rare
-  probabilities.  A silent adversary withholding 25% of committee stake would
-  leave approximately 74.13% of active stake, below quorum; such an impossible
-  event has no conditional completion distribution and is not tabulated.
-- **Discrete numerical model.** Transfer-time steps, fixed mixtures, and the
-  10 ms grid produce plateaus and sharp tail changes.  For example, the
-  recovery onset and deterministic transfer mixtures can create plateaus and
-  sharp jumps.  Sums in the two-phase module place two positive grid durations
-  at their summed time, correcting the earlier convolution's one-bin advance
-  per composition.  This also shifts some voter-readiness figures slightly.
+### Limitations
+
+The figures above are bounded by these assumptions:
+
+**Isolated scenario.** The model considers one EB in isolation. Concurrent
+EBs, background transaction traffic, and resource contention are not
+modelled, so these tables do not determine sustainable throughput or a
+production closure-size limit.
+
+**Independent nodes.** Node completion times are independent and
+stake-independent. Shared network paths, correlated cache misses, and
+differences in SPO connectivity are not represented.
+
+**Idealised recovery.** Recovery assumes certified holders serve
+immediately at 7 s with uncontended uploads. Unfinished missing batches
+restart from scratch, ignoring partial progress. Real certificate arrival,
+fetching overlap, and shared serving capacity can change the results.
+
+**Static peer graph.** Peers are fixed, stake-weighted, and do not change
+over time—no churn, replacement, or multiple relays. The active-adversary
+comparison reuses the adversary-free hop distribution, though non-forwarding
+adversaries would shift some two-hop paths to three hops or leave receivers
+without a route (§3.5).
+
+**Approximate quorum calculation.** Quorum probabilities use a permutation
+estimate (50,000 samples), not an exact enumeration. Decimal precision aids
+reproducibility but does not imply confidence in extremely rare
+probabilities. A silent adversary withholding 25% of committee stake would
+leave ~74.13% of active stake—below quorum—so that impossible event has no
+conditional completion distribution and is not tabulated.
+
+**Discrete numerical grid.** The 10 ms time grid and fixed transfer
+mixtures create plateaus and sharp tail changes. The two-phase module
+places summed durations at their exact summed time, correcting the earlier
+convolution's one-bin advance per composition.
 
 ## 5. Reproducing the tables and plots
 
