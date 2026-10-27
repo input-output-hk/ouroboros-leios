@@ -38,6 +38,12 @@
       "topology": "topologies/dozen-devnet.yaml",
       "duration": 300,
       "loki": "localhost:3101"
+    },
+    {
+      "name": "Musashi Pools (map)",
+      "topology": "topologies/musashi.yaml",
+      "duration": 300,
+      "loki": "localhost:3101"
     }
   ]
 }
