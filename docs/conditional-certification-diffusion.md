@@ -17,7 +17,7 @@ The baseline and active-adversary tables and plots use a **causal two-phase
 model**: blended fetching and validation before the 7-second deadline, then
 **graph-derived recovery for nodes still missing data** on certification
 (76.58% one hop, 23.41% two hops, 0.01% three hops), with **EB body size =
-closure size × 40/260**.  The stress (§3.3) and safety worst-case (§3.4)
+closure size × 40/260**.  The stress (§3.2) and safety worst-case (§3.3)
 scenarios use modified recovery assumptions described in their sections.
 At 260 kB, the body is 40 kB and p99.9 is **4.36 s under both models**.
 The stationary missing fraction is **one sixth at every node**.
@@ -37,7 +37,7 @@ The stationary missing fraction is **one sixth at every node**.
   certification becomes extremely rare.  Quorum probabilities use a seeded
   permutation estimate, not a Normal tail; extreme-tail values remain
   sensitive to the finite permutation sample and synthetic stake distribution.
-- **No-prior-availability stress:** §3.3 makes every node not validated by
+- **No-prior-availability stress:** §3.2 makes every node not validated by
   7 s recover the entire closure.  At 260 kB, p99 remains **4.01 s** under
   both models because the all-node p99 event precedes recovery.  At 2 MB,
   Mathis p99 rises from **9.91 s to 15.85 s** and all-node completion by
@@ -47,7 +47,7 @@ The stationary missing fraction is **one sixth at every node**.
   recovering node reaches a holder in one hop with probability close to
   $1-(1-f)^m$.  The timing model uses $f=25\%$ and $m=5$, the
   smallest holder stake and peer count in the sweep.
-- **Safety worst case** (§3.4): an adversary with stake $\sigma_\alpha$ approaching 50%
+- **Safety worst case** (§3.3): an adversary with stake $\sigma_\alpha$ approaching 50%
   can certify while releasing the EB so late that only honest nodes with
   $\tau-\sigma_\alpha\approx25\%$ of stake hold it at 7 s.  The remaining honest nodes then
   reach p99 at **12.02 s** for 260 kB under both models, against **4.01 s**
@@ -85,9 +85,9 @@ completion event has probability at least 99%, conditional on certification.
 | Voting / diffusion deadline | 7 s / 14 s |
 | Stationary missing transaction fraction | Every node fetches 1/6 of the closure (approximately 16.67%) |
 | Phase-one missing-transaction fetch | Full blended one-to-five-hop distribution; determines voter readiness and $P(C)$ |
-| Phase-two recovery | Begins no earlier than 7 s, conditional on certification: 76.58% one hop, 23.41% two hops, 0.01% three hops; see §3.1 and Appendix B |
+| Phase-two recovery | Begins no earlier than 7 s, conditional on certification: 76.58% one hop, 23.41% two hops, 0.01% three hops; see Appendices B and C |
 | Recovery graph | 2,500 nodes; 5 distinct stake-weighted peers each; holders carry 25% of stake; 16 graphs and 256 holder draws, seed 164 |
-| Stress recovery | Every node not validated by 7 s fetches the full closure; same phase one and recovery-hop distribution; see §3.3 |
+| Stress recovery | Every node not validated by 7 s fetches the full closure; same phase one and recovery-hop distribution; see §3.2 |
 | EB-body diffusion | Full blended one-to-five-hop distribution from `report.md` §4.2 |
 | EB body | Fixed size for each closure: closure size × 40/260; 40 kB at a 260 kB closure |
 | Average transaction size | 1,000 bytes |
@@ -125,7 +125,7 @@ should not be interpreted as valid Musashi configurations.
 **Units**: all sizes in this report use decimal units: kB = 1,000 bytes
 and MB = 1,000,000 bytes.
 
-## 2. Certification and completion probabilities
+## 2. Honest-baseline probabilities and completion times
 
 Very small certification probabilities are displayed in scientific notation
 as percentages, rather than rounded to zero.
@@ -138,7 +138,8 @@ The baseline has no adversarial nodes. All probabilities are percentages,
 rounded to four decimal places.  Values that would round to zero or one
 hundred percent are displayed as `<0.0001%` or `>99.9999%`, respectively,
 rather than implying impossibility or certainty.  Smaller closures saturate
-the 14-second column; §3 gives their more informative completion-time differences.
+the 14-second column; the percentile plot below gives their more informative
+completion-time differences.
 
 ### Mathis: Reno/AIMD network model
 
@@ -174,7 +175,7 @@ Certification only requires the stake quorum, so it remains effectively certain.
 ### Conditional completion CDFs
 
 All plots and tables use the **two-phase node process** defined
-in §3.2; the graph-derived recovery-hop distribution does not enter $P(C)$.
+in Appendices C and D; the graph-derived recovery-hop distribution does not enter $P(C)$.
 
 Each curve shows the probability that all 2,500 honest nodes are ready by
 time $t$, given certification, for one closure size. Vertical dotted lines
@@ -185,7 +186,29 @@ closure sizes in all four CDF plots.
 
 ![CUBIC conditional all-node closure completion CDFs for closures from 0.125 to 12 MB](conditional-certification-diffusion/cubic-honest-cdf.svg)
 
-## 3. Completion times and active-adversary comparison
+### Completion-time percentiles by closure size
+
+At 0.5 MB, the honest p99 time leaves **8.02 s** before the 14-second
+deadline under both models.  At 4 MB, conditional p99 leaves **0.78 s under
+Mathis** and **3.19 s under CUBIC**; the Mathis certificate itself is extremely
+unlikely.  These are model timing margins, not measured
+budgets for additional traffic or implementation overhead.
+
+The percentile plot uses a logarithmic closure-size axis to keep the smaller
+sizes legible. Each panel includes the honest p50, p95, p99, and p99.9 times,
+with the active-adversary p99 shown as a dashed black line for comparison
+with §3.1.  The rightmost point is 12 MB under both models.
+Where certification saturates, the
+active line nearly overlaps honest p99 because the main difference is the
+smaller honest-node target.  Conditioning on rare certification also changes
+the distribution of nodes already ready at the deadline.  The new calculation
+does not impose monotonicity by taking a running maximum of the CDF.
+
+![Conditional all-node completion-time percentiles versus closure size for Mathis and CUBIC](conditional-certification-diffusion/completion-time-percentiles.svg)
+
+## 3. Adversarial scenarios
+
+### 3.1. Active adversarial voting
 
 The honest columns target all **2,500** nodes.  The active-adversary columns
 follow §8 of the
@@ -202,7 +225,7 @@ These columns are not a safety analysis.  The adversary enters only through
 its votes in the certification condition and through the smaller honest
 population; adversarial nodes still relay bodies and transactions like honest
 ones, so they cannot delay diffusion.  Raising the adversarial share towards
-50% therefore changes these results by less than a second.  §3.4 instead
+50% therefore changes these results by less than a second.  §3.3 instead
 models an adversary that withholds diffusion, so that only $\tau-\sigma_\alpha$ of stake
 is guaranteed to help.
 
@@ -212,7 +235,7 @@ they are not evidence that adversarial voting improves diffusion. Comparisons
 of the informational strength of certificates require holding the honest
 population fixed.
 
-### Mathis
+#### Mathis
 
 | Closure (MB) | Honest p50 (s) | Honest p95 (s) | Honest p99 (s) | Honest p99.9 (s) | Active p99 (s) | Active all ready by 14 s, given $C$ |
 |---:|---:|---:|---:|---:|---:|---:|
@@ -225,7 +248,7 @@ population fixed.
 | 8 | 16.46 | 18.64 | 19.26 | 21.43 | 19.25 | 0.0015% |
 | 12 | 22.89 | 25.93 | 26.80 | 29.80 | 26.78 | <0.0001% |
 
-### CUBIC
+#### CUBIC
 
 | Closure (MB) | Honest p50 (s) | Honest p95 (s) | Honest p99 (s) | Honest p99.9 (s) | Active p99 (s) | Active all ready by 14 s, given $C$ |
 |---:|---:|---:|---:|---:|---:|---:|
@@ -238,27 +261,7 @@ population fixed.
 | 8 | 11.27 | 11.80 | 11.89 | 13.20 | 11.88 | 99.9999% |
 | 12 | 11.91 | 13.08 | 13.75 | 14.62 | 13.18 | 99.5350% |
 
-At 0.5 MB, the honest p99 time leaves **8.02 s** before the 14-second
-deadline under both models.  At 4 MB, conditional p99 leaves **0.78 s under
-Mathis** and **3.19 s under CUBIC**; the Mathis certificate itself is extremely
-unlikely.  These are model timing margins, not measured
-budgets for additional traffic or implementation overhead.
-
-### Completion-time percentiles by closure size
-
-The percentile plot uses a logarithmic closure-size axis to keep the smaller
-sizes legible. Each panel includes the honest p50, p95, p99, and p99.9 times,
-with the active-adversary p99 shown as a dashed black line.  The rightmost
-point is 12 MB under both models.
-Where certification saturates, the
-active line nearly overlaps honest p99 because the main difference is the
-smaller honest-node target.  Conditioning on rare certification also changes
-the distribution of nodes already ready at the deadline.  The new calculation
-does not impose monotonicity by taking a running maximum of the CDF.
-
-![Conditional all-node completion-time percentiles versus closure size for Mathis and CUBIC](conditional-certification-diffusion/completion-time-percentiles.svg)
-
-### Active-adversary conditional completion CDFs
+#### Conditional completion CDFs
 
 These use the same axes and size colours as the honest-baseline plots, but
 target all 1,875 honest nodes under the 25% active-adversary scenario.
@@ -268,99 +271,7 @@ Both honest and active-adversary plots use the split fetch assumptions.
 
 ![CUBIC conditional closure completion CDFs with 25% active adversarial committee stake and 1,875 honest nodes](conditional-certification-diffusion/cubic-active-cdf.svg)
 
-### 3.1. Fixed missing-transaction fetch model
-
-A node's **missing-transaction batch** is every closure transaction that the
-node lacks, fetched as one bulk transfer.  The model uses separate paths
-for the whole batch before and after the voting deadline, as follows:
-
-| Path length | Phase-one fetch | Phase-two recovery |
-|---:|---:|---:|
-| 1 hop | 0.40% | 76.58% |
-| 2 hops | 3.91% | 23.41% |
-| 3 hops | 31.06% | 0.01% |
-| 4 hops | 61.85% | 0% |
-| 5 hops | 2.78% | 0% |
-
-**Phase one:** every honest node attempts to acquire and validate the closure.
-Voter readiness and the unconditional certification probability $P(C)$ use only
-the full blended fetch law and initial validation.  Nodes outside the committee
-also follow this initial processing law, but do not vote.
-
-**Phase two starts at 7 s, conditional on certification.**  A node already
-validated remains complete.  A node that has fetched its entire missing batch
-continues any validation still in progress.  A node still missing data uses
-the short-path recovery law, beginning at the later of 7 s and its body arrival,
-then reapplies the closure.  Already completed data fetching is retained;
-partial bytes of an unfinished batch are not credited, so that batch is
-restarted in full.  This is a deliberately coarse batch-level progress model.
-
-Certified holders are assumed to be immediately available as serving sources
-at the deadline.  There is no additional certificate-construction, delivery,
-source-discovery, or queueing delay.  Recovery does not happen on a branch
-where certification fails.  This is a fixed-deadline model, not a model of
-the earliest possible quorum time or per-node certificate arrival.
-
-The generator derives `DEFAULT_HOP_WEIGHTS` from the recovery graph in Appendix B
-and uses it for recovery only.  These weights come from a graph model; they
-are not measured mainnet frequencies.
-EB bodies retain the full blended distribution from
-[`report.md` §4.2](../analysis/deltaq/improved-leios/report.md#42-network-model),
-implemented by `cdf_blended_delay` using `analysis.py`'s `_HOP_PROBS`.
-Multi-hop fetching represents data being acquired upstream before it reaches
-the requesting node.  Each hop transfers the same missing batch using the existing
-short/medium/long-distance transfer law, independently of the other hops;
-hop CDFs are convolved sequentially without pipelining.  The EB-body diffusion
-and CPU laws are unchanged.
-
-The **stationary transaction-cache miss fraction is 1/6 at every node**.
-Each node therefore fetches a batch of size `closure / 6`, with the path
-length drawn from the applicable phase's distribution.  There is no additional 5/6
-probability of a full-closure cache hit.  This is a mean-fraction approximation:
-it does not sample which individual transactions are missing or model them
-taking different paths.  The model also omits peer-discovery delays,
-timeouts, retries, and contention.
-
-Only the missing fraction traverses these fetch paths; this is not the
-§5.3 catastrophic pre-diffusion-failure scenario in `report.md`, in which the
-entire closure must traverse the network.
-
-### 3.2. Joint readiness and conditional completion
-
-Let $B$ be body arrival, $U$ the phase-one missing-batch fetch duration,
-$X$ initial validation, $R$ recovery duration, and $Y$ reapplication.  Component
-durations are independent; both phases share the same body arrival.  Set
-$L=B+U$, $V=L+X$, and define completion $D$ on a certified branch by:
-
-$$
-D = \begin{cases}
-V, & L \le t_v,\\
-\max(B,t_v)+R+Y, & L > t_v,
-\end{cases}
-\qquad t_v=7\ \mathrm{s}.
-$$
-
-Thus a node ready to vote is necessarily already complete.  For independent
-node histories, the required joint probability is known explicitly:
-
-$$
-H(t_v,t)=P(V\le t_v,D\le t)=F_V(\min(t_v,t)).
-$$
-
-Writing $A_t$ for all honest nodes completing by $t$, the conditional CDF is:
-
-$$
-P(A_t\mid C)=F_D(t)^{N_h}
-\frac{Q\!\left(H(t_v,t)/F_D(t)\right)}{Q(F_V(t_v))}.
-$$
-
-This uses the actual conditional voter probability $H/F_D$, rather than the
-old substitution involving $F_V(t_v)/F_V(t)$.  The denominator and phase-one
-vote readiness do not change when the recovery-hop distribution changes.
-The identity is exact under the independent-node model with an exact $Q$;
-the report approximates $Q$ using the reproducible method in Appendix A.
-
-### 3.3. No prior availability at remaining honest nodes: stress scenario
+### 3.2. No prior availability at remaining honest nodes: stress scenario
 
 This scenario removes the stationary-cache availability assumption from
 **recovery only**.  Phase-one fetching, validation, and the certification event
@@ -371,7 +282,7 @@ previously acquired data and was still validating it.  Thus the recovery
 payload at 260 kB is **260 kB**, compared with **43.33 kB** for a baseline
 node still missing data.
 
-Using the notation from §3.2, let $R_{\mathrm{full}}$ transfer the full closure over
+Using the notation from Appendix D, let $R_{\mathrm{full}}$ transfer the full closure over
 the same graph-derived recovery-hop distribution.  The stress completion time is:
 
 $$
@@ -436,7 +347,7 @@ immediate serving availability, short recovery paths, independent requests,
 and no serving-capacity contention remain assumptions.  It is a separate
 stress scenario rather than a change to the stationary-cache baseline.
 
-### 3.4. Late-release safety worst case
+### 3.3. Late-release safety worst case
 
 Linear Leios should not weaken Praos safety, even when the adversary controls
 stake $\sigma_\alpha$ approaching 50%.  Such an adversary supplies $\sigma_\alpha$ of the $\tau=75\%$
@@ -711,3 +622,95 @@ reachable receivers.
 Sampled figures are shown to two decimals.  `0.00%` means that no case was
 observed among approximately 160,000 to 480,000 receiver samples; it is not a
 zero probability.  Rounding may cause row sums to differ from 100% by 0.01%.
+
+## Appendix C. Fixed missing-transaction fetch model
+
+A node's **missing-transaction batch** is every closure transaction that the
+node lacks, fetched as one bulk transfer.  The model uses separate paths
+for the whole batch before and after the voting deadline, as follows:
+
+| Path length | Phase-one fetch | Phase-two recovery |
+|---:|---:|---:|
+| 1 hop | 0.40% | 76.58% |
+| 2 hops | 3.91% | 23.41% |
+| 3 hops | 31.06% | 0.01% |
+| 4 hops | 61.85% | 0% |
+| 5 hops | 2.78% | 0% |
+
+**Phase one:** every honest node attempts to acquire and validate the closure.
+Voter readiness and the unconditional certification probability $P(C)$ use only
+the full blended fetch law and initial validation.  Nodes outside the committee
+also follow this initial processing law, but do not vote.
+
+**Phase two starts at 7 s, conditional on certification.**  A node already
+validated remains complete.  A node that has fetched its entire missing batch
+continues any validation still in progress.  A node still missing data uses
+the short-path recovery law, beginning at the later of 7 s and its body arrival,
+then reapplies the closure.  Already completed data fetching is retained;
+partial bytes of an unfinished batch are not credited, so that batch is
+restarted in full.  This is a deliberately coarse batch-level progress model.
+
+Certified holders are assumed to be immediately available as serving sources
+at the deadline.  There is no additional certificate-construction, delivery,
+source-discovery, or queueing delay.  Recovery does not happen on a branch
+where certification fails.  This is a fixed-deadline model, not a model of
+the earliest possible quorum time or per-node certificate arrival.
+
+The generator derives `DEFAULT_HOP_WEIGHTS` from the recovery graph in Appendix B
+and uses it for recovery only.  These weights come from a graph model; they
+are not measured mainnet frequencies.
+EB bodies retain the full blended distribution from
+[`report.md` §4.2](../analysis/deltaq/improved-leios/report.md#42-network-model),
+implemented by `cdf_blended_delay` using `analysis.py`'s `_HOP_PROBS`.
+Multi-hop fetching represents data being acquired upstream before it reaches
+the requesting node.  Each hop transfers the same missing batch using the existing
+short/medium/long-distance transfer law, independently of the other hops;
+hop CDFs are convolved sequentially without pipelining.  The EB-body diffusion
+and CPU laws are unchanged.
+
+The **stationary transaction-cache miss fraction is 1/6 at every node**.
+Each node therefore fetches a batch of size `closure / 6`, with the path
+length drawn from the applicable phase's distribution.  There is no additional 5/6
+probability of a full-closure cache hit.  This is a mean-fraction approximation:
+it does not sample which individual transactions are missing or model them
+taking different paths.  The model also omits peer-discovery delays,
+timeouts, retries, and contention.
+
+Only the missing fraction traverses these fetch paths; this is not the
+§5.3 catastrophic pre-diffusion-failure scenario in `report.md`, in which the
+entire closure must traverse the network.
+
+## Appendix D. Joint readiness and conditional completion
+
+Let $B$ be body arrival, $U$ the phase-one missing-batch fetch duration,
+$X$ initial validation, $R$ recovery duration, and $Y$ reapplication.  Component
+durations are independent; both phases share the same body arrival.  Set
+$L=B+U$, $V=L+X$, and define completion $D$ on a certified branch by:
+
+$$
+D = \begin{cases}
+V, & L \le t_v,\\
+\max(B,t_v)+R+Y, & L > t_v,
+\end{cases}
+\qquad t_v=7\ \mathrm{s}.
+$$
+
+Thus a node ready to vote is necessarily already complete.  For independent
+node histories, the required joint probability is known explicitly:
+
+$$
+H(t_v,t)=P(V\le t_v,D\le t)=F_V(\min(t_v,t)).
+$$
+
+Writing $A_t$ for all honest nodes completing by $t$, the conditional CDF is:
+
+$$
+P(A_t\mid C)=F_D(t)^{N_h}
+\frac{Q\!\left(H(t_v,t)/F_D(t)\right)}{Q(F_V(t_v))}.
+$$
+
+This uses the actual conditional voter probability $H/F_D$, rather than the
+old substitution involving $F_V(t_v)/F_V(t)$.  The denominator and phase-one
+vote readiness do not change when the recovery-hop distribution changes.
+The identity is exact under the independent-node model with an exact $Q$;
+the report approximates $Q$ using the reproducible method in Appendix A.
