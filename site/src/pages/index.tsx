@@ -349,7 +349,7 @@ function MonthlyReviewsSection() {
               <div className={styles.countdownContainer}>
                 <Link
                   className={styles.countdown}
-                  to="meet.google.com/qhx-joxe-rmz"
+                  to="https://meet.google.com/qhx-joxe-rmz"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
