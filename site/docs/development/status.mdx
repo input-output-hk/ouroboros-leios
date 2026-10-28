@@ -38,8 +38,6 @@ export const source = `
   - [x] Design
   - [x] Implementation
   - [x] Assurance: Audited
-    - [x] Primitives audited
-    - [x] Certs peer-reviewed
 
 - New protocol parameters
   - [x] CIP: Per-tx limits unlikely
@@ -66,7 +64,7 @@ export const source = `
   - [~] Prototype: egress scheduling
   - [x] Design
   - [~] Implementation
-    - [~] Socket options
+    - [x] Socket options
     - [~] Egress scheduling
     - [ ] Incremental decoding
   - [~] Assurance: load testing
@@ -78,7 +76,7 @@ export const source = `
   - [x] Implementation
     - [x] Generate BLS keys
     - [x] Create and submit pool registration with BLS keys
-  - [~] Assurance: auditing rc-w41
+  - [~] Assurance: audits of rc-w41/43
 
 - Committee selection @230,320
   - [x] CIP
@@ -87,7 +85,7 @@ export const source = `
   - [x] Implementation
     - [x] Stake-based committee selection
     - [x] Committee selection at epoch boundaries
-  - [~] Assurance: auditing rc-w41
+  - [~] Assurance: audits of rc-w41/43
 
 - High-throughput Tx submission @400,25
   - [x] CIP
@@ -95,14 +93,14 @@ export const source = `
   - [x] Design
   - [~] Implementation
     - [x] TxSubmisison V2-undecision
-    - [ ] TxSubmission param tuning
+    - [~] TxSubmission param tuning
   - [~] Assurance: load testing
 
 - High-throughput mempool @680,25
   - [x] CIP
   - [x] Prototype
   - [x] Design
-  - [x] Implementation
+  - [~] Implementation
     - [x] Double-buffered mempool
     - [x] Capped forging
     - [ ] Cheap ticking
@@ -117,43 +115,44 @@ export const source = `
     - [~] Forge and store EBs
     - [~] Forge RBs with certificates
     - [ ] Certifying mempool view
-  - [~] Assurance: auditing on rc-w41
+    - [ ] Governed EB production
+  - [~] Assurance: audits of rc-w41/43
 
 - EB diffusion @480,280
   - [x] CIP: update mini-protocols
   - [~] Prototype: policies
-  - [?] Design: settle policies, good enough?
+  - [~] Design: settle policies
   - [~] Implementation
-    - [~] Announce and detect equivocations of EBs
+    - [x] Announce and detect equivocations of EBs
     - [~] Diffuse and validate EBs via TxCache
     - [~] Basic fetching policy (not full hedging)
     - [~] Efficient serving
     - [ ] Incremental offers
     - [ ] Advanced fetching policy
     - [ ] Catch up on not yet certified Leios EBs
-  - [~] Assurance: auditing on rc-w41
+  - [~] Assurance: audits of rc-w41/43
 
 - Transaction cache & storage
   - [x] CIP
   - [x] Prototype: schema improvements
   - [x] Design
   - [~] Implementation
+    - [x] Volatile/Immutable LeiosDB
     - [~] Disk-backed TxCache
-    - [~] Volatile/Immutable LeiosDB
     - [ ] Fully optimised LeiosDB
-  - [~] Assurance: auditing on rc-w41
+  - [~] Assurance: audits of rc-w41/43
 
 - Voting & certification @580,400
   - [x] CIP: update mini-protocols
   - [x] Prototype
   - [x] Design: keep push-based voting
   - [~] Implementation
-    - [~] Diffuse and validate votes
+    - [x] Diffuse and validate votes
     - [~] Aggregate votes
-    - [ ] Voting logic
+    - [~] Voting logic
     - [ ] Pull-based vote diffusion
     - [ ] Partial certification
-  - [~] Assurance: auditing on rc-w41
+  - [~] Assurance: audits of rc-w41/43
 
 - Block validation & adoption @985,70
   - [x] CIP
@@ -163,7 +162,7 @@ export const source = `
     - [~] Validate EB announcing and certifying blocks
     - [~] EB fetching on chain selection
     - [ ] Out of order fetch EBs in Genesis
-  - [~] Assurance: auditing on rc-w41
+  - [~] Assurance: audits of rc-w41/43
 
 - Node API & configuration
   - [x] CIP
@@ -171,7 +170,7 @@ export const source = `
   - [x] Design
   - [~] Implementation
     - [x] Query pool state showing key registration
-    - [ ] Query committee details
+    - [x] Query committee details
     - [~] Client APIs inline certified EB txs
     - [~] Node accepts BLS keys
   - [~] Assurance: Kleioscan, SPO tools
@@ -191,21 +190,24 @@ export const plan = `
     - BLS keys in block headers (?)
     - Certificates in body
     - BLS key in pool registration cert in txs
-    - Protocol parameters in txs
+    - Protocol parameter updates in txs
   - Generate BLS keys
   - Create and submit pool registration with BLS keys
     - Check PoP in ledger rules
+  - Protocol parameters and genesis config
   - Query pool state showing key registration
   - Stake-based committee selection
   - Committee selection at epoch boundaries
     - Committee in ledger state
-  - Client APIs inline certified EB txs
+  - Query committee details
   - Node integration 11.2
 
 - Stage 1: Low params (1s, 4s, 7s, 40KB, 260KB, 720M mem, 200G steps, 500 seats, 75%)
+  - Constitution guard rails
   - Socket options
   - TxSubmisison V2-undecision
   - Double-buffered mempool
+  - Size mempool via pparams
   - Capped forging
   - Cheap ticking
   - Forge and store EBs
@@ -223,9 +225,11 @@ export const plan = `
   - EB fetching on chain selection
   - Validate EB announcing and certifying blocks
   - Node accepts BLS keys
+  - Client APIs inline certified EB txs
   - Node integration 11.3
 
 - Stage 2: Higher params (1s, 4s, 7s, 100KB+, 1MB+, ..GSteps, ..GMem, 900 seats, 75%)
+  - Governed EB production
   - Egress scheduling
   - TxSubmission param tuning
   - Incremental offers
