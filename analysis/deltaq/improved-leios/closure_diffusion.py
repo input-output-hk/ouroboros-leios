@@ -54,7 +54,7 @@ def plot_completion_cdfs(model, rows, active=False, stress=False):
             A.TIMES,
             cdf,
             color=colors[i],
-            label=f"{mb:g} MB" + (" (Musashi limit)" if mb == 0.26 else ""),
+            label=size_label(mb) + (" (Musashi limit)" if mb == 0.26 else ""),
         )
     for t, label in ((7, "Vote deadline"), (14, "Diffusion deadline")):
         ax.axvline(t, color="gray", linestyle=":", linewidth=1)
@@ -78,7 +78,7 @@ def plot_completion_cdfs(model, rows, active=False, stress=False):
     ax.set_ylim(0, 1.01)
     ax.yaxis.set_major_formatter(PercentFormatter(1))
     ax.grid(alpha=0.25)
-    ax.legend(title="Closure size (decimal MB)", fontsize=8, loc="lower right")
+    ax.legend(title="Closure size", fontsize=8, loc="lower right")
     scenario = "active" if active else "honest"
     save_plot(fig, f"{model}-{'stress-' if stress else ''}{scenario}-cdf.svg")
 
@@ -112,8 +112,8 @@ def plot_completion_times(results):
         ax.axhline(14, color="gray", linestyle=":", label="14 s deadline")
         ax.set_xscale("log", base=2)
         ticks = SIZES_MB
-        ax.set_xticks(ticks, [f"{s:g}" for s in ticks])
-        ax.set_xlabel("Closure size (decimal MB; logarithmic scale)")
+        ax.set_xticks(ticks, [size_label(s) for s in ticks])
+        ax.set_xlabel("Closure size (logarithmic scale)")
         ax.set_title(model.upper())
         ax.grid(alpha=0.25)
     axes[0].set_ylabel("All-node completion time given certification (s)")
@@ -131,12 +131,34 @@ def check_cdf(cdf):
 
 
 def percentage(p):
-    formatted = f"{100 * p:.4f}%"
-    if formatted == "0.0000%":
-        return "<0.0001%"
-    if formatted == "100.0000%":
-        return ">99.9999%"
-    return formatted
+    # Two significant figures of p, or of 1 - p near one, to at most four
+    # decimal places of a percentage.
+    near_one = p >= 0.5
+    x = 100 * (1 - p if near_one else p)
+    if x < 0.0001:
+        return ">99.9999%" if near_one else "<0.0001%"
+    decimals = min(4, max(0, 1 - int(np.floor(np.log10(x)))))
+    value = 100 - round(x, decimals) if near_one else round(x, decimals)
+    return f"{value:.{decimals}f}%"
+
+
+def size_label(mb):
+    return f"{mb * 1000:g} kB" if mb < 1 else f"{mb:g} MB"
+
+
+MODELS = (("mathis", "Mathis"), ("cubic", "CUBIC"))
+
+
+def by_model(*names):
+    return [f"{name}, {label}" for name in names for _, label in MODELS]
+
+
+def print_table(title, header, rows):
+    print(f"\n## {title}\n")
+    print("| " + " | ".join(header) + " |")
+    print("|" + "---:|" * len(header))
+    for row in rows:
+        print("| " + " | ".join(row) + " |")
 
 
 def completion_quantile(cdf, p):
@@ -150,27 +172,22 @@ def seconds(t):
 
 
 def log_percentage(log_p):
+    # Tails below 1e-20 depend on the finite permutation sample; bound them.
     if not np.isfinite(log_p):
         return "0 (impossible)"
-    if log_p >= np.log(0.0000005):
-        return percentage(np.exp(log_p))
-    log10_percent = log_p / np.log(10) + 2
-    exponent = int(np.floor(log10_percent))
-    return f"{10 ** (log10_percent - exponent):.4f}e{exponent:+d}%"
+    if log_p < np.log(1e-20):
+        return "<10⁻¹⁸%"
+    return percentage(np.exp(log_p))
 
 
 def stress_scenario(baseline):
     fig, axes = plt.subplots(
         1, 2, figsize=(12, 5), sharey=True, constrained_layout=True
     )
+    cells, active_gain = {}, {}
     for ax, (model, base_rows) in zip(axes, baseline.items()):
         A.set_network_model(model)
         rows = []
-        print(f"\n## {model.upper()} no-prior-availability stress\n")
-        print(
-            "| Closure (MB) | Baseline p99 (s) | Stress p99 (s) | Stress p99.9 (s) | Stress all ready by 14 s, given $C$ | Active stress p99 (s) | Active stress all ready by 14 s, given $C$ |"
-        )
-        print("|---:|---:|---:|---:|---:|---:|---:|")
         for mb, base_honest, _ in base_rows:
             result = T.calculate(
                 mb * 1000,
@@ -192,16 +209,11 @@ def stress_scenario(baseline):
                 if result.honest is not None
                 else "N/A"
             )
-            active_ready = (
-                percentage(A.success_within(result.active, 14))
-                if result.active is not None
-                else "N/A"
-            )
-            print(
-                f"| {mb:g} | "
-                + " | ".join(seconds(t) for t in times)
-                + f" | {ready} | {seconds(completion_quantile(result.active, .99))} | {active_ready} |"
-            )
+            cells[model, mb] = [seconds(t) for t in times] + [ready]
+            # Active stress p99 against honest stress p99, where both are finite.
+            gain = times[1] - completion_quantile(result.active, 0.99)
+            if np.isfinite(gain):
+                active_gain.setdefault(model, []).append(gain)
         plot_completion_cdfs(model, rows, stress=True)
         for scenario_rows, name, color in (
             (base_rows, "Stationary cache", "tab:blue"),
@@ -229,8 +241,8 @@ def stress_scenario(baseline):
                         label=f"{name}: >{A.TIMES[-1]:g} s",
                     )
         ax.set_xscale("log", base=2)
-        ax.set_xticks(SIZES_MB, [f"{mb:g}" for mb in SIZES_MB])
-        ax.set(title=model.upper(), xlabel="Closure size (decimal MB)")
+        ax.set_xticks(SIZES_MB, [size_label(mb) for mb in SIZES_MB])
+        ax.set(title=model.upper(), xlabel="Closure size (logarithmic scale)")
         ax.axhline(14, color="gray", linestyle=":", label="14 s deadline")
         ax.grid(alpha=0.25)
         ax.legend(fontsize=7)
@@ -239,6 +251,25 @@ def stress_scenario(baseline):
         "Full-closure recovery stress versus stationary-cache baseline\nSame phase-one certification and graph-derived recovery hops from 7 s"
     )
     save_plot(fig, "stress-completion-time-percentiles.svg")
+    print_table(
+        "No-prior-availability stress",
+        ["Closure"]
+        + by_model(
+            "Baseline p99", "Stress p99", "Stress p99.9", "Stress ready by 14 s"
+        ),
+        [
+            [size_label(mb)]
+            + [cells[model, mb][i] for i in range(4) for model, _ in MODELS]
+            for mb in SIZES_MB
+        ],
+    )
+    for model, label in MODELS:
+        gains = active_gain[model]
+        assert min(gains) > -0.005  # The active target is never later.
+        print(
+            f"\n{label} active stress p99 is {abs(min(gains)):.2f} to "
+            f"{max(gains):.2f} s earlier than stress p99"
+        )
 
 
 # (adversarial stake, honest holder stake = tau - adversarial stake), both of total stake.
@@ -251,13 +282,9 @@ def safety_worst_case(baseline):
     )
     for ax, (model, base_rows) in zip(axes, baseline.items()):
         A.set_network_model(model)
-        print(f"\n## {model.upper()} late-release safety worst case\n")
-        print(
-            "| Closure (MB) | Adversarial stake | Honest holders | Receivers | p50 (s) | p99 (s) | All ready by 14 s | All ready by 20 s |"
-        )
-        print("|---:|---:|---:|---:|---:|---:|---:|---:|")
-        curves = {}
+        curves, table, receiver_counts = {}, [], {}
         for mb in SIZES_MB:
+            row = [size_label(mb)]
             for adversary, holder in SAFETY_SCENARIOS:
                 paths = G.derive_paths(holder, G.DEFAULT_PEERS, adversary)
                 receivers = round(paths.receivers / paths.trials)
@@ -270,15 +297,28 @@ def safety_worst_case(baseline):
                 check_cdf(everyone)
                 times = [completion_quantile(everyone, q) for q in (0.5, 0.99)]
                 curves.setdefault(adversary, []).append(times[1])
-                print(
-                    f"| {mb:g} | {adversary:.0%} | {holder:.0%} | {receivers:,} | "
-                    + " | ".join(seconds(t) for t in times)
-                    + " | "
-                    + " | ".join(
-                        percentage(A.success_within(everyone, t)) for t in (14, 20)
-                    )
-                    + " |"
-                )
+                receiver_counts[adversary] = receivers
+                row += [seconds(t) for t in times]
+                row += [percentage(A.success_within(everyone, t)) for t in (14, 20)]
+            table.append(row)
+        label = dict(MODELS)[model]
+        print_table(
+            f"{label} late-release safety worst case",
+            ["Closure"]
+            + [
+                f"{name}, {adversary:.0%}"
+                for adversary, _ in SAFETY_SCENARIOS
+                for name in ("p50", "p99", "Ready by 14 s", "Ready by 20 s")
+            ],
+            table,
+        )
+        print(
+            "\nReceivers: "
+            + ", ".join(
+                f"{n:,} at {a:.0%} adversarial stake"
+                for a, n in receiver_counts.items()
+            )
+        )
         ax.plot(
             SIZES_MB,
             [completion_quantile(row[1], 0.99) for row in base_rows],
@@ -287,8 +327,10 @@ def safety_worst_case(baseline):
             markersize=4,
             label="Honest baseline, p99",
         )
-        for (adversary, holder), color in zip(
-            SAFETY_SCENARIOS, ("tab:orange", "tab:red")
+        # Censored markers share a position, so nudge each scenario sideways
+        # (multiplicatively, on the logarithmic axis) to keep both visible.
+        for (adversary, holder), color, nudge in zip(
+            SAFETY_SCENARIOS, ("tab:orange", "tab:red"), (0.94, 1.06)
         ):
             values = curves[adversary]
             censored = [mb for mb, v in zip(SIZES_MB, values) if np.isposinf(v)]
@@ -302,7 +344,7 @@ def safety_worst_case(baseline):
             )
             if censored:
                 ax.scatter(
-                    censored,
+                    [mb * nudge for mb in censored],
                     [A.TIMES[-1]] * len(censored),
                     color=color,
                     marker="^",
@@ -310,8 +352,8 @@ def safety_worst_case(baseline):
                 )
         ax.axhline(14, color="gray", linestyle=":", label="14 s deadline")
         ax.set_xscale("log", base=2)
-        ax.set_xticks(SIZES_MB, [f"{mb:g}" for mb in SIZES_MB])
-        ax.set(title=model.upper(), xlabel="Closure size (decimal MB)")
+        ax.set_xticks(SIZES_MB, [size_label(mb) for mb in SIZES_MB])
+        ax.set(title=model.upper(), xlabel="Closure size (logarithmic scale)")
         ax.grid(alpha=0.25)
         ax.legend(fontsize=7)
     axes[0].set_ylabel("All-honest-node completion time (s)")
@@ -383,16 +425,10 @@ def graph_path_report():
 def main():
     print(A._committee_label())
     print(DEFAULT_HOP_LABEL)
-    results = {}
-    for model in ("mathis", "cubic"):
+    results, cells = {}, {}
+    for model, _ in MODELS:
         rows = []
         A.set_network_model(model)
-        print(f"\n## {model.upper()}\n")
-        print(
-            "| Closure (MB) | Body (kB) | Missing txs (kB) | Voter ready by 7 s | $P(C)$ | All ready by 7 s, given $C$ | All ready by 14 s, given $C$ |"
-        )
-        print("|---:|---:|---:|---:|---:|---:|---:|")
-        timing_rows = []
         for mb in SIZES_MB:
             kb = mb * 1000
             body_kb = kb * BODY_CLOSURE_RATIO
@@ -411,35 +447,75 @@ def main():
             # Saturated certification reduces to the two-phase node-CDF power.
             if result.log_pc > np.log1p(-1e-12):
                 assert np.allclose(honest, result.completion**2500, atol=1e-10, rtol=0)
-            pc_text = log_percentage(result.log_pc)
-            values = [percentage(gv), pc_text]
-            values += [
+            ready = [
                 percentage(A.success_within(honest, t)) if honest is not None else "N/A"
                 for t in (7, 14)
             ]
-            print(f"| {mb:g} | {body_kb:g} | {kb / 6:g} | " + " | ".join(values) + " |")
             quantiles = [
-                completion_quantile(honest, p) for p in (0.5, 0.95, 0.99, 0.999)
+                seconds(completion_quantile(honest, p))
+                for p in (0.5, 0.95, 0.99, 0.999)
             ]
-            q_active = completion_quantile(active, 0.99)
             f_active = (
                 percentage(A.success_within(active, 14))
                 if active is not None
                 else "N/A"
             )
-            timing_rows.append(
-                f"| {mb:g} | "
-                + " | ".join(seconds(q) for q in quantiles)
-                + f" | {seconds(q_active)} | {f_active} |"
+            cells[model, mb] = dict(
+                voter=percentage(gv),
+                pc=log_percentage(result.log_pc),
+                ready7=ready[0],
+                ready14=ready[1],
+                p50=quantiles[0],
+                p95=quantiles[1],
+                p99=quantiles[2],
+                p999=quantiles[3],
+                active_p99=seconds(completion_quantile(active, 0.99)),
+                active14=f_active,
             )
-        print(
-            "\n| Closure (MB) | Honest p50 (s) | Honest p95 (s) | Honest p99 (s) | Honest p99.9 (s) | Active p99 (s) | Active all ready by 14 s, given $C$ |"
-        )
-        print("|---:|---:|---:|---:|---:|---:|---:|")
-        print("\n".join(timing_rows))
         results[model] = rows
         plot_completion_cdfs(model, rows)
         plot_completion_cdfs(model, rows, active=True)
+
+    def table(title, names, keys, lead=lambda mb: []):
+        print_table(
+            title,
+            ["Closure"] + names + by_model(*keys.values()),
+            [
+                [size_label(mb)]
+                + lead(mb)
+                + [cells[model, mb][key] for key in keys for model, _ in MODELS]
+                for mb in SIZES_MB
+            ],
+        )
+
+    table(
+        "Certification",
+        ["Body (kB)", "Missing txs (kB)"],
+        {"voter": "Voter ready by 7 s", "pc": "$P(C)$"},
+        lambda mb: [
+            f"{mb * 1000 * BODY_CLOSURE_RATIO:,.0f}",
+            f"{mb * 1000 / 6:,.0f}",
+        ],
+    )
+    table(
+        "All honest nodes ready, given certification",
+        [],
+        {"ready7": "By 7 s", "ready14": "By 14 s"},
+    )
+    table(
+        "Completion times (s)",
+        [],
+        {"p50": "p50", "p95": "p95", "p99": "p99", "p999": "p99.9"},
+    )
+    table(
+        "Active adversarial voting",
+        [],
+        {
+            "p99": "Honest p99",
+            "active_p99": "Active p99",
+            "active14": "Active ready by 14 s",
+        },
+    )
     plot_completion_times(results)
     stress_scenario(results)
     safety_worst_case(results)
