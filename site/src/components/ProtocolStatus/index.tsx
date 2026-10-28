@@ -35,25 +35,23 @@ const MARK_SYMBOL: Record<Mark, string> = {
 const VIEWBOX_W = 1120.77;
 const VIEWBOX_H = 471.62;
 
-function progressFraction(row: Row): number {
-  // Weighted progress across all stages: done = 1, ongoing = 0.5, else 0.
-  const weighted = row.cells.map((c) => {
-    if (c.mark === "done") return 1;
-    if (c.mark === "ongoing") return 0.5;
-    return 0;
+const MARK_COLOR: Record<Mark, string> = {
+  done: "var(--done)",
+  ongoing: "var(--ongoing)",
+  missing: "var(--missing)",
+  open: "var(--open)",
+  empty: "var(--empty)",
+};
+
+// One equal segment per stage, coloured like the stage dots.
+function ringGradient(row: Row): string {
+  const n = row.cells.length;
+  const stops = row.cells.map((c, i) => {
+    const from = (i / n) * 100;
+    const to = ((i + 1) / n) * 100;
+    return `${MARK_COLOR[c.mark]} ${from}% ${to}%`;
   });
-  return weighted.reduce((a, b) => a + b, 0) / weighted.length;
-}
-
-// Color of the filled portion: the worst non-empty mark present.
-// Priority (worst first): missing > open > ongoing > done.
-const WORST_ORDER: Mark[] = ["missing", "open", "ongoing", "done"];
-
-function worstMark(row: Row): Mark {
-  for (const m of WORST_ORDER) {
-    if (row.cells.some((c) => c.mark === m)) return m;
-  }
-  return "done";
+  return `conic-gradient(${stops.join(", ")})`;
 }
 
 function Pip({ mark }: { mark: Mark }) {
@@ -91,9 +89,17 @@ function CellDetails({
         const label = labels.get(nameKey(d.text));
         return (
           <li key={i}>
-            <span
-              className={`${styles.detailPip} ${styles[`dot_${d.mark}`]}`}
-            />
+            {label ? (
+              <span
+                className={`${styles.detailCheck} ${styles[`pip_${d.mark}`]}`}
+              >
+                {MARK_SYMBOL[d.mark]}
+              </span>
+            ) : (
+              <span
+                className={`${styles.detailPip} ${styles[`dot_${d.mark}`]}`}
+              />
+            )}
             <span>
               {label && <span className={styles.stageChip}>{label}</span>}
               {d.text}
@@ -152,8 +158,6 @@ function Widget({
   open: boolean;
   onToggle: () => void;
 }) {
-  const worst = worstMark(row);
-  const pct = Math.round(progressFraction(row) * 100);
   return (
     <div
       className={`${styles.widget} ${open ? styles.widgetOpen : ""}`}
@@ -167,8 +171,8 @@ function Widget({
         aria-label={row.name}
       >
         <span
-          className={`${styles.ring} ${styles[`ring_${worst}`]}`}
-          style={{ "--pct": `${pct}` } as React.CSSProperties}
+          className={styles.ring}
+          style={{ background: ringGradient(row) }}
           aria-hidden="true"
         >
           <span className={styles.ringInner} />
