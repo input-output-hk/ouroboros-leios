@@ -168,7 +168,7 @@ def stress_scenario(baseline):
         rows = []
         print(f"\n## {model.upper()} no-prior-availability stress\n")
         print(
-            "| Closure (MB) | Baseline p99 (s) | Stress p99 (s) | Stress p99.9 (s) | Stress all ready by 14 s, given C | Active stress p99 (s) | Active stress all ready by 14 s, given C |"
+            "| Closure (MB) | Baseline p99 (s) | Stress p99 (s) | Stress p99.9 (s) | Stress all ready by 14 s, given $C$ | Active stress p99 (s) | Active stress all ready by 14 s, given $C$ |"
         )
         print("|---:|---:|---:|---:|---:|---:|---:|")
         for mb, base_honest, _ in base_rows:
@@ -389,7 +389,7 @@ def main():
         A.set_network_model(model)
         print(f"\n## {model.upper()}\n")
         print(
-            "| Closure (MB) | Body (kB) | Missing txs (kB) | Voter ready by 7 s | P(C) | All ready by 7 s, given C | All ready by 14 s, given C |"
+            "| Closure (MB) | Body (kB) | Missing txs (kB) | Voter ready by 7 s | $P(C)$ | All ready by 7 s, given $C$ | All ready by 14 s, given $C$ |"
         )
         print("|---:|---:|---:|---:|---:|---:|---:|")
         timing_rows = []
@@ -433,7 +433,7 @@ def main():
                 + f" | {seconds(q_active)} | {f_active} |"
             )
         print(
-            "\n| Closure (MB) | Honest p50 (s) | Honest p95 (s) | Honest p99 (s) | Honest p99.9 (s) | Active p99 (s) | Active all ready by 14 s, given C |"
+            "\n| Closure (MB) | Honest p50 (s) | Honest p95 (s) | Honest p99 (s) | Honest p99.9 (s) | Active p99 (s) | Active all ready by 14 s, given $C$ |"
         )
         print("|---:|---:|---:|---:|---:|---:|---:|")
         print("\n".join(timing_rows))

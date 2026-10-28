@@ -17,7 +17,7 @@ The baseline and active-adversary tables and plots use a **causal two-phase
 model**: blended fetching and validation before the 7-second deadline, then
 **graph-derived recovery for nodes still missing data** on certification
 (76.58% one hop, 23.41% two hops, 0.01% three hops), with **EB body size =
-closure size × 40/260**.  The stress (§3.4) and safety worst-case (§3.6)
+closure size × 40/260**.  The stress (§3.3) and safety worst-case (§3.4)
 scenarios use modified recovery assumptions described in their sections.
 At 260 kB, the body is 40 kB and p99.9 is **4.36 s under both models**.
 The stationary missing fraction is **one sixth at every node**.
@@ -37,19 +37,19 @@ The stationary missing fraction is **one sixth at every node**.
   certification becomes extremely rare.  Quorum probabilities use a seeded
   permutation estimate, not a Normal tail; extreme-tail values remain
   sensitive to the finite permutation sample and synthetic stake distribution.
-- **No-prior-availability stress:** §3.4 makes every node not validated by
+- **No-prior-availability stress:** §3.3 makes every node not validated by
   7 s recover the entire closure.  At 260 kB, p99 remains **4.01 s** under
   both models because the all-node p99 event precedes recovery.  At 2 MB,
   Mathis p99 rises from **9.91 s to 15.85 s** and all-node completion by
   14 s falls to **1.5397%**, conditional on the same certification event.
-- **Recovery paths come from a stake-weighted peer graph** (§3.5).  With *m*
-  peers per node chosen by stake, and holders carrying stake fraction *f*, a
+- **Recovery paths come from a stake-weighted peer graph** (Appendix B).  With $m$
+  peers per node chosen by stake, and holders carrying stake fraction $f$, a
   recovering node reaches a holder in one hop with probability close to
-  1 − (1 − *f*)^*m*.  The timing model uses *f* = 25% and *m* = 5, the
+  $1-(1-f)^m$.  The timing model uses $f=25\%$ and $m=5$, the
   smallest holder stake and peer count in the sweep.
-- **Safety worst case** (§3.6): an adversary with stake σ_α approaching 50%
+- **Safety worst case** (§3.4): an adversary with stake $\sigma_\alpha$ approaching 50%
   can certify while releasing the EB so late that only honest nodes with
-  τ − σ_α ≈ 25% of stake hold it at 7 s.  The remaining honest nodes then
+  $\tau-\sigma_\alpha\approx25\%$ of stake hold it at 7 s.  The remaining honest nodes then
   reach p99 at **12.02 s** for 260 kB under both models, against **4.01 s**
   in the honest baseline.  From 0.5 MB under Mathis and from 1 MB under
   CUBIC, p99 exceeds the 14-second deadline.
@@ -65,9 +65,9 @@ Two different probabilities appear below:
 
 - **Voter ready by 7 s:** one node has received the body, fetched its missing
   transactions, and completed the voter validation work by the voting deadline.
-- **All ready by t, given C:** every honest node has received the body, fetched
-  its missing transactions, and completed reapplication by time *t*, conditional
-  on the certification event *C*. This is a strict **all-node** target, not an
+- **All ready by $t$, given $C$:** every honest node has received the body, fetched
+  its missing transactions, and completed reapplication by time $t$, conditional
+  on the certification event $C$. This is a strict **all-node** target, not an
   average node, a stake fraction, or 99% of nodes.
 
 All times are measured from the model's EB diffusion origin. The checkpoints
@@ -84,10 +84,10 @@ completion event has probability at least 99%, conditional on certification.
 | Certification threshold | 75% of total active stake; approximately 75.88% of committee stake |
 | Voting / diffusion deadline | 7 s / 14 s |
 | Stationary missing transaction fraction | Every node fetches 1/6 of the closure (approximately 16.67%) |
-| Phase-one missing-transaction fetch | Full blended one-to-five-hop distribution; determines voter readiness and P(C) |
-| Phase-two recovery | Begins no earlier than 7 s, conditional on certification: 76.58% one hop, 23.41% two hops, 0.01% three hops; see §3.1 and §3.5 |
+| Phase-one missing-transaction fetch | Full blended one-to-five-hop distribution; determines voter readiness and $P(C)$ |
+| Phase-two recovery | Begins no earlier than 7 s, conditional on certification: 76.58% one hop, 23.41% two hops, 0.01% three hops; see §3.1 and Appendix B |
 | Recovery graph | 2,500 nodes; 5 distinct stake-weighted peers each; holders carry 25% of stake; 16 graphs and 256 holder draws, seed 164 |
-| Stress recovery | Every node not validated by 7 s fetches the full closure; same phase one and recovery-hop distribution; see §3.4 |
+| Stress recovery | Every node not validated by 7 s fetches the full closure; same phase one and recovery-hop distribution; see §3.3 |
 | EB-body diffusion | Full blended one-to-five-hop distribution from `report.md` §4.2 |
 | EB body | Fixed size for each closure: closure size × 40/260; 40 kB at a 260 kB closure |
 | Average transaction size | 1,000 bytes |
@@ -142,7 +142,7 @@ the 14-second column; §3 gives their more informative completion-time differenc
 
 ### Mathis: Reno/AIMD network model
 
-| Closure (MB) | Body (kB) | Missing txs (kB) | Voter ready by 7 s | P(C) | All ready by 7 s, given C | All ready by 14 s, given C |
+| Closure (MB) | Body (kB) | Missing txs (kB) | Voter ready by 7 s | $P(C)$ | All ready by 7 s, given $C$ | All ready by 14 s, given $C$ |
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 19.2308 | 20.8333 | >99.9999% | >99.9999% | >99.9999% | >99.9999% |
 | 0.26 | 40 | 43.3333 | >99.9999% | >99.9999% | >99.9999% | >99.9999% |
@@ -155,7 +155,7 @@ the 14-second column; §3 gives their more informative completion-time differenc
 
 ### CUBIC network model
 
-| Closure (MB) | Body (kB) | Missing txs (kB) | Voter ready by 7 s | P(C) | All ready by 7 s, given C | All ready by 14 s, given C |
+| Closure (MB) | Body (kB) | Missing txs (kB) | Voter ready by 7 s | $P(C)$ | All ready by 7 s, given $C$ | All ready by 14 s, given $C$ |
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 19.2308 | 20.8333 | >99.9999% | >99.9999% | >99.9999% | >99.9999% |
 | 0.26 | 40 | 43.3333 | >99.9999% | >99.9999% | >99.9999% | >99.9999% |
@@ -174,10 +174,10 @@ Certification only requires the stake quorum, so it remains effectively certain.
 ### Conditional completion CDFs
 
 All plots and tables use the **two-phase node process** defined
-in §3.2; the graph-derived recovery-hop distribution does not enter P(C).
+in §3.2; the graph-derived recovery-hop distribution does not enter $P(C)$.
 
 Each curve shows the probability that all 2,500 honest nodes are ready by
-time *t*, given certification, for one closure size. Vertical dotted lines
+time $t$, given certification, for one closure size. Vertical dotted lines
 mark the 7 and 14 s table checkpoints.  Colours identify the same
 closure sizes in all four CDF plots.
 
@@ -202,8 +202,8 @@ These columns are not a safety analysis.  The adversary enters only through
 its votes in the certification condition and through the smaller honest
 population; adversarial nodes still relay bodies and transactions like honest
 ones, so they cannot delay diffusion.  Raising the adversarial share towards
-50% therefore changes these results by less than a second.  §3.6 instead
-models an adversary that withholds diffusion, so that only τ − σ_α of stake
+50% therefore changes these results by less than a second.  §3.4 instead
+models an adversary that withholds diffusion, so that only $\tau-\sigma_\alpha$ of stake
 is guaranteed to help.
 
 Where certification is effectively certain, the slightly
@@ -214,7 +214,7 @@ population fixed.
 
 ### Mathis
 
-| Closure (MB) | Honest p50 (s) | Honest p95 (s) | Honest p99 (s) | Honest p99.9 (s) | Active p99 (s) | Active all ready by 14 s, given C |
+| Closure (MB) | Honest p50 (s) | Honest p95 (s) | Honest p99 (s) | Honest p99.9 (s) | Active p99 (s) | Active all ready by 14 s, given $C$ |
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 2.16 | 2.40 | 2.45 | 2.67 | 2.45 | >99.9999% |
 | 0.26 | 3.53 | 3.92 | 4.01 | 4.36 | 4.01 | >99.9999% |
@@ -227,7 +227,7 @@ population fixed.
 
 ### CUBIC
 
-| Closure (MB) | Honest p50 (s) | Honest p95 (s) | Honest p99 (s) | Honest p99.9 (s) | Active p99 (s) | Active all ready by 14 s, given C |
+| Closure (MB) | Honest p50 (s) | Honest p95 (s) | Honest p99 (s) | Honest p99.9 (s) | Active p99 (s) | Active all ready by 14 s, given $C$ |
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 2.16 | 2.40 | 2.45 | 2.67 | 2.45 | >99.9999% |
 | 0.26 | 3.53 | 3.92 | 4.01 | 4.36 | 4.01 | >99.9999% |
@@ -283,7 +283,7 @@ for the whole batch before and after the voting deadline, as follows:
 | 5 hops | 2.78% | 0% |
 
 **Phase one:** every honest node attempts to acquire and validate the closure.
-Voter readiness and the unconditional certification probability P(C) use only
+Voter readiness and the unconditional certification probability $P(C)$ use only
 the full blended fetch law and initial validation.  Nodes outside the committee
 also follow this initial processing law, but do not vote.
 
@@ -301,7 +301,7 @@ source-discovery, or queueing delay.  Recovery does not happen on a branch
 where certification fails.  This is a fixed-deadline model, not a model of
 the earliest possible quorum time or per-node certificate arrival.
 
-The generator derives `DEFAULT_HOP_WEIGHTS` from the recovery graph in §3.5
+The generator derives `DEFAULT_HOP_WEIGHTS` from the recovery graph in Appendix B
 and uses it for recovery only.  These weights come from a graph model; they
 are not measured mainnet frequencies.
 EB bodies retain the full blended distribution from
@@ -327,10 +327,10 @@ entire closure must traverse the network.
 
 ### 3.2. Joint readiness and conditional completion
 
-Let *B* be body arrival, *U* the phase-one missing-batch fetch duration,
-*X* initial validation, *R* recovery duration, and *Y* reapplication.  Component
+Let $B$ be body arrival, $U$ the phase-one missing-batch fetch duration,
+$X$ initial validation, $R$ recovery duration, and $Y$ reapplication.  Component
 durations are independent; both phases share the same body arrival.  Set
-*L = B + U*, *V = L + X*, and define completion *D* on a certified branch by:
+$L=B+U$, $V=L+X$, and define completion $D$ on a certified branch by:
 
 $$
 D = \begin{cases}
@@ -347,48 +347,20 @@ $$
 H(t_v,t)=P(V\le t_v,D\le t)=F_V(\min(t_v,t)).
 $$
 
-Writing *A_t* for all honest nodes completing by *t*, the conditional CDF is:
+Writing $A_t$ for all honest nodes completing by $t$, the conditional CDF is:
 
 $$
 P(A_t\mid C)=F_D(t)^{N_h}
 \frac{Q\!\left(H(t_v,t)/F_D(t)\right)}{Q(F_V(t_v))}.
 $$
 
-This uses the actual conditional voter probability *H/F_D*, rather than the
-old substitution involving *F_V(t_v)/F_V(t)*.  The denominator and phase-one
+This uses the actual conditional voter probability $H/F_D$, rather than the
+old substitution involving $F_V(t_v)/F_V(t)$.  The denominator and phase-one
 vote readiness do not change when the recovery-hop distribution changes.
-The identity is exact under the independent-node model with an exact *Q*;
-the report approximates *Q* using the reproducible method below.
+The identity is exact under the independent-node model with an exact $Q$;
+the report approximates $Q$ using the reproducible method in Appendix A.
 
-### 3.3. Stake-weighted quorum calculation
-
-For a committee of *K* seats, let *a_k* be the probability that a uniformly
-chosen subset of *k* seats carries quorum stake.  Then:
-
-$$
-Q(p)=\sum_{k=0}^{K} a_k {K\choose k}p^k(1-p)^{K-k}.
-$$
-
-The implementation estimates all *a_k* using **50,000 uniform random pool
-permutations**, with **seed 164**.  For each permutation it records the first
-prefix whose stake reaches quorum; the empirical CDF of this prefix length
-estimates *a_k*.  The same coefficients are used for the denominator and
-conditional numerator.  This is not rejection sampling of rare certification
-events, and the binomial mixture is evaluated in log space.
-
-The non-negative mixture preserves a consistent probability model: the
-conditional curves are bounded and non-decreasing without clipping excursions
-or taking a running maximum.  Roundoff at unity is trimmed only within a
-small numerical tolerance.  The quorum calculation is still a finite-sample
-approximation to the exact stake-weighted distribution; very rare tails can
-depend strongly on favourable subsets absent from the sample.
-
-For the stylised active-adversary comparison, 25% of committee weight votes
-deterministically and each stochastic seat's weight is scaled by 75%.
-This does not identify an actual allocation of adversarial pools; the honest
-completion target remains 1,875 nodes, following the earlier comparison.
-
-### 3.4. No prior availability at remaining honest nodes: stress scenario
+### 3.3. No prior availability at remaining honest nodes: stress scenario
 
 This scenario removes the stationary-cache availability assumption from
 **recovery only**.  Phase-one fetching, validation, and the certification event
@@ -399,7 +371,7 @@ previously acquired data and was still validating it.  Thus the recovery
 payload at 260 kB is **260 kB**, compared with **43.33 kB** for a baseline
 node still missing data.
 
-Using the notation from §3.2, let *R_full* transfer the full closure over
+Using the notation from §3.2, let $R_{\mathrm{full}}$ transfer the full closure over
 the same graph-derived recovery-hop distribution.  The stress completion time is:
 
 $$
@@ -416,7 +388,7 @@ All times below are measured from EB diffusion, not from certification.
 
 #### Mathis
 
-| Closure (MB) | Baseline p99 (s) | Stress p99 (s) | Stress p99.9 (s) | Stress all ready by 14 s, given C | Active stress p99 (s) | Active stress all ready by 14 s, given C |
+| Closure (MB) | Baseline p99 (s) | Stress p99 (s) | Stress p99.9 (s) | Stress all ready by 14 s, given $C$ | Active stress p99 (s) | Active stress all ready by 14 s, given $C$ |
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 2.45 | 2.45 | 2.67 | >99.9999% | 2.45 | >99.9999% |
 | 0.26 | 4.01 | 4.01 | 4.36 | >99.9999% | 4.01 | >99.9999% |
@@ -429,7 +401,7 @@ All times below are measured from EB diffusion, not from certification.
 
 #### CUBIC
 
-| Closure (MB) | Baseline p99 (s) | Stress p99 (s) | Stress p99.9 (s) | Stress all ready by 14 s, given C | Active stress p99 (s) | Active stress all ready by 14 s, given C |
+| Closure (MB) | Baseline p99 (s) | Stress p99 (s) | Stress p99.9 (s) | Stress all ready by 14 s, given $C$ | Active stress p99 (s) | Active stress all ready by 14 s, given $C$ |
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.125 | 2.45 | 2.45 | 2.67 | >99.9999% | 2.45 | >99.9999% |
 | 0.26 | 4.01 | 4.01 | 4.36 | >99.9999% | 4.01 | >99.9999% |
@@ -464,106 +436,27 @@ immediate serving availability, short recovery paths, independent requests,
 and no serving-capacity contention remain assumptions.  It is a separate
 stress scenario rather than a change to the stationary-cache baseline.
 
-### 3.5. Graph-derived recovery paths
-
-The phase-two recovery-hop distribution comes from
-[`recovery_graph.py`](../analysis/deltaq/improved-leios/recovery_graph.py),
-which builds the following model:
-
-1. Create **2,500 nodes** with the synthetic stake distribution.  Each node
-   chooses *m* **distinct peers** in proportion to their stake, excluding
-   itself.  An edge *i → j* means that *i* can request data from *j*.
-2. Order the nodes uniformly at random.  The shortest prefix carrying at
-   least stake fraction *f* holds the closure.  Where an adversary is
-   present, the next prefix carrying at least the adversarial stake neither
-   serves nor forwards.  All remaining nodes are honest receivers.
-3. Find each receiver's shortest path to a holder through honest nodes only.
-   Path lengths are pooled over receivers, not over stake.
-4. Sample **16 graphs** for each peer count and **256 role draws** for each
-   stake split, with **seed 164**.
-
-A stake-weighted peer is a holder with probability close to *f*, so a
-receiver reaches a holder in one hop with probability close to
-1 − (1 − *f*)^*m*.  Choosing distinct peers makes the sampled value slightly
-higher.  The result depends on the holders' stake, not on which nodes they
-are.  The holders actually conditioned on certification lean towards
-high-stake pools, but for a given *f* this leaves the one-hop probability
-unchanged.
-
-| Peers | Holder stake | Adversarial stake | One hop | Closed form | Two hops | Three+ hops | Unreachable | All reachable |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 5 | 25% | 0% | 76.58% | 76.27% | 23.41% | 0.01% | 0.00% | 100.00% |
-| 5 | 25% | 25% | 76.64% | 76.27% | 22.70% | 0.57% | 0.09% | 34.38% |
-| 5 | 25% | 50% | 76.48% | 76.27% | 18.03% | 2.08% | 3.41% | 0.00% |
-| 5 | 50% | 0% | 97.00% | 96.88% | 3.00% | 0.00% | 0.00% | 100.00% |
-| 5 | 50% | 25% | 97.02% | 96.88% | 2.88% | 0.02% | 0.09% | 57.03% |
-| 5 | 75% | 0% | 99.92% | 99.90% | 0.08% | 0.00% | 0.00% | 100.00% |
-| 10 | 25% | 0% | 94.62% | 94.37% | 5.38% | 0.00% | 0.00% | 100.00% |
-| 10 | 25% | 25% | 94.65% | 94.37% | 5.35% | 0.00% | 0.00% | 100.00% |
-| 10 | 25% | 50% | 94.57% | 94.37% | 5.31% | 0.03% | 0.10% | 56.64% |
-| 10 | 50% | 0% | 99.92% | 99.90% | 0.08% | 0.00% | 0.00% | 100.00% |
-| 10 | 50% | 25% | 99.92% | 99.90% | 0.08% | 0.00% | 0.00% | 100.00% |
-| 10 | 75% | 0% | 100.00% | 100.00% | 0.00% | 0.00% | 0.00% | 100.00% |
-| 20 | 25% | 0% | 99.73% | 99.68% | 0.27% | 0.00% | 0.00% | 100.00% |
-| 20 | 25% | 25% | 99.73% | 99.68% | 0.27% | 0.00% | 0.00% | 100.00% |
-| 20 | 25% | 50% | 99.74% | 99.68% | 0.26% | 0.00% | 0.00% | 100.00% |
-| 20 | 50% | 0% | 100.00% | 100.00% | 0.00% | 0.00% | 0.00% | 100.00% |
-| 20 | 50% | 25% | 100.00% | 100.00% | 0.00% | 0.00% | 0.00% | 100.00% |
-| 20 | 75% | 0% | 100.00% | 100.00% | 0.00% | 0.00% | 0.00% | 100.00% |
-
-![One-hop recovery probability against holder stake for 5, 10, and 20 stake-weighted peers](conditional-certification-diffusion/graph-recovery-paths.svg)
-
-**Choice for the timing model.**  Phase two uses *m* = 5, the current number
-of peers per relay, and *f* = 25% without adversaries: 76.58% one hop,
-23.41% two hops, and 0.01% three hops.  Given certification, nodes validated
-by 7 s carry at least 75% of stake in the baseline, so 25% is conservative
-there.  It is the honest stake that remains in a quorum when an adversary
-holding almost half the stake votes.  More peers make recovery faster
-still: at *m* = 10 and *f* = 25%, 94.62% of receivers are one hop away.
-
-The three-hop tail is small but not negligible for a strict all-node target.
-The earlier 50% one-hop / 50% two-hop split excluded it.  At 2 MB under
-Mathis, it lowers the probability that all nodes are ready 10 s after the
-EB diffusion origin from >99.9999% to 99.7281%,
-although the more frequent one-hop paths reduce most completion times.
-
-**Unreachable receivers are reported, not timed.**  Without adversaries,
-every receiver has a route.  When adversaries neither serve nor forward, a
-receiver whose peers are all adversarial has none: about 0.25⁵ ≈ 0.1% of
-receivers at 25% adversarial stake, and 0.5⁵ ≈ 3.1% at 50%.  These are lower
-bounds—the `Unreachable` column also counts receivers whose only routes pass
-through adversarial nodes.  `All reachable`
-is the fraction of role draws in which every receiver has a route.  The graph
-is static, whereas real nodes replace peers that fail to deliver, so these
-figures overstate persistent unreachability.  They therefore do not enter the
-completion-time calculation; the timing model uses the hop distribution of
-reachable receivers.
-
-Sampled figures are shown to two decimals.  `0.00%` means that no case was
-observed among approximately 160,000 to 480,000 receiver samples; it is not a
-zero probability.  Rounding may cause row sums to differ from 100% by 0.01%.
-
-### 3.6. Late-release safety worst case
+### 3.4. Late-release safety worst case
 
 Linear Leios should not weaken Praos safety, even when the adversary controls
-stake σ_α approaching 50%.  Such an adversary supplies σ_α of the τ = 75%
-quorum, so a certificate only guarantees that honest nodes with τ − σ_α of
+stake $\sigma_\alpha$ approaching 50%.  Such an adversary supplies $\sigma_\alpha$ of the $\tau=75\%$
+quorum, so a certificate only guarantees that honest nodes with $\tau-\sigma_\alpha$ of
 stake, about 25%, have the EB.  Adversarial nodes need not help anyone else.
 
 This scenario models that case as follows:
 
 1. The adversary releases the EB so late that, at the 7-second vote
-   deadline, only honest holders with exactly τ − σ_α of stake have the body
+   deadline, only honest holders with exactly $\tau-\sigma_\alpha$ of stake have the body
    and closure.  Every other honest node has neither, and uses no
    transactions from its cache.  The adversary votes on time, so
    certification is certain and nothing is conditioned.
 2. From 7 s, each remaining honest receiver fetches the body and then the
-   full closure, each over the reachable hop distribution of §3.5 for
-   *m* = 5, holder stake τ − σ_α, and non-forwarding adversarial stake σ_α.
+   full closure, each over the reachable hop distribution in Appendix B for
+   $m=5$, holder stake $\tau-\sigma_\alpha$, and non-forwarding adversarial stake $\sigma_\alpha$.
    It then validates the closure in full.
 3. Receivers complete independently.  Their number is the mean count of
-   honest nonholders in the graph draws: 619 at σ_α = 25% and 620 at
-   σ_α = 50%.
+   honest nonholders in the graph draws: 619 at $\sigma_\alpha=25\%$ and 620 at
+   $\sigma_\alpha=50\%$.
 
 #### Mathis
 
@@ -609,11 +502,11 @@ This scenario models that case as follows:
 
 ![All-honest-node p99 completion times in the late-release worst case, against the honest baseline](conditional-certification-diffusion/safety-worst-case-percentiles.svg)
 
-At Musashi's 260 kB limit with σ_α = 50%, p99 is **12.02 s** under both
+At Musashi's 260 kB limit with $\sigma_\alpha=50\%$, p99 is **12.02 s** under both
 models, compared with **4.01 s** in the honest baseline, and all honest
 nodes are ready by 14 s with probability **99.9996%**.  Under Mathis, p99
 exceeds 14 s from 0.5 MB (**14.11 s**); under CUBIC, from 1 MB
-(**14.36 s**).  At σ_α = 25%, p99 stays within 14 s up to 1 MB under Mathis
+(**14.36 s**).  At $\sigma_\alpha=25\%$, p99 stays within 14 s up to 1 MB under Mathis
 (13.78 s) and up to 2 MB under CUBIC (13.29 s).  Most of the gap to the
 baseline is structural: receivers start only at 7 s, transfer the body and
 the whole closure, and validate it in full.
@@ -622,10 +515,10 @@ This is a sketch of the worst case rather than a bound.  Starting every
 receiver at 7 s is pessimistic by the holders' own validation time, since
 honest holders forward data as soon as they have it, and so is ignoring
 cache contents.  Uncontended holder uploads are optimistic, and receivers
-with no honest route (3.41% at σ_α = 50% on the static graph of §3.5) are
+with no honest route (3.41% at $\sigma_\alpha=50\%$ on the static graph in Appendix B) are
 excluded.  Whether an adversary can time the release this precisely depends
 on header and EB diffusion rules not modelled here.  The safety question is
-whether these times fit within the window that L_diff allows; this report
+whether these times fit within the window that $L_{\mathrm{diff}}$ allows; this report
 measures them against the 14-second deadline used throughout.
 
 ## 4. Interpretation and scope
@@ -660,7 +553,7 @@ fetching overlap, and shared serving capacity can change the results.
 over time—no churn, replacement, or multiple relays. The active-adversary
 comparison reuses the adversary-free hop distribution, though non-forwarding
 adversaries would shift some two-hop paths to three hops or leave receivers
-without a route (§3.5).
+without a route (Appendix B).
 
 **Approximate quorum calculation.** Quorum probabilities use a permutation
 estimate (50,000 samples), not an exact enumeration. Decimal precision aids
@@ -711,3 +604,110 @@ For the mathematical derivation and broader discussion, see the
 [original note](../analysis/deltaq/improved-leios/conditional_certification_diffusion.md);
 for the component network and CPU models, see the
 [full analysis report](../analysis/deltaq/improved-leios/report.md).
+
+## Appendix A. Stake-weighted quorum calculation
+
+For a committee of $K$ seats, let $a_k$ be the probability that a uniformly
+chosen subset of $k$ seats carries quorum stake.  Then:
+
+$$
+Q(p)=\sum_{k=0}^{K} a_k {K\choose k}p^k(1-p)^{K-k}.
+$$
+
+The implementation estimates all $a_k$ using **50,000 uniform random pool
+permutations**, with **seed 164**.  For each permutation it records the first
+prefix whose stake reaches quorum; the empirical CDF of this prefix length
+estimates $a_k$.  The same coefficients are used for the denominator and
+conditional numerator.  This is not rejection sampling of rare certification
+events, and the binomial mixture is evaluated in log space.
+
+The non-negative mixture preserves a consistent probability model: the
+conditional curves are bounded and non-decreasing without clipping excursions
+or taking a running maximum.  Roundoff at unity is trimmed only within a
+small numerical tolerance.  The quorum calculation is still a finite-sample
+approximation to the exact stake-weighted distribution; very rare tails can
+depend strongly on favourable subsets absent from the sample.
+
+For the stylised active-adversary comparison, 25% of committee weight votes
+deterministically and each stochastic seat's weight is scaled by 75%.
+This does not identify an actual allocation of adversarial pools; the honest
+completion target remains 1,875 nodes, following the earlier comparison.
+
+## Appendix B. Graph-derived recovery paths
+
+The phase-two recovery-hop distribution comes from
+[`recovery_graph.py`](../analysis/deltaq/improved-leios/recovery_graph.py),
+which builds the following model:
+
+1. Create **2,500 nodes** with the synthetic stake distribution.  Each node
+   chooses $m$ **distinct peers** in proportion to their stake, excluding
+   itself.  An edge $i\to j$ means that $i$ can request data from $j$.
+2. Order the nodes uniformly at random.  The shortest prefix carrying at
+   least stake fraction $f$ holds the closure.  Where an adversary is
+   present, the next prefix carrying at least the adversarial stake neither
+   serves nor forwards.  All remaining nodes are honest receivers.
+3. Find each receiver's shortest path to a holder through honest nodes only.
+   Path lengths are pooled over receivers, not over stake.
+4. Sample **16 graphs** for each peer count and **256 role draws** for each
+   stake split, with **seed 164**.
+
+A stake-weighted peer is a holder with probability close to $f$, so a
+receiver reaches a holder in one hop with probability close to
+$1-(1-f)^m$.  Choosing distinct peers makes the sampled value slightly
+higher.  The result depends on the holders' stake, not on which nodes they
+are.  The holders actually conditioned on certification lean towards
+high-stake pools, but for a given $f$ this leaves the one-hop probability
+unchanged.
+
+| Peers | Holder stake | Adversarial stake | One hop | Closed form | Two hops | Three+ hops | Unreachable | All reachable |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 5 | 25% | 0% | 76.58% | 76.27% | 23.41% | 0.01% | 0.00% | 100.00% |
+| 5 | 25% | 25% | 76.64% | 76.27% | 22.70% | 0.57% | 0.09% | 34.38% |
+| 5 | 25% | 50% | 76.48% | 76.27% | 18.03% | 2.08% | 3.41% | 0.00% |
+| 5 | 50% | 0% | 97.00% | 96.88% | 3.00% | 0.00% | 0.00% | 100.00% |
+| 5 | 50% | 25% | 97.02% | 96.88% | 2.88% | 0.02% | 0.09% | 57.03% |
+| 5 | 75% | 0% | 99.92% | 99.90% | 0.08% | 0.00% | 0.00% | 100.00% |
+| 10 | 25% | 0% | 94.62% | 94.37% | 5.38% | 0.00% | 0.00% | 100.00% |
+| 10 | 25% | 25% | 94.65% | 94.37% | 5.35% | 0.00% | 0.00% | 100.00% |
+| 10 | 25% | 50% | 94.57% | 94.37% | 5.31% | 0.03% | 0.10% | 56.64% |
+| 10 | 50% | 0% | 99.92% | 99.90% | 0.08% | 0.00% | 0.00% | 100.00% |
+| 10 | 50% | 25% | 99.92% | 99.90% | 0.08% | 0.00% | 0.00% | 100.00% |
+| 10 | 75% | 0% | 100.00% | 100.00% | 0.00% | 0.00% | 0.00% | 100.00% |
+| 20 | 25% | 0% | 99.73% | 99.68% | 0.27% | 0.00% | 0.00% | 100.00% |
+| 20 | 25% | 25% | 99.73% | 99.68% | 0.27% | 0.00% | 0.00% | 100.00% |
+| 20 | 25% | 50% | 99.74% | 99.68% | 0.26% | 0.00% | 0.00% | 100.00% |
+| 20 | 50% | 0% | 100.00% | 100.00% | 0.00% | 0.00% | 0.00% | 100.00% |
+| 20 | 50% | 25% | 100.00% | 100.00% | 0.00% | 0.00% | 0.00% | 100.00% |
+| 20 | 75% | 0% | 100.00% | 100.00% | 0.00% | 0.00% | 0.00% | 100.00% |
+
+![One-hop recovery probability against holder stake for 5, 10, and 20 stake-weighted peers](conditional-certification-diffusion/graph-recovery-paths.svg)
+
+**Choice for the timing model.**  Phase two uses $m=5$, the current number
+of peers per relay, and $f=25\%$ without adversaries: 76.58% one hop,
+23.41% two hops, and 0.01% three hops.  Given certification, nodes validated
+by 7 s carry at least 75% of stake in the baseline, so 25% is conservative
+there.  It is the honest stake that remains in a quorum when an adversary
+holding almost half the stake votes.  More peers make recovery faster
+still: at $m=10$ and $f=25\%$, 94.62% of receivers are one hop away.
+
+The three-hop tail is small but not negligible for a strict all-node target.
+The earlier 50% one-hop / 50% two-hop split excluded it.  At 2 MB under
+Mathis, it lowers the probability that all nodes are ready 10 s after the
+EB diffusion origin from >99.9999% to 99.7281%,
+although the more frequent one-hop paths reduce most completion times.
+
+**Unreachable receivers are reported, not timed.**  Without adversaries,
+every receiver has a route.  When adversaries neither serve nor forward, a
+receiver whose peers are all adversarial has none: about $0.25^5\approx0.1\%$ of
+receivers at 25% adversarial stake, and $0.5^5\approx3.1\%$ at 50%.  These are lower
+bounds—the `Unreachable` column also counts receivers whose only routes pass
+through adversarial nodes.  `All reachable`
+is the fraction of role draws in which every receiver has a route.  The graph
+is static, whereas real nodes replace peers that fail to deliver, so these
+figures overstate persistent unreachability.  They therefore do not enter the
+completion-time calculation; the timing model uses the hop distribution of
+reachable receivers.
+
+Sampled figures are shown to two decimals.  `0.00%` means that no case was
+observed among approximately 160,000 to 480,000 receiver samples; it is not a
+zero probability.  Rounding may cause row sums to differ from 100% by 0.01%.
