@@ -64,32 +64,14 @@
 }
 
 .ring {
-  --pct: 0;
-  --ring-color: var(--done);
   position: relative;
   display: inline-grid;
   place-items: center;
   width: 1.1rem;
   height: 1.1rem;
   border-radius: 50%;
-  background: conic-gradient(
-    var(--ring-color) calc(var(--pct) * 1%),
-    var(--empty) 0
-  );
+  background: var(--empty);
   flex: 0 0 auto;
-}
-
-.ring_done {
-  --ring-color: var(--done);
-}
-.ring_ongoing {
-  --ring-color: var(--ongoing);
-}
-.ring_open {
-  --ring-color: var(--open);
-}
-.ring_missing {
-  --ring-color: var(--missing);
 }
 
 .ringInner {
@@ -198,6 +180,20 @@
   background: var(--empty);
   margin-right: 0.4rem;
   vertical-align: middle;
+}
+
+.detailCheck {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  align-self: center;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
 }
 
 .pip_done {

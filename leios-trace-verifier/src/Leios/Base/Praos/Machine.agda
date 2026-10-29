@@ -9,20 +9,17 @@
 -- checking" notes) — so they stay module parameters here, same as in
 -- Leios.Base.Praos.Node itself, rather than something to "construct".
 --
--- `slotOf` turns out NOT to need the doc's Option 1/2 redesign: the pinned
--- leios-spec here still has RankingBlock.slot (the newer, `main`-branch
--- shape the doc was written against dropped it), so `slotOf := RankingBlock.slot`
--- is immediate.
---
--- `producer` genuinely can't be recovered from a bare RankingBlock (no
--- producer/pid field survives payload projection), so it stays a parameter
--- too — but it's operationally inert for the trace verifier either way:
+-- Neither `producer` nor `slotOf` can be recovered from a bare RankingBlock:
+-- it carries no producer/pid and, since the pinned leios-spec dropped
+-- RankingBlock.slot, no slot either (the Praos block around it has both, but
+-- the payload projection loses them).  Both stay parameters, and both are
+-- operationally inert for the trace verifier:
 -- `Protocol.Semantics.processMsgsʰ` (absorbing delivered blocks) never
 -- consults `winner`/producer identity, and `Blockchain.IsBlockchain`'s
 -- `producer`/`slotOf` fields are only read by `Blockchain.Liveness.Transfer`
--- and `Network.Leios` (deployment-level theorem transport) — modules
--- src/trace-parser.agda never imports. Any placeholder (e.g. the existing
--- stub's `λ _ → Fin.zero`) is exercised by nothing at runtime.
+-- and `Network.Leios` (deployment-level theorem transport), modules
+-- src/trace-parser.agda never imports.  Any placeholder is exercised by
+-- nothing at runtime.
 --
 -- NOT --safe (Leios.Base.Praos.Instance/Assumptions aren't).
 
@@ -60,9 +57,10 @@ module Assembled
   (V-chkCerts : List PubKey → EndorserBlock × Cert → Bool)
   (stake₀     : StakeDistr)
   (producer   : RankingBlock → Fin numParties)
+  (slotOf     : RankingBlock → ℕ)
   where
 
   private module PraosNode = Node praosNode Cert VTy initSlot V-chkCerts stake₀
   -- B' is what a SpecStructure consumer installs alongside praosBase.
   open PraosNode public using (B'; node)
-  open PraosNode.Assemble numParties producer RankingBlock.slot public
+  open PraosNode.Assemble numParties producer slotOf public

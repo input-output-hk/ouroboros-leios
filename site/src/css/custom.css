@@ -580,3 +580,56 @@ blockquote {
 .secondary-button {
   background-color: transparent;
 }
+
+/* Blog: the global .col padding above is meant for the docs layout;
+   without this override it inflates the author row inside blog headers */
+.blog-wrapper article > header .col {
+  padding: 0;
+}
+
+/* Blog: tighten vertical rhythm between post title, byline, and content */
+.blog-wrapper article > header h1,
+.blog-wrapper article > header h2 {
+  margin-bottom: 0.5rem;
+}
+
+.blog-wrapper article > header .margin-vert--md {
+  margin-top: 0 !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.blog-wrapper article > header .row.margin-top--md {
+  margin-top: 0 !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.blog-wrapper article > header .avatar.margin-bottom--sm {
+  margin-bottom: 0 !important;
+}
+
+/* Rewards results tables: pool ID stays visible while the table scrolls. */
+.rewards-table table {
+  font-size: 0.85rem;
+}
+.rewards-table td:last-child {
+  min-width: 18rem;
+}
+@media (min-width: 997px) {
+  .rewards-table th:nth-child(-n + 2),
+  .rewards-table td:nth-child(-n + 2) {
+    position: sticky;
+    z-index: 1;
+    background-color: var(--ifm-background-color);
+  }
+  .rewards-table th:first-child,
+  .rewards-table td:first-child {
+    left: 0;
+    min-width: 3rem;
+    max-width: 3rem;
+  }
+  .rewards-table th:nth-child(2),
+  .rewards-table td:nth-child(2) {
+    left: 3rem;
+    box-shadow: inset -1px 0 0 var(--ifm-table-border-color);
+  }
+}

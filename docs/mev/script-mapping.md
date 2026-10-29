@@ -4,15 +4,34 @@ Identification of high-activity Plutus scripts by MEV relevance. Data sourced fr
 
 | Version | Date       | Scripts Mapped |
 |---------|------------|----------------|
+| 0.2     | 2026-09-02 | 59 scripts     |
 | 0.1     | 2026-02-05 | 59 scripts     |
+
+Dates refer to the document version. The underlying chain data is a mainnet
+snapshot taken around 2026-01-29 (all history up to that date, ~55.6M redeemers).
+
+## Data Provenance
+
+Redeemer counts come from a `cardano-db-sync` query against Cardano mainnet:
+[redeemer-stats.sql](../../post-cip/mainnet-scripts/redeemer-stats.sql) aggregates
+the `redeemer` table by script hash and purpose. The raw output is committed
+alongside it: the [full dataset](../../post-cip/mainnet-scripts/redeemer-stats.csv.gz)
+(142,977 scripts) and the [top 100](../../post-cip/mainnet-scripts/redeemer-stats-top100.csv)
+by all-time redeemer count. "Top 100" throughout this document means those 100
+busiest scripts. Of them, 59 were identified and mapped to protocols; the summary
+below covers the 28 mapped scripts in the three MEV-relevant categories (the
+remaining mapped scripts are staking, minting, or governance validators).
 
 ## Summary
 
-| Category | Scripts | Redeemers | % of Top 100 |
-|----------|---------|-----------|--------------|
-| DEX      | 18      | 21.0M     | 61%          |
-| NFT      | 4       | 8.0M      | 23%          |
-| Unknown  | 6       | 5.4M      | 16%          |
+| Category | Scripts | Redeemers | % of Categorized |
+|----------|---------|-----------|------------------|
+| DEX      | 18      | 21.0M     | 61%              |
+| NFT      | 4       | 8.0M      | 23%              |
+| Unknown  | 6       | 5.4M      | 16%              |
+
+Percentages are shares of the 34.4M redeemers in these three categories. The full
+top 100 totals 46.6M redeemers; against that base, DEX activity is ~45%.
 
 ## Top Scripts by Activity
 
@@ -44,9 +63,9 @@ Identification of high-activity Plutus scripts by MEV relevance. Data sourced fr
 
 | Protocol | Scripts | Redeemers | % of DEX |
 |----------|---------|-----------|----------|
-| Minswap | 5 | 13.8M | 62% |
+| Minswap | 5 | 13.8M | 66% |
 | WingRiders | 3 | 2.8M | 13% |
-| SundaeSwap | 4 | 1.9M | 9% |
+| SundaeSwap | 3 | 2.4M | 11% |
 | Splash | 1 | 1.7M | 8% |
 | MuesliSwap | 1 | 0.4M | 2% |
 
@@ -58,13 +77,20 @@ Identification of high-activity Plutus scripts by MEV relevance. Data sourced fr
 | **MEDIUM** | NFT marketplaces, oracle-dependent | JPG Store listings |
 | **LOW** | Staking, governance, minting | Reward validators |
 
+## Methodology
+
+1. Queried the top 100 scripts by redeemer count from `cardano-db-sync` (see [Data Provenance](#data-provenance))
+2. Matched script hashes against the StricaHQ registry, Cardanoscan, and protocol GitHub repositories
+3. CBOR-decoded unknown scripts to extract error strings for identification
+4. Classified by MEV relevance based on contract function
+
 ## Tools
 
 - [UPLC Analyzer](https://uplc.pages.dev) — Decode and inspect script bytecode
-- Script data query via Koios API
+- Koios API — script metadata lookups during identification
 
 ## Sources
 
-- [StricaHQ Script Registry](https://github.com/ADAOcommunity/cardano-plutus-script-registry)
-- [SundaeSwap GraphQL API](https://api.sundae.fi/graphql)
+- [redeemer-stats.sql](../../post-cip/mainnet-scripts/redeemer-stats.sql) on mainnet `cardano-db-sync` (redeemer counts)
+- StricaHQ script registry and [SundaeSwap GraphQL API](https://api.sundae.fi/graphql) (identification)
 - Protocol documentation and GitHub repositories

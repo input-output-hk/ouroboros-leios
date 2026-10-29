@@ -8,7 +8,7 @@ The Ouroboros Leios open source project is committed to ensuring the security of
 
 ### Reporting a Vulnerability
 
-If you discover a security vulnerability in Leios, we encourage you to responsibly disclose it to us. To report a vulnerability, please use the [private reporting form on GitHub](https://github.com/input-output-hk/ouroborous-leios/security/advisories/new) to draft a new _Security advisory_.
+If you discover a security vulnerability in Leios, we encourage you to responsibly disclose it to us. To report a vulnerability, please use the [private reporting form on GitHub](https://github.com/input-output-hk/ouroboros-leios/security/advisories/new) to draft a new _Security advisory_.
 
 Please include as much details as needed to clearly qualify the issue:
 
@@ -63,7 +63,7 @@ We will not pursue legal action against individuals who report security vulnerab
 
 ## Contact Information
 
-To report a security vulnerability, please use [GitHub form](https://github.com/input-output-hk/ouroborous-leios/security/advisories/new).
+To report a security vulnerability, please use the [GitHub form](https://github.com/input-output-hk/ouroboros-leios/security/advisories/new).
 
 ## Revision of Policy
 

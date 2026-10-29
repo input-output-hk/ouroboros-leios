@@ -61,6 +61,11 @@ const config: Config = {
             from: "/docs/development/monthly-reviews",
             to: "/docs/monthly-reviews",
           },
+          // Parameter graduation tool became a doc (2026-10-22)
+          {
+            from: "/parameter-graduation",
+            to: "/docs/parameter-graduation",
+          },
           // Join the musashi dojo link used in PR (2026-06-26)
           {
             from: "/join",
@@ -77,6 +82,12 @@ const config: Config = {
       {
         docs: {
           sidebarPath: "./sidebars.ts",
+        },
+        blog: {
+          blogTitle: "Blog",
+          blogSidebarTitle: "Latest posts",
+          showReadingTime: true,
+          authorsMapPath: "../authors.yaml",
         },
         theme: {
           customCss: "./src/css/custom.css",
@@ -121,10 +132,19 @@ const config: Config = {
           label: "Research and development",
         },
         {
+          to: "/blog",
+          label: "Blog",
+          position: "right",
+        },
+        {
           type: "dropdown",
           label: "Tools",
           position: "right",
           items: [
+            {
+              to: "/docs/parameter-graduation",
+              label: "Parameter graduation",
+            },
             {
               to: "https://leios.cardano-scaling.org/cost-estimator/",
               label: "Cost Estimator",

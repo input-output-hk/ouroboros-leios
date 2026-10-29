@@ -31,55 +31,55 @@
 // host is omitted since it duplicates the base instance label. rbHash and stack
 // are never labelled; they stay in the body for query-time `| json`.
 declare "cardano_node_process" {
-  argument "forward_to" {}
+	argument "forward_to" { }
 
-  export "receiver" {
-    value = loki.process.enrich.receiver
-  }
+	export "receiver" {
+		value = loki.process.enrich.receiver
+	}
 
-  loki.process "enrich" {
-    stage.match {
-      selector = `{service!="cardano-node"}`
-      action   = "drop"
-    }
+	loki.process "enrich" {
+		stage.match {
+			selector = `{service!="cardano-node"}`
+			action   = "drop"
+		}
 
-    stage.json {
-      expressions = {
-        at   = "at",
-        sev  = "sev",
-        ns   = "ns",
-        kind = "data.kind",
-        data = "data",
-      }
-      drop_malformed = true
-    }
+		stage.json {
+			expressions = {
+				at   = "at",
+				sev  = "sev",
+				ns   = "ns",
+				kind = "data.kind",
+				data = "data",
+			}
+			drop_malformed = true
+		}
 
-    stage.timestamp {
-      source = "at"
-      format = "RFC3339"
-    }
+		stage.timestamp {
+			source = "at"
+			format = "RFC3339"
+		}
 
-    stage.labels {
-      values = {
-        level = "sev",
-        sev   = "sev",
-        ns    = "ns",
-        kind  = "kind",
-      }
-    }
+		stage.labels {
+			values = {
+				level = "sev",
+				sev   = "sev",
+				ns    = "ns",
+				kind  = "kind",
+			}
+		}
 
-    stage.static_labels {
-      values = {
-        service = "cardano-node",
-      }
-    }
+		stage.static_labels {
+			values = {
+				service = "cardano-node",
+			}
+		}
 
-    // Republish the decoded `data` object as the body so the vote/call modules
-    // (and query-time `| json`) see kind/vote/event/... at the top level.
-    stage.output {
-      source = "data"
-    }
+		// Republish the decoded `data` object as the body so the vote/call modules
+		// (and query-time `| json`) see kind/vote/event/... at the top level.
+		stage.output {
+			source = "data"
+		}
 
-    forward_to = argument.forward_to.value
-  }
+		forward_to = argument.forward_to.value
+	}
 }

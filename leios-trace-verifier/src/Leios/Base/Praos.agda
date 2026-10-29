@@ -31,11 +31,9 @@ record PraosAbstract : Type₁ where
         readChain       : ℕ → LocalState → List Block
         payloadOf       : Block → RankingBlock
 
--- The pinned leios-spec's RankingBlock still has the pre-CIP-33 shape
--- (txs/announcedEB/ebCert/slot fields); slot is unused here (overwritten by
--- the wrapper's own Deliver step whenever this default is actually minted).
+-- An RB carrying neither transactions nor an announcement.
 emptyRB : RankingBlock
-emptyRB = record { txs = [] ; announcedEB = nothing ; ebCert = nothing ; slot = 0 }
+emptyRB = record { announcedEB = nothing ; txsOrEbCert = inj₁ [] }
 
 module Node
   (praos      : PraosAbstract) (open PraosAbstract praos)

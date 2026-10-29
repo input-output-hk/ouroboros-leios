@@ -79,8 +79,8 @@ sutStake = TotalMap.lookup stakeDistribution sutId
 -- supplied through the 'winning-slots' oracle. Voting (VT) eligibility does
 -- not go through the VRF at all: it is the explicit CIP-0164 stake-truncation
 -- committee, `inVotingCommittee` in Leios.Config.
-sortition : BlockType → ℕ → ℕ
-sortition b n with (b , n) ∈? winning-slots
+sortition : ℕ → ℕ
+sortition n with n ∈? winning-slots
 ... | yes _ = 0
 ... | no _ = sutStake
 
@@ -91,7 +91,7 @@ d-VRF =
     ; vrf        =
         record
           { isKeyPair = λ _ _ → ⊤
-          ; eval      = λ (b , _) y → sortition b y , tt
+          ; eval      = λ _ y → sortition y , tt
           ; verify    = λ _ _ _ _ → ⊤
           ; verify?   = λ _ _ _ _ → yes tt
           }
@@ -131,7 +131,7 @@ open import Leios.Base d-Abstract d-VRF public
 -- instead of echoing untouched state.
 
 -- RB-production eligibility for the wrapped Praos node: the same
--- leadership-schedule oracle 'sortition' consults under the EB tag (in
+-- leadership-schedule oracle 'sortition' consults (in
 -- linear Leios the RB is the Praos block; a leader slot lets the SUT mint an
 -- RB, announcing an EB in it). The party argument is deliberately ignored:
 -- the schedule is the SUT's own and the machine only ever evaluates 'winner'
@@ -143,30 +143,35 @@ open import Leios.Base d-Abstract d-VRF public
 -- clock`), so the schedule is only ever consulted at slots ≥ 1.
 d-winner : Fin numberOfParties → ℕ → Type
 d-winner _ Nat.zero     = ⊤
-d-winner _ (Nat.suc sl) = (EB , Nat.suc sl) ∈ winning-slots
+d-winner _ (Nat.suc sl) = Nat.suc sl ∈ winning-slots
 
 -- Deliberately NOT an instance: `d-winner _ zero` reduces to ⊤, so as an
 -- instance this would overlap with Dec-⊤ in unrelated searches. It is passed
 -- to the Praos machine explicitly below.
 d-winner⁇² : d-winner ⁇²
 d-winner⁇² {_} {Nat.zero}   .dec = yes tt
-d-winner⁇² {_} {Nat.suc sl} .dec = (EB , Nat.suc sl) ∈? winning-slots
+d-winner⁇² {_} {Nat.suc sl} .dec = Nat.suc sl ∈? winning-slots
 
 -- Block-content hash for the Praos tree's prev-linkage: slot and producer
 -- uniquely identify honest blocks; the payload part disambiguates the rest.
 d-blockHash : ℕ → Fin numberOfParties → RankingBlock → List ℕ
 d-blockHash sl pid rb =
-  sl ∷ toℕ pid ∷ RankingBlock.slot rb ∷ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+  sl ∷ toℕ pid ∷ body (RankingBlock.txsOrEbCert rb) ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+  where
+    body : List Tx ⊎ EBCert → List ℕ
+    body (inj₁ txs)  = txs
+    body (inj₂ cert) = cert
 
 import Leios.Base.Praos.Machine as PraosMachine
 module PM = PraosMachine d-Abstract d-VRF numberOfParties d-winner
   ⦃ winner⁇² = λ {p} {sl} → d-winner⁇² {p} {sl} ⦄
   (λ _ → tt)
   d-blockHash
--- producer is a placeholder (a bare RankingBlock does not determine its
--- minter) but operationally inert: IsBlockchain's producer/slotOf are read
--- only by deployment-level modules the verifier never imports.
-module PB = PM.Assembled ⊤ ⊤ (λ _ → 0) (λ _ _ → true) stakeDistribution (λ _ → sutId)
+-- producer and slotOf are placeholders (a bare RankingBlock determines
+-- neither its minter nor its slot) but operationally inert: IsBlockchain's
+-- producer/slotOf are read only by deployment-level modules the verifier
+-- never imports.
+module PB = PM.Assembled ⊤ ⊤ (λ _ → 0) (λ _ _ → true) stakeDistribution (λ _ → sutId) (λ _ → 0)
 
 d-Base : BaseAbstract
 d-Base = PB.B'
@@ -196,9 +201,11 @@ instance
   hpe : Hashable PreEndorserBlock Hash
   hpe .hash = EndorserBlockOSig.txs
 
-  -- Votes sign the announcing RB's hash: slot plus announced-EB payload.
+  -- Votes sign the announcing RB's hash: body payload plus announced-EB hash.
   hrb : Hashable RankingBlock Hash
-  hrb .hash rb = RankingBlock.slot rb ∷ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+  hrb .hash rb = case RankingBlock.txsOrEbCert rb of λ where
+    (inj₁ txs)  → txs  ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+    (inj₂ cert) → cert ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
 
 record FFDBuffers : Type where
   field inEBs : List EndorserBlock

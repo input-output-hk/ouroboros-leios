@@ -1,7 +1,8 @@
 set -exuo pipefail
 
 cd "$DOWNSTREAM_NODE_DIR"
-export LEIOS_DB_PATH="leios.db"
+export LEIOS_VOL_DB_PATH="leios.db.vol"
+export LEIOS_IMM_DB_PATH="leios.db.imm"
 cardano-node run \
   --config "config.json" \
   --topology "topology.json" \

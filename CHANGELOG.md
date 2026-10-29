@@ -5,6 +5,339 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## rc-2026w43 - 2026-10-25
+
+A small consensus-only release: more efficient storing and serving of endorser blocks, block producers forge certifying blocks without reapplying the mempool, and the mempool fills to its byte capacity more consistently. This improved the forge loop timings and generally result in faster release of announcements and smoother data diffusion. 
+
+> [!IMPORTANT]
+>
+> **Requires resync, not a respin.** The LeiosDb stores endorser blocks in a new layout that a w42 node's databases are not migrated to. Delete the chain database along with `leios.vol.db` and `leios.imm.db`, and sync again. Wire formats are unchanged, so nodes of both versions can talk to each other.
+
+- The LeiosDb stores each endorser block's transactions as one blob [consensus#2449](https://github.com/IntersectMBO/ouroboros-consensus/pull/2449)
+  - Serving an endorser block's transactions reads bytes and never decodes.
+  - Transactions the node already has from other endorser blocks are copied locally, and only if their bytes hash to the listed transaction. Copies that do not are traced as `FillsRejected` and fetched instead.
+- Forging no longer reapplies the whole mempool [consensus#2449](https://github.com/IntersectMBO/ouroboros-consensus/pull/2449)
+  - The mempool keeps a second view of its transactions with the announced endorser block's closure applied, so a block certifying it is forged from that view in milliseconds, which took up to 0.9s before.
+  - Adopting such a block makes that view the mempool's state instead of revalidating every transaction (`SwitchedToCertifyingView` trace).
+  - A block without a certificate is forged from the mempool's state as is, as long as no transaction's validity interval or the epoch ends before its slot.
+- The mempool no longer limits admission by the transactions' validation time
+- Fixes a `V2LSM` node segfaulting when reading more than 65,536 UTxO keys at once [consensus#2449](https://github.com/IntersectMBO/ouroboros-consensus/pull/2449)
+  - This can only be hit on really high Leios configurations, e.g. syncing a mempool with 10 MB worth of transactions
+  - `V2InMemory` nodes, were not affected.
+- Fixes the transaction cache holding on to one batch of transactions longer than needed [consensus#2436](https://github.com/IntersectMBO/ouroboros-consensus/pull/2436)
+  - A batch can be a whole endorser block's transactions. The retention was bounded, not a leak.
+
+## rc-2026w42 - 2026-10-16
+
+Ships all the good things that happened since `11.2` on ledger, api and cli `master` branches. Consensus-wise it fixes how endorser blocks carry a transaction's script validity and an endorser block can no longer be certified across an epoch boundary, and the CLI gains a query for the Leios committee.
+
+> [!IMPORTANT]
+>
+> **Requires respin.** Endorser blocks reference and carry their transactions in a new encoding, so a w42 node can neither exchange endorser blocks with an earlier one nor read its chain. Delete the chain database along with `leios.vol.db` and `leios.imm.db`, and sync the respun network from genesis. As w41 was not yet used on a public testnet, see below for more changes that are coming with this.
+
+> [!IMPORTANT]
+>
+> **Certification is one slot earlier.** A block producer now certifies an endorser block as soon as the announcement, voting and diffusion periods have elapsed (14 slots on the default parameters), where earlier releases waited one slot more. This matches CIP-164 and the header check of the upstream node, so prototype and production-grade nodes agree on when a block may certify.
+
+- Fixes a transaction whose Plutus script fails spending the script's outputs once its endorser block is certified [consensus#2410](https://github.com/IntersectMBO/ouroboros-consensus/pull/2410)
+  - Change the `LeiosFetch` network message format to use the ledger's block encoding of a transaction, which always carries the `is_valid` flag.
+  - A node remembers which protocol version it validated a transaction under, and validates it again before voting under another.
+
+- An endorser block can no longer be certified across an epoch boundary [consensus#2415](https://github.com/IntersectMBO/ouroboros-consensus/pull/2415)
+  - A header that does is rejected with `LeiosCertWithoutAnnouncement`.
+  - A block producer does not certify an endorser block announced in the previous epoch.
+
+- `LeiosFetch` messages follow [consensus#2416](https://github.com/IntersectMBO/ouroboros-consensus/pull/2416), as proposed for upstream
+  - `MsgLeiosBlockTxs` carries only the transactions, no longer echoing the request's point and bitmaps.
+  - Each transaction is CBOR-in-CBOR, `#6.24(bytes .cbor block_transaction)`, where it was a plain byte string.
+  - The [cardano-blueprint](https://cardano-scaling.github.io/cardano-blueprint/network/node-to-node/leios-fetch/index.html?leios=on) specifies the new message and the transactions' block encoding.
+
+- The ledger is on cardano-ledger `master` at [07d904eb](https://github.com/IntersectMBO/cardano-ledger/commit/07d904eb2c1e3fb6ea4d1787012b0786ceffaa2e)
+  - Sub-transactions are validated as upstream again, undoing the revert from w38a. Their Plutus scripts are evaluated along with those of the enclosing transaction, and their execution units count towards the transaction and block limits and the minimum fee.
+  - Re-registering a pool with the BLS key it already has keeps the epoch that key was registered in, so the key expires as if it had not been re-registered.
+  - A transaction's treasury value and reference script size are checked even when it is phase-2 invalid.
+  - A VRF key shared by two pools stays taken while either still uses it, so a third pool can no longer register it once one of them moves to another key.
+  - A transaction body listing the same required top-level guard twice no longer decodes.
+
+- `cardano-cli` and `cardano-api` are on their `master` branches at [3aecd3d3](https://github.com/IntersectMBO/cardano-cli/commit/3aecd3d3e5ca06f5f52bd7ac0c68b50cb990324b) and [aa8f2ec1](https://github.com/IntersectMBO/cardano-api/commit/aa8f2ec1adaf74cc9d44c49bfc4fc6547b857a05)
+  - New `cardano-cli dijkstra sub-transaction` commands build, sign and identify sub-transactions, and `dijkstra transaction build-raw --signed-sub-tx-file` embeds them.
+  - Dijkstra transactions can use Plutus V4 scripts, and sub-transactions can require top-level guards.
+
+- New `cardano-cli query leios-committee` shows the Leios voting committees of the current and the next epoch
+  - `query stake-snapshot` no longer reports the committee.
+
+- `cardano-cli query pool-state` reports each pool's state as the ledger keeps it
+  - The epoch a pool's BLS key was registered in is now the real one.
+  - The output is now one object per pool, with its future parameters and retirement epoch as fields.
+
+> [!TIP]
+>
+> See the [cardano-blueprint](https://cardano-scaling.github.io/cardano-blueprint/network/node-to-node/leios-fetch/index.html?leios=on) for the latest network mini-protocols and certificate verification rules. Make sure to flip **Leios changes: on**.
+
+## rc-2026w41 - 2026-10-11
+
+A release candidate that moves the prototype onto the latest cardano-node 11.2. This includes upstreaming of several prototype components already. On top come hardened endorser block diffusion, a higher endorser block ceiling and Leios mini-protocols that shut down gracefully.
+
+> [!IMPORTANT]
+>
+> **Requires respin.** Header, block and Leios mini-protocol wire formats all changed, so a w41 node can neither talk to an earlier one nor read its chain. Delete the chain database along with `leios.vol.db` and `leios.imm.db`, and sync the respun network from genesis with its new configuration:
+>
+> - The Dijkstra genesis needs eight new keys: `perasMinCandidateBlockAge`, `perasHealingFactor`, `perasCertBoost`, `perasTargetCommitteeSize`, `perasBootstrapRound`, `perasQuorumThresholdSafetyMargin`, `refInputsCostPerMultiAssetPolicy` and `refInputsCostPerDatumByte`. The node does not start on a genesis without them.
+> - The node configuration needs `LeiosMinOfferLead` for "low k" networks or no endorser block is ever relayed and nothing gets certified (see below).
+>
+> Was not used on a public testnet as `w42` superseded before a respin happened.
+
+- Dijkstra runs on upstream `Praos2` [consensus#2400](https://github.com/IntersectMBO/ouroboros-consensus/pull/2400)
+  - Eras before Dijkstra use the unchanged Praos header codecs again; the Leios fields only start with Dijkstra [consensus#2282](https://github.com/IntersectMBO/ouroboros-consensus/pull/2282).
+  - Invalid Leios headers are rejected with upstream's `LeiosEbTooBig`, `LeiosCertWithoutAnnouncement` and `LeiosCertTooYoung`.
+  - The LeiosDb now lives in upstream's `Storage.LeiosDB` modules, keeping the prototype's schema, file names and configuration.
+- Fixes a node whose chain was still in Conway rejecting every Dijkstra header that announced an endorser block with `LeiosEbTooBig`, and disconnecting honest peers with `ExnInvalidLeiosAnnouncement` [consensus#2400](https://github.com/IntersectMBO/ouroboros-consensus/pull/2400)
+- Endorser block diffusion follows the rules of the design [consensus#2282](https://github.com/IntersectMBO/ouroboros-consensus/pull/2282), [ledger#6064](https://github.com/IntersectMBO/cardano-ledger/pull/6064)
+  - A node fetches an endorser block only for an election it saw or a certificate it verified. A peer's offer only says who can serve it.
+  - A peer offering an endorser block it never announced, offering one twice, or offering one older than our immutable tip loses the connection with `ExnLeiosInvalidOffer`.
+  - An announcement giving the wrong size for its endorser block is neither relayed nor voted for.
+  - A certificate is checked as soon as its block arrives, against the committee forecast from the block before it.
+  - The LeiosFetch server disconnects a request it cannot answer, or one asking for more than an honest client would, instead of replying with what it found.
+- New node configuration `LeiosMinOfferLead`: how many slots younger than the node's immutable tip an endorser block must be for the node to relay it [consensus#2282](https://github.com/IntersectMBO/ouroboros-consensus/pull/2282)
+  - The default of 3600 slots suits mainnet but suppresses every offer on a network whose immutable tip trails the selection by less, so test networks set their own. For devnets we used 30.
+- The endorser block ceiling rises from 512 KiB to 600 kB [consensus#2392](https://github.com/IntersectMBO/ouroboros-consensus/pull/2392)
+  - A node refuses to run with `maxEndorserBlockReferencesSize` above it, failing with `maxEndorserBlockReferencesSize (…) exceeds the LeiosFetch message limit (600000)`.
+- LeiosNotify gained `MsgQuit` and `MsgCanceled`, so demoting a peer from hot to warm no longer drops the connection for lack of Leios traffic [consensus#2344](https://github.com/IntersectMBO/ouroboros-consensus/pull/2344)
+  - The messages of both Leios mini-protocols are renumbered from zero [consensus#2363](https://github.com/IntersectMBO/ouroboros-consensus/pull/2363).
+
+> [!TIP]
+>
+> The latest network mini-protocols of this version are documented on this branch of the [cardano-blueprint](https://cardano-scaling.github.io/cardano-blueprint/pr-preview/pr-67/network/node-to-node/leios-notify/index.html?leios=on).
+
+From the upstream releases, the changes noticeable on a Leios network:
+
+- `cardano-cli` no longer byte-reverses the IPv4 address of a pool relay, neither in the registration certificate nor in `query pool-state` [cli#1451](https://github.com/IntersectMBO/cardano-cli/pull/1451)
+- A node only accepts node-to-client connections from `NodeToClientV_23` onwards. Tools built against an older node stack fail to connect, so use the `cardano-cli` from this release.
+- A ledger snapshot delay or rate limit at least as long as the snapshot interval is reported at startup as an `ImplausibleSnapshotPolicy` warning. Short slots make this likely on a testnet whose snapshot settings came from mainnet.
+- `db-truncater --leios` truncates `leios.vol.db` and `leios.imm.db` along with the ImmutableDB.
+- `slotsMissed_int` no longer counts the slots that pass while forging is disabled.
+
+Integrated with [ledger#6166](https://github.com/IntersectMBO/cardano-ledger/pull/6166), [network#5449](https://github.com/IntersectMBO/ouroboros-network/pull/5449), [consensus#2400](https://github.com/IntersectMBO/ouroboros-consensus/pull/2400), [api#1375](https://github.com/IntersectMBO/cardano-api/pull/1375), [cli#1459](https://github.com/IntersectMBO/cardano-cli/pull/1459) and [node#6733](https://github.com/IntersectMBO/cardano-node/pull/6733).
+
+## prototype-2026w40a - 2026-10-06
+
+Purely internal change that (memory) bounds the voting state.
+
+- Bound the vote state to the most recent 128 points - [ouroboros-consensus#2367](https://github.com/IntersectMBO/ouroboros-consensus/pull/2367)
+
+Users should see improvements in memory retention.
+
+## prototype-2026w40 - 2026-10-04
+
+A small release with internal changes. The node stores endorser block
+transactions a new way so that keeping up with the chain costs it less, and the
+Leios decoders now reject malformed data from a peer instead of trusting it. No
+ledger change, and no change to any network protocol.
+
+> [!IMPORTANT]
+>
+> **Requires a state wipe.** The LeiosDb schema changed and there is no migration, so a node started on an existing database exits at once with
+>
+> ```
+> cardano-node: ErrorError: "no such table: ebTxBytes"
+> ```
+>
+> Delete the chain database along with `leios.vol.db` and `leios.imm.db`, then re-sync from genesis or sideload from the IOG relays.
+>
+> Deleting only the two `leios.*.db` files is not enough: a chain that already holds certified blocks then fails to resolve their closures, the same way it did in w38.
+
+> [!NOTE]
+>
+> No respin. Wire formats and header codecs are unchanged, so w39 and w40 nodes still talk to each other.
+
+- Endorser block transactions are stored per endorser block instead of by transaction hash [consensus#2334](https://github.com/IntersectMBO/ouroboros-consensus/pull/2334)
+  - Storing an endorser block is now a sequential write and discarding one is a single delete, so the database keeps pace with chain selection more easily.
+  - A transaction that several endorser blocks reference is stored once for each of them. That costs disk space in exchange for the cheaper writes.
+  - A transaction the node already holds is reused when a later endorser block references it, rather than being downloaded a second time.
+  - A peer that disconnects while the endorser block it sent is still being written can no longer leave that block stranded, neither held nor fetchable.
+- A peer can no longer make the node allocate memory on a claim the node has not checked [consensus#2358](https://github.com/IntersectMBO/ouroboros-consensus/pull/2358)
+  - Closes LEI-004, LEI-005 and LEI-009 from the Anastasia Labs audit.
+  - Transaction and endorser block hashes are fixed at 32 bytes, so a peer sending any other length is rejected rather than stored.
+  - Every count a peer declares is now checked before the node allocates for it.
+  - A reply whose transaction count disagrees with what was asked for is rejected, as are requests with empty, out-of-range or repeated indices.
+- A peer that encodes a transaction request with a definite CBOR length is no longer refused; both encodings are accepted [consensus#2358](https://github.com/IntersectMBO/ouroboros-consensus/pull/2358)
+- A database written by an older build that holds a malformed hash, or more transactions for an endorser block than can be served, now fails with a `LeiosDbException` naming the problem instead of being read past [consensus#2358](https://github.com/IntersectMBO/ouroboros-consensus/pull/2358)
+- A Praos header announcing an endorser block whose hash is not 32 bytes no longer decodes. No honest node produces one, so this only matters if a malicious block producer is on the network.
+
+## prototype-2026w39 - 2026-09-25
+
+> [!NOTE]
+>
+> No state wipe and no respin: schema and wire formats are unchanged from the previous version.
+
+This weeks release fixes some contention bugs introduced in w38 and improves Mempool performance by enabling lock-free reads
+- Reduce WAL footprint [ouroboros-consensus#2332](https://github.com/IntersectMBO/ouroboros-consensus/pull/2332)
+- Fix LeiosDB contention in block application [ouroboros-consensus#2315](https://github.com/IntersectMBO/ouroboros-consensus/pull/2315)
+- Lock-free Mempool reads [ouroboros-consensus#2308](https://github.com/IntersectMBO/ouroboros-consensus/pull/2308)
+- Close the LeiosDb handle, and stop the copier taking the caller down with it [ouroboros-consensus#2314](https://github.com/IntersectMBO/ouroboros-consensus/pull/2314)
+
+## prototype-2026w38a - 2026-09-22
+
+A patch release on w38: reverts a ledger incompatibility, and stops unbounded memory growth when syncing a node.
+
+> [!NOTE]
+>
+> No state wipe and no respin: schema and wire formats are unchanged from w38. A w38 database is picked up as it is, and a node w38 had stranded carries on.
+
+- Fixes ledger validation for `musashi` which errored with `ValidationTagMismatch Phase2Valid (FailedUnexpectedly (PlutusFailure))`.
+  - The integrated ledger had begun evaluating sub-transaction Plutus scripts and charging their execution units, for every protocol version ([ledger@309978c4](https://github.com/IntersectMBO/cardano-ledger/commit/309978c46b)). Reverted here; it needs to be gated by a hard fork or respin before it can come back.
+
+- Fixes memory usage when syncing [consensus@fdd31732](https://github.com/IntersectMBO/ouroboros-consensus/commit/fdd31732d)
+  - Making a block immutable awaited the LeiosDb writer queue once per certified block, so copying lagged chain selection without bound and the LedgerDB held a ledger state per block not yet immutable. 
+  - Endorser blocks are pinned one batch per copying pass now.
+  - The copier keeps up as a result, so `leios.vol.db` no longer grows for the whole sync.
+
+- Fixes the LeiosDb copier erroring with `UNIQUE constraint failed: ebs.ebSlot, ebs.ebHashBytes` after an unclean shutdown [consensus@fdd31732](https://github.com/IntersectMBO/ouroboros-consensus/commit/fdd31732d)
+  - The copy is idempotent now, so a database already wedged repairs itself on the first pass after the upgrade.
+
+## prototype-2026w38 - 2026-09-20
+
+> [!CAUTION]
+>
+> :warning: This release brought in ledger changes that turned out to be incompatible with the musashi dojo network at time of release. Use **prototype-2026w38a** instead :warning:
+
+Continues the LeiosDb work from w35 with a proper single-writer redesign, sizes the mempool from the protocol parameters, and lets a producer vote with more than one BLS key at once.
+
+> [!IMPORTANT]
+>
+> **Requires a state wipe:** the LeiosDb is now two partitions under new names, so the old `leios.db` is not picked up and a chain that already holds certified blocks dies on the missing closures (`resolveAndApplyLeiosClosure: failed to resolve closure LeiosClosureMissing`). Delete the chain database along with the old `leios.db` and re-sync from genesis, or sideload from the IOG relays.
+
+> [!NOTE]
+>
+> No serialization or wire-format change, so this is not a network respin — only the local state has to go.
+
+- LeiosDb improvements: separate volatile and immutable partitions [consensus#2261](https://github.com/IntersectMBO/ouroboros-consensus/pull/2261) and all writes are done on a single connection [consensus#2298](https://github.com/IntersectMBO/ouroboros-consensus/pull/2298)
+  - `LeiosDbConfig` with `Backend: SQLite` no longer takes any paths: each partition now follows the node's own database path the way the VolatileDB and ImmutableDB do, so a `Filepath`/`VolatileFilepath`/`ImmutableFilepath` key is ignored if given.
+    - `leios.vol.db` lands next to `volatile/`, `leios.imm.db` next to `immutable/`.
+    - With a single `--database-path` both sit in that directory. With `--immutable-database-path` and `--volatile-database-path` they follow their own volume, so the partition that only grows stays off the performant one.
+  - `volatileEbs`/`immutableEbs`/`walBytes` are exposed as node metrics.
+  - Removes the writer-lock contention that could previously stall or even kill the node under load.
+
+- The mempool is now sized from the protocol parameters, including the endorser block limits [consensus#2280](https://github.com/IntersectMBO/ouroboros-consensus/pull/2280)
+  - Any `MempoolCapacityBytesOverride` in the configuration file can be dropped; it was only needed to stop the mempool bounding endorser block fill.
+
+- A producer can vote with more than one BLS key at once
+  - `--shelley-bls-key` now also accepts a file holding a JSON array of key envelopes, in addition to a single one; the node casts one vote per committee seat any of the keys holds.
+  - Lets a rotation pair keep a pool voting across the epoch boundary where its key was rotated — only the currently-registered key matches a seat, so the old key alone would go dark there. Further lets a bundle of many pools' keys vote for every seat they collectively hold, useful for load-testing with many synthetic committee members.
+
+## prototype-2026w36 - 2026-09-06
+
+Adds Leios protocol parameters, selects the Leios committee at the epoch boundary, with voting keys that expire and need to be rotated (like KES keys). Plus, a forge loop that no longer blocks unboundedly on the mempool, and a corrected BLS proof of possession.
+
+> [!IMPORTANT]
+>
+> **Requires respin:** Delete your local state and re-sync from genesis or sideload from the IOG relays, using the `musashi` network config from https://book.play.dev.cardano.org/adv-musashi.html. The respin is expected to happen in 1-2 days.
+
+- **BREAKING** Committee is selected on epoch boundary and BLS keys do expire and need to be rotated (like KES keys) [ledger#6047](https://github.com/IntersectMBO/cardano-ledger/pull/6047), [ledger#6052](https://github.com/IntersectMBO/cardano-ledger/pull/6052), [consensus#2269](https://github.com/IntersectMBO/ouroboros-consensus/pull/2269)
+  - A key is honoured for `ceil(maxKESEvolutions × slotsPerKESPeriod / epochLength) + 2` epochs after it was registered, so voting-key rotation rides along with the KES rotation pools already run.
+  - A lapsed key does not free the seat: the pool keeps its committee weight, cannot vote with it, and the seat is not reallocated.
+  - This will also lower resource usage as the committee was derived for each vote validation in previous prototypes.
+
+- **BREAKING** Committee size, quorum threshold, endorser block limits and the certification gap are read from the protocol parameters [consensus#2269](https://github.com/IntersectMBO/ouroboros-consensus/pull/2269), so governance can change them without a node release.
+  - Also fixes a node crash when resolving an endorser block's closure on a chain that contains a pool registration.
+
+- **BREAKING** The BLS proof of possession now uses the domain separation tag [draft-irtf-cfrg-bls-signature-06](https://datatracker.ietf.org/doc/draft-irtf-cfrg-bls-signature/) prescribes, so proofs from earlier releases no longer verify and registration needs the `cardano-cli` from this one. A key that fails to verify is not rejected: the pool stays seated but cannot vote, with no error to say so.
+
+- **BREAKING** Rebased onto a recent cardano-ledger [consensus#2268](https://github.com/IntersectMBO/ouroboros-consensus/pull/2268). This brings several Dijkstra block structure changes independent of Leios.
+
+> [!TIP]
+>
+> The CDDL of the currently integrated ledger can be found here: [dijsktra.cddl](https://github.com/IntersectMBO/cardano-ledger/blob/1587f21a7d1306dc590c2749a5c66232ef66aad0/eras/dijkstra/impl/cddl/data/dijkstra.cddl)
+
+- The committee and the registered keys are visible from the CLI:
+  - **First draft and likely changes again**
+  - `query pool-state` reports a pool's BLS key with its registration epoch.
+  - `query stake-snapshot` reports `leiosCommittee`: every seat with its pool, weight, registered key and the epoch it was registered in, and whether it is voting. A seat with a key and `"voting": false` has expired.
+
+- Block production no longer slows as the mempool fills [consensus#2217](https://github.com/IntersectMBO/ouroboros-consensus/pull/2217)
+  - Mempool snapshot re-computation is time-capped instead of growing with occupancy.
+  - Use the `MempoolTimeoutCapacity` as a proxy configuration -> a 10th of that value is the allowed time to re-apply the mempool snapshot.
+
+- Vote telemetry [consensus#2271](https://github.com/IntersectMBO/ouroboros-consensus/pull/2271)
+  - `LeiosVoteAcquired` carries the running `tally` and the `threshold`, which shows how close a point came even when it never certifies.
+  - The `LeiosPeer.Msg` per-vote peer trace is gone; it rendered every vote's signature bytes and dominated the log on a network with many voters. Use the `SendRecv` traces for individual message debugging.
+
+## prototype-2026w35 - 2026-08-30
+
+Completes the Leios protocol pipeline with faster and more robust EB diffusion, transactions validated before an EB is voted for, and a Leios database that no longer stalls the node. Syncing should also get stuck far less. Plus tooling to see whose load a mempool is holding.
+
+> [!IMPORTANT]
+>
+> **Requires a state wipe:** the LeiosDb schema changed with no migration, so an existing `leios.db` is not readable by this version. Delete your local state and re-sync from genesis, or sideload from the IOG relays.
+
+> [!NOTE]
+>
+> No serialization or wire-format change, so this is not a network respin — w34 peers stay interoperable and only the local database has to go.
+
+- A syncing node no longer disconnects every peer that announces an EB it cannot date [consensus#2252](https://github.com/IntersectMBO/ouroboros-consensus/pull/2252), should fix [#998](https://github.com/input-output-hk/ouroboros-leios/issues/998)
+  - A node far behind the tip cannot place the current slot on a wall clock, and that counted against the peer, so ChainSync ran out of peers and the chain froze until a restart. Now ignored instead, and dated against the volatile tip so nearly all announcements stay usable.
+  - `TraceLeiosAnnouncementPastHorizon` reports the few that do not.
+
+- EB transactions are validated before a vote is cast for it [consensus#2235](https://github.com/IntersectMBO/ouroboros-consensus/pull/2235), closes [#1016](https://github.com/input-output-hk/ouroboros-leios/issues/1016)
+  - `TraceLeiosEbValidated` and `TraceLeiosVoteScheduled` report what it costs and how much of the window is left. Worth watching: validation is inline in the voting loop, so it eats into `L_vote`.
+  - The `L_hdr` / `L_vote` gates are now wall-clock offsets from the announcing slot rather than slot counts.
+
+- EBs are fetched more aggressively and prioritized by their certification window [consensus#2237](https://github.com/IntersectMBO/ouroboros-consensus/pull/2237), backed by a new in-memory `TxCache` [consensus#2188](https://github.com/IntersectMBO/ouroboros-consensus/pull/2188)
+  - For dashboards: new `TraceLeiosFetchDecision` and `TraceLeiosBodyHits`, a `FetchArrivalBytes` classification of what each arrival was worth, and arrival ages on `TraceLeiosBlockAcquired` / `TraceLeiosBlockTxsAcquired`.
+
+- Leios database no longer stalls the node, and its write-ahead log stays bounded [consensus#2245](https://github.com/IntersectMBO/ouroboros-consensus/pull/2245)
+  - EB body inserts were taking seconds — a median of 1.6s, up to 18s — for 90ms of actual work, and a node could die outright under lock contention, taking certification down with it for the rest of the run. Both fixed, and the write-ahead log a run writes shrank by more than an order of magnitude.
+  - New traces: `TraceLeiosDbBusyRetry`, and `TraceLeiosDbBusyStuck` at Critical severity when the database has made no progress for about half a minute.
+
+- Tools for color-coded transaction generation and mempool monitoring
+  [cardano-node#6660](https://github.com/IntersectMBO/cardano-node/pull/6660),
+  and [#1022](https://github.com/input-output-hk/ouroboros-leios/issues/1022)
+  - Use `tx-firehose --color ff0000`, or `--color auto` to derive one from the signing key, tags every transaction with an RGB colour in metadata label 1022.
+  - A new `mempool-monitor` walks one node's mempool over the node-to-client `LocalTxMonitor` protocol and reports which colours it holds — `--own-color` for the local share, `--tsv FILE` to keep the rows.
+  - Both ship in the release archive alongside `cardano-node` and `cardano-cli`, on linux and macOS.
+
+- EB announcement CDFs are only populated once the node is in sync [cardano-node#6665](https://github.com/IntersectMBO/cardano-node/pull/6665), so a syncing node no longer poisons the metric with its backlog.
+
+- `cardano-cli node issue-pop-BLS` is removed. A Dijkstra `stake-pool registration-certificate` takes `--bls-signing-key-file` and derives the verification key and proof of possession from it, so the standalone proof file had no consumer.
+
+- The workaround that repaired mishapen Dijkstra blocks on arrival is gone, now that the network has been respun past the blocks that needed it.
+
+> [!TIP]
+>
+> Stake pool operators: the `tx-firehose` and `mempool-monitor` is what the upcoming mempool-fragmentation experiment runs on — colour your own txs, point the monitor at your own node and see how it mixes (or not). Worth trying before the experiment starts.
+
+## prototype-2026w34 - 2026-08-23
+
+Removed congestion on the mempool and on the voting logic. Plus a few tooling updates on `db-analyser` and `tx-firehose`.
+
+> [!NOTE]
+>
+> No serialization or wire-format change since w32 — update in place, no respin.
+
+> [!IMPORTANT]
+>
+> Syncing from genesis still may get stuck sometimes. Workaround in [#998](https://github.com/input-output-hk/ouroboros-leios/issues/998), or sideload from the IOG relays. A caught-up node is unaffected.
+
+- High-throughput mempool: decouple readers and adders from ledger revalidation [consensus#2229](https://github.com/IntersectMBO/ouroboros-consensus/pull/2229) (prototype cut of [consensus#2148](https://github.com/IntersectMBO/ouroboros-consensus/pull/2148))
+  - Revalidating against a new tip used to hold the mempool state for the whole pass. The bulk now runs off the lock against a snapshot, leaving only a bounded residual under it — the committed state is byte-identical, and reader stall no longer grows with occupancy.
+  - Still linearizable: the sync retries if the tip moved, and a removal generation counter stops a racing `removeTxsEvenIfValid` from being undone.
+  - Adds `mempool-state-bench`; the QSM tests gained a `RemoveTxs` action and a removal-during-sync regression test.
+
+- Cast our own vote without waiting on inbound vote verification [consensus#2225](https://github.com/IntersectMBO/ouroboros-consensus/pull/2225)
+  - `addVote` ran the BLS pairing inside the STM transaction, so under gossip load every concurrent commit aborted it and each retry re-did the pairing — a producer's own ready vote could sit 5–10s and miss the window. Now: dedup peek → validate in plain IO → short insert.
+  - A/B on a live musashi producer: p90 5.91s → 2.14s, max 10.08s → 3.12s, holds over 5s 114 → 0.
+
+- `LeiosNotify`: remove a stale-OCIN timing attack vector [consensus#2179](https://github.com/IntersectMBO/ouroboros-consensus/pull/2179), fixes [#1029](https://github.com/input-output-hk/ouroboros-leios/issues/1029)
+  - An announcement whose OCIN our immutable tip has revoked is now accepted and ignored instead of disconnecting the peer — an honest peer may simply be behind. Removes a source of spurious disconnects; a w32 peer still drops the connection.
+
+- `db-analyser` supports Leios chains [consensus#2181](https://github.com/IntersectMBO/ouroboros-consensus/pull/2181), part of [#1023](https://github.com/input-output-hk/ouroboros-leios/issues/1023)
+  - Opens the LeiosDb with `--leios-db` (`--stubbed-leios-db` when bodies are not needed), applies EB closures in the ledger-state analyses and verifies certificates on the full-application path.
+  - `benchmark-ledger-ops` and `repro-mempool-and-forge` handle cert-RBs; `count-tx-outputs` and `show-block-txs-size` gained EB columns.
+
+- `tx-firehose`: control the shape of generated transactions [cardano-node#6658](https://github.com/IntersectMBO/cardano-node/pull/6658)
+  - `--outputs-per-tx N` alone derives the input count to hold the UTxO set size constant, so steady-state txs are `N`-in/`N`-out at constant size — a way past the tx/s ceiling on byte throughput. With `--inputs-per-tx` both are pinned.
+  - Inputs are selected largest-first, so the generator stops sharpening dust; inputs the ledger says are gone are dropped rather than retried. `Submit.Success` traces carry `inputs` and `outputs`.
+
 ## prototype-2026w32 - 2026-08-09
 
 The registered BLS Leios keys are now **used**: nodes build the voting committee from the on-chain stake distribution, sign votes with the pool operator's BLS key, and verify certificates against that committee. This completes the "registrable but not utilized" path from w30/w31 and drops the insecure key-derivation shortcut.
@@ -209,4 +542,3 @@ This is includes roughly:
 - Resolves transactions from certificates when adopting a block
 - No certificate verification whatsoever
 - Inlines transactions for the N2C chain sync server
-

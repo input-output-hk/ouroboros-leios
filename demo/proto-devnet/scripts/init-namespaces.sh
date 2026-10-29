@@ -5,10 +5,14 @@ NS_NODE1="${NS_PREFIX}:node1"
 NS_NODE2="${NS_PREFIX}:node2"
 NS_NODE3="${NS_PREFIX}:node3"
 
-# Delete existing namespaces (cleanup)
-ip netns del "$NS_NODE1" 2>/dev/null || true
-ip netns del "$NS_NODE2" 2>/dev/null || true
-ip netns del "$NS_NODE3" 2>/dev/null || true
+# Puts iproute2 on PATH (sudo drops it) and provides teardown_namespaces. The
+# Namespaces process sources the same file to tear down at shutdown, so there is
+# one implementation of "remove what we created".
+# shellcheck source=/dev/null
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/teardown-namespaces.sh"
+
+# Clean up after a previous run (ours only — dozen-devnet may be up).
+teardown_namespaces
 
 # Create namespaces
 ip netns add "$NS_NODE1"

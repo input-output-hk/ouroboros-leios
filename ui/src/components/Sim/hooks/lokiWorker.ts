@@ -28,24 +28,44 @@ export type LokiWorkerResponse =
   | { type: "EVENTS"; events: IServerMessage[] }
   | { type: "DROPPED"; count: number };
 
-// Alloy writes each cardano-node line to Loki twice: once before it promotes
-// the JSON `kind` to a stream label and once after, so every event exists in
-// both a `kind=""` stream and a `kind="..."` stream with byte-identical content.
-// The `kind=""` set is the complete one (the labelled set omits events whose
-// kind is nested, e.g. TraceSendRecv, so it never gets the label); selecting it
-// here delivers every event exactly once. That keeps the parser's stateful
-// correlation (cert -> forge -> adopt, which populates an RB's parent and
-// certified EB) from being corrupted by a duplicate forge. NB: this couples us
-// to that Alloy behaviour — if the pipeline stops emitting the pre-label copy,
-// this selector must change.
+// Selected on the line content alone, deliberately not on a `kind` label.
+//
+// Whether a cardano-node line carries a `kind` stream label is a property of
+// the Loki pipeline, not of the event: against demo/extras/x-ray, Loki promotes
+// `kind` for top-level kinds and leaves it unset only where the kind is nested
+// (TraceSendRecv and friends). A `kind=""` selector therefore drops exactly the
+// Leios events this view exists to show — measured against a live dozen-devnet,
+// it returned zero LeiosBlockAnnounced, zero TraceForgedBlock and zero
+// CompletedBlockFetch while the unconstrained selector returned all of them.
+//
+// The risk this trades against is double counting, which would corrupt the
+// parser's stateful correlation (cert -> forge -> adopt). That only arises if a
+// pipeline writes each line twice, once pre- and once post-label. Ours does not:
+// per-kind counts are identical with and without the constraint. Revisit if a
+// deployment reintroduces the duplicate write.
+// The selector is a regex, not an exact match, because the x-ray pipeline
+// labels some traces with a sub-service: vote creation arrives as
+// service="cardano-node/leios-voting" while everything else is plain
+// "cardano-node". An exact match dropped every LeiosVoted line before the line
+// filter below ever ran -- votes appeared to be sent and received but never
+// created. Matching the prefix also picks up any future cardano-node/* stream.
+// RequestNext is excluded on the stream label, not the line: it is the
+// mini-protocol's payload-free pull, it matches none of the names below (checked
+// against a live dozen-devnet: zero regex hits on that namespace), and at
+// committee size 900 it is half of every trace the devnet emits. Dropping it cut
+// lines scanned per poll by 64%, 2.31M -> 0.82M over a 5 minute window.
 const QUERY =
-  '{service="cardano-node", kind=""} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|TraceAdoptedBlock|LeiosBlockAnnounced|LeiosBlockCertified|MsgLeiosVotes|LeiosVoted"';
+  '{service=~"cardano-node.*", ns!~"LeiosNotify.Remote.(Send|Receive).RequestNext"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock|TraceAdoptedBlock|LeiosBlockAnnounced|LeiosBlockCertified|MsgLeiosVotes|LeiosVoted"';
 
 const POLL_INTERVAL_MS = 1000;
 const MAX_ENTRIES = 5000;
 const NS_PER_SEC = 1_000_000_000n;
-// How far back the first poll reaches (backfill on connect).
-const INITIAL_LOOKBACK_NS = 1800n * NS_PER_SEC;
+// How far back the first poll reaches (backfill on connect). Kept short on
+// purpose: this is a live view, and against a long-running devnet the matched
+// line volume makes deep backfills page for minutes before the view reaches
+// "now" (a 500-seat committee produces ~750 matching lines/s, i.e. a 30min
+// lookback was ~270 pages). History beyond this belongs to Grafana.
+const INITIAL_LOOKBACK_NS = 120n * NS_PER_SEC;
 // Overlap re-scanned each poll so entries ingested late (Alloy scrapes files
 // every 5s) are still picked up; dedup drops the repeats.
 const OVERLAP_NS = 15n * NS_PER_SEC;
@@ -82,26 +102,75 @@ const schedule = (delayMs: number) => {
   if (!cancelled) pollTimer = setTimeout(() => void poll(), delayMs);
 };
 
-async function poll(): Promise<void> {
-  if (cancelled) return;
-  const end = nowNs();
+// One page of the window; throws on transport errors so poll() can back off.
+async function fetchPage(
+  startNs: bigint,
+  endNs: bigint,
+): Promise<{ stream: unknown; values?: [string, string][] }[]> {
   const params = new URLSearchParams({
     query: QUERY,
-    start: sinceNs.toString(),
-    end: end.toString(),
+    start: startNs.toString(),
+    end: endNs.toString(),
     limit: String(MAX_ENTRIES),
     direction: "forward",
   });
-
-  let json: {
+  const resp = await fetch(
+    `http://${host}/loki/api/v1/query_range?${params.toString()}`,
+  );
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const json: {
     data?: { result?: { stream: unknown; values?: [string, string][] }[] };
-  };
+  } = await resp.json();
+  return json?.data?.result ?? [];
+}
+
+// Pages per poll before giving the event loop a breather. A window can only
+// need many pages while catching up (initial backfill, or Loki ingesting a
+// backlog); steady state is one or two.
+const MAX_PAGES_PER_POLL = 10;
+
+async function poll(): Promise<void> {
+  if (cancelled) return;
+  const end = nowNs();
+
+  // Drain the whole [sinceNs, end] window with a LOCAL page cursor. The
+  // global sinceNs must not advance past entries that Alloy has not shipped
+  // yet: it batches file scrapes (~5s), so lines regularly arrive in Loki
+  // seconds after their timestamps. Advancing the global cursor to the newest
+  // *seen* timestamp mid-drain (as this used to) skipped those stragglers
+  // whenever a window hit the entry cap -- with a full committee that is every
+  // poll, and the stragglers are whole nodes' vote lines. The overlap re-scan
+  // below exists exactly for them; dedup eats the cost.
+  const result: { stream: unknown; values?: [string, string][] }[] = [];
+  let pageStart = sinceNs;
+  let sawFullWindow = true;
   try {
-    const resp = await fetch(
-      `http://${host}/loki/api/v1/query_range?${params.toString()}`,
-    );
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    json = await resp.json();
+    for (let page = 0; page < MAX_PAGES_PER_POLL; page++) {
+      const pageResult = await fetchPage(pageStart, end);
+      let pageCount = 0;
+      let pageMaxTs = 0n;
+      for (const stream of pageResult) {
+        for (const [tsNs] of stream.values ?? []) {
+          pageCount++;
+          const ts = BigInt(tsNs);
+          if (ts > pageMaxTs) pageMaxTs = ts;
+        }
+      }
+      result.push(...pageResult);
+      if (pageCount < MAX_ENTRIES || pageMaxTs === 0n) break;
+      if (page === MAX_PAGES_PER_POLL - 1) {
+        // Still capped: leave the tail for the next poll rather than starving
+        // the parser; the window is re-fetched from sinceNs, dedup skips what
+        // this poll already emitted.
+        sawFullWindow = false;
+        console.warn(
+          `[lokiWorker] window still capped after ${MAX_PAGES_PER_POLL} pages; deferring tail`,
+        );
+        break;
+      }
+      // Inclusive re-fetch of the boundary timestamp; dedup covers it.
+      pageStart = pageMaxTs;
+    }
   } catch (error) {
     console.error("[lokiWorker] query_range failed:", error);
     connected = false;
@@ -116,9 +185,8 @@ async function poll(): Promise<void> {
     setState("Connected");
   }
 
+  const json = { data: { result } };
   const events: IServerMessage[] = [];
-  let count = 0;
-  let maxTs = 0n;
 
   // query_range groups the response by stream (one per distinct label set), so
   // entries are ordered within a stream but not globally. The parser correlates
@@ -147,9 +215,6 @@ async function poll(): Promise<void> {
   });
 
   for (const { tsNs, labels, logLine } of entries) {
-    count++;
-    const tsBig = BigInt(tsNs);
-    if (tsBig > maxTs) maxTs = tsBig;
     const parsed = parseStreamValue(
       labels,
       Number(tsNs) / 1_000_000_000,
@@ -175,12 +240,8 @@ async function poll(): Promise<void> {
     post({ type: "EVENTS", events });
   }
 
-  if (count >= MAX_ENTRIES && maxTs > 0n) {
-    // Window hit the entry cap; direction=forward gave us the oldest
-    // MAX_ENTRIES. Advance to the newest we saw (inclusive re-fetch; dedup
-    // covers it) and poll again promptly to drain the rest without a gap.
-    console.warn(`[lokiWorker] query_range hit ${MAX_ENTRIES} entries; paginating`);
-    sinceNs = maxTs;
+  if (!sawFullWindow) {
+    // Deferred tail: keep the cursor, come straight back for the rest.
     schedule(0);
   } else {
     const next = end - OVERLAP_NS;

@@ -60,13 +60,13 @@ Other patterns: liquidation races (Liqwid), oracle front-running, auction displa
 
 ### On-Chain Activity
 
-| Category | Redeemers | % of Top 100 | MEV Risk |
+| Category | Redeemers | % of Categorized | MEV Risk |
 |----------|-----------|--------------|----------|
 | DEX | 21.0M | 61% | HIGH |
 | NFT | 8.0M | 23% | MEDIUM |
 | Unknown | 5.4M | 16% | Variable |
 
-Top DEX by volume: Minswap (62%), WingRiders (13%), SundaeSwap (9%).
+Top DEX by volume: Minswap (66%), WingRiders (13%), SundaeSwap (11%).
 
 → [Script mapping](./script-mapping.md)
 
