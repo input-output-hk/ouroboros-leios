@@ -1,5 +1,4 @@
 open import Prelude.AssocList
-open import Prelude.Result
 open import Prelude.Errors
 
 open import Leios.Config
@@ -9,7 +8,6 @@ open import Leios.Prelude hiding (id)
 open import Data.Bool using (if_then_else_)
 import Data.Char as C
 import Data.Nat as N
-import Data.Nat.Show as S
 import Data.String as S
 open import Agda.Builtin.Word using (Word64; primWord64ToNat)
 open import Agda.Builtin.Char using (primCharToNat)
@@ -28,17 +26,17 @@ module LinearLeiosVerifierChain where
   -- | A Leios event extracted from a cardano-node tracing log (node.log), keyed
   --   by the EB hash. Mirrors 'ChainEvents.ChainEvent' on the Haskell side.
   data ChainEvent : Type where
-    CSlot        : Word64 → ChainEvent
-    CEBForged    : String → Word64 → ChainEvent
-    CEBAcquired  : String → Word64 → ChainEvent
-    CVoted       : String → Word64 → ChainEvent
-    CVoteAcquired : String → Word64 → ChainEvent
-    CRBForged    : String → Word64 → ChainEvent
-    CNodeIsLeader : Word64 → ChainEvent
+    CSlot                 : Word64 → ChainEvent
+    CEBForged             : String → Word64 → ChainEvent
+    CEBAcquired           : String → Word64 → ChainEvent
+    CVoted                : String → Word64 → ChainEvent
+    CVoteAcquired         : String → Word64 → ChainEvent
+    CRBForged             : String → Word64 → ChainEvent
+    CNodeIsLeader         : Word64 → ChainEvent
     CAnnouncementAccepted : String → Word64 → ChainEvent
-    CNotVoted    : String → Word64 → String → ChainEvent
-    CChainExtended : Word64 → ChainEvent
-    CMempoolRange : Word64 → Word64 → ChainEvent
+    CNotVoted             : String → Word64 → String → ChainEvent
+    CChainExtended        : Word64 → ChainEvent
+    CMempoolRange         : Word64 → Word64 → ChainEvent
 
   {-# FOREIGN GHC import qualified ChainEvents #-}
   {-# COMPILE GHC ChainEvent = data ChainEvents.ChainEvent
@@ -58,7 +56,9 @@ module LinearLeiosVerifierChain where
   module _
     (numberOfParties : ℕ)
     (sutId : ℕ)
-    (stakeDistr : List (Pair String ℕ))
+    -- Each party's stake, by party index. Pool names are arbitrary, so the caller
+    -- numbers the pools; the SUT is party 'sutId'.
+    (stakeDistr : List ℕ)
     (Lhdr Lvote Ldiff : ℕ)
     -- The SUT's EB-production eligibility, as queried from the node, together with
     -- whether that answer is authoritative for the epoch about to be verified.
@@ -96,17 +96,12 @@ module LinearLeiosVerifierChain where
     nodeId : String → Fin numberOfParties
     nodeId _ = SUT-id
 
-    exampleDistr : TotalMap (Fin numberOfParties) ℕ
-    exampleDistr =
-      let (r , l) = fromListᵐ (L.map (λ (x , y) → (from-id-of x , y)) stakeDistr)
-      in case (¿ total r ¿) of λ where
-           (yes p) → record { rel = r ; left-unique-rel = l ; total-rel = p }
-           (no _)  → error "Expected total map"
-      where
-        from-id-of : String → Fin numberOfParties
-        from-id-of s with S.readMaybe 10 (S.fromList (drop (S.length "node-") (S.toList s)))
-        ... | nothing = error ("Unknown node: " ◇ s)
-        ... | just n  = from-id n
+    stakeDistribution' : TotalMap (Fin numberOfParties) ℕ
+    stakeDistribution' =
+      if L.length stakeDistr N.≡ᵇ numberOfParties
+        then Fun⇒TotalMap (λ i → maybe (λ x → x) 0 (L.head (L.drop (toℕ i) stakeDistr)))
+        else error ("Expected a stake for each of the " ◇ show numberOfParties
+                     ◇ " parties, got " ◇ show (L.length stakeDistr))
 
     EventLog = List ChainEvent
 
@@ -118,7 +113,7 @@ module LinearLeiosVerifierChain where
           { networkParams =
               record
                 { numberOfParties   = numberOfParties
-                ; stakeDistribution = exampleDistr
+                ; stakeDistribution = stakeDistribution'
                 }
           ; Lhdr  = Lhdr
           ; Lvote = Lvote
@@ -204,7 +199,8 @@ module LinearLeiosVerifierChain where
       open import Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
-      open import Leios.Linear.Trace.Verifier d-SpecStructure params renaming (verifyTrace to checkTrace)
+      open import Leios.Linear.Trace.Verifier d-SpecStructure params
+      open import LinearLeiosTrace d-SpecStructure params
 
       open Params params
       open Types params
@@ -244,7 +240,7 @@ module LinearLeiosVerifierChain where
         }
 
       -- Status of the EB the chain currently announces, as the model tracks it
-      -- across a voting window. This drives the 'Slot₂'/'BASE-LDG' ledger step
+      -- across a voting window. This drives the 'Chain'/'BASE-LDG' ledger step
       -- ('annRB' below), which is the ONLY thing that sets the spec's
       -- 'currentRB' — and hence 'getCurrentEBHash', 'voteDeadline', and every
       -- role rule that reads them.
@@ -258,7 +254,7 @@ module LinearLeiosVerifierChain where
       --   superseded      : the chain has extended past the announcer (a later RB
       --                     is now the tip). The EB can no longer be certified, so
       --                     the window must close: 'closeSlot' emits ONE
-      --                     non-announcing 'Slot₂' to overwrite 'currentRB', then
+      --                     non-announcing 'Chain' to overwrite 'currentRB', then
       --                     drops to 'none'. Merely forgetting the hash would stop
       --                     re-announcing but never reset the spec's 'currentRB',
       --                     leaving the window (wrongly) open.
@@ -323,8 +319,6 @@ module LinearLeiosVerifierChain where
       blksToHeaderAndBodyList (VT-Blk vt ∷ l) = inj₁ (GenFFD.vtHeader vt) ∷ blksToHeaderAndBodyList l
       blksToHeaderAndBodyList (RB-Blk _ ∷ l)  = blksToHeaderAndBodyList l
 
-      Step = Action × (FFDT Out ⊎ BaseAbstract.BaseIOF B' In ⊎ IOT In)
-
       -- Hash of the EB registered under a given hash-string (identity on payload,
       -- see Defaults); [] if unknown.
       hashOf : Accumulator → String → Hash
@@ -348,7 +342,7 @@ module LinearLeiosVerifierChain where
         (no  _) → wasAnnounced h xs
 
       -- Emit the obligations for the slot being closed, chronologically.
-      closeSlot : Accumulator → List Step
+      closeSlot : Accumulator → List Item
       closeSlot a =
         let s = curSlot a
             -- node.log carries no mempool contents, so re-establish a proposal set
@@ -356,14 +350,14 @@ module LinearLeiosVerifierChain where
             -- 'toProposeEB' is always 'nothing', and EB-Role's first premise is
             -- unsatisfiable — leaving every forged EB unverifiable. In a slot with
             -- a forge the payload has to be that of the forged EB itself, since
-            -- EB-Role checks 'toProposeEB s π ≡ just eb'. 'Base₁' has no premises,
+            -- EB-Role checks 'toProposeEB s π ≡ just eb'. 'Mempool' has no premises,
             -- records no upkeep and only overwrites 'ToPropose', so re-emitting it
             -- each slot is idempotent.
             --
             -- In a slot with no forge the proposal set says whether an EB was OWED.
             -- 'EB-Role' needs 'toProposeEB ≡ just eb', which holds exactly when the
             -- set is non-empty, so an empty one makes the rule inapplicable and
-            -- 'Roles₂' licenses the abstention — the spec's own account of a node
+            -- 'No-EB-Role' licenses the abstention — the spec's own account of a node
             -- with nothing to put in an EB.
             --
             -- Owed iff the mempool could not have fitted in the ranking block. The
@@ -390,18 +384,18 @@ module LinearLeiosVerifierChain where
               nothing           → false
               (just (mn , mx))  →
                 maxRBBody N.<ᵇ (if forgedRB a then mx else mn)
-            mempool : List Step
+            submit : List Tx → List Item
+            submit txs = entry (Mempool-Action s) (inj₂ (inj₂ (inj₁ (SubmitTxs txs)))) ∷ []
+            mempool : List Item
             mempool = case forgedEB a of λ where
-              (just eb) → (Base₁-Action s , inj₂ (inj₂ (SubmitTxs (EndorserBlockOSig.txs eb)))) ∷ []
-              nothing   → if ebOwed
-                            then (Base₁-Action s , inj₂ (inj₂ (SubmitTxs placeholderTxs))) ∷ []
-                            else (Base₁-Action s , inj₂ (inj₂ (SubmitTxs []))) ∷ []
-            -- One 'Slot₂'/'BASE-LDG' step per slot, setting the spec's 'currentRB'
+              (just eb) → submit (EndorserBlockOSig.txs eb)
+              nothing   → submit (if ebOwed then placeholderTxs else [])
+            -- One 'Chain'/'BASE-LDG' step per slot, setting the spec's 'currentRB'
             -- (the head of 'RBs') — which is what 'getCurrentEBHash', and hence the
             -- voting window and every role rule reading it, is derived from.
-            announceStep : Maybe Hash → List Step
+            announceStep : Maybe Hash → List Item
             announceStep mh =
-              (Slot₂-Action s , inj₂ (inj₁ (BaseAbstract.BASE-LDG
+              entry (Chain-Action s) (inj₂ (inj₁ (BaseAbstract.BASE-LDG
                 (record { announcedEB = mh ; txsOrEbCert = inj₁ [] } ∷ [])))) ∷ []
             -- Which EB to present as the chain head for this slot.
             --
@@ -429,7 +423,7 @@ module LinearLeiosVerifierChain where
             -- cannot prove were late, which is the false-positive class this file has
             -- been repeatedly corrected for. Votes genuinely outside the window are
             -- still caught, by VT-Role's timing premise.
-            annRB : List Step
+            annRB : List Item
             annRB = case curEB a of λ where
               -- The deferred de-announcement falls due, and is emitted whatever else
               -- happened this slot: a vote arriving now is for an EB the chain has
@@ -445,26 +439,28 @@ module LinearLeiosVerifierChain where
                   -- The chain has extended past the announcer: overwrite 'currentRB'
                   -- with a non-announcing RB so 'getCurrentEBHash ≡ nothing',
                   -- 'voteDeadline ≡ 0', and the spec's own rules close the window
-                  -- (abstention becomes licensed by Roles₂, no vote is forced).
+                  -- (abstention becomes licensed by No-VT-Role, no vote is forced).
                   superseded       → announceStep nothing
                   retiring         → announceStep nothing
-            ebRole : List Step
+            ebRole : List Item
             ebRole = case forgedEB a of λ where
-              (just eb) → (EB-Role-Action s eb , inj₁ FFDT.SLOT) ∷ []
-              nothing   → (No-EB-Role-Action s , inj₁ FFDT.SLOT) ∷ []
-            vtRole : List Step
+              (just eb) → entry (EB-Role-Action s eb) (inj₁ FFDT.SLOT) ∷ []
+              nothing   → entry (No-EB-Role-Action s) (inj₁ FFDT.SLOT) ∷ []
+            vtRole : List Item
             vtRole = case votedEB a of λ where
-              (just (eb , slot')) → (VT-Role-Action s eb slot' , inj₁ FFDT.SLOT) ∷ []
-              nothing             → (No-VT-Role-Action s , inj₁ FFDT.SLOT) ∷ []
-        -- 'ebRole' precedes 'Base₂': the spec's Base₂ requires the EB role to be
-        -- settled for the slot ('hasUpkeep EB-Role'), so that the RB announces the
-        -- EB actually diffused rather than 'nothing'.
+              (just (eb , slot')) → entry (VT-Role-Action s eb slot') (inj₁ FFDT.SLOT) ∷ []
+              nothing             → entry (No-VT-Role-Action s) (inj₁ FFDT.SLOT) ∷ []
+        -- 'ebRole' precedes the ranking-block step: 'Base₁' and 'Base₂' require the
+        -- EB role to be settled for the slot ('hasUpkeep EB-Role'), so that the RB
+        -- announces the EB actually diffused rather than 'nothing'.  'annRB' precedes
+        -- it as well, since whether the tip calls for a certificate depends on
+        -- 'currentRB'.
         in mempool
            ++ annRB
            ++ ebRole
-           ++ ((Base₂-Action s , inj₁ FFDT.SLOT) ∷ [])
+           ++ base s ∷ []
            ++ vtRole
-           ++ ((Slot₁-Action s , inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks a)))) ∷ [])
+           ++ entry (Slot-Action s) (inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks a)))) ∷ []
 
       -- Fake producer for acquired EBs: distinct for EBs sharing a slot (so an
       -- honest slot battle does not register as equivocation, which requires
@@ -479,7 +475,7 @@ module LinearLeiosVerifierChain where
                   (Accumulator.EB-refs a))
         in from-id (if n N.<ᵇ sutId then n else suc n)
 
-      traceEvent→action : Accumulator → ChainEvent → Accumulator × List Step
+      traceEvent→action : Accumulator → ChainEvent → Accumulator × List Item
       traceEvent→action a (CSlot s) =
         if not (started a)
           then (record a { curSlot = primWord64ToNat s ; started = true } , [])
@@ -517,7 +513,7 @@ module LinearLeiosVerifierChain where
       traceEvent→action a (CEBForged h s) =
         let eb = mkEBrec SUT-id h s
         in (record a { EB-refs = (h , eb) ∷ EB-refs a ; forgedEB = just eb } , [])
-      -- Acquiring an EB means its body is in hand, which is what Slot₁ ingestion
+      -- Acquiring an EB means its body is in hand, which is what Slot ingestion
       -- models. It says nothing about the EB being announced on the chain, so it must
       -- not set 'curEB': doing so made VT-Role possible for any EB the node merely
       -- fetched, and a node is right not to vote for one its chain never announced.
@@ -554,15 +550,17 @@ module LinearLeiosVerifierChain where
                              then (record a { votedEB = just (eb , slot') } , [])
                              else (a , [])
       ... | _    | _       | _          = (a , [])
+      -- The spec does not inspect vote contents, and the log names neither the
+      -- voter nor the signed RB.
       traceEvent→action a (CVoteAcquired _ _) =
-        (record a { FFD-blks = VT-Blk (tt ∷ []) ∷ FFD-blks a } , [])
+        (record a { FFD-blks = VT-Blk ((SUT-id , []) ∷ []) ∷ FFD-blks a } , [])
       -- Not a step of its own: what it contributes is locating the mempool drain
       -- relative to the node's EB decision, which 'ebOwed' reads.
       traceEvent→action a (CRBForged h s) = (record a { forgedRB = true } , [])
       -- Consumed by 'leaderSlots' as the eligibility fallback, not as a step.
       traceEvent→action a (CNodeIsLeader _) = (a , [])
       -- The selected chain adopted a new tip. Mark the announcement 'superseded' so
-      -- the next 'closeSlot' de-announces it via a non-announcing 'Slot₂', collapsing
+      -- the next 'closeSlot' de-announces it via a non-announcing 'Chain', collapsing
       -- the spec's voteDeadline to 0. If nothing is currently announced, there is
       -- nothing to supersede.
       --
@@ -594,21 +592,30 @@ module LinearLeiosVerifierChain where
       -- producer IDs, and 'isValid' resolves the producer's key from this
       -- list — with only the SUT registered, every acquired EB header would
       -- be dropped as invalid and never reach EBs'.
-      s₀ = initLeiosState tt exampleDistr (L.tabulate (λ i → (i , tt)))
+      s₀ = initLeiosState tt stakeDistribution' (L.tabulate (λ i → (i , tt)))
 
-      format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
-      format-error x = errorMsg x , "error verifyChainTrace"
+      check : LeiosState → List Item → Pair String String
+      check s αs = [ (λ e → (e , "error verifyChainTrace")) , (λ _ → ("ok" , "")) ]′ (verifyItems s αs)
 
       showAction : Action → String
       showAction (EB-Role-Action n _)     = "EB-Role@"    ◇ show n
       showAction (VT-Role-Action n eb s') = "VT-Role@"    ◇ show n ◇ " eb@" ◇ show (slotNumber eb) ◇ " recv@" ◇ show s'
       showAction (No-EB-Role-Action n)    = "No-EB-Role@" ◇ show n
       showAction (No-VT-Role-Action n)    = "No-VT-Role@" ◇ show n
-      showAction (Slot₁-Action n)         = "Slot1@"      ◇ show n
-      showAction (Slot₂-Action n)         = "Slot2@"      ◇ show n
+      showAction (Slot-Action n)          = "Slot@"       ◇ show n
+      showAction (Chain-Action n)         = "Chain@"      ◇ show n
+      showAction (Mempool-Action n)       = "Mempool@"    ◇ show n
       showAction (Base₁-Action n)         = "Base1@"      ◇ show n
       showAction (Base₂-Action n)         = "Base2@"      ◇ show n
-      showAction (Ftch-Action n)          = "Ftch@"       ◇ show n
+      showAction (Cert₁-Action n)         = "Cert1@"      ◇ show n
+      showAction (Cert₂-Action n)         = "Cert2@"      ◇ show n
+      showAction (Cert₃-Action n)         = "Cert3@"      ◇ show n
+      showAction (Fetch-Action n)         = "Fetch@"      ◇ show n
+
+      -- The ranking-block step is named by the verifier (see 'LinearLeiosTrace').
+      showItem : Item → String
+      showItem (entry a _) = showAction a
+      showItem (base n)    = "Base@" ◇ show n
 
       n₀ : ℕ → Accumulator
       n₀ st = record
@@ -629,11 +636,8 @@ module LinearLeiosVerifierChain where
         verifyChainTrace' closeLast s =
           let (aFinal , l') = mapAccuml traceEvent→action (n₀ (LeiosState.slot s)) l
               final = if closeLast then (if started aFinal then closeSlot aFinal else []) else []
-              chron = L.concat l' ++ final
-              αs = L.reverse chron
-              tr = checkTrace αs s
-              acts = L.map (λ a → showAction (proj₁ a)) chron
-          in acts , result (λ _ → ("ok" , "")) format-error tr
+              αs = L.concat l' ++ final
+          in L.map showItem αs , check s αs
           where
             mapAccuml : {A B St : Set} → (St → A → St × B) → St → List A → St × List B
             mapAccuml f st []       = st , []
@@ -641,10 +645,6 @@ module LinearLeiosVerifierChain where
               let (st' , y)   = f st x
                   (st'' , ys) = mapAccuml f st' xs
               in st'' , y ∷ ys
-
-            result : ∀ {E A St : Type} → (f : A → St) → (g : E → St) → Result E A → St
-            result f g (Ok x) = f x
-            result f g (Err x) = g x
 
         -- Streaming checkpoint: adjudicate only the slots already closed by a
         -- later CSlot, leaving the in-progress one to the next checkpoint.

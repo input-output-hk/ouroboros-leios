@@ -1,5 +1,4 @@
 open import Prelude.AssocList
-open import Prelude.Result
 open import Prelude.Errors
 
 open import Leios.Config
@@ -158,7 +157,8 @@ module LinearLeiosVerifier where
          module PraosNode; mkPraosBlock; praosBlockHash; genesisHash)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
-      open import Leios.Linear.Trace.Verifier d-SpecStructure params renaming (verifyTrace to checkTrace)
+      open import Leios.Linear.Trace.Verifier d-SpecStructure params hiding (verifyTrace)
+      open import LinearLeiosTrace d-SpecStructure params
 
       open Params params
       open Types params
@@ -270,26 +270,26 @@ module LinearLeiosVerifier where
         test₁ = refl
 
       -- Negative {EB,VT} event, if there is no {EB,VT}Generated event
-      negative-events-EB : List Blk → Word64 → List (Action × (FFDT Out ⊎ BaseAbstract.BaseIOF B' In ⊎ IOT In))
+      negative-events-EB : List Blk → Word64 → List Item
       negative-events-EB l s
         with Any.any? isEB? l
       ... | yes _ = []
-      ... | no  _ = (No-EB-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
+      ... | no  _ = entry (No-EB-Role-Action (primWord64ToNat s)) (inj₁ FFDT.SLOT) ∷ []
 
-      negative-events-VT : List Blk → Word64 → List (Action × (FFDT Out ⊎ BaseAbstract.BaseIOF B' In ⊎ IOT In))
+      negative-events-VT : List Blk → Word64 → List Item
       negative-events-VT l s
         with Any.any? isVT? l
       ... | yes _ = []
-      ... | no  _ = (No-VT-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
+      ... | no  _ = entry (No-VT-Role-Action (primWord64ToNat s)) (inj₁ FFDT.SLOT) ∷ []
 
-      traceEvent→action : Accumulator → TraceEvent → Accumulator × List (Action × (FFDT Out ⊎ BaseAbstract.BaseIOF B' In ⊎ IOT In))
+      traceEvent→action : Accumulator → TraceEvent → Accumulator × List Item
       traceEvent→action l record { message = Slot p s }
         with p ≟ SUT
       ... | yes _ =
         record l { FFD-blks = [] ; currentSlot = suc (currentSlot l) } ,
           negative-events-EB (FFD-blks l) s ++ negative-events-VT (FFD-blks l) s ++
-            (Base₂-Action (primWord64ToNat s) , inj₁ FFDT.SLOT)
-          ∷ (Slot₁-Action (primWord64ToNat s) , inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks l))))
+            base (primWord64ToNat s)
+          ∷ entry (Slot-Action (primWord64ToNat s)) (inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks l))))
           ∷ []
       ... | no _  = l , []
 
@@ -312,16 +312,17 @@ module LinearLeiosVerifier where
       traceEvent→action l record { message = EBReceived s p _ _ i _ }
         with p ≟ SUT | EB-refs l ⁉ i | RB-refs l ⁉ i
       ... | yes _ | just eb | just rb =
-        record l { FFD-blks = EB-Blk eb ∷ FFD-blks l ; EB-received = (i , currentSlot l) ∷ (EB-received l) } , (EB-Role-Action (currentSlot l) eb , inj₁ FFDT.SLOT) ∷ []
+        record l { FFD-blks = EB-Blk eb ∷ FFD-blks l ; EB-received = (i , currentSlot l) ∷ (EB-received l) } , entry (EB-Role-Action (currentSlot l) eb) (inj₁ FFDT.SLOT) ∷ []
       ... | _ | _ | _ = l , []
 
       -- VTs
+      -- The spec does not inspect vote contents, so the voted EB's hash is left empty.
       traceEvent→action l record { message = VTBundleGenerated p i s _ _ vts } =
-        let vt = map (const tt) (elems vts)
+        let vt = map (const (nodeId p , [])) (elems vts)
         in record l { VT-refs = (i , vt) ∷ VT-refs l } , []
       traceEvent→action l record { message = VTBundleReceived _ p _ _ i _ }
         with p ≟ SUT | VT-refs l ⁉ i | EB-refs l ⁉ i | EB-received l ⁉ i
-      ... | yes _ | just vt | just eb | just slot' = record l { FFD-blks = VT-Blk vt ∷ FFD-blks l } , (VT-Role-Action (currentSlot l) eb slot' , inj₁ FFDT.SLOT) ∷ []
+      ... | yes _ | just vt | just eb | just slot' = record l { FFD-blks = VT-Blk vt ∷ FFD-blks l } , entry (VT-Role-Action (currentSlot l) eb slot') (inj₁ FFDT.SLOT) ∷ []
       ... | _ | _ | _ | _ = l , []
 
       -- RBs
@@ -344,14 +345,14 @@ module LinearLeiosVerifier where
         with p ≟ SUT | RB-refs l ⁉ i
       ... | yes _ | just rb =
         let l' = addTreeId i l
-        in l' , (Slot₂-Action (currentSlot l) , inj₂ (inj₁ (BaseAbstract.BASE-LDG (sutLedger l')))) ∷ []
+        in l' , entry (Chain-Action (currentSlot l)) (inj₂ (inj₁ (BaseAbstract.BASE-LDG (sutLedger l')))) ∷ []
       ... | _ | _ = l , []
 
       -- TXs
       traceEvent→action l record { message = TXGenerated _ _ } = l , []
       traceEvent→action l record { message = TXReceived i _ p }
         with p ≟ SUT
-      ... | yes _ = l , (Base₁-Action (currentSlot l) , inj₂ (inj₂ (SubmitTxs (concatList (map primCharToNat (S.toList i)) ∷ [])))) ∷ []
+      ... | yes _ = l , entry (Mempool-Action (currentSlot l)) (inj₂ (inj₂ (inj₁ (SubmitTxs (concatList (map primCharToNat (S.toList i)) ∷ []))))) ∷ []
       ... | _     = l , []
 
       traceEvent→action l record { message = Cpu _ _ _ _ }                = l , []
@@ -376,8 +377,8 @@ module LinearLeiosVerifier where
       -- be dropped as invalid and never reach EBs'.
       s₀ = initLeiosState tt exampleDistr (L.tabulate (λ i → (i , tt)))
 
-      format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
-      format-error x = errorMsg x , "error verifyTrace"
+      check : LeiosState → List Item → Pair String String
+      check s αs = [ (λ e → (e , "error verifyTrace")) , (λ _ → ("ok" , "")) ]′ (verifyItems s αs)
 
       opaque
         unfolding List-Model
@@ -386,9 +387,8 @@ module LinearLeiosVerifier where
         verifyTrace' s =
           let n₀ = record { EB-refs = [] ; EB-received = [] ; VT-refs = [] ; RB-refs = [] ; RB-meta = [] ; tree-ids = [] ; FFD-blks = [] ; currentSlot = LeiosState.slot s }
               l' = proj₂ $ mapAccuml traceEvent→action n₀ l
-              αs = L.reverse (L.concat l')
-              tr = checkTrace αs s
-          in L.length αs , result (λ _ → ("ok" , "")) format-error tr
+              αs = L.concat l'
+          in L.length αs , check s αs
           where
             mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
             mapAccuml f s []       = s , []
@@ -396,10 +396,6 @@ module LinearLeiosVerifier where
               let (s' , y)   = f s x
                   (s'' , ys) = mapAccuml f s' xs
               in s'' , y ∷ ys
-
-            result : ∀ {E A S : Type} → (f : A → S) → (g : E → S) → Result E A → S
-            result f g (Ok x) = f x
-            result f g (Err x) = g x
 
         verifyTrace : Pair ℕ (Pair String String)
         verifyTrace = verifyTrace' s₀

@@ -18,7 +18,7 @@
 
     iogx.url = "github:input-output-hk/iogx";
 
-    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=73d61e931ebd93ea58dacf2ad3e2562dbbdc0fbe";
+    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=0a8331c5037e090dd6a25b6164d56fcf7804143c";
 
     # The Praos formal spec, used by leios-trace-verifier's Leios.Base.Praos
     # to wrap the real Praos node as a Leios BaseMachine (see

@@ -441,8 +441,8 @@ queryChainOnce LeadershipOpts{..} = do
           )
 
 -- | Turn the on-chain stake distribution (pool-id → relative stake) into the
---   verifier's view: parties are the pools in chain (Map) order, keyed
---   @node-i@; the SUT is the pool given by --stake-pool-id, at its natural
+--   verifier's view: parties are the pools in chain (Map) order, identified
+--   by index; the SUT is the pool given by --stake-pool-id, at its natural
 --   index. Relative stakes are scaled to naturals (per billion).
 buildChainData ::
   (Api.Hash Api.StakePoolKey) ->
@@ -460,9 +460,8 @@ buildChainData sutPool epochLength maxRBBody nodeEpoch winning m =
       pairs
         | Prelude.any ((== sutPool) . fst) pairs0 = pairs0
         | otherwise = pairs0 <> [(sutPool, 0)]
-      nodeName i = T.pack ("node-" <> show (i :: Int))
       scaleStake r = floor (r * 1000000000) :: Integer
-      stakeDist = [(nodeName i, scaleStake r) | (i, (_, r)) <- Prelude.zip [0 ..] pairs]
+      stakeDist = [scaleStake r | (_, r) <- pairs]
       sutIdx =
         maybe (error sutNotFound) toInteger $
           List.findIndex ((== sutPool) . fst) pairs

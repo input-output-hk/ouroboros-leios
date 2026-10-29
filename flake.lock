@@ -685,16 +685,17 @@
     "categorical-crypto": {
       "flake": false,
       "locked": {
-        "lastModified": 1774441400,
-        "narHash": "sha256-t0HXmhW3C4VPkl1IMiwa16lgZVomxuu74O30qwoEeNU=",
+        "lastModified": 1792569972,
+        "narHash": "sha256-asOVNU0hzF33x6qvoiQCU4MOc0xRZo1P223v1fCg2KQ=",
         "owner": "input-output-hk",
         "repo": "categorical-crypto",
-        "rev": "6cdf63785fb39f5e340240667e7a0c5aed473d90",
+        "rev": "df0bdd55ba5ec5f7a32479dbd41714ff22944409",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "categorical-crypto",
+        "rev": "df0bdd55ba5ec5f7a32479dbd41714ff22944409",
         "type": "github"
       }
     },
@@ -3319,17 +3320,17 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1788438859,
-        "narHash": "sha256-3ORbos6Om/OkJ/sK4ADIeohRKSUEmiwNyG3Tu9cT9XA=",
+        "lastModified": 1792578598,
+        "narHash": "sha256-5q1NSwVw+FstdCGew1tcZa/E/Xx4qtv3zkyTMA1r2GI=",
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "73d61e931ebd93ea58dacf2ad3e2562dbbdc0fbe",
+        "rev": "0a8331c5037e090dd6a25b6164d56fcf7804143c",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "73d61e931ebd93ea58dacf2ad3e2562dbbdc0fbe",
+        "rev": "0a8331c5037e090dd6a25b6164d56fcf7804143c",
         "type": "github"
       }
     },

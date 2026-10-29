@@ -63,7 +63,9 @@ let
   # Everything (module name clashes with iog-prelude's), the Examples
   # (unsolved holes), Protocol.TraceVerifier (sole user of the
   # agda-irrelevance dependency) and the Properties theorems (to be
-  # re-included for the safety/liveness transfer work).
+  # re-included for the safety/liveness transfer work).  Its
+  # Data.List.Properties.Ext is renamed, since categorical-crypto ships an
+  # unrelated module of the same name and the verifier depends on both.
   praosSpec = pkgs.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
     pname = "praos-spec";
@@ -77,6 +79,9 @@ let
       rm -r src/Everything.agda src/Examples \
             src/Protocol/TraceVerifier.agda src/Protocol/TraceVerifier \
             src/Properties
+      mv src/Data/List/Properties/Ext.agda src/Data/List/Properties/PraosExt.agda
+      grep -rlF 'Data.List.Properties.Ext' src \
+        | xargs sed -i 's/Data\.List\.Properties\.Ext\b/Data.List.Properties.PraosExt/g'
       {
         echo "module EverythingLeios where"
         echo "import Protocol.Semantics"
