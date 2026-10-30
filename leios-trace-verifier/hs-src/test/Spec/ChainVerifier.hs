@@ -22,15 +22,15 @@ import Test.Hspec (Spec, describe, it, shouldBe, shouldNotBe)
 --   verifier is exercised against. The figures have to be non-zero: vote
 --   eligibility is the CIP-0164 committee, computed from the stake distribution
 --   rather than a per-slot lottery.
-stakeDist :: [(Text, Integer)]
-stakeDist = [("node-0", 1000000000), ("node-1", 1000000000), ("node-2", 1000000000)]
+stakeDist :: [Integer]
+stakeDist = [1000000000, 1000000000, 1000000000]
 
 -- | Verify a fixed event list starting at slot 0, returning just the status.
 --
 --   Timings are the ones the chain app hardcodes — Lhdr 1, Lvote 4, Ldiff 7 — under
 --   which an announced EB's voting window opens at @ebSlot + 3 * Lhdr == ebSlot + 3@
 --   and its deadline is @ebSlot + 3 * Lhdr + Lvote == ebSlot + 7@. Abstention is
---   licensed throughout the window by 'Roles₃' and only forced at the deadline, so a
+--   licensed throughout the window by 'VT-Defer' and only forced at the deadline, so a
 --   fixture testing a withheld vote has to run as far as @ebSlot + 7@.
 --
 --   The ranking block's body capacity is a small round number here, and fixtures give
@@ -239,8 +239,8 @@ chainVerifier = do
   describe "voting" $ do
     it "accepts a vote cast in the first slot of the window" $
       fromLog announcedAndVoted `shouldBe` "ok"
-    -- Abstention is licensed throughout the window by 'Roles₃'; only at the deadline,
-    -- ebSlot + 3 * Lhdr + Lvote, does neither it nor 'Roles₂' apply and a vote is
+    -- Abstention is licensed throughout the window by 'VT-Defer'; only at the deadline,
+    -- ebSlot + 3 * Lhdr + Lvote, does neither it nor 'No-VT-Role' apply and a vote is
     -- forced. So this fixture has to reach slot 8 to be a violation at all.
     it "rejects a vote withheld to the deadline" $
       fromLog (dropVotes announcedAndVoted) `shouldNotBe` "ok"

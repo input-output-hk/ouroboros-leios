@@ -41,7 +41,7 @@ stubChainData =
   ChainData
     { cdWinningSlots = Nothing
     , cdNumParties = 3
-    , cdStakeDistribution = [("node-0", 1000000000), ("node-1", 1000000000), ("node-2", 1000000000)]
+    , cdStakeDistribution = [1000000000, 1000000000, 1000000000]
     , cdSutIndex = 2
     , cdEpochLength = 10
     , cdMaxRBBody = 100
@@ -90,7 +90,7 @@ straddlingVoted =
     <> ticks 12 16
 
 -- | The same, with the vote withheld. Runs past the deadline at slot 15, where a vote
---   is forced; abstention before then is licensed by 'Roles₃'. The obligation is only
+--   is forced; abstention before then is licensed by 'VT-Defer'. The obligation is only
 --   visible to a segment that carried the announcement across the boundary, so this is
 --   what distinguishes an overlapping split from a clean cut.
 straddlingUnvoted :: [ChainEvent]
