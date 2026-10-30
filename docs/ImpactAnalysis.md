@@ -449,14 +449,16 @@ The [cardano-node-tests](https://github.com/IntersectMBO/cardano-node-tests) pro
 
 The end-to-end functional test suite checks existing functionalities. It operates on both locally deployed testnets and persistent testnets such as Preview and Preprod. With over 500 test cases, it covers a wide spectrum of features, including basic transactions, reward calculation, governance actions, Plutus scripts and chain rollback.
 
-Linear Leios primarily impacts the consensus component of `cardano-node`, leaving end-user experience and existing functionalities unchanged. Consequently, the current test suite can largely be used to verify `cardano-node`'s operation after the Leios upgrade, requiring only minor adjustments.
+Linear Leios primarily impacts the consensus component of `cardano-node`, leaving end-user experience and existing functionalities unchanged. Consequently, the current test suite can largely be used to verify `cardano-node`'s operation after the Leios upgrade, requiring only minor adjustments to the existing tests.
 
 ## New end-to-end tests for Leios
 
-New end-to-end tests for Leios will focus on two areas:
+New end-to-end tests for Leios will focus on following areas:
 
 - Hard-fork testing from the latest mainnet era to Leios
 - Upgrading from the latest mainnet `cardano-node` release to a Leios-enabled release
+- Running tests on saturated network to validate existing functionality on Leios testnet under load
+- Testing of integration of the new BLS key
 
 ## New automated upgrade testing test suite
 
@@ -470,6 +472,93 @@ The suite will perform the following actions:
 6. **Full Node Upgrade** - Upgrade the remaining nodes to a Leios-enabled release.
 7. **Leios Hard-Fork** - Perform the hard-fork to Leios.
 8. **Post-Hard-Fork Functional Tests** - Run a final subset of the functional tests.
+
+## New end-to-end testsuite for Ouroboros Leios network saturation
+
+### Objective
+
+Current E2E system-level tests effectively verify existing Cardano use cases and functionality. However, because they do not generate significant continuous network stress, they only produce standard Praos Ranking Blocks (RBs) during a test run.
+The objective of this test strategy is to create a modified E2E test suite that forces the network to utilize the Ouroboros Leios high-throughput overlay. By artificially saturating the base Praos RB capacity, we will validate the network's ability to seamlessly transition to creating, diffusing, voting on, and certifying Endorser Blocks (EBs) under load.
+
+### Scope
+
+* In-Scope: Execution of approximately 90% of existing standard E2E scenarios running concurrently with a heavy, synthetic background load.
+* Out-of-Scope: Long-running test scenarios that depend on crossing epoch boundaries. Because this strategy requires mainnet-like network parameters, epoch boundary tests would take too long to execute in a standard CI/CD pipeline.
+
+### Test Environment & Network Configuration
+
+To properly test Leios, the testnet environment must mirror mainnet timing constraints. The fast local testnets typically used for E2E testing (e.g., `slotLength` of 0.2s and `activeSlotsCoeff` of 0.1) are fundamentally incompatible with Leios mechanics for two reasons:
+
+* Timing Stage Collapses: The Leios protocol relies on strict timing constraints for equivocation detection, voting, and certificate diffusion. With a slot length of 0.2s, a typical voting period would last only 0.8 seconds. This provides almost no time for nodes to download large EBs, validate the transactions, and aggregate votes, resulting in honest EBs being discarded before they can be certified.
+* Obscured Leios Benefits: A fast testnet produces an RB every 2 seconds on average. This means the base Praos protocol is already running at an artificially massive speed, making it nearly impossible to observe Leios EBs absorbing the transaction surplus.
+
+Required Network Parameters: We will configure the testnet variant with parameters closely matching mainnet:
+
+```json
+{
+    "activeSlotsCoeff": 0.05,
+    "epochLength": 432000,
+    "securityParam": 2160,
+    "slotLength": 1
+}
+```
+
+### Load Generation & Saturation Strategy
+
+Leios is designed to be adaptive: if network traffic is low, the protocol naturally incentivizes the use of standard RBs due to their lower inclusion latency, and empty EBs are not announced to avoid unnecessary voting overhead.
+To force the creation of EBs, we must saturate the standard RB limits. We will utilize the Cardano `tx-generator` tool to inject a heavy background workload via the Node-to-Node protocol. We will employ a combination of the following three saturation strategies:
+
+* Increase TPS (Transactions Per Second): By configuring the `tx-generator` to push 50 TPS or higher ("tps": 50), we will overflow the standard RB transaction limits, forcing the network to bundle the surplus into EBs.
+* Increase Transaction Size: We will configure the `tx-generator` to submit larger transactions (`add_tx_size`). Larger payloads will rapidly exhaust the maximum RB byte limit, displacing overflow transactions into EBs, which have a separate, much larger transaction size capacity.
+* Use Heavy Plutus Scripts: Ranking blocks have strict per-block limits on Plutus execution steps and memory. By configuring the `tx-generator` to submit computationally heavy Plutus scripts (`plutus` configuration), we will quickly exhaust the RB Plutus budget. Transactions that require higher Plutus execution limits or cause the RB budget to overflow will necessitate placement in EBs, which support vastly expanded Plutus execution bounds.
+
+### Test Execution Plan
+
+* Phase 1: Environment Initialization: Stand up the Cardano testnet using the mainnet-like genesis parameters specified above.
+* Phase 2: Load Injection: Start the `tx-generator` to simulate the high-throughput workload (utilizing high TPS, large sizes, and heavy Plutus scripts) to saturate RB capacity and trigger EB production.
+* Phase 3: Concurrent Scenario Execution: While the network is actively managing the synthetic load and producing certified EBs, execute the applicable 90% of standard E2E test scenarios.
+* Phase 4: Validation: Verify that standard transactions from the E2E tests are successfully validated, integrated into the ledger, and that Leios mechanisms (EB creation, voting, and certification) function securely without disrupting standard Praos network consensus.
+
+## New automated tests for Ouroboros Leios BLS Key integration
+
+### Objective
+
+The primary objective of this testing strategy is to validate the complete lifecycle of the new BLS12-381 cryptographic keys required for Stake Pool Operators (SPOs) in the Ouroboros Leios era. As SPOs acting as voting members and block-producing nodes must now register a BLS key alongside their standard VRF and KES keys, these automated tests will ensure that the updated API and CLI correctly generate and process these artifacts, and that the `cardano-node` functions seamlessly when initialized with the new BLS parameters.
+
+### Scope
+
+The test suite will validate:
+
+* Generation of Leios BLS keys via the `cardano-cli`.
+* Embedding of BLS keys into pool registration certificates.
+* Initialization and block-producing operation of the `cardano-node` using the new parameters.
+* System rejection of invalid or malformed BLS configurations.
+
+### Execution Methodology
+
+The approach leverages existing infrastructure while expanding it for Leios-specific flows:
+
+* Module Placement: Tests will either expand the existing pool test modules (e.g., `test_pools.py`) or be housed in a newly dedicated module specifically for Leios testnet workflows.
+* CLI Wrapper: The ClusterLib Python wrapper will be updated to invoke the newly added `cardano-cli` commands responsible for BLS key generation and pool certificate issuance.
+* Test Environments: Tests will dynamically spin up live, ephemeral local clusters using the cluster_manager fixtures. These local testnets will run the `cardano-node` and `cardano-cli` binaries configured with BLS12-381 capabilities to execute tests against live ledger states.
+
+### E2E Testing Scenarios
+
+While an exhaustive parameter matrix is not required for this document, the following core end-to-end workflows must be broadly covered:
+
+* Scenario 1: Key Generation (Positive)
+  - Action: Use the updated `cardano-cli` to generate BLS keys relying on the updated cardano-crypto-class backend.
+  - Expected Outcome: Valid BLS keys over the BLS12-381 elliptic curve are successfully generated without errors.
+* Scenario 2: Pool Registration & Certificate Submission (Positive)
+  - Action: Create stake pool registration certificates that embed the newly generated BLS keys. Submit these certificates inside a transaction to a running local cluster.
+  - Expected Outcome: The transaction is accepted, and the ledger state updates to reflect the successfully registered pool with the correct BLS key attached.
+* Scenario 3: Node Startup & Operation (Positive)
+  - Action: Provision a local testnet cluster where block-producing nodes are started using the new BLS key CLI parameters.
+  - Expected Outcome: The nodes start successfully, connect to the network, and actively produce both standard Ranking Blocks (RBs) and Leios Endorser Blocks (EBs) without failure.
+* Scenario 4: Negative Testing
+  - Action: Attempt to submit pool registration transactions with improperly formatted BLS keys, mismatched byte strings, or entirely missing BLS parameters while operating in a Leios era context.
+  - Expected Outcome: Both the `cardano-cli` during transaction build/submission and the `cardano-node` during validation successfully reject these actions and return the appropriate error messages.
+
 
 # Appendix
 
