@@ -18,6 +18,7 @@ processes:
       --signing-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator1/payment.skey
       --staking-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator1/staking.skey
       --tps ${TPS}
+      ${FIREHOSE_SCHEDULE_ARGS}
       --outputs-per-tx ${OUTPUTS}
       --color ${COLOR1}
       --fee 1000000
@@ -49,6 +50,7 @@ processes:
       --signing-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator2/payment.skey
       --staking-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator2/staking.skey
       --tps ${TPS}
+      ${FIREHOSE_SCHEDULE_ARGS}
       --outputs-per-tx ${OUTPUTS}
       --color ${COLOR2}
       --fee 1000000
@@ -74,6 +76,7 @@ processes:
       --signing-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator3/payment.skey
       --staking-key-file ${SHARED_CONFIG_DIR}/stake-delegators/delegator3/staking.skey
       --tps ${TPS}
+      ${FIREHOSE_SCHEDULE_ARGS}
       --outputs-per-tx ${OUTPUTS}
       --color ${COLOR3}
       --fee 1000000
