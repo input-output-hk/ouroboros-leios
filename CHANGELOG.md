@@ -5,6 +5,42 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## rc-2026w44 - 2026-10-31
+
+Nodes schedule their egress in tiers so local roots and stake pools' relays are served before strangers under load, block producers can optionally forge smaller endorser blocks while votes fall short, and bulk credentials can carry a BLS key per pool.
+
+> [!NOTE]
+>
+> **No resync, no respin.** Databases and wire formats are unchanged, so nodes of this and the w43 release can talk to each other.
+
+- Nodes schedule their egress across peers [consensus:egress_scheduler](https://github.com/IntersectMBO/ouroboros-consensus/tree/karknu/egress_scheduler.leios) [network:egress_scheduler](https://github.com/IntersectMBO/ouroboros-network/tree/karknu/egress_scheduler.leios)
+  - Outbound bytes are split into tiers: local roots, then the relays of the largest stake pools with credit refilled by what the chain announces, then everyone else in turns.
+  - New `EgressBudgetMbps` node configuration sets the budget shared among all peers, defaulting to 250. Set it to `0` to turn scheduling off.
+  - New metrics count, per tier, the peers served and how much the order slowed them (`egress.tier.<tier>.slowed.<n>x`), and the bytes sent and read per mini-protocol.
+- Inbound transaction submission polls most peers less often [network:egress_scheduler](https://github.com/IntersectMBO/ouroboros-network/tree/karknu/egress_scheduler.leios)
+  - Local roots, peers that recently delivered new transactions, and a few inbound peers rotated at random are polled at full speed. Every other peer waits between requests.
+  - A peer is asked for up to 10 transaction ids at once, where it was 6.
+  - A `MsgReplyTxs` listing a transaction twice is rejected with `ProtocolErrorTxNotRequested`.
+  - Fixes the transaction-submission counters no longer being emitted under heavy load.
+- Experimental: block producers can scale down the endorser blocks they forge while votes fall short [consensus:adaptive-endorsements](https://github.com/IntersectMBO/ouroboros-consensus/tree/ch1bo/leios-adaptive-endorsements)
+  - Off by default. Enable it with a `LeiosAdaptiveEndorsements` section in the node configuration:
+    ```yaml
+    LeiosAdaptiveEndorsements:
+      Enabled: true
+      TargetParticipation: 0.95
+    ```
+  - Each sample is traced as `LeiosAdaptiveEb`, with the participation seen and the resulting capacity scale.
+  - Not attack-resistant: a single endorser block that collects no votes, from any producer, shrinks the capacity of every producer.
+- Voters open and close their voting window as the protocol parameters say [consensus:adaptive-endorsements](https://github.com/IntersectMBO/ouroboros-consensus/tree/ch1bo/leios-adaptive-endorsements)
+  - The window opens `3 * L_hdr` after the announcing slot and closes after `L_vote`. Before, it opened after 3s and closed 4s later, whatever the parameters.
+- `TraceLeiosEbValidated` reports how long validating an endorser block's transactions took, and how many bytes, execution units and reference-script bytes were validated in full [consensus#2443](https://github.com/IntersectMBO/ouroboros-consensus/pull/2443)
+- A node no longer serves a certifying block to local clients without its endorser block's transactions [consensus#2454](https://github.com/IntersectMBO/ouroboros-consensus/pull/2454)
+  - Where it would have, it now ends the client's connection with `CertRbWithoutEbTxs`.
+- Bulk credentials accept a BLS signing key per pool [cardano-node#6749](https://github.com/IntersectMBO/cardano-node/pull/6749)
+  - Each entry is `[opcert, vrf, kes]` or `[opcert, vrf, kes, bls]`, where `bls` is one key envelope or an array of them.
+- `tx-firehose` can vary its submission rate over time with `--tps-schedule`, e.g. `0:20,3600:250` ramps from 20 to 250 tx/s over an hour
+  - `--schedule-start` lets a restarted firehose resume the schedule.
+
 ## rc-2026w43 - 2026-10-25
 
 A small consensus-only release: more efficient storing and serving of endorser blocks, block producers forge certifying blocks without reapplying the mempool, and the mempool fills to its byte capacity more consistently. This improved the forge loop timings and generally result in faster release of announcements and smoother data diffusion. 
