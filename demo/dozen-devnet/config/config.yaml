@@ -24,6 +24,28 @@ DijkstraGenesisFile: dijkstra-genesis.json
 # a long gap; the cost of losing that bet on a devnet is a reconnect.
 LeiosMinOfferLead: 30
 
+# Block producers forge smaller endorser blocks while votes fall short.
+#
+# Each block following an announcement samples the vote weight it collected, as
+# a share of total stake like the 75% quorum. Only announcements that could be
+# certified (the next block came after the certification gap) count. The
+# shortfall below TargetParticipation cuts the whole EB capacity by
+# exp(-GainP * shortfall); GainD reacts to how fast it changes, and the filter
+# cuts fast (Attack) and recovers slowly (Release). MinScale is the floor.
+#
+# There is no integral term: nobody knows what full honest participation is, so
+# a target nobody reaches only holds a fixed cut instead of winding down to the
+# floor. Each sample is traced as LeiosAdaptiveEb with participation,
+# certifiable and ebCapacityScale, which the EB fill panel plots.
+LeiosAdaptiveEndorsements:
+  Enabled: true
+  TargetParticipation: 0.95
+  GainP: 4
+  GainD: 1
+  Attack: 0.3
+  Release: 0.08
+  MinScale: 0.1
+
 # 5MB is a bit below the timeout capacity default ceiling
 # MempoolCapacityBytesOverride: 5000000
 # Defaults
