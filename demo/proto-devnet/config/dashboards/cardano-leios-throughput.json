@@ -379,7 +379,7 @@
         "type": "loki",
         "uid": "loki"
       },
-      "description": "Transactions per forged endorser block, per node, averaged over the Rate / avg window.\n\nRead the shape, not the level: a flat top means a size limit is binding, while scatter below the ceiling means the forge time budget is. The red line is the hard per-EB transaction cap, which no protocol parameter can raise.\n\nDashed lines on the right axis are each producer's adaptive endorsements capacity scale (LeiosAdaptiveEb). Where a producer has it enabled, the fill should track its scale: the EB capacity is cut to that share while votes fall short of the target participation.",
+      "description": "Transactions per forged endorser block, per node, averaged over the Rate / avg window.\n\nRead the shape, not the level: a flat top means a size limit is binding, while scatter below the ceiling means the forge time budget is. The red line is the hard per-EB transaction cap, which no protocol parameter can raise.\n\nDashed lines on the right axis are each producer's adaptive endorsements capacity scale (LeiosAdaptiveEb). Where a producer has it enabled, the fill should track its scale: the EB capacity is cut to that share while recent announcements lose their quorum margin. See the Adaptive endorsements panel for why.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1317,6 +1317,204 @@
         }
       ],
       "title": "Cache hit rate, counter-based (weighted by tx, not by validation)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Each producer's adaptive endorsements controller (LeiosAdaptiveEb), averaged over the Rate / avg window. Only certifiable announcements count.\n\nVoted is the stake that voted on an announcement, alive the stake that voted on any of the last AliveWindow ones. The margin share on the right axis is how much of the margin between alive stake and the quorum threshold (red line) an announcement lost: 0 when everyone alive voted, -1 at or below the threshold. The capacity scale follows it, down to exp(-GainP).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Stake / capacity",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "max": 1,
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.75
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Margin share"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "min",
+                "value": -1
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.thresholdsStyle",
+                "value": {
+                  "mode": "off"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time({service=\"cardano-node\", kind=\"LeiosAdaptiveEb\", instance=~\"$instance\"} | json v=\"participation\", c=\"certifiable\" | c=\"true\" | unwrap v [${window}s]) by (instance)",
+          "legendFormat": "{{instance}} voted",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time({service=\"cardano-node\", kind=\"LeiosAdaptiveEb\", instance=~\"$instance\"} | json v=\"aliveStake\", c=\"certifiable\" | c=\"true\" | unwrap v [${window}s]) by (instance)",
+          "legendFormat": "{{instance}} alive",
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time({service=\"cardano-node\", kind=\"LeiosAdaptiveEb\", instance=~\"$instance\"} | json v=\"ebCapacityScale\" | unwrap v [${window}s]) by (instance)",
+          "legendFormat": "{{instance}} capacity scale",
+          "queryType": "range",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time({service=\"cardano-node\", kind=\"LeiosAdaptiveEb\", instance=~\"$instance\"} | json v=\"marginShare\", c=\"certifiable\" | c=\"true\" | unwrap v [${window}s]) by (instance)",
+          "legendFormat": "{{instance}} margin share",
+          "queryType": "range",
+          "refId": "D"
+        }
+      ],
+      "title": "Adaptive endorsements",
       "type": "timeseries"
     }
   ],

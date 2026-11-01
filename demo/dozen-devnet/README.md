@@ -86,12 +86,13 @@ TPS=1000 RATE=100Mbps DELAY=50ms ./run.sh
 ## Adaptive endorsements
 
 `config.yaml` turns on `LeiosAdaptiveEndorsements`: block producers forge
-smaller endorser blocks while the votes for recent announcements fall short of
-`TargetParticipation`. The comment above the section explains the controller.
+smaller endorser blocks while votes fall short of a comfortable quorum, and grow
+them back once votes recover.
 
-Each sample is traced as `LeiosAdaptiveEb` and the **Endorser block fill** panel
-on the throughput dashboard plots its `ebCapacityScale` as dashed lines on the
-right axis. The fill should track it.
+The **Adaptive endorsements** panel on the throughput dashboard shows, per
+producer, the stake that voted, the stake that is online, how much of the quorum
+margin was lost, and the resulting capacity scale. The **Endorser block fill**
+panel draws the same scale as dashed lines, and the fill should track it.
 
 To watch it respond, alternate the load between a level voting keeps up with and
 one it does not:
@@ -104,6 +105,17 @@ This holds 50 tx/s for 10 minutes, then 500 tx/s for 10 minutes, and so on,
 starting low. It overrides `TPS` and needs a `tx-firehose` with
 `--tps-schedule`. The wave is anchored to the run's start, so a firehose that
 process-compose restarts picks it up in phase.
+
+With only the three producers voting, one missing vote already costs the whole
+margin, so the controller sees all or nothing. `VOTERS=500` spreads a tenth of
+the stake over many small voters, and `scripts/adaptive-experiment.sh` walks
+such a run through stake going offline and a slow third of the stake:
+
+``` shell
+VOTERS=500 TC=0 TPS_SQUARE=50:500:600 TX_FIREHOSE=... ./run.sh
+# in a second terminal, once the devnet is up
+scripts/adaptive-experiment.sh
+```
 
 ## Mempool colouring
 
