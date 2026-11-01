@@ -7,11 +7,21 @@ As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
 ## rc-2026w44 - 2026-10-31
 
-Nodes schedule their egress in tiers so local roots and stake pools' relays are served before strangers under load, block producers can optionally forge smaller endorser blocks while votes fall short, and bulk credentials can carry a BLS key per pool.
+Nodes schedule their egress in tiers so local roots and stake pools' relays are served before strangers under load, block producers forge smaller endorser blocks while recent announcements lose their quorum margin, and bulk credentials can carry a BLS key per pool.
 
 > [!NOTE]
 >
 > **No resync, no respin.** Databases and wire formats are unchanged, so nodes of this and the w43 release can talk to each other.
+
+> [!IMPORTANT]
+>
+> **Enable all experimental features.** This release is only tested with the egress scheduler, adaptive endorsements and the V2 transaction submission logic all on. The attached `config.json` for the testnet sets them:
+>
+> ```json
+> "EgressBudgetMbps": 250,
+> "LeiosAdaptiveEndorsements": { "Enabled": true },
+> "TxSubmissionLogicVersion": "TxSubmissionLogicV2"
+> ```
 
 - Nodes schedule their egress across peers [consensus:egress_scheduler](https://github.com/IntersectMBO/ouroboros-consensus/tree/karknu/egress_scheduler.leios) [network:egress_scheduler](https://github.com/IntersectMBO/ouroboros-network/tree/karknu/egress_scheduler.leios)
   - Outbound bytes are split into tiers: local roots, then the relays of the largest stake pools with credit refilled by what the chain announces, then everyone else in turns.
@@ -22,15 +32,20 @@ Nodes schedule their egress in tiers so local roots and stake pools' relays are 
   - A peer is asked for up to 10 transaction ids at once, where it was 6.
   - A `MsgReplyTxs` listing a transaction twice is rejected with `ProtocolErrorTxNotRequested`.
   - Fixes the transaction-submission counters no longer being emitted under heavy load.
-- Experimental: block producers can scale down the endorser blocks they forge while votes fall short [consensus:adaptive-endorsements](https://github.com/IntersectMBO/ouroboros-consensus/tree/ch1bo/leios-adaptive-endorsements)
-  - Off by default. Enable it with a `LeiosAdaptiveEndorsements` section in the node configuration:
+- Experimental: block producers can scale down the endorser blocks they forge while recent announcements lose their quorum margin [consensus:adaptive-endorsements](https://github.com/IntersectMBO/ouroboros-consensus/tree/ch1bo/leios-adaptive-endorsements)
+  - The margin is the stake that voted on any recent announcement minus the quorum threshold, so the controller works the same whether 97% or 80% of the stake votes, with no target to pick.
+  - Off by default. Enable it with a `LeiosAdaptiveEndorsements` section in the node configuration, shown here with the defaults:
     ```yaml
     LeiosAdaptiveEndorsements:
       Enabled: true
-      TargetParticipation: 0.95
+      GainP: 2
+      Attack: 0.1
+      Release: 0.03
+      MinScale: 0.1
+      AliveWindow: 20
     ```
-  - Each sample is traced as `LeiosAdaptiveEb`, with the participation seen and the resulting capacity scale.
-  - Not attack-resistant: a single endorser block that collects no votes, from any producer, shrinks the capacity of every producer.
+  - Each sample is traced as `LeiosAdaptiveEb`, with the stake that voted, the stake alive, the margin share and the resulting capacity scale.
+  - Stake withholding its votes, or endorser blocks that collect none, shrink the capacity of every producer, to as little as `exp(-GainP)` of it. If it misbehaves, turn it off with `Enabled: false`.
 - Voters open and close their voting window as the protocol parameters say [consensus:adaptive-endorsements](https://github.com/IntersectMBO/ouroboros-consensus/tree/ch1bo/leios-adaptive-endorsements)
   - The window opens `3 * L_hdr` after the announcing slot and closes after `L_vote`. Before, it opened after 3s and closed 4s later, whatever the parameters.
 - `TraceLeiosEbValidated` reports how long validating an endorser block's transactions took, and how many bytes, execution units and reference-script bytes were validated in full [consensus#2443](https://github.com/IntersectMBO/ouroboros-consensus/pull/2443)
