@@ -42,14 +42,14 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Ref to checkout and build (branch, tag, or sha). Defaults to the workflow ref.'
+        description: "Ref to checkout and build (branch, tag, or sha). Defaults to the workflow ref."
         required: false
-        default: ''
+        default: ""
         type: string
       push_images:
-        description: 'Push images to GHCR (even from a PR-style run)'
+        description: "Push images to GHCR (even from a PR-style run)"
         required: false
-        default: 'false'
+        default: "false"
         type: boolean
 
 env:
@@ -380,8 +380,7 @@ jobs:
 
   build-macos:
     name: "Build aarch64-darwin binaries"
-    # macos-14 = Apple Silicon (aarch64-darwin). macos-13 is Intel.
-    runs-on: macos-14
+    runs-on: macos-15
     permissions:
       contents: read
 
