@@ -77,7 +77,7 @@ Any node can run a different `cardano-node`, and any node can run as a relay, wi
 TOPOLOGY=line RELAY_NODES=2 CARDANO_NODE_2=/path/to/cardano-node ./run.sh
 ```
 
-A relay's pool keeps its stake and committee seat, but neither forges nor votes. `EXTRA_COMPOSE` merges further process-compose files. The [acceptance demo](../acceptance) is built this way.
+A relay's pool keeps its stake and committee seat, but neither forges nor votes. `EXTRA_COMPOSE` merges further process-compose files. `GENESIS_OVERRIDES` names a directory of genesis files that replace proto-devnet's own, whole. The [acceptance demo](../acceptance) is built this way.
 
 ## Traffic control
 

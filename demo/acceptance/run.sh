@@ -7,12 +7,13 @@ set -eo pipefail
 set -a
 : "${ACCEPTANCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 : "${PROTO_DEVNET_DIR:=${ACCEPTANCE_DIR}/../proto-devnet}"
-: "${WORKING_DIR:=$(pwd)/tmp-acceptance}"
+: "${WORKING_DIR:=$(pwd)/tmp-devnet}"
 # Defaults to the prototype node, the reference to reach parity with.
 : "${RELAY_CARDANO_NODE:=$(command -v cardano-node || true)}"
 TOPOLOGY=line
 RELAY_NODES=2
 CARDANO_NODE_2="$RELAY_CARDANO_NODE"
+GENESIS_OVERRIDES="${ACCEPTANCE_DIR}/config/genesis"
 EXTRA_COMPOSE="${ACCEPTANCE_DIR}/process-compose.yaml ${EXTRA_COMPOSE:-}"
 set +a
 

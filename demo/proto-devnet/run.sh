@@ -70,6 +70,8 @@ fi
 : "${RELAY_NODES:=}"
 # Further process-compose files to merge in, space separated.
 : "${EXTRA_COMPOSE:=}"
+# A directory of genesis files that replace proto-devnet's own, whole.
+: "${GENESIS_OVERRIDES:=}"
 set +a
 
 # Check for required commands
@@ -181,17 +183,24 @@ export TOOL_PATH IP_BIN
 # Copy genesis files and set start time. Skipped on resume: a new systemStart
 # would orphan every persisted chain.
 if [ "$RESUME" != "1" ]; then
-  cp -r "$CONFIG_DIR/genesis" "$WORKING_DIR/genesis"
+  GENESIS_SOURCE_DIR="${WORKING_DIR}/genesis-source"
+  rm -rf "$GENESIS_SOURCE_DIR"
+  cp -r "$CONFIG_DIR/genesis" "$GENESIS_SOURCE_DIR"
+  if [ -n "$GENESIS_OVERRIDES" ]; then
+    cp "$GENESIS_OVERRIDES"/*.json "$GENESIS_SOURCE_DIR/"
+  fi
+  cp -r "$GENESIS_SOURCE_DIR" "$WORKING_DIR/genesis"
   chmod u+w -R "${WORKING_DIR}/genesis"
 
   startTimeEpoch=$(date +%s)
   startTimeIso=$(date -u -d "@$startTimeEpoch" +"%Y-%m-%dT%H:%M:%SZ")
 
   jq --argjson time "$startTimeEpoch" '.startTime = $time' \
-    "$CONFIG_DIR/genesis/byron-genesis.json" >"$WORKING_DIR/genesis/byron-genesis.json"
+    "$GENESIS_SOURCE_DIR/byron-genesis.json" >"$WORKING_DIR/genesis/byron-genesis.json"
 
   jq --arg time "$startTimeIso" '.systemStart = $time' \
-    "$CONFIG_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json"
+    "$GENESIS_SOURCE_DIR/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json"
+  rm -rf "$GENESIS_SOURCE_DIR"
 fi
 
 # Set up each node
