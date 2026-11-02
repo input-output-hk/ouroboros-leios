@@ -235,6 +235,32 @@ export interface UIAnnouncementReceived {
   slot: number;
 }
 
+// --- Network: EB offers ----------------------------------------------------
+
+/** Sent event for a `MsgLeiosBlockOffer` or `MsgLeiosBlockTxsOffer` hop over
+ *  LeiosNotify: the sender holds the EB's body, or its whole closure, and
+ *  offers it for fetching. `id`/`slot` identify the EB. */
+export interface UIOfferSent {
+  type: "OfferSent";
+  /** Hash of the offered EB, prefixed by what is offered. */
+  id: string;
+  sender: string;
+  recipient: string;
+  /** Slot of the offered EB. */
+  slot: number;
+  /** The EB's body, or its txs. */
+  offers: "block" | "txs";
+}
+
+export interface UIOfferReceived {
+  type: "OfferReceived";
+  id: string;
+  recipient: string;
+  sender?: string;
+  slot: number;
+  offers: "block" | "txs";
+}
+
 // --- Union ----------------------------------------------------------------
 
 /** Union of every message shape the UI renders. */
@@ -252,7 +278,9 @@ export type UIMessage =
   | UIVotesReceived
   | UITxsReceived
   | UIAnnouncementSent
-  | UIAnnouncementReceived;
+  | UIAnnouncementReceived
+  | UIOfferSent
+  | UIOfferReceived;
 
 /** Set of `message.type` strings the UI renders — also used by CI to filter
  *  a trace before validating it against this schema. */
