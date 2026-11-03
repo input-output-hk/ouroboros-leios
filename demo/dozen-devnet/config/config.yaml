@@ -21,19 +21,16 @@ EgressBudgetMbps: 250
 # Newer transaction submission between nodes (the default is V1).
 TxSubmissionLogicVersion: TxSubmissionLogicV2
 
-# Adaptive endorsements: block producers forge smaller endorser blocks while
-# votes fall short of a comfortable quorum, and grow them back once votes
-# recover. GainP sets how deep the cut can go (to exp(-GainP), with MinScale as
-# the floor), Attack and Release how fast it cuts and recovers, and
-# AliveWindow how many recent blocks count a voter as online. Watch it on the
-# Adaptive endorsements dashboard panel.
+# Adaptive endorsements: block producers forge smaller endorser blocks after
+# announcements miss their quorum, and grow them back while quorums are made.
+# Each miss scales the capacity by Decrease, each quorum made adds Increase
+# back, and MinScale is the floor. Watch it on the Adaptive endorsements
+# dashboard panel.
 LeiosAdaptiveEndorsements:
   Enabled: true
-  GainP: 2
-  Attack: 0.1
-  Release: 0.03
+  Decrease: 0.8
+  Increase: 0.01
   MinScale: 0.1
-  AliveWindow: 20
 
 # Keep the endorser block databases next to, not inside, the chain database.
 LeiosDbConfig:

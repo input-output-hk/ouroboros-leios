@@ -379,7 +379,7 @@
         "type": "loki",
         "uid": "loki"
       },
-      "description": "Transactions per forged endorser block, per node, averaged over the Rate / avg window.\n\nRead the shape, not the level: a flat top means a size limit is binding, while scatter below the ceiling means the forge time budget is. The red line is the hard per-EB transaction cap, which no protocol parameter can raise.\n\nDashed lines on the right axis are each producer's adaptive endorsements capacity scale (LeiosAdaptiveEb). Where a producer has it enabled, the fill should track its scale: the EB capacity is cut to that share while recent announcements lose their quorum margin. See the Adaptive endorsements panel for why.",
+      "description": "Transactions per forged endorser block, per node, averaged over the Rate / avg window.\n\nRead the shape, not the level: a flat top means a size limit is binding, while scatter below the ceiling means the forge time budget is. The red line is the hard per-EB transaction cap, which no protocol parameter can raise.\n\nDashed lines on the right axis are each producer's adaptive endorsements capacity scale (LeiosAdaptiveEb). Where a producer has it enabled, the fill should track its scale: the EB capacity is cut to that share after announcements miss their quorum. See the Adaptive endorsements panel for why.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1324,7 +1324,7 @@
         "type": "loki",
         "uid": "loki"
       },
-      "description": "Each producer's adaptive endorsements controller (LeiosAdaptiveEb), averaged over the Rate / avg window. Only certifiable announcements count.\n\nVoted is the stake that voted on an announcement, alive the stake that voted on any of the last AliveWindow ones. The margin share on the right axis is how much of the margin between alive stake and the quorum threshold (red line) an announcement lost: 0 when everyone alive voted, -1 at or below the threshold. The capacity scale follows it, down to exp(-GainP).",
+      "description": "Each producer's adaptive endorsements controller (LeiosAdaptiveEb), averaged over the Rate / avg window. Only certifiable announcements count.\n\nVoted is the stake that voted on an announcement, against the quorum threshold (red line). The controller's input on the right axis is the share of them that missed it. Each miss cuts the capacity scale by Decrease (0.8), each quorum made adds Increase (0.01) back, down to MinScale.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1366,7 +1366,6 @@
           },
           "mappings": [],
           "min": 0,
-          "max": 1,
           "unit": "percentunit",
           "thresholds": {
             "mode": "absolute",
@@ -1417,15 +1416,15 @@
               },
               {
                 "id": "custom.axisLabel",
-                "value": "Margin share"
+                "value": "Missed share"
               },
               {
                 "id": "unit",
-                "value": "none"
+                "value": "percentunit"
               },
               {
                 "id": "min",
-                "value": -1
+                "value": 0
               },
               {
                 "id": "max",
@@ -1486,17 +1485,6 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "avg_over_time({service=\"cardano-node\", kind=\"LeiosAdaptiveEb\", instance=~\"$instance\"} | json v=\"aliveStake\", c=\"certifiable\" | c=\"true\" | unwrap v [${window}s]) by (instance)",
-          "legendFormat": "{{instance}} alive",
-          "queryType": "range",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "editorMode": "code",
           "expr": "avg_over_time({service=\"cardano-node\", kind=\"LeiosAdaptiveEb\", instance=~\"$instance\"} | json v=\"ebCapacityScale\" | unwrap v [${window}s]) by (instance)",
           "legendFormat": "{{instance}} capacity scale",
           "queryType": "range",
@@ -1508,8 +1496,8 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "avg_over_time({service=\"cardano-node\", kind=\"LeiosAdaptiveEb\", instance=~\"$instance\"} | json v=\"marginShare\", c=\"certifiable\" | c=\"true\" | unwrap v [${window}s]) by (instance)",
-          "legendFormat": "{{instance}} margin share",
+          "expr": "avg_over_time({service=\"cardano-node\", kind=\"LeiosAdaptiveEb\", instance=~\"$instance\"} | json m=\"missedQuorum\", c=\"certifiable\" | c=\"true\" | label_format miss=`{{ if eq .m \"true\" }}1{{ else }}0{{ end }}` | unwrap miss [${window}s]) by (instance)",
+          "legendFormat": "{{instance}} missed share",
           "queryType": "range",
           "refId": "D"
         }
