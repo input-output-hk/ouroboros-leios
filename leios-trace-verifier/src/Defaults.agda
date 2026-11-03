@@ -124,8 +124,7 @@ open import Leios.Base d-Abstract d-VRF public
 -- linear Leios the RB is the Praos block; a leader slot lets the SUT mint an
 -- RB, announcing an EB in it). The party argument is deliberately ignored:
 -- the schedule is the SUT's own and the machine only ever evaluates 'winner'
--- at its own identity (makeBlockʰ), which also neutralizes the
--- party₀-vs-sutId identity fixed inside Leios.Base.Praos.Assumptions.
+-- at its own identity (makeBlockʰ), which is the SUT's.
 -- Slot 0 is a universal winner: it discharges the Praos Assumptions record's
 -- genesisWinner (only the genesis block sits at slot 0) and changes no real
 -- behavior — the machine never mints at slot 0 (Deliver mints at `suc
@@ -141,21 +140,20 @@ d-winner⁇² : d-winner ⁇²
 d-winner⁇² {_} {Nat.zero}   .dec = yes tt
 d-winner⁇² {_} {Nat.suc sl} .dec = Nat.suc sl ∈? winning-slots
 
--- Block-content hash for the Praos tree's prev-linkage: slot and producer
--- uniquely identify honest blocks; the payload part disambiguates the rest.
+-- Block hash for the Praos tree's prev-linkage: slot and producer, which
+-- identify honest blocks.  The payload is left out: the node mints the SUT's
+-- blocks with the payload Leios submitted, which the log does not record,
+-- while the blocks of other parties name them as parents by their log id.
+-- Two blocks of one producer in one slot (equivocation) are not told apart.
 d-blockHash : ℕ → Fin numberOfParties → RankingBlock → List ℕ
-d-blockHash sl pid rb =
-  sl ∷ toℕ pid ∷ body (RankingBlock.txsOrEbCert rb) ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
-  where
-    body : List Tx ⊎ EBCert → List ℕ
-    body (inj₁ txs)  = txs
-    body (inj₂ cert) = cert
+d-blockHash sl pid _ = sl ∷ toℕ pid ∷ []
 
 import Leios.Base.Praos.Machine as PraosMachine
 module PM = PraosMachine d-Abstract d-VRF numberOfParties d-winner
   ⦃ winner⁇² = λ {p} {sl} → d-winner⁇² {p} {sl} ⦄
   (λ _ → tt)
   d-blockHash
+  sutId
 -- producer and slotOf are placeholders (a bare RankingBlock determines
 -- neither its minter nor its slot) but operationally inert: IsBlockchain's
 -- producer/slotOf are read only by deployment-level modules the verifier
@@ -167,6 +165,10 @@ d-Base = PB.B'
 
 d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
 d-BaseFunctionality = PB.praosBase
+
+-- The same node without its (empty) adversary port, with its trace checker,
+-- for stacking Linear Leios on it (LinearLeiosStack).
+open PB public using (node⁻; nodeᶜ; NodeState; initNodeState)
 
 -- The Praos node's honest-local interface (tree state, block insertion,
 -- chain read-out) plus block construction/hashing, for the verifier to

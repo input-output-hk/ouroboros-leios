@@ -685,17 +685,17 @@
     "categorical-crypto": {
       "flake": false,
       "locked": {
-        "lastModified": 1792569972,
-        "narHash": "sha256-asOVNU0hzF33x6qvoiQCU4MOc0xRZo1P223v1fCg2KQ=",
+        "lastModified": 1793358738,
+        "narHash": "sha256-pRwTBx5QhwVVb6bw3dRWA8wXrC2sXiwEnKCXUhNWMyo=",
         "owner": "input-output-hk",
         "repo": "categorical-crypto",
-        "rev": "df0bdd55ba5ec5f7a32479dbd41714ff22944409",
+        "rev": "7b90368f931a47bcc3861c3b99abc64d13785d78",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "categorical-crypto",
-        "rev": "df0bdd55ba5ec5f7a32479dbd41714ff22944409",
+        "rev": "7b90368f931a47bcc3861c3b99abc64d13785d78",
         "type": "github"
       }
     },
@@ -3320,17 +3320,17 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1792578598,
-        "narHash": "sha256-5q1NSwVw+FstdCGew1tcZa/E/Xx4qtv3zkyTMA1r2GI=",
+        "lastModified": 1793697113,
+        "narHash": "sha256-Y1vxegueJ0cERn+MxTDsYABRrgcMR7ZpjAl9nSOicek=",
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "0a8331c5037e090dd6a25b6164d56fcf7804143c",
+        "rev": "426f3756655d8b6b562d49b33243f796c5ab39b3",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "0a8331c5037e090dd6a25b6164d56fcf7804143c",
+        "rev": "426f3756655d8b6b562d49b33243f796c5ab39b3",
         "type": "github"
       }
     },
@@ -5028,16 +5028,17 @@
     "standard-library-meta": {
       "flake": false,
       "locked": {
-        "lastModified": 1754406588,
-        "narHash": "sha256-YH8OqGsQ2DKhKqhSUWBDTimQSZsNCnqwZqNqQwnnVS0=",
+        "lastModified": 1788253692,
+        "narHash": "sha256-jA65FwnhoIxahmJtkaCnoDvo+PvmejeO6JJPh4aPvJI=",
         "owner": "agda",
         "repo": "agda-stdlib-meta",
-        "rev": "ba0159a198c99185bda86541362f8e0a4a82538a",
+        "rev": "97e2f65f5c8a1cc07aacec32b4974668ef32979b",
         "type": "github"
       },
       "original": {
         "owner": "agda",
         "repo": "agda-stdlib-meta",
+        "rev": "97e2f65f5c8a1cc07aacec32b4974668ef32979b",
         "type": "github"
       }
     },

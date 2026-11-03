@@ -154,11 +154,15 @@ module LinearLeiosVerifier where
 
       open import Defaults params testParams using
         (d-SpecStructure; FFDBuffers; isb; hpe;
-         module PraosNode; mkPraosBlock; praosBlockHash; genesisHash)
+         module PraosNode; mkPraosBlock; praosBlockHash; genesisHash;
+         node⁻; nodeᶜ; initNodeState)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
       open import Leios.Linear.Trace.Verifier d-SpecStructure params hiding (verifyTrace)
-      open import LinearLeiosTrace d-SpecStructure params
+      -- Linear Leios stacked on the Praos node: the node, not the trace,
+      -- answers Leios's requests for the ledger and takes its blocks.
+      open import LinearLeiosStack d-SpecStructure params node⁻ nodeᶜ tt using
+        (Stack; Item; entry; deliver; base; ffdᵢ; voteᵢ; ioᵢ; verifyItems)
 
       open Params params
       open Types params
@@ -180,14 +184,15 @@ module LinearLeiosVerifier where
               -- payload lives in RB-refs and may still be corrected by a
               -- later EBGenerated, so blocks are materialized on demand.
               RB-meta : AssocList String (Hash × ℕ × Fin (Params.numberOfParties params))
-              -- ids of the RBs in the SUT's Praos block tree (deduplicated)
-              tree-ids : List String
+              -- the blocks the SUT received in the current slot, latest
+              -- first, for the next delivery to the Praos node
+              inbox : List PraosNode.Block
               FFD-blks : List Blk
               currentSlot : ℕ
 
       open Accumulator
 
-      -- ── The SUT's Praos block tree, maintained from trace events ──
+      -- ── Blocks for the Praos node, built from trace events ──
 
       buildBlk : Accumulator → String → Maybe PraosNode.Block
       buildBlk l i with RB-meta l ⁉ i | RB-refs l ⁉ i
@@ -198,23 +203,6 @@ module LinearLeiosVerifier where
       parentHash l p with unwrap p
       ... | nothing  = genesisHash
       ... | just ref = maybe praosBlockHash genesisHash (buildBlk l (BlockRef.id ref))
-
-      addTreeId : String → Accumulator → Accumulator
-      addTreeId i l =
-        if L.any (λ j → isYes (j ≟ i)) (tree-ids l)
-          then l
-          else record l { tree-ids = i ∷ tree-ids l }
-
-      sutTree : Accumulator → PraosNode.LocalState
-      sutTree l = foldr
-        (λ i ls → maybe (λ blk → PraosNode.processMsgs (blk ∷ []) ls) ls (buildBlk l i))
-        PraosNode.initState
-        (tree-ids l)
-
-      -- The SUT's current base ledger: the Praos best chain of its tree
-      -- (tip first, ending in the genesis payload).
-      sutLedger : Accumulator → List RankingBlock
-      sutLedger l = L.map PraosNode.payloadOf (PraosNode.readChain (currentSlot l) (sutTree l))
 
       instance
         _ = Show-List
@@ -274,22 +262,32 @@ module LinearLeiosVerifier where
       negative-events-EB l s
         with Any.any? isEB? l
       ... | yes _ = []
-      ... | no  _ = entry (No-EB-Role-Action (primWord64ToNat s)) (inj₁ FFDT.SLOT) ∷ []
+      ... | no  _ = entry (No-EB-Role-Action (primWord64ToNat s)) (ffdᵢ FFDT.SLOT) ∷ []
 
       negative-events-VT : List Blk → Word64 → List Item
       negative-events-VT l s
         with Any.any? isVT? l
       ... | yes _ = []
-      ... | no  _ = entry (No-VT-Role-Action (primWord64ToNat s)) (inj₁ FFDT.SLOT) ∷ []
+      ... | no  _ = entry (No-VT-Role-Action (primWord64ToNat s)) (ffdᵢ FFDT.SLOT) ∷ []
+
+      -- The Praos node's round of slot 'n', after Leios submitted its block
+      -- for it: the blocks the SUT received in the slot, and minting.  The
+      -- node's clock trails the Leios slot by one, so it has no round for
+      -- slot 0, whose blocks wait for slot 1.
+      delivery : Accumulator → ℕ → Accumulator × List Item
+      delivery l zero    = l , []
+      delivery l (suc n) = record l { inbox = [] } , deliver (L.reverse (inbox l)) ∷ []
 
       traceEvent→action : Accumulator → TraceEvent → Accumulator × List Item
       traceEvent→action l record { message = Slot p s }
         with p ≟ SUT
       ... | yes _ =
-        record l { FFD-blks = [] ; currentSlot = suc (currentSlot l) } ,
+        let (l' , delivered) = delivery l (primWord64ToNat s)
+        in record l' { FFD-blks = [] ; currentSlot = suc (currentSlot l) } ,
           negative-events-EB (FFD-blks l) s ++ negative-events-VT (FFD-blks l) s ++
             base (primWord64ToNat s)
-          ∷ entry (Slot-Action (primWord64ToNat s)) (inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks l))))
+          ∷ delivered
+          ++ entry (Slot-Action (primWord64ToNat s)) (ffdᵢ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks l))))
           ∷ []
       ... | no _  = l , []
 
@@ -312,7 +310,7 @@ module LinearLeiosVerifier where
       traceEvent→action l record { message = EBReceived s p _ _ i _ }
         with p ≟ SUT | EB-refs l ⁉ i | RB-refs l ⁉ i
       ... | yes _ | just eb | just rb =
-        record l { FFD-blks = EB-Blk eb ∷ FFD-blks l ; EB-received = (i , currentSlot l) ∷ (EB-received l) } , entry (EB-Role-Action (currentSlot l) eb) (inj₁ FFDT.SLOT) ∷ []
+        record l { FFD-blks = EB-Blk eb ∷ FFD-blks l ; EB-received = (i , currentSlot l) ∷ (EB-received l) } , entry (EB-Role-Action (currentSlot l) eb) (ffdᵢ FFDT.SLOT) ∷ []
       ... | _ | _ | _ = l , []
 
       -- VTs
@@ -322,7 +320,7 @@ module LinearLeiosVerifier where
         in record l { VT-refs = (i , vt) ∷ VT-refs l } , []
       traceEvent→action l record { message = VTBundleReceived _ p _ _ i _ }
         with p ≟ SUT | VT-refs l ⁉ i | EB-refs l ⁉ i | EB-received l ⁉ i
-      ... | yes _ | just vt | just eb | just slot' = record l { FFD-blks = VT-Blk vt ∷ FFD-blks l } , entry (VT-Role-Action (currentSlot l) eb slot') (inj₁ FFDT.SLOT) ∷ []
+      ... | yes _ | just vt | just eb | just slot' = record l { FFD-blks = VT-Blk vt ∷ FFD-blks l } , entry (VT-Role-Action (currentSlot l) eb slot') (ffdᵢ FFDT.SLOT) ∷ []
       ... | _ | _ | _ | _ = l , []
 
       -- RBs
@@ -337,22 +335,20 @@ module LinearLeiosVerifier where
                    { RB-refs = (i , rb) ∷ RB-refs l
                    ; RB-meta = (i , (parentHash l parent , primWord64ToNat s , nodeId p)) ∷ RB-meta l
                    }
-        -- The SUT's own block enters its tree at minting (accumulator-only;
-        -- the ledger is next reported at the following BASE-LDG).
-        in (if isYes (p ≟ SUT) then addTreeId i l' else l') , []
+        -- The SUT's own blocks are minted by the Praos node; the log's
+        -- record of them only serves as parents of blocks it receives.
+        in l' , []
 
       traceEvent→action l record { message = RBReceived s p _ _ i _ }
-        with p ≟ SUT | RB-refs l ⁉ i
-      ... | yes _ | just rb =
-        let l' = addTreeId i l
-        in l' , entry (Chain-Action (currentSlot l)) (inj₂ (inj₁ (BaseAbstract.BASE-LDG (sutLedger l')))) ∷ []
+        with p ≟ SUT | buildBlk l i
+      ... | yes _ | just blk = record l { inbox = blk ∷ inbox l } , []
       ... | _ | _ = l , []
 
       -- TXs
       traceEvent→action l record { message = TXGenerated _ _ } = l , []
       traceEvent→action l record { message = TXReceived i _ p }
         with p ≟ SUT
-      ... | yes _ = l , entry (Mempool-Action (currentSlot l)) (inj₂ (inj₂ (inj₁ (SubmitTxs (concatList (map primCharToNat (S.toList i)) ∷ []))))) ∷ []
+      ... | yes _ = l , entry (Mempool-Action (currentSlot l)) (ioᵢ (SubmitTxs (concatList (map primCharToNat (S.toList i)) ∷ []))) ∷ []
       ... | _     = l , []
 
       traceEvent→action l record { message = Cpu _ _ _ _ }                = l , []
@@ -377,15 +373,20 @@ module LinearLeiosVerifier where
       -- be dropped as invalid and never reach EBs'.
       s₀ = initLeiosState tt exampleDistr (L.tabulate (λ i → (i , tt)))
 
+      -- The stack in Leios state 's', with the Praos node's clock one slot
+      -- behind (see 'delivery').
+      stack₀ : LeiosState → Machine.State Stack
+      stack₀ s = ((tt , record initNodeState { clock = LeiosState.slot s ∸ 1 }) , tt) , s
+
       check : LeiosState → List Item → Pair String String
-      check s αs = [ (λ e → (e , "error verifyTrace")) , (λ _ → ("ok" , "")) ]′ (verifyItems s αs)
+      check s αs = [ (λ e → (e , "error verifyTrace")) , (λ _ → ("ok" , "")) ]′ (verifyItems (stack₀ s) αs)
 
       opaque
         unfolding List-Model
 
         verifyTrace' : LeiosState → Pair ℕ (Pair String String)
         verifyTrace' s =
-          let n₀ = record { EB-refs = [] ; EB-received = [] ; VT-refs = [] ; RB-refs = [] ; RB-meta = [] ; tree-ids = [] ; FFD-blks = [] ; currentSlot = LeiosState.slot s }
+          let n₀ = record { EB-refs = [] ; EB-received = [] ; VT-refs = [] ; RB-refs = [] ; RB-meta = [] ; inbox = [] ; FFD-blks = [] ; currentSlot = LeiosState.slot s }
               l' = proj₂ $ mapAccuml traceEvent→action n₀ l
               αs = L.concat l'
           in L.length αs , check s αs

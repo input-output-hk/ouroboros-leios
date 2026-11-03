@@ -42,10 +42,12 @@ module Leios.Base.Praos.Machine
   (winner₀ : ∀ p → winner p 0)
   -- Block-content hash for prev-linkage (see Assumptions.agda).
   (blockHash : ℕ → Fin numParties → LB.RankingBlock a vrf' → Hash)
+  -- The party the node mints as.
+  (self : Fin numParties)
   where
 
 open import Leios.Base.Praos.Assumptions a vrf' numParties winner
-  ⦃ winner⁇² = winner⁇² ⦄ winner₀ blockHash
+  ⦃ winner⁇² = winner⁇² ⦄ winner₀ blockHash self
   public using (praosNode; mkPraosBlock; praosBlockHash; genesisHash)
 open import Leios.Base.Praos a vrf' using (module Node)
 open import Leios.Base a vrf' using (RankingBlock; StakeDistr)
@@ -62,5 +64,5 @@ module Assembled
 
   private module PraosNode = Node praosNode Cert VTy initSlot V-chkCerts stake₀
   -- B' is what a SpecStructure consumer installs alongside praosBase.
-  open PraosNode public using (B'; node)
+  open PraosNode public using (B'; node; node⁻; nodeᶜ; NodeState; initNodeState)
   open PraosNode.Assemble numParties producer slotOf public

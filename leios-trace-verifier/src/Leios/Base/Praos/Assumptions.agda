@@ -66,6 +66,8 @@ module Leios.Base.Praos.Assumptions
   -- it injective enough (e.g. include slot and producer) that reconstructed
   -- chains reflect real parenthood.
   (blockHash : ℕ → Fin numParties → LB.RankingBlock a vrf' → Hash)
+  -- The party the node mints as.
+  (self : Fin numParties)
   where
 
 open import Leios.Base.Praos.Instance a vrf' numParties winner ⦃ winner⁇² = winner⁇² ⦄
@@ -253,7 +255,7 @@ instance
 -- Closes the gap docs/praos-base-machine-sketch.md flagged: with a concrete
 -- Assumptions instance in hand, Leios.Base.Praos.Instance.WithAssumptions no
 -- longer needs one as a bare module parameter.
-open WithAssumptions ⦃ praosAssumptions ⦄ party₀ public using (praosNode)
+open WithAssumptions ⦃ praosAssumptions ⦄ self public using (praosNode)
 
 -- Verifier-facing helpers for building tree blocks from trace data (the
 -- PraosAbstract interface keeps Block abstract, so construction and hashing

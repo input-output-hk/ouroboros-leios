@@ -5,6 +5,7 @@ open import Leios.Abstract
 open import Leios.VRF
 
 open import CategoricalCrypto hiding (id; _∘_)
+open import CategoricalCrypto.Machine.Trace using (Checker; Step; step)
 
 import Blockchain.IsBlockchain as IsBC
 
@@ -83,17 +84,22 @@ module Node
       return just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ STAKE stake₀)
       newState record s { checkCert = just chk }
 
+    -- No acknowledgement: Linear Leios has no rule that consumes 'EMPTY',
+    -- so stacked on this node (see 'node⁻') it could not take a step that
+    -- submits.
     Submit : ∀ {rb} →
       WithState s
       receive L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ SUBMIT rb
-      return just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ EMPTY)
+      return nothing
       newState record s { pending = just rb }
 
+    -- The chain up to the slot of the last 'Deliver', which is the slot
+    -- Leios is about to leave when it asks (see 'Deliver').
     FtchLdg :
       WithState s
       receive L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG
       return just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ
-        BASE-LDG (map payloadOf (readChain (s .clock ∸ 1) (s .ls))))
+        BASE-LDG (map payloadOf (readChain (s .clock) (s .ls))))
       newState s
 
     FtchSlot :
@@ -104,6 +110,8 @@ module Node
 
     -- One DD round, localized: absorb the delivery batch, tick, mint if the
     -- slot is won. The diffusion answer is synchronous (cf. NetTranslate).
+    -- The round of slot 'suc clock' closes that slot, after Leios submitted
+    -- its block for it, so the clock trails the Leios slot by one.
     Deliver : ∀ {bs} →
       let ls₁         = processMsgs bs (s .ls)
           sl          = suc (s .clock)
@@ -117,6 +125,38 @@ module Node
   node : Machine BaseNetwork (BaseIO ⊗₀ BaseAdv)
   node .Machine.State   = _
   node .Machine.stepRel = WithState_receive_return_newState_
+
+  -- The node without its adversary port, which is the empty channel 'I',
+  -- so that it fits under Linear Leios's 'BaseIO' port.
+  opaque
+    unfolding _⊗₀_
+
+    dropAdv : ∀ {m} → BaseNetwork ⊗₀ BaseIO ᵀ [ m ]⇒[ m ] BaseNetwork ⊗₀ (BaseIO ⊗₀ BaseAdv) ᵀ
+    dropAdv {In}  = mk⇒ [ inj₁ , inj₂ ∘ inj₁ ]′
+    dropAdv {Out} = mk⇒ [ inj₁ , inj₂ ∘ inj₁ ]′
+
+  node⁻ : Machine BaseNetwork BaseIO
+  node⁻ = modifyStepRel dropAdv node
+
+  -- Every input steps, in one way only, so the checker needs no hint and
+  -- never fails.
+  opaque
+    unfolding dropAdv
+
+    node-step : ∀ s i → Step node⁻ s i
+    node-step _ (inj₁ _)                = step (just (inj₁ _)) _ Deliver
+    node-step _ (inj₂ (INIT _))         = step (just (inj₂ _)) _ Init
+    node-step _ (inj₂ (SUBMIT _))       = step nothing _ Submit
+    node-step _ (inj₂ FTCH-LDG)         = step (just (inj₂ _)) _ FtchLdg
+    node-step _ (inj₂ FTCH-SLOT)        = step (just (inj₂ _)) _ FtchSlot
+
+  nodeᶜ : Checker node⁻
+  nodeᶜ = record
+    { Hint      = ⊤
+    ; hintOf    = λ _ → tt
+    ; Err       = λ _ _ _ → ⊥
+    ; checkStep = λ _ i s → inj₂ (node-step s i , refl)
+    }
 
   -- producer and slotOf are parameters until RankingBlock determines its
   -- Praos header (see docs/praos-base-machine-sketch.md).

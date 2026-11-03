@@ -64,8 +64,9 @@ let
   # (unsolved holes), Protocol.TraceVerifier (sole user of the
   # agda-irrelevance dependency) and the Properties theorems (to be
   # re-included for the safety/liveness transfer work).  Its
-  # Data.List.Properties.Ext is renamed, since categorical-crypto ships an
-  # unrelated module of the same name and the verifier depends on both.
+  # `*.Properties.Ext` modules that categorical-crypto also ships (unrelated
+  # modules of the same names) are renamed to `*.Properties.PraosExt`, since
+  # the verifier depends on both.
   praosSpec = pkgs.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
     pname = "praos-spec";
@@ -79,9 +80,14 @@ let
       rm -r src/Everything.agda src/Examples \
             src/Protocol/TraceVerifier.agda src/Protocol/TraceVerifier \
             src/Properties
-      mv src/Data/List/Properties/Ext.agda src/Data/List/Properties/PraosExt.agda
-      grep -rlF 'Data.List.Properties.Ext' src \
-        | xargs sed -i 's/Data\.List\.Properties\.Ext\b/Data.List.Properties.PraosExt/g'
+      for m in Data.List.Properties.Ext Data.Fin.Properties.Ext \
+               Relation.Binary.PropositionalEquality.Properties.Ext; do
+        f=src/$(echo "$m" | tr . /).agda
+        [ -f "$f" ] || continue
+        mv "$f" "$(dirname "$f")/PraosExt.agda"
+        re=$(echo "$m" | sed 's/\./\\./g')
+        grep -rlF "$m" src | xargs -r sed -i "s/$re\b/''${m%.Ext}.PraosExt/g"
+      done
       {
         echo "module EverythingLeios where"
         echo "import Protocol.Semantics"
