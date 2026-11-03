@@ -6,9 +6,8 @@
 #   1. baseline         every voter online
 #   2. offline          bp3 votes with its own key only, so its share of the
 #                       generated voters (a third of a tenth of the stake) is
-#                       offline. aliveStake should drop by that much once the
-#                       last AliveWindow samples no longer hold their votes,
-#                       and the cut it caused until then should recover.
+#                       offline. Quorums are still made, so the cap should
+#                       not move.
 #   3. restored         bp3 votes with its whole bundle again
 #   4. slow third       bp3 is pinned to one core. Without bp3 there is no
 #                       quorum, so the cap should shrink until bp3's votes make
