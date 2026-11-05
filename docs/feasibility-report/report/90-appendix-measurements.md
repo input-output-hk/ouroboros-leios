@@ -4,7 +4,7 @@ This appendix states, for every quantity the report's tables and
 figures rest on, which records it was read from, what marks its start
 and its end, which records were kept or dropped, and how the result was
 aggregated, so that a reviewer can judge the approach and not only the
-numbers. It is written for sections 1 to 5 and grows with the sections
+numbers. It is written for sections 1 to 6 and grows with the sections
 that follow. A.1 describes the sources and the records they hold, A.2
 the conventions every entry shares, A.3 the quantities themselves, and
 A.4 maps each quantity to the script or query that implements it.
@@ -50,7 +50,15 @@ selection with each call's name, argument and duration. For each
 testnet window the pulls are merged with the archive into one period
 database in the archive's record layout, the one IOG host that also
 sends to the archive being taken from the monitoring copy only, so that
-every instrument reads both populations with one definition.
+every instrument reads both populations with one definition. Two
+further pulls from the monitoring serve section 6 and are not merged
+into the period databases: the per-peer announcement events (one event
+per peer that announced an EB to the host, with the peer's connection
+id), and the per-minute metric series of each host (the node's resident
+memory, GC live data and CPU tick counters, and the host's CPU count,
+total memory and CPU busy fraction). The hosts' instance types, vCPU
+counts and CPU generations (Table 3.2) are held in a small table the
+instruments read.
 
 **The cluster runs.** The benchmarking team's archives hold every
 node's traces in per-namespace tables with the node and the nanosecond
@@ -232,7 +240,9 @@ won and, when it lost, from the orphan's size in the block-fetch
 completion event, a certifying RB fetching at about 1 kB and a plain one
 under load at 88 kB. Orphans adopted by a single node are left out as a
 node on its own stale chain. On the cluster the orphan's size comes from
-its forger's adoption event.
+its forger's adoption event. The cluster archives also hold a resource
+trace per node, one row per second with the resident set, the live
+data and the cumulative CPU and GC centiseconds.
 
 **Leader slots and chain density (section 5).** The observed hosts'
 leader-slot and forged-RB events counted per window; on the testnet
@@ -261,6 +271,61 @@ equals the chain-selection call's own duration RB by RB. Medians and
 90th percentiles over node-RB pairs; the cluster reads the same events
 from its chain-database traces.
 
+**Validation time by unseen share (section 6.1).** The records of the
+validation entry above, every EB a node validated whether it certified
+or not, with the duration between 0 and 60 s and at least 100
+transactions; the applied share is applied over applied plus reapplied.
+The EBs are classed by their transaction count in steps of 500 and the
+class holding the most distinct EBs is kept, so that every cell compares
+EBs of one size. Records are binned by applied share (under 10 %, 10 to
+30, 30 to 50, 50 to 70, 70 and over). For each IOG and PIR host the
+median duration per bin, printed per instance class as the range of its
+hosts' medians, with the records in brackets; a cell is marked tentative
+when a host in it has fewer than 30 records and left blank when every
+host has fewer than 10. For the operators, the nodes with 20 or more
+records in every bin are kept, the same set in every column; per node
+the median per bin, then the median and the quartiles across nodes. On
+the cluster all 51 nodes form the one population.
+
+**EBs failing by unseen share (section 6.2).** On a cluster run, per
+EB the mean over its voters of the applied share from the same records,
+binned (under 30 %, then steps of 10 to 70 and over); per bin the EBs
+and the share that failed to certify, an EB certifying when 39 or more
+of the 51 voters had it validated by 7 s after the slot. The median
+applied share quoted for a population is the median over all its
+validation records.
+
+**Nodes by their closure p90 (section 6.3).** The per-node closure
+percentiles of the diffusion entry above (nodes with 50 or more EBs),
+counted in bins of the node's own p90 (under 2 s, 2 to 3, 3 to 4, 4 to
+7, 7 to 15, 15 to 60, 60 and over), with the median node's p90 and
+never-completed share.
+
+**Upstream-peer groups (section 6.3).** A node's upstream peers are the
+distinct peers that delivered its EB announcements during the window,
+counted from the peer field of its accepted-announcement events; for
+the IOG and PIR hosts, whose events carry no peer, the same count is
+taken from the monitoring's per-peer announcement events over the same
+period. Nodes are grouped (1, 2 to 3, 4 to 10, 11 to 30, 31 and more)
+and the group is described by its closure p90 at its median node and at
+its 90th-percentile node, its body p90 and never-completed share at the
+median node, its vote rate at the median and at the 10th-percentile
+node, and the committee weight of its pools, the mean over the window's
+committees of the pools' share.
+
+**Memory and CPU (section 6.4).** Operators: from each node's metric
+scrapes (about one per minute) the resident set at the node's median
+and peak sample, the GC live data at its peak, the process CPU as cores
+from the differences of the cumulative tick counter over intervals of
+60 s or more (shorter intervals quantise), taking the node's median and
+90th-percentile interval, with counters that imply more than 32 cores
+dropped as a different unit, and the GC share as the positive
+increments of the GC counter over those of the CPU counter; then the
+distribution across nodes. IOG and PIR hosts: the same from the
+monitoring's per-minute series, plus the host's total memory and its
+five-minute CPU busy fraction. Cluster: the same from the per-second
+resource trace.
+
 **Node versions.** The build information metric of each node's
 scrapes, per day, keeping the revision seen last on a day with an
 upgrade.
@@ -280,7 +345,13 @@ Inside the repository are the instruments, which read a data set and
 write a saved output per window or run, the saved outputs themselves,
 and the printers, which read the outputs and print the report's tables;
 every number in a table is reproducible from the data sets by running
-the instrument and then the printer.
+the instrument and then the printer. In the published copy the per-node
+outputs of the testnet windows and the hosts table carry every node and
+pool as a number (n1, n2, … and p1, p2, …, one number per node across
+the windows) in place of the agent names, hostnames and pool ids, with
+the operators' tickers emptied and the IOG and PIR labels kept; the
+printers read them unchanged, and the mapping is held by the author and
+available to reviewers on request.
 
 | quantity | data set | instrument | printer |
 |---|---|---|---|
@@ -299,4 +370,8 @@ the instrument and then the printer.
 | the forge path | archived monitoring pulls, chain cache | `forge_path.py` | `praos_table.py` |
 | the adoption path | period database or cluster run, chain cache | `adoption_path.sql`, `cluster_adoption_path.sql` | `praos_table.py` |
 | the Praos control | the team's report | | `praos_table.py`, typed constants |
+| validation time by unseen share | the per-record validation output of a window or run, the hosts table | `validation_bins.py` | `cost_table.py bins` |
+| EBs failing by unseen share | the per-record validation output of a cluster run, its ladder export | `host_speed.py` | `cost_table.py unseen` |
+| nodes by their closure p90, upstream-peer groups | the per-node diffusion outputs, the voters table; the archived per-peer announcement pulls | `diffusion_bins.py`, `peers_upstream.py` | `diffusion_table.py bins`, `upstream` |
+| memory and CPU | the period database's metrics, the archived monitoring series, the cluster's resource trace; the hosts table | `resources.py` | `cost_table.py resources` |
 | node versions | the period database's metrics | the node-versions query | read directly |

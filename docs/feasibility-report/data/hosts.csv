@@ -1,0 +1,14 @@
+agent,host,deployment,instance,vcpu,generation
+n80,IOG1,IOG,c8id.xlarge,4,current
+n81,IOG2,IOG,r8id.xlarge,4,current
+n82,IOG3,IOG,c8id.xlarge,4,current
+n83,PIR1,PIR,c8id.xlarge,4,current
+n84,PIR2,PIR,c6id.2xlarge,8,two older
+n85,PIR3,PIR,c8id.xlarge,4,current
+n86,PIR4,PIR,c8id.xlarge,4,current
+n87,PIR5,PIR,c6id.2xlarge,8,two older
+n88,PIR6,PIR,c6id.2xlarge,8,two older
+n89,PIR7,PIR,c5d.2xlarge,8,three older
+n90,PIR8,PIR,c8id.xlarge,4,current
+n91,PIR9,PIR,c5d.2xlarge,8,three older
+n92,PIR10,PIR,c8id.xlarge,4,current
