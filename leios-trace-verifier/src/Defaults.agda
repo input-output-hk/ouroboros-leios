@@ -6,7 +6,10 @@
    (VT) eligibility follows the deterministic, epoch-fixed committee of CIP-0164
    computed from the stake distribution, whereas block production (EB) is
    decided by the 'winning-slots' oracle (the Praos VRF leadership schedule)
-   supplied through 'TestParams'. See 'sortition' below.
+   supplied through 'TestParams'. See 'sortition' below.  The slots in which
+   the SUT mints a ranking block, 'rb-slots', are a separate parameter: a
+   leader may put the transactions in the ranking block and announce no EB,
+   so these slots carry no EB obligation.  See 'd-winner' below.
 
    The cryptographic components stay abstract: hashing is the identity on the
    relevant payloads, signatures/proofs are the unit type. The base layer is
@@ -33,7 +36,10 @@ open import Tactic.Derive.DecEq
 
 module Defaults
   (params : Params) (let open Params params)
-  (testParams : TestParams params) (let open TestParams testParams) where
+  (testParams : TestParams params) (let open TestParams testParams)
+  -- The slots in which the SUT leads, and mints a ranking block.
+  (rb-slots : ℙ ℕ)
+  where
 
 instance
   htx : Hashable (List ℕ) (List ℕ)
@@ -119,26 +125,29 @@ open import Leios.Base d-Abstract d-VRF public
 -- follow Praos's honest-node semantics (processMsgsʰ/makeBlockʰ/bestChain)
 -- instead of echoing untouched state.
 
--- RB-production eligibility for the wrapped Praos node: the same
--- leadership-schedule oracle 'sortition' consults (in
--- linear Leios the RB is the Praos block; a leader slot lets the SUT mint an
--- RB, announcing an EB in it). The party argument is deliberately ignored:
--- the schedule is the SUT's own and the machine only ever evaluates 'winner'
--- at its own identity (makeBlockʰ), which is the SUT's.
+-- RB-production eligibility for the wrapped Praos node: for the SUT, the
+-- slots 'rb-slots' (in linear Leios the RB is the Praos block; a leader slot
+-- lets the SUT mint an RB, which may announce an EB).  The schedules of the other parties are unknown, so their blocks are
+-- taken as the log has them: every slot is theirs to win.  Without this, a
+-- block of another party would only be valid in a winning slot of the SUT,
+-- and the node would never extend it.
 -- Slot 0 is a universal winner: it discharges the Praos Assumptions record's
 -- genesisWinner (only the genesis block sits at slot 0) and changes no real
 -- behavior — the machine never mints at slot 0 (Deliver mints at `suc
 -- clock`), so the schedule is only ever consulted at slots ≥ 1.
 d-winner : Fin numberOfParties → ℕ → Type
 d-winner _ Nat.zero     = ⊤
-d-winner _ (Nat.suc sl) = Nat.suc sl ∈ winning-slots
+d-winner p (Nat.suc sl) = p ≡ sutId → Nat.suc sl ∈ rb-slots
 
 -- Deliberately NOT an instance: `d-winner _ zero` reduces to ⊤, so as an
 -- instance this would overlap with Dec-⊤ in unrelated searches. It is passed
 -- to the Praos machine explicitly below.
 d-winner⁇² : d-winner ⁇²
 d-winner⁇² {_} {Nat.zero}   .dec = yes tt
-d-winner⁇² {_} {Nat.suc sl} .dec = Nat.suc sl ∈? winning-slots
+d-winner⁇² {p} {Nat.suc sl} .dec with p ≟ sutId | Nat.suc sl ∈? rb-slots
+... | no p≢  | _       = yes λ p≡ → ⊥-elim (p≢ p≡)
+... | yes _  | yes w   = yes λ _ → w
+... | yes p≡ | no ¬w   = no λ f → ¬w (f p≡)
 
 -- Block hash for the Praos tree's prev-linkage: slot and producer, which
 -- identify honest blocks.  The payload is left out: the node mints the SUT's
@@ -166,9 +175,14 @@ d-Base = PB.B'
 d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
 d-BaseFunctionality = PB.praosBase
 
--- The same node without its (empty) adversary port, with its trace checker,
--- for stacking Linear Leios on it (LinearLeiosStack).
-open PB public using (node⁻; nodeᶜ; NodeState; initNodeState)
+-- The same node without its (empty) adversary port, for stacking Linear
+-- Leios on it (LinearLeiosStack), and its trace checker 'Check'.  A verifier
+-- picks what its log observes: blocks by parent and slot ('praosHeader'),
+-- which is what a log records of the blocks the node mints (their payload is
+-- Leios's, see 'd-blockHash'), and the selected chain by its tip
+-- ('tipHash'), where the log names it.
+open PB public using (node⁻; NodeState; initNodeState; module Check)
+open PM public using (praosHeader)
 
 -- The Praos node's honest-local interface (tree state, block insertion,
 -- chain read-out) plus block construction/hashing, for the verifier to
@@ -177,6 +191,11 @@ open PM public using (mkPraosBlock; praosBlockHash; genesisHash)
 
 open import Leios.Base.Praos d-Abstract d-VRF using (PraosAbstract)
 module PraosNode = PraosAbstract PM.praosNode
+
+-- The hash of the tip of a selected chain, which a node log names.
+tipHash : List PraosNode.Block → Hash
+tipHash []      = PM.genesisHash
+tipHash (b ∷ _) = PM.praosBlockHash b
 
 open import Leios.FFD public
 

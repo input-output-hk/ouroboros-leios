@@ -123,6 +123,11 @@ TraceOptions:
     maxFrequency: 2.0
   ChainDB.AddBlockEvent.AddedBlockToVolatileDB:
     maxFrequency: 2.0
+  # The trace verifier's Praos layer needs the headers these list at DDetailed.
+  ChainDB.AddBlockEvent.AddedToCurrentChain:
+    detail: DDetailed
+  ChainDB.AddBlockEvent.SwitchedToAFork:
+    detail: DDetailed
   ChainDB.CopyToImmutableDBEvent.CopiedBlockToImmutableDB:
     maxFrequency: 2.0
   # The whole subtree traces per UTxO read, per handle operation or per block

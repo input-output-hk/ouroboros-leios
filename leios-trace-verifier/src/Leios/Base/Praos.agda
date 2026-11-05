@@ -5,7 +5,8 @@ open import Leios.Abstract
 open import Leios.VRF
 
 open import CategoricalCrypto hiding (id; _∘_)
-open import CategoricalCrypto.Machine.Trace using (Checker; Step; step)
+open import CategoricalCrypto.Machine.Trace using (Checker; Checkable; Step; step)
+import CategoricalCrypto.Machine.Trace as MT
 
 import Blockchain.IsBlockchain as IsBC
 
@@ -73,6 +74,11 @@ module Node
   payload nothing   = emptyRB
   payload (just rb) = rb
 
+  -- The blocks the node mints in the round that absorbs 'bs': it ticks to
+  -- the next slot and mints there if it leads.
+  mintedIn : NodeState → List Block → List Block × LocalState
+  mintedIn s bs = makeBlock (suc (s .clock)) (payload (s .pending)) (processMsgs bs (s .ls))
+
   private variable s : NodeState
 
   data WithState_receive_return_newState_ :
@@ -94,12 +100,14 @@ module Node
       newState record s { pending = just rb }
 
     -- The chain up to the slot of the last 'Deliver', which is the slot
-    -- Leios is about to leave when it asks (see 'Deliver').
+    -- Leios is about to leave when it asks (see 'Deliver').  Leios keeps its
+    -- base chain oldest first, with the tip last, and Praos the other way
+    -- round, so the chain is reversed.
     FtchLdg :
       WithState s
       receive L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG
       return just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ
-        BASE-LDG (map payloadOf (readChain (s .clock) (s .ls))))
+        BASE-LDG (reverse (map payloadOf (readChain (s .clock) (s .ls)))))
       newState s
 
     FtchSlot :
@@ -113,14 +121,12 @@ module Node
     -- The round of slot 'suc clock' closes that slot, after Leios submitted
     -- its block for it, so the clock trails the Leios slot by one.
     Deliver : ∀ {bs} →
-      let ls₁         = processMsgs bs (s .ls)
-          sl          = suc (s .clock)
-          (out , ls₂) = makeBlock sl (payload (s .pending)) ls₁
+      let (out , ls′) = mintedIn s bs
       in
       WithState s
       receive ϵ ⊗R ↑ᵢ bs
       return just (ϵ ⊗R ↑ₒ out)
-      newState record s { ls = ls₂ ; clock = sl }
+      newState record s { ls = ls′ ; clock = suc (s .clock) }
 
   node : Machine BaseNetwork (BaseIO ⊗₀ BaseAdv)
   node .Machine.State   = _
@@ -138,8 +144,7 @@ module Node
   node⁻ : Machine BaseNetwork BaseIO
   node⁻ = modifyStepRel dropAdv node
 
-  -- Every input steps, in one way only, so the checker needs no hint and
-  -- never fails.
+  -- Every input steps, in one way only.
   opaque
     unfolding dropAdv
 
@@ -150,13 +155,46 @@ module Node
     node-step _ (inj₂ FTCH-LDG)         = step (just (inj₂ _)) _ FtchLdg
     node-step _ (inj₂ FTCH-SLOT)        = step (just (inj₂ _)) _ FtchSlot
 
-  nodeᶜ : Checker node⁻
-  nodeᶜ = record
-    { Hint      = ⊤
-    ; hintOf    = λ _ → tt
-    ; Err       = λ _ _ _ → ⊥
-    ; checkStep = λ _ i s → inj₂ (node-step s i , refl)
-    }
+  -- The node's trace checker.  The node is deterministic, so a hint picks
+  -- no step; it is what the log observes of the step, and the checker
+  -- rejects a step the log observes otherwise.  The log records the blocks
+  -- the node mints, as 'observe' sees them, and its selected chain after the
+  -- round, as 'observeTip' sees it, and nothing of its other steps: the hint
+  -- of a delivery round is its slot with these two, and the hint of every
+  -- other step is 'nothing'.  A log that does not record the selected chain
+  -- observes it as '⊤'.
+  module Check {Obs TipObs : Type} ⦃ DecEq-Obs : DecEq Obs ⦄ ⦃ DecEq-TipObs : DecEq TipObs ⦄
+               (observe : Block → Obs) (observeTip : List Block → TipObs) where
+
+    NodeHint : Type
+    NodeHint = Maybe (ℕ × List Obs × TipObs)
+
+    opaque
+      unfolding dropAdv
+
+      -- What the log observes of the step of the node in state 's' on 'i'.
+      hintAt : NodeState → MT.Input node⁻ → NodeHint
+      hintAt s (inj₁ bs) =
+        let (out , ls′) = mintedIn s bs
+            sl          = suc (s .clock)
+        in just (sl , map observe out , observeTip (readChain sl ls′))
+      hintAt _ (inj₂ _)  = nothing
+
+    nodeᶜ : Checker node⁻
+    nodeᶜ = record
+      { Hint      = NodeHint
+      ; hintOf    = λ {s} {i} _ → hintAt s i
+      ; Err       = λ h i s → hintAt s i ≢ h
+      ; checkStep = λ h i s → case hintAt s i ≟ h of λ where
+          (yes eq) → inj₂ (node-step s i , eq)
+          (no neq) → inj₁ neq
+      }
+
+    -- An error refutes the step, since the hint of a step is fixed by its
+    -- state and input.
+    nodeᶜ-refute : ∀ {h i s} → Checkable.Err nodeᶜ h i s
+                 → ¬ Checkable.StepWith nodeᶜ h s i
+    nodeᶜ-refute neq (_ , eq) = neq eq
 
   -- producer and slotOf are parameters until RankingBlock determines its
   -- Praos header (see docs/praos-base-machine-sketch.md).

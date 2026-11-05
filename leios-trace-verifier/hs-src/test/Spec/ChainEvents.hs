@@ -13,6 +13,8 @@ module Spec.ChainEvents (
 
 import ChainEvents (ChainEvent (..), parseNodeLog)
 import qualified Data.ByteString.Lazy.Char8 as BSL8
+import Data.Text (Text)
+import qualified Data.Text as T
 import Test.Hspec (Spec, describe, it, shouldBe)
 
 parse :: [BSL8.ByteString] -> [ChainEvent]
@@ -21,6 +23,33 @@ parse = parseNodeLog . BSL8.unlines
 -- | A 64-hex-char RB hash (ChainDB's @newtip@ parser requires exactly 64).
 rb64 :: BSL8.ByteString
 rb64 = BSL8.concat (replicate 32 "ab")
+
+rb64T :: Text
+rb64T = T.replicate 32 "ab"
+
+-- | A 64-hex-char block hash named by a short prefix.
+hx :: Text -> Text
+hx n = T.justifyLeft 64 '0' n
+
+-- | An adopted header as ChainDB renders it at @DDetailed@: the hash with its
+--   own quotes inside the string, and slot and block number as decimal strings.
+hdr :: Text -> Integer -> Integer -> Text
+hdr n s b =
+  "{\"kind\":\"ShelleyBlock\",\"hash\":\"\\\"" <> hx n <> "\\\""
+    <> "\",\"slotNo\":\"" <> T.pack (show s)
+    <> "\",\"blockNo\":\"" <> T.pack (show b) <> "\"}"
+
+-- | A selection event at @DDetailed@: the new tip and the adopted headers.
+selectionLine :: Text -> Text -> Text -> Integer -> [Text] -> BSL8.ByteString
+selectionLine ns kind tip s hs =
+  BSL8.pack . T.unpack $
+    "{\"ns\":\"" <> ns <> "\",\"data\":{\"kind\":\"" <> kind
+      <> "\",\"newtip\":\"" <> hx tip <> "@" <> T.pack (show s)
+      <> "\",\"headers\":[" <> T.intercalate "," hs <> "]}}"
+
+added, switched :: Text -> Integer -> Integer -> [Text] -> BSL8.ByteString
+added tip s _ = selectionLine "ChainDB.AddBlockEvent.AddedToCurrentChain" "AddedToCurrentChain" tip s
+switched tip s _ = selectionLine "ChainDB.AddBlockEvent.SwitchedToAFork" "TraceAddBlockEvent.SwitchedToAFork" tip s
 
 chainEvents :: Spec
 chainEvents = do
@@ -60,7 +89,7 @@ chainEvents = do
         , "{\"ns\":\"Consensus.LeiosKernel.Voted\",\"data\":{\"kind\":\"LeiosVoted\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":20},\"weight\":1.22e-2}}"
         , "{\"ns\":\"Consensus.LeiosKernel.VoteAcquired\",\"data\":{\"kind\":\"LeiosVoteAcquired\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":32}}}"
         ]
-        `shouldBe` [CAnnouncementAccepted "eb05" 300, CChainExtended 300, CVoted "eb05" 300, CVoteAcquired "eb05" 300]
+        `shouldBe` [CAnnouncementAccepted "eb05" 300, CUndetailed, CNewTip rb64T 300, CVoted "eb05" 300, CVoteAcquired "eb05" 300]
     -- An RB can be adopted by switching to a fork rather than by extending the
     -- current chain. Both report the adopted tip in 'newtip', and the node votes
     -- on whatever it selected, so both must feed the linkage map. Listening only
@@ -74,19 +103,46 @@ chainEvents = do
         , "{\"ns\":\"ChainDB.AddBlockEvent.SwitchedToAFork\",\"data\":{\"kind\":\"TraceAddBlockEvent.SwitchedToAFork\",\"newSuffixSelectView\":{\"blockNo\":32,\"kind\":\"PraosTiebreakerView\",\"slotNo\":699},\"newtip\":\"" <> rb64 <> "@699\"}}"
         , "{\"ns\":\"Consensus.LeiosKernel.Voted\",\"data\":{\"kind\":\"LeiosVoted\",\"vote\":{\"rbHash\":\"" <> rb64 <> "\",\"voterId\":2},\"weight\":0.333333333333}}"
         ]
-        `shouldBe` [CAnnouncementAccepted "eb07" 699, CChainExtended 699, CVoted "eb07" 699]
+        `shouldBe` [CAnnouncementAccepted "eb07" 699, CUndetailed, CNewTip rb64T 699, CVoted "eb07" 699]
     it "emits AnnouncementAccepted, which is what makes an EB votable" $
       parse ["{\"ns\":\"Consensus.LeiosKernel.AnnouncementAccepted\",\"data\":{\"kind\":\"LeiosAnnouncementAccepted\",\"ebHash\":\"eb06\",\"electionSlot\":301,\"ebBodySize\":1,\"equivocation\":false}}"]
         `shouldBe` [CAnnouncementAccepted "eb06" 301]
     it "parses NodeIsLeader" $
       parse ["{\"ns\":\"Forge.Loop.NodeIsLeader\",\"data\":{\"kind\":\"TraceNodeIsLeader\",\"slot\":7}}"]
         `shouldBe` [CNodeIsLeader 7]
-    it "emits CChainExtended when the tip advances (AddedToCurrentChain)" $
+    it "flags a tip advance without its headers (AddedToCurrentChain)" $
       parse ["{\"ns\":\"ChainDB.AddBlockEvent.AddedToCurrentChain\",\"data\":{\"kind\":\"AddedToCurrentChain\",\"newtip\":\"" <> rb64 <> "@432\"}}"]
-        `shouldBe` [CChainExtended 432]
-    it "emits CChainExtended on a fork switch too (SwitchedToAFork)" $
+        `shouldBe` [CUndetailed, CNewTip rb64T 432]
+    it "flags a fork switch without its headers too (SwitchedToAFork)" $
       parse ["{\"ns\":\"ChainDB.AddBlockEvent.SwitchedToAFork\",\"data\":{\"kind\":\"TraceAddBlockEvent.SwitchedToAFork\",\"newtip\":\"" <> rb64 <> "@433\"}}"]
-        `shouldBe` [CChainExtended 433]
+        `shouldBe` [CUndetailed, CNewTip rb64T 433]
+    it "links the adopted headers to their parents (DDetailed)" $
+      parse
+        [ added "a" 10 1 [hdr "a" 10 1]
+        , added "c" 12 3 [hdr "b" 11 2, hdr "c" 12 3]
+        ]
+        `shouldBe` [ CAdopted (hx "a") 10 Nothing
+                   , CNewTip (hx "a") 10
+                   , CAdopted (hx "b") 11 (Just (hx "a"))
+                   , CAdopted (hx "c") 12 (Just (hx "b"))
+                   , CNewTip (hx "c") 12
+                   ]
+    it "links a fork to the block it branches from (DDetailed)" $
+      parse
+        [ added "a" 10 1 [hdr "a" 10 1]
+        , added "b" 11 2 [hdr "b" 11 2]
+        , switched "c" 12 2 [hdr "c" 12 2]
+        , added "d" 13 3 [hdr "d" 13 3]
+        ]
+        `shouldBe` [ CAdopted (hx "a") 10 Nothing
+                   , CNewTip (hx "a") 10
+                   , CAdopted (hx "b") 11 (Just (hx "a"))
+                   , CNewTip (hx "b") 11
+                   , CAdopted (hx "c") 12 (Just (hx "a"))
+                   , CNewTip (hx "c") 12
+                   , CAdopted (hx "d") 13 (Just (hx "c"))
+                   , CNewTip (hx "d") 13
+                   ]
     it "maps NotVoted (a deliberate, protocol-legal abstention) with its reason" $
       parse ["{\"ns\":\"Consensus.LeiosKernel.NotVoted\",\"data\":{\"kind\":\"LeiosNotVoted\",\"ebHash\":\"eb07\",\"ebSlot\":540,\"reason\":\"chainTipDoesNotAnnounce\"}}"]
         `shouldBe` [CNotVoted "eb07" 540 "chainTipDoesNotAnnounce"]

@@ -79,6 +79,12 @@ segmentStarts ps = [segStart s | SegmentStarted s _ <- ps]
 ticks :: Integer -> Integer -> [ChainEvent]
 ticks from to = [CSlot (fromInteger s) | s <- [from .. to]]
 
+-- | The node adopts a ranking block (hash, slot, parent) and it becomes the tip of
+--   its selected chain.  An EB is votable only once the block of its election slot
+--   heads the chain.
+adopt :: Text -> Integer -> Maybe Text -> [ChainEvent]
+adopt h s p = [CAdopted h (fromInteger s) p, CNewTip h (fromInteger s)]
+
 -- | An EB announced in slot 8 of a ten-slot epoch: its window opens in slot 11 and
 --   its deadline is slot 15, both in the next epoch. The vote is present, cast in the
 --   first slot of the window.
@@ -86,6 +92,7 @@ straddlingVoted :: [ChainEvent]
 straddlingVoted =
   ticks 0 7
     <> [CSlot 8, CAnnouncementAccepted "eb" 8, CEBAcquired "eb" 8]
+    <> adopt "rb8" 8 Nothing
     <> [CSlot 9, CSlot 10, CSlot 11, CVoted "eb" 8]
     <> ticks 12 16
 
@@ -97,6 +104,7 @@ straddlingUnvoted :: [ChainEvent]
 straddlingUnvoted =
   ticks 0 7
     <> [CSlot 8, CAnnouncementAccepted "eb" 8, CEBAcquired "eb" 8]
+    <> adopt "rb8" 8 Nothing
     <> ticks 9 16
 
 -- | Two announcements inside one slot. An EB announced at slot 2 is votable at 5;
@@ -106,6 +114,7 @@ twoAnnouncementsInOneSlot :: [ChainEvent]
 twoAnnouncementsInOneSlot =
   ticks 0 1
     <> [CSlot 2, CAnnouncementAccepted "eb2" 2, CEBAcquired "eb2" 2]
+    <> adopt "rb2" 2 Nothing
     <> [CSlot 3, CSlot 4]
     <> [ CSlot 5
        , CNodeIsLeader 5
@@ -114,6 +123,7 @@ twoAnnouncementsInOneSlot =
        , CRBForged "rb5" 5
        , CAnnouncementAccepted "eb5" 5
        ]
+    <> adopt "rb5" 5 (Just "rb2")
     <> ticks 6 9
 
 -- | Announcements in consecutive slots. The EB announced at slot 2 is superseded as
@@ -124,13 +134,15 @@ supersededBeforeVotable :: [ChainEvent]
 supersededBeforeVotable =
   ticks 0 1
     <> [CSlot 2, CAnnouncementAccepted "eb2" 2, CEBAcquired "eb2" 2]
+    <> adopt "rb2" 2 Nothing
     <> [CSlot 3, CAnnouncementAccepted "eb3" 3, CEBAcquired "eb3" 3]
+    <> adopt "rb3" 3 (Just "rb2")
     <> [CSlot 4, CSlot 5]
     <> [CSlot 6, CVoted "eb3" 3]
     <> ticks 7 9
 
--- | A vote for an EB the chain never announced must not establish its own
---   precondition by supplying the head for its slot.
+-- | A vote for an EB the chain never announced: no ranking block of the chain
+--   announces it, so the vote is not legal.
 voteForUnannouncedEB :: [ChainEvent]
 voteForUnannouncedEB =
   ticks 0 1
@@ -146,6 +158,7 @@ praosOnly :: [ChainEvent]
 praosOnly =
   ticks 0 3
     <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4, CMempoolRange 200 200]
+    <> adopt "rb" 4 Nothing
     <> ticks 5 9
 
 -- | The same, but with a mempool that fits. The gate still suppresses enforcement,
@@ -156,6 +169,7 @@ praosOnlyMempoolFits :: [ChainEvent]
 praosOnlyMempoolFits =
   ticks 0 3
     <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4, CMempoolRange 50 50]
+    <> adopt "rb" 4 Nothing
     <> ticks 5 9
 
 -- | The same leader slot, but preceded by a Leios acquisition, so the gate is open;
@@ -168,6 +182,7 @@ leiosActiveThenSilentLeader =
   ticks 0 1
     <> [CSlot 2, CAnnouncementAccepted "eb" 2, CEBAcquired "eb" 2, CSlot 3]
     <> [CSlot 4, CNodeIsLeader 4, CRBForged "rb" 4, CMempoolRange 200 200]
+    <> adopt "rb" 4 Nothing
     <> ticks 5 9
 
 -- | An EB announced in slot 4 of a ten-slot epoch: its window opens at 7 and its
@@ -182,6 +197,7 @@ lateDeadlineStraddling :: [ChainEvent]
 lateDeadlineStraddling =
   ticks 0 3
     <> [CSlot 4, CAnnouncementAccepted "eb" 4, CEBAcquired "eb" 4]
+    <> adopt "rb4" 4 Nothing
     <> ticks 5 13
 
 -- | A slot tick that repeats, then one that goes backwards — the shape concatenated
@@ -199,7 +215,9 @@ twoVotesOneSlot :: [ChainEvent]
 twoVotesOneSlot =
   ticks 0 1
     <> [CSlot 2, CAnnouncementAccepted "ebA" 2, CEBAcquired "ebA" 2]
+    <> adopt "rbA" 2 Nothing
     <> [CSlot 3, CAnnouncementAccepted "ebB" 3, CEBAcquired "ebB" 3]
+    <> adopt "rbB" 3 (Just "rbA")
     <> [CSlot 4, CSlot 5]
     <> [CSlot 6, CVoted "ebA" 2, CVoted "ebB" 3]
     <> ticks 7 13
@@ -212,7 +230,9 @@ twoVotesOneSlotHeadFirst :: [ChainEvent]
 twoVotesOneSlotHeadFirst =
   ticks 0 1
     <> [CSlot 2, CAnnouncementAccepted "ebA" 2, CEBAcquired "ebA" 2]
+    <> adopt "rbA" 2 Nothing
     <> [CSlot 3, CAnnouncementAccepted "ebB" 3, CEBAcquired "ebB" 3]
+    <> adopt "rbB" 3 (Just "rbA")
     <> [CSlot 4, CSlot 5]
     <> [CSlot 6, CVoted "ebB" 3, CVoted "ebA" 2]
     <> ticks 7 13
@@ -275,11 +295,11 @@ chainSegments = do
     it "adjudicates the slot against the EB that was voted for" $ do
       ps <- collectWith 100 twoAnnouncementsInOneSlot
       violations ps `shouldBe` []
-    it "does not let a vote supply the head for an unannounced EB" $ do
-      -- eb2 was acquired but never announced, so it was never votable; the vote
-      -- must not make itself legal by becoming the slot's head.
+    it "rejects a vote for an EB the chain never announced" $ do
+      -- eb2 was acquired but never announced, so it was never votable: the head
+      -- of the chain the Praos node selects does not announce it.
       ps <- collectWith 100 voteForUnannouncedEB
-      violations ps `shouldBe` []
+      violations ps `shouldNotBe` []
     it "raises no obligation for a head superseded before its vote window opens" $ do
       ps <- collectWith 100 supersededBeforeVotable
       violations ps `shouldBe` []

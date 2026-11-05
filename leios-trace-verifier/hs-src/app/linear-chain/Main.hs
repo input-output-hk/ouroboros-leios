@@ -15,7 +15,7 @@
 --   is needed.
 module Main where
 
-import ChainEvents (parseNodeLog)
+import ChainEvents (ChainEvent (CUndetailed), parseNodeLog)
 import Control.Monad (when)
 import Data.ByteString.Lazy as BSL
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -70,6 +70,13 @@ main = do
 --   "LinearLeiosChain" so the driver stays testable with a collecting reporter.
 render :: Progress -> IO ()
 render = \case
+  -- The Praos layer builds the node's block tree from the headers ChainDB lists
+  -- with each selection, which it does only at DDetailed.
+  Saw CUndetailed ->
+    die
+      "node.log lists no headers with the chain selections: set \"detail\": \"DDetailed\" for \
+      \ChainDB.AddBlockEvent.AddedToCurrentChain and ChainDB.AddBlockEvent.SwitchedToAFork \
+      \in the node's TraceOptions"
   Saw ev -> hPutStrLn stderr $ "event: " <> show ev
   SegmentStarted seg spans -> reportSchedule seg spans
   Verified nEvents nActions ->

@@ -110,6 +110,14 @@ module LinearLeiosVerifier where
     winningSlot record { message = VTBundleGenerated _ _ _ _ _ _ }  = nothing
     winningSlot record { message = RBGenerated _ _ _ _ _ _ _ _ _ }  = nothing
 
+    -- The slot of a ranking block the SUT mints.
+    rbSlot : TraceEvent → Maybe ℕ
+    rbSlot record { message = RBGenerated p _ s _ _ _ _ _ _ }
+      with p ≟ SUT
+    ... | yes _ = just (primWord64ToNat s)
+    ... | no _  = nothing
+    rbSlot _ = nothing
+
     EventLog = List TraceEvent
 
     module _ (l : EventLog) where
@@ -145,6 +153,18 @@ module LinearLeiosVerifier where
           then fromList (L.catMaybes (L.map winningSlot l))
           else fromList leadershipSchedule
 
+      -- The slots in which the SUT leads and mints a ranking block, for the
+      -- Praos node.  A leadership schedule is the ranking-block lottery, so
+      -- when one is supplied it gives these slots as well; otherwise they are
+      -- harvested from the SUT's 'RBGenerated' events.  They are not EB
+      -- winning slots: a leader may put the transactions in the ranking block
+      -- and announce no EB.
+      rb-slots-of : ℙ ℕ
+      rb-slots-of =
+        if L.null leadershipSchedule
+          then fromList (L.catMaybes (L.map rbSlot l))
+          else fromList leadershipSchedule
+
       testParams : TestParams params
       testParams =
         record
@@ -152,17 +172,13 @@ module LinearLeiosVerifier where
           ; winning-slots = winning-slots-of
           }
 
-      open import Defaults params testParams using
+      open import Defaults params testParams rb-slots-of using
         (d-SpecStructure; FFDBuffers; isb; hpe;
          module PraosNode; mkPraosBlock; praosBlockHash; genesisHash;
-         node⁻; nodeᶜ; initNodeState)
+         node⁻; module Check; praosHeader; initNodeState)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
       open import Leios.Linear.Trace.Verifier d-SpecStructure params hiding (verifyTrace)
-      -- Linear Leios stacked on the Praos node: the node, not the trace,
-      -- answers Leios's requests for the ledger and takes its blocks.
-      open import LinearLeiosStack d-SpecStructure params node⁻ nodeᶜ tt using
-        (Stack; Item; entry; deliver; base; ffdᵢ; voteᵢ; ioᵢ; verifyItems)
 
       open Params params
       open Types params
@@ -207,6 +223,29 @@ module LinearLeiosVerifier where
       instance
         _ = Show-List
         _ = Show-×
+
+      -- The trace records the blocks the SUT mints, by parent and slot, but
+      -- not its selected chain.
+      open Check praosHeader (λ _ → tt) using (NodeHint; nodeᶜ)
+
+      -- Why the Praos node rejects a step: in the round of a slot, it mints
+      -- other blocks than the SUT's 'RBGenerated' events of the slot, given
+      -- by parent and slot.
+      nodeMsg : NodeHint → String
+      nodeMsg nothing = "the Praos node rejects a request of Leios"
+      nodeMsg (just (n , bs , _)) =
+        "the Praos node's round of slot " ◇ show n ◇ " does not match the trace, in which the SUT "
+          ◇ minted bs
+        where
+          minted : List (Hash × ℕ) → String
+          minted [] = "mints no block"
+          minted bs = "mints (parent, slot) " ◇ show bs
+
+      -- Linear Leios stacked on the Praos node: the node, not the trace,
+      -- answers Leios's requests for the ledger and takes its blocks, and
+      -- the trace's record of the blocks it mints is checked.
+      open import LinearLeiosStack d-SpecStructure params node⁻ nodeᶜ nothing nodeMsg using
+        (Stack; Item; entry; deliver; base; ffdᵢ; voteᵢ; ioᵢ; verifyItems)
 
       instance
         Show-EBCert : Show (Maybe EBCert)
@@ -270,13 +309,28 @@ module LinearLeiosVerifier where
       ... | yes _ = []
       ... | no  _ = entry (No-VT-Role-Action (primWord64ToNat s)) (ffdᵢ FFDT.SLOT) ∷ []
 
+      -- The blocks the SUT minted in slot 'n', by parent and slot, in the
+      -- order of the log.  A slot's 'RBGenerated' precedes its 'Slot' event.
+      mintedAt : Accumulator → ℕ → List (Hash × ℕ)
+      mintedAt l n = L.reverse (L.mapMaybe sut (RB-meta l))
+        where
+          sut : String × (Hash × ℕ × Fin (Params.numberOfParties params)) → Maybe (Hash × ℕ)
+          sut (_ , ph , sl , p) with p ≟ SUT-id | sl ≟ n
+          ... | yes _ | yes _ = just (ph , sl)
+          ... | _     | _     = nothing
+
       -- The Praos node's round of slot 'n', after Leios submitted its block
-      -- for it: the blocks the SUT received in the slot, and minting.  The
-      -- node's clock trails the Leios slot by one, so it has no round for
-      -- slot 0, whose blocks wait for slot 1.
+      -- for it: the blocks the SUT received in the slot, and minting, which
+      -- must give the blocks the SUT minted in the slot.  The node adds the
+      -- blocks of a delivery from the last to the first, so the inbox, which
+      -- holds the latest first, is delivered as it stands.  The node's clock
+      -- trails the Leios slot by one, so it has no round for slot 0, whose
+      -- blocks wait for slot 1.
       delivery : Accumulator → ℕ → Accumulator × List Item
       delivery l zero    = l , []
-      delivery l (suc n) = record l { inbox = [] } , deliver (L.reverse (inbox l)) ∷ []
+      delivery l (suc n) =
+        record l { inbox = [] } ,
+          deliver (just (suc n , mintedAt l (suc n) , tt)) (inbox l) ∷ []
 
       traceEvent→action : Accumulator → TraceEvent → Accumulator × List Item
       traceEvent→action l record { message = Slot p s }

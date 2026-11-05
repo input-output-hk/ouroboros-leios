@@ -48,7 +48,7 @@ module Leios.Base.Praos.Machine
 
 open import Leios.Base.Praos.Assumptions a vrf' numParties winner
   ⦃ winner⁇² = winner⁇² ⦄ winner₀ blockHash self
-  public using (praosNode; mkPraosBlock; praosBlockHash; genesisHash)
+  public using (praosNode; mkPraosBlock; praosBlockHash; praosHeader; genesisHash)
 open import Leios.Base.Praos a vrf' using (module Node)
 open import Leios.Base a vrf' using (RankingBlock; StakeDistr)
 open import Leios.Blocks a using (EndorserBlock)
@@ -64,5 +64,5 @@ module Assembled
 
   private module PraosNode = Node praosNode Cert VTy initSlot V-chkCerts stake₀
   -- B' is what a SpecStructure consumer installs alongside praosBase.
-  open PraosNode public using (B'; node; node⁻; nodeᶜ; NodeState; initNodeState)
+  open PraosNode public using (B'; node; node⁻; module Check; NodeState; initNodeState)
   open PraosNode.Assemble numParties producer slotOf public

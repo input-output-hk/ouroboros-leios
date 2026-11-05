@@ -1,17 +1,12 @@
 {-# OPTIONS --safe #-}
-{- Generic list machinery for the Praos block-tree instance
-   (Leios.Base.Praos.Assumptions).
+{- Generic list machinery for the Praos block tree
+   (Leios.Base.Praos.ChainSel):
 
-   The block tree's bestChain enumerates every subsequence of the
-   slot-descending sorting of the block pool and keeps the longest valid one.
-   These are the pieces that make the Protocol.Tree laws provable:
-
-   - subseqs-complete : every sublist of the sorted pool is enumerated;
-   - decr-sub-sorted  : every strictly-decreasing selection from the pool IS
-     a sublist of the sorted pool, so the `optimal` law quantifies over
-     nothing the enumeration misses;
-   - maxBy-mem/-≥     : the fold picking the longest candidate returns the
-     base or a member, and no member is longer.
+   - maxBy-mem/-≥       : the fold picking the longest candidate returns the
+     base or a member, and no member is longer;
+   - sortDesc-∈/-∈⁻     : sorting a pool by slot keeps exactly its members,
+     and sortDesc-sorted : the result is sorted, which is the order the tree
+     rebuilds its entries in.
 
    Everything is measure-generic: μ : A → ℕ is `slot` at the use site and
    ν : B → ℕ is `length`.
@@ -34,17 +29,6 @@ open import Relation.Nullary.Negation using (contradiction)
 
 private variable
   A : Set
-
--- ── All subsequences ────────────────────────────────────────────────────
-
-subseqs : List A → List (List A)
-subseqs []       = [ [] ]
-subseqs (x ∷ xs) = map (x ∷_) (subseqs xs) ++ subseqs xs
-
-subseqs-complete : ∀ {c ys : List A} → c SL.⊆ ys → c ∈ subseqs ys
-subseqs-complete {ys = []}     SL.[]         = here refl
-subseqs-complete {ys = y ∷ ys} (_ SL.∷ʳ s)   = ∈-++⁺ʳ (map (y ∷_) (subseqs ys)) (subseqs-complete s)
-subseqs-complete {ys = y ∷ ys} (refl SL.∷ s) = ∈-++⁺ˡ (∈-map⁺ (y ∷_) (subseqs-complete s))
 
 -- ── Longest element by a measure ────────────────────────────────────────
 
@@ -92,7 +76,7 @@ module SortDesc {A : Set} (_≟ᴬ_ : ∀ (x y : A) → Dec (x ≡ y)) (μ : A �
   sortDesc : List A → List A
   sortDesc = foldr insert []
 
-  -- membership is preserved (this direction is all the laws need)
+  -- membership is preserved
   insert-∈ : ∀ {z} b xs → z ∈ b ∷ xs → z ∈ insert b xs
   insert-∈ b [] p = p
   insert-∈ b (x ∷ xs) p with μ x ≤? μ b
@@ -106,27 +90,28 @@ module SortDesc {A : Set} (_≟ᴬ_ : ∀ (x y : A) → Dec (x ≡ y)) (μ : A �
   sortDesc-∈ (x ∷ xs) (here refl) = insert-∈ x (sortDesc xs) (here refl)
   sortDesc-∈ (x ∷ xs) (there p)   = insert-∈ x (sortDesc xs) (there (sortDesc-∈ xs p))
 
+  -- and back: sorting adds nothing
+  insert-∈⁻ : ∀ {z} b xs → z ∈ insert b xs → z ∈ b ∷ xs
+  insert-∈⁻ b [] p = p
+  insert-∈⁻ b (x ∷ xs) p with μ x ≤? μ b
+  ... | yes _ = p
+  ... | no  _ with p
+  ...   | here refl = there (here refl)
+  ...   | there q with insert-∈⁻ b xs q
+  ...     | here refl = here refl
+  ...     | there r   = there (there r)
+
+  sortDesc-∈⁻ : ∀ {z} xs → z ∈ sortDesc xs → z ∈ xs
+  sortDesc-∈⁻ (x ∷ xs) p with insert-∈⁻ x (sortDesc xs) p
+  ... | here refl = here refl
+  ... | there q   = there (sortDesc-∈⁻ xs q)
+
   Sorted : List A → Set
   Sorted = Lkd.Linked (λ x y → μ y ≤ μ x)
-
-  Decr : List A → Set
-  Decr = Lkd.Linked (λ x y → μ y < μ x)
 
   ltail≤ : ∀ {x xs} → Sorted (x ∷ xs) → Sorted xs
   ltail≤ Lkd.[-]      = Lkd.[]
   ltail≤ (_ Lkd.∷ s) = s
-
-  ltail< : ∀ {x xs} → Decr (x ∷ xs) → Decr xs
-  ltail< Lkd.[-]      = Lkd.[]
-  ltail< (_ Lkd.∷ s) = s
-
-  sorted⇒All : ∀ {y ys} → Sorted (y ∷ ys) → All (λ z → μ z ≤ μ y) ys
-  sorted⇒All Lkd.[-]      = []
-  sorted⇒All (r Lkd.∷ s) = r ∷ mapAll (λ q → ≤-trans q r) (sorted⇒All s)
-
-  decr⇒All : ∀ {y ys} → Decr (y ∷ ys) → All (λ z → μ z < μ y) ys
-  decr⇒All Lkd.[-]      = []
-  decr⇒All (r Lkd.∷ s) = r ∷ mapAll (λ q → <-trans q r) (decr⇒All s)
 
   insert-sorted : ∀ b xs → Sorted xs → Sorted (insert b xs)
   insert-sorted b [] _ = Lkd.[-]
@@ -141,36 +126,3 @@ module SortDesc {A : Set} (_≟ᴬ_ : ∀ (x y : A) → Dec (x ≡ y)) (μ : A �
   sortDesc-sorted : ∀ xs → Sorted (sortDesc xs)
   sortDesc-sorted []       = Lkd.[]
   sortDesc-sorted (x ∷ xs) = insert-sorted x (sortDesc xs) (sortDesc-sorted xs)
-
-  []⊆ : ∀ (ys : List A) → SL._⊆_ [] ys
-  []⊆ []       = SL.[]
-  []⊆ (y ∷ ys) = y SL.∷ʳ []⊆ ys
-
-  -- The key completeness fact: a strictly-decreasing selection from a pool
-  -- is a sublist of the pool's descending sorting.
-  decr-sub-sorted : ∀ {c ys} → Decr c → All (_∈ ys) c → Sorted ys → c SL.⊆ ys
-  decr-sub-sorted {[]}     {ys} _ _ _ = []⊆ ys
-  decr-sub-sorted {x ∷ c′} {[]} _ (() ∷ _) _
-  decr-sub-sorted {x ∷ c′} {y ∷ ys} d (x∈ ∷ a′) s with x ≟ᴬ y
-  ... | yes refl = refl SL.∷ decr-sub-sorted (ltail< d) (strip a′ (decr⇒All d)) (ltail≤ s)
-    where
-      strip : ∀ {zs} → All (_∈ x ∷ ys) zs → All (λ z → μ z < μ x) zs → All (_∈ ys) zs
-      strip []                 []       = []
-      strip (here refl ∷ _)    (h ∷ _)  = contradiction h (<-irrefl refl)
-      strip (there p ∷ ps)     (_ ∷ hs) = p ∷ strip ps hs
-  ... | no x≢y = y SL.∷ʳ decr-sub-sorted d (x∈ys ∷ strip′ a′ (decr⇒All d)) (ltail≤ s)
-    where
-      drop-here : x ∈ y ∷ ys → x ∈ ys
-      drop-here (here e)  = contradiction e x≢y
-      drop-here (there p) = p
-
-      x∈ys : x ∈ ys
-      x∈ys = drop-here x∈
-
-      x≤y : μ x ≤ μ y
-      x≤y = lookupAll (sorted⇒All s) x∈ys
-
-      strip′ : ∀ {zs} → All (_∈ y ∷ ys) zs → All (λ z → μ z < μ x) zs → All (_∈ ys) zs
-      strip′ []              []       = []
-      strip′ (here refl ∷ _) (h ∷ _)  = contradiction (<-≤-trans h x≤y) (<-irrefl refl)
-      strip′ (there p ∷ ps)  (_ ∷ hs) = p ∷ strip′ ps hs

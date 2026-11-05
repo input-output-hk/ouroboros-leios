@@ -110,6 +110,21 @@ nix run '.#trace-parser:exe:linear-leios-trace-verifier-chain' -- \
 The verifier reports `ok` at each slot boundary and fails fast on the first
 violation.
 
+Linear Leios runs on a Praos node (`src/LinearLeiosStack.agda`): the node's
+ranking blocks feed the Praos node of the spec, which selects the chain Leios
+reads its ledger from, and which must mint the blocks the node forged and select
+the chain the node selected.  It builds its block tree from the headers ChainDB
+lists with each chain selection, which the node logs only at `DDetailed`, so the
+node has to run with the following in its `TraceOptions`:
+
+```json
+"ChainDB.AddBlockEvent.AddedToCurrentChain": { "detail": "DDetailed" },
+"ChainDB.AddBlockEvent.SwitchedToAFork": { "detail": "DDetailed" }
+```
+
+The configurations in `testnet/config/` and `demo/*-devnet/config/` set them.
+The verifier refuses a log whose selections carry no headers.
+
 
 ## Test cases for trace verify and conformance tests
 

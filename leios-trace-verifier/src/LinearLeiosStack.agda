@@ -49,9 +49,11 @@ module LinearLeiosStack
   (⋯ : SpecStructure) (let open SpecStructure ⋯) (params : Params)
   (BaseM : Machine (BaseAbstract.BaseNetwork B') (BaseAbstract.BaseIO B'))
   (baseᶜ : Checker BaseM)
-  -- The hint of every step of the base machine; enough for a deterministic
-  -- one.
+  -- The hint of the base machine's steps on requests of Leios; a delivery
+  -- of blocks names its own (see 'deliver').
   (baseH : Checkable.Hint baseᶜ)
+  -- Why the base machine rejects a step with the given hint.
+  (baseMsg : Checkable.Hint baseᶜ → String)
   where
 
 open import Leios.Linear.Trace.Verifier ⋯ params as V
@@ -110,6 +112,10 @@ ffdᴴ baseᴴ voteᴴ : H
 ffdᴴ  = inj₁ (inj₁ (inj₁ tt))
 baseᴴ = inj₁ (inj₁ (inj₂ baseH))
 voteᴴ = inj₁ (inj₂ tt)
+
+-- A step of the base machine on blocks from the network.
+deliverᴴ : Checkable.Hint baseᶜ → H
+deliverᴴ = inj₁ ∘ inj₁ ∘ inj₂
 
 leiosᴴ : Action → H
 leiosᴴ = inj₂
@@ -178,8 +184,7 @@ layersᶜ = reindexᶜ ∘σ ∘σ-back (belowᶜ ⊗ᶜ leiosᶜ)
 
 module _ ⦃ _ : Show Hash ⦄ where
 
-  -- Only Leios rejects a step: the wires and a deterministic base machine
-  -- step on every input.
+  -- Leios and the base machine reject steps; the wires step on every input.
   layerMsg : ∀ h i s → Checkable.Err layersᶜ h i s → String
   layerMsg (inj₂ a) i s e
     with side {(FFD ⊗₀ BaseNetwork) ⊗₀ VotingC} {(FFD ⊗₀ BaseIO) ⊗₀ VotingC}
@@ -188,7 +193,8 @@ module _ ⦃ _ : Show Hash ⦄ where
                        {IO ⊗₀ Adv} {In}) i)
   ... | inj₂ _ = errorMsg e
   ... | inj₁ _ = "wrong layer for " ◇ actionName a
-  layerMsg (inj₁ _) _ _ _ = "a base step was rejected"
+  layerMsg (inj₁ (inj₁ (inj₂ h))) _ _ _ = baseMsg h
+  layerMsg (inj₁ _) _ _ _ = "a wire step was rejected"
 
   loopMsg : ∀ {hs j s} → TrErr {A = (FFD ⊗₀ BaseNetwork) ⊗₀ VotingC} {B = IO ⊗₀ Adv}
                                 {C = (FFD ⊗₀ BaseIO) ⊗₀ VotingC} layersᶜ hs j s → String
@@ -205,10 +211,11 @@ module _ ⦃ _ : Show Hash ⦄ where
 -- Running a trace read off a log
 
 -- An input with the action Leios takes on it, a batch of blocks for the base
--- machine, or the ranking-block step of the given slot.
+-- machine with the hint of its step there, or the ranking-block step of the
+-- given slot.
 data Item : Type where
   entry   : Action → StackInput → Item
-  deliver : List BaseMsg → Item
+  deliver : Checkable.Hint baseᶜ → List BaseMsg → Item
   base    : ℕ → Item
 
 -- The ranking-block step of a slot is 'Base₁' when the tip calls for no
@@ -238,7 +245,7 @@ verifyItems s = go s []
     go : Machine.State Stack → Trace → List Item → String ⊎ Machine.State Stack
     go s pending []                  = flush s (L.reverse pending)
     go s pending (entry a m ∷ items) = go s (toEntry a m ∷ pending) items
-    go s pending (deliver bs ∷ items) = go s (⟨ baseᴴ ∷ [] , netᵢ bs ⟩ ∷ pending) items
+    go s pending (deliver h bs ∷ items) = go s (⟨ deliverᴴ h ∷ [] , netᵢ bs ⟩ ∷ pending) items
     go s pending (base n ∷ items)    = case flush s (L.reverse pending) of λ where
       (inj₁ err) → inj₁ err
       (inj₂ s′)  → go s′ (L.reverse (baseEntries (leiosState s′) n)) items

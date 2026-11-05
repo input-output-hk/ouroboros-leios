@@ -9,7 +9,7 @@ open import Data.Bool using (if_then_else_)
 import Data.Char as C
 import Data.Nat as N
 import Data.String as S
-open import Agda.Builtin.Word using (Word64; primWord64ToNat)
+open import Agda.Builtin.Word using (Word64; primWord64ToNat; primWord64FromNat)
 open import Agda.Builtin.Char using (primCharToNat)
 open import Foreign.Haskell.Pair
 
@@ -35,8 +35,10 @@ module LinearLeiosVerifierChain where
     CNodeIsLeader         : Word64 → ChainEvent
     CAnnouncementAccepted : String → Word64 → ChainEvent
     CNotVoted             : String → Word64 → String → ChainEvent
-    CChainExtended        : Word64 → ChainEvent
+    CAdopted              : String → Word64 → Maybe String → ChainEvent
+    CNewTip               : String → Word64 → ChainEvent
     CMempoolRange         : Word64 → Word64 → ChainEvent
+    CUndetailed           : ChainEvent
 
   {-# FOREIGN GHC import qualified ChainEvents #-}
   {-# COMPILE GHC ChainEvent = data ChainEvents.ChainEvent
@@ -49,8 +51,10 @@ module LinearLeiosVerifierChain where
         | ChainEvents.CNodeIsLeader
         | ChainEvents.CAnnouncementAccepted
         | ChainEvents.CNotVoted
-        | ChainEvents.CChainExtended
+        | ChainEvents.CAdopted
+        | ChainEvents.CNewTip
         | ChainEvents.CMempoolRange
+        | ChainEvents.CUndetailed
         ) #-}
 
   module _
@@ -196,11 +200,28 @@ module LinearLeiosVerifierChain where
           ; winning-slots = winning-slots-of
           }
 
-      open import Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)
+      -- Every slot in which the node led, for the Praos node, which mints in
+      -- exactly these.  Unlike 'leaderSlots' it is not gated on Leios activity:
+      -- that gate guards EB obligations, and a ranking block is forged whether
+      -- or not Leios is running.
+      allLeaderSlots : EventLog → List ℕ
+      allLeaderSlots []                     = []
+      allLeaderSlots (CNodeIsLeader s ∷ es) = primWord64ToNat s ∷ allLeaderSlots es
+      allLeaderSlots (_ ∷ es)               = allLeaderSlots es
+
+      rb-slots-of : ℙ ℕ
+      rb-slots-of =
+        if scheduleAuthoritative
+          then fromList winningSlots
+          else fromList (allLeaderSlots l)
+
+      open import Defaults params testParams rb-slots-of using
+        (d-SpecStructure; FFDBuffers; isb; hpe; d-blockHash;
+         module PraosNode; mkPraosBlock; genesisHash; tipHash;
+         node⁻; module Check; praosHeader; initNodeState)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
-      open import Leios.Linear.Trace.Verifier d-SpecStructure params
-      open import LinearLeiosTrace d-SpecStructure params
+      open import Leios.Linear.Trace.Verifier d-SpecStructure params hiding (verifyTrace)
 
       open Params params
       open Types params
@@ -239,39 +260,11 @@ module LinearLeiosVerifierChain where
         ; signature  = tt
         }
 
-      -- Status of the EB the chain currently announces, as the model tracks it
-      -- across a voting window. This drives the 'Chain'/'BASE-LDG' ledger step
-      -- ('annRB' below), which is the ONLY thing that sets the spec's
-      -- 'currentRB' — and hence 'getCurrentEBHash', 'voteDeadline', and every
-      -- role rule that reads them.
-      --
-      --   none            : no EB currently announced (default RB announces nothing)
-      --   announcing h e  : the head RB announces EB 'h', whose election slot is 'e';
-      --                     re-asserted each slot to keep the voting window open
-      --                     until 'voteDeadline'. The election slot is carried
-      --                     because it is what tells a tip advance *to* the
-      --                     announcer from one *past* it — see 'CChainExtended'.
-      --   superseded      : the chain has extended past the announcer (a later RB
-      --                     is now the tip). The EB can no longer be certified, so
-      --                     the window must close: 'closeSlot' emits ONE
-      --                     non-announcing 'Chain' to overwrite 'currentRB', then
-      --                     drops to 'none'. Merely forgetting the hash would stop
-      --                     re-announcing but never reset the spec's 'currentRB',
-      --                     leaving the window (wrongly) open.
-      --   retiring        : a vote landed in the very slot the chain superseded the
-      --                     EB, so 'annRB' presented the voted EB there instead of
-      --                     de-announcing, and the de-announcement owes one slot.
-      --                     It is emitted unconditionally on the next slot — a vote
-      --                     arriving then is for an EB the chain has already moved
-      --                     past and should fail. Without this state the deferral
-      --                     renewed itself for as long as votes kept arriving, so a
-      --                     superseded EB could stay head indefinitely, which is not
-      --                     what the one-slot deferral was meant to allow.
-      data EBStatus : Type where
-        none       : EBStatus
-        announcing : String → ℕ → EBStatus
-        superseded : EBStatus
-        retiring   : EBStatus
+      -- The spec-level hash of the EB with this hash string.  It is fixed by the
+      -- string alone, so a ranking block can announce an EB the node has not
+      -- acquired yet.
+      ebHash : String → Hash
+      ebHash h = hash (mkEBrec SUT-id h (primWord64FromNat 0))
 
       -- Accumulator threaded through the chain events. Slot obligations are
       -- flushed when the next CSlot arrives (or at end of stream).
@@ -281,18 +274,33 @@ module LinearLeiosVerifierChain where
               FFD-blks    : List Blk
               curSlot     : ℕ
               started     : Bool
-              curEB       : EBStatus
-              -- Every EB the chain has announced, not only the latest. Two
-              -- announcements can land inside a single slot, and closeSlot collapses
-              -- a slot into one snapshot.
-              announced   : List String
               -- (min , max) mempool bytes observed during the slot being accumulated.
               memRange    : Maybe (ℕ × ℕ)
-              -- Whether the node forged a ranking block in this slot, which locates
-              -- the mempool drain relative to its EB decision. See 'ebOwed'.
-              forgedRB    : Bool
               forgedEB    : Maybe EndorserBlock
               votedEB     : Maybe (EndorserBlock × ℕ)
+              -- ── The Praos node ──
+              -- Each ranking block of the log, by its hash: its slot and the
+              -- party it is minted as.  The log names no producers, so the
+              -- blocks of a slot other than the SUT's are numbered, skipping
+              -- the SUT, which keeps them apart in the block tree.
+              ids         : AssocList String (ℕ × Party)
+              -- The blocks the node adopted before the SUT forged in this slot,
+              -- latest first: the node forges at the start of a slot, so these
+              -- are what the Praos node absorbs in this slot's round.
+              inbox       : List PraosNode.Block
+              -- The blocks it adopted after the SUT forged, which wait for the
+              -- next round.
+              late        : List PraosNode.Block
+              -- The ranking block the SUT forged in this slot, with the hash of
+              -- the tip it extended.
+              forgedRB    : Maybe (String × ℕ × Hash)
+              -- The tip of the node's selected chain.
+              tipNow      : Maybe String
+              -- The EB each ranking block announces, by its election slot.
+              annBySlot   : AssocList ℕ String
+              -- The EB the chain head announced when the slot opened: the one a
+              -- vote of the slot can be for.
+              headEB      : Maybe String
 
       open Accumulator
 
@@ -313,33 +321,68 @@ module LinearLeiosVerifierChain where
       unquoteDecl Show-RankingBlock = derive-Show [ (quote RankingBlock , Show-RankingBlock) ]
       unquoteDecl Show-Blk = derive-Show [ (quote Blk , Show-Blk) ]
 
+      -- The log names the blocks the SUT forges, and the tip of its selected
+      -- chain; it records the blocks it adopts by hash, slot and parent.
+      open Check praosHeader tipHash using (NodeHint; nodeᶜ)
+
+      -- Why the Praos node rejects a step: in the round of a slot, it mints
+      -- other blocks than the SUT forged, or selects another chain.
+      nodeMsg : NodeHint → String
+      nodeMsg nothing = "the Praos node rejects a request of Leios"
+      nodeMsg (just (n , bs , t)) =
+        "the Praos node's round of slot " ◇ show n ◇ " does not match the log, in which the SUT "
+          ◇ minted bs ◇ " and its chain ends in " ◇ show t
+        where
+          minted : List (Hash × ℕ) → String
+          minted [] = "mints no block"
+          minted bs = "mints (parent, slot) " ◇ show bs
+
+      open import LinearLeiosStack d-SpecStructure params node⁻ nodeᶜ nothing nodeMsg using
+        (Stack; Item; entry; deliver; base; ffdᵢ; voteᵢ; ioᵢ; verifyItems)
+
       blksToHeaderAndBodyList : List Blk → List (FFDA.Header ⊎ FFDA.Body)
       blksToHeaderAndBodyList []              = []
       blksToHeaderAndBodyList (EB-Blk eb ∷ l) = inj₁ (GenFFD.ebHeader eb) ∷ blksToHeaderAndBodyList l
       blksToHeaderAndBodyList (VT-Blk vt ∷ l) = inj₁ (GenFFD.vtHeader vt) ∷ blksToHeaderAndBodyList l
       blksToHeaderAndBodyList (RB-Blk _ ∷ l)  = blksToHeaderAndBodyList l
 
-      -- Hash of the EB registered under a given hash-string (identity on payload,
-      -- see Defaults); [] if unknown.
-      hashOf : Accumulator → String → Hash
-      hashOf a h = case EB-refs a ⁉ h of λ where
-        (just eb) → hash eb
-        nothing   → []
+      -- ── Blocks for the Praos node ──
 
-      -- Whether this hash is the EB the chain head currently announces. Only that EB
-      -- is votable, so where a slot holds several votes this picks the one the spec
-      -- can actually discharge.
-      isCurrentHead : String → EBStatus → Bool
-      isCurrentHead h (announcing h' _) = case h ≟ h' of λ where
+      -- The hash of a ranking block in the block tree, from the slot and the
+      -- party it is minted as (see 'd-blockHash').
+      rbHash : ℕ → Party → Hash
+      rbHash sl p = d-blockHash sl p (record { announcedEB = nothing ; txsOrEbCert = inj₁ [] })
+
+      -- The tree hash of the block with this log hash.  A block the log has
+      -- not shown, such as the parent of the first block of a segment, is
+      -- genesis: the segment's chain is rooted there.
+      treeHash : Accumulator → String → Hash
+      treeHash a h = case ids a ⁉ h of λ where
+        (just (sl , p)) → rbHash sl p
+        nothing         → genesisHash
+
+      tipTreeHash : Accumulator → Hash
+      tipTreeHash a = maybe (treeHash a) genesisHash (tipNow a)
+
+      -- The ranking block of a slot: it announces the EB of its election slot,
+      -- if any.  The log does not say what else it carries.
+      rbAt : Accumulator → ℕ → RankingBlock
+      rbAt a sl = record
+        { announcedEB = ebHash <$> annBySlot a ⁉ sl
+        ; txsOrEbCert = inj₁ [] }
+
+      -- The party the next block of a slot is minted as: the blocks of the slot
+      -- seen so far are numbered, skipping the SUT.
+      nextParty : Accumulator → ℕ → Party
+      nextParty a sl =
+        let n = L.length (L.filter (λ (_ , (sl′ , _)) → sl′ ≟ sl) (ids a))
+        in from-id (if n N.<ᵇ sutId then n else suc n)
+
+      isCurrentHead : String → Maybe String → Bool
+      isCurrentHead h (just h′) = case h ≟ h′ of λ where
         (yes _) → true
         (no  _) → false
-      isCurrentHead _ _ = false
-
-      wasAnnounced : String → List String → Bool
-      wasAnnounced h []       = false
-      wasAnnounced h (x ∷ xs) = case h ≟ x of λ where
-        (yes _) → true
-        (no  _) → wasAnnounced h xs
+      isCurrentHead _ nothing = false
 
       -- Emit the obligations for the slot being closed, chronologically.
       closeSlot : Accumulator → List Item
@@ -379,88 +422,50 @@ module LinearLeiosVerifierChain where
             --
             -- No reading at all (a log without the Mempool traces) is likewise not
             -- owed: EB-role enforcement then lapses rather than firing on a guess.
+            forged = maybe (λ _ → true) false (forgedRB a)
             ebOwed : Bool
             ebOwed = case memRange a of λ where
               nothing           → false
               (just (mn , mx))  →
-                maxRBBody N.<ᵇ (if forgedRB a then mx else mn)
+                maxRBBody N.<ᵇ (if forged then mx else mn)
             submit : List Tx → List Item
-            submit txs = entry (Mempool-Action s) (inj₂ (inj₂ (inj₁ (SubmitTxs txs)))) ∷ []
+            submit txs = entry (Mempool-Action s) (ioᵢ (SubmitTxs txs)) ∷ []
             mempool : List Item
             mempool = case forgedEB a of λ where
               (just eb) → submit (EndorserBlockOSig.txs eb)
               nothing   → submit (if ebOwed then placeholderTxs else [])
-            -- One 'Chain'/'BASE-LDG' step per slot, setting the spec's 'currentRB'
-            -- (the head of 'RBs') — which is what 'getCurrentEBHash', and hence the
-            -- voting window and every role rule reading it, is derived from.
-            announceStep : Maybe Hash → List Item
-            announceStep mh =
-              entry (Chain-Action s) (inj₂ (inj₁ (BaseAbstract.BASE-LDG
-                (record { announcedEB = mh ; txsOrEbCert = inj₁ [] } ∷ [])))) ∷ []
-            -- Which EB to present as the chain head for this slot.
-            --
-            -- A vote cast in this slot wins over the announcement status, because
-            -- closeSlot collapses a slot into one snapshot and the log timestamps
-            -- only to slot granularity, so intra-slot order is unknowable. Two ways
-            -- that bites:
-            --
-            --   * Two announcements in one slot — the node votes for an EB announced
-            --     earlier, then forges its own and that is announced too, moving the
-            --     head. Presenting the later one contradicts the vote emitted for the
-            --     same slot: "442 : Err-VT-Role-premises: Current EB hash does not
-            --     match".
-            --   * The chain supersedes the announcer in the very slot the vote was
-            --     cast. De-announcing here would refuse a vote we cannot show was
-            --     illegal, so the de-announcement is deferred one slot ('nextEB').
-            --
-            -- Presenting the voted EB is not self-justifying: 'CVoted' records a vote
-            -- only for an EB the chain actually announced, so a vote for an
-            -- unannounced EB leaves 'votedEB' unset and no head is invented for it.
-            --
-            -- The residual weakening is deliberate: a vote cast in its legal slot for
-            -- an EB whose announcer the chain had already superseded is accepted
-            -- rather than refused. Refusing it would mean rejecting votes the log
-            -- cannot prove were late, which is the false-positive class this file has
-            -- been repeatedly corrected for. Votes genuinely outside the window are
-            -- still caught, by VT-Role's timing premise.
-            annRB : List Item
-            annRB = case curEB a of λ where
-              -- The deferred de-announcement falls due, and is emitted whatever else
-              -- happened this slot: a vote arriving now is for an EB the chain has
-              -- already moved past, and should fail rather than renew the deferral.
-              retiring → announceStep nothing
-              st       → case votedEB a of λ where
-                (just (eb , _)) → announceStep (just (hash eb))
-                nothing         → case st of λ where
-                  -- No announcement to make: leave 'currentRB' as it stands.
-                  none             → []
-                  -- Re-assert the announcement so the window stays open this slot.
-                  (announcing h _) → announceStep (just (hashOf a h))
-                  -- The chain has extended past the announcer: overwrite 'currentRB'
-                  -- with a non-announcing RB so 'getCurrentEBHash ≡ nothing',
-                  -- 'voteDeadline ≡ 0', and the spec's own rules close the window
-                  -- (abstention becomes licensed by No-VT-Role, no vote is forced).
-                  superseded       → announceStep nothing
-                  retiring         → announceStep nothing
             ebRole : List Item
             ebRole = case forgedEB a of λ where
-              (just eb) → entry (EB-Role-Action s eb) (inj₁ FFDT.SLOT) ∷ []
-              nothing   → entry (No-EB-Role-Action s) (inj₁ FFDT.SLOT) ∷ []
+              (just eb) → entry (EB-Role-Action s eb) (ffdᵢ FFDT.SLOT) ∷ []
+              nothing   → entry (No-EB-Role-Action s) (ffdᵢ FFDT.SLOT) ∷ []
+            -- The Praos node's round of the slot: it absorbs the blocks adopted
+            -- before the SUT forged, and mints if it leads.  It must mint the
+            -- block the SUT forged, on the tip the SUT had then, and select the
+            -- chain the SUT selected: ending in its own block if it forged one,
+            -- and else in the tip of the log.
+            --
+            -- The node's clock trails the Leios slot by one, so there is no
+            -- round for slot 0, whose blocks wait for slot 1.
+            round : NodeHint
+            round = case forgedRB a of λ where
+              (just (_ , sl , parent)) → just (s , (parent , sl) ∷ [] , rbHash sl SUT-id)
+              nothing                  → just (s , [] , tipTreeHash a)
+            praos : List Item
+            praos = if s N.≡ᵇ 0 then [] else deliver round (inbox a) ∷ []
             vtRole : List Item
             vtRole = case votedEB a of λ where
-              (just (eb , slot')) → entry (VT-Role-Action s eb slot') (inj₁ FFDT.SLOT) ∷ []
-              nothing             → entry (No-VT-Role-Action s) (inj₁ FFDT.SLOT) ∷ []
+              (just (eb , slot')) → entry (VT-Role-Action s eb slot') (ffdᵢ FFDT.SLOT) ∷ []
+              nothing             → entry (No-VT-Role-Action s) (ffdᵢ FFDT.SLOT) ∷ []
         -- 'ebRole' precedes the ranking-block step: 'Base₁' and 'Base₂' require the
         -- EB role to be settled for the slot ('hasUpkeep EB-Role'), so that the RB
-        -- announces the EB actually diffused rather than 'nothing'.  'annRB' precedes
-        -- it as well, since whether the tip calls for a certificate depends on
-        -- 'currentRB'.
+        -- announces the EB actually diffused rather than 'nothing'.  The Praos
+        -- round follows it, minting the RB Leios submitted there.  'Slot' reads
+        -- the chain the round left for the next slot.
         in mempool
-           ++ annRB
            ++ ebRole
-           ++ base s ∷ []
+           ++ base s ∷ praos
            ++ vtRole
-           ++ entry (Slot-Action s) (inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks a)))) ∷ []
+           ++ entry (Slot-Action s) (ffdᵢ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks a)))) ∷ []
 
       -- Fake producer for acquired EBs: distinct for EBs sharing a slot (so an
       -- honest slot battle does not register as equivocation, which requires
@@ -475,48 +480,33 @@ module LinearLeiosVerifierChain where
                   (Accumulator.EB-refs a))
         in from-id (if n N.<ᵇ sutId then n else suc n)
 
+      -- The EB the head of the selected chain announces.
+      headOf : Accumulator → Maybe String
+      headOf a = tipNow a >>= λ h → ids a ⁉ h >>= λ (sl , _) → annBySlot a ⁉ sl
+
       traceEvent→action : Accumulator → ChainEvent → Accumulator × List Item
       traceEvent→action a (CSlot s) =
         if not (started a)
-          then (record a { curSlot = primWord64ToNat s ; started = true } , [])
+          then (record a { curSlot = primWord64ToNat s ; started = true ; headEB = headOf a } , [])
           else
             let steps = closeSlot a
-                -- A 'superseded' de-announcement is emitted once, by the closeSlot
-                -- above; the spec's 'currentRB' is then non-announcing, so drop to
-                -- 'none'. 'announcing'/'none' persist across the slot.
-                --
-                -- Unless a vote was cast in this slot: 'annRB' presented the voted EB
-                -- instead of de-announcing, so the de-announcement has not happened
-                -- yet and must fire on the next slot. Dropping to 'none' here would
-                -- retire the status without ever resetting 'currentRB', leaving the
-                -- window open — the failure the status was introduced to avoid.
-                --
-                -- It becomes 'retiring' rather than staying 'superseded', so the
-                -- deferral is spent: 'retiring' de-announces unconditionally. Staying
-                -- 'superseded' let a vote in each following slot renew the deferral,
-                -- and a superseded EB could then remain head indefinitely.
-                nextEB = case curEB a of λ where
-                  superseded → case votedEB a of λ where
-                    (just _) → retiring
-                    nothing  → none
-                  retiring   → none
-                  st         → st
             in (record a
                   { curSlot = primWord64ToNat s
                   ; FFD-blks = []
-                  ; curEB = nextEB
                   ; memRange = nothing
-                  ; forgedRB = false
                   ; forgedEB = nothing
                   ; votedEB = nothing
+                  ; inbox = (if curSlot a N.≡ᵇ 0 then late a ++ inbox a else late a)
+                  ; late = []
+                  ; forgedRB = nothing
+                  ; headEB = headOf a
                   } , steps)
       traceEvent→action a (CEBForged h s) =
         let eb = mkEBrec SUT-id h s
         in (record a { EB-refs = (h , eb) ∷ EB-refs a ; forgedEB = just eb } , [])
       -- Acquiring an EB means its body is in hand, which is what Slot ingestion
-      -- models. It says nothing about the EB being announced on the chain, so it must
-      -- not set 'curEB': doing so made VT-Role possible for any EB the node merely
-      -- fetched, and a node is right not to vote for one its chain never announced.
+      -- models. It says nothing about the EB being announced on the chain: that
+      -- is the ranking block's, which the Praos node selects.
       traceEvent→action a (CEBAcquired h s) =
         let eb = mkEBrec (fakeProducer a s) h s
         in (record a
@@ -524,68 +514,62 @@ module LinearLeiosVerifierChain where
               ; EB-received = (h , curSlot a) ∷ EB-received a
               ; FFD-blks = EB-Blk eb ∷ FFD-blks a
               } , [])
-      -- The chain head announces this EB, which is what 'getCurrentEBHash' denotes.
-      -- This, and not acquisition, is what makes the EB votable.
+      -- The ranking block of this election slot announces the EB.
       traceEvent→action a (CAnnouncementAccepted h s) =
-        (record a { curEB = announcing h (primWord64ToNat s) ; announced = h ∷ announced a } , [])
-      -- Deliberately does not touch 'curEB': letting a vote establish its own
-      -- precondition would make VT-Role self-justifying, hiding a node that voted for
-      -- an EB its chain never announced.
+        (record a { annBySlot = (primWord64ToNat s , h) ∷ annBySlot a } , [])
       -- 'closeSlot' emits at most one VT-Role per slot, the spec recording VT-Role
       -- upkeep once per slot, so where a slot holds several votes only one can be
-      -- adjudicated. Which one is not arbitrary: only the chain's current head is
-      -- votable, so the vote naming the head is the one the spec can discharge, and
-      -- the others are unrepresentable whatever we do. The driver counts them.
-      --
-      -- Keeping simply the first is actively wrong. With EB A announced at 2 and B at
-      -- 3, both votable at 6, holding A leaves B's vote dropped — and at B's deadline
-      -- the verifier then demands a vote the node had in fact cast, turning a silent
-      -- loss into a false violation.
+      -- adjudicated.  The one for the EB the chain head announced when the slot
+      -- opened is the one the spec can discharge; the driver counts the others.
+      -- Whether a vote was legal at all is for VT-Role to decide, against the
+      -- chain the Praos node selected.
       traceEvent→action a (CVoted h s)
-        with wasAnnounced h (announced a) | EB-refs a ⁉ h | EB-received a ⁉ h
-      ... | true | just eb | just slot' =
+        with EB-refs a ⁉ h | EB-received a ⁉ h
+      ... | just eb | just slot' =
               case votedEB a of λ where
                 nothing  → (record a { votedEB = just (eb , slot') } , [])
-                (just _) → if isCurrentHead h (curEB a)
+                (just _) → if isCurrentHead h (headEB a)
                              then (record a { votedEB = just (eb , slot') } , [])
                              else (a , [])
-      ... | _    | _       | _          = (a , [])
+      ... | _       | _          = (a , [])
       -- The spec does not inspect vote contents, and the log names neither the
       -- voter nor the signed RB.
       traceEvent→action a (CVoteAcquired _ _) =
         (record a { FFD-blks = VT-Blk ((SUT-id , []) ∷ []) ∷ FFD-blks a } , [])
-      -- Not a step of its own: what it contributes is locating the mempool drain
-      -- relative to the node's EB decision, which 'ebOwed' reads.
-      traceEvent→action a (CRBForged h s) = (record a { forgedRB = true } , [])
-      -- Consumed by 'leaderSlots' as the eligibility fallback, not as a step.
+      -- The SUT forged a ranking block on the tip it had selected.  It is the
+      -- block the Praos node mints, under the SUT's identity.
+      traceEvent→action a (CRBForged h s) =
+        let sl = primWord64ToNat s
+        in (record a
+              { forgedRB = just (h , sl , tipTreeHash a)
+              ; ids = (h , (sl , SUT-id)) ∷ ids a
+              } , [])
+      -- Consumed by 'leaderSlots' and 'allLeaderSlots', not as a step.
       traceEvent→action a (CNodeIsLeader _) = (a , [])
-      -- The selected chain adopted a new tip. Mark the announcement 'superseded' so
-      -- the next 'closeSlot' de-announces it via a non-announcing 'Chain', collapsing
-      -- the spec's voteDeadline to 0. If nothing is currently announced, there is
-      -- nothing to supersede.
-      --
-      -- Only a tip strictly beyond the announcer retires the EB. Adopting the
-      -- announcer itself is the ordinary case — in Linear Leios the announcing RB and
-      -- its EB share an election slot, and the node reports adopting its own block
-      -- immediately after announcing it, so treating any tip advance as superseding
-      -- closes every window in the slot it opened. Observed on a devnet as
-      -- CAnnouncementAccepted at slot 20 followed by CChainExtended 20, which then
-      -- retired an EB not votable until slot 23.
-      traceEvent→action a (CChainExtended tip) =
-        case curEB a of λ where
-          (announcing h e) →
-            if e N.<ᵇ primWord64ToNat tip
-              then (record a { curEB = superseded } , [])
-              else (record a { curEB = announcing h e } , [])
-          _ → (a , [])
-      -- A deliberate, protocol-legal abstention the node logged. It corroborates
-      -- the retirement but drives no state itself: the window is closed by the
-      -- chain extension (CChainExtended) or by the deadline, both via 'currentRB'.
+      -- The node adopted a ranking block into its selected chain.  The SUT's own
+      -- blocks are the Praos node's to mint; any other goes to the Praos node,
+      -- in this slot's round if the SUT has not forged yet, else in the next.
+      traceEvent→action a (CAdopted h s mp) =
+        case ids a ⁉ h of λ where
+          (just _) → (a , [])
+          nothing  →
+            let sl  = primWord64ToNat s
+                p   = nextParty a sl
+                blk = mkPraosBlock (maybe (treeHash a) genesisHash mp) sl (rbAt a sl) p
+                a′  = record a { ids = (h , (sl , p)) ∷ ids a }
+            in case forgedRB a of λ where
+                 nothing  → (record a′ { inbox = blk ∷ inbox a } , [])
+                 (just _) → (record a′ { late = blk ∷ late a } , [])
+      traceEvent→action a (CNewTip h _) = (record a { tipNow = just h } , [])
+      -- A deliberate, protocol-legal abstention the node logged. It drives no
+      -- state: VT-Role and No-VT-Role decide against the selected chain.
       traceEvent→action a (CNotVoted _ _ _) = (a , [])
       -- The mempool range for the slot now ending; the parser emits it just ahead of
       -- the tick that closes that slot, so 'closeSlot' sees the right one.
       traceEvent→action a (CMempoolRange mn mx) =
         (record a { memRange = just (primWord64ToNat mn , primWord64ToNat mx) } , [])
+      -- The driver refuses a log without the adopted headers before it gets here.
+      traceEvent→action a CUndetailed = (a , [])
 
       s₀ : LeiosState
       -- Register a key for every party: acquired EBs carry (fake) non-SUT
@@ -594,8 +578,13 @@ module LinearLeiosVerifierChain where
       -- be dropped as invalid and never reach EBs'.
       s₀ = initLeiosState tt stakeDistribution' (L.tabulate (λ i → (i , tt)))
 
+      -- The stack in Leios state 's', with the Praos node's clock one slot
+      -- behind (see 'LinearLeiosStack').
+      stack₀ : LeiosState → Machine.State Stack
+      stack₀ s = ((tt , record initNodeState { clock = LeiosState.slot s ∸ 1 }) , tt) , s
+
       check : LeiosState → List Item → Pair String String
-      check s αs = [ (λ e → (e , "error verifyChainTrace")) , (λ _ → ("ok" , "")) ]′ (verifyItems s αs)
+      check s αs = [ (λ e → (e , "error verifyChainTrace")) , (λ _ → ("ok" , "")) ]′ (verifyItems (stack₀ s) αs)
 
       showAction : Action → String
       showAction (EB-Role-Action n _)     = "EB-Role@"    ◇ show n
@@ -612,16 +601,18 @@ module LinearLeiosVerifierChain where
       showAction (Cert₃-Action n)         = "Cert3@"      ◇ show n
       showAction (Fetch-Action n)         = "Fetch@"      ◇ show n
 
-      -- The ranking-block step is named by the verifier (see 'LinearLeiosTrace').
+      -- The ranking-block step is named by the verifier (see 'LinearLeiosStack').
       showItem : Item → String
-      showItem (entry a _) = showAction a
-      showItem (base n)    = "Base@" ◇ show n
+      showItem (entry a _)   = showAction a
+      showItem (deliver h _) = "Praos@" ◇ maybe (λ (n , _) → show n) "?" h
+      showItem (base n)      = "Base@" ◇ show n
 
       n₀ : ℕ → Accumulator
       n₀ st = record
         { EB-refs = [] ; EB-received = [] ; FFD-blks = [] ; curSlot = st
-        ; started = false ; curEB = none ; announced = [] ; memRange = nothing
-        ; forgedRB = false ; forgedEB = nothing ; votedEB = nothing }
+        ; started = false ; memRange = nothing ; forgedEB = nothing ; votedEB = nothing
+        ; ids = [] ; inbox = [] ; late = [] ; forgedRB = nothing ; tipNow = nothing
+        ; annBySlot = [] ; headEB = nothing }
 
       opaque
         unfolding List-Model
