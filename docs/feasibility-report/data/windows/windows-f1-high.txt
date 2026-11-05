@@ -1,0 +1,8 @@
+# F1 loaded hours (40 kB references / 260 kB closures) under the normal
+# committee of 100-108 pools: the generator's on-hours of 2026-10-21 and the
+# first hour of 10-22, the three windows of the ladder in
+# ANALYSIS-2026-10-18-22.md. 10-22 16:00-21:00 (128-134 pools, mixed hours)
+# is left out.
+2026-10-21T12:00 2026-10-21T13:00
+2026-10-21T17:00 2026-10-21T21:00
+2026-10-22T00:00 2026-10-22T01:00
