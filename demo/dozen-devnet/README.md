@@ -77,6 +77,7 @@ Environment variables, see `run.sh` for the full list:
 | `SHARED_CONFIG_DIR` | `../proto-devnet/config` | genesis, pool keys, delegators, dashboards      |
 | `COLOR1..3`         | red, blue, amber     | colour each generator tags its transactions with    |
 | `TPS_SQUARE`        | (empty)              | square-wave load `LOW:HIGH:HALF_PERIOD_SECONDS`     |
+| `PAD_BYTES`         | `0`                  | metadata padding per tx, to make transactions bigger |
 | `TX_FIREHOSE`       | `tx-firehose`        | generator binary, e.g. a local cabal build          |
 
 ``` shell

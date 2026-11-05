@@ -68,6 +68,11 @@ set -a
 # is fixed, so the input selection has to cover fee + OUTPUTS * min-ada. 5 outputs
 # gives ~648 B transactions.
 : "${OUTPUTS:=1}"
+# Metadata padding per generated tx, in bytes: the other lever on size, without
+# the min-ada of extra outputs. A padded tx costs about as much to validate as an
+# unpadded one, so it moves bytes with less validation per byte. The 1 ADA fee
+# covers up to about 19 kB, above the 16,384 B maxTxSize.
+: "${PAD_BYTES:=0}"
 # Which tx-firehose to run. Defaults to whatever is on PATH, which is normally the
 # nix-store build; point it at a local cabal build to iterate on the generator
 # without rebuilding the devnet:
@@ -625,7 +630,7 @@ cp "${SHARED_CONFIG_DIR}/alloy-modules/"*.alloy "${WORKING_DIR}/alloy-modules/"
   done
   echo
   echo "settings:"
-  for v in TPS TPS_SQUARE OUTPUTS RATE DELAY TC XRAY SERVER NODE_RTS RESUME; do
+  for v in TPS TPS_SQUARE OUTPUTS PAD_BYTES RATE DELAY TC XRAY SERVER NODE_RTS RESUME; do
     echo "  ${v}=${!v}"
   done
   echo "  nodes=${#NODES[@]}"

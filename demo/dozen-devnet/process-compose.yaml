@@ -20,6 +20,7 @@ processes:
       --tps ${TPS}
       ${FIREHOSE_SCHEDULE_ARGS}
       --outputs-per-tx ${OUTPUTS}
+      --pad-bytes ${PAD_BYTES}
       --color ${COLOR1}
       --fee 1000000
     log_location: "${WORKING_DIR}/tx-firehose1.log"
@@ -52,6 +53,7 @@ processes:
       --tps ${TPS}
       ${FIREHOSE_SCHEDULE_ARGS}
       --outputs-per-tx ${OUTPUTS}
+      --pad-bytes ${PAD_BYTES}
       --color ${COLOR2}
       --fee 1000000
     log_location: "${WORKING_DIR}/tx-firehose2.log"
@@ -78,6 +80,7 @@ processes:
       --tps ${TPS}
       ${FIREHOSE_SCHEDULE_ARGS}
       --outputs-per-tx ${OUTPUTS}
+      --pad-bytes ${PAD_BYTES}
       --color ${COLOR3}
       --fee 1000000
     log_location: "${WORKING_DIR}/tx-firehose3.log"

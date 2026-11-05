@@ -29,7 +29,7 @@ TxSubmissionLogicVersion: TxSubmissionLogicV2
 LeiosAdaptiveEndorsements:
   Enabled: true
   Decrease: 0.8
-  Increase: 0.01
+  Increase: 0.02
   MinScale: 0.1
 
 # Keep the endorser block databases next to, not inside, the chain database.

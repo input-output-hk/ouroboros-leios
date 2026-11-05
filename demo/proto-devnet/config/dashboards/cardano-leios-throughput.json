@@ -1324,7 +1324,7 @@
         "type": "loki",
         "uid": "loki"
       },
-      "description": "Each producer's adaptive endorsements controller (LeiosAdaptiveEb), averaged over the Rate / avg window. Only certifiable announcements count.\n\nVoted is the stake that voted on an announcement, against the quorum threshold (red line). The controller's input on the right axis is the share of them that missed it. Each miss cuts the capacity scale by Decrease (0.8), each quorum made adds Increase (0.01) back, down to MinScale.",
+      "description": "Each producer's adaptive endorsements controller (LeiosAdaptiveEb), averaged over the Rate / avg window. Only certifiable announcements count.\n\nVoted is the stake that voted on an announcement, against the quorum threshold the nodes count votes with (red line). The controller's input on the right axis is the share of them that missed it. Each miss scales the capacity by Decrease, each quorum made adds Increase back, down to MinScale.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1361,7 +1361,7 @@
               "mode": "none"
             },
             "thresholdsStyle": {
-              "mode": "dashed"
+              "mode": "off"
             }
           },
           "mappings": [],
@@ -1376,7 +1376,7 @@
               },
               {
                 "color": "red",
-                "value": 0.75
+                "value": null
               }
             ]
           }
@@ -1399,6 +1399,31 @@
                   "dash": [
                     10,
                     10
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "E"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    4,
+                    4
                   ]
                 }
               }
@@ -1500,6 +1525,17 @@
           "legendFormat": "{{instance}} missed share",
           "queryType": "range",
           "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "max(max_over_time({service=\"cardano-node\", kind=\"LeiosVoteAcquired\", instance=~\"$instance\"} | json q=\"threshold\" | unwrap q [${window}s]))",
+          "legendFormat": "quorum",
+          "queryType": "range",
+          "refId": "E"
         }
       ],
       "title": "Adaptive endorsements",
