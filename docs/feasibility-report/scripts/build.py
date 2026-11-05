@@ -28,7 +28,11 @@ def main():
         sys.exit("no section files in " + REPORT)
     try:
         commit = subprocess.run(["git", "-C", HERE, "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
-        dirty = subprocess.run(["git", "-C", HERE, "status", "--porcelain"], capture_output=True, text=True, check=True).stdout.strip() != ""
+        top = subprocess.run(["git", "-C", HERE, "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True).stdout.strip()
+        status = subprocess.run(["git", "-C", HERE, "status", "--porcelain"], capture_output=True, text=True, check=True).stdout.splitlines()
+        # the output file itself does not make the tree dirty: it is rewritten by this build
+        out_rel = os.path.relpath(os.path.abspath(a.out), top) if a.out else None
+        dirty = any(l[3:].strip() != out_rel for l in status if l.strip())
     except Exception:
         commit, dirty = "unknown", False
     sections, headings = [], []

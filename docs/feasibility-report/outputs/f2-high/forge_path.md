@@ -1,4 +1,4 @@
-Forge-loop calls per RB forged and on the chain, hosts leios1-bp-a-1, leios2-bp-b-1, leios3-bp-c-1, loaded windows of windows-f2-high.txt; p50 / p90 s.
+Forge-loop calls per RB forged and on the chain, hosts n80, n81, n82, loaded windows of windows-f2-high.txt; p50 / p90 s.
 
 | step | plain RB, 80-88 kB | certifies, closure < 0.5 MB | certifies, closure 0.5-1 MB | certifies, closure 1-1.5 MB | certifies, closure 1.5-2 MB |
 |---|---|---|---|---|---|

@@ -11,16 +11,19 @@ rebuilt from here with:
 
     python3 docs/feasibility-report/scripts/build.py --out docs/feasibility-report.md
 
-**Held back for now.** The per-node outputs of the testnet windows and the
-cluster runs (`diffusion.csv` and `.md`, `diffusion-body.csv` and `.md`,
-`validation_nodes.csv`, `tally_quorum_nodes.csv` and `voters.csv` under
-each window) carry the operators' agent names, pool ids and tickers, one
-row per node. Whether they are published as they are or pseudonymised is
-not decided, so they are not in this copy; until they are, the stage
-table's rows that read them (the body, closure, applied-share, validation,
-tally, vote-rate rows and the reporting-weight captions) print as n/a
-when regenerated from here, and the instruments regenerate them from the
-data sets of DATA.md.
+**Per-node outputs.** The per-node outputs of the testnet windows
+(`diffusion.csv`, `diffusion-body.csv`, `validation_nodes.csv`,
+`tally_quorum_nodes.csv` and `voters.csv` under each window) are
+published with every node and pool numbered (n1, n2, … and p1, p2, …,
+one number per node across the windows) in place of the agent names,
+hostnames and pool ids, and the operators' ticker column emptied, by
+`scripts/publish_outputs.py`; the IOG and PIR hosts keep their labels
+(IOG1 to IOG3, PIR1 to PIR10, the pool tickers the report uses) next to
+their number, in `data/hosts.csv` as well. The printers read the files
+unchanged, so every table regenerates from here. The mapping from numbers
+to agent names, hostnames and pool ids is held by the author and
+available to reviewers on request. The Markdown views of the diffusion
+files are not published.
 
 Layout:
 
@@ -60,6 +63,8 @@ Printers (section, what they print, what they read under `outputs/`):
 | `scripts/stage_table.py` | 4, table (b) and the 4.3 closure-tail sub-table; `--archive-only` for the check column | `<window>/diffusion.csv`, `diffusion-body.csv`, `validation_nodes.csv`, `tally_quorum_nodes.csv`, `tally_quorum_ebs.csv`, `closure_fleet_per_eb.csv`, `voters.csv` |
 | `scripts/eb_composition.py` | 4.3.1, the EB classes of the 1 kB window | the chain cache (`--data`) and `1kb/eb_composition_dbsync.csv`, the certified closures' composition written outside the repository by the db-sync query |
 | `scripts/praos_table.py` | 5, Tables 5.1 to 5.5 (`kinds`, `adoption`, `pairs`, `density`, `control`), the `path` table behind 5.3's timings, `--trickle` for the density rows of 5.5's note | `<window>/adoption.md`, `pairs.md`, `adoption_path.md`, `forge_path.md`; the chain caches (`--data`) for `kinds` and `density` |
+| `scripts/cost_table.py` | 6, Table 6.1 (`bins`), 6.2 (`unseen`), 6.5 (`resources`); `fit` for section 7 and `speed` for section 8 | `<window>/validation_bins.md`, `host_speed.md`, `resources.md`, `validation_fit.md` |
+| `scripts/diffusion_table.py` | 6, Tables 6.3 (`bins`) and 6.4 (`upstream`) | `<window>/diffusion_bins.csv`, `upstream.csv` |
 
 Instruments (what they write under `outputs/<window>/`, from which data set):
 
@@ -76,6 +81,12 @@ Instruments (what they write under `outputs/<window>/`, from which data set):
 | `instruments/consecutive_pairs.sql`, `cluster_forks.sql` | `pairs.md` | a period database or a cluster run, the chain cache |
 | `instruments/adoption_path.sql`, `cluster_adoption_path.sql` | `adoption_path.md` | a period database or a cluster run, the chain cache |
 | `instruments/forge_path.py` | `f2-high/forge_path.md` | the archived IOG monitoring pulls of the 2 MB period, the chain cache |
+| `instruments/validation_bins.py` | `validation_bins.md` (validation time per EB by applied-share bin on the window's most common EB size class, host classes from `data/hosts.csv` and the operators' quartiles) | the per-pair `validation_pairs.csv` of the window or run (outside) |
+| `instruments/validation_fit.py` | `validation_fit.md` (the least-squares fit: fixed cost per EB, rate per applied and per reapplied transaction; section 7) | the same |
+| `instruments/host_speed.py` | `host_speed.md` (certification and throughput on faster hosts; failures by unseen share; cluster runs) | the same, `ladder.jsonl` |
+| `instruments/resources.py` | `resources.md` (memory and CPU distributions; the IOG and PIR hosts by instance class) | the period database's metric scrapes and the archived monitoring series (testnet), `raw/Resources.db` (cluster) |
+| `instruments/diffusion_bins.py` | `diffusion_bins.csv`, `upstream.csv` (nodes per p90 bin; nodes by upstream peers with committee weight) | `diffusion.csv`, `diffusion-body.csv`, `voters.csv`, `upstream_hosts.csv` in the window's folder |
+| `instruments/peers_upstream.py` | `upstream_hosts.csv` (the IOG and PIR hosts' upstream peers) | the archived per-peer announcement pulls (DATA.md) |
 | `instruments/testnet_window.sh`, `cluster_run.sh` | everything above for one window or run | the data sets, by path |
 
 The SQL instruments take their inputs as DuckDB variables (`t0`, `t1`,

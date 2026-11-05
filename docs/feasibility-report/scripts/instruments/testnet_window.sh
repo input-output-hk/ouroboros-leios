@@ -1,8 +1,10 @@
 #!/bin/sh
 # Run every testnet instrument for one window and write its saved outputs,
-# the files the printers (ladder_table.py, stage_table.py, praos_table.py)
-# read, into <outputs>/<KEY>/ (or <outputs>/<KEY>/archive-only/ with
-# --archive-only, from the SPO archive's period database alone).
+# the files the printers (ladder_table.py, stage_table.py, praos_table.py,
+# cost_table.py, diffusion_table.py) read, into <outputs>/<KEY>/ (or
+# <outputs>/<KEY>/archive-only/ with --archive-only, from the SPO archive's
+# period database alone: the section 4 check column, without the section 5
+# and 6 outputs).
 #
 #   testnet_window.sh KEY DB T0 T1 [--archive-only] [--keep-pairs]
 #
@@ -14,8 +16,10 @@
 #         tens of MB, the regression's input); by default only its per-node
 #         summary is kept
 #
-# Environment: DATA (the data folder holding chain-2026-10-18/, default the
-# parent of this repository), OUTPUTS (default outputs/ in this repository).
+# Environment: DATA (the data folder holding chain-2026-10-18/ and the
+# archived monitoring pulls grafana/archive/{loki/peers,mimir}/<KEY>/,
+# default the parent of this repository), OUTPUTS (default outputs/ in this
+# repository); the hosts table is data/hosts.csv in this repository.
 # Needs duckdb and python3 on PATH. The passes over a 30 GB period database
 # take minutes each; the whole window about half an hour.
 #
@@ -50,6 +54,11 @@ python3 "$HERE/diffusion_nodes.py" --db "$DB" --from "$FROM" --to "$TO" --chain 
     --percentiles 90,95,99 --before 3,4,5,7 --sort p90 $EXCL --stage body --out diffusion-body.md --csv diffusion-body.csv
 echo "-- validation (per-node summary), tally, closure fleet, never-completed closures"
 duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/validation_pairs.sql" > validation.md
+if [ -z "$ARCHIVE_ONLY" ]; then
+  echo "-- validation by unseen share and the fit (sections 6.1 and 7), from the per-pair file"
+  python3 "$HERE/validation_bins.py" validation_pairs.csv --hosts "$REPO/data/hosts.csv" > validation_bins.md
+  python3 "$HERE/validation_fit.py" validation_pairs.csv --hosts "$REPO/data/hosts.csv" > validation_fit.md
+fi
 [ -n "$KEEP" ] || rm -f validation_pairs.csv
 duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/tally_quorum.sql" > tally.md
 duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/closure_fleet.sql" > closure_fleet.md
@@ -69,4 +78,11 @@ if [ -z "$ARCHIVE_ONLY" ]; then
 fi
 echo "-- reporting coverage"
 duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/coverage.sql" > coverage.md
+if [ -z "$ARCHIVE_ONLY" ]; then
+  echo "-- the hosts' upstream peers, the diffusion bins and upstream groups (section 6.3)"
+  python3 "$HERE/peers_upstream.py" "$DATA/grafana/archive/loki/peers/$KEY" "$FROM" "$TO" > upstream_hosts.csv
+  python3 "$HERE/diffusion_bins.py" .
+  echo "-- memory and CPU (section 6.4)"
+  python3 "$HERE/resources.py" testnet --db "$DB" --t0 "$T0" --t1 "$T1" --mimir "$DATA/grafana/archive/mimir/$KEY" --hosts "$REPO/data/hosts.csv" > resources.md
+fi
 echo "done: $(ls | tr '\n' ' ')"

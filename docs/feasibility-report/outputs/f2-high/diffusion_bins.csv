@@ -1,0 +1,21 @@
+stage,bin,nodes
+body,under 2 s,0
+body,2 to 3 s,40
+body,3 to 4 s,24
+body,4 to 7 s,11
+body,7 to 15 s,12
+body,15 to 60 s,2
+body,60 s and over,0
+body,nodes,89
+body,median node p90,3.09
+body,median node never completed %,4.8
+closure,under 2 s,0
+closure,2 to 3 s,14
+closure,3 to 4 s,31
+closure,4 to 7 s,20
+closure,7 to 15 s,13
+closure,15 to 60 s,11
+closure,60 s and over,0
+closure,nodes,89
+closure,median node p90,3.90
+closure,median node never completed %,8.1
