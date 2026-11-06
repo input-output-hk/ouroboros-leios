@@ -35,17 +35,30 @@ hx n = T.justifyLeft 64 '0' n
 --   own quotes inside the string, and slot and block number as decimal strings.
 hdr :: Text -> Integer -> Integer -> Text
 hdr n s b =
-  "{\"kind\":\"ShelleyBlock\",\"hash\":\"\\\"" <> hx n <> "\\\""
-    <> "\",\"slotNo\":\"" <> T.pack (show s)
-    <> "\",\"blockNo\":\"" <> T.pack (show b) <> "\"}"
+  "{\"kind\":\"ShelleyBlock\",\"hash\":\"\\\""
+    <> hx n
+    <> "\\\""
+    <> "\",\"slotNo\":\""
+    <> T.pack (show s)
+    <> "\",\"blockNo\":\""
+    <> T.pack (show b)
+    <> "\"}"
 
 -- | A selection event at @DDetailed@: the new tip and the adopted headers.
 selectionLine :: Text -> Text -> Text -> Integer -> [Text] -> BSL8.ByteString
 selectionLine ns kind tip s hs =
   BSL8.pack . T.unpack $
-    "{\"ns\":\"" <> ns <> "\",\"data\":{\"kind\":\"" <> kind
-      <> "\",\"newtip\":\"" <> hx tip <> "@" <> T.pack (show s)
-      <> "\",\"headers\":[" <> T.intercalate "," hs <> "]}}"
+    "{\"ns\":\""
+      <> ns
+      <> "\",\"data\":{\"kind\":\""
+      <> kind
+      <> "\",\"newtip\":\""
+      <> hx tip
+      <> "@"
+      <> T.pack (show s)
+      <> "\",\"headers\":["
+      <> T.intercalate "," hs
+      <> "]}}"
 
 added, switched :: Text -> Integer -> Integer -> [Text] -> BSL8.ByteString
 added tip s _ = selectionLine "ChainDB.AddBlockEvent.AddedToCurrentChain" "AddedToCurrentChain" tip s

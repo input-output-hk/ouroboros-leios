@@ -273,7 +273,8 @@ selection d = do
 --   it (@"\"6652…\""@), unlike @newtip@, so they are dropped.
 header :: Value -> Parser (Text, Word64, Word64)
 header = withObject "header" $ \o ->
-  (,,) <$> (T.dropAround (== '"') <$> o .: "hash")
+  (,,)
+    <$> (T.dropAround (== '"') <$> o .: "hash")
     <*> (o .: "slotNo" >>= number)
     <*> (o .: "blockNo" >>= number)
 
