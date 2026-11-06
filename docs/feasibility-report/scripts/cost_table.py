@@ -5,7 +5,7 @@ of section 8), printed as Markdown from the saved outputs.
     cost_table.py [--outputs DIR] TABLE WINDOW [WINDOW ...]
 
 TABLE    bins      validation time per EB by the share of the EB the voter
-                   had not seen, on the window's most common EB size class,
+                   applied in full, on the window's most common EB size class,
                    one block per window: the IOG and PIR host classes and the
                    operators' quartiles (validation_bins.md); section 6.1
          fit       the validation fit per window: fixed cost per EB and the
@@ -17,7 +17,7 @@ TABLE    bins      validation time per EB by the share of the EB the voter
                    set and CPU (resources.md)
          resources the memory and CPU distributions per population (resources.md)
          unseen    the EBs that fail by the share of their transactions the
-                   voters had not seen, cluster runs (host_speed.md, second table)
+                   voters applied in full, cluster runs (host_speed.md, second table)
          speed     the host-speed counterfactual, cluster runs (host_speed.md,
                    first table); section 8
 WINDOW   a key of WINDOWS below
@@ -28,7 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUTPUTS = os.path.normpath(os.path.join(HERE, "..", "outputs"))
 WINDOWS = {
     "f1-high": dict(label="testnet 40 kB / 260 kB, loaded hours", shape="257 B, one input, no scripts"),
-    "f2-high": dict(label="testnet 308 kB / 2 MB, loaded hours", shape="318 B, one input, no scripts"),
+    "f2-high": dict(label="testnet 308 kB / 2 MB, loaded hours", shape="247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts"),
     "1kb": dict(label="testnet 308 kB / 2 MB, 1 kB transactions", shape="about 1 kB with metadata, and 235 to 260 B, mixed"),
     "cluster-40k260k": dict(label="cluster 40 kB / 260 kB, 200 B", shape="200 B, one input, one output", cluster=True),
     "cluster-100k1m": dict(label="cluster 100 kB / 1 MB, 200 B", shape="200 B, one input, one output", cluster=True),

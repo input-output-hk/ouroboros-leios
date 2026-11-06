@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Certification and throughput of a cluster run on faster hosts, and the
-EBs that fail by the share of their transactions the voters had not seen
-(report sections 6.2 and 6.4), from the run's per-(voter, EB) validation
+EBs that fail by the share of their transactions the voters applied in full
+(report sections 6.2 and 8), from the run's per-(voter, EB) validation
 records (validation_pairs.csv) and its ladder export.
 
 Per record: validated' = max(closure, 3 s) + ratio x duration, where
@@ -19,8 +19,8 @@ validation record are not in the input, so the gain is understated by
 their share (1.6 % of pairs on the 374 B run, 0.3 % on the 200 B run).
 
 Second table: the EBs that still fail at each ratio, by the share of their
-transactions the voters had not seen before the closure (applied share,
-mean over the EB's voters).
+transactions the voters applied in full, i.e. had not validated before the
+closure arrived (applied share, mean over the EB's voters).
 
     host_speed.py validation_pairs.csv ladder.jsonl E_KB [ratio ...] > host_speed.md
 
@@ -77,7 +77,7 @@ def main():
             if sum(1 for start, dur, _, _ in recs if start + ratio * dur <= DEADLINE) < QUORUM:
                 fails[ratio][b] += 1
     print()
-    print("| share of the EB's transactions unseen by the voters | EBs | " + " | ".join("fail at %.1f" % r for r in ratios) + " |")
+    print("| share of the EB's transactions the voters applied in full | EBs | " + " | ".join("fail at %.1f" % r for r in ratios) + " |")
     print("|---|---|" + "---|" * len(ratios))
     for b in order:
         if tot[b]:

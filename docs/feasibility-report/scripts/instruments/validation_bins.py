@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Validation time by the share of the EB's transactions the voter had not
-seen (report sections 6.1 and 6.2), without a model: on the per-(node, EB)
+"""Validation time by the share of the EB's transactions the voter applied
+in full, i.e. had not validated before at mempool admission or in an
+earlier EB (report sections 6.1 and 6.2), without a model: on the per-(node, EB)
 validation records of one window or run (validation_pairs.csv), the
 validation time per EB, where the time is the one after the later of the
 closure's arrival and the slot plus 3 s, on the EBs of one size (the

@@ -12,7 +12,7 @@ EBs with records 1,628, records 81,233, quorum 39 voters, E 555 kB, p observed 0
 
 Ceiling at full certification 15.9 kB/s. As recorded: 20.9 % of the votes late, 1,115 EBs (68.5 %) with 39 or more voters validated by 7 s.
 
-| share of the EB's transactions unseen by the voters | EBs | fail at 1.0 | fail at 0.9 | fail at 0.8 | fail at 0.7 | fail at 0.6 | fail at 0.5 | fail at 0.4 |
+| share of the EB's transactions the voters applied in full | EBs | fail at 1.0 | fail at 0.9 | fail at 0.8 | fail at 0.7 | fail at 0.6 | fail at 0.5 | fail at 0.4 |
 |---|---|---|---|---|---|---|---|---|
 | under 30 % | 607 | 3 % | 3 % | 1 % | 1 % | 1 % | 1 % | 1 % |
 | 30 to 40 % | 227 | 5 % | 2 % | 1 % | 1 % | 1 % | 1 % | 1 % |
