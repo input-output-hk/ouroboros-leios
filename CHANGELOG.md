@@ -5,6 +5,28 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## rc-2026w45 - 2026-11-06
+
+Small release with a few consensus internal changes: Adaptive endorsements react only to missed quorums, block producers stop fetching their own endorser blocks back, and the mempool waits for a committee that can reach a quorum.
+
+- Block producers scale down their endorser blocks only when certifiable announcements miss their quorum [consensus#2480](https://github.com/IntersectMBO/ouroboros-consensus/pull/2480)
+  - Each miss scales the capacity by `Decrease`, each quorum reached adds `Increase`, and it never drops below `MinScale`.
+  - The w44 keys `GainP`, `Attack`, `Release` and `AliveWindow` are ignored.
+  - Still experimental and off by default. Enable it with:
+    ```yaml
+    LeiosAdaptiveEndorsements:
+      Enabled: true
+    ```
+- A block producer no longer fetches its own endorser block's transactions back from peers [consensus#2477](https://github.com/IntersectMBO/ouroboros-consensus/pull/2477)
+- The fetch client writes endorser blocks and their transactions to the LeiosDb before handling the next reply [consensus#2477](https://github.com/IntersectMBO/ouroboros-consensus/pull/2477)
+  - Quick test balloon whether we need the book keeping complexity in practice
+- The mempool makes room for endorser blocks only once the epoch's committee can reach a quorum [consensus#2481](https://github.com/IntersectMBO/ouroboros-consensus/pull/2481)
+- `tx-firehose --pad-bytes N` pads every transaction with about `N` bytes of metadata
+
+> [!NOTE]
+>
+> No resync, no respin. Nodes of this and the w44 release can talk to each other, and a w44 configuration loads unchanged.
+
 ## rc-2026w44 - 2026-10-31
 
 Several experimental network and consensus features: Nodes schedule their egress in tiers, block producers forge smaller endorser blocks while votes fall short, and bulk credentials can carry a BLS key per pool.
