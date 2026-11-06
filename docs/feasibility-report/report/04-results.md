@@ -199,11 +199,22 @@ from 2026-10-24 12:00 to 10-26 13:00 UTC, 2,128 eligible EBs, 1,033
 certified. 1 kB window: the four even hours from 10-28 18:00 to 10-29
 01:00 UTC, 361 eligible, 164 certified. Both voting-adjusted rungs are
 shown because they differ here: "full" is the survival of EBs at the cap,
-"mix" of all eligible EBs as forged. The three rungs that assume one
-transaction size (the cap that binds, the threshold for a full EB and the
-EB fullness, all read at the measured size) are left out of the 1 kB
-column, where two sizes coexisted; 4.3.1 reads that window by EB class
-instead. Transactions per second at the measured size: 38.0 and 29.6.
+"mix" of all eligible EBs as forged. Both columns carry two transaction
+sizes (Table 3.1). Three rungs read an EB's bytes from its references at
+the mean size: the cap that binds, the threshold for a full EB and the
+EBs' load factor. In the loaded hours the sizes are 247 and 506 B and
+the closure cap binds for both, so the mean misreads the 506 B-heavy
+EBs, a quarter of the transactions, as 0.6 to 0.8 of their bytes: the
+full rung then counts the 247 B EBs of 6,200 transactions and up, the
+ones costliest to validate, and the load-adjusted rung is an estimate
+off by at most that quarter in a direction the chain does not record;
+the measured rung, the certified closures' bytes, is exact. The rungs
+are kept with that reading. In the 1 kB window the sizes are 220 and
+1,024 B and bind different caps: a full 1 kB closure reads as 0.8 full
+and a full small-transaction EB as 3.5 times the cap, so there the mean
+gives no reading at all; those rungs are left out of its column and
+4.3.1 reads the window by EB class. Transactions per second at the
+measured size: 38.0 and 29.6.
 
 | stage | testnet 308 kB / 2 MB, loaded hours | testnet 308 kB / 2 MB, 1 kB transactions |
 |---|---|---|
@@ -345,8 +356,9 @@ side.
 Two caveats on this window. It ran on a mixed node build (two thirds of
 the operator agents on the next revision, one third on the previous; the
 IOG hosts on the next), so it is not a clean measurement of either build.
-And with two generators the ladder's single-size rungs are not meaningful;
-a clean reading at 1 kB needs a window with one generator at that size.
+And its two sizes bind different caps, so the ladder's reference-based
+rungs give no reading (Table 4.5); a clean reading at 1 kB needs a window
+with one generator at that size.
 The forge events of the announcing nodes would give the closure bytes of
 the failed EBs as well, for the 39 % forged by reporting pools, but in a
 fifth of those events the closure field equals the reference bytes instead

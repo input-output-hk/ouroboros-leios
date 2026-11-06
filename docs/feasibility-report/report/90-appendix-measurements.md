@@ -97,7 +97,9 @@ dictionary defines each of them; the report does not recompute them.
 - **Loaded windows.** Each testnet window is the set of hours in which
   the load generator ran (Table 3.1), kept as a list of start and end
   times; an EB or RB belongs to a window by the time of its slot. Cluster
-  runs are read whole.
+  runs are read whole. A window's transaction size (Table 3.1) is the
+  bytes of its certified closures over their transaction count, the
+  figure the ladder divides the byte cap by.
 - **A node** is one reporting agent for one pool; one agent name can
   report for two pools and then counts twice.
 - **Eligible EB.** An announced EB whose next RB on the chain is 14 or
@@ -271,7 +273,7 @@ equals the chain-selection call's own duration RB by RB. Medians and
 90th percentiles over node-RB pairs; the cluster reads the same events
 from its chain-database traces.
 
-**Validation time by unseen share (section 6.1).** The records of the
+**Validation time by applied share (section 6.1).** The records of the
 validation entry above, every EB a node validated whether it certified
 or not, with the duration between 0 and 60 s and at least 100
 transactions; the applied share is applied over applied plus reapplied.
@@ -287,7 +289,7 @@ records in every bin are kept, the same set in every column; per node
 the median per bin, then the median and the quartiles across nodes. On
 the cluster all 51 nodes form the one population.
 
-**EBs failing by unseen share (section 6.2).** On a cluster run, per
+**EBs failing by applied share (section 6.2).** On a cluster run, per
 EB the mean over its voters of the applied share from the same records,
 binned (under 30 %, then steps of 10 to 70 and over); per bin the EBs
 and the share that failed to certify, an EB certifying when 39 or more
@@ -370,8 +372,8 @@ available to reviewers on request.
 | the forge path | archived monitoring pulls, chain cache | `forge_path.py` | `praos_table.py` |
 | the adoption path | period database or cluster run, chain cache | `adoption_path.sql`, `cluster_adoption_path.sql` | `praos_table.py` |
 | the Praos control | the team's report | | `praos_table.py`, typed constants |
-| validation time by unseen share | the per-record validation output of a window or run, the hosts table | `validation_bins.py` | `cost_table.py bins` |
-| EBs failing by unseen share | the per-record validation output of a cluster run, its ladder export | `host_speed.py` | `cost_table.py unseen` |
+| validation time by applied share | the per-record validation output of a window or run, the hosts table | `validation_bins.py` | `cost_table.py bins` |
+| EBs failing by applied share | the per-record validation output of a cluster run, its ladder export | `host_speed.py` | `cost_table.py unseen` |
 | nodes by their closure p90, upstream-peer groups | the per-node diffusion outputs, the voters table; the archived per-peer announcement pulls | `diffusion_bins.py`, `peers_upstream.py` | `diffusion_table.py bins`, `upstream` |
 | memory and CPU | the period database's metrics, the archived monitoring series, the cluster's resource trace; the hosts table | `resources.py` | `cost_table.py resources` |
 | node versions | the period database's metrics | the node-versions query | read directly |

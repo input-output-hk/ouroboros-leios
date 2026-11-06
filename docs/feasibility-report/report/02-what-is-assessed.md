@@ -48,9 +48,9 @@ parameters L_hdr, L_vote and L_diff are 1, 4 and 7 s on these networks). A
 voter that holds the closure before the three-second mark waits; one that
 receives it after the seven-second deadline does not vote. Validation
 applies to the ledger state every transaction of the closure, in full for
-the ones the node has not seen before and as a reapplication for the ones
-its mempool already validated, so its cost depends on how much of the EB
-the voter already held.
+the ones the node has not validated before and as a reapplication for the
+ones it validated at mempool admission or in an earlier EB, so its cost
+depends on how much of the EB the voter had already validated.
 
 The fifth stage is the tally. Votes diffuse between the nodes, and every
 node keeps a running tally of the weight behind each EB; the EB is
@@ -205,8 +205,9 @@ either by bandwidth, on hosts that receive from well-connected peers, or
 by topology, on hosts several hops from the forgers; a closure that arrives
 after the vote deadline is lost to the voting stage whatever else happens.
 Validation should cost a roughly constant time per transaction the voter
-has not seen, so it grows with the EB's transaction count and with the
-share of it the voter did not hold, and it has to fit in the four seconds
+has not validated before, so it grows with the EB's transaction count and
+with the share of it the voter applies in full, and it has to fit in the
+four seconds
 between the vote mark and the deadline after the closure is in hand. The
 tally should reach the quorum once three quarters of the committee's
 weight has voted, so it arrives close to the deadline when the slow voters

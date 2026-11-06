@@ -35,7 +35,7 @@ voters are the pools themselves and the vote traffic per EB is one vote
 from each, not 900. Table 3.1 lists the three load windows the report
 measures on it.
 
-| window | caps | loaded hours (UTC) | transaction size (median, certified closures) | pools in the committee | weight of the 14 IOG and PIR pools |
+| window | caps | loaded hours (UTC) | transaction size (mean over the certified closures) | pools in the committee | weight of the 14 IOG and PIR pools |
 |---|---|---|---|---|---|
 | 40 kB / 260 kB | 40 kB references, 260 kB closure | 2026-10-21 12:00-13:00, 17:00-21:00, 10-22 00:00-01:00 (6 h) | 257 B | 100-108 | 0.45-0.48 |
 | 308 kB / 2 MB | 308 kB references, 2 MB closure | 25 even hours from 2026-10-24 12:00 to 10-26 13:00 | 318 B | 145-148 | 0.35-0.36 |
@@ -43,7 +43,10 @@ measures on it.
 
 Table 3.1. The testnet load windows. The loaded hours are those in which
 the generator ran; the odd hours between them carried residual load only
-and are excluded.
+and are excluded. The 2 MB window's 318 B is the mean of two sizes of
+the same one-input transaction from two generators, 247 B for three
+quarters of the transactions and 506 B for a quarter, which differ in
+their metadata.
 
 The stake is not evenly spread. Fourteen pools are operated by IOG (IOG1
 to IOG3, PIR0 to PIR10), and together they hold between a

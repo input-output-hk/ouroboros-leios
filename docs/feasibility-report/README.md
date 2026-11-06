@@ -83,7 +83,7 @@ Instruments (what they write under `outputs/<window>/`, from which data set):
 | `instruments/forge_path.py` | `f2-high/forge_path.md` | the archived IOG monitoring pulls of the 2 MB period, the chain cache |
 | `instruments/validation_bins.py` | `validation_bins.md` (validation time per EB by applied-share bin on the window's most common EB size class, host classes from `data/hosts.csv` and the operators' quartiles) | the per-pair `validation_pairs.csv` of the window or run (outside) |
 | `instruments/validation_fit.py` | `validation_fit.md` (the least-squares fit: fixed cost per EB, rate per applied and per reapplied transaction; section 7) | the same |
-| `instruments/host_speed.py` | `host_speed.md` (certification and throughput on faster hosts; failures by unseen share; cluster runs) | the same, `ladder.jsonl` |
+| `instruments/host_speed.py` | `host_speed.md` (certification and throughput on faster hosts; failures by applied share; cluster runs) | the same, `ladder.jsonl` |
 | `instruments/resources.py` | `resources.md` (memory and CPU distributions; the IOG and PIR hosts by instance class) | the period database's metric scrapes and the archived monitoring series (testnet), `raw/Resources.db` (cluster) |
 | `instruments/diffusion_bins.py` | `diffusion_bins.csv`, `upstream.csv` (nodes per p90 bin; nodes by upstream peers with committee weight) | `diffusion.csv`, `diffusion-body.csv`, `voters.csv`, `upstream_hosts.csv` in the window's folder |
 | `instruments/peers_upstream.py` | `upstream_hosts.csv` (the IOG and PIR hosts' upstream peers) | the archived per-peer announcement pulls (DATA.md) |
