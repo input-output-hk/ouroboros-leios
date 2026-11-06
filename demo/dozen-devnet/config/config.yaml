@@ -5,48 +5,34 @@ AlonzoGenesisFile: alonzo-genesis.json
 ConwayGenesisFile: conway-genesis.json
 DijkstraGenesisFile: dijkstra-genesis.json
 
-# How much younger than this node's immutable tip an endorser block must be for
-# the node to offer it onward, in slots. Without this the consensus default
-# applies: 3600, an hour of mainnet, which on a short-horizon network suppresses
-# every offer -- no peer obtains an EB it did not forge, so no election reaches
-# a quorum and nothing is ever certified.
-#
-# Small because of how a young chain reads: until k=40 blocks have been
-# selected -- about k/f = 800 slots -- the immutable tip is still at Origin,
-# which the decision reads as slot 0, so nothing at all is offered until EBs
-# reach slot 30. Afterwards the immutable tip trails the selection by roughly
-# those same 800 slots, and every EB worth offering lives in that window, so the
-# lead must stay far below it.
-#
-# The floor is how far a peer's immutable tip can run ahead of ours, since
-# offering below a peer's immutable tip costs us that connection. Blocks arrive
-# every 1/f = 20 slots on average, so 30 covers a typical one-block lag but not
-# a long gap; the cost of losing that bet on a devnet is a reconnect.
+# Offer endorser blocks to peers once they are this many slots past the
+# immutable tip. The default (3600) is tuned for mainnet and would keep a young
+# devnet from ever certifying.
 LeiosMinOfferLead: 30
 
-# 5MB is a bit below the timeout capacity default ceiling
-# MempoolCapacityBytesOverride: 5000000
-# Defaults
-# MempoolTimeoutsEnabled: true
-# MempoolTimeoutSoft: 1.0
-# MempoolTimeoutHard: 1.5
-# MempoolTimeoutCapacity: 5.0
-# A 10th of this is used as the forge time cap
-# MempoolTimeoutCapacity: 8.0
-
-# Needed < 10.6
 EnableP2P: true
 
-# Node-to-node tx-submission inbound logic. V2 is the newer pull/decision-based
-# logic; V1 is the legacy path. Switch to compare N2N propagation throughput
-# under real traffic delays (default is TxSubmissionLogicV1).
+# Experimental features of this release, all of which should be on.
+#
+# Egress scheduler: serves local roots and large pools' relays first under
+# load, within this bandwidth budget. 0 turns it off.
+EgressBudgetMbps: 250
+
+# Newer transaction submission between nodes (the default is V1).
 TxSubmissionLogicVersion: TxSubmissionLogicV2
 
-# LeiosDb opens its SQLite connections eagerly at construction, before
-# ChainDB writes its marker file. Resolved inside the db dir (the default),
-# that races ChainDB's own-empty-dir check on a fresh start and aborts with
-# NoDbMarkerAndNotEmpty. Point it at a sibling dir instead so a fresh --database-path
-# stays empty until ChainDB itself populates it.
+# Adaptive endorsements: block producers forge smaller endorser blocks after
+# announcements miss their quorum, and grow them back while quorums are made.
+# Each miss scales the capacity by Decrease, each quorum made adds Increase
+# back, and MinScale is the floor. Watch it on the Adaptive endorsements
+# dashboard panel.
+LeiosAdaptiveEndorsements:
+  Enabled: true
+  Decrease: 0.8
+  Increase: 0.02
+  MinScale: 0.1
+
+# Keep the endorser block databases next to, not inside, the chain database.
 LeiosDbConfig:
   Backend: SQLite
   VolatileFilepath: "../leios.vol.db"
@@ -58,9 +44,8 @@ LastKnownBlockVersion-Minor: 1
 ConsensusMode: GenesisMode
 RequiresNetworkMagic: RequiresMagic
 LedgerDB:
-  # On-disk UTxO-HD backend (LSM-tree backing store) so UTxO reads/writes hit
-  # disk — makes ledger access demanding, as wanted for mempool throughput
-  # baselining. Switch back to V2InMemory to keep the UTxO set in RAM.
+  # Keep the UTxO set on disk, which makes ledger access more demanding.
+  # V2InMemory keeps it in RAM instead.
   Backend: V2LSM
   NumOfDiskSnapshots: 2
   QueryBatchSize: 100000
@@ -130,11 +115,7 @@ TraceOptions:
     detail: DDetailed
   ChainDB.CopyToImmutableDBEvent.CopiedBlockToImmutableDB:
     maxFrequency: 2.0
-  # The whole subtree traces per UTxO read, per handle operation or per block
-  # (handle reads alone were 40% of all log lines; the leaf-by-leaf silences
-  # this replaces kept missing spouts like LedgerTablesHandleClose, still the
-  # top producer at 500 voters). Nothing downstream reads any of it: not the
-  # dashboards, not the alloy modules, not the visualizer's query filter.
+  # Very noisy and not used by the dashboards.
   ChainDB.LedgerEvent:
     severity: Silence
   ChainDB.ReplayBlock.LedgerReplay:
@@ -161,15 +142,8 @@ TraceOptions:
     severity: Info
   LeiosMetrics:
     severity: Info
-  # The whole mempool add path is traced here, on purpose: a stalled add shows
-  # up as an AttemptAdd with no matching AddedTx, and a LedgerNotFound storm
-  # tells us the mempool is failing to acquire the ledger state it wants rather
-  # than doing slow work. Silencing these is what made the long stalls opaque.
   Mempool:
     severity: Debug
-  # Silenced again now that it has done its job: it confirmed the stalls are
-  # slow work rather than a LedgerNotFound retry storm, and at hundreds of
-  # tx/s it is pure volume.
   Mempool.AttemptAdd:
     severity: Silence
   Mempool.LedgerFound:
@@ -265,19 +239,12 @@ TraceOptions:
     severity: Notice
   TxSubmission.TxInbound:
     severity: Debug
-  # These two fire once per decision-loop iteration and were half of all log
-  # lines at 330 tx/s — 12 MB/s across twelve nodes, enough JSON encoding to
-  # make the tracer a load source in its own right. They only ever told us a
-  # ratio; raise them to Debug for a diagnostic run, not a throughput one.
+  # The following are very noisy at high throughput; raise them to Debug only
+  # for a diagnostic run.
   TxSubmission.TxInbound.CanRequestMoreTxs:
     severity: Silence
   TxSubmission.TxInbound.CannotRequestMoreTxs:
     severity: Silence
-  # Per-tx bookkeeping, four lines for every transaction pulled from a peer, and
-  # all of it is already available: Mempool.AddedTx covers the adds and the
-  # txSubmission_* metrics cover the accept/request counts. Every node line is
-  # parsed three times over by the Alloy chain (node -> voting -> call-trace),
-  # so line count is what a saturated collector actually costs.
   TxSubmission.TxInbound.Processed:
     severity: Silence
   TxSubmission.TxInbound.Collected:

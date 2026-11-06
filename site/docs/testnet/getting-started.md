@@ -92,7 +92,7 @@ endorser blocks, as they land.
 | **Network magic**   | `164`                                                                                                    |
 | **Faucet**          | [faucet.leios.play.dev.cardano.org](https://faucet.leios.play.dev.cardano.org/basic-faucet)              |
 | **Node releases**   | [https://github.com/input-output-hk/ouroboros-leios/releases](https://github.com/input-output-hk/ouroboros-leios/releases) |
-| **Node version**    | reports `cardano-node 11.1.0.164`                                                                        |
+| **Node version**    | reports `cardano-node 11.2.0.164`                                                                        |
 
 ## System requirements
 
@@ -100,12 +100,13 @@ The network is fresh and will be respun every couple of weeks. Thus, the load on
 validating nodes is light by testnet standards — a small machine is plenty, but
 requires a reasonably fast disk:
 
-|               |                                                    |
-|---------------|----------------------------------------------------|
+|               |                                                                                 |
+|---------------|---------------------------------------------------------------------------------|
 | **OS / arch** | Linux **x86-64**, Linux **aarch64**, or macOS **aarch64** for prebuilt binaries |
-| **CPU**       | 2 cores is fine; more only speeds the initial sync |
-| **RAM**       | 4 GB comfortable (the node uses ~2–2.5 GB)         |
-| **Disk**      | SSD, ~25 GB                                        |
+| **CPU**       | 2 or more cores                                                                 |
+| **RAM**       | 4 GB comfortable on this network (the node uses ~2–2.5 GB)                      |
+| **Disk**      | 25GB SSD NVMe or other low latency disk                                         |
+| **Network**   | 100 Mbit would be good (depends on # of peers)                                  |
 
 
 :::info Requirements will change

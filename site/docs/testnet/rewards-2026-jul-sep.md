@@ -17,6 +17,8 @@ keywords:
 
 One row per registered stake pool. A pool earns **$100 for each month** it qualifies, for up to three pools per participant. Where a participant registered more than once, pools from all their registrations count towards the three; if there are more than three, the pools in their latest registration take priority.
 
+**Paid on 29 October 2026.** All rewards in this table, $18,100 in total, were paid in ADA in a single Cardano mainnet transaction to all participants who qualified: `6200d0e3683be0dd37f39f6840b30226a441e853e83e6fff889f4046afa5d7ef`, view it on [Cardanoscan](https://cardanoscan.io/transaction/6200d0e3683be0dd37f39f6840b30226a441e853e83e6fff889f4046afa5d7ef) or [AdaStat](https://adastat.net/transactions/6200d0e3683be0dd37f39f6840b30226a441e853e83e6fff889f4046afa5d7ef). USD amounts were converted at 0.2058 USD/ADA, the CoinMarketCap ADA/USD close of 28 October 2026, for a total of 87,949.47 ADA.
+
 - **KYC:** the participant's identity verification and wallet check are both complete. Rewards are paid only to participants who completed KYC. ❌ means the checks were not completed within the KYC period, which has now closed.
 - **Jul blocks:** the pool produced at least one block on MusashiNet in July.
 - **Aug blocks (10-31):** the pool produced at least one block on MusashiNet from 10 August, when the network was reset. Blocks from 1 to 9 August alone do not cover most of the month and do not qualify.

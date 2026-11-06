@@ -5,6 +5,70 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## rc-2026w45 - 2026-11-06
+
+Small release with a few consensus internal changes: Adaptive endorsements react only to missed quorums, block producers stop fetching their own endorser blocks back, and the mempool waits for a committee that can reach a quorum.
+
+- Block producers scale down their endorser blocks only when certifiable announcements miss their quorum [consensus#2480](https://github.com/IntersectMBO/ouroboros-consensus/pull/2480)
+  - Each miss scales the capacity by `Decrease`, each quorum reached adds `Increase`, and it never drops below `MinScale`.
+  - The w44 keys `GainP`, `Attack`, `Release` and `AliveWindow` are ignored.
+  - Still experimental and off by default. Enable it with:
+    ```yaml
+    LeiosAdaptiveEndorsements:
+      Enabled: true
+    ```
+- A block producer no longer fetches its own endorser block's transactions back from peers [consensus#2477](https://github.com/IntersectMBO/ouroboros-consensus/pull/2477)
+- The fetch client writes endorser blocks and their transactions to the LeiosDb before handling the next reply [consensus#2477](https://github.com/IntersectMBO/ouroboros-consensus/pull/2477)
+  - Quick test balloon whether we need the book keeping complexity in practice
+- The mempool makes room for endorser blocks only once the epoch's committee can reach a quorum [consensus#2481](https://github.com/IntersectMBO/ouroboros-consensus/pull/2481)
+- `tx-firehose --pad-bytes N` pads every transaction with about `N` bytes of metadata
+
+> [!NOTE]
+>
+> No resync, no respin. Nodes of this and the w44 release can talk to each other, and a w44 configuration loads unchanged.
+
+## rc-2026w44 - 2026-10-31
+
+Several experimental network and consensus features: Nodes schedule their egress in tiers, block producers forge smaller endorser blocks while votes fall short, and bulk credentials can carry a BLS key per pool.
+
+> [!IMPORTANT]
+>
+> **Enable all experimental features.** To make most of this version on the musashi dojo, turn egress scheduler, adaptive endorsements and the V2 transaction submission logic all on. The attached `config.json` sets them:
+>
+> ```json
+> "EgressBudgetMbps": 250,
+> "LeiosAdaptiveEndorsements": { "Enabled": true },
+> "TxSubmissionLogicVersion": "TxSubmissionLogicV2"
+> ```
+>
+> Otherwise, no resync, no respin. Databases and wire formats are unchanged, so nodes of this and the w43 release can talk to each other. Should this release make any problems, feel free to revert back to w43.
+
+- Nodes schedule their egress across peers [network](https://github.com/IntersectMBO/ouroboros-network/tree/karknu/egress_scheduler.leios)/[consensus](https://github.com/IntersectMBO/ouroboros-consensus/tree/karknu/egress_scheduler.leios)
+  - New `EgressBudgetMbps` node configuration sets the budget shared among all peers, defaulting to 250. Set it to `0` to turn scheduling off.
+  - New metrics count, per tier, the peers served and how much the order slowed them (`egress.tier.<tier>.slowed.<n>x`), and the bytes sent and read per mini-protocol.
+- Inbound transaction submission polls most peers less often [network:egress_scheduler](https://github.com/IntersectMBO/ouroboros-network/tree/karknu/egress_scheduler.leios)
+  - Local roots, peers that recently delivered new transactions, and a few inbound peers rotated at random are polled at full speed. Every other peer waits between requests.
+  - A peer is asked for up to 10 transaction ids at once, from 6 before.
+  - A `MsgReplyTxs` listing a transaction twice is rejected with `ProtocolErrorTxNotRequested`.
+  - Fixes the transaction-submission counters no longer being emitted under heavy load.
+- Block producers scale down the endorser blocks they forge if recent announcements lose their quorum margin [#2475](https://github.com/IntersectMBO/ouroboros-consensus/pull/2475)
+  - The margin is the stake that voted on any recent announcement minus the quorum threshold, so the controller works the same whether 97% or 80% of the stake votes, with no target to pick.
+  - Off by default. Enable it with a `LeiosAdaptiveEndorsements` section in the node configuration, shown here with the defaults:
+    ```yaml
+    LeiosAdaptiveEndorsements:
+      Enabled: true
+    ```
+  - Each sample is traced as `LeiosAdaptiveEb`, with the stake that voted, the stake alive, the margin share and the resulting capacity scale.
+- Voters open and close their voting window as the protocol parameters say [consensus:adaptive-endorsements](https://github.com/IntersectMBO/ouroboros-consensus/tree/ch1bo/leios-adaptive-endorsements)
+  - The window opens `3 * L_hdr` after the announcing slot and closes after `L_vote`. Before, it opened after 3s and closed 4s later, whatever the parameters.
+- `TraceLeiosEbValidated` reports how long validating an endorser block's transactions took, and how many bytes, execution units and reference-script bytes were validated in full [consensus#2443](https://github.com/IntersectMBO/ouroboros-consensus/pull/2443)
+- A node no longer serves a certifying block to local clients without its endorser block's transactions [consensus#2454](https://github.com/IntersectMBO/ouroboros-consensus/pull/2454)
+  - Where it would have, it now ends the client's connection with `CertRbWithoutEbTxs`.
+- Bulk credentials accept a BLS signing key per pool [cardano-node#6749](https://github.com/IntersectMBO/cardano-node/pull/6749)
+  - Each entry is `[opcert, vrf, kes]` or `[opcert, vrf, kes, bls]`, where `bls` is one key envelope or an array of them.
+- `tx-firehose` can vary its submission rate over time with `--tps-schedule`, e.g. `0:20,3600:250` ramps from 20 to 250 tx/s over an hour
+  - `--schedule-start` lets a restarted firehose resume the schedule.
+
 ## rc-2026w43 - 2026-10-25
 
 A small consensus-only release: more efficient storing and serving of endorser blocks, block producers forge certifying blocks without reapplying the mempool, and the mempool fills to its byte capacity more consistently. This improved the forge loop timings and generally result in faster release of announcements and smoother data diffusion. 

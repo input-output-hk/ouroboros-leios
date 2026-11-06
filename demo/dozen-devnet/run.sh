@@ -68,6 +68,11 @@ set -a
 # is fixed, so the input selection has to cover fee + OUTPUTS * min-ada. 5 outputs
 # gives ~648 B transactions.
 : "${OUTPUTS:=1}"
+# Metadata padding per generated tx, in bytes: the other lever on size, without
+# the min-ada of extra outputs. A padded tx costs about as much to validate as an
+# unpadded one, so it moves bytes with less validation per byte. The 1 ADA fee
+# covers up to about 19 kB, above the 16,384 B maxTxSize.
+: "${PAD_BYTES:=0}"
 # Which tx-firehose to run. Defaults to whatever is on PATH, which is normally the
 # nix-store build; point it at a local cabal build to iterate on the generator
 # without rebuilding the devnet:
@@ -82,6 +87,24 @@ set -a
 : "${COLOR1:=ff0000}"
 : "${COLOR2:=00ff00}"
 : "${COLOR3:=0000ff}"
+# Square-wave load, e.g. TPS_SQUARE=50:500:600 alternates the firehoses between
+# 50 and 500 tx/s every 10 minutes, starting low, to watch the adaptive
+# endorsements controller's step response. Needs a tx-firehose with
+# --tps-schedule (point TX_FIREHOSE at a local build).
+: "${TPS_SQUARE:=}"
+FIREHOSE_SCHEDULE_ARGS=""
+if [ -n "$TPS_SQUARE" ]; then
+  IFS=: read -r sqLow sqHigh sqHalf <<<"$TPS_SQUARE"
+  # A 1 s ramp makes each edge; twelve hours of it is plenty for a run. The
+  # fixed start keeps the wave in phase when process-compose restarts a firehose.
+  sqPoints=""
+  for ((k = 0; k < 43200 / sqHalf; k++)); do
+    if ((k % 2 == 0)); then rate=$sqLow; else rate=$sqHigh; fi
+    sqPoints+="${sqPoints:+,}$((k * sqHalf)):${rate},$(((k + 1) * sqHalf - 1)):${rate}"
+  done
+  FIREHOSE_SCHEDULE_ARGS="--tps-schedule ${sqPoints} --schedule-start $(date +%s)"
+fi
+export FIREHOSE_SCHEDULE_ARGS
 # Mempool observers are not devnet processes: process-compose cannot tile, so
 # twelve panes would only be viewable one at a time. See ./mempool-panes.sh.
 # Traffic control (on by default, disable with TC=0)
@@ -597,16 +620,17 @@ cp "${SHARED_CONFIG_DIR}/alloy-modules/"*.alloy "${WORKING_DIR}/alloy-modules/"
 {
   echo "# dozen-devnet run provenance — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo
-  for tool in cardano-node cardano-cli tx-firehose; do
+  for tool in cardano-node cardano-cli "$TX_FIREHOSE"; do
     path=$(command -v "$tool")
+    tool=$(basename "$tool")
     echo "${tool}:"
     echo "  path:    ${path}"
-    echo "  version: $("$tool" --version 2>/dev/null | head -1)"
+    echo "  version: $("$path" --version 2>/dev/null | head -1)"
     echo "  sha256:  $(sha256sum "$path" 2>/dev/null | cut -d' ' -f1)"
   done
   echo
   echo "settings:"
-  for v in TPS OUTPUTS RATE DELAY TC XRAY SERVER NODE_RTS RESUME; do
+  for v in TPS TPS_SQUARE OUTPUTS PAD_BYTES RATE DELAY TC XRAY SERVER NODE_RTS RESUME; do
     echo "  ${v}=${!v}"
   done
   echo "  nodes=${#NODES[@]}"
