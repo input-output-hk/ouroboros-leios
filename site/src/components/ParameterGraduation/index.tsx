@@ -325,7 +325,7 @@ export default function ParameterGraduation({ plans: initialPlans, model: initia
                         <td>
                           <b>{fmtU(S)}</b>
                         </td>
-                        <td>{fmtB(p.steps * 20000)}</td>
+                        <td>{fmtB(p.refScriptBytes ?? p.steps * 20000)}</td>
                       </tr>
                     );
                   })}

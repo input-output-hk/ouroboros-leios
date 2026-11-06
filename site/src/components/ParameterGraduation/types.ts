@@ -5,8 +5,10 @@ export interface Step {
   id: string;
   // EB txs in kB; EB references follow as txs × 40/260.
   txs: number;
-  // Plutus steps in G; memory and reference scripts follow from it.
+  // Plutus steps in G; memory and reference scripts (unless overridden) follow from it.
   steps: number;
+  // Explicit reference-script limit in bytes; defaults to 20 kB per G steps.
+  refScriptBytes?: number;
   // L_diff in seconds; L_vote = L_diff − 3·L_hdr.
   diff: number;
   color?: Color;
