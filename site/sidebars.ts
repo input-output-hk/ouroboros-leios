@@ -31,6 +31,7 @@ const sidebars: SidebarsConfig = {
         "development/throughput-simulation",
         "development/simulation-demonstration",
         "development/cost-estimator",
+        "development/benchmark-reports",
       ],
     },
   ],
