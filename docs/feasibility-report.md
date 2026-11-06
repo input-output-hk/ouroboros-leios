@@ -1,6 +1,6 @@
 # Leios technical feasibility: a measured assessment of the pipeline on the public testnet and the benchmarking cluster
 
-Build of 2026-11-05, from commit cb782700. Sections drafted so far: 1, 2, 3, 4, 5, 6, Appendix A. Sections not yet in this build are listed at the end. The open points the text leaves for the team and the reviewers are kept in place as block quotes headed "Note to resolve".
+Build of 2026-11-05, from commit 0fd84b4a. Sections drafted so far: 1, 2, 3, 4, 5, 6, Appendix A. Sections not yet in this build are listed at the end. The open points the text leaves for the team and the reviewers are kept in place as block quotes headed "Note to resolve".
 
 ## Contents
 
@@ -223,9 +223,9 @@ parameters L_hdr, L_vote and L_diff are 1, 4 and 7 s on these networks). A
 voter that holds the closure before the three-second mark waits; one that
 receives it after the seven-second deadline does not vote. Validation
 applies to the ledger state every transaction of the closure, in full for
-the ones the node has not seen before and as a reapplication for the ones
-its mempool already validated, so its cost depends on how much of the EB
-the voter already held.
+the ones the node has not validated before and as a reapplication for the
+ones it validated at mempool admission or in an earlier EB, so its cost
+depends on how much of the EB the voter had already validated.
 
 The fifth stage is the tally. Votes diffuse between the nodes, and every
 node keeps a running tally of the weight behind each EB; the EB is
@@ -374,8 +374,9 @@ either by bandwidth, on hosts that receive from well-connected peers, or
 by topology, on hosts several hops from the forgers; a closure that arrives
 after the vote deadline is lost to the voting stage whatever else happens.
 Validation should cost a roughly constant time per transaction the voter
-has not seen, so it grows with the EB's transaction count and with the
-share of it the voter did not hold, and it has to fit in the four seconds
+has not validated before, so it grows with the EB's transaction count and
+with the share of it the voter applies in full, and it has to fit in the
+four seconds
 between the vote mark and the deadline after the closure is in hand. The
 tally should reach the quorum once three quarters of the committee's
 weight has voted, so it arrives close to the deadline when the slow voters
@@ -426,7 +427,7 @@ voters are the pools themselves and the vote traffic per EB is one vote
 from each, not 900. Table 3.1 lists the three load windows the report
 measures on it.
 
-| window | caps | loaded hours (UTC) | transaction size (median, certified closures) | pools in the committee | weight of the 14 IOG and PIR pools |
+| window | caps | loaded hours (UTC) | transaction size (mean over the certified closures) | pools in the committee | weight of the 14 IOG and PIR pools |
 |---|---|---|---|---|---|
 | 40 kB / 260 kB | 40 kB references, 260 kB closure | 2026-10-21 12:00-13:00, 17:00-21:00, 10-22 00:00-01:00 (6 h) | 257 B | 100-108 | 0.45-0.48 |
 | 308 kB / 2 MB | 308 kB references, 2 MB closure | 25 even hours from 2026-10-24 12:00 to 10-26 13:00 | 318 B | 145-148 | 0.35-0.36 |
@@ -434,7 +435,10 @@ measures on it.
 
 Table 3.1. The testnet load windows. The loaded hours are those in which
 the generator ran; the odd hours between them carried residual load only
-and are excluded.
+and are excluded. The 2 MB window's 318 B is the mean of two sizes of
+the same one-input transaction from two generators, 247 B for three
+quarters of the transactions and 506 B for a quarter, which differ in
+their metadata.
 
 The stake is not evenly spread. Fourteen pools are operated by IOG (IOG1
 to IOG3, PIR0 to PIR10), and together they hold between a
@@ -818,11 +822,22 @@ from 2026-10-24 12:00 to 10-26 13:00 UTC, 2,128 eligible EBs, 1,033
 certified. 1 kB window: the four even hours from 10-28 18:00 to 10-29
 01:00 UTC, 361 eligible, 164 certified. Both voting-adjusted rungs are
 shown because they differ here: "full" is the survival of EBs at the cap,
-"mix" of all eligible EBs as forged. The three rungs that assume one
-transaction size (the cap that binds, the threshold for a full EB and the
-EB fullness, all read at the measured size) are left out of the 1 kB
-column, where two sizes coexisted; 4.3.1 reads that window by EB class
-instead. Transactions per second at the measured size: 38.0 and 29.6.
+"mix" of all eligible EBs as forged. Both columns carry two transaction
+sizes (Table 3.1). Three rungs read an EB's bytes from its references at
+the mean size: the cap that binds, the threshold for a full EB and the
+EBs' load factor. In the loaded hours the sizes are 247 and 506 B and
+the closure cap binds for both, so the mean misreads the 506 B-heavy
+EBs, a quarter of the transactions, as 0.6 to 0.8 of their bytes: the
+full rung then counts the 247 B EBs of 6,200 transactions and up, the
+ones costliest to validate, and the load-adjusted rung is an estimate
+off by at most that quarter in a direction the chain does not record;
+the measured rung, the certified closures' bytes, is exact. The rungs
+are kept with that reading. In the 1 kB window the sizes are 220 and
+1,024 B and bind different caps: a full 1 kB closure reads as 0.8 full
+and a full small-transaction EB as 3.5 times the cap, so there the mean
+gives no reading at all; those rungs are left out of its column and
+4.3.1 reads the window by EB class. Transactions per second at the
+measured size: 38.0 and 29.6.
 
 | stage | testnet 308 kB / 2 MB, loaded hours | testnet 308 kB / 2 MB, 1 kB transactions |
 |---|---|---|
@@ -954,7 +969,7 @@ EBs for which no vote was heard anywhere, 31 of those 35 being the
 small-transaction EBs of 6,000 references and up, and 9 % the forger's
 side.
 
-> **Note to resolve.** Two caveats on this window. It ran on a mixed node build (two thirds of the operator agents on the next revision, one third on the previous; the IOG hosts on the next), so it is not a clean measurement of either build. And with two generators the ladder's single-size rungs are not meaningful; a clean reading at 1 kB needs a window with one generator at that size. The forge events of the announcing nodes would give the closure bytes of the failed EBs as well, for the 39 % forged by reporting pools, but in a fifth of those events the closure field equals the reference bytes instead (16 forgers, likely one build), and the field is left out until that is understood.
+> **Note to resolve.** Two caveats on this window. It ran on a mixed node build (two thirds of the operator agents on the next revision, one third on the previous; the IOG hosts on the next), so it is not a clean measurement of either build. And its two sizes bind different caps, so the ladder's reference-based rungs give no reading (Table 4.5); a clean reading at 1 kB needs a window with one generator at that size. The forge events of the announcing nodes would give the closure bytes of the failed EBs as well, for the 39 % forged by reporting pools, but in a fifth of those events the closure field equals the reference bytes instead (16 forgers, likely one build), and the field is left out until that is understood.
 
 ## 4.4 Across the sets
 
@@ -1272,18 +1287,18 @@ change them in section 8. The tables are regenerated by
 ## 6.1 The cost of validating a transaction
 
 A voter validates an EB's closure transaction by transaction: the ones it
-already holds validated in its mempool are reapplied, the state update
-without the checks; the ones it has not seen are applied in full. The
-validation time of an EB is therefore the EB's transaction count times a
-cost that depends on how many of them the voter had seen, on the
-transactions' shape, and on the host. Tables 6.1a to 6.1e read it
+has validated before, at admission to its mempool or in an earlier EB, are
+reapplied, the state update without the checks; the rest are applied in
+full. The validation time of an EB is therefore the EB's transaction count
+times a cost that depends on how many of them the voter had already
+validated, on the transactions' shape, and on the host. Tables 6.1a to 6.1e read it
 directly from the validation records: per host, on the EBs of one window,
 the validation time per EB (the time after the later of the closure's
 arrival and the slot plus 3 s), grouped by the share of the EB's
 transactions the voter had to apply in full. The transaction count is held
 fixed: each table takes the window's most common 500-transaction size
 class, so that a cell compares EBs of one size and the rise along a row is
-the unseen share alone. The IOG and PIR hosts are shown by instance class,
+the applied share alone. The IOG and PIR hosts are shown by instance class,
 the IOG producers behind their relays apart from the PIR hosts in the open
 network; the operators as the median and quartile nodes of one node set.
 
@@ -1306,7 +1321,7 @@ operator node; one that holds less than a third, in 0.2 to 0.9 s on the
 hosts and 0.65 s at the median operator node. Every cell is well inside
 the window.
 
-**Table 6.1b.** testnet 308 kB / 2 MB, loaded hours (318 B, one input, no scripts): EBs of 4,500 to 5,000 transactions, the window's most common size class, 367 EBs; a cell in which a host has fewer than 30 records is marked tentative.
+**Table 6.1b.** testnet 308 kB / 2 MB, loaded hours (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts): EBs of 4,500 to 5,000 transactions, the window's most common size class, 367 EBs; a cell in which a host has fewer than 30 records is marked tentative.
 
 | validation time per EB, s (median; records in brackets) | applied share under 10 % | applied share 10 to 30 % | applied share 30 to 50 % | applied share 50 to 70 % | applied share 70 % and over |
 |---|---|---|---|---|---|
@@ -1319,14 +1334,17 @@ the window.
 | lower quartile node | 0.95 | 2.06 | 3.69 | 5.14 | 6.57 |
 | upper quartile node | 2.01 | 5.57 | 10.89 | 14.86 | 19.01 |
 
-A voter that holds nine tenths of the 2 MB window's common EB validates
-it in 0.4 s on the current-generation hosts and 1.5 s at the median
-operator node; one that holds half needs 2.1 to 2.7 s on those hosts,
-3.2 to 4.1 s on the older ones and 6.2 s at the median operator node; one
-that holds less than a third, where the cells are populated, 3.7 to 8 s
-on the hosts and 10.5 s at the median operator node, past the four-second
-window. The upper-quartile operator node is at 11 s with half the EB
-unseen and 19 s with less than a third.
+A voter applying a tenth of the 2 MB window's common EB validates it in
+0.4 s on the current-generation hosts and 1.5 s at the median operator
+node; one applying half needs 2.1 to 2.7 s on those hosts, 3.2 to 4.1 s
+on the older ones and 6.2 s at the median operator node; one applying
+more than two thirds, where the cells are populated, 3.7 to 8 s on the
+hosts and 10.5 s at the median operator node, past the four-second
+window. The upper-quartile operator node is at 11 s applying half the EB
+and 19 s applying more than two thirds. The certified EBs of this class
+are mostly closures in which the 506 B kind dominates (37 of 57 in the
+loaded hours; 13 are pure 247 B), so this table reads the heavier mix;
+section 7 separates the two kinds.
 
 **Table 6.1c.** testnet 308 kB / 2 MB, 1 kB transactions (about 1 kB with metadata, and 235 to 260 B, mixed): EBs of 1,500 to 2,000 transactions, the window's most common size class, 178 EBs; a cell in which a host has fewer than 30 records is marked tentative.
 
@@ -1342,10 +1360,10 @@ unseen and 19 s with less than a third.
 | upper quartile node | 0.82 | 1.29 | 1.68 | 1.96 | 2.06 |
 
 This window's common EBs are the closures made of the metadata
-transactions (Table 4.8). A voter that holds nine tenths of one validates
-it in 0.16 to 0.34 s on the hosts and 0.37 s at the median operator node;
-one that holds half, in 0.4 to 0.8 s and 0.8 s; the window is seven hours
-and most cells beyond a tenth unseen are tentative.
+transactions (Table 4.8). A voter applying a tenth of one validates it in
+0.16 to 0.34 s on the hosts and 0.37 s at the median operator node; one
+applying half, in 0.4 to 0.8 s and 0.8 s; the window is seven hours and
+most cells beyond a tenth applied are tentative.
 
 **Table 6.1d.** cluster 100 kB / 1 MB, 200 B (200 B, one input, one output): EBs of 2,500 to 3,000 transactions, the window's most common size class, 1478 EBs; a cell in which a host has fewer than 30 records is marked tentative.
 
@@ -1369,11 +1387,11 @@ the last two cells of each run past the four-second window, and the
 quartile nodes within a tenth of the median. The line is the content
 dependence as well: the two runs differ only in the transaction, and two
 inputs with two outputs cost 1.6 to 1.8 times one input with one output
-at every unseen share.
+at every applied share.
 
 Tables 6.1a to 6.1e. Validation time per EB by the share of the EB the
-voter had not seen, per window, on the window's most common EB size
-class. A record is one voter validating one EB, certified or not; the
+voter had not validated before, per window, on the window's most common
+EB size class. A record is one voter validating one EB, certified or not; the
 applied share is the transactions it applied in full over the EB's
 total. The IOG and PIR hosts' cells are the range of the hosts' medians,
 with the records in brackets; a cell in which a host has fewer than 30
@@ -1382,13 +1400,13 @@ blank. The operators' rows are the median node and the quartile nodes
 across the nodes with 20 or more records in every bin, the same nodes in
 every column. The cluster rows are the whole population, uniform hosts.
 
-Across the five tables, every row rises with the unseen share, on every
+Across the five tables, every row rises with the applied share, on every
 host and in every window, and the hosts keep one order in every window
 and every column: the current-generation hosts at four vCPUs fastest
 (c8id.xlarge and r8id.xlarge, 0.37 to 0.54 s on the 2 MB window's common
-EB at a tenth unseen), the c6id.2xlarge hosts at eight vCPUs 1.4 to 1.7
+EB at a tenth applied), the c6id.2xlarge hosts at eight vCPUs 1.4 to 1.7
 times slower, the c5d.2xlarge hosts at eight vCPUs 1.7 to 2.0 times
-slower, the ratios holding at every unseen share. Two things in that
+slower, the ratios holding at every applied share. Two things in that
 order are separated by the tables. The two older generations, both at
 eight capabilities, differ by 10 to 20 %, the size of one generation
 step. Within the current generation, the IOG producers with four upstream
@@ -1411,14 +1429,15 @@ the voting loop's own per-transaction term, measured per host in section
 
 ## 6.2 Mempool coverage
 
-The unseen share is not a property of the EB: it is the difference
-between what the producer put in the EB and what each voter's mempool
-held when the closure arrived, and it decides whether the voter validates
-in time. Table 6.2 gives the outcome on the cluster, where every voter is
-observed: the EBs that failed to certify, by the mean share of their
-transactions the voters had not seen.
+The applied share is not a property of the EB: it is the difference
+between what the producer put in the EB and what each voter had validated
+before the closure arrived, in its mempool or through an earlier EB, and
+it decides whether the voter validates in time. Table 6.2 gives the
+outcome on the cluster, where every voter is observed: the EBs that
+failed to certify, by the mean share of their transactions the voters
+applied in full.
 
-| run | share of the EB's transactions unseen by the voters | EBs | fail as recorded |
+| run | share of the EB's transactions the voters applied in full | EBs | fail as recorded |
 |---|---|---|---|
 | cluster 100 kB / 1 MB, 200 B | under 30 % | 607 | 3 % |
 | cluster 100 kB / 1 MB, 200 B | 30 to 40 % | 227 | 5 % |
@@ -1434,16 +1453,17 @@ transactions the voters had not seen.
 | cluster 100 kB / 1 MB, 374 B | 70 % and over | 82 | 100 % |
 
 Table 6.2. EBs failing to certify by the share of their transactions the
-voters had not seen, the two cluster runs at 100 kB / 1 MB; an EB fails
-when fewer than 39 of the 51 voters had it validated by 7 s.
+voters applied in full, the two cluster runs at 100 kB / 1 MB; an EB
+fails when fewer than 39 of the 51 voters had it validated by 7 s.
 
-An EB whose transactions most voters already held certifies at either
-transaction size; one that is half unseen fails three times in five at
-200 B and almost always at 374 B. Over all the validations of a window,
+An EB whose transactions most voters had already validated certifies at
+either transaction size; one that is half applied fails three times in
+five at 200 B and almost always at 374 B. Over all the validations of a window,
 one per node and EB whether the EB certified or not, the median applied
 share is 35 % on the cluster and 1 to 8 % on the testnet, where the operator
 producers forge from mempools the generator fills more slowly, so the
-testnet's EBs are mostly seen and its loss sits in the slow tail of hosts
+testnet's EBs are mostly validated before the closure arrives and its
+loss sits in the slow tail of hosts
 and nodes rather than in coverage; the cluster's generator feeds every
 node a different set of transactions, and coverage is what its runs
 measure. How the load is submitted therefore sets the certification rate
@@ -1668,7 +1688,9 @@ dictionary defines each of them; the report does not recompute them.
 - **Loaded windows.** Each testnet window is the set of hours in which
   the load generator ran (Table 3.1), kept as a list of start and end
   times; an EB or RB belongs to a window by the time of its slot. Cluster
-  runs are read whole.
+  runs are read whole. A window's transaction size (Table 3.1) is the
+  bytes of its certified closures over their transaction count, the
+  figure the ladder divides the byte cap by.
 - **A node** is one reporting agent for one pool; one agent name can
   report for two pools and then counts twice.
 - **Eligible EB.** An announced EB whose next RB on the chain is 14 or
@@ -1842,7 +1864,7 @@ equals the chain-selection call's own duration RB by RB. Medians and
 90th percentiles over node-RB pairs; the cluster reads the same events
 from its chain-database traces.
 
-**Validation time by unseen share (section 6.1).** The records of the
+**Validation time by applied share (section 6.1).** The records of the
 validation entry above, every EB a node validated whether it certified
 or not, with the duration between 0 and 60 s and at least 100
 transactions; the applied share is applied over applied plus reapplied.
@@ -1858,7 +1880,7 @@ records in every bin are kept, the same set in every column; per node
 the median per bin, then the median and the quartiles across nodes. On
 the cluster all 51 nodes form the one population.
 
-**EBs failing by unseen share (section 6.2).** On a cluster run, per
+**EBs failing by applied share (section 6.2).** On a cluster run, per
 EB the mean over its voters of the applied share from the same records,
 binned (under 30 %, then steps of 10 to 70 and over); per bin the EBs
 and the share that failed to certify, an EB certifying when 39 or more
@@ -1941,8 +1963,8 @@ available to reviewers on request.
 | the forge path | archived monitoring pulls, chain cache | `forge_path.py` | `praos_table.py` |
 | the adoption path | period database or cluster run, chain cache | `adoption_path.sql`, `cluster_adoption_path.sql` | `praos_table.py` |
 | the Praos control | the team's report | | `praos_table.py`, typed constants |
-| validation time by unseen share | the per-record validation output of a window or run, the hosts table | `validation_bins.py` | `cost_table.py bins` |
-| EBs failing by unseen share | the per-record validation output of a cluster run, its ladder export | `host_speed.py` | `cost_table.py unseen` |
+| validation time by applied share | the per-record validation output of a window or run, the hosts table | `validation_bins.py` | `cost_table.py bins` |
+| EBs failing by applied share | the per-record validation output of a cluster run, its ladder export | `host_speed.py` | `cost_table.py unseen` |
 | nodes by their closure p90, upstream-peer groups | the per-node diffusion outputs, the voters table; the archived per-peer announcement pulls | `diffusion_bins.py`, `peers_upstream.py` | `diffusion_table.py bins`, `upstream` |
 | memory and CPU | the period database's metrics, the archived monitoring series, the cluster's resource trace; the hosts table | `resources.py` | `cost_table.py resources` |
 | node versions | the period database's metrics | the node-versions query | read directly |
