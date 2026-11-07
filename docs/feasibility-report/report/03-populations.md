@@ -74,14 +74,16 @@ as well. The 1 kB window is thus measured on a mixed build, and the report
 treats it as such.
 
 The IOG and PIR hosts are AWS instances whose configuration is known
-(Table 3.2). The node runs with an in-memory ledger and one capability per
-vCPU, and each PIR host is in a different AWS region. PIR0 runs on a host
+(Table 3.2). The node runs with an in-memory ledger on every host but
+IOG3, which keeps the UTxO set on disk (the LSM backend on the instance's
+local NVMe), and one capability per vCPU; each PIR host is in a different
+AWS region. PIR0 runs on a host
 outside the monitoring and sends neither logs nor metrics to any source
 the report reads.
 
 | hosts | instance type | vCPUs, node capabilities | memory | role |
 |---|---|---|---|---|
-| IOG1, IOG3 | c8id.xlarge | 4 | 8 GiB | block producers behind IOG relays |
+| IOG1, IOG3 | c8id.xlarge | 4 | 8 GiB | block producers behind IOG relays; IOG3 with the UTxO set on disk |
 | IOG2 | r8id.xlarge | 4 | 32 GiB | block producer behind IOG relays |
 | PIR1, PIR3, PIR4, PIR8, PIR10 | c8id.xlarge | 4 | 8 GiB | block producers, one region each |
 | PIR2, PIR5, PIR6 | c6id.2xlarge | 8 | 16 GiB | block producers, one region each |
