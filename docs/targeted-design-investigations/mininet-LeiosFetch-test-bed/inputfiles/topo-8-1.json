@@ -1,0 +1,66 @@
+{
+  "nic_bw_mbit": 1000,
+  "default_duration": 120,
+  "edges": [
+    {
+      "a": 1, "b": 9,
+      "bw_mbit": 10, "delay": "12ms", "jitter": "2ms",
+      "loss_gemodel": [0.05, 50, 80, 0.001],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 2, "b": 9,
+      "bw_mbit": 8, "delay": "18ms", "jitter": "3ms",
+      "loss_gemodel": [0.1, 40, 75, 0.001],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 3, "b": 9,
+      "bw_mbit": 5, "delay": "25ms", "jitter": "4ms",
+      "loss_gemodel": [0.15, 35, 70, 0.005],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 4, "b": 9,
+      "bw_mbit": 12, "delay": "8ms", "jitter": "1ms",
+      "loss_gemodel": [0.02, 60, 90, 0],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 5, "b": 9,
+      "bw_mbit": 7, "delay": "15ms", "jitter": "3ms",
+      "loss_gemodel": [0.08, 45, 80, 0.001],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 6, "b": 9,
+      "bw_mbit": 4, "delay": "40ms", "jitter": "8ms",
+      "loss_gemodel": [0.1, 30, 70, 0.005],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 7, "b": 9,
+      "bw_mbit": 6, "delay": "5ms", "jitter": "1ms",
+      "loss_gemodel": [0.05, 50, 85, 0],
+      "a_pulls": false, "b_pulls": true
+    },
+    {
+      "a": 8, "b": 9,
+      "bw_mbit": 3, "delay": "30ms", "jitter": "5ms",
+      "loss_gemodel": [0.15, 35, 75, 0.005],
+      "a_pulls": false, "b_pulls": true
+    }
+  ],
+  "tuned_initcwnd": [9],
+  "node_nicknames": {
+    "1": "10M/12ms/0.05%",
+    "2": "8M/18ms/0.10%",
+    "3": "5M/25ms/0.15%",
+    "4": "12M/8ms/0.02%",
+    "5": "7M/15ms/0.08%",
+    "6": "4M/40ms/0.10%",
+    "7": "6M/5ms/0.05%",
+    "8": "3M/30ms/0.15%",
+    "9": "Sink"
+  }
+}
