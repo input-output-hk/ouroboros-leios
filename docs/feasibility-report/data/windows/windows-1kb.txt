@@ -1,0 +1,9 @@
+# Testnet F2 (308 kB refs, 2 MB closures) after the generator moved to ~1 kB
+# transactions (metadata), from 2026-10-28 18:00 UTC: the loaded even hours
+# (carried 5.8-10.9 kB/s against 4.1-5.0 in the odd hours). A second
+# generator kept submitting 235-260 B transactions, so EBs of 8,555 txs
+# (reference cap) and of ~2,000 txs (closure cap) coexist in every hour.
+2026-10-28T18:00:00 2026-10-28T19:00:00
+2026-10-28T20:00:00 2026-10-28T21:00:00
+2026-10-28T22:00:00 2026-10-28T23:00:00
+2026-10-29T00:00:00 2026-10-29T01:00:00
