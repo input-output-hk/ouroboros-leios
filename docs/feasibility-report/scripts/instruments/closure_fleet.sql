@@ -6,8 +6,11 @@
 -- as infinite, shown as 1e9), then the distribution of those ages over EBs,
 -- the share of EBs whose closure 90 % of the nodes held by 3 s and by 7 s,
 -- and the same by EB size (transactions = reference bytes / 36) with the
--- certified closures' median bytes. The per-EB rows are written to
--- closure_fleet_per_eb.csv in the current directory.
+-- certified closures' median bytes; then the 6,000-and-up class split at the
+-- reference cap (8,550 references and up), with the nodes that received the
+-- body (BlockAcquired) and the closure per EB, since the EBs at the cap mostly
+-- never deliver their body (read in 4.3.1's prose and its note). The per-EB
+-- rows are written to closure_fleet_per_eb.csv in the current directory.
 --
 -- Variables as in validation_pairs.sql: t0, t1, win, gap (default 14), slot0
 -- (default 1792281600), chain (default chain-2026-10-18/blocks.sqlite under the
@@ -35,17 +38,19 @@ create temp table ebs as
 -- extract first, then filter: a filter on data->>x straight on trace makes DuckDB cast other namespaces' payloads
 create temp table ev as
   select agent, ns, data->>'$.ebHash' eb, try_cast(data->>'$.closureAgeSeconds' as double) age,
+         try_cast(data->>'$.bodyAgeSeconds' as double) body,
          try_cast(data->>'$.announcementAgeSeconds' as double) ann
-  from trace, p where ns in ('Consensus.LeiosKernel.AnnouncementAccepted', 'Consensus.LeiosKernel.BlockTxsAcquired')
+  from trace, p where ns in ('Consensus.LeiosKernel.AnnouncementAccepted', 'Consensus.LeiosKernel.BlockAcquired', 'Consensus.LeiosKernel.BlockTxsAcquired')
     and t >= p.t0 and t < p.t1 + interval 1 hour;
 create temp table pair as
   select eb, agent,
          min(age) filter (where ns = 'Consensus.LeiosKernel.BlockTxsAcquired') closure_s,
+         min(body) filter (where ns = 'Consensus.LeiosKernel.BlockAcquired') body_s,
          min(ann) filter (where ns = 'Consensus.LeiosKernel.AnnouncementAccepted') ann_s
   from ev where eb in (select eb from ebs) group by 1, 2 having
          min(ann) filter (where ns = 'Consensus.LeiosKernel.AnnouncementAccepted') <= 60;
 create temp table per_eb as
-  select eb, txs, closure, certified, count(*) nodes,
+  select eb, txs, closure, certified, count(*) nodes, count(body_s) nodes_body, count(closure_s) nodes_closure,
          quantile_cont(coalesce(closure_s, 1e9), 0.9) t90, quantile_cont(coalesce(closure_s, 1e9), 0.95) t95
   from pair join ebs using (eb) group by 1, 2, 3, 4 having count(*) >= 40;
 copy (select * from per_eb order by eb) to 'closure_fleet_per_eb.csv' (header, delimiter ',');
@@ -61,3 +66,9 @@ select case when txs < 2000 then 'a under 2,000 txs' when txs < 4000 then 'b 2,0
        round(quantile_cont(t90, 0.5), 2) t90_p50, round(quantile_cont(t90, 0.9), 2) t90_p90,
        round(100.0 * sum(t90 < 7) / count(*)) pct_ebs_t90_lt7, round(100.0 * sum(t95 < 7) / count(*)) pct_ebs_t95_lt7
 from per_eb group by 1 order by 1;
+-- the 6,000-and-up class split at the reference cap: how many nodes received the body and the closure
+select case when txs >= 8550 then 'b at the reference cap, 8,550 references and up' else 'a 6,000 to 8,549' end eb_txs,
+       count(*) ebs, sum(certified) certified, sum((t90 >= 1e8)::int) ebs_t90_never,
+       round(quantile_cont(nodes, 0.5)) nodes_p50, round(quantile_cont(nodes_body, 0.5)) nodes_body_p50,
+       round(quantile_cont(nodes_closure, 0.5)) nodes_closure_p50
+from per_eb where txs >= 6000 group by 1 order by 1;

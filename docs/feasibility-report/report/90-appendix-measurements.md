@@ -4,7 +4,7 @@ This appendix states, for every quantity the report's tables and
 figures rest on, which records it was read from, what marks its start
 and its end, which records were kept or dropped, and how the result was
 aggregated, so that a reviewer can judge the approach and not only the
-numbers. It is written for sections 1 to 6 and grows with the sections
+numbers. It is written for sections 1 to 7 and grows with the sections
 that follow. A.1 describes the sources and the records they hold, A.2
 the conventions every entry shares, A.3 the quantities themselves, and
 A.4 maps each quantity to the script or query that implements it.
@@ -81,6 +81,25 @@ protocol parameters, read for the congestion windows of section 1.
 **The benchmarking team's comparison.** The figures of Table 5.5 are
 taken as printed from the team's report of 2026-10-27, whose data
 dictionary defines each of them; the report does not recompute them.
+
+**The ledger benchmark survey.** The operators' submissions to the
+ledger-operations survey of October 2026 (db-analyser at one pin over
+one chain fragment, 26 operators' machines and the benchmarking team's
+reference host), copied from the survey's results page with the machine
+names removed: per machine the processor model, logical CPUs and
+physical cores, virtualisation, the disk's write-cache mode, and the
+read latency, apply and reapply costs per transaction with the UTxO set
+in memory and on disk. Held as a small table the printer reads.
+
+**db-sync.** The testnet's db-sync instance, reached through the
+monitoring's data source, gives the certified closures what the chain
+cache cannot: for every certifying RB of a window, the transactions it
+carries with their sizes, and for every input the block in which the
+spent output was created. The report keeps one row per certifying RB
+(transaction count and bytes, the size percentiles and extremes, the
+share of inputs spending an output of the same block and the median age
+in blocks of the outputs spent); the 1 kB window's composition table of
+section 4.3.1 is an earlier cut of the same query.
 
 ## A.2 Conventions
 
@@ -201,6 +220,20 @@ which 90 % and 95 % of them held the closure, a node that never
 completed counting as infinite. EBs are binned by their reference count;
 per bin, the median over EBs of the 90 % age, the share of EBs whose 90 %
 and 95 % ages are under 7 s, and the certified closures' median bytes.
+Per EB the nodes that received its body and that completed its closure
+are counted as well, and the 6,000-and-up bin is split at the reference
+cap, 8,550 references and up, with the median of those counts (4.3.1).
+
+**Validation by EB size class (section 4.3.1).** The records of the
+validation entry, as for 6.1, every EB validated in the loaded hours,
+binned by the EB's transaction count as the closure-tail sub-table: per
+bin the
+records and EBs, the median age of the closure's arrival and the share
+of records with the closure in hand by the slot plus 3 s, the median
+validation time after the later of the closure and the slot plus 3 s,
+the median age at which the record was validated and the share validated
+within 7 s of the slot. A node that never validated an EB has no record,
+so the shares are of the validations that completed.
 
 **Never-completed closures by fate (section 4).** Per node and EB heard
 announced within 60 s, whether the closure and the body ever arrived,
@@ -332,6 +365,39 @@ resource trace.
 scrapes, per day, keeping the revision seen last on a day with an
 upgrade.
 
+**The ledger benchmark by processor (section 7.1).** The survey's rows
+grouped by the processor model as reported; a model's cell is the range
+over its machines, and the summary rows the minimum, quartiles, median
+and maximum over all machines. The machines' logical CPU counts and
+virtualisation are in the printer's expanded output.
+
+**The cost per transaction at the vote (section 7.2).** The records of
+the validation entry, as for 6.1, on the EBs of one size class and, on
+the testnet, on the certified closures the db-sync rows select: by input
+origin, the closures with 80 % or more of their inputs spending an
+output of the same block (chained) and those with 50 % or less
+(old-input), or by transaction size, the closures whose transactions all
+lie in a band. A certifying RB is mapped to its EB through the chain
+cache. Per host, the cost per reapplied transaction is the median over
+the records in which the host applied no transaction of the closure of
+the validation time over the transaction count; the cost per applied
+transaction the median over the records in which it applied half or
+more of the time net of the reapplied transactions at that rate, over
+the applied count. Hosts are printed by instance class as the range of
+their medians, with the number of EBs behind each reading in brackets;
+a cell resting on fewer than 10 EBs on some host of the class reads
+"too few EBs" in the report, its cost kept in the instrument's output
+and the printer's expanded form; the operators' quartiles are
+over one node set under both selections, the nodes with 10 or more EBs
+behind the apply reading and 20 or more behind the reapply reading under
+each, so that the two columns compare the same nodes. The cluster runs
+(section 7.3) take the most common 500-transaction class and no
+selection, every node in one population. The size series, read in the
+prose of 7.2 and 7.3 and not a table of the report, repeats the
+readings per EB size class on the 2 MB window with the chained closures
+of 200 to 260 B transactions and on the cluster runs with the classes
+they populate.
+
 ## A.4 Where each quantity is computed
 
 The repository draws one boundary. Its inputs are the data sets of
@@ -362,7 +428,8 @@ available to reviewers on request.
 | body and closure diffusion per node, vote rate | period database or cluster run, chain cache | `diffusion_nodes.py` | `stage_table.py` |
 | applied share, validation after the closure | period database or cluster run | `validation_pairs.sql`, `cluster_validation_pairs.sql` | `stage_table.py` |
 | vote tally reaches the quorum, quorums that became certificates | period database or cluster run, chain cache | `tally_quorum.sql`, `cluster_tally_quorum.sql` | `stage_table.py` |
-| closure at 90 and 95 % of the nodes by EB size | period database, chain cache | `closure_fleet.sql` | `stage_table.py` |
+| closure at 90 and 95 % of the nodes by EB size; the body and closure reach of the EBs at the reference cap | period database, chain cache | `closure_fleet.sql` | `stage_table.py`, `--classes` for the reference-cap split |
+| validation by EB size class | the per-record validation output of a window | `validation_classes.py` | `stage_table.py --classes` |
 | never-completed closures by fate | period database, chain cache | `closure_never.sql` | read directly |
 | reporting coverage | period database, committee | the voters table of the causes pass | `stage_table.py` |
 | EB classes and composition of the 1 kB window | chain cache; the db-sync result as a saved output | `eb_composition.py` (chain half) | the same |
@@ -377,3 +444,5 @@ available to reviewers on request.
 | nodes by their closure p90, upstream-peer groups | the per-node diffusion outputs, the voters table; the archived per-peer announcement pulls | `diffusion_bins.py`, `peers_upstream.py` | `diffusion_table.py bins`, `upstream` |
 | memory and CPU | the period database's metrics, the archived monitoring series, the cluster's resource trace; the hosts table | `resources.py` | `cost_table.py resources` |
 | node versions | the period database's metrics | the node-versions query | read directly |
+| the ledger benchmark by processor | the survey table | | `benchmark_table.py` |
+| the cost per transaction at the vote, the size series | the per-record validation output of a window or run, the hosts table; the db-sync composition rows and the chain cache (testnet) | `validation_shape.py` | `cost_table.py shape`, `series` |

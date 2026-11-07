@@ -200,7 +200,9 @@ every node observed, so that a change between runs is attributable to the
 parameter that changed. What it cannot say is anything about diversity.
 Its stake is uniform, its topology fixed and shallow, its hosts identical,
 and its load comes from one generator that submits different transactions
-into every node's mempool. A voter still receives the other nodes'
+into every node's mempool, spending outputs created at genesis, 5.5
+million of them, which the runs reuse almost never. A voter still
+receives the other nodes'
 transactions through diffusion, so what it already holds of an EB when it
 is announced is decided by the race between the generator's injection and
 the diffusion among peers, in time rather than in place, whereas on the

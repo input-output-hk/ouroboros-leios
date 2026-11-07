@@ -8,13 +8,22 @@ TABLE    bins      validation time per EB by the share of the EB the voter
                    applied in full, on the window's most common EB size class,
                    one block per window: the IOG and PIR host classes and the
                    operators' quartiles (validation_bins.md); section 6.1
-         fit       the validation fit per window: fixed cost per EB and the
-                   rate per applied and per reapplied transaction, pooled and
-                   at the median node with the quartiles, with the window's
-                   transaction shape (validation_fit.md); section 7
-         hosts     the IOG and PIR hosts by instance class within a window
-                   (validation_fit.md, host-class table) with their resident
-                   set and CPU (resources.md)
+         shape     the cost per applied and per reapplied transaction at the
+                   vote on EBs of one size class, per host class and the
+                   operators' quartiles, on the chained closures and on the
+                   old-input closures side by side, one block per testnet
+                   window (validation_shape.md; Tables 7.2a and 7.2b) and one
+                   block for the cluster runs (Table 7.3); a host cell resting
+                   on fewer than 10 EBs reads "too few EBs" and the EBs
+                   each host validated are left out, with --full the expanded
+                   tables as the instrument prints them
+         series    the same on the chained closures of one transaction size
+                   across the EB size classes and on the classes the cluster
+                   runs populate (validation_shape_series.md); read in 7.2's
+                   and 7.3's prose
+         kind      the within-kind check: one window's closures of one
+                   transaction size by their same-block input share
+                   (validation_shape_kind.md); read in 7.2's prose
          resources the memory and CPU distributions per population (resources.md)
          unseen    the EBs that fail by the share of their transactions the
                    voters applied in full, cluster runs (host_speed.md, second table)
@@ -74,42 +83,102 @@ def bins(outputs, names):
             print()
 
 
-def fit(outputs, names):
-    print("| window | transactions | records, nodes | fixed per EB (pooled) | per applied transaction: pooled; nodes' quartiles and median | per reapplied transaction: pooled; nodes' median |")
-    print("|---|---|---|---|---|---|")
-    for name in names:
-        w = WINDOWS[name]
-        t = tables(os.path.join(outputs, name, "validation_fit.md"))
-        if len(t) < 2:
-            print("| %s | %s | n/a | | | |" % (w["label"], w["shape"]))
-            continue
-        head, row = t[0][0], t[0][1]
-        m = re.search(r"over ([\d,]+) records of (\d+) nodes", head[0])
-        per = {r[0]: r[1:] for r in t[1][1:]}
-        a, b = per["ms per applied transaction"], per["ms per reapplied transaction"]
-        print("| %s | %s | %s, %s | %s | %s ms; %s to %s, median %s | %s ms; median %s |" % (
-            w["label"], w["shape"], m.group(1), m.group(2), row[3], row[1].replace(" ms", ""), a[1], a[3], a[2], row[2].replace(" ms", ""), b[2]))
+def leads(path):
+    """The lines of a saved output that are not table rows: one lead line per table, in order."""
+    return [l.strip() for l in open(path) if l.strip() and not l.startswith("|")] if os.path.exists(path) else []
 
 
-def hosts(outputs, names):
-    print("| window | host class | hosts | per applied transaction | per reapplied transaction | fixed per EB | resident set, median / peak | process CPU, cores, median interval |")
-    print("|---|---|---|---|---|---|---|---|")
+def class_cell(lead):
+    """The EB class and count of a validation_shape.md lead line (the selection is in the caption)."""
+    m = re.match(r"EBs of ([\d,]+) to ([\d,]+) transactions(?:, certified closures [^,]*)?, ([\d,]+) EBs", lead)
+    return "%s to %s transactions, %s EBs" % (m.group(1), m.group(2), m.group(3)) if m else lead
+
+
+TENTATIVE = re.compile(r"^(.*?) \(([^)]*)\) tentative$")
+TENTATIVE_LEAD = "a host cell resting on fewer than %d EBs is marked tentative"
+
+
+def blank(cell):
+    """A tentative cell (a reading on fewer than 10 EBs on some host of the class) reads "too few
+    EBs": the report shows no cost that rests on so few EBs; the expanded form keeps it."""
+    return "too few EBs" if TENTATIVE.match(cell) else cell
+
+
+def compact_lead(lead):
+    m = re.search(TENTATIVE_LEAD.replace("%d", r"(\d+)"), lead)
+    return lead.replace(m.group(0), "a host cell resting on fewer than %s EBs reads too few" % m.group(1)) if m else lead
+
+
+def shape(outputs, names, full=False):
+    """One block per testnet window: the lead line and the table of validation_shape.md, the hosts by
+    class and the operators' quartiles under the two selections (chained and old-input closures) side
+    by side; the cluster runs, uniform hosts, as one block with a row per run (no selection: the runs'
+    transactions spend genesis outputs, almost never reused: the old-input case throughout). By
+    default a tentative cell is reduced to its EB count; full=True prints the instrument's cells."""
+    letters = iter("abcdefgh")
+    cluster = [n for n in names if WINDOWS[n].get("cluster")]
     for name in names:
         w = WINDOWS[name]
-        t = tables(os.path.join(outputs, name, "validation_fit.md"))
-        r = tables(os.path.join(outputs, name, "resources.md"))
-        res = {}
-        for tab in r:
-            if tab and tab[0][0] == "host class":
-                for row in tab[1:]:
-                    res[row[0].split(",")[0]] = row
-        if len(t) < 3:
+        if w.get("cluster"):
             continue
-        for row in t[2][1:]:
-            inst = row[0].split(",")[0]
-            rr = res.get(inst)
-            print("| %s | %s | %s | %s ms | %s ms | %s | %s | %s |" % (
-                w["label"], row[0], row[1], row[3], row[4], row[5], rr[3] if rr else "n/a", rr[5].split(" / ")[0] if rr else "n/a"))
+        path = os.path.join(outputs, name, "validation_shape.md")
+        t, ld = tables(path), leads(path)
+        if not t:
+            print("%s: n/a\n" % w["label"])
+            continue
+        # the report's form drops the last column (the EBs of the class each host validated) with the tentative costs
+        print("**Table 7.2%s.** %s (%s): %s\n" % (next(letters), w["label"], w["shape"], ld[0] if full else compact_lead(ld[0])))
+        head = t[0][0] if full else t[0][0][:-1]
+        print("| " + " | ".join(head) + " |")
+        print("|---|" + "---|" * (len(head) - 1))
+        for row in t[0][1:]:
+            print("| " + " | ".join(row if full else [blank(c) for c in row[:-1]]) + " |")
+        print()
+    if cluster:
+        print("**Table 7.3.** the cluster runs, c5d.2xlarge at two capabilities, every node: the lower quartile, median and upper quartile node of the run's most common EB size class.\n")
+        print("| run | EBs | per applied transaction, milliseconds | per reapplied transaction, microseconds |" + (" EBs validated per node |" if full else ""))
+        print("|---|---|---|---|" + ("---|" if full else ""))
+        for name in cluster:
+            w = WINDOWS[name]
+            path = os.path.join(outputs, name, "validation_shape.md")
+            t, ld = tables(path), leads(path)
+            if not t:
+                print("| %s | n/a | | |" % w["label"] + (" |" if full else ""))
+                continue
+            row = t[0][1]
+            print("| %s (%s) | %s | %s | %s |" % (w["label"], w["shape"], class_cell(ld[0]), row[2], row[3]) + (" %s |" % row[4] if full else ""))
+        print()
+
+
+def kind(outputs, names):
+    """The within-kind check: one window's closures of one transaction size by their same-block input
+    share (validation_shape_kind.md, one table per band), the hosts by class."""
+    print("| population | EB class | same-block share of the closure's inputs | host class (instance, vCPU, generation) | hosts | per applied transaction, milliseconds (EBs per host) | per reapplied transaction, microseconds (EBs per host) |")
+    print("|---|---|---|---|---|---|---|")
+    for name in names:
+        w = WINDOWS[name]
+        path = os.path.join(outputs, name, "validation_shape_kind.md")
+        for lead, tab in zip(leads(path), tables(path)):
+            m = re.search(r"in which (.*?) of the inputs", lead)
+            for row in tab[1:]:
+                if not row[0].startswith("operators"):
+                    print("| %s | %s | %s | %s | %s | %s | %s |" % (w["label"], class_cell(lead), m.group(1) if m else "", row[0], row[1], row[2], row[3]))
+
+
+def series(outputs, names):
+    """The size series (validation_shape_series.md): the chained closures of one transaction size
+    across the EB size classes on the testnet, and the classes the cluster runs populate, one row per
+    population, class and host class with both costs; read in 7.2's and 7.3's prose, not a table of
+    the report."""
+    print("| population | EB class | host class (instance, vCPU, generation) | hosts | per applied transaction, milliseconds (EBs per host) | per reapplied transaction, microseconds (EBs per host) | EBs validated per host |")
+    print("|---|---|---|---|---|---|---|")
+    for name in names:
+        w = WINDOWS[name]
+        path = os.path.join(outputs, name, "validation_shape_series.md")
+        for lead, tab in zip(leads(path), tables(path)):
+            for row in tab[1:]:
+                if not row[0].startswith("operators"):
+                    print("| %s | %s | %s | %s | %s | %s | %s |" % (w["label"], class_cell(lead), row[0], row[1], row[2], row[3], row[4]))
 
 
 def resources(outputs, names):
@@ -164,14 +233,18 @@ def speed(outputs, names):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("table", choices=["bins", "fit", "hosts", "resources", "unseen", "speed"])
+    ap.add_argument("table", choices=["bins", "shape", "series", "kind", "resources", "unseen", "speed"])
     ap.add_argument("windows", nargs="+", metavar="WINDOW")
     ap.add_argument("--outputs", default=OUTPUTS)
+    ap.add_argument("--full", action="store_true", help="shape: the expanded tables (the tentative cells' costs and the EBs validated per host)")
     a = ap.parse_args()
     bad = [w for w in a.windows if w not in WINDOWS]
     if bad:
         sys.exit("unknown window %s" % ", ".join(bad))
-    {"bins": bins, "fit": fit, "hosts": hosts, "resources": resources, "unseen": unseen, "speed": speed}[a.table](a.outputs, a.windows)
+    if a.table == "shape":
+        shape(a.outputs, a.windows, a.full)
+        return
+    {"bins": bins, "series": series, "kind": kind, "resources": resources, "unseen": unseen, "speed": speed}[a.table](a.outputs, a.windows)
 
 
 if __name__ == "__main__":

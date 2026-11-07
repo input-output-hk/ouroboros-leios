@@ -55,9 +55,33 @@ python3 "$HERE/diffusion_nodes.py" --db "$DB" --from "$FROM" --to "$TO" --chain 
 echo "-- validation (per-node summary), tally, closure fleet, never-completed closures"
 duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/validation_pairs.sql" > validation.md
 if [ -z "$ARCHIVE_ONLY" ]; then
-  echo "-- validation by unseen share and the fit (sections 6.1 and 7), from the per-pair file"
+  echo "-- validation by applied share (6.1) and the per-transaction cost on closures of one size (7), from the per-pair file"
   python3 "$HERE/validation_bins.py" validation_pairs.csv --hosts "$REPO/data/hosts.csv" > validation_bins.md
-  python3 "$HERE/validation_fit.py" validation_pairs.csv --hosts "$REPO/data/hosts.csv" > validation_fit.md
+  # validation by EB size class (4.3.1's prose): closure arrival and validation time per class
+  python3 "$HERE/validation_classes.py" validation_pairs.csv > validation_classes.md
+  # the per-transaction cost by input provenance (Table 7.2): the EB size class per window, the
+  # chained closures (80 % or more of the inputs spend an output of the same block) and the old-input
+  # ones (half or less) side by side; eb_shape_dbsync.csv is the saved db-sync composition of the
+  # window's certified closures (DATA.md), fetched outside this repository
+  case $KEY in
+    f1-high) CLASS="--class 1000 1499";;
+    f2-high) CLASS="--class 2000 4999";;
+    1kb)     CLASS="--class 1500 2499";;
+  esac
+  SHAPE="validation_pairs.csv --hosts $REPO/data/hosts.csv --shape eb_shape_dbsync.csv --chain $CHAIN"
+  python3 "$HERE/validation_shape.py" $SHAPE $CLASS --provenance 0.8 0.5 > validation_shape.md
+  if [ "$KEY" = f1-high ]; then
+    # the within-kind check read in 7.2's prose: closures of the 247 B transaction alone, by their same-block share
+    : > validation_shape_kind.md
+    for band in "0 0.1" "0.1 0.5" "0.5 0.8" "0.8 1"; do
+      python3 "$HERE/validation_shape.py" $SHAPE $CLASS --min-size 200 --max-size 260 --same-block-min ${band% *} --same-block-max ${band#* } >> validation_shape_kind.md
+    done
+  fi
+  if [ "$KEY" = f2-high ]; then
+    # the size series (Table 7.3): chained closures of one transaction size across the EB size classes
+    python3 "$HERE/validation_shape.py" $SHAPE --class 1000 1999 --class 2000 2999 --class 3000 3999 --class 5500 6999 \
+      --min-size 200 --max-size 260 --same-block-min 0.8 > validation_shape_series.md
+  fi
 fi
 [ -n "$KEEP" ] || rm -f validation_pairs.csv
 duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/tally_quorum.sql" > tally.md

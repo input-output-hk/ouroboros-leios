@@ -1,0 +1,28 @@
+processor,logical_cpus,physical_cores,virtualisation,write_cache,read_us_per_tx,apply_in_memory_us,apply_on_disk_us,reapply_in_memory_us,reapply_on_disk_us
+12th Gen Intel Core i7-1260P,16,12,none,write back,9.1,100,102,24,39
+Intel Xeon Gold 6240 @ 2.60GHz,72,18,lxc,write through,24.4,179,205,47,74
+Intel Xeon Gold 6240 @ 2.60GHz,72,18,lxc,write through,24.5,178,199,47,76
+AMD Ryzen 7 5700U,16,8,none,write back,24.7,148,174,49,72
+Intel Xeon Gold 6240 @ 2.60GHz,72,18,lxc,write through,24.7,174,202,49,73
+Intel Core i7-6700 @ 3.40GHz,8,4,none,write back,26.9,154,187,41,68
+AMD EPYC 3251 8-Core,12,12,kvm,write back,30.6,265,290,81,113
+AMD EPYC 4584PX 16-Core,2,2,kvm,write back,31.4,84,118,23,55
+AMD EPYC (with IBPB),4,4,kvm,write back,32.3,181,226,60,109
+AMD EPYC 7T83 64-Core,16,8,kvm,write back,35.5,179,220,47,85
+not stated (the reference host),,,,,35.7,168,205,47,85
+AMD EPYC-Genoa,8,1,kvm,write back,36.3,141,187,42,75
+AMD EPYC 7T83 64-Core,32,16,kvm,write back,36.5,180,224,49,91
+AMD EPYC 4584PX 16-Core,8,8,kvm,write back,38.6,93,130,26,68
+AMD Ryzen 9 5950X 16-Core,16,16,kvm,write back,42.0,121,159,32,72
+AMD EPYC (with IBPB),4,4,kvm,write back,45.8,294,335,92,160
+AMD EPYC (with IBPB),8,8,kvm,write back,48.5,293,336,86,141
+AMD Ryzen 9 5900X 12-Core,24,12,none,write back,63.6,121,188,32,71
+AMD EPYC (with IBPB),12,12,kvm,write back,64.1,340,412,117,176
+not stated,14,,kvm,write back,64.3,420,497,99,164
+Intel Core i7-3630QM @ 2.40GHz,8,4,none,write back,68.6,228,302,69,131
+Intel Xeon E5-2623 v3 @ 3.00GHz,16,4,none,write through,99.3,203,327,60,196
+not stated,4,,kvm,write through,104.1,316,424,66,161
+Intel Xeon E5-2696 v2 @ 2.50GHz,12,6,kvm,write back,198.6,346,553,104,307
+"Intel Core (Broadwell, no TSX, IBRS)",4,1,kvm,write through,217.2,300,634,94,289
+"Intel Core (Broadwell, no TSX, IBRS)",4,1,kvm,write through,223.5,227,542,74,295
+Intel Xeon Silver 4214 @ 2.20GHz,6,1,kvm,write through,291.9,526,1052,120,492
