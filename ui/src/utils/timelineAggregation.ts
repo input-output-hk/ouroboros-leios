@@ -16,7 +16,7 @@ import {
 
 // Helper functions
 
-// Link-colour priority: RB > Announcement > EB > EB txs > Votes.
+// Link-colour priority: RB > Announcement > Offer > EB > EB txs > Votes.
 //
 // FIXME: This is a second copy of the order. The one that actually colours
 // links lives in Graph/hooks/useHandlers.ts and this export has no importers,
@@ -26,6 +26,7 @@ import {
 const MESSAGE_PRIORITY_ORDER = [
   EMessageType.RB, // Highest priority
   EMessageType.Announcement,
+  EMessageType.Offer,
   EMessageType.EB,
   EMessageType.Txs, // EB txs, pulled once the EB is known
   EMessageType.Votes, // Lowest priority
@@ -48,6 +49,7 @@ const createEmptyMessageTypeCounts = (): IMessageTypeCounts => ({
   [EMessageType.Votes]: 0,
   [EMessageType.Txs]: 0,
   [EMessageType.Announcement]: 0,
+  [EMessageType.Offer]: 0,
 });
 
 const getTotalActiveCount = (counts: IMessageTypeCounts): number => {
@@ -334,6 +336,7 @@ const getMessageParticipants = (
     case EServerMessageType.RBSent:
     case EServerMessageType.VotesSent:
     case EServerMessageType.AnnouncementSent:
+    case EServerMessageType.OfferSent:
       return {
         sender: (message as any).sender,
         recipient: (message as any).recipient,
@@ -666,6 +669,66 @@ const foldEvent = (acc: IMonotoneAcc, event: IServerMessage) => {
       break;
     }
 
+    case EServerMessageType.OfferSent: {
+      const msgBytes = getMessageBytes(
+        acc,
+        EMessageType.Offer,
+        message.id,
+      );
+      const stats = nodeStats.get(message.sender);
+      if (stats) {
+        if (!stats.sent.has(EMessageType.Offer)) {
+          stats.sent.set(EMessageType.Offer, { count: 0, bytes: 0 });
+        }
+        const sentStats = stats.sent.get(EMessageType.Offer)!;
+        sentStats.count += 1;
+        sentStats.bytes += msgBytes;
+        stats.bytesSent += msgBytes;
+      }
+
+      // Track last activity for node coloring
+      updateLastActivity(
+        nodeStats,
+        message.sender,
+        EMessageType.Offer,
+        ActivityAction.Sent,
+        event.time_s,
+      );
+      acc.traversedEdges.add(edgeKeyFor(message.sender, message.recipient));
+      break;
+    }
+
+    case EServerMessageType.OfferReceived: {
+      const msgBytes = getMessageBytes(
+        acc,
+        EMessageType.Offer,
+        message.id,
+      );
+      const stats = nodeStats.get(message.recipient);
+      if (stats) {
+        if (!stats.received.has(EMessageType.Offer)) {
+          stats.received.set(EMessageType.Offer, {
+            count: 0,
+            bytes: 0,
+          });
+        }
+        const receivedStats = stats.received.get(EMessageType.Offer)!;
+        receivedStats.count += 1;
+        receivedStats.bytes += msgBytes;
+        stats.bytesReceived += msgBytes;
+      }
+
+      // Track last activity for node coloring
+      updateLastActivity(
+        nodeStats,
+        message.recipient,
+        EMessageType.Offer,
+        ActivityAction.Received,
+        event.time_s,
+      );
+      break;
+    }
+
     case EServerMessageType.RBGenerated: {
       setMessageBytes(acc, EMessageType.RB, message.id, message.size_bytes);
       const stats = nodeStats.get(message.producer);
@@ -889,6 +952,20 @@ const buildTransitWindow = (
           targetTime,
           calculateTravelTime(topology, event, 0.3),
           getMessageBytes(acc, EMessageType.Announcement, message.id),
+          { slot: message.slot },
+        );
+        break;
+      case EServerMessageType.OfferSent:
+        createMessageAnimation(
+          result,
+          EMessageType.Offer,
+          message.id,
+          message.sender,
+          message.recipient,
+          event.time_s,
+          targetTime,
+          calculateTravelTime(topology, event, 0.3),
+          getMessageBytes(acc, EMessageType.Offer, message.id),
           { slot: message.slot },
         );
         break;
