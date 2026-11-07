@@ -51,8 +51,6 @@ def main():
             "", "## Contents", ""] + ["- " + h for h in headings] + [""]
     tail = ["", "---", "", "## Sections still to be drafted", "",
             "- 0. Summary: the verdict per set, the confirmed set, the path upward, the open items (written last)",
-            "- 6. Cross-cutting explanations: validation cost, mempool coverage, diffusion by population, hardware",
-            "- 7. Models against measurements: DeltaQ and the CIP cost model",
             "- 8. Improvements in the pipeline and what each would buy", ""]
     out = a.out or os.path.join(REPORT, "REPORT.md")
     md = "\n".join(head) + "\n" + "\n\n".join(sections) + "\n" + "\n".join(tail)
@@ -119,6 +117,8 @@ article tbody td:first-child { font-weight: 600; }
 article td:first-child, article th:first-child { padding-left: 8px; }
 article td:last-child, article th:last-child { padding-right: 8px; }
 article p.caption { font-size: 14px; color: var(--muted); margin: 6px 0 24px; line-height: 1.45; }
+article p.lead { margin: 32px 0 6px; }
+.tablewrap + .tablewrap { margin-top: 28px; }
 article blockquote { margin: 18px 0; padding: 10px 14px; border-left: 3px solid var(--note-rule); background: var(--note-bg); font-size: 15.5px; }
 article blockquote p { margin: 0; }
 article blockquote strong:first-child { font-family: var(--sans); text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; display: block; margin-bottom: 4px; color: var(--note-rule); }
@@ -149,10 +149,14 @@ article blockquote strong:first-child { font-family: var(--sans); text-transform
     if (hd.tagName === "H3") { a.className = "l3"; }
     toc.appendChild(a);
   });
+  // a paragraph opening with a bold "Table n." introduces the table below it (a lead); a plain
+  // paragraph opening with "Table n." after a table is that table's caption
+  function isLead(p) { var f = p.firstElementChild; return !!f && f.tagName === "STRONG" && f === p.firstChild && /^Table \d/.test(f.textContent); }
+  art.querySelectorAll("p").forEach(function (p) { if (isLead(p)) { p.className = "lead"; } });
   art.querySelectorAll("table").forEach(function (t) {
     var w = document.createElement("div"); w.className = "tablewrap"; t.parentNode.insertBefore(w, t); w.appendChild(t);
     var nx = w.nextElementSibling;
-    if (nx && nx.tagName === "P" && /^Table \d/.test(nx.textContent)) { nx.className = "caption"; }
+    if (nx && nx.tagName === "P" && !isLead(nx) && /^Table \d/.test(nx.textContent)) { nx.className = "caption"; }
   });
   // the contents rail can be hidden for reading; the choice is kept in this browser only
   var wrap = document.getElementById("wrap"), btn = document.getElementById("toggle");
