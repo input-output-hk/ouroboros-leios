@@ -1,4 +1,3 @@
-{-# OPTIONS --safe #-}
 {- Module: Defaults
 
    Concrete instantiation of the Leios 'SpecStructure' obligations used by the
@@ -7,43 +6,40 @@
    (VT) eligibility follows the deterministic, epoch-fixed committee of CIP-0164
    computed from the stake distribution, whereas block production (EB) is
    decided by the 'winning-slots' oracle (the Praos VRF leadership schedule)
-   supplied through 'TestParams'. See 'sortition' below.
+   supplied through 'TestParams'. See 'sortition' below.  The slots in which
+   the SUT mints a ranking block, 'rb-slots', are a separate parameter: a
+   leader may put the transactions in the ranking block and announce no EB,
+   so these slots carry no EB obligation.  See 'd-winner' below.
 
-   The cryptographic components stay abstract (this is '--safe'): hashing is the
-   identity on the relevant payloads, signatures/proofs are the unit type. The
-   base layer is the spec's simple single-producer blockchain machine.
+   The cryptographic components stay abstract: hashing is the identity on the
+   relevant payloads, signatures/proofs are the unit type. The base layer is
+   the real Praos node from ouroboros-praos-formal-spec, wrapped as a
+   BaseMachine by Leios.Base.Praos (see d-BaseFunctionality below and
+   docs/praos-base-machine-sketch.md).
+
+   Not '--safe' (it was, with the previous stub base machine): the Praos
+   instantiation transitively imports Protocol.Chain, whose chainFromBlock is
+   TERMINATING. The block-tree laws themselves are proved, not postulated
+   (Leios.Base.Praos.Assumptions).
 -}
 
 open import Leios.Prelude hiding (_⊗_)
 open import Leios.Abstract
 open import Leios.Config
 open import Leios.SpecStructure
-open import Blockchain.Safety
-import Blockchain.IsBlockchain
 
-open import Axiom.Set.Properties th
-open import Data.Bool using (if_then_else_)
-open import Data.Nat.Show as N
 import Data.Nat as Nat
-open import Data.Integer hiding (_≟_)
-open import Data.String as S using (intersperse)
-open import Function.Related.TypeIsomorphisms
-open import Relation.Binary.Structures
+open import Data.Fin.Base using (toℕ)
 
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
-open import LibExt
-
-open import CategoricalCrypto using (I ; Machine ; machine-type ; Channel ; _⊗ᵀ_)
-open import CategoricalCrypto.Channel.Core
-open import CategoricalCrypto.Channel.Selection
-
-open Equivalence
-
 module Defaults
   (params : Params) (let open Params params)
-  (testParams : TestParams params) (let open TestParams testParams) where
+  (testParams : TestParams params) (let open TestParams testParams)
+  -- The slots in which the SUT leads, and mints a ranking block.
+  (rb-slots : ℙ ℕ)
+  where
 
 instance
   htx : Hashable (List ℕ) (List ℕ)
@@ -60,9 +56,9 @@ d-Abstract =
     ; Sig               = ⊤
     ; Hash              = List ℕ
     ; EBCert            = List ℕ
-    ; getEBHash         = id
-    ; Vote              = ⊤
-    ; vote              = λ _ _ → tt
+    ; getCertRef        = id
+    ; Vote              = Fin numberOfParties × List ℕ
+    ; vote              = λ _ h → sutId , h
     ; sign              = λ _ _ → tt
     ; splitTxs          = λ l → [] , l
     }
@@ -121,106 +117,85 @@ d-KeyRegistrationFunctionality =
 
 open import Leios.Base d-Abstract d-VRF public
 
+-- Base layer: the real Praos node (ouroboros-praos-formal-spec, wrapped by
+-- Leios.Base.Praos — see docs/praos-base-machine-sketch.md). Cert/VTy/
+-- initSlot/V-chkCerts keep the trivial choices the previous stub machine
+-- made, so the verifier-facing BaseIOF interface is unchanged; what changes
+-- is the machine behind it: FTCH-LDG/FTCH-SLOT answers and RB minting now
+-- follow Praos's honest-node semantics (processMsgsʰ/makeBlockʰ/bestChain)
+-- instead of echoing untouched state.
+
+-- RB-production eligibility for the wrapped Praos node: for the SUT, the
+-- slots 'rb-slots' (in linear Leios the RB is the Praos block; a leader slot
+-- lets the SUT mint an RB, which may announce an EB).  The schedules of the other parties are unknown, so their blocks are
+-- taken as the log has them: every slot is theirs to win.  Without this, a
+-- block of another party would only be valid in a winning slot of the SUT,
+-- and the node would never extend it.
+-- Slot 0 is a universal winner: it discharges the Praos Assumptions record's
+-- genesisWinner (only the genesis block sits at slot 0) and changes no real
+-- behavior — the machine never mints at slot 0 (Deliver mints at `suc
+-- clock`), so the schedule is only ever consulted at slots ≥ 1.
+d-winner : Fin numberOfParties → ℕ → Type
+d-winner _ Nat.zero     = ⊤
+d-winner p (Nat.suc sl) = p ≡ sutId → Nat.suc sl ∈ rb-slots
+
+-- Deliberately NOT an instance: `d-winner _ zero` reduces to ⊤, so as an
+-- instance this would overlap with Dec-⊤ in unrelated searches. It is passed
+-- to the Praos machine explicitly below.
+d-winner⁇² : d-winner ⁇²
+d-winner⁇² {_} {Nat.zero}   .dec = yes tt
+d-winner⁇² {p} {Nat.suc sl} .dec with p ≟ sutId | Nat.suc sl ∈? rb-slots
+... | no p≢  | _       = yes λ p≡ → ⊥-elim (p≢ p≡)
+... | yes _  | yes w   = yes λ _ → w
+... | yes p≡ | no ¬w   = no λ f → ¬w (f p≡)
+
+-- Block hash for the Praos tree's prev-linkage: slot and producer, which
+-- identify honest blocks.  The payload is left out: the node mints the SUT's
+-- blocks with the payload Leios submitted, which the log does not record,
+-- while the blocks of other parties name them as parents by their log id.
+-- Two blocks of one producer in one slot (equivocation) are not told apart.
+d-blockHash : ℕ → Fin numberOfParties → RankingBlock → List ℕ
+d-blockHash sl pid _ = sl ∷ toℕ pid ∷ []
+
+import Leios.Base.Praos.Machine as PraosMachine
+module PM = PraosMachine d-Abstract d-VRF numberOfParties d-winner
+  ⦃ winner⁇² = λ {p} {sl} → d-winner⁇² {p} {sl} ⦄
+  (λ _ → tt)
+  d-blockHash
+  sutId
+-- producer and slotOf are placeholders (a bare RankingBlock determines
+-- neither its minter nor its slot) but operationally inert: IsBlockchain's
+-- producer/slotOf are read only by deployment-level modules the verifier
+-- never imports.
+module PB = PM.Assembled ⊤ ⊤ (λ _ → 0) (λ _ _ → true) stakeDistribution (λ _ → sutId) (λ _ → 0)
+
 d-Base : BaseAbstract
-d-Base =
-  record
-    { Cert        = ⊤
-    ; VTy         = ⊤
-    ; initSlot    = λ _ → 0
-    ; V-chkCerts  = λ _ _ → true
-    ; BaseAdv     = I
-    ; BaseMsg     = ⊤
-    }
-
-d-BaseState : Type
-d-BaseState = List RankingBlock × ℕ
-
-d-BaseChannel : Channel
-d-BaseChannel = BaseNetwork ⊗ᵀ (BaseIO ⊗₀ BaseAdv)
-  where open BaseAbstract d-Base
-
-data d-BaseRel : machine-type d-BaseState d-BaseChannel where
-
-  fetch-blocks :
-    ∀ blocks slot →
-      d-BaseRel
-        (blocks , slot)
-        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-LDG)
-        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks))
-        (blocks , slot)
-
-  fetch-slot :
-    ∀ blocks slot →
-      d-BaseRel
-        (blocks , slot)
-        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-SLOT)
-        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot))
-        (blocks , slot)
-
-open Blockchain.IsBlockchain (Fin 1)
-
-helper : BlockChainInfo RankingBlock → BaseAbstract.BaseIOF d-Base CategoricalCrypto.Out
-helper = let open BaseAbstract.BaseIOF in λ where
-  Chain → FTCH-LDG
-  Slot  → FTCH-SLOT
-
-private
-  open BaseAbstract.BaseIOF
-
-  opaque
-    unfolding _⊗₀_
-
-    correctness-chain : ∀ {s response' s'}
-      → d-BaseRel s (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG) response' s'
-      → ∃ λ response → response' ≡ just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BASE-LDG response)
-    correctness-chain (fetch-blocks blocks _) = blocks , refl
-
-    correctness-slot : ∀ {s response' s'}
-      → d-BaseRel s (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-SLOT) response' s'
-      → ∃ λ response → response' ≡ just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ SLOT response)
-    correctness-slot (fetch-slot _ slot) = slot , refl
-
-    isPure-chain : ∀ {s response' s'}
-      → d-BaseRel s (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG) response' s'
-      → s ≡ s'
-    isPure-chain (fetch-blocks _ _) = refl
-
-    isPure-slot : ∀ {s response' s'}
-      → d-BaseRel s (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-SLOT) response' s'
-      → s ≡ s'
-    isPure-slot (fetch-slot _ _) = refl
+d-Base = PB.B'
 
 d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
-d-BaseFunctionality =
-  record
-    { n = 1
-    ; m =
-        record
-          { State = (List RankingBlock × ℕ)
-          ; stepRel = d-BaseRel
-          }
-    ; is-blockchain = let open BaseAbstract.BaseIOF in
-        record
-          { isConstrained =
-              record
-                { queryI = (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ_) ∘ helper
-                ; queryO = λ where
-                    {Chain} rankingBlocks → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BASE-LDG rankingBlocks
-                    {Slot}  slot          → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ SLOT slot
-                ; correctness = λ where
-                    {Chain} → correctness-chain
-                    {Slot}  → correctness-slot
-                ; completeness = λ where
-                    {Chain} {blocks , slot} → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks , (blocks , slot) , fetch-blocks blocks slot
-                    {Slot}  {blocks , slot} → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT     slot   , (blocks , slot) , fetch-slot   blocks slot
-                }
-          ; isPure = λ where
-              Chain → isPure-chain
-              Slot  → isPure-slot
-          ; producer = λ _ → Fin.zero
-          ; slotOf   = λ _ → 0
-          }
-    }
+d-BaseFunctionality = PB.praosBase
+
+-- The same node without its (empty) adversary port, for stacking Linear
+-- Leios on it (LinearLeiosStack), and its trace checker 'Check'.  A verifier
+-- picks what its log observes: blocks by parent and slot ('praosHeader'),
+-- which is what a log records of the blocks the node mints (their payload is
+-- Leios's, see 'd-blockHash'), and the selected chain by its tip
+-- ('tipHash'), where the log names it.
+open PB public using (node⁻; NodeState; initNodeState; module Check)
+open PM public using (praosHeader)
+
+-- The Praos node's honest-local interface (tree state, block insertion,
+-- chain read-out) plus block construction/hashing, for the verifier to
+-- maintain the SUT's block tree from trace events.
+open PM public using (mkPraosBlock; praosBlockHash; genesisHash)
+
+open import Leios.Base.Praos d-Abstract d-VRF using (PraosAbstract)
+module PraosNode = PraosAbstract PM.praosNode
+
+-- The hash of the tip of a selected chain, which a node log names.
+tipHash : List PraosNode.Block → Hash
+tipHash []      = PM.genesisHash
+tipHash (b ∷ _) = PM.praosBlockHash b
 
 open import Leios.FFD public
 
@@ -238,9 +213,7 @@ instance
 
   -- Votes sign the announcing RB's hash: body payload plus announced-EB hash.
   hrb : Hashable RankingBlock Hash
-  hrb .hash rb = case RankingBlock.txsOrEbCert rb of λ where
-    (inj₁ txs)  → txs  ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
-    (inj₂ cert) → cert ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+  hrb .hash rb = let open RankingBlock rb in [ id , id ]′ txsOrEbCert ++ maybe id [] announcedEB
 
 record FFDBuffers : Type where
   field inEBs : List EndorserBlock
@@ -294,13 +267,13 @@ instance
   Dec-SimpleFFD : ∀ {s i o s'} → SimpleFFD s i o s' ⁇
   Dec-SimpleFFD {s} {FFDAbstract.Send h b} {FFDAbstract.SendRes} {s'} with s' ≟ proj₁ (send-total {s} {h} {b})
   ... | yes p rewrite p = ⁇ yes (proj₂ send-total)
-  ... | no ¬p = ⁇ no λ x → ⊥-elim (¬p (send-complete x))
+  ... | no ¬p = ⁇ no (¬p ∘ send-complete)
   Dec-SimpleFFD {_} {FFDAbstract.Send _ _} {FFDAbstract.FetchRes _} {_} = ⁇ no λ ()
   Dec-SimpleFFD {s} {FFDAbstract.Fetch} {FFDAbstract.FetchRes r} {s'}
     with s' ≟ proj₁ (proj₂ (fetch-total {s})) | r ≟ proj₁ (fetch-total {s}) -- TODO: improve performance
   ... | yes p | yes q rewrite p rewrite q = ⁇ yes (proj₂ (proj₂ (fetch-total {s})))
-  ... | _     | no ¬q = ⁇ no λ x → ⊥-elim (¬q (fetch-complete₂ x))
-  ... | no ¬p | _     = ⁇ no λ x → ⊥-elim (¬p (fetch-complete₁ x))
+  ... | _     | no ¬q = ⁇ no (¬q ∘ fetch-complete₂)
+  ... | no ¬p | _     = ⁇ no (¬p ∘ fetch-complete₁)
   Dec-SimpleFFD {_} {FFDAbstract.Fetch} {FFDAbstract.SendRes} {_} = ⁇ no λ ()
 
 d-FFDFunctionality : FFDAbstract.Functionality ffdAbstract
@@ -309,16 +282,6 @@ d-FFDFunctionality =
     { State         = FFDBuffers
     ; initFFDState  = record { inEBs = []; inVTs = []; outEBs = []; outVTs = [] }
     ; _-⟦_/_⟧⇀_     = SimpleFFD
-    }
-
-open import Leios.Voting public
-
-d-VotingAbstract : VotingAbstract EndorserBlock
-d-VotingAbstract =
-  record
-    { VotingState     = ⊤
-    ; initVotingState = tt
-    ; isVoteCertified = λ _ _ → ⊤
     }
 
 d-SpecStructure : SpecStructure
@@ -337,8 +300,6 @@ d-SpecStructure = record
       ; BM                        = d-BaseFunctionality
       ; K'                        = d-KeyRegistration
       ; KF                        = d-KeyRegistrationFunctionality
-      ; va                        = d-VotingAbstract
-      ; getEBCert                 = λ _ → []
       -- The verifier cannot observe validation completion from the trace; the
       -- node's own gate ensures it only votes after validating, so a logged
       -- vote is taken as evidence of completed validation. To be refined via

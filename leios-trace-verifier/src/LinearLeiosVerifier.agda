@@ -1,5 +1,4 @@
 open import Prelude.AssocList
-open import Prelude.Result
 open import Prelude.Errors
 
 open import Leios.Config
@@ -111,6 +110,14 @@ module LinearLeiosVerifier where
     winningSlot record { message = VTBundleGenerated _ _ _ _ _ _ }  = nothing
     winningSlot record { message = RBGenerated _ _ _ _ _ _ _ _ _ }  = nothing
 
+    -- The slot of a ranking block the SUT mints.
+    rbSlot : TraceEvent → Maybe ℕ
+    rbSlot record { message = RBGenerated p _ s _ _ _ _ _ _ }
+      with p ≟ SUT
+    ... | yes _ = just (primWord64ToNat s)
+    ... | no _  = nothing
+    rbSlot _ = nothing
+
     EventLog = List TraceEvent
 
     module _ (l : EventLog) where
@@ -146,6 +153,18 @@ module LinearLeiosVerifier where
           then fromList (L.catMaybes (L.map winningSlot l))
           else fromList leadershipSchedule
 
+      -- The slots in which the SUT leads and mints a ranking block, for the
+      -- Praos node.  A leadership schedule is the ranking-block lottery, so
+      -- when one is supplied it gives these slots as well; otherwise they are
+      -- harvested from the SUT's 'RBGenerated' events.  They are not EB
+      -- winning slots: a leader may put the transactions in the ranking block
+      -- and announce no EB.
+      rb-slots-of : ℙ ℕ
+      rb-slots-of =
+        if L.null leadershipSchedule
+          then fromList (L.catMaybes (L.map rbSlot l))
+          else fromList leadershipSchedule
+
       testParams : TestParams params
       testParams =
         record
@@ -153,10 +172,13 @@ module LinearLeiosVerifier where
           ; winning-slots = winning-slots-of
           }
 
-      open import Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)
+      open import Defaults params testParams rb-slots-of using
+        (d-SpecStructure; FFDBuffers; isb; hpe;
+         module PraosNode; mkPraosBlock; praosBlockHash; genesisHash;
+         node⁻; module Check; praosHeader; initNodeState)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
-      open import Leios.Linear.Trace.Verifier d-SpecStructure params renaming (verifyTrace to checkTrace)
+      open import Leios.Linear.Trace.Verifier d-SpecStructure params hiding (verifyTrace)
 
       open Params params
       open Types params
@@ -174,14 +196,56 @@ module LinearLeiosVerifier where
               EB-received : AssocList String ℕ
               VT-refs : AssocList String (List Vote)
               RB-refs : AssocList String RankingBlock
+              -- Praos-header data per RB (prev-hash, slot, producer); the
+              -- payload lives in RB-refs and may still be corrected by a
+              -- later EBGenerated, so blocks are materialized on demand.
+              RB-meta : AssocList String (Hash × ℕ × Fin (Params.numberOfParties params))
+              -- the blocks the SUT received in the current slot, latest
+              -- first, for the next delivery to the Praos node
+              inbox : List PraosNode.Block
               FFD-blks : List Blk
               currentSlot : ℕ
 
       open Accumulator
 
+      -- ── Blocks for the Praos node, built from trace events ──
+
+      buildBlk : Accumulator → String → Maybe PraosNode.Block
+      buildBlk l i with RB-meta l ⁉ i | RB-refs l ⁉ i
+      ... | just (ph , sl , pid) | just rb = just (mkPraosBlock ph sl rb pid)
+      ... | _ | _ = nothing
+
+      parentHash : Accumulator → Nullable BlockRef → Hash
+      parentHash l p with unwrap p
+      ... | nothing  = genesisHash
+      ... | just ref = maybe praosBlockHash genesisHash (buildBlk l (BlockRef.id ref))
+
       instance
         _ = Show-List
         _ = Show-×
+
+      -- The trace records the blocks the SUT mints, by parent and slot, but
+      -- not its selected chain.
+      open Check praosHeader (λ _ → tt) using (NodeHint; nodeᶜ)
+
+      -- Why the Praos node rejects a step: in the round of a slot, it mints
+      -- other blocks than the SUT's 'RBGenerated' events of the slot, given
+      -- by parent and slot.
+      nodeMsg : NodeHint → String
+      nodeMsg nothing = "the Praos node rejects a request of Leios"
+      nodeMsg (just (n , bs , _)) =
+        "the Praos node's round of slot " ◇ show n ◇ " does not match the trace, in which the SUT "
+          ◇ minted bs
+        where
+          minted : List (Hash × ℕ) → String
+          minted [] = "mints no block"
+          minted bs = "mints (parent, slot) " ◇ show bs
+
+      -- Linear Leios stacked on the Praos node: the node, not the trace,
+      -- answers Leios's requests for the ledger and takes its blocks, and
+      -- the trace's record of the blocks it mints is checked.
+      open import LinearLeiosStack d-SpecStructure params node⁻ nodeᶜ nothing nodeMsg using
+        (Stack; Item; entry; deliver; base; ffdᵢ; voteᵢ; ioᵢ; verifyItems)
 
       instance
         Show-EBCert : Show (Maybe EBCert)
@@ -233,26 +297,51 @@ module LinearLeiosVerifier where
         test₁ = refl
 
       -- Negative {EB,VT} event, if there is no {EB,VT}Generated event
-      negative-events-EB : List Blk → Word64 → List (Action × (FFDT Out ⊎ BaseAbstract.BaseIOF B' In ⊎ IOT In))
+      negative-events-EB : List Blk → Word64 → List Item
       negative-events-EB l s
         with Any.any? isEB? l
       ... | yes _ = []
-      ... | no  _ = (No-EB-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
+      ... | no  _ = entry (No-EB-Role-Action (primWord64ToNat s)) (ffdᵢ FFDT.SLOT) ∷ []
 
-      negative-events-VT : List Blk → Word64 → List (Action × (FFDT Out ⊎ BaseAbstract.BaseIOF B' In ⊎ IOT In))
+      negative-events-VT : List Blk → Word64 → List Item
       negative-events-VT l s
         with Any.any? isVT? l
       ... | yes _ = []
-      ... | no  _ = (No-VT-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
+      ... | no  _ = entry (No-VT-Role-Action (primWord64ToNat s)) (ffdᵢ FFDT.SLOT) ∷ []
 
-      traceEvent→action : Accumulator → TraceEvent → Accumulator × List (Action × (FFDT Out ⊎ BaseAbstract.BaseIOF B' In ⊎ IOT In))
+      -- The blocks the SUT minted in slot 'n', by parent and slot, in the
+      -- order of the log.  A slot's 'RBGenerated' precedes its 'Slot' event.
+      mintedAt : Accumulator → ℕ → List (Hash × ℕ)
+      mintedAt l n = L.reverse (L.mapMaybe sut (RB-meta l))
+        where
+          sut : String × (Hash × ℕ × Fin (Params.numberOfParties params)) → Maybe (Hash × ℕ)
+          sut (_ , ph , sl , p) with p ≟ SUT-id | sl ≟ n
+          ... | yes _ | yes _ = just (ph , sl)
+          ... | _     | _     = nothing
+
+      -- The Praos node's round of slot 'n', after Leios submitted its block
+      -- for it: the blocks the SUT received in the slot, and minting, which
+      -- must give the blocks the SUT minted in the slot.  The node adds the
+      -- blocks of a delivery from the last to the first, so the inbox, which
+      -- holds the latest first, is delivered as it stands.  The node's clock
+      -- trails the Leios slot by one, so it has no round for slot 0, whose
+      -- blocks wait for slot 1.
+      delivery : Accumulator → ℕ → Accumulator × List Item
+      delivery l zero    = l , []
+      delivery l (suc n) =
+        record l { inbox = [] } ,
+          deliver (just (suc n , mintedAt l (suc n) , tt)) (inbox l) ∷ []
+
+      traceEvent→action : Accumulator → TraceEvent → Accumulator × List Item
       traceEvent→action l record { message = Slot p s }
         with p ≟ SUT
       ... | yes _ =
-        record l { FFD-blks = [] ; currentSlot = suc (currentSlot l) } ,
+        let (l' , delivered) = delivery l (primWord64ToNat s)
+        in record l' { FFD-blks = [] ; currentSlot = suc (currentSlot l) } ,
           negative-events-EB (FFD-blks l) s ++ negative-events-VT (FFD-blks l) s ++
-            (Base₂-Action (primWord64ToNat s) , inj₁ FFDT.SLOT)
-          ∷ (Slot₁-Action (primWord64ToNat s) , inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks l))))
+            base (primWord64ToNat s)
+          ∷ delivered
+          ++ entry (Slot-Action (primWord64ToNat s)) (ffdᵢ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks l))))
           ∷ []
       ... | no _  = l , []
 
@@ -275,38 +364,45 @@ module LinearLeiosVerifier where
       traceEvent→action l record { message = EBReceived s p _ _ i _ }
         with p ≟ SUT | EB-refs l ⁉ i | RB-refs l ⁉ i
       ... | yes _ | just eb | just rb =
-        record l { FFD-blks = EB-Blk eb ∷ FFD-blks l ; EB-received = (i , currentSlot l) ∷ (EB-received l) } , (EB-Role-Action (currentSlot l) eb , inj₁ FFDT.SLOT) ∷ []
+        record l { FFD-blks = EB-Blk eb ∷ FFD-blks l ; EB-received = (i , currentSlot l) ∷ (EB-received l) } , entry (EB-Role-Action (currentSlot l) eb) (ffdᵢ FFDT.SLOT) ∷ []
       ... | _ | _ | _ = l , []
 
       -- VTs
+      -- The spec does not inspect vote contents, so the voted EB's hash is left empty.
       traceEvent→action l record { message = VTBundleGenerated p i s _ _ vts } =
-        let vt = map (const tt) (elems vts)
+        let vt = map (const (nodeId p , [])) (elems vts)
         in record l { VT-refs = (i , vt) ∷ VT-refs l } , []
       traceEvent→action l record { message = VTBundleReceived _ p _ _ i _ }
         with p ≟ SUT | VT-refs l ⁉ i | EB-refs l ⁉ i | EB-received l ⁉ i
-      ... | yes _ | just vt | just eb | just slot' = record l { FFD-blks = VT-Blk vt ∷ FFD-blks l } , (VT-Role-Action (currentSlot l) eb slot' , inj₁ FFDT.SLOT) ∷ []
+      ... | yes _ | just vt | just eb | just slot' = record l { FFD-blks = VT-Blk vt ∷ FFD-blks l } , entry (VT-Role-Action (currentSlot l) eb slot') (ffdᵢ FFDT.SLOT) ∷ []
       ... | _ | _ | _ | _ = l , []
 
       -- RBs
-      traceEvent→action l record { message = RBGenerated p i s _ eb _ _ _ txs } =
+      traceEvent→action l record { message = RBGenerated p i s _ eb _ _ parent txs } =
         let ebCert = unwrap eb >>= λ b → EB-refs l ⁉ BlockRef.id (Endorsement.eb b) >>= λ eb' → return (hash eb')
             rb = record
                    { announcedEB = nothing -- this is set in EBReceived
                    -- An RB carries either a certificate or transactions, never both.
                    ; txsOrEbCert = maybe inj₂ (inj₁ (map primWord64ToNat txs)) ebCert
                    }
-        in record l { RB-refs = (i , rb) ∷ RB-refs l } , []
+            l' = record l
+                   { RB-refs = (i , rb) ∷ RB-refs l
+                   ; RB-meta = (i , (parentHash l parent , primWord64ToNat s , nodeId p)) ∷ RB-meta l
+                   }
+        -- The SUT's own blocks are minted by the Praos node; the log's
+        -- record of them only serves as parents of blocks it receives.
+        in l' , []
 
       traceEvent→action l record { message = RBReceived s p _ _ i _ }
-        with p ≟ SUT | RB-refs l ⁉ i
-      ... | yes _ | just rb = l , (Slot₂-Action (currentSlot l) , inj₂ (inj₁ (BaseAbstract.BASE-LDG (rb ∷ [])))) ∷ []
+        with p ≟ SUT | buildBlk l i
+      ... | yes _ | just blk = record l { inbox = blk ∷ inbox l } , []
       ... | _ | _ = l , []
 
       -- TXs
       traceEvent→action l record { message = TXGenerated _ _ } = l , []
       traceEvent→action l record { message = TXReceived i _ p }
         with p ≟ SUT
-      ... | yes _ = l , (Base₁-Action (currentSlot l) , inj₂ (inj₂ (SubmitTxs (concatList (map primCharToNat (S.toList i)) ∷ [])))) ∷ []
+      ... | yes _ = l , entry (Mempool-Action (currentSlot l)) (ioᵢ (SubmitTxs (concatList (map primCharToNat (S.toList i)) ∷ []))) ∷ []
       ... | _     = l , []
 
       traceEvent→action l record { message = Cpu _ _ _ _ }                = l , []
@@ -331,19 +427,23 @@ module LinearLeiosVerifier where
       -- be dropped as invalid and never reach EBs'.
       s₀ = initLeiosState tt exampleDistr (L.tabulate (λ i → (i , tt)))
 
-      format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
-      format-error x = errorMsg x , "error verifyTrace"
+      -- The stack in Leios state 's', with the Praos node's clock one slot
+      -- behind (see 'delivery').
+      stack₀ : LeiosState → Machine.State Stack
+      stack₀ s = ((tt , record initNodeState { clock = LeiosState.slot s ∸ 1 }) , tt) , s
+
+      check : LeiosState → List Item → Pair String String
+      check s αs = [ (λ e → (e , "error verifyTrace")) , (λ _ → ("ok" , "")) ]′ (verifyItems (stack₀ s) αs)
 
       opaque
         unfolding List-Model
 
         verifyTrace' : LeiosState → Pair ℕ (Pair String String)
         verifyTrace' s =
-          let n₀ = record { EB-refs = [] ; EB-received = [] ; VT-refs = [] ; RB-refs = [] ; FFD-blks = [] ; currentSlot = LeiosState.slot s }
+          let n₀ = record { EB-refs = [] ; EB-received = [] ; VT-refs = [] ; RB-refs = [] ; RB-meta = [] ; inbox = [] ; FFD-blks = [] ; currentSlot = LeiosState.slot s }
               l' = proj₂ $ mapAccuml traceEvent→action n₀ l
-              αs = L.reverse (L.concat l')
-              tr = checkTrace αs s
-          in L.length αs , result (λ _ → ("ok" , "")) format-error tr
+              αs = L.concat l'
+          in L.length αs , check s αs
           where
             mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
             mapAccuml f s []       = s , []
@@ -351,10 +451,6 @@ module LinearLeiosVerifier where
               let (s' , y)   = f s x
                   (s'' , ys) = mapAccuml f s' xs
               in s'' , y ∷ ys
-
-            result : ∀ {E A S : Type} → (f : A → S) → (g : E → S) → Result E A → S
-            result f g (Ok x) = f x
-            result f g (Err x) = g x
 
         verifyTrace : Pair ℕ (Pair String String)
         verifyTrace = verifyTrace' s₀

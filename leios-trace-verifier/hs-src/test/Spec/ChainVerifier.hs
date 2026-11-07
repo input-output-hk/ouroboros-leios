@@ -22,15 +22,15 @@ import Test.Hspec (Spec, describe, it, shouldBe, shouldNotBe)
 --   verifier is exercised against. The figures have to be non-zero: vote
 --   eligibility is the CIP-0164 committee, computed from the stake distribution
 --   rather than a per-slot lottery.
-stakeDist :: [(Text, Integer)]
-stakeDist = [("node-0", 1000000000), ("node-1", 1000000000), ("node-2", 1000000000)]
+stakeDist :: [Integer]
+stakeDist = [1000000000, 1000000000, 1000000000]
 
 -- | Verify a fixed event list starting at slot 0, returning just the status.
 --
 --   Timings are the ones the chain app hardcodes — Lhdr 1, Lvote 4, Ldiff 7 — under
 --   which an announced EB's voting window opens at @ebSlot + 3 * Lhdr == ebSlot + 3@
 --   and its deadline is @ebSlot + 3 * Lhdr + Lvote == ebSlot + 7@. Abstention is
---   licensed throughout the window by 'Roles₃' and only forced at the deadline, so a
+--   licensed throughout the window by 'VT-Defer' and only forced at the deadline, so a
 --   fixture testing a withheld vote has to run as far as @ebSlot + 7@.
 --
 --   The ranking block's body capacity is a small round number here, and fixtures give
@@ -87,11 +87,9 @@ announcedAndVoted =
   , CSlot 1
   , CAnnouncementAccepted "eb" 1
   , CEBAcquired "eb" 1
-  , CSlot 2
-  , CSlot 3
-  , CSlot 4
-  , CVoted "eb" 1
   ]
+    <> adopt "rb1" 1 Nothing
+    <> [CSlot 2, CSlot 3, CSlot 4, CVoted "eb" 1]
     <> [CSlot s | s <- [5 .. 8]]
 
 -- | The same EB fetched but never announced on the chain, so nothing makes it
@@ -107,19 +105,16 @@ acquiredNotAnnounced =
   , CSlot 5
   ]
 
--- | The announcer's own adoption: 'CChainExtended' in the very slot the EB was
---   announced, which is the ordinary self-forge shape — the node reports adopting its
---   own ranking block right after announcing, and in Linear Leios that block shares
---   the EB's election slot. The tip has reached the announcer, not passed it, so the
---   window must stay open and the vote at slot 4 is still due.
+-- | The announcer heads the chain: the node adopted the ranking block of the EB's
+--   election slot, and nothing after it. The window stays open and the vote is due.
 adoptedAtAnnouncer :: [ChainEvent]
 adoptedAtAnnouncer =
   [ CSlot 0
   , CSlot 1
   , CAnnouncementAccepted "eb" 1
   , CEBAcquired "eb" 1
-  , CChainExtended 1
   ]
+    <> adopt "rb1" 1 Nothing
     <> [CSlot s | s <- [2 .. 8]]
 
 -- | The chain moves strictly past the announcer, so the EB can no longer be
@@ -130,9 +125,10 @@ adoptedPastAnnouncer =
   , CSlot 1
   , CAnnouncementAccepted "eb" 1
   , CEBAcquired "eb" 1
-  , CSlot 2
-  , CChainExtended 2
   ]
+    <> adopt "rb1" 1 Nothing
+    <> [CSlot 2]
+    <> adopt "rb2" 2 (Just "rb1")
     <> [CSlot s | s <- [3 .. 8]]
 
 -- | A repeat vote far from the original, and the bounded window a windowed verifier
@@ -141,6 +137,7 @@ adoptedPastAnnouncer =
 votedTwiceFar :: [ChainEvent]
 votedTwiceFar =
   [CSlot 0, CSlot 1, CAnnouncementAccepted "eb" 1, CEBAcquired "eb" 1]
+    <> adopt "rb1" 1 Nothing
     <> [CSlot s | s <- [2 .. 3]]
     <> [CSlot 4, CVoted "eb" 1]
     <> [CSlot s | s <- [5 .. 19]]
@@ -160,14 +157,16 @@ votedTwice =
   , CSlot 1
   , CAnnouncementAccepted "eb" 1
   , CEBAcquired "eb" 1
-  , CSlot 2
-  , CSlot 3
-  , CSlot 4
-  , CVoted "eb" 1
-  , CSlot 5
-  , CVoted "eb" 1
-  , CSlot 6
   ]
+    <> adopt "rb1" 1 Nothing
+    <> [ CSlot 2
+       , CSlot 3
+       , CSlot 4
+       , CVoted "eb" 1
+       , CSlot 5
+       , CVoted "eb" 1
+       , CSlot 6
+       ]
 
 -- | Two announced EBs, each voted in its own slot. Requires the EB payload to be
 --   derived from the hash: a constant one collapses both to the same spec-level
@@ -178,19 +177,53 @@ twoVotes =
   , CSlot 1
   , CAnnouncementAccepted "eb1" 1
   , CEBAcquired "eb1" 1
+  ]
+    <> adopt "rb1" 1 Nothing
+    <> [ CSlot 2
+       , CSlot 3
+       , CSlot 4
+       , CVoted "eb1" 1
+       , CSlot 5
+       , CAnnouncementAccepted "eb2" 5
+       , CEBAcquired "eb2" 5
+       ]
+    <> adopt "rb5" 5 (Just "rb1")
+    <> [ CSlot 6
+       , CSlot 7
+       , CSlot 8
+       , CVoted "eb2" 5
+       , CSlot 9
+       ]
+
+-- | An EB announced and acquired, and voted, but its ranking block never adopted:
+--   the chain head does not announce it, so the vote is not legal.
+votedNotAdopted :: [ChainEvent]
+votedNotAdopted =
+  [ CSlot 0
+  , CSlot 1
+  , CAnnouncementAccepted "eb" 1
+  , CEBAcquired "eb" 1
   , CSlot 2
   , CSlot 3
   , CSlot 4
-  , CVoted "eb1" 1
+  , CVoted "eb" 1
   , CSlot 5
-  , CAnnouncementAccepted "eb2" 5
-  , CEBAcquired "eb2" 5
-  , CSlot 6
-  , CSlot 7
-  , CSlot 8
-  , CVoted "eb2" 5
-  , CSlot 9
   ]
+
+-- | The node forges a ranking block in a slot it leads, on the tip it selected.
+forgedOnTip :: [ChainEvent]
+forgedOnTip =
+  [CSlot 0, CSlot 1]
+    <> adopt "rb1" 1 Nothing
+    <> [CSlot 2, CNodeIsLeader 2, CRBForged "rb2" 2]
+    <> adopt "rb2" 2 (Just "rb1")
+    <> [CSlot 3]
+
+-- | The node adopts a ranking block (hash, slot, parent) and it becomes the tip of
+--   its selected chain.  An EB is votable only once the block of its election slot
+--   heads the chain the Praos node selects.
+adopt :: Text -> Integer -> Maybe Text -> [ChainEvent]
+adopt h s p = [CAdopted h (fromInteger s) p, CNewTip h (fromInteger s)]
 
 dropVotes :: [ChainEvent] -> [ChainEvent]
 dropVotes = filter (not . isVote)
@@ -239,8 +272,8 @@ chainVerifier = do
   describe "voting" $ do
     it "accepts a vote cast in the first slot of the window" $
       fromLog announcedAndVoted `shouldBe` "ok"
-    -- Abstention is licensed throughout the window by 'Roles₃'; only at the deadline,
-    -- ebSlot + 3 * Lhdr + Lvote, does neither it nor 'Roles₂' apply and a vote is
+    -- Abstention is licensed throughout the window by 'VT-Defer'; only at the deadline,
+    -- ebSlot + 3 * Lhdr + Lvote, does neither it nor 'No-VT-Role' apply and a vote is
     -- forced. So this fixture has to reach slot 8 to be a violation at all.
     it "rejects a vote withheld to the deadline" $
       fromLog (dropVotes announcedAndVoted) `shouldNotBe` "ok"
@@ -248,9 +281,8 @@ chainVerifier = do
       fromLog acquiredNotAnnounced `shouldBe` "ok"
     it "accepts votes for two distinct EBs in one run" $
       fromLog twoVotes `shouldBe` "ok"
-    -- What distinguishes these two is the obligation, not the vote: our head
-    -- selection would let a vote through either way, so the cost of treating the
-    -- announcer's own adoption as superseding is a withheld vote going unreported.
+    -- What distinguishes these two is the obligation: with the announcer at the
+    -- head a vote is forced at the deadline, past it there is none to force.
     it "keeps the window open when the tip only reaches the announcer" $
       fromLog adoptedAtAnnouncer `shouldNotBe` "ok"
     it "closes the window when the tip moves past the announcer" $
@@ -261,10 +293,38 @@ chainVerifier = do
       fromLog votedTwiceFar `shouldNotBe` "ok"
     -- Characterises what bounding the verified prefix would cost, rather than
     -- asserting it is desirable. Verification from slot 16 sees neither the
-    -- announcement nor the first vote, so 'wasAnnounced' is false, CVoted is
-    -- dropped, no VT-Role is raised, and the stale vote passes unnoticed. Any
+    -- acquisition nor the first vote, so CVoted names an EB the verifier does not
+    -- know and is dropped, no VT-Role is raised, and the stale vote passes unnoticed. Any
     -- windowing scheme has to carry the announcement history forward, or accept
     -- this blind spot: the overlap width is sized for legitimate obligations and
     -- says nothing about how far back a spurious event may reach.
     it "loses a stale vote when the prefix cannot see the announcement" $
       verifyFrom 16 windowOfVotedTwiceFar `shouldBe` "ok"
+    it "refuses a vote for an EB whose ranking block the node never adopted" $
+      fromLog votedNotAdopted `shouldNotBe` "ok"
+
+  describe "the Praos layer" $ do
+    it "accepts a ranking block forged on the selected tip" $
+      fromLog forgedOnTip `shouldBe` "ok"
+    it "rejects a ranking block forged in a slot the node did not lead" $
+      fromLog (filter (/= CNodeIsLeader 2) forgedOnTip) `shouldNotBe` "ok"
+    it "rejects a lead in which the node forged nothing" $
+      fromLog ([CSlot 0, CSlot 1] <> adopt "rb1" 1 Nothing <> [CSlot 2, CNodeIsLeader 2, CSlot 3])
+        `shouldNotBe` "ok"
+    it "rejects a switch to a shorter chain" $
+      fromLog
+        ( [CSlot 0, CSlot 1]
+            <> adopt "rb1" 1 Nothing
+            <> [CSlot 2, CAdopted "rb2" 2 (Just "rb1"), CNewTip "rb1" 1, CSlot 3]
+        )
+        `shouldNotBe` "ok"
+    it "accepts a switch to an equally long fork" $
+      fromLog
+        ( [CSlot 0, CSlot 1]
+            <> adopt "rb1" 1 Nothing
+            <> [CSlot 2]
+            <> adopt "rb2" 2 (Just "rb1")
+            <> adopt "rb2'" 2 (Just "rb1")
+            <> [CSlot 3]
+        )
+        `shouldBe` "ok"
