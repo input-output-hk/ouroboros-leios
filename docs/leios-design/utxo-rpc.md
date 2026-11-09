@@ -62,12 +62,13 @@ It also compiles against `v1beta`, while #215 adds the Leios fields to `v1` only
 ### Task
 
 - Move to `v1` (cardano-api#1263).
-- For a CertRB, read the EB's transactions from the LeiosDB and put them in `body.tx`. Do it in the ChainDB follower, so `sync` and `WaitForTx` (which reads blocks from the same follower) both get them. Reuse the consensus code the N2C server uses (`resolveLeiosClosure`), rather than a second copy.
+- For a CertRB, read the EB's transactions from the LeiosDB and put them in `body.tx`. Do it in two places: the ChainDB follower, which `FollowTip` and `WaitForTx` read from, and the block-by-point read ([`fetchBlock`](https://github.com/IntersectMBO/cardano-api/blob/c2212851b06b9c2acc5bb0bfe1b8a8e8cf2be03a/cardano-rpc/src/Cardano/Rpc/Server/NodeKernelAccess.hs#L255-L270)), which `FetchBlock` and `FollowTip`'s `undo` use. Reuse the consensus code the N2C server uses (`resolveLeiosClosure`), rather than a second copy.
 - If the EB's transactions can't be read, fail loudly, as in [node-to-client #1](node-to-client.md#1-never-send-a-certrb-without-its-ebs-transactions).
 
 ### Acceptance criteria
 
 - [ ] `FetchBlock` and `FollowTip` return a CertRB with the EB's transactions in `body.tx`.
+- [ ] A CertRB in a `FollowTip` `undo` has the same `body.tx` as in its `apply`.
 - [ ] `WaitForTx` reports an EB's transaction as confirmed when its CertRB is adopted.
 - [ ] A CertRB is never returned without its EB's transactions.
 - [ ] The Leios header and body fields from #215 are filled.
@@ -101,7 +102,7 @@ Dingo already stores EBs and indexes their transactions under the CertRB: `ReadT
 
 ### Context
 
-Dolos serves UTxO-RPC from blocks it fetches over N2N ([`sync.rs`](https://github.com/txpipe/dolos/blob/34d2b7f619724de0a19da322b04e41deccea7465/src/serve/grpc/v1beta/sync.rs#L23-L40)), so it doesn't get the N2C inlining either. It has no Leios code yet. To return a CertRB with its EB's transactions, it must first fetch and store EBs. Pallas has the pieces in progress: [#816](https://github.com/txpipe/pallas/pull/816) (read EBs, merged), [#836](https://github.com/txpipe/pallas/pull/836) (LeiosNotify and LeiosFetch), [#833](https://github.com/txpipe/pallas/pull/833) (map Dijkstra scripts and votes) and [#835](https://github.com/txpipe/pallas/pull/835) (map blocks onto the `v1` schema, built against #215).
+Dolos serves UTxO-RPC from blocks it fetches over N2N ([`sync.rs`](https://github.com/txpipe/dolos/blob/34d2b7f619724de0a19da322b04e41deccea7465/src/serve/grpc/v1beta/sync.rs#L23-L40)), so it doesn't get the N2C inlining either. It has no Leios code yet. To return a CertRB with its EB's transactions, it must first fetch and store EBs. Pallas has most of the pieces: [#816](https://github.com/txpipe/pallas/pull/816) (read EBs, merged), [#836](https://github.com/txpipe/pallas/pull/836) (LeiosNotify and LeiosFetch, merged), [#833](https://github.com/txpipe/pallas/pull/833) (map Dijkstra scripts and votes, merged) and [#835](https://github.com/txpipe/pallas/pull/835) (map blocks onto the `v1` schema, built against #215, open).
 
 ### Acceptance criteria
 
