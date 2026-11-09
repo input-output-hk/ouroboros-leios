@@ -1,13 +1,9 @@
--- A concrete Assumptions instance for Leios.Base.Praos.Instance, closing the
--- module parameter that docs/praos-base-machine-sketch.md flagged as
--- missing: "no concrete Tree implementation with discharged laws exists
--- upstream, so it stays a parameter."
+-- A concrete Assumptions instance for Leios.Base.Praos.Instance.
 --
--- The block tree is Leios.Base.Praos.ChainSel: chain selection is
+-- The block tree is Leios.Base.Praos.BlockTree: chain selection is
 -- incremental, for chains of node-log size, and all five Protocol.Tree
 -- obligations (instantiated/extendable/valid/optimal/selfContained) are
--- proved there; upstream leaves the same five as `{!!}` holes in its own
--- Examples.Praos.  Genesis is part of every tree's pool, so a valid best
+-- proved there.  Genesis is part of every tree's pool, so a valid best
 -- chain always exists inside it.
 --
 -- genesisWinner is a module parameter (winner₀): the leader predicate is
@@ -70,15 +66,15 @@ instance
 open import Protocol.Chain ⦃ praosParams ⦄
 open import Protocol.Tree  ⦃ praosParams ⦄
 
-import Leios.Base.Praos.ChainSel ⦃ praosParams ⦄ as ChainSel
+import Leios.Base.Praos.BlockTree ⦃ praosParams ⦄ as BlockTree
 
 -- Genesis is a valid chain of slot 0.
 TreeImpl : Type
-TreeImpl = ChainSel.TreeImpl (winner₀ party₀) refl
+TreeImpl = BlockTree.TreeImpl (winner₀ party₀) refl
 
 instance
   praosTree : Tree TreeImpl
-  praosTree = ChainSel.chainSelTree (winner₀ party₀) refl
+  praosTree = BlockTree.blockTree (winner₀ party₀) refl
 
 open import Protocol.Assumptions ⦃ praosParams ⦄
 
@@ -109,9 +105,7 @@ instance
     ; genesisWinner      = winner₀ party₀
     }
 
--- Closes the gap docs/praos-base-machine-sketch.md flagged: with a concrete
--- Assumptions instance in hand, Leios.Base.Praos.Instance.WithAssumptions no
--- longer needs one as a bare module parameter.
+-- The honest node of Leios.Base.Praos.Instance, under the Assumptions above.
 open WithAssumptions ⦃ praosAssumptions ⦄ self public using (praosNode)
 
 -- Verifier-facing helpers for building tree blocks from trace data (the

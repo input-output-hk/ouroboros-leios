@@ -1,13 +1,9 @@
--- Closes the remaining two gaps docs/praos-base-machine-sketch.md flagged
--- after Assumptions.agda: assembling Leios.Base.Praos.Node's `praosNode`
--- (from Assumptions.agda) all the way to a `BaseMachine`, and the
--- `producer`/`slotOf` wrinkle.
+-- Assembles the `praosNode` of Assumptions.agda into a `BaseMachine`
+-- (see docs/praos-base-machine-sketch.md).
 --
--- `Cert`/`VTy`/`initSlot`/`V-chkCerts`/`stake₀` are genuinely free choices —
--- the sketch doc already treats them as the caller's Cert-checking scheme
--- and stake distribution, unrelated to Praos itself ("Stake" / "Cert
--- checking" notes) — so they stay module parameters here, same as in
--- Leios.Base.Praos.Node itself, rather than something to "construct".
+-- `Cert`/`VTy`/`initSlot`/`V-chkCerts`/`stake₀` are the caller's
+-- cert-checking scheme and stake distribution, unrelated to Praos itself, so
+-- they stay module parameters here, as in Leios.Base.Praos.Node.
 --
 -- Neither `producer` nor `slotOf` can be recovered from a bare RankingBlock:
 -- it carries no producer/pid and, since the pinned leios-spec dropped

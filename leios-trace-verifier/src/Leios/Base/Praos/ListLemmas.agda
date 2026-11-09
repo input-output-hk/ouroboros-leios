@@ -1,6 +1,6 @@
 {-# OPTIONS --safe #-}
 {- Generic list machinery for the Praos block tree
-   (Leios.Base.Praos.ChainSel):
+   (Leios.Base.Praos.BlockTree):
 
    - maxBy-mem/-≥       : the fold picking the longest candidate returns the
      base or a member, and no member is longer;

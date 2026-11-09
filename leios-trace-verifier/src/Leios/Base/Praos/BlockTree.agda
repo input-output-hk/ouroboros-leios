@@ -1,4 +1,4 @@
-{- Module: Leios.Base.Praos.ChainSel
+{- Module: Leios.Base.Praos.BlockTree
 
    A block tree for the Praos node whose chain selection is incremental, for
    chains of node-log size, with the 'Protocol.Tree' laws proved.
@@ -22,7 +22,7 @@ open import Protocol.Params using (Params)
 open import Protocol.Crypto using (Hashable)
 open import Protocol.Block using (Block)
 
-module Leios.Base.Praos.ChainSel
+module Leios.Base.Praos.BlockTree
   ⦃ params : _ ⦄ (open Params params)
   ⦃ _ : Hashable Block ⦄
   ⦃ _ : Default Block ⦄
@@ -543,8 +543,8 @@ module _
           nonempty (here _)  = s≤s z≤n
           nonempty (there _) = s≤s z≤n
 
-  chainSelTree : Tree TreeImpl
-  chainSelTree = record
+  blockTree : Tree TreeImpl
+  blockTree = record
     { tree₀         = tree₀′
     ; extendTree    = extend
     ; allBlocks     = pool
