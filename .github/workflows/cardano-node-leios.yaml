@@ -92,8 +92,8 @@ jobs:
       # ----------------------------------------------------------------
       # x86_64-linux release tarball — `cardano-node-release` already
       # strips upstream's cardano-node-linux to cardano-node, cardano-cli,
-      # tx-firehose and mempool-monitor, and drops bundled configs (see
-      # nix/release.nix), so CI just publishes what nix produced. Building
+      # tx-firehose, mempool-monitor and snapshot-converter, and drops bundled
+      # configs (see nix/release.nix), so CI just publishes what nix produced. Building
       # this also realises cardano-node-static / cardano-cli-static in the
       # store, so the docker image below reuses those exact paths without
       # rebuilding.
@@ -120,7 +120,8 @@ jobs:
       # `cardano-node-leios` input. The flake exposes
       # `packages.<system>.cardano-node-leios-image`, a streamed
       # docker tarball of the statically-linked cardano-node +
-      # cardano-cli on a minimal layer (bash, coreutils, ca-certs).
+      # cardano-cli + snapshot-converter on a minimal layer
+      # (bash, coreutils, ca-certs).
       # Reuses the static binaries built above from the nix store.
       # ----------------------------------------------------------------
       - name: Extract metadata for cardano-node-leios (base)
