@@ -101,22 +101,15 @@ alongside them, and reading the proposal's capacity as a count at the
 mainnet mix extends to whatever those budgets allow. Section 2 states the
 full set of limits and which of them the measurements exercise.
 
-<!-- note -->
-Open points on the caps other than bytes. The congested periods in Table
-1.1 are characterised in bytes only; their Plutus steps and memory and
-reference-script bytes (the share of block bytes in script transactions,
-and how often the execution-unit limit binds before the size limit) have
-not been measured, although the transaction-level data is available from
-Koios. Neither the testnet nor the cluster has run script transactions, so
-the script and reference-script caps are not exercised by any measurement
-in this report; the DeltaQ model's inputs are a mainnet mix that includes
-Plutus, so its coverage of those caps should be stated where the model is
-discussed. Whether the proposed parameter sets scale the script budgets
-proportionally from the Praos limits is a hypothesis still to be confirmed.
-The caps trade against each other inside the one validation window, so
-raising the byte caps while holding the script budgets conservative is a
-choice with a cost, not a free move.
-<!-- /note -->
+The congested periods of Table 1.1 are characterised in bytes only.
+Their Plutus steps and memory and reference-script bytes, the share of
+block bytes in script transactions and how often the execution-unit
+limit binds before the size limit, are not measured here, although the
+transaction-level data is available from Koios. Whether the proposed
+parameter sets scale the script budgets proportionally from the Praos
+limits is a question this report does not settle. The validation
+margin that script computation would draw on is discussed in sections
+8.5 and 9.
 
 Tables 1.2 and 1.3 put the targets and the Praos baseline in one unit. The
 byte-defined targets are converted to transactions per second at the three

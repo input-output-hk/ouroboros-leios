@@ -65,18 +65,6 @@ to announce an EB. The rows that follow compare the first column with the
 full plain announcing RBs; the other kinds are too few to read and are
 left out.
 
-<!-- note -->
-The benchmarking team's comparison mentions three filters applied to the
-RBs before its propagation figures (its manifest counts them, and
-"filtered to chained blocks" is 0.71 on every run) but does not describe
-them, so the selection behind Table 5.5 is to be clarified with the team
-before its figures are set against this section's. The adoption figures
-agree in magnitude with Table 5.2 for the run both read, but the "height
-and slot battles per RB" of 0.022 is a third of this section's orphans per
-RB on the chain for that run (207 of 2,968) and close to its same-slot
-forks alone (75), which suggests the filters, or the definition, leave out
-the forks of consecutive slots this section counts.
-<!-- /note -->
 
 ## 5.3 Adoption within a run
 
@@ -122,18 +110,10 @@ The 1 kB window puts the cost on the transaction count rather than the
 bytes: closures of 1.5 to 2 MB holding about 2,000 transactions are
 adopted at 0.62 s, where closures of the same bytes holding 6,000 took
 1.57 s in the loaded hours, and the full plain RB of that window is
-adopted at the same 0.62 s.
-
-<!-- note -->
-The 1 kB window ran on a mixed node build (Table 4.8). The
-conclusion stands either way: within the window, on one set of nodes and
-one hour, a 2 MB closure of 2,000 transactions is adopted as fast as the
-full plain RB, and the build mix cannot produce that equality. What the
-mix leaves open is the comparison across periods (0.62 s here against
-1.57 s in the loaded hours of 2026-10-24 to 26), where a change between
-the builds could account for part of the difference; a window with one
-generator at 1 kB on the same build as its comparison would close that.
-<!-- /note -->
+adopted at the same 0.62 s. The window ran on a mixed node build (Table
+4.8): the equality within the window, on one set of nodes and one hour,
+does not depend on it, while the comparison across periods could owe
+part of its difference to a change between the builds.
 
 Where the time goes is visible on the IOG and PIR hosts' traces at 2 MB,
 which time each step of the forge and adoption paths
@@ -187,19 +167,12 @@ to 30 % on the testnet and 60 % on the cluster, consistent with the hosts
 validating closures when the next header arrives; the pairs are too few
 to separate that from the certificate's share.
 
-<!-- note -->
-Two things behind Table 5.3 are open. First, which RB of a forked pair
-loses differs between the populations (the saved pairs outputs count
-both): on the cluster the first RB loses about as often as the second (57
-against 65 of the 122 pairs at 1 MB, the tiebreak deciding), while on the
-testnet the first RB loses 44 of its 46 forked pairs. Our data does not say why; it may be a difference in the
-chain-selection tiebreak between the builds or the networks, and is a
-question for the consensus team. Second, the benchmarking team's "height
-and slot battles per block" counts every abandoned block at a height,
-while this table counts consecutive-slot pairs only; the two are different
-measures of the same forks and should not be read against each other
-without the team's filter definitions (the note in 5.2).
-<!-- /note -->
+Which RB of a forked pair loses differs between the populations (the
+saved pairs outputs count both): on the cluster the first RB loses about
+as often as the second (57 against 65 of the 122 pairs at 1 MB, the
+tiebreak deciding), while on the testnet the first RB loses 44 of its 46
+forked pairs. The data does not say why; it may be a difference in the
+chain-selection tiebreak between the builds or the networks.
 
 ## 5.5 Missed slots and chain density
 
@@ -286,7 +259,7 @@ earlier than its plain ones (Table 5.2), is 0.2 s behind the control at
 the median and 0.07 s at the 90th percentile, so most of that run's gap
 is the forge path, not the certificate. Height and slot battles per RB
 rise from 0.0009 on the control to 0.005 at 260 kB and 0.022 at 1 MB, a
-factor of 6 and 24, against the forked pair shares of Table 5.3. The
+factor of 6 and 24. The
 control is a single run of an older release at Praos's own load, and
 these figures are read as the order of the cost, not its measure.
 

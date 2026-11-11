@@ -317,11 +317,9 @@ every population, and the host series of the IOG and PIR hosts show them
 validation, is below these series' resolution and is measured by the
 validation times of Tables 6.1a to 6.1e instead.
 
-<!-- note -->
-Three points from the metrics to look at: the operator nodes above 6 GB
-resident (a tenth of them, up to 21 GB) with no explanation in the data;
-five-minute peaks of the host CPU near full busy on three PIR hosts that
-the node's own counter does not show, so something else on those hosts;
-and the operators' host memory, which the telemetry does not scrape, so
-no resident-set-to-RAM ratio exists for them.
-<!-- /note -->
+Three things the metrics leave unexplained. A tenth of the operator nodes sit above 6 GB
+resident, up to 21 GB, with nothing in the data to account for it. Three
+PIR hosts show five-minute peaks of the host CPU near full busy that the
+node's own counter does not, so that load is not the node's. The
+operators' host memory is not scraped, so their resident set has no RAM
+figure to be read against.

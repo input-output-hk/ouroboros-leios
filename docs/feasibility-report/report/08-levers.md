@@ -396,18 +396,14 @@ capabilities pay the same per transaction as the testnet's hosts at
 eight (section 7.3). Whether the loop can be parallelised is a question
 about the ledger's apply, which runs transactions in sequence, and about
 which of its parts, witness and signature checks among them, are
-independent; the report has no measurement of it and makes no claim.
+independent; the report has no measurement of it and makes no claim. A
+reading of the apply path's parallelisable parts would come before any
+number is put on it, and the loop in isolation (section 9.1) is where
+that number could be taken without a deployment.
 
-<!-- note -->
-Three questions the levers of this subsection leave. Whether the closure
-forwarding and egress scheduling changes recover the single-relay nodes'
-closure times is a run to make, since the gap is measured and the
-changes are not. Why the EBs at the reference cap deliver no body is open
-in section 4.3.1. And the thread question needs a reading of the apply
-path's parallelisable parts before any number is put on it; a harness
-that runs the voting loop over the closures of a Leios database, which
-db-analyser does not have, would give it a figure without a deployment.
-<!-- /note -->
+The closure forwarding and egress scheduling changes are the other
+unpriced lever: the single-relay nodes' gap is measured and the changes
+are not, so whether they recover it is a run to make.
 
 ## 8.5 What the measurements support
 
