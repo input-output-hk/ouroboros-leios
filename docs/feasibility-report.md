@@ -1,6 +1,6 @@
 # Leios technical feasibility: a measured assessment of the pipeline on the public testnet and the benchmarking cluster
 
-Build of 2026-11-11, from commit 43255357. Sections in this build: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, Appendix A. The open points the text leaves for the team and the reviewers are kept in place as block quotes headed "Note to resolve".
+Build of 2026-11-11, from commit 157d70b9. Sections in this build: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, Appendix A. The open points the text leaves for the team and the reviewers are kept in place as block quotes headed "Note to resolve".
 
 ## Contents
 
