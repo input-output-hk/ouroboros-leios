@@ -401,8 +401,9 @@ share: 31 % on the cluster at 2,777 transactions, 46 % at 2,673 two-input
 transactions, half or more on the testnet at 4,000 and above, where the
 operator hardware spreads the validation time over a factor of four. In
 every case the stage table puts the loss in the same two rows, validation
-after the closure and the tally reaching the quorum at the deadline, and
-nowhere in the body or closure diffusion of a certifiable EB. The
+after the closure and the tally reaching the quorum at the deadline; the
+closure's diffusion adds to it only on the testnet at 2 MB, on the
+smallest EBs and on the largest, as section 8.1 reads per vote. The
 quantity that moves between the sets is the validation work of an EB on a
 host, in transactions and their shape, which section 6 measures per host,
 and the quorum's margin, which the unobserved and the slow weight spend
