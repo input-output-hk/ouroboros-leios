@@ -1,6 +1,6 @@
 # Leios technical feasibility: a measured assessment of the pipeline on the public testnet and the benchmarking cluster
 
-Build of 2026-11-11, from commit d2365c51. Sections in this build: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, Appendix A. The open points the text leaves for the team and the reviewers are kept in place as block quotes headed "Note to resolve".
+Build of 2026-11-11, from commit 19d6fb62. Sections in this build: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, Appendix A. The open points the text leaves for the team and the reviewers are kept in place as block quotes headed "Note to resolve".
 
 ## Contents
 
@@ -209,7 +209,15 @@ alongside them, and reading the proposal's capacity as a count at the
 mainnet mix extends to whatever those budgets allow. Section 2 states the
 full set of limits and which of them the measurements exercise.
 
-> **Note to resolve.** Open points on the caps other than bytes. The congested periods in Table 1.1 are characterised in bytes only; their Plutus steps and memory and reference-script bytes (the share of block bytes in script transactions, and how often the execution-unit limit binds before the size limit) have not been measured, although the transaction-level data is available from Koios. Neither the testnet nor the cluster has run script transactions, so the script and reference-script caps are not exercised by any measurement in this report; the DeltaQ model's inputs are a mainnet mix that includes Plutus, so its coverage of those caps should be stated where the model is discussed. Whether the proposed parameter sets scale the script budgets proportionally from the Praos limits is a hypothesis still to be confirmed. The caps trade against each other inside the one validation window, so raising the byte caps while holding the script budgets conservative is a choice with a cost, not a free move.
+The congested periods of Table 1.1 are characterised in bytes only.
+Their Plutus steps and memory and reference-script bytes, the share of
+block bytes in script transactions and how often the execution-unit
+limit binds before the size limit, are not measured here, although the
+transaction-level data is available from Koios. Whether the proposed
+parameter sets scale the script budgets proportionally from the Praos
+limits is a question this report does not settle. The validation
+margin that script computation would draw on is discussed in sections
+8.5 and 9.
 
 Tables 1.2 and 1.3 put the targets and the Praos baseline in one unit. The
 byte-defined targets are converted to transactions per second at the three
@@ -500,7 +508,13 @@ are read with their population in mind. The report does not define a
 reference machine; every result is stated against the population it was
 measured on.
 
-> **Note to resolve.** No reference hardware has been defined for Leios yet. The report measures on the populations it has: the operator nodes of the testnet, whose hardware is unknown except through the ledger benchmark's spread and the measured validation speeds; the IOG and PIR hosts, whose instance types are known; and the cluster's uniform c5d.2xlarge hosts. Which of these, if any, stands for the machine the parameters are set for is left open.
+No reference hardware has been defined for Leios yet. The report measures
+on the populations it has: the operator nodes of the testnet, whose
+hardware is unknown except through the ledger benchmark's spread and the
+measured validation speeds; the IOG and PIR hosts, whose instance types
+are known; and the cluster's uniform c5d.2xlarge hosts. Which of these
+stands for the machine the parameters are set for is a decision this
+report does not make.
 
 ## 3.1 The public testnet
 
@@ -1171,8 +1185,6 @@ to announce an EB. The rows that follow compare the first column with the
 full plain announcing RBs; the other kinds are too few to read and are
 left out.
 
-> **Note to resolve.** The benchmarking team's comparison mentions three filters applied to the RBs before its propagation figures (its manifest counts them, and "filtered to chained blocks" is 0.71 on every run) but does not describe them, so the selection behind Table 5.5 is to be clarified with the team before its figures are set against this section's. The adoption figures agree in magnitude with Table 5.2 for the run both read, but the "height and slot battles per RB" of 0.022 is a third of this section's orphans per RB on the chain for that run (207 of 2,968) and close to its same-slot forks alone (75), which suggests the filters, or the definition, leave out the forks of consecutive slots this section counts.
-
 ## 5.3 Adoption within a run
 
 For each reporting node and each RB on the chain, the delay from the RB's
@@ -1217,9 +1229,10 @@ The 1 kB window puts the cost on the transaction count rather than the
 bytes: closures of 1.5 to 2 MB holding about 2,000 transactions are
 adopted at 0.62 s, where closures of the same bytes holding 6,000 took
 1.57 s in the loaded hours, and the full plain RB of that window is
-adopted at the same 0.62 s.
-
-> **Note to resolve.** The 1 kB window ran on a mixed node build (Table 4.8). The conclusion stands either way: within the window, on one set of nodes and one hour, a 2 MB closure of 2,000 transactions is adopted as fast as the full plain RB, and the build mix cannot produce that equality. What the mix leaves open is the comparison across periods (0.62 s here against 1.57 s in the loaded hours of 2026-10-24 to 26), where a change between the builds could account for part of the difference; a window with one generator at 1 kB on the same build as its comparison would close that.
+adopted at the same 0.62 s. The window ran on a mixed node build (Table
+4.8): the equality within the window, on one set of nodes and one hour,
+does not depend on it, while the comparison across periods could owe
+part of its difference to a change between the builds.
 
 Where the time goes is visible on the IOG and PIR hosts' traces at 2 MB,
 which time each step of the forge and adoption paths
@@ -1273,7 +1286,12 @@ to 30 % on the testnet and 60 % on the cluster, consistent with the hosts
 validating closures when the next header arrives; the pairs are too few
 to separate that from the certificate's share.
 
-> **Note to resolve.** Two things behind Table 5.3 are open. First, which RB of a forked pair loses differs between the populations (the saved pairs outputs count both): on the cluster the first RB loses about as often as the second (57 against 65 of the 122 pairs at 1 MB, the tiebreak deciding), while on the testnet the first RB loses 44 of its 46 forked pairs. Our data does not say why; it may be a difference in the chain-selection tiebreak between the builds or the networks, and is a question for the consensus team. Second, the benchmarking team's "height and slot battles per block" counts every abandoned block at a height, while this table counts consecutive-slot pairs only; the two are different measures of the same forks and should not be read against each other without the team's filter definitions (the note in 5.2).
+Which RB of a forked pair loses differs between the populations (the
+saved pairs outputs count both): on the cluster the first RB loses about
+as often as the second (57 against 65 of the 122 pairs at 1 MB, the
+tiebreak deciding), while on the testnet the first RB loses 44 of its 46
+forked pairs. The data does not say why; it may be a difference in the
+chain-selection tiebreak between the builds or the networks.
 
 ## 5.5 Missed slots and chain density
 
@@ -1360,7 +1378,7 @@ earlier than its plain ones (Table 5.2), is 0.2 s behind the control at
 the median and 0.07 s at the 90th percentile, so most of that run's gap
 is the forge path, not the certificate. Height and slot battles per RB
 rise from 0.0009 on the control to 0.005 at 260 kB and 0.022 at 1 MB, a
-factor of 6 and 24, against the forked pair shares of Table 5.3. The
+factor of 6 and 24. The
 control is a single run of an older release at Praos's own load, and
 these figures are read as the order of the cost, not its measure.
 
@@ -1703,7 +1721,12 @@ every population, and the host series of the IOG and PIR hosts show them
 validation, is below these series' resolution and is measured by the
 validation times of Tables 6.1a to 6.1e instead.
 
-> **Note to resolve.** Three points from the metrics to look at: the operator nodes above 6 GB resident (a tenth of them, up to 21 GB) with no explanation in the data; five-minute peaks of the host CPU near full busy on three PIR hosts that the node's own counter does not show, so something else on those hosts; and the operators' host memory, which the telemetry does not scrape, so no resident-set-to-RAM ratio exists for them.
+Three things the metrics leave unexplained. A tenth of the operator nodes sit above 6 GB
+resident, up to 21 GB, with nothing in the data to account for it. Three
+PIR hosts show five-minute peaks of the host CPU near full busy that the
+node's own counter does not, so that load is not the node's. The
+operators' host memory is not scraped, so their resident set has no RAM
+figure to be read against.
 
 # 7. Models against measurements: DeltaQ and the CIP cost model
 
@@ -1920,7 +1943,10 @@ The deployment should be prepared for the costlier one, old inputs.
 The chained figures are a floor: the cost the loop reaches only when a
 transaction's inputs arrive in the same closure.
 
-> **Note to resolve.** On the testnet the transaction kind and the path to the voters move together, since the chaining generator submits to the hosts and the other does not; a run with one generator spending old outputs and submitting to the hosts would separate them.
+On the testnet the transaction kind and the path to the voters move together, since the
+chaining generator submits to the hosts and the other does not, so the
+two are not separated here; a run with one generator spending old
+outputs and submitting to the hosts would separate them.
 
 ## 7.3 The cluster against the testnet
 
@@ -2054,7 +2080,14 @@ the adoption path, which costs within five times it per transaction,
 not the voting path, which costs ten to twenty times it. The voting
 loop has no term in the model.
 
-> **Note to resolve.** Two questions on the CIP's constants are open with the model's owners: whether the model's apply figure is to be read as the ledger's cost on a mainnet mix, which the old-input measurements exceed without scripts, and whether the voting path's cost should enter the model as a separate term, with the measured values by host class and input origin. The script cost is unmeasured by every source here; the CIP's per-step figure is the only number for it.
+Two readings of the model follow. Its apply figure, read as the
+ledger's cost on a mainnet mix, is exceeded by the old-input
+measurements without any script. With the validation overhead of
+section 7.3 removed, the voter's cost would be more in line with it
+(section 9). The reapply gap would remain, so the voting path would
+need a term of its own for it, with values by host class. The script
+cost is unmeasured by every source here. The CIP's per-step figure is
+the only number for it.
 
 ## 7.6 The DeltaQ model's inputs
 
@@ -2064,7 +2097,8 @@ in the Leios repository, predicts from the voter's side whether an EB
 of a given closure size certifies within the vote window. It takes
 three inputs from the voter. Two are costs, 0.507 ms to apply a
 transaction and 0.070 ms to reapply one, transaction-weighted means
-over a mainnet block set. The third is how much of the closure the
+over a mainnet block set, script costs included at their mainnet
+frequency. The third is how much of the closure the
 voter has to fetch and apply because it is not in its mempool: a sixth
 by default, with an empirical estimate on mainnet of about 0.06. With
 those inputs the model finds the voter's CPU time small next to the
@@ -2097,7 +2131,14 @@ closure and pays the chained cost. The voters that decide certification
 on these populations pay the old-input cost on a third to half of the
 closure, a case the model's inputs do not describe.
 
-> **Note to resolve.** A re-run of the DeltaQ model with this report's inputs would show how much of the gap the inputs explain: the apply and reapply costs of Tables 7.2a, 7.2b and 7.3 by host class and input origin, and the applied shares at the closure of Table 4.4 on the cluster and of section 6.2 at the voters that fail on the testnet. Its certification verdict per closure size could then be set against Tables 4.3 and 4.5.
+This report's inputs to that model are the apply and reapply costs of
+Tables 7.2a, 7.2b and 7.3 by host class and input origin and the
+applied shares of Table 4.4 and section 6.2. A run of the model on them
+is a check of the model against the populations measured: its
+certification verdict per closure size set against the measured rates
+of Tables 4.3 and 4.5. A second run at the chained apply cost, the voter's
+cost once the overhead of section 7.3 is removed, would estimate what
+that change buys (section 9).
 
 # 8. What binds certification, and what would move it
 
@@ -2497,9 +2538,14 @@ capabilities pay the same per transaction as the testnet's hosts at
 eight (section 7.3). Whether the loop can be parallelised is a question
 about the ledger's apply, which runs transactions in sequence, and about
 which of its parts, witness and signature checks among them, are
-independent; the report has no measurement of it and makes no claim.
+independent; the report has no measurement of it and makes no claim. A
+reading of the apply path's parallelisable parts would come before any
+number is put on it, and the loop in isolation (section 9.1) is where
+that number could be taken without a deployment.
 
-> **Note to resolve.** Three questions the levers of this subsection leave. Whether the closure forwarding and egress scheduling changes recover the single-relay nodes' closure times is a run to make, since the gap is measured and the changes are not. Why the EBs at the reference cap deliver no body is open in section 4.3.1. And the thread question needs a reading of the apply path's parallelisable parts before any number is put on it; a harness that runs the voting loop over the closures of a Leios database, which db-analyser does not have, would give it a figure without a deployment.
+The closure forwarding and egress scheduling changes are the other
+unpriced lever: the single-relay nodes' gap is measured and the changes
+are not, so whether they recover it is a run to make.
 
 ## 8.5 What the measurements support
 
