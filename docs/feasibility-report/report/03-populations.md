@@ -10,14 +10,13 @@ are read with their population in mind. The report does not define a
 reference machine; every result is stated against the population it was
 measured on.
 
-<!-- note -->
 No reference hardware has been defined for Leios yet. The report measures
 on the populations it has: the operator nodes of the testnet, whose
 hardware is unknown except through the ledger benchmark's spread and the
 measured validation speeds; the IOG and PIR hosts, whose instance types
-are known; and the cluster's uniform c5d.2xlarge hosts. Which of these, if
-any, stands for the machine the parameters are set for is left open.
-<!-- /note -->
+are known; and the cluster's uniform c5d.2xlarge hosts. Which of these
+stands for the machine the parameters are set for is a decision this
+report does not make.
 
 ## 3.1 The public testnet
 

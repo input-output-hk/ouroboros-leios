@@ -213,12 +213,10 @@ The deployment should be prepared for the costlier one, old inputs.
 The chained figures are a floor: the cost the loop reaches only when a
 transaction's inputs arrive in the same closure.
 
-<!-- note -->
-On the testnet the transaction kind and the path to the voters move
-together, since the chaining generator submits to the hosts and the
-other does not; a run with one generator spending old outputs and
-submitting to the hosts would separate them.
-<!-- /note -->
+On the testnet the transaction kind and the path to the voters move together, since the
+chaining generator submits to the hosts and the other does not, so the
+two are not separated here; a run with one generator spending old
+outputs and submitting to the hosts would separate them.
 
 ## 7.3 The cluster against the testnet
 
@@ -352,15 +350,14 @@ the adoption path, which costs within five times it per transaction,
 not the voting path, which costs ten to twenty times it. The voting
 loop has no term in the model.
 
-<!-- note -->
-Two questions on the CIP's constants are open with the model's owners:
-whether the model's apply figure is to be read
-as the ledger's cost on a mainnet mix, which the old-input measurements
-exceed without scripts, and whether the voting path's cost should enter
-the model as a separate term, with the measured values by host class and
-input origin. The script cost is unmeasured by every source here; the
-CIP's per-step figure is the only number for it.
-<!-- /note -->
+Two readings of the model follow. Its apply figure, read as the
+ledger's cost on a mainnet mix, is exceeded by the old-input
+measurements without any script. With the validation overhead of
+section 7.3 removed, the voter's cost would be more in line with it
+(section 9). The reapply gap would remain, so the voting path would
+need a term of its own for it, with values by host class. The script
+cost is unmeasured by every source here. The CIP's per-step figure is
+the only number for it.
 
 ## 7.6 The DeltaQ model's inputs
 
@@ -370,7 +367,8 @@ in the Leios repository, predicts from the voter's side whether an EB
 of a given closure size certifies within the vote window. It takes
 three inputs from the voter. Two are costs, 0.507 ms to apply a
 transaction and 0.070 ms to reapply one, transaction-weighted means
-over a mainnet block set. The third is how much of the closure the
+over a mainnet block set, script costs included at their mainnet
+frequency. The third is how much of the closure the
 voter has to fetch and apply because it is not in its mempool: a sixth
 by default, with an empirical estimate on mainnet of about 0.06. With
 those inputs the model finds the voter's CPU time small next to the
@@ -403,11 +401,11 @@ closure and pays the chained cost. The voters that decide certification
 on these populations pay the old-input cost on a third to half of the
 closure, a case the model's inputs do not describe.
 
-<!-- note -->
-A re-run of the DeltaQ model with this report's inputs would show how
-much of the gap the inputs explain: the apply and reapply costs of
-Tables 7.2a, 7.2b and 7.3 by host class and input origin, and the
-applied shares at the closure of Table 4.4 on the cluster and of
-section 6.2 at the voters that fail on the testnet. Its certification
-verdict per closure size could then be set against Tables 4.3 and 4.5.
-<!-- /note -->
+This report's inputs to that model are the apply and reapply costs of
+Tables 7.2a, 7.2b and 7.3 by host class and input origin and the
+applied shares of Table 4.4 and section 6.2. A run of the model on them
+is a check of the model against the populations measured: its
+certification verdict per closure size set against the measured rates
+of Tables 4.3 and 4.5. A second run at the chained apply cost, the voter's
+cost once the overhead of section 7.3 is removed, would estimate what
+that change buys (section 9).
