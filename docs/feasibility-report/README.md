@@ -93,7 +93,7 @@ Instruments (what they write under `outputs/<window>/`, from which data set):
 | `instruments/resources.py` | `resources.md` (memory and CPU distributions; the IOG and PIR hosts by instance class) | the period database's metric scrapes and the archived monitoring series (testnet), `raw/Resources.db` (cluster) |
 | `instruments/diffusion_bins.py` | `diffusion_bins.csv`, `upstream.csv` (nodes per p90 bin; nodes by upstream peers with committee weight) | `diffusion.csv`, `diffusion-body.csv`, `voters.csv`, `upstream_hosts.csv` in the window's folder |
 | `instruments/peers_upstream.py` | `upstream_hosts.csv` (the IOG and PIR hosts' upstream peers) | the archived per-peer announcement pulls (DATA.md) |
-| `instruments/loop_hosts.py` | `loop-fix-pir7/loop_hosts.md` (the host on the voting-loop change against its control: the apply and reapply cost per transaction, the validation time by applied count, the votes cast and missed; Tables 9.1 and 9.2, printed by the instrument itself) | the archived voting-event pull of the four hosts (DATA.md) |
+| `instruments/loop_hosts.py` | `loop-fix-pir7-full/loop_hosts.md` (the host on the voting-loop change against its control: the apply and reapply cost per transaction, the validation time by applied count, the votes cast and missed; Tables 9.1 and 9.2, printed by the instrument itself) | the archived voting-event pull of the two hosts (DATA.md) |
 | `instruments/testnet_window.sh`, `cluster_run.sh` | everything above for one window or run | the data sets, by path |
 
 The SQL instruments take their inputs as DuckDB variables (`t0`, `t1`,

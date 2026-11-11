@@ -34,14 +34,14 @@ members and validated the same EBs, so the transactions are identical
 between them; the load was the one-input generator, a fifth of its
 transactions padded with metadata, no scripts, as a sample of the
 chain's transactions in the window confirms. Table 9.1 reads both hosts
-over the 252 EBs announced in the first eighty minutes after the
-changed host's restart, of which each validated about 220, the rest
-superseded by the next RB before the vote.
+over the 10,770 EBs announced in the 66 hours from the changed host's
+restart, of which each validated about 9,500, the rest superseded by
+the next RB before the vote.
 
-| host, 2026-11-08 23:45 to 11-09 01:04 UTC | EBs validated | apply cost per transaction | reapply cost per transaction | EBs applying 500 or more with few reapplies: validation per applied transaction, p50 |
+| host, 2026-11-08 23:45 to 11-11 17:16 UTC | EBs validated | apply cost per transaction | reapply cost per transaction | EBs applying 500 or more with few reapplies: validation per applied transaction, p50 |
 |---|---:|---:|---:|---:|
-| the changed host | 218 | 0.30 ms | 0.17 ms | 0.35 ms |
-| the control | 220 | 1.66 ms | 0.19 ms | 1.40 ms |
+| the changed host | 9,492 | 0.34 ms | 0.20 ms | 0.36 ms |
+| the control | 9,472 | 1.41 ms | 0.21 ms | 1.11 ms |
 | Table 7.2b, c5d | | chained 0.35 / old-input 1.85 | 0.147 | |
 
 Table 9.1. Each host's validation records regressed on the counts of
@@ -51,9 +51,9 @@ validated in the window. The last column takes the EBs with 500 or more
 applied transactions and fewer reapplied than a third of that, where the
 validation is the apply cost, and divides the time by the applied count.
 
-The changed host applies at the chained level of section 7, 0.30 to
-0.35 ms per transaction on one-input transactions, and the control at
-the old-input level, 1.4 to 1.7 ms, on the same transactions. Reapply
+The changed host applies at the chained level of section 7, 0.34 to
+0.36 ms per transaction on one-input transactions, and the control at
+the old-input level, 1.1 to 1.4 ms, on the same transactions. Reapply
 is unchanged within the noise on both.
 
 The outcome follows the cost. Table 9.2 bins each host's EBs by the
@@ -61,10 +61,10 @@ transactions it applied.
 
 | transactions applied in the EB | the changed host: EBs | validation p50 / p90 | per applied transaction, p50 | the control: EBs | validation p50 / p90 | per applied transaction, p50 |
 |---|---:|---:|---:|---:|---:|---:|
-| 100 to 500 | 42 | 0.18 / 0.50 s | 0.59 ms | 42 | 0.46 / 0.88 s | 1.78 ms |
-| 500 to 1,000 | 28 | 0.38 / 0.84 s | 0.55 ms | 27 | 1.30 / 1.91 s | 1.77 ms |
-| 1,000 to 2,000 | 22 | 0.64 / 1.00 s | 0.42 ms | 25 | 2.05 / 2.80 s | 1.53 ms |
-| 2,000 and up | 19 | 1.11 / 1.34 s | 0.38 ms | 13 | 4.17 / 6.95 s | 1.72 ms |
+| 100 to 500 | 1,166 | 0.37 / 0.84 s | 1.36 ms | 1,586 | 0.43 / 1.09 s | 1.68 ms |
+| 500 to 1,000 | 667 | 0.55 / 1.02 s | 0.78 ms | 938 | 1.03 / 2.01 s | 1.44 ms |
+| 1,000 to 2,000 | 688 | 0.83 / 1.23 s | 0.58 ms | 693 | 2.22 / 3.70 s | 1.65 ms |
+| 2,000 and up | 607 | 1.32 / 2.13 s | 0.42 ms | 428 | 4.32 / 8.75 s | 1.70 ms |
 
 Table 9.2. Validation time by applied count on the two hosts over the
 window, each host binned by its own count since the two apply different
@@ -72,13 +72,15 @@ shares of the same EBs; the per-transaction figure is the validation
 time over the applied count, so the reapplies are in it. The bins under
 100 applied are left out, where a fixed cost and the reapplies dominate.
 
-The changed host validated every EB of the window within 1.8 s, the
-largest one, 6,997 transactions with 2,787 applied, in 1.73 s, and
-voted on 217 of the 219 EBs it was to vote on; the two it missed had
-their closures arrive at 7.0 and 15.4 s after the slot, past the
-deadline at any validation speed. The control missed ten of 221, nine
-of them with the closure in hand by 5.8 s and the validation past the
-deadline, its largest validation 7.76 s on an EB of 3,769 transactions.
+The changed host validated every EB of the window within 2.9 s, the
+largest one, 7,983 transactions with 5,326 applied, in 2.87 s, and
+voted on 9,439 of the 9,623 EBs it was to vote on. Of the 184 it
+missed, 149 had their closure arrive after the deadline, and 35 had it
+arrive inside the window but after 4.3 s, with the validation past the
+deadline. The control missed 509 of 9,620: 141 with the closure late,
+the same EBs as the changed host's within a few, and 368 with the
+closure in hand and the validation past the deadline, its largest
+validation 19.7 s on an EB of 8,555 transactions.
 
 ## 9.3 The cluster
 

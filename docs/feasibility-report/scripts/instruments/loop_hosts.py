@@ -6,11 +6,11 @@ the validation time by applied count, and the votes each host cast or
 missed, printed as Markdown.
 
     loop_hosts.py [--data DIR] [--pulls DIR] [--hosts FILE] [--changed HOST] [--control HOST]
-                  [--from-slot N] [--to-slot N] > outputs/loop-fix-pir7/loop_hosts.md
+                  [--from-slot N] [--to-slot N] > outputs/loop-fix-pir7-full/loop_hosts.md
 
 --data       the data folder (default: the parent of this repository)
 --pulls      the pull folder with one <agent>_voting.jsonl per host (default
-             grafana/archive/loki/loop-fix-pir7 under --data; DATA.md)
+             grafana/archive/loki/loop-fix-pir7-full under --data; DATA.md)
 --hosts      the hosts table (default data/hosts.csv in this repository),
              which maps a host label to its agent, the pull file's stem
 --changed    the host on the changed build, by label (default PIR7), or
@@ -102,7 +102,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     here = os.path.dirname(os.path.abspath(__file__))
     ap.add_argument("--data", dest="root", default=os.path.normpath(os.path.join(here, "..", "..", "..")))
-    ap.add_argument("--pulls", default="grafana/archive/loki/loop-fix-pir7")
+    ap.add_argument("--pulls", default="grafana/archive/loki/loop-fix-pir7-full")
     ap.add_argument("--hosts", default=os.path.normpath(os.path.join(here, "..", "..", "data", "hosts.csv")))
     ap.add_argument("--changed", default="PIR7")
     ap.add_argument("--control", default="PIR9")
@@ -141,7 +141,7 @@ def main():
         rows = [(data[label][eb]["applied"], data[label][eb]["reapplied"], data[label][eb]["duration"]) for eb in val[label]]
         ac, rc, _ = fit(rows)
         dom = [t / x for x, y, t in rows if x >= 500 and y < x / 3]
-        print("| %s | %d | %.2f ms | %.2f ms | %.2f ms |" % (label, len(rows), ac * 1e3, rc * 1e3, st.median(dom) * 1e3 if dom else float("nan")))
+        print("| %s | %s | %.2f ms | %.2f ms | %.2f ms |" % (label, format(len(rows), ","), ac * 1e3, rc * 1e3, st.median(dom) * 1e3 if dom else float("nan")))
 
     print("\n| transactions applied in the EB | %s |" % " | ".join(
         "%s: EBs | validation p50 / p90 | per applied transaction, p50" % label for label, _ in hosts))
@@ -152,7 +152,7 @@ def main():
             ebs = [eb for eb in val[label] if lo <= data[label][eb]["applied"] < hi]
             d = [data[label][eb]["duration"] for eb in ebs]
             per = [data[label][eb]["duration"] / data[label][eb]["applied"] for eb in ebs]
-            cells.append("%d | %.2f / %.2f s | %.2f ms" % (len(ebs), q(d, .5), q(d, .9), st.median(per) * 1e3) if ebs else "0 | - | -")
+            cells.append("%s | %.2f / %.2f s | %.2f ms" % (format(len(ebs), ","), q(d, .5), q(d, .9), st.median(per) * 1e3) if ebs else "0 | - | -")
         print("| %s | %s |" % (lab, " | ".join(cells)))
 
     print()
