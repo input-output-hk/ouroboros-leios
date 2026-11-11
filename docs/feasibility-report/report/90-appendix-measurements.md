@@ -235,6 +235,23 @@ the median age at which the record was validated and the share validated
 within 7 s of the slot. A node that never validated an EB has no record,
 so the shares are of the validations that completed.
 
+**Voter stages (section 8.1).** Per EB and per node that scheduled a
+vote on it (on the cluster, per node that accepted its announcement,
+the build having no vote-scheduled event), the record of the closure's
+arrival, the validation and the vote's outcome, taken from the
+vote-scheduled, closure-acquired, EB-validated and not-voted events over
+the loaded hours; a node that refused the EB because its own chain tip
+did not announce it, or found itself off the committee, is not a voter
+of that EB. Each EB's shares are over its voters, so a voter that never
+validated the EB counts as lost; a late vote is attributed to one cause,
+the closure after the deadline or never, the validation past the
+deadline, or the validation never finished. Binned by the EB's
+transaction count from the body hits, or from the body's bytes at 36 B
+per reference where the build has no body-hits event, with the EBs
+whose late voters exceed a quarter of their voters and, from the chain
+cache, the certified share of the EBs the chain could certify (the next
+RB at the certification gap or beyond).
+
 **Never-completed closures by fate (section 4).** Per node and EB heard
 announced within 60 s, whether the closure and the body ever arrived,
 split by what the chain did with the EB: certified, eligible but not
@@ -398,6 +415,58 @@ readings per EB size class on the 2 MB window with the chained closures
 of 200 to 260 B transactions and on the cluster runs with the classes
 they populate.
 
+**The repricings (section 8).** Both repricings take the per-record validation
+output of 6.1 and re-run the vote rule on altered validation times. On
+the cluster, each record's time after its start (the later of the
+closure's arrival and the 3 s mark) is split between the apply and the
+reapply operations in proportion to the record's counts at the run's
+measured costs (Table 7.3) and each part scaled by a factor: the
+hardware factors of Table 7.2 on both, or the chained-to-old-input ratio
+on the apply part alone (the loop fix); a row may start the validation
+at the closure's arrival instead. A voter votes if its scaled time is
+within 7 s of the EB's slot; an EB certifies with 39 voters, the run's
+quorum. Per row the cluster repricing prints the time at which the
+voter completing the quorum has validated (p50 and p90 over EBs) and
+the EB's transactions scaled by the share of the window that voter
+used, the closure arriving as it did; throughput is the ladder's
+formula of 4.1 with the EB term at the certified bytes per eligible EB
+and the plain-RB term at the certification share, pinned to the run's
+measured figure, at the run's transaction size. On the testnet the
+reporting voters hold 59 to 73 % of the committee weight and the rest
+cannot be repriced, so the repricing reads the votes and projects no
+certification: it takes the per-vote records of the voter stages above,
+one per vote a node scheduled, and gives each a validation time per
+row, the later of the closure's arrival and the 3 s mark plus a
+duration. Rows: the recorded duration; every voter slower than the
+current generation scaled down by the ratio of the class's to the
+node's cost per reapplied transaction (the hardware factor, read on
+reapply because it does not depend on the input origin; a node without
+a reapply reading uses its apply cost, else is not moved); and the
+pessimistic rebuild, the duration rebuilt as 20 ms plus the applied
+transactions at a class's old-input apply cost and the reapplied ones
+at the class's reapply cost, with the loop's cost removed as the same
+rebuild at the class's chained apply cost. A vote whose closure arrived
+after the deadline or never is late in every row; one whose validation
+never finished has no counts and stays so. Per row and per EB size bin
+it prints the votes in time, the votes out of time with the closure in
+hand, when those votes' closures arrived (p50 and p90), and the
+duration's p50, p90 and maximum over the votes.
+
+**The changed host against its control (section 9.2).** From the
+archived voting events of the two hosts, per host and EB the same
+record as the validation pairs: the closure's arrival, the validated
+time, the validation time after the later of the closure and the 3 s
+mark, the applied and reapplied counts, and the vote's outcome. Per
+host the least-squares fit of the validation time to the two counts
+with a constant gives the apply and reapply cost per transaction, and
+the EBs applying 500 or more with fewer reapplied than a third of that
+give the validation time per applied transaction at the median. The
+validation time by applied count bins each host's EBs by its own count,
+since the two apply different shares of the same EBs. The votes are
+counted over the EBs the host's chain tip still announced at the vote,
+with the missed ones split by whether the closure arrived after the
+deadline or the validation ran past it.
+
 ## A.4 Where each quantity is computed
 
 The repository draws one boundary. Its inputs are the data sets of
@@ -430,6 +499,7 @@ available to reviewers on request.
 | vote tally reaches the quorum, quorums that became certificates | period database or cluster run, chain cache | `tally_quorum.sql`, `cluster_tally_quorum.sql` | `stage_table.py` |
 | closure at 90 and 95 % of the nodes by EB size; the body and closure reach of the EBs at the reference cap | period database, chain cache | `closure_fleet.sql` | `stage_table.py`, `--classes` for the reference-cap split |
 | validation by EB size class | the per-record validation output of a window | `validation_classes.py` | `stage_table.py --classes` |
+| voter stages: where each voter lost the EB, the vote's outcome by cause, by EB size | period database or cluster run, chain cache | `voter_stages.sql`, `voter_stages.py` | `stage_table.py --voters` |
 | never-completed closures by fate | period database, chain cache | `closure_never.sql` | read directly |
 | reporting coverage | period database, committee | the voters table of the causes pass | `stage_table.py` |
 | EB classes and composition of the 1 kB window | chain cache; the db-sync result as a saved output | `eb_composition.py` (chain half) | the same |
@@ -440,7 +510,9 @@ available to reviewers on request.
 | the adoption path | period database or cluster run, chain cache | `adoption_path.sql`, `cluster_adoption_path.sql` | `praos_table.py` |
 | the Praos control | the team's report | | `praos_table.py`, typed constants |
 | validation time by applied share | the per-record validation output of a window or run, the hosts table | `validation_bins.py` | `cost_table.py bins` |
-| EBs failing by applied share | the per-record validation output of a cluster run, its ladder export | `host_speed.py` | `cost_table.py unseen` |
+| EBs failing by applied share; the cluster records repriced on faster hosts and with the loop's cost removed | the per-record validation output of a cluster run, its ladder export | `host_speed.py` | `cost_table.py unseen`, `speed`, `combined` |
+| the testnet votes repriced by host class, the pessimistic rebuild and the loop's cost removed, per vote and per EB size bin | the per-vote records of a window, the hosts table | `voter_reprice.py` | `cost_table.py votes` |
+| the changed host against its control: the costs per transaction, the validation time by applied count, the votes cast and missed | the archived voting events of the four hosts | `loop_hosts.py` | the same |
 | nodes by their closure p90, upstream-peer groups | the per-node diffusion outputs, the voters table; the archived per-peer announcement pulls | `diffusion_bins.py`, `peers_upstream.py` | `diffusion_table.py bins`, `upstream` |
 | memory and CPU | the period database's metrics, the archived monitoring series, the cluster's resource trace; the hosts table | `resources.py` | `cost_table.py resources` |
 | node versions | the period database's metrics | the node-versions query | read directly |

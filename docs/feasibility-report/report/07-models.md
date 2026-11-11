@@ -268,18 +268,23 @@ one. Section 7.4 sets both populations against the ledger benchmark.
 
 The node's code suggests why the old-input cost grows with the EB and
 the chained one does not. Before the loop the voter resolves every
-input of the closure into one table, and each applied transaction ends
-with a difference computed over that whole table. A closure whose
-inputs all sit in the ledger carries one entry per transaction through
-every step; a chained closure's table holds only the heads of its
-chains.
+input of the closure into one table and carries that table inside the
+ledger state. After each applied transaction the loop writes the
+transaction's effect back into the state, and on the Cardano block that
+step converts the whole table out of the multi-era ledger state and
+into it again, a pass over every entry. A closure whose inputs all sit
+in the ledger carries one entry per transaction through every applied
+transaction; a chained closure's table holds only the heads of its
+chains. The reapply path never takes that step, which is why its cost
+is flat.
 
 <!-- note -->
-The mechanism is read from the code and not yet profiled: the voting
-loop computes, per applied transaction, the difference between the
-closure's resolved input table before and after the transaction, which
-costs in proportion to the table's size; a profile or a call trace
-around that step would confirm or refute it.
+The mechanism is read from the code and reproduced on the loop in
+isolation, on one machine: the cost per applied transaction grows with
+the table's size while the table travels inside the ledger state, and is
+flat at the chained level when each transaction is handed its own
+inputs and the table is kept outside. It is not yet measured on a node
+under load.
 <!-- /note -->
 
 ## 7.4 Two paths, two costs

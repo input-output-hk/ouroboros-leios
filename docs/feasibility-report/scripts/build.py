@@ -50,8 +50,7 @@ def main():
                 dt.date.today().isoformat(), commit, " (uncommitted changes)" if dirty else "", ", ".join(h.split(".")[0] for h in headings)),
             "", "## Contents", ""] + ["- " + h for h in headings] + [""]
     tail = ["", "---", "", "## Sections still to be drafted", "",
-            "- 0. Summary: the verdict per set, the confirmed set, the path upward, the open items (written last)",
-            "- 8. Improvements in the pipeline and what each would buy", ""]
+            "- 0. Summary: the verdict per set, the confirmed set, the path upward, the open items (written last)", ""]
     out = a.out or os.path.join(REPORT, "REPORT.md")
     md = "\n".join(head) + "\n" + "\n\n".join(sections) + "\n" + "\n".join(tail)
     with open(out, "w") as fh:

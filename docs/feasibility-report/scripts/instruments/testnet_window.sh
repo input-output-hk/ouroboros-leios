@@ -12,9 +12,9 @@
 #   DB    the period database (DATA.md: archive/<KEY>-merged.duckdb, or the
 #         archive-only build with --archive-only)
 #   T0 T1 the period's bounds, UTC 'YYYY-MM-DD HH:MM:SS'
-#   --keep-pairs   keep the per-pair validation file (validation_pairs.csv,
-#         tens of MB, the regression's input); by default only its per-node
-#         summary is kept
+#   --keep-pairs   keep the per-pair files (validation_pairs.csv, tens of MB,
+#         the regression's input; voter_stages_pairs.csv, the per-vote
+#         records); by default only their summaries are kept
 #
 # Environment: DATA (the data folder holding chain-2026-10-18/ and the
 # archived monitoring pulls grafana/archive/{loki/peers,mimir}/<KEY>/,
@@ -55,6 +55,9 @@ python3 "$HERE/diffusion_nodes.py" --db "$DB" --from "$FROM" --to "$TO" --chain 
 echo "-- validation (per-node summary), tally, closure fleet, never-completed closures"
 duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/validation_pairs.sql" > validation.md
 if [ -z "$ARCHIVE_ONLY" ]; then
+  echo "-- voter stages (8.1): per vote scheduled, where the voter lost the EB, by EB size"
+  duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/voter_stages.sql" > voter_stages.md
+  python3 "$HERE/voter_stages.py" voter_stages_pairs.csv --chain "$CHAIN" --csv voter_stages.csv >> voter_stages.md
   echo "-- validation by applied share (6.1) and the per-transaction cost on closures of one size (7), from the per-pair file"
   python3 "$HERE/validation_bins.py" validation_pairs.csv --hosts "$REPO/data/hosts.csv" > validation_bins.md
   # validation by EB size class (4.3.1's prose): closure arrival and validation time per class
@@ -78,12 +81,25 @@ if [ -z "$ARCHIVE_ONLY" ]; then
     done
   fi
   if [ "$KEY" = f2-high ]; then
-    # the size series (Table 7.3): chained closures of one transaction size across the EB size classes
+    # the size series (read in 7.2 and 7.3): chained closures of one transaction size across the EB size classes
     python3 "$HERE/validation_shape.py" $SHAPE --class 1000 1999 --class 2000 2999 --class 3000 3999 --class 5500 6999 \
       --min-size 200 --max-size 260 --same-block-min 0.8 > validation_shape_series.md
   fi
+  # the records repriced by host class (Tables 8.3a, 8.3b): per class the cost per applied transaction on old-input
+  # closures, on chained closures, and per reapplied transaction, in ms / ms / us. The 2 MB windows take the
+  # cluster's c5d old-input reading at 2,500 to 3,000 transactions (Table 7.3, 1.85 ms) scaled by the hardware
+  # factors (0.85, 0.6), the chained and reapply costs of Table 7.2b; the 260 kB window its own Table 7.2a
+  # readings (the current generation's old-input cost from the c5d reading and the hardware factor)
+  case $KEY in
+    f1-high) COSTS=("current:0.50:0.19:88" "two older:0.75:0.30:135" "three older:0.83:0.35:140");;
+    *)       COSTS=("current:1.11:0.20:85" "two older:1.57:0.31:128" "three older:1.85:0.35:147");;
+  esac
+  python3 "$HERE/testnet_speed.py" validation_pairs.csv --voters voters.csv --windows "$WIN" --ebs tally_quorum_ebs.csv \
+    --hosts "$REPO/data/hosts.csv" --ladder ladder.jsonl --fleet closure_fleet_per_eb.csv --costs "${COSTS[@]}" > host_speed.md
+  # the votes repriced (Tables 8.3a to 8.3c): the same rows read per vote on the per-vote records, no certification projected
+  python3 "$HERE/voter_reprice.py" voter_stages_pairs.csv --hosts "$REPO/data/hosts.csv" --costs "${COSTS[@]}" > voter_reprice.md
 fi
-[ -n "$KEEP" ] || rm -f validation_pairs.csv
+[ -n "$KEEP" ] || rm -f validation_pairs.csv voter_stages_pairs.csv
 duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/tally_quorum.sql" > tally.md
 duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/closure_fleet.sql" > closure_fleet.md
 if [ -z "$ARCHIVE_ONLY" ]; then
