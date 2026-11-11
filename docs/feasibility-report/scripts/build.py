@@ -45,12 +45,11 @@ def main():
         headings.append(m.group(1) if m else f)
         sections.append(text)
     head = ["# " + TITLE, "",
-            "Build of %s, from commit %s%s. Sections drafted so far: %s. Sections not yet in this build are listed at the end. "
+            "Build of %s, from commit %s%s. Sections in this build: %s. "
             "The open points the text leaves for the team and the reviewers are kept in place as block quotes headed \"Note to resolve\"." % (
                 dt.date.today().isoformat(), commit, " (uncommitted changes)" if dirty else "", ", ".join(h.split(".")[0] for h in headings)),
             "", "## Contents", ""] + ["- " + h for h in headings] + [""]
-    tail = ["", "---", "", "## Sections still to be drafted", "",
-            "- 0. Summary: the verdict per set, the confirmed set, the path upward, the open items (written last)", ""]
+    tail = [""]
     out = a.out or os.path.join(REPORT, "REPORT.md")
     md = "\n".join(head) + "\n" + "\n\n".join(sections) + "\n" + "\n".join(tail)
     with open(out, "w") as fh:

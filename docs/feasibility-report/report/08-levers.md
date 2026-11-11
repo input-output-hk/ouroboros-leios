@@ -439,7 +439,8 @@ their measured 12 and 22 kB/s (Table 4.5), and what a change to the
 voters could add there is bounded by the closure's arrival, not by the
 voters.
 
-The comparison is an order of magnitude and no more. The transactions
-measured are one-input value transfers without scripts. A like-for-like
-reading against mainnet needs a run of mainnet-like transactions, which
-the report has not made.
+The comparison is in bytes per second at the measured transactions,
+not at mainnet's mix. The transactions measured are one-input value
+transfers without scripts. A like-for-like reading against mainnet
+needs a run of mainnet-like transactions, which the report has not
+made.
