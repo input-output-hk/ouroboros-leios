@@ -138,7 +138,10 @@ times slower, the c5d.2xlarge hosts at eight vCPUs 1.7 to 2.0 times
 slower, the ratios holding at every applied share. Two things in that
 order are separated by the tables. The two older generations, both at
 eight capabilities, differ by 10 to 20 %, the size of one generation
-step. Within the current generation, the IOG producers with four upstream
+step. The gap to the current generation at four capabilities is the CPU
+rather than the capability count: the cluster's c5d nodes at two
+capabilities pay the same per transaction as the testnet's c5d hosts at
+eight (section 7.3). Within the current generation, the IOG producers with four upstream
 peers sit at the fast end of the range of the PIR hosts with 90 to 160
 peers, the slowest PIR host up to a quarter above them in the loaded
 windows and the two ranges overlapping in the 1 kB window, so the peer
@@ -146,18 +149,6 @@ count costs the validator at most that much. The operators' nodes, whose
 hardware is unknown, spread from the fastest hosts' level at the lower
 quartile to two to three times the median at the upper quartile, in
 every bin.
-
-<!-- note -->
-The gap between the current-generation hosts at four capabilities and the
-older ones at eight is not attributed: the playground sets one capability
-per vCPU, so the CPU generation and the capability count change together
-across the testnet hosts, and the 1.4 to 2.0 between them may be the CPU,
-the eight capabilities sharing a single-threaded validation with the
-node's other work, or both. One host of an older generation run at four
-capabilities for a window would separate them; the benchmarking cluster,
-c5d.2xlarge at two capabilities, is a third point on that line and is
-read against the testnet's c5d hosts in section 7.
-<!-- /note -->
 
 The voting path is the expensive one. The same transactions pass through
 the node once more when the certifying RB is adopted, and section 5

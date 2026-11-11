@@ -9,7 +9,8 @@
 -- certified closures' median bytes; then the 6,000-and-up class split at the
 -- reference cap (8,550 references and up), with the nodes that received the
 -- body (BlockAcquired) and the closure per EB, since the EBs at the cap mostly
--- never deliver their body (read in 4.3.1's prose and its note). The per-EB
+-- never deliver their body (read in 4.3.1's prose; eb_forgers.py joins them
+-- to their forging pools). The per-EB
 -- rows are written to closure_fleet_per_eb.csv in the current directory.
 --
 -- Variables as in validation_pairs.sql: t0, t1, win, gap (default 14), slot0

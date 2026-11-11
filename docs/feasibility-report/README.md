@@ -77,6 +77,7 @@ Instruments (what they write under `outputs/<window>/`, from which data set):
 | `instruments/tally_quorum.sql`, `cluster_tally_quorum.sql` | `tally_quorum_nodes.csv`, `tally_quorum_ebs.csv`, `tally.md` | a period database or a cluster run, the chain cache |
 | `instruments/closure_fleet.sql` | `closure_fleet_per_eb.csv`, `closure_fleet.md` | a period database, the chain cache |
 | `instruments/closure_never.sql` | `closure_never.md` | a period database, the chain cache |
+| `instruments/eb_forgers.py` | `eb_forgers.md` (the 1 kB window: pools that served the body of every eligible EB, of none, of some, with the EBs at the reference cap in each) | the chain cache, `closure_fleet_per_eb.csv`, `diffusion.csv`, and the window's slot leaders fetched from db-sync outside the repository (DATA.md) |
 | `instruments/coverage.sql` | `voters.csv`, `coverage.md` (the reporting weight) | a period database, the chain cache and the committee file |
 | `instruments/adoption_delay.sql`, `cluster_adoption.sql` | `adoption.md` (adoption delay by RB kind; the leader slots of the observed hosts) | a period database or a cluster run, the chain cache |
 | `instruments/consecutive_pairs.sql`, `cluster_forks.sql` | `pairs.md` | a period database or a cluster run, the chain cache |

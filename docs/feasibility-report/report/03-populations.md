@@ -155,14 +155,6 @@ unobserved voter, PIR0, holds a tenth or more of it, so a failure to
 certify can be attributed to a reporting voter's lateness or silence but
 only inferred for the non-reporting weight.
 
-<!-- note -->
-The text names no operator node: where section 4 compares operator nodes
-with the IOG and PIR hosts it gives counts. The per-node outputs behind
-the tables carry agent names, pool ids and tickers, which are public, and
-whether they are published as they are or pseudonymised is not decided;
-until it is, they are left out of the public copy of the repository.
-<!-- /note -->
-
 ## 3.2 The benchmarking cluster
 
 The cluster is a network of 51 nodes run by the benchmarking team on one

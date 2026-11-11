@@ -121,17 +121,8 @@ three-second mark escapes this trade, since voting cannot start earlier
 and its validation has the full four seconds whatever its size; there,
 script computation trades against the validation of other transactions
 instead. A larger script budget therefore means a smaller closure in
-either case. The report treats
-them as budgets to be set conservatively alongside the byte caps it
-measures, not as dimensions it has confirmed.
-
-<!-- note -->
-Whether a voter could start validating a closure it already holds before
-the three-second mark, rather than waiting for it, has not been confirmed
-in the deployed node or in the protocol's design. If it could, the trade
-above would apply only to closures arriving after the mark, and the
-validation window for early closures would be longer than four seconds.
-<!-- /note -->
+either case. The report treats them as budgets to be set conservatively
+alongside the byte caps it measures, not as dimensions it has confirmed.
 
 ## 2.3 The ceiling and the ladder
 

@@ -1,7 +1,7 @@
 # 9. A change to the voting loop, and where it has run
 
 The drafting of this report led to a review of the voting loop's code.
-The source of the inefficiency section 7.3 describes was identified,
+The source of the old-input cost section 7.3 measures was identified,
 patched and measured. The patch reached one testnet host and one
 cluster run when the previous sections were mostly complete, so this
 section gives partial data on what section 8 claims the loop's cost
@@ -11,9 +11,14 @@ deployment can tolerate once it is in, are left to further work.
 
 ## 9.1 The change
 
-The patch keeps the closure's input table outside the ledger state and
-hands each transaction its own inputs, which removes the pass section
-7.3 traced the loop's cost to; it is local to the loop. It is merged in
+The voting loop carried the closure's input table inside the ledger
+state and made a pass over the whole table after every applied
+transaction: one entry per transaction on an old-input closure, the
+heads of the chains on a chained one, and never on the reapply path,
+which is why the old-input cost grows with the EB in section 7.3 and the
+other two costs do not. The patch keeps the table outside the ledger
+state and hands each transaction its own inputs, which removes that
+pass; it is local to the loop. It is merged in
 the consensus repository's Leios branch as
 [commit 7b91f3619](https://github.com/IntersectMBO/ouroboros-consensus/commit/7b91f3619).
 On the loop in isolation its cost per applied transaction is flat at
