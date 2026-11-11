@@ -128,8 +128,8 @@ Two levers act on the validation budget: faster hardware at the voters,
 and the removal of the voting loop's own cost. Both have a measured
 price per transaction. The hardware lever's is the cost per transaction
 by host class of Tables 7.2a and 7.2b. The loop lever's is the gap
-between the chained and the old-input apply cost, which section 7.3
-traced to one step of the loop.
+between the chained and the old-input apply cost, which section 9.1
+traces to one step of the loop.
 
 To read what each lever would buy, this section reprices the recorded
 validations at the lever's cost per transaction and reads the votes
@@ -160,7 +160,7 @@ cost, the most expensive one measured, which section 7.2 says to plan
 on; so each class's row is its pessimistic case.
 
 The loop lever is measured by repricing the same votes at the class's
-chained apply cost instead, reapply unchanged. Section 7.3 traced the
+chained apply cost instead, reapply unchanged. Section 9.1 traces the
 gap between the two apply costs to the loop's pass over the closure's
 input table, so the chained cost is the apply cost without that pass
 (measurement made in section 9).
@@ -320,7 +320,9 @@ generation), relative to the run's 1.85 ms and 144 µs.
 With the loop's cost removed, hardware buys margin rather than
 certification at this EB size: the quorum voter finishes 0.4 s earlier
 on current-generation hosts than on c5d. That margin is what a later
-closure, or a larger one, would draw on. Table 8.6 sizes it in
+closure, a larger one, or one carrying script computation would draw
+on; the script budgets of section 2.2 remain unmeasured, and this
+margin is the room they would be set within. Table 8.6 sizes it in
 transactions: what a voter applies in the window's 4 s, or in the 2 or
 3 s a late closure leaves, at each class's apply cost, every
 transaction applied and every input old.

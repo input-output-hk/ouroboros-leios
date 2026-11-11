@@ -125,7 +125,7 @@ adopted at 0.62 s, where closures of the same bytes holding 6,000 took
 adopted at the same 0.62 s.
 
 <!-- note -->
-The 1 kB window ran on a mixed node build (section 4.3.1's note). The
+The 1 kB window ran on a mixed node build (Table 4.8). The
 conclusion stands either way: within the window, on one set of nodes and
 one hour, a 2 MB closure of 2,000 transactions is adopted as fast as the
 full plain RB, and the build mix cannot produce that equality. What the
@@ -236,18 +236,10 @@ account for about 2 % of the expected count in each; the remaining gap,
 logs cannot attribute it. It belongs to the pools outside the 13 observed
 producers, as stake that was not forging or leader slots those pools
 missed, and the same periods' trickle hours show a gap of the same order,
-so it is not read as a cost of the load. What the testnet does show about
-Praos is the forks of Table 5.3 and the delays of Table 5.2.
-
-<!-- note -->
-The trickle-hour densities behind the last sentence, from the hours of
-each period outside its loaded windows (`praos_table.py --trickle
-density`): 0.87 at 260 kB, 0.83 at 2 MB and 0.94 in the 1 kB period,
-against 0.87, 0.79 and 0.88 in the loaded hours. The loaded hours are
-lower by 0.04 at 2 MB and 0.06 in the 1 kB period, each within two
-standard deviations of the lottery (1.5 % and about 4 % of the expected
-count), and the observed orphans are about half of each difference.
-<!-- /note -->
+densities of 0.87 at 260 kB, 0.83 at 2 MB and 0.94 in the 1 kB period
+against 0.87, 0.79 and 0.88 loaded, so it is not read as a cost of the
+load. What the testnet does show about Praos is the forks of Table 5.3
+and the delays of Table 5.2.
 
 ## 5.6 The Praos control
 

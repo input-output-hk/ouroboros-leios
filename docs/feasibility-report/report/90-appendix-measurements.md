@@ -223,6 +223,11 @@ and 95 % ages are under 7 s, and the certified closures' median bytes.
 Per EB the nodes that received its body and that completed its closure
 are counted as well, and the 6,000-and-up bin is split at the reference
 cap, 8,550 references and up, with the median of those counts (4.3.1).
+The forgers of those EBs are read by joining the window's EB
+announcements to their slot leaders, fetched from db-sync, and to the
+per-EB body counts: pools are grouped by whether they served the body of
+every eligible EB they announced, of none, or of some, with the EBs at
+the cap counted in each group.
 
 **Validation by EB size class (section 4.3.1).** The records of the
 validation entry, as for 6.1, every EB validated in the loaded hours,
@@ -498,6 +503,7 @@ available to reviewers on request.
 | applied share, validation after the closure | period database or cluster run | `validation_pairs.sql`, `cluster_validation_pairs.sql` | `stage_table.py` |
 | vote tally reaches the quorum, quorums that became certificates | period database or cluster run, chain cache | `tally_quorum.sql`, `cluster_tally_quorum.sql` | `stage_table.py` |
 | closure at 90 and 95 % of the nodes by EB size; the body and closure reach of the EBs at the reference cap | period database, chain cache | `closure_fleet.sql` | `stage_table.py`, `--classes` for the reference-cap split |
+| the forgers of the EBs whose body reached no node, by pool | chain cache, the per-EB closure output, the window's slot leaders from db-sync | `eb_forgers.py` | read directly |
 | validation by EB size class | the per-record validation output of a window | `validation_classes.py` | `stage_table.py --classes` |
 | voter stages: where each voter lost the EB, the vote's outcome by cause, by EB size | period database or cluster run, chain cache | `voter_stages.sql`, `voter_stages.py` | `stage_table.py --voters` |
 | never-completed closures by fate | period database, chain cache | `closure_never.sql` | read directly |

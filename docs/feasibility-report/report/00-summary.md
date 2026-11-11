@@ -45,8 +45,8 @@ above 1.5 MB reach most nodes after the deadline (section 4.3).
 
 **The path upward.** The larger part of the validation cost is the
 voting loop's own: a pass over the closure's input table after every
-applied transaction, which section 7 traced in the code and section 8
-priced. A patch removing it has run on one testnet host and on one
+applied transaction, which section 8 priced and section 9 traced in the
+code. A patch removing it has run on one testnet host and on one
 cluster rerun (section 9).
 
 Repriced at the cost that host reaches, the cluster goes from 69 to
@@ -72,7 +72,9 @@ on the patched build.
 **What the measurements do not cover.** The transaction mix of mainnet,
 with scripts and witnesses: no window or run in this report exercised
 it, so the comparison with the targets of section 1 is in bytes per
-second at the measured transactions, not at mainnet's mix.
+second at the measured transactions, not at mainnet's mix. The
+validation margin the patch opens is room for that computation; how
+much of it is a measurement still to make.
 
 The patched build at the committee's scale: it has run on one testnet
 host, and the records of the cluster rerun were pending when this
