@@ -9,13 +9,12 @@ reference cap (8,550 references and up) are counted in each. Pools are
 counted, never named.
 
     eb_forgers.py --chain blocks.sqlite --forgers forgers.csv --fleet closure_fleet_per_eb.csv
-                  --diffusion diffusion.csv --from T --to T
+                  --from T --to T
 
 --chain      the chain cache, opened read-only
 --forgers    the slot leaders of the window's RBs (block_no, slot_no, hash, pool),
              fetched from db-sync by the analysis folder's grafana/eb_forgers_dbsync.py
 --fleet      the per-EB rows of closure_fleet.sql (eb, nodes, nodes_body, ...)
---diffusion  the window's per-node closure output, for which pools report logs
 --from/--to  the window, UTC 'YYYY-MM-DDTHH:MM'
 """
 import argparse, csv, sqlite3
@@ -26,14 +25,13 @@ CAP = 8550
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    for k in ("chain", "forgers", "fleet", "diffusion"):
+    for k in ("chain", "forgers", "fleet"):
         ap.add_argument("--" + k, required=True)
     ap.add_argument("--from", dest="t0", required=True)
     ap.add_argument("--to", dest="t1", required=True)
     a = ap.parse_args()
     pool_of = {r["hash"]: r["pool"] for r in csv.DictReader(open(a.forgers))}
     body_of = {r["eb"]: int(r["nodes_body"]) for r in csv.DictReader(open(a.fleet))}
-    reporting = {r["pool"] for r in csv.DictReader(open(a.diffusion))}
     con = sqlite3.connect("file:%s?mode=ro" % a.chain, uri=True)
     rows = con.execute("""select hash, eb_announcement_hash, eb_announcement_size from block
                           where time >= ? and time < ? and eb_announcement_hash is not null
@@ -50,8 +48,7 @@ def main():
     def cell(pools):
         n = sum(len(ebs[p]) for p in pools)
         cap = sum(c for p in pools for c, _ in ebs[p])
-        rep = sum(p in reporting for p in pools)
-        return "%d pools, %d EBs, %d at the cap, %d reporting" % (len(pools), n, cap, rep)
+        return "%d pools, %d EBs, %d at the cap" % (len(pools), n, cap)
 
     print("EB forgers by body service, %s to %s UTC: %d EB announcements, %d of them eligible EBs heard by 40 or more reporting nodes (the fleet rows), from %d pools.\n"
           % (a.t0, a.t1, len(rows), sum(len(l) for l in ebs.values()), len(ebs)))
