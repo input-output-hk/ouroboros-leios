@@ -27,8 +27,22 @@ TABLE    bins      validation time per EB by the share of the EB the voter
          resources the memory and CPU distributions per population (resources.md)
          unseen    the EBs that fail by the share of their transactions the
                    voters applied in full, cluster runs (host_speed.md, second table)
-         speed     the host-speed counterfactual, cluster runs (host_speed.md,
-                   first table); section 8
+         speed     the cluster records repriced on faster hosts and with the loop's cost
+                   removed (host_speed.md, first table), runs side by side;
+                   section 8, Table 8.4
+         combined  the loop's cost removed combined with each host generation
+                   on a cluster run (host_speed_combined.md); Table 8.5
+         hardware  the testnet records repriced by host class to a certification
+                   rate under a calibrated quorum (a testnet window's
+                   host_speed.md), one table per window; no longer a table of
+                   the report, kept for the saved outputs
+         capacity  the transactions a voter applies in 2, 3 and 4 s at each
+                   host class's apply cost, with the loop's cost and with it
+                   removed, from the costs the drivers take (no window); Table 8.6
+         votes     the testnet votes repriced by host class, the pessimistic
+                   rebuild and the loop's cost removed, read per vote (a
+                   testnet window's voter_reprice.md): one table per window and
+                   the first window's by-EB-size table; Tables 8.3a to 8.3c
 WINDOW   a key of WINDOWS below
 """
 import argparse, os, re, sys
@@ -215,36 +229,134 @@ def unseen(outputs, names):
             print("| %s | %s | %s | %s |" % (w["label"], row[0], row[1], row[2]))
 
 
-def speed(outputs, names):
-    first = True
+SPEED_COLS = "certification | kB/s | tx/s | quorum voter validated at, s: p50 / p90"
+
+
+def speed(outputs, names, path="host_speed.md"):
+    """The cluster repricing (host_speed.md, section 8): one row per lever, the runs given side by side, with the
+    certification, the throughput at the run's transaction size and the time at which the voter completing
+    the quorum has validated (the saved output's last column, the transactions that voter could have
+    validated by the deadline, is not printed: the repricing keeps the reapplied counts, so it misreads)."""
+    runs = []
+    for name in names:
+        t = tables(os.path.join(outputs, name, path))
+        if t:
+            runs.append((WINDOWS[name]["label"], t[0]))
+    if not runs:
+        return
+    print("| voters' speed | " + " | ".join("%s: %s" % (label, SPEED_COLS) for label, _ in runs) + " |")
+    print("|---|" + "---|" * (4 * len(runs)))
+    rows = {}
+    order = []
+    for label, tab in runs:
+        for row in tab[1:]:
+            if row[0] not in rows:
+                rows[row[0]] = {}
+                order.append(row[0])
+            rows[row[0]][label] = row[4:8]
+    for key in order:
+        cells = []
+        for label, _ in runs:
+            cells.extend(rows[key].get(label, ["-"] * 4))
+        print("| %s | %s |" % (key, " | ".join(cells)))
+
+
+def combined(outputs, names):
+    """The loop's cost removed combined with each host generation's measured costs (host_speed_combined.md)."""
+    speed(outputs, names, path="host_speed_combined.md")
+
+
+def hardware(outputs, names):
+    """The testnet repricing (host_speed.md of a testnet window, section 8): one table per window, the rows as
+    recorded, hardware alone, and the pessimistic rebuild at each host class, with the loop-fix column group."""
+    letters = iter("abcdefgh")
     for name in names:
         w = WINDOWS[name]
         t = tables(os.path.join(outputs, name, "host_speed.md"))
         if not t:
+            print("%s: n/a\n" % w["label"])
             continue
-        tab = t[0]
-        if first:
-            print("| run | " + " | ".join(tab[0]) + " |")
-            print("|---|" + "---|" * len(tab[0]))
-            first = False
-        for row in tab[1:]:
-            print("| %s | %s |" % (w["label"], " | ".join(row)))
+        print("**Table 8.3%s.** %s (%s).\n" % (next(letters), w["label"], w["shape"]))
+        print("| voters' speed and closures | %s | with the loop's cost removed: %s |" % (SPEED_COLS, SPEED_COLS))
+        print("|---|" + "---|" * 10)
+        for row in t[0][1:]:
+            print("| %s | %s | %s |" % (row[0], " | ".join(row[2:7]), " | ".join(row[8:13])))
+        print()
+
+
+def votes(outputs, names, size_bin="4,000 to 6,000"):
+    """The testnet votes repriced (voter_reprice.md of a testnet window, section 8): per window the per-vote table,
+    rows as recorded, hardware alone, the rebuilt rows and the chained rows (Tables 8.3a, 8.3b), with the window's
+    lead line as the caption's figures; then the first window's table for the EB size bin named (Table 8.3c)."""
+    letters = iter("abcdefgh")
+    first = None
+    for name in names:
+        w = WINDOWS[name]
+        path = os.path.join(outputs, name, "voter_reprice.md")
+        t, lead = tables(path), leads(path)
+        if not t:
+            print("%s: n/a\n" % w["label"])
+            continue
+        print("**Table 8.3%s.** %s (%s).\n" % (next(letters), w["label"], w["shape"]))
+        print("| " + " | ".join(t[0][0]) + " |")
+        print("|---|" + "---|" * (len(t[0][0]) - 1))
+        for row in t[0][1:]:
+            print("| " + " | ".join(row) + " |")
+        print("\nCaption, %s: %s\n" % (name, lead[0]))
+        if first is None:
+            first = (name, w, t, lead)
+    if first:
+        name, w, t, lead = first
+        for i, l in enumerate(lead[1:], 1):
+            if l.startswith("EBs of %s transactions" % size_bin) and i < len(t):
+                print("**Table 8.3%s.** %s (%s), the EBs of %s transactions.\n" % (next(letters), w["label"], w["shape"], size_bin))
+                print("| " + " | ".join(t[i][0]) + " |")
+                print("|---|" + "---|" * (len(t[i][0]) - 1))
+                for row in t[i][1:]:
+                    print("| " + " | ".join(row) + " |")
+                print("\nCaption, %s: %s\n" % (name, l))
+
+
+# the apply cost per transaction by host class, ms, with the loop's cost (old-input closures, Table 7.2b and the
+# c5d reading of Table 7.3 scaled by the hardware factors, as the 2 MB windows' repricing takes them) and with it
+# removed (the chained cost of Table 7.2b)
+CAPACITY = [("c5d", 1.85, 0.35), ("c6id", 1.57, 0.31), ("current generation", 1.11, 0.20)]
+
+
+def capacity(outputs, names, budgets=(2.0, 3.0, 4.0)):
+    """The transactions a voter applies in a budget of seconds at each host class's apply cost, every
+    transaction applied (the worst case), with the loop's cost and with it removed (section 8.2)."""
+    print("| host class, apply cost per transaction | " + " | ".join("in %g s" % b for b in budgets) + " |")
+    print("|---|" + "---|" * len(budgets))
+    for cls, old, chained in CAPACITY:
+        for label, cost in (("with the loop's cost (%.2f ms)" % old, old), ("the loop's cost removed (%.2f ms)" % chained, chained)):
+            print("| %s, %s | %s |" % (cls, label, " | ".join("{:,}".format(int(round(b * 1000.0 / cost, -2))) for b in budgets)))
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("table", choices=["bins", "shape", "series", "kind", "resources", "unseen", "speed"])
-    ap.add_argument("windows", nargs="+", metavar="WINDOW")
+    ap.add_argument("table", choices=["bins", "shape", "series", "kind", "resources", "unseen", "speed", "combined", "hardware", "votes", "capacity"])
+    ap.add_argument("windows", nargs="*", metavar="WINDOW")
     ap.add_argument("--outputs", default=OUTPUTS)
     ap.add_argument("--full", action="store_true", help="shape: the expanded tables (the tentative cells' costs and the EBs validated per host)")
-    a = ap.parse_args()
+    ap.add_argument("--size-bin", default="4,000 to 6,000",
+                    help="votes: the EB size bin of Table 8.3c, as the instrument labels it (default '4,000 to 6,000')")
+    a = ap.parse_intermixed_args()
     bad = [w for w in a.windows if w not in WINDOWS]
     if bad:
         sys.exit("unknown window %s" % ", ".join(bad))
     if a.table == "shape":
         shape(a.outputs, a.windows, a.full)
         return
-    {"bins": bins, "series": series, "kind": kind, "resources": resources, "unseen": unseen, "speed": speed}[a.table](a.outputs, a.windows)
+    if a.table == "votes":
+        votes(a.outputs, a.windows, a.size_bin)
+        return
+    if a.table == "capacity":
+        capacity(a.outputs, a.windows)
+        return
+    if not a.windows:
+        sys.exit("a window is needed")
+    {"bins": bins, "series": series, "kind": kind, "resources": resources, "unseen": unseen, "speed": speed, "combined": combined, "hardware": hardware}[a.table](a.outputs, a.windows)
 
 
 if __name__ == "__main__":

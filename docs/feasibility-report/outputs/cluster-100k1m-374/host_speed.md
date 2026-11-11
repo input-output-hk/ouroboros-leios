@@ -1,22 +1,22 @@
-EBs with records 1,566, records 76,863, quorum 39 voters, E 1000 kB, p observed 0.533, f observed 0.0480 per s, R 88 kB.
+EBs with records 1,566, records 76,863, quorum 39 voters; the run's costs per applied / reapplied transaction 3.42 ms / 163 us split each record's time between the two operations. Throughput by the ladder's formula with the EB term at the certified bytes (transactions x 374 B) and the plain-RB term at the certification share, pinned to the run's measured 15.5 kB/s and 41.3 tx/s.
 
-| host speed, cost relative to the run's hosts | late votes | votes per EB | certified | certification | kB/s | of the ceiling |
-|---|---|---|---|---|---|---|
-| 1.00 | 35.4 % | 31.7 | 808 | 51.6 % | 15.5 | 59 % |
-| 0.90 | 30.2 % | 34.3 | 885 | 56.5 % | 16.6 | 63 % |
-| 0.80 | 23.9 % | 37.3 | 1,031 | 65.8 % | 18.6 | 71 % |
-| 0.70 | 17.1 % | 40.7 | 1,159 | 74.0 % | 20.4 | 78 % |
-| 0.60 | 10.3 % | 44.0 | 1,309 | 83.6 % | 22.6 | 86 % |
-| 0.50 | 4.2 % | 47.0 | 1,441 | 92.0 % | 24.4 | 93 % |
-| 0.40 | 1.1 % | 48.6 | 1,505 | 96.1 % | 25.3 | 97 % |
-
-Ceiling at full certification 26.2 kB/s. As recorded: 35.4 % of the votes late, 808 EBs (51.6 %) with 39 or more voters validated by 7 s.
-
-| share of the EB's transactions the voters applied in full | EBs | fail at 1.0 | fail at 0.9 | fail at 0.8 | fail at 0.7 | fail at 0.6 | fail at 0.5 | fail at 0.4 |
+| voters' speed | apply, reapply relative to the run's hosts | late votes | EBs certified | certification | kB/s | tx/s | quorum voter validated at, s: p50 / p90 | transactions that voter validates by the deadline, median |
 |---|---|---|---|---|---|---|---|---|
-| under 30 % | 728 | 9 % | 7 % | 5 % | 4 % | 4 % | 3 % | 3 % |
-| 30 to 40 % | 271 | 61 % | 45 % | 22 % | 10 % | 5 % | 3 % | 3 % |
-| 40 to 50 % | 244 | 86 % | 79 % | 54 % | 36 % | 16 % | 7 % | 5 % |
-| 50 to 60 % | 148 | 97 % | 94 % | 89 % | 65 % | 32 % | 10 % | 5 % |
-| 60 to 70 % | 93 | 99 % | 99 % | 97 % | 92 % | 63 % | 19 % | 9 % |
-| 70 % and over | 82 | 100 % | 100 % | 100 % | 96 % | 87 % | 52 % | 7 % |
+| as measured | 1.00, 1.00 | 35.4 % | 808 | 51.6 % | 15.5 | 41.3 | 6.80 / 9.96 | 2,600 |
+| hosts two generations newer (c6id) | 0.85, 0.85 | 27.1 % | 956 | 61.0 % | 17.5 | 46.9 | 6.25 / 8.98 | 3,000 |
+| hosts of the current generation | 0.60, 0.60 | 10.3 % | 1,309 | 83.6 % | 22.5 | 60.3 | 5.36 / 7.31 | 4,300 |
+| the loop's cost removed, on the run hosts | 0.19, 1.00 | 0.2 % | 1,518 | 96.9 % | 25.5 | 68.3 | 4.09 / 4.80 | 10,300 |
+| validation started at the closure arrival | 1.00, 1.00 | 29.3 % | 896 | 57.2 % | 16.8 | 44.8 | 6.43 / 9.73 | 2,900 |
+
+As recorded: 35.4 % of the votes late, 808 EBs (51.6 %) with 39 or more voters validated by 7 s.
+
+The quorum voter is the one whose validation completes the quorum (the 39-th earliest per EB); its closure start is the 39-th earliest start. The transactions it validates by the deadline are the EB's scaled by (deadline - start) / (validated - start), the closure arriving as it did.
+
+| share of the EB's transactions the voters applied in full | EBs | fail: as measured | fail: hosts two generations newer (c6id) | fail: hosts of the current generation | fail: the loop's cost removed, on the run hosts | fail: validation started at the closure arrival |
+|---|---|---|---|---|---|---|
+| under 30 % | 728 | 9 % | 6 % | 4 % | 3 % | 7 % |
+| 30 to 40 % | 271 | 61 % | 35 % | 5 % | 3 % | 39 % |
+| 40 to 50 % | 244 | 86 % | 68 % | 16 % | 5 % | 80 % |
+| 50 to 60 % | 148 | 97 % | 91 % | 32 % | 3 % | 95 % |
+| 60 to 70 % | 93 | 99 % | 98 % | 63 % | 5 % | 98 % |
+| 70 % and over | 82 | 100 % | 100 % | 87 % | 0 % | 100 % |
