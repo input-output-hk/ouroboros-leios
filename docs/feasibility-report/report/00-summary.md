@@ -7,11 +7,11 @@ closure. Every transaction measured is a value transfer without
 scripts. The standard is the proposal's: a parameter set confirmed
 feasible, with a credible path upward.
 
-| parameter set | ceiling, kB/s | measured, kB/s | certified of the eligible EBs | verdict |
-|---|---:|---:|---:|---|
-| 40 kB / 260 kB, cluster and testnet | 8.9 | 7.5 and 7.2 | 99 % and 97 % | confirmed |
-| 100 kB / 1 MB, cluster | 27.9 | 12.2 and 15.5; 26.6 on the latest build | 69 % and 52 %; 99 % on the latest build | confirmed on the cluster on the latest build at the time of this report; the testnet at this set is the next stage |
-| 308 kB / 2 MB, testnet | 53.5 | 12.0 and 22.0 | 49 % and 45 % | not confirmed as measured; not measured on the latest build, for which sections 8 and 9 give evidence of feasibility on the validation side |
+| parameter set | ceiling, kB/s | measured, kB/s | certified of the eligible EBs |
+|---|---:|---:|---:|
+| 40 kB / 260 kB, cluster and testnet | 8.9 | 7.5 and 7.2 | 99 % and 97 % |
+| 100 kB / 1 MB, cluster | 27.9 | 12.2 and 15.5; 26.6 on the latest build | 69 % and 52 %; 99 % on the latest build |
+| 308 kB / 2 MB, testnet | 53.5 | 12.0 and 22.0 | 49 % and 45 % |
 
 Table 0.1. The three sets against their parameter ceiling, the rate
 with every EB full and certified; two windows or runs per set (Tables
@@ -22,10 +22,11 @@ set the EBs were at 0.6 of the cap on average.
 
 Leios is confirmed at twice the Praos ceiling on both populations. It
 is confirmed at six times on the cluster on the latest build at the
-time of this report; the testnet at that set is the next stage. The
-ten-times set depends on that build and on the closure's diffusion.
-The ten-times line needs a closure of about 1.7 MB, smaller than the
-2 MB closures measured here.
+time of this report. The testnet at that set is the next stage. The
+ten-times set is not confirmed as measured. It depends on that build
+and on the closure's diffusion, and sections 8 and 9 give evidence of
+feasibility on the validation side. The ten-times line needs a closure
+of about 1.7 MB, smaller than the 2 MB closures measured here.
 
 **The confirmed set.** At 40 kB / 260 kB, twice the Praos ceiling, every
 stage of the pipeline is inside its budget on both populations and the

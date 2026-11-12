@@ -1,129 +1,103 @@
 # 2. What is assessed and what to expect
 
-This section describes the Leios pipeline as it is deployed on the networks
-measured in this report, the clock each of its stages runs against, the set
-of parameters and conditions that bound it, and the way the report relates a
-parameter set's ceiling to what the chain actually carries. It contains no
-measurements. Its purpose is to fix the vocabulary and the expectations that
-the results in section 4 are read with, so that each result there can be
-stated as what was expected, what was measured, and why the two differ.
+This section describes the Leios pipeline as deployed on the measured
+networks: its stages, the limits that bound it, and how a parameter
+set's ceiling relates to what the chain carries. It holds no
+measurements. It fixes the vocabulary with which section 4 is read.
 
 ## 2.1 The pipeline and its clock
 
-Leios adds to Praos a second kind of block, the endorser block, which lets a
-ranking block bring into the chain many more transactions than it could
-carry itself. The ranking block (RB) remains the Praos block: produced by the
-slot leader, limited in size, and the only block that extends the chain. The
-endorser block (EB) is a list of transaction references announced inside an
-RB; the transactions it refers to, called its closure, enter the ledger only
-when a later RB carries a certificate stating that a committee of stake
-pools has validated them. The pipeline between an announcement and its
-certificate has six stages, each with a clock of its own.
+Leios adds to Praos a second kind of block, the endorser block. The
+ranking block (RB) remains the Praos block and the only one that
+extends the chain. The endorser block (EB) is a list of transaction
+references announced inside an RB. Its transactions, called its
+closure, enter the ledger when a later RB carries a certificate from a
+committee of stake pools that validated them. Between announcement and
+certificate the pipeline has six stages, each with a clock of its own.
 
-The first stage is the forger's snapshot. When a pool is elected for a slot,
-its node takes a snapshot of its mempool, builds the RB, and, as deployed,
-announces an EB with it: the references of the transactions in the snapshot
-that fit the caps, 36 or 37 bytes per reference by the transaction's
-size. The node budgets a fixed time for
-the snapshot, so the EB is bounded by what the mempool holds when the slot
-comes and by the time the node allows itself to partition it, not only by
-the caps. An RB that carries a certificate brings the certified closure's
-transactions into the ledger and, as deployed, carries no transactions of
-its own; an RB without a certificate carries its own transactions as a Praos
-block does.
+The first stage is the forger's snapshot. A pool elected for a slot
+snapshots its mempool, builds the RB and announces with it an EB of
+the snapshot's transactions that fit the caps. The snapshot has a time
+budget, so the EB is bounded by the mempool's content and by that
+budget, not only by the caps. As deployed, an RB that carries a
+certificate carries no transactions of its own.
 
-The second and third stages are diffusion. The EB body, the reference list,
-is fetched by every node that learns of the announcement; the closure, the
-transactions themselves, is assembled next, from the node's own mempool for
-the transactions it already holds and from its peers for the rest. Both are
-driven by the node's block-fetch and transaction-fetch logic and therefore
-depend on the topology, the bandwidth and the mempool content of each node.
+The second and third stages are diffusion. Every node fetches the EB
+body, the reference list, and then assembles the closure from its own
+mempool and from its peers.
 
-The fourth stage is validation and voting. The committee, the pools with
-the most stake up to a maximum number of seats (900 on the testnet), one
-seat per pool and each seat's vote weighted by its pool's stake, validates
-the closure against the ledger state and votes. The vote is
-scheduled three seconds after the EB's slot and must be cast by seven
-seconds after it, the deployed diffusion bound (the protocol's timing
-parameters L_hdr, L_vote and L_diff are 1, 4 and 7 s on these networks). A
-voter that holds the closure before the three-second mark waits; one that
-receives it after the seven-second deadline does not vote. Validation
-applies to the ledger state every transaction of the closure, in full for
-the ones the node has not validated before and as a reapplication for the
-ones it validated at mempool admission or in an earlier EB, so its cost
-depends on how much of the EB the voter had already validated.
+The fourth stage is validation and voting. The committee, the pools
+with the most stake with each vote weighted by stake, validates the
+closure against the ledger state and votes. The vote is scheduled
+three seconds after the EB's slot and must be cast by seven. A voter
+that receives the closure after the deadline does not vote.
 
-The fifth stage is the tally. Votes diffuse between the nodes, and every
-node keeps a running tally of the weight behind each EB; the EB is
-certifiable once the tally reaches the quorum, three quarters of the
-committee's weight. The certificate can be included only in an RB whose slot
-is at least fourteen slots after the announcing RB's, the certification gap,
-which gives the votes time to arrive. Since RBs come at random with an
-active slot coefficient of 0.05, the probability that the next RB is far
-enough away is 0.95 raised to the thirteenth power, 0.513: on paper, about
-half of the EBs announced are eligible for certification at all, and the
-other half are superseded by the next announcement before their votes could
-count.
+Validation applies every transaction of the closure to the ledger
+state: in full for the ones the node has not seen, and as a cheaper
+reapplication for the ones it validated at mempool admission or in an
+earlier EB. Its cost therefore depends on how much of the EB the voter
+had already validated.
 
-The sixth stage is adoption. A node that receives a certifying RB must hold
-the certified closure before it can select the block, apply or reapply its
-transactions on top of the chain, and only then adopt it. This is the point
-at which Leios touches Praos directly: the certifying RB is a Praos block
-whose adoption carries more work than a plain one, and if that work delays
-its propagation, the next slot leader may build on the previous block
-instead, forking the chain. Section 5 is about this stage.
+The fifth stage is the tally. The EB is certifiable once the votes
+reach the quorum, three quarters of the committee's weight. The
+certificate can only go in an RB at least fourteen slots after the
+announcing one, the certification gap. On paper the next RB comes that
+late with probability 0.513, so about half of the announced EBs are
+eligible for certification. The rest are superseded by the next
+announcement.
 
-Each stage thus has either a deadline or a budget: the snapshot has a time
-budget, the body and the closure must arrive before the vote can be cast,
-validation must fit between the closure's arrival and the deadline, the
-tally must reach the quorum before an eligible RB comes, and adoption must
-not delay the Praos block. The results tables of section 4 have one row per
-stage for that reason.
+The sixth stage is adoption. A node that receives a certifying RB must
+hold the closure and apply its transactions before adopting the block.
+That is more work than a plain Praos block takes, and if it delays
+propagation the next slot leader may fork the chain. Section 5 is
+about this stage.
+
+Each stage has a deadline or a budget. The tables of section 4 have
+one row per stage for that reason.
 
 ## 2.2 The constraint set
 
-A Leios parameter set is not one number. The caps and budgets below bound
-the pipeline jointly, and the quantity of interest, the bytes the chain
-carries per second, integrates all of them. Table 2.1 lists them with the
-stage each one binds and whether the measurements in this report exercise
-it.
+A Leios parameter set is more than the two caps that name it. Table
+2.1 lists its parameters with the stage of 2.1 each one binds.
 
-| constraint | what it bounds | stage it binds | exercised by the measurements |
-|---|---|---|---|
-| reference cap (bytes of the EB body) | the number of transactions an EB may reference, at 36 or 37 B each | snapshot; body diffusion | yes, binding at small transactions |
-| closure cap (bytes of the EB's transactions) | the bytes an EB brings into the chain | closure diffusion; validation; adoption | yes, binding at large transactions |
-| reference-script cap | the bytes of reference scripts the closure may pull in | validation | no: the transactions used carry no scripts |
-| Plutus steps and memory budgets | the script computation the closure may require | validation | no: the transactions used carry no scripts |
-| timings L_hdr, L_vote, L_diff | when votes are cast and by when | validation and voting | yes, at the deployed values only |
-| certification gap | how far the next RB must be for a certificate to count | tally | yes, at 14 slots |
-| committee size and quorum | how much stake must vote, and how it is spread | tally | yes, with the real stake distribution of each network |
-| the Praos block limit and f | the plain block's share and the RB rate | all, as the clock | fixed at mainnet's values |
+| parameter | what it bounds | stage it binds |
+|---|---|---|
+| reference cap (bytes of the EB body) | the number of transactions an EB may reference, at 36 or 37 B each | snapshot; body diffusion |
+| closure cap (bytes of the EB's transactions) | the bytes an EB brings into the chain | closure diffusion; validation; adoption |
+| reference-script cap | the bytes of reference scripts the closure may pull in | validation |
+| Plutus steps and memory budgets | the script computation the closure may require | validation |
+| timings L_hdr, L_vote, L_diff | when votes are cast and by when | validation and voting |
+| certification gap | how far the next RB must be for a certificate to count | tally |
+| committee size and quorum | how much stake must vote, and how it is spread | tally |
+| the Praos block limit and f | the plain block's share and the RB rate | all, as the clock |
 
 Table 2.1. The parameters of a Leios set and the stage each one binds.
 
-Three conditions outside the parameter set bound the pipeline as much as
-the parameters do and cannot be set by the protocol: the hardware of the
-nodes, which decides how fast a closure is validated; the mempool coverage,
-how much of an EB a node already holds when it is announced, which decides
-how much validation is applied in full; and the topology, which decides how
-fast bodies, closures and votes travel. The report measures on the
-populations described in section 3 and states its results against them; it
-does not define a reference machine. The script and reference-script
-budgets are the one part of the parameter set the measurements leave
-untouched, because every population ran plain value transactions. Those
-budgets share the voter's validation window with the byte caps, so they are
-not independent of them. A voter must have received and validated the
-closure by the deadline, so the seven seconds after the slot are shared
-between the closure's arrival and its validation: whatever validation
-work a closure carries, script computation or more transactions, must be
-paid for by a closure that arrives earlier, and at a given bandwidth an
-earlier closure is a smaller one. Only a closure that arrives before the
-three-second mark escapes this trade, since voting cannot start earlier
-and its validation has the full four seconds whatever its size; there,
-script computation trades against the validation of other transactions
-instead. A larger script budget therefore means a smaller closure in
-either case. The report treats them as budgets to be set conservatively
-alongside the byte caps it measures, not as dimensions it has confirmed.
+The measurements exercise the two caps, the timings at their deployed
+values, the certification gap at 14 slots and the committee with each
+network's real stake. The Praos block limit and f stay at mainnet's
+values. The script and reference-script budgets are left untouched:
+every transaction measured carries no script.
+
+Three conditions outside the parameter set bound the pipeline as much
+as the parameters do: the hardware of the nodes, which decides how
+fast a closure is validated; the mempool coverage, how much of an EB a
+node already holds when it is announced, which decides how much of it
+is applied in full; and the topology, which decides how fast bodies,
+closures and votes travel. This report measures on the populations of
+section 3 and states its results against them. It defines no
+reference machine.
+
+The script budgets are not independent of the byte caps. A voter must
+have received and validated the closure by the deadline, so the
+closure's arrival and its validation share the same seconds. Whatever
+validation work a closure carries, script computation or more
+transactions, must be paid for by a closure that arrives earlier, and
+at a given bandwidth an earlier closure is a smaller one. At fixed
+hardware, bandwidth and implementation, a larger script budget
+therefore means a smaller closure. This report treats
+the script budgets as values to be set conservatively alongside the
+caps it measures, not as dimensions it has confirmed.
 
 ## 2.3 The ceiling and the ladder
 
