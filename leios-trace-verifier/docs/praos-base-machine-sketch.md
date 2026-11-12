@@ -162,8 +162,9 @@ in the wrapper's `Deliver`/mint step, since an RB *is* a Praos block.
 
 ## What stays outside the wrapper (deliberately)
 
-- **Stake**: `stake₀` is a parameter.  Praos has no stake distribution, and
-  nothing in CP/CG/CQ constrains it; it only feeds Leios's voting committee.
+- **Stake**: `stake₀` is a parameter, which the node returns on Leios's
+  `INIT`.  It is Praos's stake distribution, which is used for RB and EB
+  selection.
 - **Cert checking**: `checkCert` is stored but unused, since Praos's `_✓`
   ignores payloads.  Enforcing it at minting is easy in the wrapper; making
   *chain validity* respect it is an upstream `_✓`-hook change.

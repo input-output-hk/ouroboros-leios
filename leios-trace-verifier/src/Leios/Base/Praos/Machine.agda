@@ -2,7 +2,7 @@
 -- (see docs/praos-base-machine-sketch.md).
 --
 -- `Cert`/`VTy`/`initSlot`/`V-chkCerts`/`stake₀` are the caller's
--- cert-checking scheme and stake distribution, unrelated to Praos itself, so
+-- cert-checking scheme and stake distribution, so
 -- they stay module parameters here, as in Leios.Base.Praos.Node.
 --
 -- Neither `producer` nor `slotOf` can be recovered from a bare RankingBlock:
