@@ -35,21 +35,27 @@ The EB's hash isn't needed in the CertRB: it's in the previous block's header (`
 
 ### Open question
 
-Which `native_bytes` for a CertRB? We suggest the bytes as stored on chain: they match the header's `block_body_hash`, follow #198, and the parsed `body.tx` already carries the EB's transactions. The catch is that apps decoding `native_bytes` themselves (with Pallas or gouroboros) won't see the EB's transactions there, unlike N2C.
+Which `native_bytes` for a CertRB? We suggest the bytes as stored on chain. They match the header's `block_body_hash`, servers likely have them already, and `body.tx` already lists the EB's transactions.
+
+Neither choice fits every rule in #198. On-chain bytes break one: the parsed block should match `native_bytes`, but `body.tx` has transactions that `native_bytes` doesn't. The N2C form breaks more: it is re-encoded, it isn't what's on chain, and it doesn't match `block_body_hash`. So the spec needs an exception for CertRBs either way, and on-chain bytes need the smaller one.
+
+The downside: apps that decode `native_bytes` themselves (with Pallas or gouroboros) won't find the EB's transactions there. They can tell a block is a CertRB from `body_contains_leios_certificate`, and read `body.tx` instead.
+
+The one server that does this today, the Dolos fork in #4, made the other choice: its `native_bytes` is the N2C form.
 
 ### Acceptance criteria
 
 - [ ] #215 is merged.
 - [ ] The spec says what `native_bytes` is for a CertRB.
 - [ ] The spec says an EB's transactions belong to the CertRB: it is their `block_ref` in `query` and their `block` in `watch`, and they reach `STAGE_CONFIRMED` with it.
-- [ ] #198 has a CertRB test case.
+- [ ] #198 has a CertRB test case: `native_bytes` match the header's `block_body_hash`, and `body.tx` equals the transactions of the EB the previous block announced.
 
 ---
 
-## 2. `cardano-rpc`: move to `v1` and fill a CertRB's `body.tx`
+## 2. `cardano-rpc`: fill a CertRB's `body.tx`, then move to `v1`
 
 **Repository:** `IntersectMBO/cardano-api` (`cardano-rpc`, started in-process by `cardano-node`)
-**Depends on:** #1
+**Depends on:** #1, only for the `v1` part. Filling `body.tx` can start now on `v1beta`.
 **Requirements:** **REQ-UtxoRpcInlineCertifiedEbs**, **REQ-UtxoRpcCertifiedOnly**, **UPD-LeiosUtxoRpcServer**
 **Tracked in:** [cardano-api#1263](https://github.com/IntersectMBO/cardano-api/issues/1263)
 
@@ -61,9 +67,14 @@ It also compiles against `v1beta`, while #215 adds the Leios fields to `v1` only
 
 ### Task
 
-- Move to `v1` (cardano-api#1263).
+Now, on `v1beta` (it already has `body.tx`, and `native_bytes` stays the on-chain block, as `cardano-rpc` returns today):
+
 - For a CertRB, read the EB's transactions from the LeiosDB and put them in `body.tx`. Do it in two places: the ChainDB follower, which `FollowTip` and `WaitForTx` read from, and the block-by-point read ([`fetchBlock`](https://github.com/IntersectMBO/cardano-api/blob/c2212851b06b9c2acc5bb0bfe1b8a8e8cf2be03a/cardano-rpc/src/Cardano/Rpc/Server/NodeKernelAccess.hs#L255-L270)), which `FetchBlock` and `FollowTip`'s `undo` use. Reuse the consensus code the N2C server uses (`resolveLeiosClosure`), rather than a second copy.
 - If the EB's transactions can't be read, fail loudly, as in [node-to-client #1](node-to-client.md#1-never-send-a-certrb-without-its-ebs-transactions).
+
+After #215 is merged:
+
+- Move to `v1` (cardano-api#1263), and fill the Leios header and body fields.
 
 ### Acceptance criteria
 
@@ -71,43 +82,50 @@ It also compiles against `v1beta`, while #215 adds the Leios fields to `v1` only
 - [ ] A CertRB in a `FollowTip` `undo` has the same `body.tx` as in its `apply`.
 - [ ] `WaitForTx` reports an EB's transaction as confirmed when its CertRB is adopted.
 - [ ] A CertRB is never returned without its EB's transactions.
-- [ ] The Leios header and body fields from #215 are filled.
+- [ ] After #215: served as `v1`, with the Leios header and body fields filled.
 
 ---
 
 ## 3. Dingo: fill a CertRB's `body.tx` in `sync`
 
 **Repository:** `blinklabs-io/dingo` (and `blinklabs-io/gouroboros`)
-**Depends on:** #1
+**Depends on:** #1, only for the `v1` part. Filling `body.tx` can start now on `v1beta`.
 **Requirement:** **REQ-UtxoRpcInlineCertifiedEbs**
 
 ### Context
 
 Dingo already stores EBs and indexes their transactions under the CertRB: `ReadTx` returns an EB's transaction with `block_ref` = the CertRB, and `WatchTx` applies and undoes it with the CertRB ([`leios_test.go`](https://github.com/blinklabs-io/dingo/blob/857f7bf0a20b1363ccd6351f57186ca6af38f6cd/api/utxorpc/leios_test.go)).
 
-`sync` doesn't do the same. It maps the stored block with gouroboros ([`sync.go`](https://github.com/blinklabs-io/dingo/blob/857f7bf0a20b1363ccd6351f57186ca6af38f6cd/api/utxorpc/sync.go#L410-L432)), and `DijkstraBlock.Utxorpc()` only maps the block's own transactions ([`dijkstra.go`](https://github.com/blinklabs-io/gouroboros/blob/v0.216.3/ledger/dijkstra/dijkstra.go#L156-L178)). So a CertRB likely comes out with an empty `body.tx`. This is from reading the code, not tested.
+`sync` doesn't do the same. It maps the stored block with gouroboros ([`sync.go`](https://github.com/blinklabs-io/dingo/blob/857f7bf0a20b1363ccd6351f57186ca6af38f6cd/api/utxorpc/sync.go#L410-L432)), and `DijkstraBlock.Utxorpc()` only maps the block's own transactions ([`dijkstra.go`](https://github.com/blinklabs-io/gouroboros/blob/v0.219.0/ledger/dijkstra/dijkstra.go#L156-L178)). So a CertRB likely comes out with an empty `body.tx`. This is from reading the code, not tested.
 
 ### Acceptance criteria
 
 - [ ] `FetchBlock`, `FollowTip` and `DumpHistory` return a CertRB with the EB's transactions in `body.tx`, matching `ReadTx` and `WatchTx`.
-- [ ] Served as `v1` once #215 is merged.
+- [ ] After #215: served as `v1`.
 
 ---
 
-## 4. Dolos: support Leios blocks
+## 4. Dolos: upstream the Leios support
 
 **Repository:** `txpipe/dolos` (and `txpipe/pallas`)
-**Depends on:** #1
+**Depends on:** #1, only for `native_bytes` and the `v1` release. Upstreaming the rest can start now.
 **Requirements:** **REQ-UtxoRpcInlineCertifiedEbs**, **REQ-UtxoRpcCertifiedOnly**
 
 ### Context
 
-Dolos serves UTxO-RPC from blocks it fetches over N2N ([`sync.rs`](https://github.com/txpipe/dolos/blob/34d2b7f619724de0a19da322b04e41deccea7465/src/serve/grpc/v1beta/sync.rs#L23-L40)), so it doesn't get the N2C inlining either. It has no Leios code yet. To return a CertRB with its EB's transactions, it must first fetch and store EBs. Pallas has most of the pieces: [#816](https://github.com/txpipe/pallas/pull/816) (read EBs, merged), [#836](https://github.com/txpipe/pallas/pull/836) (LeiosNotify and LeiosFetch, merged), [#833](https://github.com/txpipe/pallas/pull/833) (map Dijkstra scripts and votes, merged) and [#835](https://github.com/txpipe/pallas/pull/835) (map blocks onto the `v1` schema, built against #215, open).
+Dolos serves UTxO-RPC from blocks it fetches over N2N ([`sync.rs`](https://github.com/txpipe/dolos/blob/34d2b7f619724de0a19da322b04e41deccea7465/src/serve/grpc/v1beta/sync.rs#L23-L40)), so it doesn't get the N2C inlining either. Upstream Dolos has no Leios code yet.
+
+The [`leios-musashi`](https://github.com/SundaeSwap-finance/dolos/tree/leios-musashi) branch of the SundaeSwap fork does most of this ticket, but none of it is upstream. Its pull stage fetches each certified EB over LeiosFetch, checks it against the announcement, and puts its transactions into the CertRB before the block is stored ([`leios.rs`](https://github.com/SundaeSwap-finance/dolos/blob/2bac21ff9eb7413356c0d89601903bad909148f7/src/sync/leios.rs)). So `sync`, `query`, `watch` and `WaitForTx` all see them under the CertRB. It refuses a CertRB whose EB it couldn't fetch. It serves `v1` alongside `v1beta`, built against #215, with forks of the spec and Pallas.
+
+One difference from #1: its `native_bytes` for a CertRB is the re-encoded N2C form, not the bytes stored on chain. The header is kept as is, so the block hash is the same, but the body no longer matches `block_body_hash`.
+
+On the Pallas side, upstream has most of the pieces: [#816](https://github.com/txpipe/pallas/pull/816) (read EBs, merged), [#836](https://github.com/txpipe/pallas/pull/836) (LeiosNotify and LeiosFetch, merged), [#833](https://github.com/txpipe/pallas/pull/833) (map Dijkstra scripts and votes, merged) and [#835](https://github.com/txpipe/pallas/pull/835) (map blocks onto the `v1` schema, built against #215, open).
 
 ### Acceptance criteria
 
-- [ ] Dolos fetches and stores the EBs certified on its chain.
+- [ ] The `leios-musashi` work is upstreamed to `txpipe/dolos`, and the Pallas parts to `txpipe/pallas`.
 - [ ] `sync`, `ReadTx`, `WaitForTx` and `WatchTx` follow the table at the top.
+- [ ] `native_bytes` for a CertRB follows what #1 settles.
 
 ---
 
