@@ -42,10 +42,6 @@ Layout:
 - `data/windows/`: the loaded hours of each testnet window, the files the
   instruments and printers restrict to; `data/hosts.csv`, the IOG and PIR
   hosts' instance classes.
-- `data/private/node-map.csv`: the mapping from the operators' agent names
-  and pool ids to the numbers the public copy carries, written by
-  `scripts/publish_outputs.py`; this folder is never copied to the public
-  repository.
 - `DATA.md`: the data sets the instruments read (origin, period, size,
   hash). They are not in this repository, and neither are the scripts that
   acquire or build them: anything that reaches the explorer, the telemetry
