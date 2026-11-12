@@ -1308,6 +1308,17 @@ A change is needed in the `LocalChainSync` server (**UPD-LeiosN2cChainSyncServer
 
 Out of scope for now; certified transactions come first. A later N2C version can add them, as a new optional mini-protocol or a `LocalChainSync` option, without changing what existing clients see.
 
+### UTxO-RPC
+
+UTxO-RPC clients see certified EB transactions the same way as N2C clients: in the CertRB that certifies their EB.
+
+- **REQ-UtxoRpcInlineCertifiedEbs** When a UTxO-RPC server returns a CertRB, its `body.tx` lists the transactions of the EB it certifies. All other blocks are returned as they are on chain. No extra `undo` is sent.
+- **REQ-UtxoRpcCertifiedOnly** No UTxO-RPC method exposes transactions from an EB that is not certified on the server's selected chain. Mempool methods (`ReadMempool`, `WatchMempool`) are unchanged.
+
+An EB's transactions belong to the CertRB: `ReadTx` and `ReadUtxos` report it as their `block_ref`, `WaitForTx` reports them confirmed when it is adopted, and `WatchTx` applies and undoes them with it. The open PR [utxorpc/spec#215](https://github.com/utxorpc/spec/pull/215) adds the Leios header and body fields to the `v1` package and states the `body.tx` rule. The other rules, and what `native_bytes` holds for a CertRB, are not in the spec yet.
+
+The node's UTxO-RPC server (`cardano-rpc` in cardano-api, **UPD-LeiosUtxoRpcServer**) reads blocks from ChainDB directly, not through `LocalChainSync`, so it must add the EB's transactions itself. It does so in two places: the ChainDB follower that `FollowTip` and `WaitForTx` read from, and the block-by-point reads that `FetchBlock` and `FollowTip`'s `undo` use, so that an `undo` carries the same body as its `apply`. `cardano-rpc` serves the `v1beta` package, so it can expose the Leios fields only once it moves to `v1` or the fields are added to `v1beta`. It does not implement `ReadTx` or `WatchTx`, and `ReadUtxos` does not set `block_ref`.
+
 ### Feature flags and configuration
 
 > [!WARNING]
