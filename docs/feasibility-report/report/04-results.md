@@ -52,8 +52,8 @@ rows unchanged. Transactions per second at the measured size: 37.4 and
 | applied share at the closure | 47 % | 16 % |
 | validation, start to validated, p90 | 0.95 s, nodes' quartiles 0.91 to 0.98 | 0.49 s, nodes' quartiles 0.28 to 1.11 |
 | vote tally reaches the quorum, p90 | 4.17 s, nodes' quartiles 4.15 to 4.17 | 3.84 s, nodes' quartiles 3.78 to 4.08 |
-| vote rate on eligible EBs | 100 % | 93 % |
-| quorums that became certificates | 100 %, 1,539 of 1,539 quorums seen | 100 %, 531 of 532 quorums seen |
+| vote rate on eligible EBs | 99.5 % | 93 % |
+| quorums that became certificates | 100 %, 1,539 of 1,539 quorums seen | 99.8 %, 531 of 532 quorums seen |
 
 Table 4.2. The stages at 40 kB / 260 kB. Cluster: all 51 nodes, equal
 weight. Testnet: 83 reporting nodes from 83 pools of the 100 to 108 in the
@@ -129,7 +129,7 @@ measured size: 60.7 and 41.3.
 | validation, start to validated, p90 | 4.48 s, nodes' quartiles 4.31 to 4.57 | 6.40 s, nodes' quartiles 6.12 to 6.51 |
 | vote tally reaches the quorum, p90 | 6.73 s, nodes' quartiles 6.72 to 6.76 | 6.73 s, nodes' quartiles 6.71 to 6.76 |
 | vote rate on eligible EBs | 77 % | 63 % |
-| quorums that became certificates | 100 %, 1,128 of 1,132 quorums seen | 100 %, 820 of 823 quorums seen |
+| quorums that became certificates | 99.6 %, 1,128 of 1,132 quorums seen | 99.6 %, 820 of 823 quorums seen |
 
 Table 4.4. The stages at 100 kB / 1 MB, all 51 nodes, equal weight.
 

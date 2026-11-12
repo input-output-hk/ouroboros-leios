@@ -281,4 +281,6 @@ closure that every voter validated at the vote window, 14 to 100 slots
 before the RB arrived, so the state the certifying RB leads to was
 computable in advance; an implementation that keeps the vote-time ledger
 state for adoption would remove most of the certificate's share, and
-section 8 takes that up with the other levers.
+section 8 takes that up with the other levers. The forge path's half
+second belongs to the build measured, not to the protocol: an
+implementation change can remove it (see section 9.3).
