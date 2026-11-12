@@ -130,11 +130,17 @@ def cmd_ceiling(args):
            sum(case when certified = 1 then certified_txs end) eb_txs,
            sum(case when has_leios_cert = 0 then size end) rb_bytes,
            sum(case when has_leios_cert = 0 then tx_count end) rb_txs,
-           sum(has_leios_cert = 0) plain_blocks
+           sum(has_leios_cert = 0) plain_blocks,
+           sum(case when certified = 1 and certified_txs > 0 then eb_announcement_size end) cert_ref_bytes,
+           sum(case when certified = 1 and certified_txs > 0 then certified_txs end) cert_ref_txs
     from ext where {where} {bin_filter}"""
     qparams = params if args.all else params + params
     (blocks, bins, announced, eligible, certified,
-     avg_ref, eb_bytes, eb_txs, rb_bytes, rb_txs, plain_blocks) = db.execute(q, qparams).fetchone()
+     avg_ref, eb_bytes, eb_txs, rb_bytes, rb_txs, plain_blocks, cert_ref_bytes, cert_ref_txs) = db.execute(q, qparams).fetchone()
+    # the bytes one reference takes in the EB body: the 32-byte hash and the transaction's size as a
+    # CBOR integer, 36 B for transactions under 256 B and 37 B from there on; measured on the window's
+    # certified EBs, whose exact transaction count the chain carries, so a mixed window gets its mix
+    ref_width = cert_ref_bytes / cert_ref_txs if cert_ref_txs else 36.0
     if not blocks or not announced:
         print("no announced EBs in range")
         return
@@ -153,19 +159,19 @@ def cmd_ceiling(args):
     p_obs = eligible / announced
     s_all = certified / eligible if eligible else float("nan")
     tx_size = args.tx_size if args.tx_size else (eb_bytes / eb_txs if eb_txs else 204.0)
-    E_txs_ref = ref_cap / 36.0
+    E_txs_ref = ref_cap / ref_width
     E_bytes_workload = min(payload_cap, E_txs_ref * tx_size)
     binds = "payload cap" if payload_cap < E_txs_ref * tx_size else "reference cap"
     E_txs_workload = E_bytes_workload / tx_size
     # an EB is as full as the cap that binds; "full" is 99 % of that capacity in reference bytes
-    full_ref_bytes = args.full_bytes if args.full_bytes else 0.99 * E_txs_workload * 36
+    full_ref_bytes = args.full_bytes if args.full_bytes else 0.99 * E_txs_workload * ref_width
     eligible_full, certified_full = db.execute(EXT + f"""
         select sum(eb_announcement_hash is not null and gap_slots >= {args.gap} and eb_announcement_size >= {full_ref_bytes}),
                sum(certified = 1 and eb_announcement_size >= {full_ref_bytes})
         from ext where {where} {bin_filter}""", qparams).fetchone()
     s_full = certified_full / eligible_full if eligible_full else float("nan")
     announce_share = announced / blocks
-    fullness = avg_ref / (E_txs_workload * 36)
+    fullness = avg_ref / (E_txs_workload * ref_width)
     rb_fullness = (rb_bytes / plain_blocks / args.rb_bytes) if plain_blocks else 1.0
     R_B = args.rb_bytes
     R_T = args.rb_txs if args.rb_txs else R_B / tx_size
@@ -205,7 +211,8 @@ def cmd_ceiling(args):
     print(f"range {params[0]} .. {params[-1]}, {scope}")
     print(f"RBs {blocks} (observed 1 RB / {1 / f_obs:.1f} s; nominal f = {f:g}), G = {G} slots, EBs announced {announced}, eligible {eligible}, certified {certified}")
     print(f"caps: references {ref_cap:,} B, payload {payload_cap:,} B ({cap_source}); "
-          f"full EB = reference list >= {full_ref_bytes / 1000:.0f} KB (99 % of the binding capacity)")
+          f"full EB = reference list >= {full_ref_bytes / 1000:.0f} KB (99 % of the binding capacity); "
+          f"reference width {ref_width:.2f} B per transaction, measured on the certified EBs")
     print()
     tps_hdr = f"TPS@{tx_size:.0f}B"
     print(f"{'level':22} {'tx KB/s':>8} {tps_hdr:>10}   assumption")
@@ -216,7 +223,7 @@ def cmd_ceiling(args):
         clean = lambda x: None if isinstance(x, float) and math.isnan(x) else x
         rec = {"from": params[0], "to": params[-1], "scope": scope, "f": f, "f_observed": f_obs, "G": G, "p_model": p_model, "p_obs": p_obs,
                "s_full": clean(s_full), "s_all": clean(s_all), "tx_size": tx_size, "announce_share": announce_share,
-               "eb_fullness": fullness, "rb_fullness": rb_fullness,
+               "eb_fullness": fullness, "rb_fullness": rb_fullness, "ref_width": ref_width,
                "ref_cap": ref_cap, "payload_cap": payload_cap, "binds": binds,
                "ladder": [{"level": n, "note": t, "kbs": k, "tps": tp} for n, t, (k, tp) in ladder]}
         path = Path(args.export)
@@ -235,16 +242,19 @@ def cmd_ceiling(args):
 
 def cmd_sizes(args):
     """Percentiles of EB size over a range: transactions for every eligible EB
-    (reference bytes / 36), closure bytes and bytes per transaction for the
-    certified ones."""
+    (reference bytes over the reference width measured on the certified EBs),
+    closure bytes and bytes per transaction for the certified ones."""
     db = sqlite3.connect(f"file:{args.chain}?mode=ro", uri=True)
     where, params, _, scope = scope_clause(args)
-    rows = db.execute(EXT + f"""
-        select eb_announcement_size / 36, certified, eb_closure_size, certified_txs
+    raw = db.execute(EXT + f"""
+        select eb_announcement_size, certified, eb_closure_size, certified_txs
         from ext where {where} and eb_announcement_hash is not null and gap_slots >= {args.gap}""", params).fetchall()
-    if not rows:
+    if not raw:
         print("no eligible EBs in range")
         return
+    cert_ref = [(r[0], r[3]) for r in raw if r[1] == 1 and r[3]]
+    ref_width = sum(b for b, _ in cert_ref) / sum(t for _, t in cert_ref) if cert_ref else 36.0
+    rows = [(r[0] / ref_width, r[1], r[2], r[3]) for r in raw]
     pcts = [10, 25, 50, 75, 90]
 
     def pct(values, p):
@@ -268,7 +278,8 @@ def cmd_sizes(args):
     line("certified EBs, B/tx", [r[2] / r[3] for r in cert], n)
     if fail:
         line("failed EBs, txs", fail, n)
-    print("(txs from the reference list, 36 B each; closure bytes exist on chain for certified EBs only)")
+    print(f"(txs from the reference list at {ref_width:.2f} B per reference, measured on the certified EBs; "
+          "closure bytes exist on chain for certified EBs only)")
 
 
 def main():

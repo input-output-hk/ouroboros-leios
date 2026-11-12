@@ -1,6 +1,6 @@
 range 2026-10-17T22:01:00Z .. 2026-10-18T15:40:00Z, whole range
 RBs 3062 (observed 1 RB / 20.7 s; nominal f = 0.05), G = 15 slots, EBs announced 3059, eligible 1547, certified 1539
-caps: references 40,000 B, payload 260,000 B (from flags); full EB = reference list >= 40 KB (99 % of the binding capacity)
+caps: references 40,000 B, payload 260,000 B (from flags); full EB = reference list >= 40 KB (99 % of the binding capacity); reference width 36.00 B per transaction, measured on the certified EBs
 
 level                   tx KB/s   TPS@200B   assumption
 parameter ceiling          8.65          -   payload cap 0.26 MB, f = 0.05 (1 RB / 20 s), p = (1-f)^(G-1) = 0.488

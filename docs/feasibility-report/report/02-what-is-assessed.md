@@ -23,7 +23,8 @@ certificate has six stages, each with a clock of its own.
 The first stage is the forger's snapshot. When a pool is elected for a slot,
 its node takes a snapshot of its mempool, builds the RB, and, as deployed,
 announces an EB with it: the references of the transactions in the snapshot
-that fit the caps, 36 bytes per reference. The node budgets a fixed time for
+that fit the caps, 36 or 37 bytes per reference by the transaction's
+size. The node budgets a fixed time for
 the snapshot, so the EB is bounded by what the mempool holds when the slot
 comes and by the time the node allows itself to partition it, not only by
 the caps. An RB that carries a certificate brings the certified closure's
@@ -89,7 +90,7 @@ it.
 
 | constraint | what it bounds | stage it binds | exercised by the measurements |
 |---|---|---|---|
-| reference cap (bytes of the EB body) | the number of transactions an EB may reference, at 36 B each | snapshot; body diffusion | yes, binding at small transactions |
+| reference cap (bytes of the EB body) | the number of transactions an EB may reference, at 36 or 37 B each | snapshot; body diffusion | yes, binding at small transactions |
 | closure cap (bytes of the EB's transactions) | the bytes an EB brings into the chain | closure diffusion; validation; adoption | yes, binding at large transactions |
 | reference-script cap | the bytes of reference scripts the closure may pull in | validation | no: the transactions used carry no scripts |
 | Plutus steps and memory budgets | the script computation the closure may require | validation | no: the transactions used carry no scripts |

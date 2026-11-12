@@ -146,7 +146,8 @@ sits three to eight times above that line.
 
 The report measures three parameter sets, each named by the two caps that
 define it: the reference list an endorser block may carry, which caps the
-transaction count at 36 bytes per reference, and the bytes of its closure,
+transaction count at 36 or 37 bytes per reference by the transaction's
+size, and the bytes of its closure,
 the transactions it brings into the chain. Table 1.4 gives the parameter
 ceiling of each set, the rate it would carry with every endorser block full
 and every one certified, against the targets of the previous subsection.
