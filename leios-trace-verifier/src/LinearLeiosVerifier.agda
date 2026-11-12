@@ -8,7 +8,7 @@ open import Leios.Prelude hiding (id)
 open import Data.Bool using (if_then_else_)
 import Data.Nat.Show as S
 import Data.String as S
-open import Agda.Builtin.Word using (Word64; primWord64ToNat)
+open import Agda.Builtin.Word using (primWord64ToNat)
 open import Agda.Builtin.Char using (primCharToNat)
 open import Foreign.Haskell.Pair
 
@@ -16,6 +16,7 @@ open import Tactic.Defaults
 open import Tactic.Derive.Show
 
 open import Parser
+open import TraceTypes
 
 module LinearLeiosVerifier where
 
@@ -30,7 +31,7 @@ module LinearLeiosVerifier where
   -- postulated here so the spec treats it as an abstract oracle rather than
   -- threading it through as data.  An empty schedule means "not provided",
   -- in which case the verifier falls back to harvesting from the trace.
-  postulate leadershipSchedule : List ℕ
+  postulate leadershipSchedule : List SlotNumber
   {-# FOREIGN GHC import qualified LeadershipSchedule #-}
   {-# COMPILE GHC leadershipSchedule = LeadershipSchedule.leadershipScheduleSlots #-}
 
@@ -82,7 +83,7 @@ module LinearLeiosVerifier where
     -- EB-production winning slots harvested from the trace.  Voting slots are
     -- not collected: 'winning-slots' governs EB production only, since VT
     -- eligibility is the CIP-0164 committee rather than a per-slot lottery.
-    winningSlot : TraceEvent → Maybe ℕ
+    winningSlot : TraceEvent → Maybe SlotNumber
     winningSlot record { message = Slot _ _ }                     = nothing
     winningSlot record { message = Cpu _ _ _ _ }                  = nothing
     winningSlot record { message = NoIBGenerated _ _ }            = nothing
@@ -111,7 +112,7 @@ module LinearLeiosVerifier where
     winningSlot record { message = RBGenerated _ _ _ _ _ _ _ _ _ }  = nothing
 
     -- The slot of a ranking block the SUT mints.
-    rbSlot : TraceEvent → Maybe ℕ
+    rbSlot : TraceEvent → Maybe SlotNumber
     rbSlot record { message = RBGenerated p _ s _ _ _ _ _ _ }
       with p ≟ SUT
     ... | yes _ = just (primWord64ToNat s)
@@ -147,7 +148,7 @@ module LinearLeiosVerifier where
       -- Voting (VT) eligibility is NOT taken from here: it follows the
       -- deterministic, epoch-fixed committee of CIP-0164 (see Defaults.sortition),
       -- computed from the stake distribution rather than a per-slot lottery.
-      winning-slots-of : ℙ ℕ
+      winning-slots-of : ℙ SlotNumber
       winning-slots-of =
         if L.null leadershipSchedule
           then fromList (L.catMaybes (L.map winningSlot l))
@@ -159,7 +160,7 @@ module LinearLeiosVerifier where
       -- harvested from the SUT's 'RBGenerated' events.  They are not EB
       -- winning slots: a leader may put the transactions in the ranking block
       -- and announce no EB.
-      rb-slots-of : ℙ ℕ
+      rb-slots-of : ℙ SlotNumber
       rb-slots-of =
         if L.null leadershipSchedule
           then fromList (L.catMaybes (L.map rbSlot l))
@@ -186,31 +187,34 @@ module LinearLeiosVerifier where
       open GenFFD
       open import CategoricalCrypto hiding (_∘_)
 
+      Party : Type
+      Party = Fin (Params.numberOfParties params)
+
       data Blk : Type where
         EB-Blk : EndorserBlock → Blk
         VT-Blk : List Vote → Blk
         RB-Blk : RankingBlock → Blk
 
       record Accumulator : Type where
-        field EB-refs : AssocList String EndorserBlock
-              EB-received : AssocList String ℕ
-              VT-refs : AssocList String (List Vote)
-              RB-refs : AssocList String RankingBlock
+        field EB-refs : AssocList EBId EndorserBlock
+              EB-received : AssocList EBId SlotNumber
+              VT-refs : AssocList VTBundleId (List Vote)
+              RB-refs : AssocList RBId RankingBlock
               -- Praos-header data per RB (prev-hash, slot, producer); the
               -- payload lives in RB-refs and may still be corrected by a
               -- later EBGenerated, so blocks are materialized on demand.
-              RB-meta : AssocList String (Hash × ℕ × Fin (Params.numberOfParties params))
+              RB-meta : AssocList RBId (Hash × SlotNumber × Party)
               -- the blocks the SUT received in the current slot, latest
               -- first, for the next delivery to the Praos node
               inbox : List PraosNode.Block
               FFD-blks : List Blk
-              currentSlot : ℕ
+              currentSlot : SlotNumber
 
       open Accumulator
 
       -- ── Blocks for the Praos node, built from trace events ──
 
-      buildBlk : Accumulator → String → Maybe PraosNode.Block
+      buildBlk : Accumulator → RBId → Maybe PraosNode.Block
       buildBlk l i with RB-meta l ⁉ i | RB-refs l ⁉ i
       ... | just (ph , sl , pid) | just rb = just (mkPraosBlock ph sl rb pid)
       ... | _ | _ = nothing
@@ -237,7 +241,7 @@ module LinearLeiosVerifier where
         "the Praos node's round of slot " ◇ show n ◇ " does not match the trace, in which the SUT "
           ◇ minted bs
         where
-          minted : List (Hash × ℕ) → String
+          minted : List (Hash × SlotNumber) → String
           minted [] = "mints no block"
           minted bs = "mints (parent, slot) " ◇ show bs
 
@@ -297,13 +301,13 @@ module LinearLeiosVerifier where
         test₁ = refl
 
       -- Negative {EB,VT} event, if there is no {EB,VT}Generated event
-      negative-events-EB : List Blk → Word64 → List Item
+      negative-events-EB : List Blk → SlotNo → List Item
       negative-events-EB l s
         with Any.any? isEB? l
       ... | yes _ = []
       ... | no  _ = entry (No-EB-Role-Action (primWord64ToNat s)) (ffdᵢ FFDT.SLOT) ∷ []
 
-      negative-events-VT : List Blk → Word64 → List Item
+      negative-events-VT : List Blk → SlotNo → List Item
       negative-events-VT l s
         with Any.any? isVT? l
       ... | yes _ = []
@@ -311,10 +315,10 @@ module LinearLeiosVerifier where
 
       -- The blocks the SUT minted in slot 'n', by parent and slot, in the
       -- order of the log.  A slot's 'RBGenerated' precedes its 'Slot' event.
-      mintedAt : Accumulator → ℕ → List (Hash × ℕ)
+      mintedAt : Accumulator → SlotNumber → List (Hash × SlotNumber)
       mintedAt l n = L.reverse (L.mapMaybe sut (RB-meta l))
         where
-          sut : String × (Hash × ℕ × Fin (Params.numberOfParties params)) → Maybe (Hash × ℕ)
+          sut : RBId × (Hash × SlotNumber × Party) → Maybe (Hash × SlotNumber)
           sut (_ , ph , sl , p) with p ≟ SUT-id | sl ≟ n
           ... | yes _ | yes _ = just (ph , sl)
           ... | _     | _     = nothing
@@ -326,7 +330,7 @@ module LinearLeiosVerifier where
       -- holds the latest first, is delivered as it stands.  The node's clock
       -- trails the Leios slot by one, so it has no round for slot 0, whose
       -- blocks wait for slot 1.
-      delivery : Accumulator → ℕ → Accumulator × List Item
+      delivery : Accumulator → SlotNumber → Accumulator × List Item
       delivery l zero    = l , []
       delivery l (suc n) =
         record l { inbox = [] } ,
@@ -456,6 +460,6 @@ module LinearLeiosVerifier where
         verifyTrace = verifyTrace' s₀
         {-# COMPILE GHC verifyTrace as verifyTrace #-}
 
-        verifyTraceFromSlot : ℕ → Pair ℕ (Pair String String)
+        verifyTraceFromSlot : SlotNumber → Pair ℕ (Pair String String)
         verifyTraceFromSlot n = verifyTrace' (record s₀ { slot = n })
         {-# COMPILE GHC verifyTraceFromSlot as verifyTraceFromSlot #-}

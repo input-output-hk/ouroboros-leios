@@ -9,9 +9,12 @@ open import Data.Bool using (if_then_else_)
 import Data.Char as C
 import Data.Nat as N
 import Data.String as S
-open import Agda.Builtin.Word using (Word64; primWord64ToNat; primWord64FromNat)
+open import Agda.Builtin.Word using (primWord64ToNat; primWord64FromNat)
 open import Agda.Builtin.Char using (primCharToNat)
 open import Foreign.Haskell.Pair
+
+open import Parser using (SlotNo; Bytes)
+open import TraceTypes
 
 open import Tactic.Defaults
 open import Tactic.Derive.Show
@@ -26,18 +29,18 @@ module LinearLeiosVerifierChain where
   -- | A Leios event extracted from a cardano-node tracing log (node.log), keyed
   --   by the EB hash. Mirrors 'ChainEvents.ChainEvent' on the Haskell side.
   data ChainEvent : Type where
-    CSlot                 : Word64 → ChainEvent
-    CEBForged             : String → Word64 → ChainEvent
-    CEBAcquired           : String → Word64 → ChainEvent
-    CVoted                : String → Word64 → ChainEvent
-    CVoteAcquired         : String → Word64 → ChainEvent
-    CRBForged             : String → Word64 → ChainEvent
-    CNodeIsLeader         : Word64 → ChainEvent
-    CAnnouncementAccepted : String → Word64 → ChainEvent
-    CNotVoted             : String → Word64 → String → ChainEvent
-    CAdopted              : String → Word64 → Maybe String → ChainEvent
-    CNewTip               : String → Word64 → ChainEvent
-    CMempoolRange         : Word64 → Word64 → ChainEvent
+    CSlot                 : SlotNo → ChainEvent
+    CEBForged             : EBId → SlotNo → ChainEvent
+    CEBAcquired           : EBId → SlotNo → ChainEvent
+    CVoted                : EBId → SlotNo → ChainEvent
+    CVoteAcquired         : EBId → SlotNo → ChainEvent
+    CRBForged             : RBId → SlotNo → ChainEvent
+    CNodeIsLeader         : SlotNo → ChainEvent
+    CAnnouncementAccepted : EBId → SlotNo → ChainEvent
+    CNotVoted             : EBId → SlotNo → String → ChainEvent
+    CAdopted              : RBId → SlotNo → Maybe RBId → ChainEvent
+    CNewTip               : RBId → SlotNo → ChainEvent
+    CMempoolRange         : Bytes → Bytes → ChainEvent
     CUndetailed           : ChainEvent
 
   {-# FOREIGN GHC import qualified ChainEvents #-}
@@ -69,12 +72,12 @@ module LinearLeiosVerifierChain where
     -- Passed in per call rather than read from a mutable global: the caller chooses
     -- a different source per segment, and a top-level binding would be a CAF, fixed
     -- after its first evaluation.
-    (winningSlots : List ℕ)
+    (winningSlots : List SlotNumber)
     (scheduleAuthoritative : Bool)
     -- The ranking block's body capacity in bytes ('maxBlockBodySize'). An EB is owed
     -- only when the mempool does not fit in the RB, so this is what separates a forge
     -- without an EB that is a violation from one that is ordinary behaviour.
-    (maxRBBody : ℕ)
+    (maxRBBody : ByteCount)
     where
 
     from-id : ℕ → Fin numberOfParties
@@ -129,7 +132,7 @@ module LinearLeiosVerifierChain where
 
       -- Slots at which the log shows the Leios subsystem itself doing something.
       -- Praos events — NodeIsLeader, RBForged — deliberately do not count.
-      leiosActivitySlots : EventLog → List ℕ
+      leiosActivitySlots : EventLog → List SlotNumber
       leiosActivitySlots []                               = []
       leiosActivitySlots (CEBForged _ s ∷ es)             = primWord64ToNat s ∷ leiosActivitySlots es
       leiosActivitySlots (CEBAcquired _ s ∷ es)           = primWord64ToNat s ∷ leiosActivitySlots es
@@ -138,12 +141,12 @@ module LinearLeiosVerifierChain where
       leiosActivitySlots (CVoteAcquired _ s ∷ es)         = primWord64ToNat s ∷ leiosActivitySlots es
       leiosActivitySlots (_ ∷ es)                         = leiosActivitySlots es
 
-      minSlot : ℕ → List ℕ → ℕ
+      minSlot : SlotNumber → List SlotNumber → SlotNumber
       minSlot m []       = m
       minSlot m (x ∷ xs) = minSlot (if x N.<ᵇ m then x else m) xs
 
       -- Leader slots at or after the first slot where Leios did anything.
-      leaderSlotsFrom : ℕ → EventLog → List ℕ
+      leaderSlotsFrom : SlotNumber → EventLog → List SlotNumber
       leaderSlotsFrom from []                     = []
       leaderSlotsFrom from (CNodeIsLeader s ∷ es) =
         let n = primWord64ToNat s
@@ -171,7 +174,7 @@ module LinearLeiosVerifierChain where
       -- The node emits no positive readiness event, and its "wait for leios ready"
       -- message recurs a dozen times in runs that do forge EBs, so that cannot serve
       -- as the gate.
-      leaderSlots : EventLog → List ℕ
+      leaderSlots : EventLog → List SlotNumber
       leaderSlots es = case leiosActivitySlots es of λ where
         []       → []
         (a ∷ as) → leaderSlotsFrom (minSlot a as) es
@@ -187,7 +190,7 @@ module LinearLeiosVerifierChain where
       --
       -- Voting eligibility is unaffected: it follows the CIP-0164 committee in
       -- Defaults, computed from the stake distribution rather than a per-slot lottery.
-      winning-slots-of : ℙ ℕ
+      winning-slots-of : ℙ SlotNumber
       winning-slots-of =
         if scheduleAuthoritative
           then fromList winningSlots
@@ -204,12 +207,12 @@ module LinearLeiosVerifierChain where
       -- exactly these.  Unlike 'leaderSlots' it is not gated on Leios activity:
       -- that gate guards EB obligations, and a ranking block is forged whether
       -- or not Leios is running.
-      allLeaderSlots : EventLog → List ℕ
+      allLeaderSlots : EventLog → List SlotNumber
       allLeaderSlots []                     = []
       allLeaderSlots (CNodeIsLeader s ∷ es) = primWord64ToNat s ∷ allLeaderSlots es
       allLeaderSlots (_ ∷ es)               = allLeaderSlots es
 
-      rb-slots-of : ℙ ℕ
+      rb-slots-of : ℙ SlotNumber
       rb-slots-of =
         if scheduleAuthoritative
           then fromList winningSlots
@@ -248,10 +251,10 @@ module LinearLeiosVerifierChain where
       -- happens to come first in 'EBs'', and the second vote of a run is rejected
       -- as 'Already voted' because 'VotedEBs' already holds that hash. The leading
       -- zero keeps the list non-empty, EBs being non-empty per the CIP.
-      synthTxs : String → List Tx
+      synthTxs : EBId → List Tx
       synthTxs h = 0 ∷ L.map C.toℕ (S.toList h)
 
-      mkEBrec : Party → String → Word64 → EndorserBlock
+      mkEBrec : Party → EBId → SlotNo → EndorserBlock
       mkEBrec p h s = record
         { slotNumber = primWord64ToNat s
         ; producerID = p
@@ -263,27 +266,27 @@ module LinearLeiosVerifierChain where
       -- The spec-level hash of the EB with this hash string.  It is fixed by the
       -- string alone, so a ranking block can announce an EB the node has not
       -- acquired yet.
-      ebHash : String → Hash
+      ebHash : EBId → Hash
       ebHash h = hash (mkEBrec SUT-id h (primWord64FromNat 0))
 
       -- Accumulator threaded through the chain events. Slot obligations are
       -- flushed when the next CSlot arrives (or at end of stream).
       record Accumulator : Type where
-        field EB-refs     : AssocList String EndorserBlock
-              EB-received : AssocList String ℕ
+        field EB-refs     : AssocList EBId EndorserBlock
+              EB-received : AssocList EBId SlotNumber
               FFD-blks    : List Blk
-              curSlot     : ℕ
+              curSlot     : SlotNumber
               started     : Bool
               -- (min , max) mempool bytes observed during the slot being accumulated.
-              memRange    : Maybe (ℕ × ℕ)
+              memRange    : Maybe (ByteCount × ByteCount)
               forgedEB    : Maybe EndorserBlock
-              votedEB     : Maybe (EndorserBlock × ℕ)
+              votedEB     : Maybe (EndorserBlock × SlotNumber)
               -- ── The Praos node ──
               -- Each ranking block of the log, by its hash: its slot and the
               -- party it is minted as.  The log names no producers, so the
               -- blocks of a slot other than the SUT's are numbered, skipping
               -- the SUT, which keeps them apart in the block tree.
-              ids         : AssocList String (ℕ × Party)
+              ids         : AssocList RBId (SlotNumber × Party)
               -- The blocks the node adopted before the SUT forged in this slot,
               -- latest first: the node forges at the start of a slot, so these
               -- are what the Praos node absorbs in this slot's round.
@@ -293,14 +296,14 @@ module LinearLeiosVerifierChain where
               late        : List PraosNode.Block
               -- The ranking block the SUT forged in this slot, with the hash of
               -- the tip it extended.
-              forgedRB    : Maybe (String × ℕ × Hash)
+              forgedRB    : Maybe (RBId × SlotNumber × Hash)
               -- The tip of the node's selected chain.
-              tipNow      : Maybe String
+              tipNow      : Maybe RBId
               -- The EB each ranking block announces, by its election slot.
-              annBySlot   : AssocList ℕ String
+              annBySlot   : AssocList SlotNumber EBId
               -- The EB the chain head announced when the slot opened: the one a
               -- vote of the slot can be for.
-              headEB      : Maybe String
+              headEB      : Maybe EBId
 
       open Accumulator
 
@@ -333,7 +336,7 @@ module LinearLeiosVerifierChain where
         "the Praos node's round of slot " ◇ show n ◇ " does not match the log, in which the SUT "
           ◇ minted bs ◇ " and its chain ends in " ◇ show t
         where
-          minted : List (Hash × ℕ) → String
+          minted : List (Hash × SlotNumber) → String
           minted [] = "mints no block"
           minted bs = "mints (parent, slot) " ◇ show bs
 
@@ -350,13 +353,13 @@ module LinearLeiosVerifierChain where
 
       -- The hash of a ranking block in the block tree, from the slot and the
       -- party it is minted as (see 'd-blockHash').
-      rbHash : ℕ → Party → Hash
+      rbHash : SlotNumber → Party → Hash
       rbHash sl p = d-blockHash sl p (record { announcedEB = nothing ; txsOrEbCert = inj₁ [] })
 
       -- The tree hash of the block with this log hash.  A block the log has
       -- not shown, such as the parent of the first block of a segment, is
       -- genesis: the segment's chain is rooted there.
-      treeHash : Accumulator → String → Hash
+      treeHash : Accumulator → RBId → Hash
       treeHash a h = case ids a ⁉ h of λ where
         (just (sl , p)) → rbHash sl p
         nothing         → genesisHash
@@ -366,19 +369,19 @@ module LinearLeiosVerifierChain where
 
       -- The ranking block of a slot: it announces the EB of its election slot,
       -- if any.  The log does not say what else it carries.
-      rbAt : Accumulator → ℕ → RankingBlock
+      rbAt : Accumulator → SlotNumber → RankingBlock
       rbAt a sl = record
         { announcedEB = ebHash <$> annBySlot a ⁉ sl
         ; txsOrEbCert = inj₁ [] }
 
       -- The party the next block of a slot is minted as: the blocks of the slot
       -- seen so far are numbered, skipping the SUT.
-      nextParty : Accumulator → ℕ → Party
+      nextParty : Accumulator → SlotNumber → Party
       nextParty a sl =
         let n = L.length (L.filter (λ (_ , (sl′ , _)) → sl′ ≟ sl) (ids a))
         in from-id (if n N.<ᵇ sutId then n else suc n)
 
-      isCurrentHead : String → Maybe String → Bool
+      isCurrentHead : EBId → Maybe EBId → Bool
       isCurrentHead h (just h′) = case h ≟ h′ of λ where
         (yes _) → true
         (no  _) → false
@@ -472,7 +475,7 @@ module LinearLeiosVerifierChain where
       -- equal producers) and never the SUT (so acquired EBs cannot equivocate
       -- with the SUT's own forged EBs). Genuine equivocation by other pools is
       -- not detectable until the trace carries real producer identities.
-      fakeProducer : Accumulator → Word64 → Party
+      fakeProducer : Accumulator → SlotNo → Party
       fakeProducer a s =
         let slotNat = primWord64ToNat s
             n = L.length (L.filter
@@ -481,7 +484,7 @@ module LinearLeiosVerifierChain where
         in from-id (if n N.<ᵇ sutId then n else suc n)
 
       -- The EB the head of the selected chain announces.
-      headOf : Accumulator → Maybe String
+      headOf : Accumulator → Maybe EBId
       headOf a = tipNow a >>= λ h → ids a ⁉ h >>= λ (sl , _) → annBySlot a ⁉ sl
 
       traceEvent→action : Accumulator → ChainEvent → Accumulator × List Item
@@ -607,7 +610,7 @@ module LinearLeiosVerifierChain where
       showItem (deliver h _) = "Praos@" ◇ maybe (λ (n , _) → show n) "?" h
       showItem (base n)      = "Base@" ◇ show n
 
-      n₀ : ℕ → Accumulator
+      n₀ : SlotNumber → Accumulator
       n₀ st = record
         { EB-refs = [] ; EB-received = [] ; FFD-blks = [] ; curSlot = st
         ; started = false ; memRange = nothing ; forgedEB = nothing ; votedEB = nothing
@@ -639,13 +642,13 @@ module LinearLeiosVerifierChain where
 
         -- Streaming checkpoint: adjudicate only the slots already closed by a
         -- later CSlot, leaving the in-progress one to the next checkpoint.
-        verifyChainTraceFromSlot : ℕ → Pair (List String) (Pair String String)
+        verifyChainTraceFromSlot : SlotNumber → Pair (List String) (Pair String String)
         verifyChainTraceFromSlot n = verifyChainTrace' false (record s₀ { slot = n })
         {-# COMPILE GHC verifyChainTraceFromSlot as verifyChainTraceFromSlot #-}
 
         -- Whole-log variant: additionally adjudicate the trailing slot. Sound only
         -- for a complete capture (e.g. a fixed event list in a test); on a stream
         -- truncated mid-slot it reports a spurious abstention violation.
-        verifyChainTraceFinalFromSlot : ℕ → Pair (List String) (Pair String String)
+        verifyChainTraceFinalFromSlot : SlotNumber → Pair (List String) (Pair String String)
         verifyChainTraceFinalFromSlot n = verifyChainTrace' true (record s₀ { slot = n })
         {-# COMPILE GHC verifyChainTraceFinalFromSlot as verifyChainTraceFinalFromSlot #-}
