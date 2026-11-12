@@ -44,9 +44,8 @@ def main():
         m = re.match(r"# (.*)", text)
         headings.append(m.group(1) if m else f)
         sections.append(text)
-    head = ["# " + TITLE, "",
-            "Build of %s, from commit %s%s. Sections in this build: %s. "
-            "The open points the text leaves for the team and the reviewers are kept in place as block quotes headed \"Note to resolve\"." % (
+    head = ["# " + TITLE, "", "Ezequiel Postan, ezequiel.postan@iohk.io", "",
+            "Build of %s, from commit %s%s. Sections in this build: %s." % (
                 dt.date.today().isoformat(), commit, " (uncommitted changes)" if dirty else "", ", ".join(h.split(".")[0] for h in headings)),
             "", "## Contents", ""] + ["- " + h for h in headings] + [""]
     tail = [""]

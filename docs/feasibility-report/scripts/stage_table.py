@@ -54,6 +54,7 @@ WINDOWS = {
     "cluster-40k260k": dict(label="cluster 40 kB / 260 kB, 200 B", cluster=True),
     "cluster-100k1m": dict(label="cluster 100 kB / 1 MB, 200 B", cluster=True),
     "cluster-100k1m-374": dict(label="cluster 100 kB / 1 MB, 374 B", cluster=True),
+    "cluster-100k1m-374-patched": dict(label="cluster 100 kB / 1 MB, 374 B, changed build", cluster=True),
 }
 OUTPUTS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "outputs"))
 ROWS = ["body: p90 / p95; nodes with p90 under 3 s",
@@ -84,7 +85,12 @@ def q(xs, p):
 
 
 def pct(n, d):
-    return "%.0f %%" % (100.0 * n / d) if d else "n/a"
+    """A whole percentage, except that a value which would round to 100 % without being exact
+    keeps one decimal, so that 820 of 823 reads 99.6 % and not 100 %."""
+    if not d:
+        return "n/a"
+    v = 100.0 * n / d
+    return "%.1f %%" % v if n != d and round(v) == 100 else "%.0f %%" % v
 
 
 def diffusion_row(rows, befores):
@@ -112,7 +118,7 @@ def column(outputs, name, archive_only):
         never = st.median(float(r["never"]) for r in clo)
         out[ROWS[1]] = diffusion_row(clo, [3, 7]) + "; %.0f %%" % never
         votes = [float(r["vote_pct"]) for r in clo if r["vote_pct"] not in ("", None)]
-        out[ROWS[5]] = "%.0f %%" % st.median(votes) if votes else "n/a"
+        out[ROWS[5]] = pct(st.median(votes), 100.0) if votes else "n/a"
     else:
         out[ROWS[1]] = out[ROWS[5]] = "n/a"
     if val is not None:

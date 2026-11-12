@@ -40,7 +40,7 @@ Layout:
   (`cluster_run.sh`).
 - `outputs/<window>/`: the saved outputs per testnet window (`f1-high`,
   `f2-high`, `1kb`, with `archive-only/` for the SPO-archive-only check) and
-  per cluster run (`cluster-40k260k`, `cluster-100k1m`, `cluster-100k1m-374`),
+  per cluster run (`cluster-40k260k`, `cluster-100k1m`, `cluster-100k1m-374`, and `cluster-100k1m-374-patched` for the 374 B run on the changed build of section 9),
   small text files committed with the scripts so that every table is
   reproducible from the repository alone: run the printer; to regenerate
   the outputs from the data sets, run the driver first.

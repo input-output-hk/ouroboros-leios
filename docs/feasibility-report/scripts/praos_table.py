@@ -66,6 +66,9 @@ WINDOWS = {
     "cluster-100k1m-374": dict(label="cluster 100 kB / 1 MB, 374 B",
                                run="cluster/2026-10-21-16-22-81787-w42notxsub-value-leios-workload-all-n2n-100k1m-2i2o2w-nomadperf-dira-nom",
                                cert_bin="c2 certifies, closure 500 kB to 1 MB", cert_label="closure 0.5-1 MB"),
+    "cluster-100k1m-374-patched": dict(label="cluster 100 kB / 1 MB, 374 B, changed build",
+                                       run="cluster/2026-11-09-16-29-2a1ad-w45ezenotxsu-value-leios-workload-all-n2n-100k1m-2i2o2w-nomadperf-dira-nom",
+                                       cert_bin="c2 certifies, closure 500 kB to 1 MB", cert_label="closure 1 MB"),
 }
 PLAIN_FULL = ("f plain RB, 80-88 kB", "p1 plain RB, full (80 kB and up)")
 

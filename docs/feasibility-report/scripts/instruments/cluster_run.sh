@@ -4,7 +4,7 @@
 #
 #   cluster_run.sh KEY RUN T0 T1 GAP REF_CAP PAYLOAD_CAP E_KB
 #
-#   KEY     cluster-40k260k | cluster-100k1m | cluster-100k1m-374 (the printers' keys)
+#   KEY     cluster-40k260k | cluster-100k1m | cluster-100k1m-374 | cluster-100k1m-374-patched (the printers' keys)
 #   RUN     the run folder holding the built inputs (DATA.md): cluster.duckdb,
 #           blocks.sqlite and raw/*.db
 #   T0 T1   the range read, UTC 'YYYY-MM-DDTHH:MM:SS' (the generator's start to
@@ -65,6 +65,8 @@ case $KEY in
   cluster-40k260k)     COSTS="0.91 152"; FIX=0.38;;
   cluster-100k1m)      COSTS="1.85 144"; FIX=0.19;;
   cluster-100k1m-374)  COSTS="3.42 163"; FIX=0.19;;
+  # the rerun on the changed build (section 9.3): its own costs; the loop's cost is already out, so the fix row is the measured one
+  cluster-100k1m-374-patched)  COSTS="0.41 190"; FIX=1;;
 esac
 python3 "$HERE/host_speed.py" validation_pairs.csv "$OUT/ladder.jsonl" "$E_KB" --costs $COSTS "as measured:1:1" \
   "hosts two generations newer (c6id):0.85:0.85" "hosts of the current generation:0.6:0.6" \

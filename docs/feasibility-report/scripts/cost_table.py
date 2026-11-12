@@ -56,6 +56,7 @@ WINDOWS = {
     "cluster-40k260k": dict(label="cluster 40 kB / 260 kB, 200 B", shape="200 B, one input, one output", cluster=True),
     "cluster-100k1m": dict(label="cluster 100 kB / 1 MB, 200 B", shape="200 B, one input, one output", cluster=True),
     "cluster-100k1m-374": dict(label="cluster 100 kB / 1 MB, 374 B", shape="374 B, two inputs, two outputs", cluster=True),
+    "cluster-100k1m-374-patched": dict(label="cluster 100 kB / 1 MB, 374 B, changed build", shape="374 B, two inputs, two outputs", cluster=True),
 }
 
 

@@ -27,6 +27,7 @@ LADDERS = {
     "cluster-40k260k": "cluster 40 kB / 260 kB, 200 B",
     "cluster-100k1m": "cluster 100 kB / 1 MB, 200 B",
     "cluster-100k1m-374": "cluster 100 kB / 1 MB, 374 B",
+    "cluster-100k1m-374-patched": "cluster 100 kB / 1 MB, 374 B, changed build",
 }
 OUTPUTS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "outputs"))
 RUNGS = ["parameter ceiling", "workload ceiling", "observed spacing", "voting-adjusted, mix", "voting-adjusted, full", "load-adjusted", "measured"]
