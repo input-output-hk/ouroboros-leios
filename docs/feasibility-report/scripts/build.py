@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Assemble the report from its section files.
 
-    build.py [--html] [--out FILE]
+    build.py [--html] [--pdf] [--out FILE]
 
 Concatenates report/0*.md in file order into one Markdown document with a
 title block, the build date and commit, and a contents list of the
@@ -9,18 +9,59 @@ top-level sections. Notes to resolve are the blocks between <!-- note -->
 and <!-- /note --> in the section files, the open points the text leaves
 for the team and the reviewers; the build keeps them, rendered as block
 quotes headed "Note to resolve". The output is report/REPORT.md.
+
+--pdf writes a PDF next to the Markdown with pandoc and the tectonic
+XeTeX engine (`brew install pandoc tectonic`), after the Leios design
+document's recipe: the settings are in report/pdf-metadata.yaml. The PDF
+takes its title block from pandoc's metadata and its contents from
+pandoc's table of contents, and every pipe table gets column widths in
+proportion to its longest cells, since LaTeX wraps cells instead of
+scrolling.
 """
 import argparse, datetime as dt, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPORT = os.path.join(HERE, "..", "report")
 TITLE = "Leios technical feasibility: a measured assessment of the pipeline on the public testnet and the benchmarking cluster"
+AUTHOR = "Ezequiel Postan, ezequiel.postan@iohk.io"
+PDF_METADATA = os.path.join(REPORT, "pdf-metadata.yaml")
 NOTE = re.compile(r"<!--\s*note\s*-->\s*(.*?)\s*<!--\s*/note\s*-->", re.S)
+
+
+def pdf_tables(md):
+    """Rewrite each pipe table's separator line so that the dashes per column are in proportion to
+    the column's longest cell; pandoc reads the relative widths from them when a table is wider
+    than its text width, which every table of the report is."""
+    out, table = [], []
+
+    def flush():
+        if len(table) >= 2 and re.match(r"^\|[\s:|-]+\|$", table[1]):
+            cells = [[c.strip() for c in row.strip().strip("|").split("|")] for row in table]
+            ncol = len(cells[1])
+            longest = [max(len(r[i]) for r in cells if len(r) > i and r is not cells[1]) or 1 for i in range(ncol)]
+            total = sum(longest)
+            seps = []
+            for i, c in enumerate(cells[1]):
+                n = max(3, round(60 * longest[i] / total))
+                seps.append(("-" * n + ":") if c.endswith(":") and not c.startswith(":") else "-" * (n + 1))
+            table[1] = "|" + "|".join(seps) + "|"
+        out.extend(table)
+        table.clear()
+
+    for line in md.splitlines():
+        if line.startswith("|"):
+            table.append(line)
+        else:
+            flush()
+            out.append(line)
+    flush()
+    return "\n".join(out)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--html", action="store_true", help="also write the self-contained preview page next to the Markdown")
+    ap.add_argument("--pdf", action="store_true", help="also write the PDF next to the Markdown (pandoc + tectonic)")
     ap.add_argument("--out")
     a = ap.parse_args()
     files = sorted(f for f in os.listdir(REPORT) if re.match(r"\d\d-.*\.md$", f))
@@ -62,6 +103,23 @@ def main():
         with open(html_out, "w") as fh:
             fh.write(page)
         print("wrote %s (%d kB)" % (html_out, len(page) // 1000))
+    if a.pdf:
+        stamp = "Build of %s, from commit %s%s" % (dt.date.today().isoformat(), commit, " (uncommitted changes)" if dirty else "")
+        meta = ["---", "title: \"%s\"" % TITLE, "author: \"%s\"" % AUTHOR, "date: \"%s\"" % stamp, "---", ""]
+        body = re.sub(r"(\d) %", "\\1\u00a0%", "\n\n".join(sections))  # a percent sign stays with its number
+        pdf_md = "\n".join(meta) + pdf_tables(body) + "\n"
+        pdf_src = os.path.splitext(out)[0] + ".pdf.md"
+        pdf_out = os.path.splitext(out)[0] + ".pdf"
+        with open(pdf_src, "w") as fh:
+            fh.write(pdf_md)
+        cmd = ["pandoc", pdf_src, "--pdf-engine=tectonic", "--from=markdown", "--to=pdf",
+               "--metadata-file", PDF_METADATA, "--output", pdf_out]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        os.remove(pdf_src)
+        if res.returncode != 0:
+            sys.exit("pandoc failed:\n" + res.stderr[-3000:])
+        warn = [l for l in res.stderr.splitlines() if "Overfull" in l or "Missing character" in l]
+        print("wrote %s (%d kB%s)" % (pdf_out, os.path.getsize(pdf_out) // 1000, ", %d TeX warnings" % len(warn) if warn else ""))
 
 
 # The self-contained preview page: the assembled Markdown is embedded and rendered in the browser (marked, pinned),

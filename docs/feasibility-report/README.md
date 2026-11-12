@@ -9,7 +9,12 @@ This folder holds the sources of `docs/feasibility-report.md`, the report
 one level up, and everything needed to reproduce its tables. The report is
 rebuilt from here with:
 
-    python3 docs/feasibility-report/scripts/build.py --out docs/feasibility-report.md
+    python3 docs/feasibility-report/scripts/build.py --pdf --out docs/feasibility-report.md
+
+which also writes `docs/feasibility-report.pdf` with pandoc and the
+tectonic XeTeX engine (`brew install pandoc tectonic`), on the settings
+of `report/pdf-metadata.yaml`; without `--pdf` only the Markdown is
+written.
 
 **Per-node outputs.** The per-node outputs of the testnet windows
 (`diffusion.csv`, `diffusion-body.csv`, `validation_nodes.csv`,
@@ -56,7 +61,7 @@ Printers (section, what they print, what they read under `outputs/`):
 
 | printer | section | reads |
 |---|---|---|
-| `scripts/build.py` | the whole report, `report/REPORT.md`, with the notes to resolve as block quotes; `--html` also writes the self-contained preview page next to it | the section files `report/*.md` and the repository's commit |
+| `scripts/build.py` | the whole report, `report/REPORT.md`, with the notes to resolve as block quotes; `--html` also writes the self-contained preview page next to it; `--pdf` also writes the PDF next to it with pandoc and tectonic (`brew install pandoc tectonic`), on the settings of `report/pdf-metadata.yaml` | the section files `report/*.md` and the repository's commit |
 | `scripts/mainnet_blocks.py` | 1, the fetch of the mainnet data set; the one fetcher kept in the repository, because its source (Koios) is public and keyless and a reviewer can repeat it | Koios: block headers and epoch parameters per epoch into the mainnet data set (DATA.md) |
 | `scripts/mainnet_praos.py`, `scripts/mainnet_windows.sh` | 1, the congestion-windows table (Praos under load) | the mainnet data set, `$LEIOS_MAINNET` (instrument and printer in one) |
 | `scripts/ladder_table.py` | 4, table (a), the ladder per parameter set | `<window>/ladder.jsonl` |
