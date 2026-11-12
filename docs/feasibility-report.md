@@ -2,7 +2,7 @@
 
 Ezequiel Postan, ezequiel.postan@iohk.io
 
-Build of 2026-11-12, from commit 49da0561. Sections in this build: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, Appendix A.
+Build of 2026-11-12, from commit 29ea4b16 (uncommitted changes). Sections in this build: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, Appendix A.
 
 ## Contents
 
@@ -27,11 +27,11 @@ closure. Every transaction measured is a value transfer without
 scripts. The standard is the proposal's: a parameter set confirmed
 feasible, with a credible path upward.
 
-| parameter set | ceiling, kB/s | measured, kB/s | certified of the eligible EBs | verdict |
-|---|---:|---:|---:|---|
-| 40 kB / 260 kB, cluster and testnet | 8.9 | 7.5 and 7.2 | 99 % and 97 % | confirmed |
-| 100 kB / 1 MB, cluster | 27.9 | 12.2 and 15.5; 26.6 on the latest build | 69 % and 52 %; 99 % on the latest build | confirmed on the cluster on the latest build at the time of this report; the testnet at this set is the next stage |
-| 308 kB / 2 MB, testnet | 53.5 | 12.0 and 22.0 | 49 % and 45 % | not confirmed as measured; not measured on the latest build, for which sections 8 and 9 give evidence of feasibility on the validation side |
+| parameter set | ceiling, kB/s | measured, kB/s | certified of the eligible EBs |
+|---|---:|---:|---:|
+| 40 kB / 260 kB, cluster and testnet | 8.9 | 7.5 and 7.2 | 99 % and 97 % |
+| 100 kB / 1 MB, cluster | 27.9 | 12.2 and 15.5; 26.6 on the latest build | 69 % and 52 %; 99 % on the latest build |
+| 308 kB / 2 MB, testnet | 53.5 | 12.0 and 22.0 | 49 % and 45 % |
 
 Table 0.1. The three sets against their parameter ceiling, the rate
 with every EB full and certified; two windows or runs per set (Tables
@@ -42,10 +42,11 @@ set the EBs were at 0.6 of the cap on average.
 
 Leios is confirmed at twice the Praos ceiling on both populations. It
 is confirmed at six times on the cluster on the latest build at the
-time of this report; the testnet at that set is the next stage. The
-ten-times set depends on that build and on the closure's diffusion.
-The ten-times line needs a closure of about 1.7 MB, smaller than the
-2 MB closures measured here.
+time of this report. The testnet at that set is the next stage. The
+ten-times set is not confirmed as measured. It depends on that build
+and on the closure's diffusion, and sections 8 and 9 give evidence of
+feasibility on the validation side. The ten-times line needs a closure
+of about 1.7 MB, smaller than the 2 MB closures measured here.
 
 **The confirmed set.** At 40 kB / 260 kB, twice the Praos ceiling, every
 stage of the pipeline is inside its budget on both populations and the
@@ -111,123 +112,119 @@ protocol therefore carries at most 4.5 kB/s. The chain comes close to this
 rate in practice. Chain density, the share of the expected blocks that
 actually extend the chain, lies between 97 and 99 % in every period
 considered below except one; the remainder is made of slots lost to
-propagation and to competing blocks. The parameter ceiling is thus nearly
+propagation and to competing forks. The parameter ceiling is thus nearly
 the real one, and it is the quantity of which every Leios parameter set is a
 multiple.
 
 What the chain carries under load is a different quantity. Table 1.1 lists
 the six periods of highest load in the chain's history for which the data
 was pulled, taken from block headers and epoch parameters (Koios, fetched on
-2026-10-21), each measured against the block limit of its own epoch. A block
-is counted as full at 90 % of the limit, since a block stops when the next
-transaction does not fit and so never reaches the limit exactly.
+2026-10-21), each measured against the block limit of its own epoch.
 
-| period (UTC) | event | hours | RBs | spacing; chain density | carried, kB/s | fullness, mean / median | RBs full | tx per RB | bytes per tx |
-|---|---|---|---|---|---|---|---|---|---|
-| 2022-01-21 00:00 to 01-23 06:00 | SundaeSwap launch; pre-Vasil, scripts inline | 54 | 9,114 | 21.3 s; 93.8 % | 3.25 | 94 % / 96 % | 85 % | 45 | 1,549 |
-| 2023-12-08 06:00 to 12-09 18:00 | memecoin minting wave | 36 | 6,307 | 20.5 s; 97.4 % | 3.43 | 78 % / 92 % | 60 % | 29 | 2,396 |
-| 2024-09-05 12:00 to 09-06 00:00 | Snek.fun launch | 12 | 2,094 | 20.6 s; 96.9 % | 2.49 | 57 % / 55 % | 31 % | 51 | 1,011 |
-| 2024-12-02 18:00 to 12-03 00:00 | bull-run activity, the busiest 6 h of epoch 525 | 6 | 1,063 | 20.3 s; 98.6 % | 2.86 | 64 % / 80 % | 42 % | 43 | 1,344 |
-| 2026-10-08 06:00 to 18:00 | Hosky spam campaign (synthetic mix) | 12 | 2,107 | 20.5 s; 97.6 % | 3.40 | 77 % / 96 % | 62 % | 151 | 461 |
-| 2026-10-11 to 10-16, epoch 661 | normal operation | 120 | 21,385 | 20.2 s; 99.0 % | 0.51 | 12 % / 6 % | 2 % | 12 | 877 |
+| period | event | hours | spacing; chain density | carried, kB/s | fullness, mean / median | bytes per tx |
+|---|---|---|---|---|---|---|
+| 2022-01-21 to 01-23 | SundaeSwap launch, pre-Vasil | 54 | 21.3 s; 93.8 % | 3.25 | 94 % / 96 % | 1,549 |
+| 2023-12-08 to 12-09 | memecoin minting wave | 36 | 20.5 s; 97.4 % | 3.43 | 78 % / 92 % | 2,396 |
+| 2024-09-05 | Snek.fun launch | 12 | 20.6 s; 96.9 % | 2.49 | 57 % / 55 % | 1,011 |
+| 2024-12-02 | bull-run peak, epoch 525 | 6 | 20.3 s; 98.6 % | 2.86 | 64 % / 80 % | 1,344 |
+| 2026-10-08 | Hosky spam campaign | 12 | 20.5 s; 97.6 % | 3.40 | 77 % / 96 % | 461 |
+| 2026-10-11 to 10-16 | normal operation, epoch 661 | 120 | 20.2 s; 99.0 % | 0.51 | 12 % / 6 % | 877 |
 
-Table 1.1. Praos under load on mainnet. Carried is block bytes over
-wall-clock time, fullness is block bytes over the epoch's block limit, and
-RBs full is the share of blocks at 90 % of the limit or more. The table is
-regenerated by `scripts/mainnet_windows.sh` from the data set listed in
-DATA.md.
+Table 1.1. Praos under load on mainnet. Hours is each period's exact
+span; carried is block bytes over wall-clock time; fullness is block
+bytes over the epoch's block limit. The spam campaign's transactions are
+a synthetic mix. The table is regenerated by
+`scripts/mainnet_windows.sh` from the data set listed in DATA.md.
 
-Three observations from this table are used throughout the report. The
-first is that mainnet has been saturated for days only once. The SundaeSwap
-launch in January 2022 ran at a mean fullness of 94 % for 54 hours. Every
-episode of congestion since the introduction of reference scripts (Vasil,
-September 2022) has lasted hours rather than days, and even at its peak has
-left between 20 and 45 % of the available bytes unused: the median block is
-full, at 92 to 96 %, while the mean is only 57 to 78 %, because full blocks
-alternate with near-empty ones as the mempool drains faster than it refills.
-The best sustained rate since Vasil is 3.4 kB/s, three quarters of the
-ceiling. This is what load looks like on mainnet, and it is the reason the
-report measures Leios in load windows and against its caps rather than per
-day: a daily average mixes the congested hours with the quiet ones and
-describes neither.
+Three observations from this table are used throughout the report.
 
-The second observation is that transaction size is a range rather than a
-constant. The mean bytes per transaction run from 461 B under the spam
-campaign, through 877 B in normal operation and 1,000 to 1,550 B at the two
-DEX launches, to 2,396 B in the metadata-heavy minting wave; the CIP-164
-convention of 1,500 B sits in the middle of this range. A throughput target
-stated as a transaction count therefore has no meaning without a declared
-transaction size. The report states every target in bytes per second and
-converts it to transactions per second at three sizes.
+The first is that mainnet has been saturated for days only once. The
+SundaeSwap launch in January 2022 ran at a mean fullness of 94 % for 54
+hours. Every episode of congestion since the introduction of reference
+scripts, at Vasil in September 2022, has lasted hours rather than days.
+Even at its peak, each left between 20 and 45 % of the available bytes
+unused: the median block is full, at 92 to 96 %, while the mean is only
+57 to 78 %. Full blocks alternate with near-empty ones as the mempool
+drains faster than it refills. The best sustained rate since Vasil is
+3.4 kB/s, three quarters of the ceiling.
 
-The third is that chain density is a second, smaller loss: one percent in
-normal operation, 2.5 to 3 % in the congested periods, and 6 % in the one
-sustained full-block period. Leios keeps the Praos block at its present size,
-but a certifying block carries more work at adoption, and section 5 covers
-what that does to this term.
+This is what load looks like on mainnet. It is why the report measures
+Leios in load windows and against its caps rather than per day: a daily
+average mixes the congested hours with the quiet ones and describes
+neither.
+
+The second observation is that transaction size is a range rather than
+a constant: the mean bytes per transaction run from 461 B under the
+spam campaign to 2,396 B in the minting wave, a factor of five. A
+throughput target stated as a transaction count therefore has no
+meaning without a declared transaction size. The report states every
+target in bytes per second and converts it to transactions per second
+at three sizes.
+
+The third is that chain density falls under load: 99 % in normal
+operation, 97 to 98 % in the congested periods, and 94 % in the one
+sustained full-block period. Leios keeps the Praos block at its present
+size, but a certifying block carries more work at adoption; section 5
+measures what that does to density.
 
 ## 1.2 The targets
 
-The throughput targets against which this report reads its measurements
-are the ones set by the two documents that commissioned Leios, the treasury
-proposal and CIP-164, and they are taken here as those documents state
-them. The treasury proposal ("IO: Consensus Initiative") sets no unit for
-capacity. It commits to 27 million transactions a month by 2030, from about
-800,000 today, and asks for at least six times the current capacity with 50
-to 70 % headroom; elsewhere it states that Leios delivers ten times or more.
-Its implicit measure of current capacity is a count, about three
-transactions per second, which is the Praos ceiling at a transaction of
-1,500 B. The report reads the proposal's multipliers as counts at the
-mainnet size mix, so that six and ten times the current capacity are 27 and
-45 kB/s respectively.
+The throughput targets used in this report come from the two documents
+that commissioned Leios, the treasury proposal and CIP-164, and are
+taken as those documents state them.
 
-CIP-164 gives 50 transactions per second as the sustained throughput beyond
-which fees offset diminishing rewards (in its cost-estimate document),
-quotes throughput at 1,500 B per transaction, and simulates 150 to 350 kB/s
-for the parameter set it describes as feasible: 512 kB endorser blocks,
-12 MB of transactions and reference scripts, 900 committee seats, a quorum
-of 0.75, and timings of 1, 4 and 7 s. The proposal itself treats the
-CIP-164 parameters as an ideal goal: technical feasibility may be confirmed
-at a lower parameter set, with the higher targets addressed through the
-gradual deployment plan. That is the standard this report applies: a
-parameter set confirmed feasible, with a credible path upward.
+The treasury proposal, "IO: Consensus Initiative", sets no unit for
+capacity. It commits to 27 million transactions a month by 2030, from
+about 800,000 today. It asks for at least six times the current
+capacity, and elsewhere states that Leios delivers ten times or more. Its measure of current capacity is a count,
+about three transactions per second, the Praos ceiling at 1,500 B per
+transaction. The report reads the multipliers as counts at the mainnet
+size mix: six and ten times the current capacity are 27 and 45 kB/s.
+
+CIP-164 quotes throughput at 1,500 B per transaction. Its cost-estimate
+document gives 50 transactions per second as the sustainability line.
+Its simulations give 150 to 350 kB/s for the parameter set it
+describes as feasible, with 512 kB endorser blocks and 12 MB closures.
+
+The proposal treats the CIP-164 parameters as an ideal goal: technical
+feasibility may be confirmed at a lower parameter set, with the higher
+targets addressed through the gradual deployment plan. That is the
+standard this report applies: a parameter set confirmed feasible, with
+a credible path upward to the proposal's multipliers. The CIP's
+parameters beyond them belong to the deployment plan's later stages.
 
 Bytes are one of several limits on what a Leios block carries. Plutus
-execution steps and memory and the bytes of reference scripts are capped
-alongside them, and reading the proposal's capacity as a count at the
-mainnet mix extends to whatever those budgets allow. Section 2 states the
-full set of limits and which of them the measurements exercise.
+execution steps, Plutus memory and reference-script bytes are capped
+alongside them. Section 2 states which of these limits the
+measurements exercise. The congested periods of Table 1.1 are
+characterised in bytes only. Whether the proposed parameter sets scale
+the script budgets from the Praos limits is a question this report
+does not settle. The validation margin that script computation would
+draw on is discussed in sections 8.5 and 9.
 
-The congested periods of Table 1.1 are characterised in bytes only.
-Their Plutus steps and memory and reference-script bytes, the share of
-block bytes in script transactions and how often the execution-unit
-limit binds before the size limit, are not measured here, although the
-transaction-level data is available from Koios. Whether the proposed
-parameter sets scale the script budgets proportionally from the Praos
-limits is a question this report does not settle. The validation
-margin that script computation would draw on is discussed in sections
-8.5 and 9.
-
-Tables 1.2 and 1.3 put the targets and the Praos baseline in one unit. The
-byte-defined targets are converted to transactions per second at the three
-sizes identified above, and the count-defined ones are converted to bytes
-per second the other way.
+Table 1.2 puts the byte-defined targets and the Praos baseline in one
+unit. Each is converted to transactions per second at three
+transaction sizes: the normal mix, the CIP's figure and the minting
+wave.
 
 | target | kB/s | tx/s at 877 B (normal) | at 1,500 B (CIP) | at 2,396 B (mint wave) |
 |---|---|---|---|---|
-| Praos ceiling, 90,112 B x 0.05 | 4.5 | 5.1 | 3.0 | 1.9 |
-| Praos in its busiest post-Vasil hours | 3.4 | 3.9 | 2.3 | 1.4 |
+| Praos ceiling | 4.5 | 5.1 | 3.0 | 1.9 |
+| Praos, busiest hours | 3.4 | 3.9 | 2.3 | 1.4 |
 | current load, epoch 661 | 0.5 | 0.6 | 0.3 | 0.2 |
 | proposal, 6x capacity | 27 | 31 | 18 | 11 |
 | proposal, 10x capacity | 45 | 51 | 30 | 19 |
-| CIP-164 feasible parameters, simulated | 150-350 | 171-399 | 100-233 | 63-146 |
+| CIP-164 simulated set | 150-350 | 171-399 | 100-233 | 63-146 |
 
 Table 1.2. Byte-defined targets and the Praos baseline, in bytes per second
 and in transactions per second at three transaction sizes.
 
+Table 1.3 converts the count-defined targets the other way, to bytes
+per second at the same three sizes.
+
 | target | tx/s | kB/s at 877 B (normal) | at 1,500 B (CIP) | at 2,396 B (mint wave) |
 |---|---|---|---|---|
-| proposal, 27 M transactions a month at 50 to 70 % utilisation | 15-21 | 13-18 | 22-31 | 36-50 |
+| proposal, 27 M transactions a month | 10.4 | 9.1 | 16 | 25 |
 | CIP-164 sustainability line | 50 | 44 | 75 | 120 |
 
 Table 1.3. Count-defined targets, in bytes per second at the same three
@@ -235,162 +232,143 @@ sizes. The proposal's figures are taken from its on-chain metadata (Koios),
 the CIP's from the CIP-164 README and its cost-estimate document.
 
 The proposal's tenfold target and the CIP's 50 transactions per second
-coincide near 45 kB/s at the normal mix; at the CIP's own transaction size
-of 1,500 B, the 50 tx/s line is 75 kB/s. The CIP's simulated parameter set
-sits three to eight times above that line.
+coincide near 45 kB/s at the normal mix. At the CIP's own transaction
+size the same line is 75 kB/s. The CIP's simulated parameter set sits
+three to eight times above it.
 
 ## 1.3 Where the measured parameter sets sit on paper
 
-The report measures three parameter sets, each named by the two caps that
-define it: the reference list an endorser block may carry, which caps the
-transaction count at 36 or 37 bytes per reference by the transaction's
-size, and the bytes of its closure,
-the transactions it brings into the chain. Table 1.4 gives the parameter
-ceiling of each set, the rate it would carry with every endorser block full
-and every one certified, against the targets of the previous subsection.
+The report measures three parameter sets. Each is named by the two
+caps that define it. The first is the reference list an endorser block
+may carry, which caps its transaction count at 36 or 37 bytes per
+reference, depending on the transaction's size. The second is the
+bytes of its closure, the transactions it brings into the chain.
 
-| parameter set | reference cap | closure cap | parameter ceiling, kB/s | tx/s at 877 B | against the targets |
-|---|---|---|---|---|---|
-| 40 kB / 260 kB | 40,000 B (1,111 txs) | 260 kB | 8.9 | 10 | twice the Praos ceiling |
-| 100 kB / 1 MB | 100,000 B (2,777 txs) | 1,000 kB | 27.9 | 32 | the proposal's 6x line |
-| 308 kB / 2 MB | 308,000 B (8,555 txs) | 2,000 kB | 53.5 | 61 | the 10x line, and the CIP's 50 tx/s at the normal mix |
+Table 1.4 gives each set's parameter ceiling, the rate it would carry
+with every endorser block full and every one certified, beside the
+targets of the previous subsection.
 
-Table 1.4. The parameter ceiling of each set, computed as the closure cap
-times f times p, plus the plain Praos block's share at its 90,112 B limit,
-where p = 0.513 is the probability that the next block arrives late enough
-(14 slots or more) for the certificate to be included. Section 2 defines the ceiling and the
-corrections that take it down to a measurement, and section 4 reports both
-for each set.
+| parameter set | reference cap | closure cap | parameter ceiling, kB/s | tx/s at 877 B |
+|---|---|---|---|---|
+| 40 kB / 260 kB | 40,000 B (1,111 txs) | 260 kB | 8.9 | 10 |
+| 100 kB / 1 MB | 100,000 B (2,777 txs) | 1,000 kB | 27.9 | 32 |
+| 308 kB / 2 MB | 308,000 B (8,555 txs) | 2,000 kB | 53.5 | 61 |
+
+Table 1.4. The parameter ceiling is the closure cap times f times p,
+plus the plain Praos block's share at its 90,112 B limit. Here
+p = 0.513 is the probability that the next block arrives 14 slots or
+more later, late enough for the certificate to be included. Section 2
+defines the ceiling and the corrections that take it down to a
+measurement. Section 4 reports both for each set.
+
+The smallest set is twice the Praos ceiling. The middle set reaches
+the proposal's sixfold line. The largest set's ceiling lies above the
+tenfold line, and at the normal mix above the CIP's 50 transactions
+per second as well.
 
 How much of each ceiling the protocol delivers on real nodes, and why it
 falls short where it does, is the question the rest of the report answers.
 
 # 2. What is assessed and what to expect
 
-This section describes the Leios pipeline as it is deployed on the networks
-measured in this report, the clock each of its stages runs against, the set
-of parameters and conditions that bound it, and the way the report relates a
-parameter set's ceiling to what the chain actually carries. It contains no
-measurements. Its purpose is to fix the vocabulary and the expectations that
-the results in section 4 are read with, so that each result there can be
-stated as what was expected, what was measured, and why the two differ.
+This section describes the Leios pipeline as deployed on the measured
+networks: its stages, the limits that bound it, and how a parameter
+set's ceiling relates to what the chain carries. It holds no
+measurements. It fixes the vocabulary with which section 4 is read.
 
 ## 2.1 The pipeline and its clock
 
-Leios adds to Praos a second kind of block, the endorser block, which lets a
-ranking block bring into the chain many more transactions than it could
-carry itself. The ranking block (RB) remains the Praos block: produced by the
-slot leader, limited in size, and the only block that extends the chain. The
-endorser block (EB) is a list of transaction references announced inside an
-RB; the transactions it refers to, called its closure, enter the ledger only
-when a later RB carries a certificate stating that a committee of stake
-pools has validated them. The pipeline between an announcement and its
-certificate has six stages, each with a clock of its own.
+Leios adds to Praos a second kind of block, the endorser block. The
+ranking block (RB) remains the Praos block and the only one that
+extends the chain. The endorser block (EB) is a list of transaction
+references announced inside an RB. Its transactions, called its
+closure, enter the ledger when a later RB carries a certificate from a
+committee of stake pools that validated them. Between announcement and
+certificate the pipeline has six stages, each with a clock of its own.
 
-The first stage is the forger's snapshot. When a pool is elected for a slot,
-its node takes a snapshot of its mempool, builds the RB, and, as deployed,
-announces an EB with it: the references of the transactions in the snapshot
-that fit the caps, 36 or 37 bytes per reference by the transaction's
-size. The node budgets a fixed time for
-the snapshot, so the EB is bounded by what the mempool holds when the slot
-comes and by the time the node allows itself to partition it, not only by
-the caps. An RB that carries a certificate brings the certified closure's
-transactions into the ledger and, as deployed, carries no transactions of
-its own; an RB without a certificate carries its own transactions as a Praos
-block does.
+The first stage is the forger's snapshot. A pool elected for a slot
+snapshots its mempool, builds the RB and announces with it an EB of
+the snapshot's transactions that fit the caps. The snapshot has a time
+budget, so the EB is bounded by the mempool's content and by that
+budget, not only by the caps. As deployed, an RB that carries a
+certificate carries no transactions of its own.
 
-The second and third stages are diffusion. The EB body, the reference list,
-is fetched by every node that learns of the announcement; the closure, the
-transactions themselves, is assembled next, from the node's own mempool for
-the transactions it already holds and from its peers for the rest. Both are
-driven by the node's block-fetch and transaction-fetch logic and therefore
-depend on the topology, the bandwidth and the mempool content of each node.
+The second and third stages are diffusion. Every node fetches the EB
+body, the reference list, and then assembles the closure from its own
+mempool and from its peers.
 
-The fourth stage is validation and voting. The committee, the pools with
-the most stake up to a maximum number of seats (900 on the testnet), one
-seat per pool and each seat's vote weighted by its pool's stake, validates
-the closure against the ledger state and votes. The vote is
-scheduled three seconds after the EB's slot and must be cast by seven
-seconds after it, the deployed diffusion bound (the protocol's timing
-parameters L_hdr, L_vote and L_diff are 1, 4 and 7 s on these networks). A
-voter that holds the closure before the three-second mark waits; one that
-receives it after the seven-second deadline does not vote. Validation
-applies to the ledger state every transaction of the closure, in full for
-the ones the node has not validated before and as a reapplication for the
-ones it validated at mempool admission or in an earlier EB, so its cost
-depends on how much of the EB the voter had already validated.
+The fourth stage is validation and voting. The committee, the pools
+with the most stake with each vote weighted by stake, validates the
+closure against the ledger state and votes. The vote is scheduled
+three seconds after the EB's slot and must be cast by seven. A voter
+that receives the closure after the deadline does not vote.
 
-The fifth stage is the tally. Votes diffuse between the nodes, and every
-node keeps a running tally of the weight behind each EB; the EB is
-certifiable once the tally reaches the quorum, three quarters of the
-committee's weight. The certificate can be included only in an RB whose slot
-is at least fourteen slots after the announcing RB's, the certification gap,
-which gives the votes time to arrive. Since RBs come at random with an
-active slot coefficient of 0.05, the probability that the next RB is far
-enough away is 0.95 raised to the thirteenth power, 0.513: on paper, about
-half of the EBs announced are eligible for certification at all, and the
-other half are superseded by the next announcement before their votes could
-count.
+Validation applies every transaction of the closure to the ledger
+state: in full for the ones the node has not seen, and as a cheaper
+reapplication for the ones it validated at mempool admission or in an
+earlier EB. Its cost therefore depends on how much of the EB the voter
+had already validated.
 
-The sixth stage is adoption. A node that receives a certifying RB must hold
-the certified closure before it can select the block, apply or reapply its
-transactions on top of the chain, and only then adopt it. This is the point
-at which Leios touches Praos directly: the certifying RB is a Praos block
-whose adoption carries more work than a plain one, and if that work delays
-its propagation, the next slot leader may build on the previous block
-instead, forking the chain. Section 5 is about this stage.
+The fifth stage is the tally. The EB is certifiable once the votes
+reach the quorum, three quarters of the committee's weight. The
+certificate can only go in an RB at least fourteen slots after the
+announcing one, the certification gap. On paper the next RB comes that
+late with probability 0.513, so about half of the announced EBs are
+eligible for certification. The rest are superseded by the next
+announcement.
 
-Each stage thus has either a deadline or a budget: the snapshot has a time
-budget, the body and the closure must arrive before the vote can be cast,
-validation must fit between the closure's arrival and the deadline, the
-tally must reach the quorum before an eligible RB comes, and adoption must
-not delay the Praos block. The results tables of section 4 have one row per
-stage for that reason.
+The sixth stage is adoption. A node that receives a certifying RB must
+hold the closure and apply its transactions before adopting the block.
+That is more work than a plain Praos block takes, and if it delays
+propagation the next slot leader may fork the chain. Section 5 is
+about this stage.
+
+Each stage has a deadline or a budget. The tables of section 4 have
+one row per stage for that reason.
 
 ## 2.2 The constraint set
 
-A Leios parameter set is not one number. The caps and budgets below bound
-the pipeline jointly, and the quantity of interest, the bytes the chain
-carries per second, integrates all of them. Table 2.1 lists them with the
-stage each one binds and whether the measurements in this report exercise
-it.
+A Leios parameter set is more than the two caps that name it. Table
+2.1 lists its parameters with the stage of 2.1 each one binds.
 
-| constraint | what it bounds | stage it binds | exercised by the measurements |
-|---|---|---|---|
-| reference cap (bytes of the EB body) | the number of transactions an EB may reference, at 36 or 37 B each | snapshot; body diffusion | yes, binding at small transactions |
-| closure cap (bytes of the EB's transactions) | the bytes an EB brings into the chain | closure diffusion; validation; adoption | yes, binding at large transactions |
-| reference-script cap | the bytes of reference scripts the closure may pull in | validation | no: the transactions used carry no scripts |
-| Plutus steps and memory budgets | the script computation the closure may require | validation | no: the transactions used carry no scripts |
-| timings L_hdr, L_vote, L_diff | when votes are cast and by when | validation and voting | yes, at the deployed values only |
-| certification gap | how far the next RB must be for a certificate to count | tally | yes, at 14 slots |
-| committee size and quorum | how much stake must vote, and how it is spread | tally | yes, with the real stake distribution of each network |
-| the Praos block limit and f | the plain block's share and the RB rate | all, as the clock | fixed at mainnet's values |
+| parameter | what it bounds | stage it binds |
+|---|---|---|
+| reference cap (bytes of the EB body) | the number of transactions an EB may reference, at 36 or 37 B each | snapshot; body diffusion |
+| closure cap (bytes of the EB's transactions) | the bytes an EB brings into the chain | closure diffusion; validation; adoption |
+| reference-script cap | the bytes of reference scripts the closure may pull in | validation |
+| Plutus steps and memory budgets | the script computation the closure may require | validation |
+| timings L_hdr, L_vote, L_diff | when votes are cast and by when | validation and voting |
+| certification gap | how far the next RB must be for a certificate to count | tally |
+| committee size and quorum | how much stake must vote, and how it is spread | tally |
+| the Praos block limit and f | the plain block's share and the RB rate | all, as the clock |
 
 Table 2.1. The parameters of a Leios set and the stage each one binds.
 
-Three conditions outside the parameter set bound the pipeline as much as
-the parameters do and cannot be set by the protocol: the hardware of the
-nodes, which decides how fast a closure is validated; the mempool coverage,
-how much of an EB a node already holds when it is announced, which decides
-how much validation is applied in full; and the topology, which decides how
-fast bodies, closures and votes travel. The report measures on the
-populations described in section 3 and states its results against them; it
-does not define a reference machine. The script and reference-script
-budgets are the one part of the parameter set the measurements leave
-untouched, because every population ran plain value transactions. Those
-budgets share the voter's validation window with the byte caps, so they are
-not independent of them. A voter must have received and validated the
-closure by the deadline, so the seven seconds after the slot are shared
-between the closure's arrival and its validation: whatever validation
-work a closure carries, script computation or more transactions, must be
-paid for by a closure that arrives earlier, and at a given bandwidth an
-earlier closure is a smaller one. Only a closure that arrives before the
-three-second mark escapes this trade, since voting cannot start earlier
-and its validation has the full four seconds whatever its size; there,
-script computation trades against the validation of other transactions
-instead. A larger script budget therefore means a smaller closure in
-either case. The report treats them as budgets to be set conservatively
-alongside the byte caps it measures, not as dimensions it has confirmed.
+The measurements exercise the two caps, the timings at their deployed
+values, the certification gap at 14 slots and the committee with each
+network's real stake. The Praos block limit and f stay at mainnet's
+values. The script and reference-script budgets are left untouched:
+every transaction measured carries no script.
+
+Three conditions outside the parameter set bound the pipeline as much
+as the parameters do: the hardware of the nodes, which decides how
+fast a closure is validated; the mempool coverage, how much of an EB a
+node already holds when it is announced, which decides how much of it
+is applied in full; and the topology, which decides how fast bodies,
+closures and votes travel. This report measures on the populations of
+section 3 and states its results against them. It defines no
+reference machine.
+
+The script budgets are not independent of the byte caps. A voter must
+have received and validated the closure by the deadline, so the
+closure's arrival and its validation share the same seconds. Whatever
+validation work a closure carries, script computation or more
+transactions, must be paid for by a closure that arrives earlier, and
+at a given bandwidth an earlier closure is a smaller one. At fixed
+hardware, bandwidth and implementation, a larger script budget
+therefore means a smaller closure. This report treats
+the script budgets as values to be set conservatively alongside the
+caps it measures, not as dimensions it has confirmed.
 
 ## 2.3 The ceiling and the ladder
 
