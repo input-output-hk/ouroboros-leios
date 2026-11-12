@@ -9,7 +9,7 @@ number; their hostnames are numbered like the operators' agent names,
 also in the hosts table and in the outputs that mention them. The cluster
 runs' nodes are already node-00 to node-50 and need no mapping.
 
-    publish_outputs.py --out PUBLIC_COPY [--outputs DIR] [--map FILE] [--hosts FILE] WINDOW [WINDOW ...]
+    publish_outputs.py --out PUBLIC_COPY --map FILE [--outputs DIR] [--hosts FILE] WINDOW [WINDOW ...]
 
 PUBLIC_COPY is the public repository folder; the script writes under its
 outputs/<window>/ and its data/hosts.csv. The mapping (kind, name, number)
@@ -39,7 +39,7 @@ def main():
     ap.add_argument("windows", nargs="+", metavar="WINDOW")
     ap.add_argument("--out", required=True, help="the public copy's folder (outputs/ and data/ under it)")
     ap.add_argument("--outputs", default=os.path.normpath(os.path.join(HERE, "..", "outputs")))
-    ap.add_argument("--map", default=os.path.normpath(os.path.join(HERE, "..", "data", "private", "node-map.csv")))
+    ap.add_argument("--map", required=True, help="the mapping file (kind, name, number), kept outside the repository")
     ap.add_argument("--hosts", default=os.path.normpath(os.path.join(HERE, "..", "data", "hosts.csv")))
     a = ap.parse_args()
     mapping = {}
