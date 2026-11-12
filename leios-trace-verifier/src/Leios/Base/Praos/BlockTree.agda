@@ -13,6 +13,11 @@
    in out of order makes the tree rebuild its entries from the pool in slot
    order; the converters deliver blocks in order, so that is rare.
 
+   Of equally long chains the tree takes the one whose tip it adopted last,
+   since the node adopts blocks in the order it selects them.  Every entry
+   records the adoption number of its block, so a rebuild in slot order
+   still breaks ties by adoption.
+
    The chains of the entries share their tails, so an entry costs one cell.
    The invariant 'Inv' travels with the tree; the laws follow from it.
 -}
@@ -36,8 +41,8 @@ open Hashable ⦃ ... ⦄ using (hash)
 
 open import Data.Nat.Base using (z≤n; s≤s)
 open import Data.Nat.Properties
-  using (≤-refl; ≤-trans; <⇒≤; <-irrefl; ≤-<-trans; <-≤-trans; ≮⇒≥; ≰⇒>; n≮0)
-open import Data.List.Membership.Propositional.Properties using (∈-filter⁺; ∈-filter⁻)
+  using (≤-refl; ≤-trans; <⇒≤; <-irrefl; ≤-<-trans; <-≤-trans; n≮0)
+open import Data.List.Membership.Propositional.Properties using (∈-filter⁺; ∈-filter⁻; ∈-map⁺; ∈-map⁻)
 open import Data.List.Relation.Binary.SetEquality using (_≡ˢ_; ⊆×⊇⇒≡ˢ)
 import Data.List.Relation.Unary.Linked as Lkd
 
@@ -107,9 +112,11 @@ module _
   lenM (just c) = length c
 
   record Entry : Type where
-    constructor ⟪_,_⟫
+    constructor ⟪_,_,_⟫
     field blk     : Block
           chainOf : Maybe Chain
+          -- the adoption number of 'blk': the k-th block added has k
+          seq     : ℕ
 
   open Entry public
 
@@ -142,11 +149,15 @@ module _
       entries : List Entry
       -- the highest slot in the pool
       top     : Slot
-      -- the longest chain of all entries
-      bestC   : Chain
-      inv     : Inv (genesisBlock ∷ blocks) entries top bestC
+      -- the longest chain of all entries, with the adoption number of its
+      -- tip
+      best    : ℕ × Chain
+      inv     : Inv (genesisBlock ∷ blocks) entries top (proj₂ best)
 
   open TreeImpl
+
+  bestC : TreeImpl → Chain
+  bestC = proj₂ ∘ best
 
   pool : TreeImpl → List Block
   pool t = genesisBlock ∷ blocks t
@@ -157,7 +168,7 @@ module _
   opaque
     unfolding gb✓
 
-    inv₀ : Inv [ genesisBlock ] [ ⟪ genesisBlock , just [ genesisBlock ] ⟫ ] 0 [ genesisBlock ]
+    inv₀ : Inv [ genesisBlock ] [ ⟪ genesisBlock , just [ genesisBlock ] , 0 ⟫ ] 0 [ genesisBlock ]
     inv₀ = record
       { inPool  = λ where (here refl) → here refl
       ; covers  = λ where (here refl) → _ , here refl , refl
@@ -170,12 +181,14 @@ module _
       }
 
   tree₀′ : TreeImpl
-  tree₀′ = mkTree [] [ ⟪ genesisBlock , just [ genesisBlock ] ⟫ ] 0 [ genesisBlock ] inv₀
+  tree₀′ = mkTree [] [ ⟪ genesisBlock , just [ genesisBlock ] , 0 ⟫ ] 0 (0 , [ genesisBlock ]) inv₀
 
   ----------------------------------------------------------------------------
   -- Adding a block in slot order
 
-  open MaxBy {B = Chain} length
+  -- Parent chains have no tie-break; best chains break ties by adoption.
+  open MaxBy {B = Chain} length (λ _ → 0)
+  module Latest = MaxBy {B = ℕ × Chain} (length ∘ proj₂) proj₁
 
   -- The chains of the entries that can be the parent of 'b': their block is
   -- the one 'b' points to, in an earlier slot.
@@ -230,38 +243,37 @@ module _
   ... | no _  | yes _ = extendWith b (parents b es)
   ... | no _  | no _  = nothing
 
-  -- The longer of the best chain so far and the chain of a new block; the new
-  -- one on a tie.  A node adopts the blocks it is given in the order it
-  -- selects them, so of equally long chains the latest is its tip.
-  pick : Chain → Maybe Chain → Chain
-  pick bc nothing  = bc
-  pick bc (just c) with length bc ≤? length c
-  ... | yes _ = c
-  ... | no  _ = bc
+  -- The longer of the best chain so far and the chain of a new block 'b'
+  -- with adoption number 'n'; of equally long ones, the one adopted last.
+  -- A node adopts the blocks it is given in the order it selects them, so
+  -- of equally long chains the latest is its tip.
+  pick : ℕ × Chain → ℕ → Maybe Chain → ℕ × Chain
+  pick bp n nothing  = bp
+  pick bp n (just c) = Latest.maxBy bp [ (n , c) ]
 
-  pick-mem : ∀ bc m → pick bc m ≡ bc ⊎ m ≡ just (pick bc m)
-  pick-mem bc nothing  = inj₁ refl
-  pick-mem bc (just c) with length bc ≤? length c
-  ... | yes _ = inj₂ refl
-  ... | no  _ = inj₁ refl
+  pick-mem : ∀ bp n m → proj₂ (pick bp n m) ≡ proj₂ bp ⊎ m ≡ just (proj₂ (pick bp n m))
+  pick-mem bp n nothing  = inj₁ refl
+  pick-mem bp n (just c) with Latest.maxBy-mem bp [ (n , c) ]
+  ... | inj₁ eq        = inj₁ (cong proj₂ eq)
+  ... | inj₂ (here eq) = inj₂ (cong just (sym (cong proj₂ eq)))
 
-  pick-≥bc : ∀ bc m → length bc ≤ length (pick bc m)
-  pick-≥bc bc nothing  = ≤-refl
-  pick-≥bc bc (just c) with length bc ≤? length c
-  ... | yes le = le
-  ... | no  _  = ≤-refl
+  pick-≥bc : ∀ bp n m → length (proj₂ bp) ≤ length (proj₂ (pick bp n m))
+  pick-≥bc bp n nothing  = ≤-refl
+  pick-≥bc bp n (just c) = Latest.maxBy-base bp [ (n , c) ]
 
-  pick-≥m : ∀ bc m → lenM m ≤ length (pick bc m)
-  pick-≥m bc nothing  = z≤n
-  pick-≥m bc (just c) with length bc ≤? length c
-  ... | yes _  = ≤-refl
-  ... | no ¬le = <⇒≤ (≰⇒> ¬le)
+  pick-≥m : ∀ bp n m → lenM m ≤ length (proj₂ (pick bp n m))
+  pick-≥m bp n nothing  = z≤n
+  pick-≥m bp n (just c) = Latest.maxBy-≥ bp [ (n , c) ] (here refl)
 
-  -- Adding 'b' to the pool 'genesis ∷ bs', at or past every slot in it.
-  module Insert {bs es top bc} (b : Block) (top≤ : top ≤ b .slot)
-                (I : Inv (genesisBlock ∷ bs) es top bc) where
+  -- Adding 'b', with adoption number 'n', to the pool 'genesis ∷ bs', at or
+  -- past every slot in it.
+  module Insert {bs es top} {bp : ℕ × Chain} (b : Block) (n : ℕ) (top≤ : top ≤ b .slot)
+                (I : Inv (genesisBlock ∷ bs) es top (proj₂ bp)) where
 
     open Inv I
+
+    bc : Chain
+    bc = proj₂ bp
 
     P P′ : List Block
     P  = genesisBlock ∷ bs
@@ -345,13 +357,13 @@ module _
                                     (inj₂ (subst (λ y → y .slot ≤ top) (sym tc) (below (inPool e∈))))
                                     c⊆)
 
-    pick-sound : pick bc m ✓ × pick bc m ⊆ˢ P′
-    pick-sound with pick-mem bc m
+    pick-sound : proj₂ (pick bp n m) ✓ × proj₂ (pick bp n m) ⊆ˢ P′
+    pick-sound with pick-mem bp n m
     ... | inj₁ eq rewrite eq = bc✓ , widen ∘ bc⊆
     ... | inj₂ eq with subst (Sound P′ b) eq sound-new
     ...   | c✓ , _ , c⊆ = c✓ , c⊆
 
-    inv′ : Inv P′ (⟪ b , m ⟫ ∷ es) (b .slot) (pick bc m)
+    inv′ : Inv P′ (⟪ b , m , n ⟫ ∷ es) (b .slot) (proj₂ (pick bp n m))
     inv′ = record
       { inPool  = λ where (here refl) → there (here refl)
                           (there e∈)  → widen (inPool e∈)
@@ -367,33 +379,55 @@ module _
                     (inj₂ q)    → ≤-trans (below q) top≤
       ; bc✓     = pick-sound .proj₁
       ; bc⊆     = pick-sound .proj₂
-      ; bc≥     = λ where (here refl) → pick-≥m bc m
-                          (there e∈)  → ≤-trans (bc≥ e∈) (pick-≥bc bc m)
+      ; bc≥     = λ where (here refl) → pick-≥m bp n m
+                          (there e∈)  → ≤-trans (bc≥ e∈) (pick-≥bc bp n m)
       }
 
-  insert : (t : TreeImpl) (b : Block) → top t ≤ b .slot → TreeImpl
-  insert t b top≤ =
-    mkTree (b ∷ blocks t) (⟪ b , Insert.m b top≤ (inv t) ⟫ ∷ entries t) (b .slot)
-           (pick (bestC t) (Insert.m b top≤ (inv t))) (Insert.inv′ b top≤ (inv t))
+  insert : (t : TreeImpl) (b : Block) (n : ℕ) → top t ≤ b .slot → TreeImpl
+  insert t b n top≤ =
+    mkTree (b ∷ blocks t) (⟪ b , I.m , n ⟫ ∷ entries t) (b .slot) (pick (best t) n I.m) I.inv′
+    where module I = Insert {bp = best t} b n top≤ (inv t)
 
   ----------------------------------------------------------------------------
   -- Adding a block out of slot order: rebuild the entries in slot order
 
-  open SortDesc _≟_ slot using (sortDesc; sortDesc-∈; sortDesc-∈⁻; Sorted; ltail≤; sortDesc-sorted)
+  -- The blocks added, latest first, each with its adoption number.
+  numbered : List Block → List (Block × ℕ)
+  numbered []       = []
+  numbered (x ∷ xs) = (x , suc (length xs)) ∷ numbered xs
+
+  blocksOf : List (Block × ℕ) → List Block
+  blocksOf = map proj₁
+
+  numbered-blocks : ∀ xs → blocksOf (numbered xs) ≡ xs
+  numbered-blocks []       = refl
+  numbered-blocks (x ∷ xs) = cong (x ∷_) (numbered-blocks xs)
+
+  open import Data.Product.Properties using (≡-dec)
+  import Data.Nat.Properties as ℕ
+
+  open SortDesc (≡-dec _≟_ ℕ._≟_) (slot ∘ proj₁) using (sortDesc; sortDesc-∈; sortDesc-∈⁻; Sorted; ltail≤; sortDesc-sorted)
 
   mutual
-    -- The tree of a pool sorted latest first, built from its earliest block.
-    build : (xs : List Block) → Sorted xs → TreeImpl
-    build []       _ = tree₀′
-    build (x ∷ xs) s = insert (build xs (ltail≤ s)) x (build-top≤ x xs s)
+    -- The tree of a pool sorted latest first, built from its earliest block;
+    -- every block keeps its adoption number.
+    build : (xs : List (Block × ℕ)) → Sorted xs → TreeImpl
+    build []             _ = tree₀′
+    build ((x , n) ∷ xs) s = insert (build xs (ltail≤ s)) x n (build-top≤ x n xs s)
 
-    build-top≤ : ∀ x xs (s : Sorted (x ∷ xs)) → top (build xs (ltail≤ s)) ≤ x .slot
-    build-top≤ x []       _             = z≤n
-    build-top≤ x (y ∷ ys) (y≤x Lkd.∷ _) = y≤x
+    build-top≤ : ∀ x n xs (s : Sorted ((x , n) ∷ xs)) → top (build xs (ltail≤ s)) ≤ x .slot
+    build-top≤ x n []       _             = z≤n
+    build-top≤ x n (y ∷ ys) (y≤x Lkd.∷ _) = y≤x
 
-  build-blocks : ∀ xs (s : Sorted xs) → blocks (build xs s) ≡ xs
-  build-blocks []       _ = refl
-  build-blocks (x ∷ xs) s = cong (x ∷_) (build-blocks xs (ltail≤ s))
+  build-blocks : ∀ xs (s : Sorted xs) → blocks (build xs s) ≡ blocksOf xs
+  build-blocks []             _ = refl
+  build-blocks ((x , n) ∷ xs) s = cong (x ∷_) (build-blocks xs (ltail≤ s))
+
+  -- The blocks of a list of numbered blocks follow its membership.
+  ∈-blocks : ∀ {ys zs : List (Block × ℕ)} → (∀ {p} → p ∈ ys → p ∈ zs)
+           → ∀ {x} → x ∈ blocksOf ys → x ∈ blocksOf zs
+  ∈-blocks f x∈ with ∈-map⁻ proj₁ x∈
+  ... | _ , p∈ , refl = ∈-map⁺ proj₁ (f p∈)
 
   -- The invariant only sees the pool through membership.
   Inv-cong : ∀ {P Q es top bc} → (∀ {x} → x ∈ P → x ∈ Q) → (∀ {x} → x ∈ Q → x ∈ P)
@@ -416,36 +450,41 @@ module _
 
   rebuild : TreeImpl → Block → TreeImpl
   rebuild t b =
-    mkTree (b ∷ blocks t) (entries t′) (top t′) (bestC t′) (Inv-cong to from (inv t′))
+    mkTree (b ∷ blocks t) (entries t′) (top t′) (best t′) (Inv-cong to from (inv t′))
     where
-      xs = sortDesc (b ∷ blocks t)
-      s  = sortDesc-sorted (b ∷ blocks t)
+      ns = numbered (b ∷ blocks t)
+      xs = sortDesc ns
+      s  = sortDesc-sorted ns
       t′ = build xs s
 
       to : ∀ {x} → x ∈ genesisBlock ∷ blocks t′ → x ∈ genesisBlock ∷ b ∷ blocks t
-      to (here refl) = here refl
-      to (there q)   = there (sortDesc-∈⁻ (b ∷ blocks t) (subst (_ ∈_) (build-blocks xs s) q))
+      to     (here refl) = here refl
+      to {x} (there q)   = there (subst (x ∈_) (numbered-blocks (b ∷ blocks t))
+                                    (∈-blocks (sortDesc-∈⁻ ns) (subst (x ∈_) (build-blocks xs s) q)))
 
       from : ∀ {x} → x ∈ genesisBlock ∷ b ∷ blocks t → x ∈ genesisBlock ∷ blocks t′
-      from (here refl) = here refl
-      from (there q)   = there (subst (_ ∈_) (sym (build-blocks xs s)) (sortDesc-∈ (b ∷ blocks t) q))
+      from     (here refl) = here refl
+      from {x} (there q)   = there (subst (x ∈_) (sym (build-blocks xs s))
+                                      (∈-blocks (sortDesc-∈ ns)
+                                        (subst (x ∈_) (sym (numbered-blocks (b ∷ blocks t))) q)))
 
   extend : TreeImpl → Block → TreeImpl
   extend t b with top t ≤? b .slot
-  ... | yes top≤ = insert t b top≤
+  ... | yes top≤ = insert t b (suc (length (blocks t))) top≤
   ... | no  _    = rebuild t b
 
   ----------------------------------------------------------------------------
   -- The longest chain up to a slot
 
-  chainsUpTo : Slot → List Entry → List Chain
+  -- The chains of the blocks up to a slot, each with its adoption number.
+  chainsUpTo : Slot → List Entry → List (ℕ × Chain)
   chainsUpTo sl [] = []
   chainsUpTo sl (e ∷ es) with blk e .slot ≤? sl | chainOf e
-  ... | yes _ | just c = c ∷ chainsUpTo sl es
+  ... | yes _ | just c = (seq e , c) ∷ chainsUpTo sl es
   ... | _     | _      = chainsUpTo sl es
 
-  chainsUpTo-sound : ∀ {sl c} es → c ∈ chainsUpTo sl es
-                   → ∃[ e ] e ∈ es × chainOf e ≡ just c × blk e .slot ≤ sl
+  chainsUpTo-sound : ∀ {sl p} es → p ∈ chainsUpTo sl es
+                   → ∃[ e ] e ∈ es × chainOf e ≡ just (proj₂ p) × blk e .slot ≤ sl
   chainsUpTo-sound {sl} (e ∷ es) c∈ with blk e .slot ≤? sl | chainOf e in eq
   ... | yes ≤sl | just _ with c∈
   ...   | here refl = e , here refl , eq , ≤sl
@@ -454,7 +493,7 @@ module _
   chainsUpTo-sound (e ∷ es) c∈ | no _  | _       = let (e′ , e∈ , rest) = chainsUpTo-sound es c∈ in e′ , there e∈ , rest
 
   chainsUpTo-complete : ∀ {sl e c} es → e ∈ es → chainOf e ≡ just c → blk e .slot ≤ sl
-                      → c ∈ chainsUpTo sl es
+                      → (seq e , c) ∈ chainsUpTo sl es
   chainsUpTo-complete {sl} (e ∷ es) e∈ eq ≤sl with blk e .slot ≤? sl | chainOf e in eq′ | e∈
   ... | yes _ | just _  | here refl with refl ← trans (sym eq′) eq = here refl
   ... | yes _ | just _  | there e∈′ = there (chainsUpTo-complete es e∈′ eq ≤sl)
@@ -464,11 +503,12 @@ module _
   ... | no _  | _       | there e∈′ = chainsUpTo-complete es e∈′ eq ≤sl
 
   -- At or past the highest slot it is the longest chain of all; before
-  -- that, the longest chain of a block up to the slot.
+  -- that, the longest chain of a block up to the slot.  Either way, of
+  -- equally long chains the one adopted last.
   bestChainT : Slot → TreeImpl → Chain
   bestChainT sl t with top t ≤? sl
   ... | yes _ = bestC t
-  ... | no  _ = maxBy [ genesisBlock ] (chainsUpTo sl (entries t))
+  ... | no  _ = proj₂ (Latest.maxBy (0 , [ genesisBlock ]) (chainsUpTo sl (entries t)))
 
   ----------------------------------------------------------------------------
   -- The laws
@@ -502,8 +542,8 @@ module _
   valid′ : ∀ t sl → bestChainT sl t ✓
   valid′ t sl with top t ≤? sl
   ... | yes _ = Inv.bc✓ (inv t)
-  ... | no  _ with maxBy-mem [ genesisBlock ] (chainsUpTo sl (entries t))
-  ...   | inj₁ eq = subst _✓ (sym eq) gb✓
+  ... | no  _ with Latest.maxBy-mem (0 , [ genesisBlock ]) (chainsUpTo sl (entries t))
+  ...   | inj₁ eq = subst _✓ (sym (cong proj₂ eq)) gb✓
   ...   | inj₂ c∈ with chainsUpTo-sound (entries t) c∈
   ...     | e , e∈ , eq , _ = subst (Sound (pool t) (blk e)) eq (Inv.sound (inv t) e∈) .proj₁
 
@@ -512,8 +552,8 @@ module _
   ... | yes top≤ = λ x∈ →
         let x∈P = Inv.bc⊆ (inv t) x∈
         in ∈-filter⁺ ((_≤? sl) ∘ slot) x∈P (≤-trans (Inv.below (inv t) x∈P) top≤)
-  ... | no  _ with maxBy-mem [ genesisBlock ] (chainsUpTo sl (entries t))
-  ...   | inj₁ eq = λ x∈ → case subst (_ ∈_) eq x∈ of λ where
+  ... | no  _ with Latest.maxBy-mem (0 , [ genesisBlock ]) (chainsUpTo sl (entries t))
+  ...   | inj₁ eq = λ x∈ → case subst (_ ∈_) (cong proj₂ eq) x∈ of λ where
             (here refl) → ∈-filter⁺ ((_≤? sl) ∘ slot) (here refl) (subst (_≤ sl) (sym gb-slot) z≤n)
   ...   | inj₂ c∈ with chainsUpTo-sound (entries t) c∈
   ...     | e , e∈ , eq , ≤sl with subst (Sound (pool t) (blk e)) eq (Inv.sound (inv t) e∈)
@@ -536,7 +576,7 @@ module _
       go e e∈ ≤sl lenC with top t ≤? sl
       ... | yes _ = ≤-trans lenC (Inv.bc≥ (inv t) e∈)
       ... | no  _ with chainOf e in eq
-      ...   | just c″ = ≤-trans lenC (maxBy-≥ [ genesisBlock ] _ (chainsUpTo-complete (entries t) e∈ eq ≤sl))
+      ...   | just c″ = ≤-trans lenC (Latest.maxBy-≥ (0 , [ genesisBlock ]) _ (chainsUpTo-complete (entries t) e∈ eq ≤sl))
       ...   | nothing = contradiction (≤-trans (nonempty (✓-tip∈ c✓)) lenC) λ ()
         where
           nonempty : ∀ {x} {xs : List Block} → x ∈ xs → 1 ≤ length xs

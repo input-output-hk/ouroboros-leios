@@ -2,14 +2,16 @@
 {- Generic list machinery for the Praos block tree
    (Leios.Base.Praos.BlockTree):
 
-   - maxBy-mem/-≥       : the fold picking the longest candidate returns the
-     base or a member, and no member is longer;
+   - maxBy-mem/-≥       : the fold picking the longest candidate, the
+     latest of equally long ones, returns the base or a member, and no
+     member is longer;
    - sortDesc-∈/-∈⁻     : sorting a pool by slot keeps exactly its members,
      and sortDesc-sorted : the result is sorted, which is the order the tree
      rebuilds its entries in.
 
-   Everything is measure-generic: μ : A → ℕ is `slot` at the use site and
-   ν : B → ℕ is `length`.
+   Everything is measure-generic: μ : A → ℕ is `slot` at the use site,
+   ν : B → ℕ is `length`, and σ : B → ℕ, which breaks ties, is the
+   adoption number of a chain's tip.
 -}
 module Leios.Base.Praos.ListLemmas where
 
@@ -21,28 +23,44 @@ open import Data.List.Relation.Unary.Any using (here; there)
 import Data.List.Relation.Unary.Linked as Lkd
 import Data.List.Relation.Binary.Sublist.Propositional as SL
 open import Data.Nat.Base using (ℕ; _≤_; _<_)
-open import Data.Nat.Properties using (_≤?_; _<?_; ≤-refl; ≤-trans; <⇒≤; <-trans; <-≤-trans; ≰⇒≥; ≮⇒≥; <-irrefl)
+open import Data.Nat.Properties using (_≤?_; _<?_; ≤-refl; ≤-reflexive; ≤-trans; <⇒≤; <-trans; <-≤-trans; ≰⇒≥; ≮⇒≥; <-irrefl)
 open import Data.Sum.Base using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Relation.Nullary.Decidable using (Dec; yes; no)
-open import Relation.Nullary.Negation using (contradiction)
+open import Relation.Nullary.Decidable using (Dec; yes; no; _⊎-dec_; _×-dec_)
+open import Data.Product.Base using (_×_; _,_; proj₁)
+import Data.Nat.Properties as ℕ
+open import Relation.Nullary.Negation using (¬_; contradiction)
 
 private variable
   A : Set
 
 -- ── Longest element by a measure ────────────────────────────────────────
 
-module MaxBy {B : Set} (ν : B → ℕ) where
+module MaxBy {B : Set} (ν : B → ℕ) (σ : B → ℕ) where
+
+  -- 'c' displaces 'b' if it is longer, or as long and later.
+  Beats : B → B → Set
+  Beats b c = ν b < ν c ⊎ (ν b ≡ ν c × σ b < σ c)
+
+  beats? : ∀ b c → Dec (Beats b c)
+  beats? b c = (ν b <? ν c) ⊎-dec ((ν b ℕ.≟ ν c) ×-dec (σ b <? σ c))
+
+  beats⇒≤ : ∀ {b c} → Beats b c → ν b ≤ ν c
+  beats⇒≤ (inj₁ lt)       = <⇒≤ lt
+  beats⇒≤ (inj₂ (eq , _)) = ≤-reflexive eq
+
+  ¬beats⇒≥ : ∀ {b c} → ¬ Beats b c → ν c ≤ ν b
+  ¬beats⇒≥ ¬bt = ≮⇒≥ (λ lt → ¬bt (inj₁ lt))
 
   maxBy : B → List B → B
   maxBy b []       = b
-  maxBy b (c ∷ cs) with ν b <? ν c
+  maxBy b (c ∷ cs) with beats? b c
   ... | yes _ = maxBy c cs
   ... | no  _ = maxBy b cs
 
   maxBy-mem : ∀ b cs → maxBy b cs ≡ b ⊎ maxBy b cs ∈ cs
   maxBy-mem b [] = inj₁ refl
-  maxBy-mem b (c ∷ cs) with ν b <? ν c
+  maxBy-mem b (c ∷ cs) with beats? b c
   ... | yes _ with maxBy-mem c cs
   ...   | inj₁ e = inj₂ (here e)
   ...   | inj₂ m = inj₂ (there m)
@@ -52,15 +70,15 @@ module MaxBy {B : Set} (ν : B → ℕ) where
 
   maxBy-base : ∀ b cs → ν b ≤ ν (maxBy b cs)
   maxBy-base b [] = ≤-refl
-  maxBy-base b (c ∷ cs) with ν b <? ν c
-  ... | yes lt = ≤-trans (<⇒≤ lt) (maxBy-base c cs)
+  maxBy-base b (c ∷ cs) with beats? b c
+  ... | yes bt = ≤-trans (beats⇒≤ bt) (maxBy-base c cs)
   ... | no  _  = maxBy-base b cs
 
   maxBy-≥ : ∀ b cs {c} → c ∈ cs → ν c ≤ ν (maxBy b cs)
-  maxBy-≥ b (c ∷ cs) m with ν b <? ν c | m
+  maxBy-≥ b (c ∷ cs) m with beats? b c | m
   ... | yes _  | here refl = maxBy-base c cs
   ... | yes _  | there m′  = maxBy-≥ c cs m′
-  ... | no ¬lt | here refl = ≤-trans (≮⇒≥ ¬lt) (maxBy-base b cs)
+  ... | no ¬bt | here refl = ≤-trans (¬beats⇒≥ ¬bt) (maxBy-base b cs)
   ... | no _   | there m′  = maxBy-≥ b cs m′
 
 -- ── Descending insertion sort by a measure ──────────────────────────────
