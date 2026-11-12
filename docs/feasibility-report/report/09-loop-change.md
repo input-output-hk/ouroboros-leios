@@ -101,7 +101,7 @@ Table 9.3 is the rerun's ladder beside the unchanged run's.
 | workload ceiling | 27.9 (payload cap at 374 B/tx) | 27.9 (payload cap at 374 B/tx) |
 | observed spacing | 27.6 (1 RB / 20.8 s, p = 0.533) | 27.2 (1 RB / 19.9 s, p = 0.494) |
 | voting-adjusted, full | 16.9 (s_full = 0.540) | 27.0 (s_full = 0.992) |
-| load-adjusted | 15.9 (announcing 0.99, EB 0.97, plain RB 0.98) | 27.3 (announcing 0.99, EB 1.02, plain RB 0.97) |
+| load-adjusted | 15.5 (announcing 0.99, EB 0.94, plain RB 0.98) | 26.6 (announcing 0.99, EB 1.00, plain RB 0.97) |
 | measured | 15.5 | 26.6 |
 
 Table 9.3. The ladder of the two-input run on the two builds, as Table

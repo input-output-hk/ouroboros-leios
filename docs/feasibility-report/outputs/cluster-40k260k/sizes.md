@@ -5,4 +5,4 @@ certified EBs, txs                   1539      1,110      1,110      1,110      
 certified EBs, closure               1539     222 KB     222 KB     222 KB     222 KB     222 KB     222 KB
 certified EBs, B/tx                  1539        200        200        200        200        200        200
 failed EBs, txs                         8      1,110      1,110      1,110      1,110      1,110      1,110
-(txs from the reference list, 36 B each; closure bytes exist on chain for certified EBs only)
+(txs from the reference list at 36.00 B per reference, measured on the certified EBs; closure bytes exist on chain for certified EBs only)

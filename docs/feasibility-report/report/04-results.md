@@ -43,7 +43,10 @@ windows of 2026-10-21 12:00-13:00, 17:00-21:00 and 10-22 00:00-01:00 UTC,
 parameter ceiling: closures reached every cluster node by 3.2 s and the
 tally its quorum by 4.2 s, so a 14-slot gap would have left the measured
 rows unchanged. Transactions per second at the measured size: 37.4 and
-28.1.
+28.1. In every ladder the transaction count of an EB is its reference
+bytes over the width a reference takes, 36 B for a transaction under
+256 B and 37 B from there on, measured on each window's certified EBs,
+whose count the chain carries.
 
 | stage | cluster 40 kB / 260 kB, 200 B | testnet 40 kB / 260 kB, loaded hours |
 |---|---|---|
@@ -114,7 +117,7 @@ each at the same count.
 | workload ceiling | 16.5 (reference cap at 200 B/tx) | 27.9 (payload cap at 374 B/tx) |
 | observed spacing | 16.4 (1 RB / 20.8 s, p = 0.538) | 27.6 (1 RB / 20.8 s, p = 0.533) |
 | voting-adjusted, full | 12.6 (s_full = 0.689) | 16.9 (s_full = 0.540) |
-| load-adjusted | 12.2 (announcing 0.99, EB 0.97, plain RB 0.97) | 15.9 (announcing 0.99, EB 0.97, plain RB 0.98) |
+| load-adjusted | 12.2 (announcing 0.99, EB 0.97, plain RB 0.97) | 15.5 (announcing 0.99, EB 0.94, plain RB 0.98) |
 | measured | 12.2 | 15.5 |
 
 Table 4.3. The ladder at 100 kB / 1 MB, whole runs of 17.8 h and 17.2 h,
@@ -179,8 +182,8 @@ operator population spans a wider range of hosts than the cluster.
 | workload ceiling | 53.5 (payload cap at 318 B/tx) | - |
 | observed spacing | 49.5 (1 RB / 25.5 s, p = 0.613) | 52.0 (1 RB / 22.6 s, p = 0.569) |
 | voting-adjusted, mix | 25.9 (s_all = 0.485) | 25.8 (s_all = 0.454) |
-| voting-adjusted, full | 10.1 (s_full = 0.142) | - |
-| load-adjusted | 16.0 (announcing 0.98, EB 0.60, plain RB 0.90) | - |
+| voting-adjusted, full | 9.9 (s_full = 0.138) | - |
+| load-adjusted | 15.9 (announcing 0.98, EB 0.59, plain RB 0.90) | - |
 | measured | 12.0 | 22.0 |
 
 Table 4.5. The ladder at 308 kB / 2 MB. Loaded hours: the 25 even hours
@@ -224,8 +227,8 @@ closures of EBs that failed, were superseded within the gap, or sat on
 losing forks, which nodes stop fetching.
 
 Measured, in the loaded hours: 12.0 kB/s, 22 % of the parameter ceiling,
-with 0.485 of the eligible EBs certified as forged and 0.142 of the full
-ones. The ladder splits the loss in two. The EBs were at 0.60 of the cap
+with 0.485 of the eligible EBs certified as forged and 0.138 of the full
+ones. The ladder splits the loss in two. The EBs were at 0.59 of the cap
 on average (the load-adjusted rung, 16 kB/s), because the operator
 producers forge small EBs from thin mempools while the IOG and PIR
 producers, whose mempools are at the injection points, forge full ones;
