@@ -1,6 +1,8 @@
 # Leios technical feasibility: a measured assessment of the pipeline on the public testnet and the benchmarking cluster
 
-Build of 2026-11-11, from commit 157d70b9. Sections in this build: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, Appendix A. The open points the text leaves for the team and the reviewers are kept in place as block quotes headed "Note to resolve".
+Ezequiel Postan, ezequiel.postan@iohk.io
+
+Build of 2026-11-12, from commit cbc2e30a. Sections in this build: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, Appendix A.
 
 ## Contents
 
@@ -28,83 +30,70 @@ feasible, with a credible path upward.
 | parameter set | ceiling, kB/s | measured, kB/s | certified of the eligible EBs | verdict |
 |---|---:|---:|---:|---|
 | 40 kB / 260 kB, cluster and testnet | 8.9 | 7.5 and 7.2 | 99 % and 97 % | confirmed |
-| 100 kB / 1 MB, cluster | 27.9 | 12.2 and 15.5 | 69 % and 52 % | not confirmed as measured; the voting-loop patch of section 9 is the step |
-| 308 kB / 2 MB, testnet | 53.5 | 12.0 and 22.0 | 49 % and 45 % | not confirmed as measured; with the patch, validation is no longer the limit and the closure's arrival on the testnet's topology is; a cluster run at this set on the patched build would settle it |
+| 100 kB / 1 MB, cluster | 27.9 | 12.2 and 15.5; 26.6 on the latest build | 69 % and 52 %; 99 % on the latest build | confirmed on the cluster on the latest build at the time of this report; the testnet at this set is the next stage |
+| 308 kB / 2 MB, testnet | 53.5 | 12.0 and 22.0 | 49 % and 45 % | not confirmed as measured; not measured on the latest build, for which sections 8 and 9 give evidence of feasibility on the validation side |
 
 Table 0.1. The three sets against their parameter ceiling, the rate
 with every EB full and certified; two windows or runs per set (Tables
-1.4, 4.1, 4.3 and 4.5). An EB is eligible when the next RB leaves it
-the certification gap; on the 2 MB set the EBs were at 0.6 of the cap
-on average.
+1.4, 4.1, 4.3 and 4.5), and for the 100 kB / 1 MB set a third run on
+the latest build at the time of this report (Table 9.3). An EB is
+eligible when the next RB leaves it the certification gap; on the 2 MB
+set the EBs were at 0.6 of the cap on average.
 
-Leios is confirmed at twice the Praos ceiling. The six-times set
-depends on the patch of section 9. The ten-times set depends on the
-patch and on the closure's diffusion; the 2 MB set measured here is
-within reach of both, and the ten-times line itself needs a closure of
-about 1.7 MB, a smaller step than the one measured.
+Leios is confirmed at twice the Praos ceiling on both populations. It
+is confirmed at six times on the cluster on the latest build at the
+time of this report; the testnet at that set is the next stage. The
+ten-times set depends on that build and on the closure's diffusion.
+The ten-times line needs a closure of about 1.7 MB, smaller than the
+2 MB closures measured here.
 
 **The confirmed set.** At 40 kB / 260 kB, twice the Praos ceiling, every
 stage of the pipeline is inside its budget on both populations and the
-voting stage loses nothing. The cost to Praos is a forge path half a
-second slower and a fork rate six times the control's, within the order
-the control sets (section 5).
+voting stage loses nothing.
 
-**What binds above it.** One stage: the validation of the closure at
-the vote. From about 2,700 transactions per EB the voters need more
-than the four seconds the window leaves, on the cluster's uniform hosts
-and on the testnet's spread of operator hardware alike (section 4).
+**What bound above it, and what the latest build changes.** On the
+build of section 4, one stage bound certification above the confirmed
+set: closure validation at the voting stage. The latest build removes
+most of its cost. Where that build is measured, on a testnet host over
+three days and on the cluster at 100 kB / 1 MB, validation is no
+longer the limit: the cluster run at 100 kB / 1 MB certifies 99 % of
+its eligible EBs where the build of section 4 certified 52 %
+(section 9).
 
-The cost is per transaction, not per byte. Closures of 2 MB certify at
-66 % with 2,000 transactions and at 4 % with 4,000 to 6,000
-(section 4.3.1).
+Section 5 measures a cost to Praos on the build of section 4, a slower
+forge path and a higher fork rate. The latest build removes it where
+it is measured, on the cluster at 100 kB / 1 MB (section 9.3).
 
-On the testnet the closure's arrival is the second cause. Closures
-above 1.5 MB reach most nodes after the deadline (section 4.3).
+**What is not yet measured on the latest build.** At the time of this
+report the latest build runs on one testnet host, and no cluster run
+exists at the 308 kB / 2 MB set.
 
-**The path upward.** The larger part of the validation cost is the
-voting loop's own: a pass over the closure's input table after every
-applied transaction, which section 8 priced and section 9 traced in the
-code. A patch removing it has run on one testnet host and on one
-cluster rerun (section 9).
+For those, section 8 estimates what the latest build would do. It
+reprices the votes measured on the build of section 4 at the latest
+build's validation cost. On the testnet's 2 MB windows that repricing
+takes validation out of the causes of late votes at every host class
+and EB size. The same repricing was made for the 100 kB / 1 MB cluster
+run before that run existed on the latest build: it predicted 97 %
+certification, and the run gave 99 %.
 
-Repriced at the cost that host reaches, the cluster goes from 69 to
-99 % certification at 1 MB on the same hosts. On the testnet's 2 MB
-windows validation stops being a cause of late votes at every host
-class and EB size, the longest validation on the oldest class at
-3.3 s (section 8). The testnet reading covers the voters that send
-logs, 60 % of the committee weight; the rest runs the same software,
-so the committee's gain is at least that.
-
-What remains late on the testnet is the closure's arrival, a fifth of
-the votes on the largest EBs, on a topology the cluster does not share.
-Its levers, closure forwarding, egress scheduling and the upstream peer
-count, have measured gaps and no measured gain yet (section 8.4), so
-the testnet's share at 2 MB is open upward.
-
-Hardware alone is worth less than the patch. With the patch in, it buys
-margin rather than certification at these sizes (section 8.2).
-
-The measurement that would settle the 2 MB set is a cluster run at it
-on the patched build.
+What stays late on the testnet, as recorded on the build of section 4,
+is the closure's arrival on its topology, a fifth of the votes on the
+largest EBs. The changes that
+would move it, in closure forwarding, egress scheduling and the
+upstream peer count, are not measured in this report (section 8.4).
 
 **What the measurements do not cover.** The transaction mix of mainnet,
-with scripts and witnesses: no window or run in this report exercised
-it, so the comparison with the targets of section 1 is in bytes per
+with scripts: no window or run in this report exercised it, so the
+comparison with the targets of section 1 is in bytes per
 second at the measured transactions, not at mainnet's mix. The
-validation margin the patch opens is room for that computation; how
-much of it is a measurement still to make.
+validation margin the latest build opens is room for that computation;
+how much of it is a measurement still to make.
 
-The patched build at the committee's scale: it has run on one testnet
-host, and the records of the cluster rerun were pending when this
-report was written.
+The latest build at the committee's scale: on the testnet it has run
+on one host, and on the cluster on every node of one run.
 
-The models the proposal rests on, the DeltaQ model and the CIP's cost
-model, charge apply at 0.5 to 0.6 ms per transaction, above what a
-voter pays after the patch of section 9 and below what it paid before.
-Their reapply cost and the share of the closure a voter applies remain
-on the optimistic side of every measurement here (section 7).
-
-The open points of each section are kept in place as notes to resolve.
+Further experiments on the latest build are scheduled. This report
+makes no claim about the points they would measure.
 
 # 1. Mainnet baseline and targets
 
@@ -794,8 +783,8 @@ rows unchanged. Transactions per second at the measured size: 37.4 and
 | applied share at the closure | 47 % | 16 % |
 | validation, start to validated, p90 | 0.95 s, nodes' quartiles 0.91 to 0.98 | 0.49 s, nodes' quartiles 0.28 to 1.11 |
 | vote tally reaches the quorum, p90 | 4.17 s, nodes' quartiles 4.15 to 4.17 | 3.84 s, nodes' quartiles 3.78 to 4.08 |
-| vote rate on eligible EBs | 100 % | 93 % |
-| quorums that became certificates | 100 %, 1,539 of 1,539 quorums seen | 100 %, 531 of 532 quorums seen |
+| vote rate on eligible EBs | 99.5 % | 93 % |
+| quorums that became certificates | 100 %, 1,539 of 1,539 quorums seen | 99.8 %, 531 of 532 quorums seen |
 
 Table 4.2. The stages at 40 kB / 260 kB. Cluster: all 51 nodes, equal
 weight. Testnet: 83 reporting nodes from 83 pools of the 100 to 108 in the
@@ -871,7 +860,7 @@ measured size: 60.7 and 41.3.
 | validation, start to validated, p90 | 4.48 s, nodes' quartiles 4.31 to 4.57 | 6.40 s, nodes' quartiles 6.12 to 6.51 |
 | vote tally reaches the quorum, p90 | 6.73 s, nodes' quartiles 6.72 to 6.76 | 6.73 s, nodes' quartiles 6.71 to 6.76 |
 | vote rate on eligible EBs | 77 % | 63 % |
-| quorums that became certificates | 100 %, 1,128 of 1,132 quorums seen | 100 %, 820 of 823 quorums seen |
+| quorums that became certificates | 99.6 %, 1,128 of 1,132 quorums seen | 99.6 %, 820 of 823 quorums seen |
 
 Table 4.4. The stages at 100 kB / 1 MB, all 51 nodes, equal weight.
 
@@ -1400,7 +1389,9 @@ closure that every voter validated at the vote window, 14 to 100 slots
 before the RB arrived, so the state the certifying RB leads to was
 computable in advance; an implementation that keeps the vote-time ledger
 state for adoption would remove most of the certificate's share, and
-section 8 takes that up with the other levers.
+section 8 takes that up with the other levers. The forge path's half
+second belongs to the build measured, not to the protocol: an
+implementation change can remove it (see section 9.3).
 
 # 6. Cross-cutting explanations
 
@@ -2671,14 +2662,178 @@ validation 19.7 s on an EB of 8,555 transactions.
 
 ## 9.3 The cluster
 
-The 100 kB / 1 MB run with two-input transactions of section 4.2, which
-certified 52 % of its EBs on the unchanged build, was rerun on the
-changed build. The run's own tally puts certification close to all of
-its EBs; its trace database, from which the validation times and the
-ladder would be read with the instruments of sections 4 and 8, was not
-available when this section was written.
+The 100 kB / 1 MB run with two-input transactions of section 4.2
+certified 52 % of its eligible EBs on the build of section 4, called
+the unchanged build here. A new run with the same parameters, nodes
+and workload was made on the changed build on 2026-11-09, over 16
+hours. The changed build carries the patch of 9.1 and three weeks of
+the Leios branch's own work. Tables 9.3 to 9.8 read the new run with
+the instruments of sections 4, 5 and 8. The effects of these changes are
+told apart at the end of this subsection.
 
-> **Note to resolve.** The cluster rerun's figures are to be read from its trace database when it is delivered: the certification rate over eligible EBs, the apply and reapply costs on two-input transactions, which the report has no measurement of (Table 7.2b has the one-input chained cost only), and the ladder against the run's workload ceiling.
+Table 9.3 is the rerun's ladder beside the unchanged run's.
+
+| rung, kB/s | cluster 100 kB / 1 MB, 374 B | cluster 100 kB / 1 MB, 374 B, changed build |
+|---|---|---|
+| parameter ceiling | 27.9 (p = 0.513) | 27.9 (p = 0.513) |
+| workload ceiling | 27.9 (payload cap at 374 B/tx) | 27.9 (payload cap at 374 B/tx) |
+| observed spacing | 27.6 (1 RB / 20.8 s, p = 0.533) | 27.2 (1 RB / 19.9 s, p = 0.494) |
+| voting-adjusted, full | 16.9 (s_full = 0.540) | 27.0 (s_full = 0.992) |
+| load-adjusted | 15.9 (announcing 0.99, EB 0.97, plain RB 0.98) | 27.3 (announcing 0.99, EB 1.02, plain RB 0.97) |
+| measured | 15.5 | 26.6 |
+
+Table 9.3. The ladder of the two-input run on the two builds, as Table
+4.3. Changed build: the whole run, 2026-11-09 16:45 to 11-10 09:03 UTC,
+1,446 eligible EBs, 1,434 certified, 14-slot gap. Transactions per
+second at 374 B: 41.3 and 71.1.
+
+The chain carried 26.6 kB/s against 15.5 on the unchanged build. That
+is 95 % of the parameter ceiling. The voting rung no longer takes a
+share: 0.992 of the full EBs certified, and every certified closure
+was at the 1 MB cap. What remains between the ceiling and the chain is
+the run's RB spacing.
+
+Table 9.4 reads the stages of the pipeline on the two builds, as
+section 4 does for every set.
+
+| stage | cluster 100 kB / 1 MB, 374 B | cluster 100 kB / 1 MB, 374 B, changed build |
+|---|---|---|
+| body: p90 / p95; nodes with p90 under 3 s | 2.60 / 2.96 s; 100 % | 1.76 / 2.21 s; 100 % |
+| closure: p90 / p95; nodes with p90 under 3 s / 7 s; not completed | 3.54 / 3.96 s; 0 % / 100 %; 0 % | 3.00 / 3.37 s; 47 % / 100 %; 0 % |
+| applied share at the closure | 32 % | 43 % |
+| validation, start to validated, p90 | 6.40 s, nodes' quartiles 6.12 to 6.51 | 1.14 s, nodes' quartiles 1.11 to 1.25 |
+| vote tally reaches the quorum, p90 | 6.73 s, nodes' quartiles 6.71 to 6.76 | 4.55 s, nodes' quartiles 4.53 to 4.57 |
+| vote rate on eligible EBs | 63 % | 99.8 % |
+| quorums that became certificates | 99.6 %, 820 of 823 quorums seen | 99.6 %, 1,434 of 1,440 quorums seen |
+
+Table 9.4. The stages of the two-input run on the two builds, as Table
+4.4: all 51 nodes, equal weight.
+
+Validation is the row that moved. It falls from 6.4 s to 1.1 s at the
+90th percentile, and the nodes' spread shrinks from 0.4 s to 0.14 s.
+The tally follows it, from the deadline's edge to 4.55 s. The vote rate
+at the median node goes from 63 % to 99.8 %. Of the 137,053 votes
+scheduled on the run, eligible EBs and superseded ones alike, 215 were
+too late.
+
+The voters applied more of each EB in full on the changed build, 43 %
+against 32 %. They validated six times faster regardless.
+
+The body and the closure also arrive earlier, by 0.8 s and 0.5 s at
+the 90th percentile. That is not the patch. The attribution at the end
+of this subsection says what it is.
+
+Behind the validation row is the cost per transaction. Table 9.5 reads
+it on the two builds as section 7 does.
+
+| run | EBs | per applied transaction, milliseconds | per reapplied transaction, microseconds |
+|---|---|---|---|
+| cluster 100 kB / 1 MB, 374 B (374 B, two inputs, two outputs) | 2,500 to 2,999 transactions, 1,105 EBs | 3.28 / 3.42 / 3.49 | 158 / 163 / 166 |
+| cluster 100 kB / 1 MB, 374 B, changed build (374 B, two inputs, two outputs) | 2,500 to 2,999 transactions, 1,421 EBs | 0.41 / 0.41 / 0.48 | 188 / 190 / 195 |
+
+Table 9.5. The cost per transaction at the vote on the two builds, as
+Table 7.3: the quartile nodes of all 51 on the run's most common EB
+size class.
+
+The apply cost on two-input transactions falls by a factor of eight,
+from 3.42 to 0.41 ms at the median node.
+
+The reapply cost rises by 15 %, from 163 to 190 µs. The patch touches
+that path too: it hands every transaction its own inputs, reapplied
+ones included. A cost per input would show more on these two-input
+transactions than on the testnet's one-input ones, where 9.2 reads no
+rise. The difference is not attributed here.
+
+The run is also the first test of section 8's repricing. Section 8
+priced this run with the loop's cost removed before the run existed
+(Table 8.4). Table 9.6 sets that prediction against the outcome.
+
+| | section 8's repricing, the loop's cost removed on the run hosts | the rerun on the changed build |
+|---|---|---|
+| apply cost per transaction | 0.65 ms | 0.41 ms |
+| reapply cost per transaction | 163 µs | 190 µs |
+| closure arrival, p90 | 3.54 s | 3.00 s |
+| certification | 96.9 % | 99.2 % |
+| measured, kB/s | 25.5 | 26.6 |
+| quorum voter validated at, p50 / p90 | 4.09 / 4.80 s | 3.97 / 4.45 s |
+
+Table 9.6. Section 8's repricing of the two-input run against the
+rerun. The repricing row is Table 8.4's; the rerun's certification is
+over its eligible EBs, its throughput Table 9.3's measured rung, and
+its quorum voter the 39th voter to validate each EB, read as in
+Table 8.4.
+
+The prediction sits under the outcome on every line: by two points of
+certification, by one kilobyte per second, and by a few tenths of a
+second at the quorum voter. The first three rows say why. The
+repricing charged apply at 0.65 ms where the run pays 0.41, the
+pessimistic choice section 8 made. It held reapply where the run
+pays 15 % more. And it kept the closure arrivals of the unchanged
+build. The changed build moved them earlier for a reason outside the
+patch.
+
+That reason is in the Leios branch between the two builds. The
+benchmarking team ran the same workload on the week 45 build without
+the patch on 2026-11-06. Its report reads the forge, slot start to the
+RB forged, at 30 ms at the median. The report of the 2026-11-09 run
+with the patch reads the same 30 ms. On the unchanged build the forge
+took 0.59 s from leadership to forged (Table 5.5).
+
+That half second is the mempool snapshot cited on section 5.3. The branch's
+mempool work merged on 2026-10-25 as
+[commit 7ff142d5c](https://github.com/IntersectMBO/ouroboros-consensus/commit/7ff142d5c)
+removes it. The patch does not touch the forge.
+
+Certification did not move with the branch's work. The team's reports
+count the announcements that came to carry a certificate. On the week
+45 build without the patch that share is 26.0 %. With the patch it is
+49.0 %, where the share of EBs eligible at all is 51 % on paper. The
+unchanged build's run read 27.3 % of its RBs certifying (Table 5.5).
+Three weeks of the branch left certification where it was. The patch
+took it to the eligible share.
+
+The two effects act on different stages, and they add through the one
+window of 8.1. The forge change gives every voter half a second more.
+The patch takes five seconds off the validation. Section 8's repricing
+kept the old arrivals, so it measures the patch alone on this run:
+96.9 % certification. The forge change is worth the two points above
+it.
+
+The forge change shows on the Praos side as well. Table 9.7 reads the
+adoption of the certifying RB and of the full plain RB on the two
+builds, as Table 5.2 does.
+
+| window | certifying RB (closure) | certifying RBs | adopted p50 / p90 | within 1 s | full plain RB, p50 / p90 | within 1 s | full plain RBs |
+|---|---|---|---|---|---|---|---|
+| cluster 100 kB / 1 MB, 374 B | closure 0.5-1 MB | 810 | 1.28 / 1.56 s | 3 % | 1.12 / 1.76 s | 32 % | 2,125 |
+| cluster 100 kB / 1 MB, 374 B, changed build | closure 1 MB | 1,433 | 0.51 / 0.75 s | 99 % | 0.59 / 1.17 s | 75 % | 1,493 |
+
+Table 9.7. Adoption delay after the RB's slot on the two builds, as
+Table 5.2: over all (node, RB) pairs of the run, the certifying RB read
+at the closure bin that holds the run's typical closure.
+
+The certifying RB is adopted at 0.51 s at the median on the changed
+build against 1.28 s on the unchanged one. The full plain RB is
+adopted at 0.59 s against 1.12 s. The team's report of the week 45
+run without the patch reads the adoption of certificate-carrying
+blocks at 0.51 s as well, so this gain is the branch's work too.
+
+Table 9.8 reads the forks on the two builds, as Table 5.3 does.
+
+| window | share forked among all consecutive-slot pairs | among the pairs led by a certifying RB | among the pairs led by a plain RB |
+|---|---|---|---|
+| cluster 100 kB / 1 MB, 374 B | 129 of 182 (71 %) | 50 of 53 (94 %) | 79 of 129 (61 %) |
+| cluster 100 kB / 1 MB, 374 B, changed build | 19 of 142 (13 %) | 1 of 70 (1 %) | 18 of 72 (25 %) |
+
+Table 9.8. Consecutive-slot leader pairs forked on the two builds, as
+Table 5.3, by the kind of the pair's first RB.
+
+The share of consecutive-slot pairs forked falls from 71 % to 13 %.
+Among the pairs led by a certifying RB it falls from 94 % to 1 %. The
+orphans on the chain halve, from 207 to 102 over the same number of
+RBs. The cost to Praos that section 5 measures on the unchanged build,
+the slower forge and the forks it causes, is not there on the changed
+build.
 
 ## 9.4 What is not measured
 
@@ -2687,9 +2842,11 @@ does at the committee's scale is still section 8's repricing: the cost
 per transaction is confirmed on one host, the votes of the committee
 are not.
 
-It has not run at parameter sets larger than 308 kB / 2 MB. It has not
-run with transactions of mainnet's mix, where the per-transaction cost
-is the script's and the witnesses' rather than the input's.
+It has not run on a whole network at a set larger than 100 kB / 1 MB:
+the cluster run is at that set, and the only host running it at
+308 kB / 2 MB is the one testnet host. It has not run with
+transactions of mainnet's mix, where the script's cost adds to the
+input's.
 
 The host that ran it is of the oldest class measured, so the current
 generation's cost with the change is the repricing's figure and not a
