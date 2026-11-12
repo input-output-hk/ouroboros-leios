@@ -2,7 +2,7 @@
 
 Ezequiel Postan, ezequiel.postan@iohk.io
 
-Build of 2026-11-12, from commit cbc2e30a. Sections in this build: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, Appendix A.
+Build of 2026-11-12, from commit 49da0561. Sections in this build: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, Appendix A.
 
 ## Contents
 
@@ -243,7 +243,8 @@ sits three to eight times above that line.
 
 The report measures three parameter sets, each named by the two caps that
 define it: the reference list an endorser block may carry, which caps the
-transaction count at 36 bytes per reference, and the bytes of its closure,
+transaction count at 36 or 37 bytes per reference by the transaction's
+size, and the bytes of its closure,
 the transactions it brings into the chain. Table 1.4 gives the parameter
 ceiling of each set, the rate it would carry with every endorser block full
 and every one certified, against the targets of the previous subsection.
@@ -289,7 +290,8 @@ certificate has six stages, each with a clock of its own.
 The first stage is the forger's snapshot. When a pool is elected for a slot,
 its node takes a snapshot of its mempool, builds the RB, and, as deployed,
 announces an EB with it: the references of the transactions in the snapshot
-that fit the caps, 36 bytes per reference. The node budgets a fixed time for
+that fit the caps, 36 or 37 bytes per reference by the transaction's
+size. The node budgets a fixed time for
 the snapshot, so the EB is bounded by what the mempool holds when the slot
 comes and by the time the node allows itself to partition it, not only by
 the caps. An RB that carries a certificate brings the certified closure's
@@ -355,7 +357,7 @@ it.
 
 | constraint | what it bounds | stage it binds | exercised by the measurements |
 |---|---|---|---|
-| reference cap (bytes of the EB body) | the number of transactions an EB may reference, at 36 B each | snapshot; body diffusion | yes, binding at small transactions |
+| reference cap (bytes of the EB body) | the number of transactions an EB may reference, at 36 or 37 B each | snapshot; body diffusion | yes, binding at small transactions |
 | closure cap (bytes of the EB's transactions) | the bytes an EB brings into the chain | closure diffusion; validation; adoption | yes, binding at large transactions |
 | reference-script cap | the bytes of reference scripts the closure may pull in | validation | no: the transactions used carry no scripts |
 | Plutus steps and memory budgets | the script computation the closure may require | validation | no: the transactions used carry no scripts |
@@ -774,7 +776,10 @@ windows of 2026-10-21 12:00-13:00, 17:00-21:00 and 10-22 00:00-01:00 UTC,
 parameter ceiling: closures reached every cluster node by 3.2 s and the
 tally its quorum by 4.2 s, so a 14-slot gap would have left the measured
 rows unchanged. Transactions per second at the measured size: 37.4 and
-28.1.
+28.1. In every ladder the transaction count of an EB is its reference
+bytes over the width a reference takes, 36 B for a transaction under
+256 B and 37 B from there on, measured on each window's certified EBs,
+whose count the chain carries.
 
 | stage | cluster 40 kB / 260 kB, 200 B | testnet 40 kB / 260 kB, loaded hours |
 |---|---|---|
@@ -845,7 +850,7 @@ each at the same count.
 | workload ceiling | 16.5 (reference cap at 200 B/tx) | 27.9 (payload cap at 374 B/tx) |
 | observed spacing | 16.4 (1 RB / 20.8 s, p = 0.538) | 27.6 (1 RB / 20.8 s, p = 0.533) |
 | voting-adjusted, full | 12.6 (s_full = 0.689) | 16.9 (s_full = 0.540) |
-| load-adjusted | 12.2 (announcing 0.99, EB 0.97, plain RB 0.97) | 15.9 (announcing 0.99, EB 0.97, plain RB 0.98) |
+| load-adjusted | 12.2 (announcing 0.99, EB 0.97, plain RB 0.97) | 15.5 (announcing 0.99, EB 0.94, plain RB 0.98) |
 | measured | 12.2 | 15.5 |
 
 Table 4.3. The ladder at 100 kB / 1 MB, whole runs of 17.8 h and 17.2 h,
@@ -910,8 +915,8 @@ operator population spans a wider range of hosts than the cluster.
 | workload ceiling | 53.5 (payload cap at 318 B/tx) | - |
 | observed spacing | 49.5 (1 RB / 25.5 s, p = 0.613) | 52.0 (1 RB / 22.6 s, p = 0.569) |
 | voting-adjusted, mix | 25.9 (s_all = 0.485) | 25.8 (s_all = 0.454) |
-| voting-adjusted, full | 10.1 (s_full = 0.142) | - |
-| load-adjusted | 16.0 (announcing 0.98, EB 0.60, plain RB 0.90) | - |
+| voting-adjusted, full | 9.9 (s_full = 0.138) | - |
+| load-adjusted | 15.9 (announcing 0.98, EB 0.59, plain RB 0.90) | - |
 | measured | 12.0 | 22.0 |
 
 Table 4.5. The ladder at 308 kB / 2 MB. Loaded hours: the 25 even hours
@@ -955,8 +960,8 @@ closures of EBs that failed, were superseded within the gap, or sat on
 losing forks, which nodes stop fetching.
 
 Measured, in the loaded hours: 12.0 kB/s, 22 % of the parameter ceiling,
-with 0.485 of the eligible EBs certified as forged and 0.142 of the full
-ones. The ladder splits the loss in two. The EBs were at 0.60 of the cap
+with 0.485 of the eligible EBs certified as forged and 0.138 of the full
+ones. The ladder splits the loss in two. The EBs were at 0.59 of the cap
 on average (the load-adjusted rung, 16 kB/s), because the operator
 producers forge small EBs from thin mempools while the IOG and PIR
 producers, whose mempools are at the injection points, forge full ones;
@@ -2679,7 +2684,7 @@ Table 9.3 is the rerun's ladder beside the unchanged run's.
 | workload ceiling | 27.9 (payload cap at 374 B/tx) | 27.9 (payload cap at 374 B/tx) |
 | observed spacing | 27.6 (1 RB / 20.8 s, p = 0.533) | 27.2 (1 RB / 19.9 s, p = 0.494) |
 | voting-adjusted, full | 16.9 (s_full = 0.540) | 27.0 (s_full = 0.992) |
-| load-adjusted | 15.9 (announcing 0.99, EB 0.97, plain RB 0.98) | 27.3 (announcing 0.99, EB 1.02, plain RB 0.97) |
+| load-adjusted | 15.5 (announcing 0.99, EB 0.94, plain RB 0.98) | 26.6 (announcing 0.99, EB 1.00, plain RB 0.97) |
 | measured | 15.5 | 26.6 |
 
 Table 9.3. The ladder of the two-input run on the two builds, as Table
