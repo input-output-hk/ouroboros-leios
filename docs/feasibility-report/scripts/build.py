@@ -1,31 +1,64 @@
 #!/usr/bin/env python3
-"""Assemble the report from its section files.
+"""Render the report, README.md, as a web page and as a PDF.
 
-    build.py [--html] [--pdf] [--out FILE]
+    build.py [--html] [--pdf] [--out BASENAME]
 
-Concatenates report/0*.md in file order into one Markdown document with a
-title block, the build date and commit, and a contents list of the
-top-level sections. Notes to resolve are the blocks between <!-- note -->
-and <!-- /note --> in the section files, the open points the text leaves
-for the team and the reviewers; the build keeps them, rendered as block
-quotes headed "Note to resolve". The output is report/REPORT.md.
-
---pdf writes a PDF next to the Markdown with pandoc and the tectonic
-XeTeX engine (`brew install pandoc tectonic`), after the Leios design
-document's recipe: the settings are in report/pdf-metadata.yaml. The PDF
-takes its title block from pandoc's metadata and its contents from
-pandoc's table of contents, and every pipe table gets column widths in
-proportion to its longest cells, since LaTeX wraps cells instead of
-scrolling.
+README.md is the report itself: a YAML block with the title and the
+author, then the text, with unnumbered headings and links between
+sections. --html writes the self-contained preview page, --pdf the PDF
+with pandoc and the tectonic XeTeX engine (`brew install pandoc
+tectonic`), after the Leios design document's recipe: the settings are in
+metadata.yaml. Pandoc numbers the sections in the PDF; the summary and
+the appendix stay unnumbered so that the numbers match the text's
+references, and every heading carries the id GitHub gives it, so that
+the links between sections resolve in the PDF too. Every pipe table gets
+column widths in proportion to its longest cells, since LaTeX wraps cells
+instead of scrolling. The outputs are BASENAME.html and BASENAME.pdf,
+by default feasibility-report next to README.md.
 """
 import argparse, datetime as dt, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPORT = os.path.join(HERE, "..", "report")
-TITLE = "Leios technical feasibility: a measured assessment of the pipeline on the public testnet and the benchmarking cluster"
-AUTHOR = "Ezequiel Postan, ezequiel.postan@iohk.io"
-PDF_METADATA = os.path.join(REPORT, "pdf-metadata.yaml")
-NOTE = re.compile(r"<!--\s*note\s*-->\s*(.*?)\s*<!--\s*/note\s*-->", re.S)
+ROOT = os.path.normpath(os.path.join(HERE, ".."))
+README = os.path.join(ROOT, "README.md")
+METADATA = os.path.join(ROOT, "metadata.yaml")
+UNNUMBERED = ("Summary", "Appendix")  # top-level sections pandoc leaves unnumbered, with their subsections
+
+
+def slug(title, seen):
+    """GitHub's heading anchor: lowercase, punctuation dropped, spaces to hyphens, duplicates suffixed."""
+    s = re.sub(r"[^\w\- ]", "", title.lower()).replace(" ", "-")
+    base, n = s, 0
+    while s in seen:
+        n += 1
+        s = "%s-%d" % (base, n)
+    seen.add(s)
+    return s
+
+
+def split_front_matter(text):
+    m = re.match(r"---\n(.*?)\n---\n", text, re.S)
+    if not m:
+        sys.exit("README.md has no YAML block")
+    meta = m.group(1)
+    title = re.search(r'^title:\s*"(.*)"', meta, re.M).group(1)
+    authors = re.findall(r"^\s+- (.*)", meta, re.M)
+    return m.group(0), title, authors, text[m.end():].strip()
+
+
+def pdf_headings(body):
+    """Give each heading its GitHub id, and the unnumbered class under the summary and the appendix."""
+    out, seen, unnumbered = [], set(), False
+    for line in body.split("\n"):
+        m = re.match(r"^(#{1,3}) (.*)$", line)
+        if m:
+            hashes, title = m.groups()
+            if hashes == "#":
+                unnumbered = title.split(":")[0].split(" ")[0] in UNNUMBERED
+            attrs = "{#%s%s}" % (slug(title, seen), " .unnumbered" if unnumbered else "")
+            line = "%s %s %s" % (hashes, title, attrs)
+        out.append(line)
+    return "\n".join(out)
 
 
 def pdf_tables(md):
@@ -60,60 +93,36 @@ def pdf_tables(md):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--html", action="store_true", help="also write the self-contained preview page next to the Markdown")
-    ap.add_argument("--pdf", action="store_true", help="also write the PDF next to the Markdown (pandoc + tectonic)")
-    ap.add_argument("--out")
+    ap.add_argument("--html", action="store_true", help="write the self-contained preview page")
+    ap.add_argument("--pdf", action="store_true", help="write the PDF (pandoc + tectonic)")
+    ap.add_argument("--out", default=os.path.join(ROOT, "feasibility-report"), help="output basename (default: feasibility-report next to README.md)")
     a = ap.parse_args()
-    files = sorted(f for f in os.listdir(REPORT) if re.match(r"\d\d-.*\.md$", f))
-    if not files:
-        sys.exit("no section files in " + REPORT)
+    with open(README) as fh:
+        text = fh.read()
+    front, title, authors, body = split_front_matter(text)
     try:
-        commit = subprocess.run(["git", "-C", HERE, "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
-        top = subprocess.run(["git", "-C", HERE, "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True).stdout.strip()
-        status = subprocess.run(["git", "-C", HERE, "status", "--porcelain"], capture_output=True, text=True, check=True).stdout.splitlines()
-        # the output file itself does not make the tree dirty: it is rewritten by this build
-        out_rel = os.path.relpath(os.path.abspath(a.out), top) if a.out else None
-        dirty = any(l[3:].strip() != out_rel for l in status if l.strip())
+        commit = subprocess.run(["git", "-C", ROOT, "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+        status = subprocess.run(["git", "-C", ROOT, "status", "--porcelain"], capture_output=True, text=True, check=True).stdout.splitlines()
+        dirty = any(l.strip() for l in status)
     except Exception:
         commit, dirty = "unknown", False
-    sections, headings = [], []
-    for f in files:
-        with open(os.path.join(REPORT, f)) as fh:
-            text = fh.read().strip()
-        text = NOTE.sub(lambda m: "> **Note to resolve.** " + " ".join(m.group(1).split()), text)
-        text = re.sub(r"\n{3,}", "\n\n", text)
-        m = re.match(r"# (.*)", text)
-        headings.append(m.group(1) if m else f)
-        sections.append(text)
-    head = ["# " + TITLE, "", "Ezequiel Postan, ezequiel.postan@iohk.io", "",
-            "Build of %s, from commit %s%s. Sections in this build: %s." % (
-                dt.date.today().isoformat(), commit, " (uncommitted changes)" if dirty else "", ", ".join(h.split(".")[0] for h in headings)),
-            "", "## Contents", ""] + ["- " + h for h in headings] + [""]
-    tail = [""]
-    out = a.out or os.path.join(REPORT, "REPORT.md")
-    md = "\n".join(head) + "\n" + "\n\n".join(sections) + "\n" + "\n".join(tail)
-    with open(out, "w") as fh:
-        fh.write(md)
-    print("wrote %s (%d sections, %d words)" % (out, len(sections), sum(len(s.split()) for s in sections)))
+    stamp = "%s, commit %s%s" % (dt.date.today().isoformat(), commit, ", uncommitted changes" if dirty else "")
+    print("README.md: %d words, %d headings" % (len(body.split()), len(re.findall(r"^#", body, re.M))))
     if a.html:
-        page = HTML.replace("%%TITLE%%", TITLE).replace("%%KIND%%", "Draft build") \
-                   .replace("%%STAMP%%", "%s, commit %s%s" % (dt.date.today().isoformat(), commit, ", uncommitted changes" if dirty else "")) \
+        md = "\n\n".join(["# " + title, ", ".join(re.sub(r" <.*>", "", x) for x in authors), body])
+        page = HTML.replace("%%TITLE%%", title).replace("%%STAMP%%", stamp) \
                    .replace("%%MARKDOWN%%", md.replace("</script", "<\\/script"))
-        html_out = os.path.splitext(out)[0] + ".html"
+        html_out = a.out + ".html"
         with open(html_out, "w") as fh:
             fh.write(page)
         print("wrote %s (%d kB)" % (html_out, len(page) // 1000))
     if a.pdf:
-        stamp = "Build of %s, from commit %s%s" % (dt.date.today().isoformat(), commit, " (uncommitted changes)" if dirty else "")
-        meta = ["---", "title: \"%s\"" % TITLE, "author: \"%s\"" % AUTHOR, "date: \"%s\"" % stamp, "---", ""]
-        body = re.sub(r"(\d) %", "\\1\u00a0%", "\n\n".join(sections))  # a percent sign stays with its number
-        pdf_md = "\n".join(meta) + pdf_tables(body) + "\n"
-        pdf_src = os.path.splitext(out)[0] + ".pdf.md"
-        pdf_out = os.path.splitext(out)[0] + ".pdf"
+        pdf_body = re.sub(r"(\d) %", "\\1\u00a0%", pdf_tables(pdf_headings(body)))  # a percent sign stays with its number
+        pdf_src, pdf_out = a.out + ".pdf.md", a.out + ".pdf"
         with open(pdf_src, "w") as fh:
-            fh.write(pdf_md)
+            fh.write(front + "\n" + pdf_body + "\n")
         cmd = ["pandoc", pdf_src, "--pdf-engine=tectonic", "--from=markdown", "--to=pdf",
-               "--metadata-file", PDF_METADATA, "--output", pdf_out]
+               "--metadata-file", METADATA, "--metadata", "date=Build of " + stamp, "--output", pdf_out]
         res = subprocess.run(cmd, capture_output=True, text=True)
         os.remove(pdf_src)
         if res.returncode != 0:
@@ -122,8 +131,9 @@ def main():
         print("wrote %s (%d kB%s)" % (pdf_out, os.path.getsize(pdf_out) // 1000, ", %d TeX warnings" % len(warn) if warn else ""))
 
 
-# The self-contained preview page: the assembled Markdown is embedded and rendered in the browser (marked, pinned),
-# with a contents rail, tables in scrolling containers, tabular figures and the notes to resolve as marked boxes.
+# The self-contained preview page: the report's Markdown is embedded and rendered in the browser (marked, pinned),
+# with a contents rail, tables in scrolling containers and tabular figures. Headings get GitHub's ids, so the
+# report's links between sections work here as they do on GitHub.
 HTML = r"""<title>Leios Feasibility Report</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
@@ -152,10 +162,10 @@ article { max-width: 760px; }
 .bar button { font: 500 13px var(--sans); color: var(--fg); background: var(--code-bg); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
 .bar button:hover, .bar button:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
 article h1, article h2, article h3 { font-family: var(--serif); text-wrap: balance; line-height: 1.2; font-weight: 600; }
-article > h1 { font-size: 2rem; margin: 0 0 8px; }
-article h2 { font-size: 1.5rem; margin: 48px 0 12px; padding-top: 16px; border-top: 1px solid var(--rule); }
-article h3 { font-size: 1.2rem; margin: 32px 0 8px; }
-article h4 { font-family: var(--sans); font-size: 1rem; margin: 24px 0 6px; }
+article > h1:first-child { font-size: 2rem; margin: 0 0 8px; }
+article h1 { font-size: 1.6rem; margin: 56px 0 12px; padding-top: 20px; border-top: 2px solid var(--fg); }
+article h2 { font-size: 1.3rem; margin: 40px 0 10px; padding-top: 12px; border-top: 1px solid var(--rule); }
+article h3 { font-size: 1.1rem; margin: 28px 0 8px; }
 article p { margin: 0 0 14px; }
 article ul, article ol { padding-left: 1.4em; margin: 0 0 14px; }
 article a { color: var(--accent); }
@@ -176,13 +186,12 @@ article p.lead { margin: 32px 0 6px; }
 .tablewrap + .tablewrap { margin-top: 28px; }
 article blockquote { margin: 18px 0; padding: 10px 14px; border-left: 3px solid var(--note-rule); background: var(--note-bg); font-size: 15.5px; }
 article blockquote p { margin: 0; }
-article blockquote strong:first-child { font-family: var(--sans); text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; display: block; margin-bottom: 4px; color: var(--note-rule); }
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 </style>
 <div class="wrap with-toc" id="wrap">
   <nav class="toc" id="toc" aria-label="Contents"><div class="label">Contents</div></nav>
   <main>
-    <div class="bar"><button type="button" id="toggle" aria-pressed="true">Hide contents</button><span><strong>%%KIND%%</strong> · %%STAMP%%</span></div>
+    <div class="bar"><button type="button" id="toggle" aria-pressed="true">Hide contents</button><span><strong>Draft build</strong> · %%STAMP%%</span></div>
     <article id="report"></article>
   </main>
 </div>
@@ -194,14 +203,17 @@ article blockquote strong:first-child { font-family: var(--sans); text-transform
   var art = document.getElementById("report");
   marked.use({ gfm: true, breaks: false });
   art.innerHTML = marked.parse(src);
-  // the "Contents" list the build writes into the Markdown duplicates the rail: drop its heading and list
-  var h = Array.prototype.find.call(art.querySelectorAll("h2"), function (x) { return x.textContent.trim() === "Contents"; });
-  if (h && h.nextElementSibling && h.nextElementSibling.tagName === "UL") { h.nextElementSibling.remove(); h.remove(); }
-  var toc = document.getElementById("toc"), n = 0;
-  art.querySelectorAll("h2, h3").forEach(function (hd) {
-    if (!hd.id) { hd.id = "s" + (++n); }
-    var a = document.createElement("a"); a.href = "#" + hd.id; a.textContent = hd.textContent;
-    if (hd.tagName === "H3") { a.className = "l3"; }
+  // headings get the ids GitHub gives them, so the report's own links resolve; the first h1 is the title
+  var toc = document.getElementById("toc"), seen = {};
+  var heads = Array.prototype.slice.call(art.querySelectorAll("h1, h2, h3"));
+  heads.forEach(function (hd, i) {
+    if (i === 0) { return; }
+    var s = hd.textContent.toLowerCase().replace(/[^\w\- ]/g, "").replace(/ /g, "-"), base = s, n = 0;
+    while (seen[s]) { n += 1; s = base + "-" + n; }
+    seen[s] = true; hd.id = s;
+    if (hd.tagName === "H3") { return; }
+    var a = document.createElement("a"); a.href = "#" + s; a.textContent = hd.textContent;
+    if (hd.tagName === "H2") { a.className = "l3"; }
     toc.appendChild(a);
   });
   // a paragraph opening with a bold "Table n." introduces the table below it (a lead); a plain
