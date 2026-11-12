@@ -1,12 +1,13 @@
 # Pandoc settings for the PDF, after the Leios design document's recipe
 # (docs/leios-design/metadata.yaml in the ouroboros-leios repository):
-# the same class, page, margins and link colours. Section numbering is off
-# because the headings carry their own numbers. The T1 font encoding of
+# the same class, page, margins and link colours. Pandoc numbers the
+# sections; scripts/build.py marks the summary and the appendix unnumbered
+# so that the numbers match the text's references. The T1 font encoding of
 # that recipe is left out: XeTeX sets the text in Unicode fonts and loses
 # the curly quotes under it. Tables are set one size smaller than the text.
 toc: true
 toc-depth: 3
-numbersections: false
+numbersections: true
 highlight-style: haddock
 documentclass: scrartcl
 fontsize: 11pt
