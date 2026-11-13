@@ -377,7 +377,7 @@ queryChainOnce LeadershipOpts{..} = do
     ) <-
     Api.executeLocalStateQueryExpr connInfo Api.VolatileTip $ do
       Api.AnyCardanoEra era <- expectQuery "current era" Api.queryCurrentEra
-      Api.caseByronOrShelleyBasedEra
+      Api.inEonForEra
         (error "Byron era is not supported")
         ( \sbe -> do
             pparams <- expectQueryEra "protocol parameters" (Api.queryProtocolParameters sbe)

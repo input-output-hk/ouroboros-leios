@@ -80,7 +80,9 @@ let
       "https://chap.intersectmbo.org/" = inputs.CHaP-tv;
     };
     name = "leios-trace-verifier";
-    compiler-nix-name = lib.mkDefault "ghc9101";
+    # The node release builds with GHC 9.6.7; its ledger needs -fno-spec-eval,
+    # which GHC 9.10.1 lacks.
+    compiler-nix-name = lib.mkDefault "ghc967";
     modules = [
       {
         # cardano-rpc (a subdir of the cardano-api pin) depends on
