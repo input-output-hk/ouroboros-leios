@@ -19,8 +19,8 @@ import LeiosEvents (decodeJSONL)
 import LeiosTopology (LocationKind (COORD2D), Node (..), NodeInfo (..), NodeName (..), Topology (..))
 import LinearLeiosLib (verifyTrace)
 import qualified Paths_trace_parser as Paths
-import System.Directory (listDirectory)
-import System.FilePath ((</>))
+import System.Directory (doesFileExist, listDirectory)
+import System.FilePath (takeBaseName, (<.>), (</>))
 import Test.Hspec (Expectation, Spec, SpecWith, describe, it, runIO, shouldBe, shouldNotBe)
 
 -- | Run golden tests.
@@ -29,12 +29,7 @@ golden = do
   dir <- runIO $ Paths.getDataDir
   validFiles <- runIO $ sort <$> listDirectory (dir </> "valid")
   invalidFiles <- runIO $ sort <$> listDirectory (dir </> "invalid")
-  (top :: Topology COORD2D) <- runIO $ decodeFileThrow (dir </> "topology.yaml")
   (config :: Config) <- runIO $ decodeFileThrow (dir </> "config.yaml")
-  let nrNodes = toInteger $ Prelude.length (elems $ nodes top)
-  let nodeNames = Prelude.map unNodeName (keys $ nodes top)
-  let stakes = Prelude.map (toInteger . stake . nodeInfo) (elems $ nodes top)
-  let stakeDistribution = Prelude.zip nodeNames stakes
   let idSut = 0
   let lHdr = 1 -- TODO: read from config
   let lVote = toInteger (linearVoteStageLengthSlots config)
@@ -44,6 +39,7 @@ golden = do
         describe label $ do
           forM_ files $ \file ->
             it file $ do
+              (nrNodes, stakeDistribution) <- topologyFor dir file
               result <-
                 verifyTrace nrNodes idSut stakeDistribution lHdr lVote lDiff
                   . decodeJSONL
@@ -51,3 +47,15 @@ golden = do
               fst (snd result) `predicate` "ok"
   check "Verify valid traces" "valid" validFiles shouldBe
   check "Reject invalid traces" "invalid" invalidFiles shouldNotBe
+
+-- | The number of parties and the stake distribution a trace was simulated
+--   with: from @topologies/<trace name>.yaml@ when there is one, else from
+--   the shared @topology.yaml@.
+topologyFor :: FilePath -> FilePath -> IO (Integer, [(Text, Integer)])
+topologyFor dir file = do
+  let own = dir </> "topologies" </> takeBaseName file <.> "yaml"
+  hasOwn <- doesFileExist own
+  (top :: Topology COORD2D) <- decodeFileThrow (if hasOwn then own else dir </> "topology.yaml")
+  let nodeNames = Prelude.map unNodeName (keys $ nodes top)
+      stakes = Prelude.map (toInteger . stake . nodeInfo) (elems $ nodes top)
+  pure (toInteger $ Prelude.length (elems $ nodes top), Prelude.zip nodeNames stakes)

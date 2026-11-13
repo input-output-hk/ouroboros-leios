@@ -15,7 +15,7 @@
 --   is needed.
 module Main where
 
-import ChainEvents (parseNodeLog)
+import ChainEvents (ChainEvent (CUndetailed), parseNodeLog)
 import Control.Monad (when)
 import Data.ByteString.Lazy as BSL
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -70,6 +70,13 @@ main = do
 --   "LinearLeiosChain" so the driver stays testable with a collecting reporter.
 render :: Progress -> IO ()
 render = \case
+  -- The Praos layer builds the node's block tree from the headers ChainDB lists
+  -- with each selection, which it does only at DDetailed.
+  Saw CUndetailed ->
+    die
+      "node.log lists no headers with the chain selections: set \"detail\": \"DDetailed\" for \
+      \ChainDB.AddBlockEvent.AddedToCurrentChain and ChainDB.AddBlockEvent.SwitchedToAFork \
+      \in the node's TraceOptions"
   Saw ev -> hPutStrLn stderr $ "event: " <> show ev
   SegmentStarted seg spans -> reportSchedule seg spans
   Verified nEvents nActions ->
@@ -370,7 +377,7 @@ queryChainOnce LeadershipOpts{..} = do
     ) <-
     Api.executeLocalStateQueryExpr connInfo Api.VolatileTip $ do
       Api.AnyCardanoEra era <- expectQuery "current era" Api.queryCurrentEra
-      Api.caseByronOrShelleyBasedEra
+      Api.inEonForEra
         (error "Byron era is not supported")
         ( \sbe -> do
             pparams <- expectQueryEra "protocol parameters" (Api.queryProtocolParameters sbe)
@@ -441,8 +448,8 @@ queryChainOnce LeadershipOpts{..} = do
           )
 
 -- | Turn the on-chain stake distribution (pool-id → relative stake) into the
---   verifier's view: parties are the pools in chain (Map) order, keyed
---   @node-i@; the SUT is the pool given by --stake-pool-id, at its natural
+--   verifier's view: parties are the pools in chain (Map) order, identified
+--   by index; the SUT is the pool given by --stake-pool-id, at its natural
 --   index. Relative stakes are scaled to naturals (per billion).
 buildChainData ::
   (Api.Hash Api.StakePoolKey) ->
@@ -460,9 +467,8 @@ buildChainData sutPool epochLength maxRBBody nodeEpoch winning m =
       pairs
         | Prelude.any ((== sutPool) . fst) pairs0 = pairs0
         | otherwise = pairs0 <> [(sutPool, 0)]
-      nodeName i = T.pack ("node-" <> show (i :: Int))
       scaleStake r = floor (r * 1000000000) :: Integer
-      stakeDist = [(nodeName i, scaleStake r) | (i, (_, r)) <- Prelude.zip [0 ..] pairs]
+      stakeDist = [scaleStake r | (_, r) <- pairs]
       sutIdx =
         maybe (error sutNotFound) toInteger $
           List.findIndex ((== sutPool) . fst) pairs

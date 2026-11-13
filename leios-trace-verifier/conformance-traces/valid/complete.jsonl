@@ -10897,7 +10897,7 @@
 {"time_s":4.0,"message":{"type":"Slot","node":"node-44","slot":3}}
 {"time_s":4.0,"message":{"type":"NoIBGenerated","node":"node-44","slot":4}}
 {"time_s":4.001,"message":{"type":"CpuTaskFinished","task":{"node":"node-19","index":43},"task_type":"GenRB","cpu_time_s":0.001,"wall_time_s":0.001,"extra":""}}
-{"time_s":4.001,"message":{"type":"RBGenerated","id":"4-node-19","slot":4,"producer":"node-19","vrf":335180134020309306,"parent":null,"header_bytes":1024,"size_bytes":2566,"endorsement":null,"transactions":["0","1"]}}
+{"time_s":4.001,"message":{"type":"RBGenerated","id":"4-node-19","slot":4,"producer":"node-19","vrf":335180134020309306,"parent":null,"header_bytes":1024,"size_bytes":2566,"tx_payload_bytes":1542,"endorsement":null,"transactions":[0,1]}}
 {"time_s":4.009,"message":{"type":"RBSent","id":"4-node-19","slot":4,"producer":"node-19","sender":"node-19","recipient":"node-49","msg_size_bytes":2566}}
 {"time_s":4.013,"message":{"type":"RBReceived","id":"4-node-19","slot":4,"producer":"node-19","sender":"node-19","recipient":"node-49"}}
 {"time_s":4.013,"message":{"type":"CpuTaskScheduled","task":{"node":"node-49","index":52},"task_type":"ValRB","subtasks":1}}
@@ -129000,7 +129000,7 @@
 {"time_s":53.0,"message":{"type":"CpuTaskScheduled","task":{"node":"node-19","index":496},"task_type":"GenRB","subtasks":1}}
 {"time_s":53.0,"message":{"type":"Cpu","task":{"node":"node-19","index":496},"node":"node-19","cpu_time_s":0.001,"task_label":"GenRB: node-19-496-0","task_type":"GenRB","id":"node-19-496-0"}}
 {"time_s":53.001,"message":{"type":"CpuTaskFinished","task":{"node":"node-19","index":496},"task_type":"GenRB","cpu_time_s":0.001,"wall_time_s":0.001,"extra":""}}
-{"time_s":53.001,"message":{"type":"RBGenerated","id":"53-node-19","slot":53,"producer":"node-19","vrf":264652829318836419,"parent":{"id":"4-node-19"},"header_bytes":1024,"size_bytes":68099,"endorsement":null,"transactions":["2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36","37","38","39","40","41","42","43","44","45","46","47","48"]}}
+{"time_s":53.001,"message":{"type":"RBGenerated","id":"53-node-19","slot":53,"producer":"node-19","vrf":264652829318836419,"parent":{"id":"4-node-19"},"header_bytes":1024,"size_bytes":68099,"tx_payload_bytes":67075,"endorsement":null,"transactions":[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48]}}
 {"time_s":53.009,"message":{"type":"RBSent","id":"53-node-19","slot":53,"producer":"node-19","sender":"node-19","recipient":"node-49","msg_size_bytes":68099}}
 {"time_s":53.013,"message":{"type":"RBReceived","id":"53-node-19","slot":53,"producer":"node-19","sender":"node-19","recipient":"node-49"}}
 {"time_s":53.013,"message":{"type":"CpuTaskScheduled","task":{"node":"node-49","index":608},"task_type":"ValRB","subtasks":1}}
@@ -171267,7 +171267,7 @@
 {"time_s":69.0,"message":{"type":"CpuTaskScheduled","task":{"node":"node-19","index":659},"task_type":"GenIB","subtasks":1}}
 {"time_s":69.0,"message":{"type":"Cpu","task":{"node":"node-19","index":659},"node":"node-19","cpu_time_s":0.13,"task_label":"GenIB: node-19-659-0","task_type":"GenIB","id":"node-19-659-0"}}
 {"time_s":69.001,"message":{"type":"CpuTaskFinished","task":{"node":"node-17","index":740},"task_type":"GenRB","cpu_time_s":0.001,"wall_time_s":0.001,"extra":""}}
-{"time_s":69.001,"message":{"type":"RBGenerated","id":"69-node-17","slot":69,"producer":"node-17","vrf":118637506647182620,"parent":{"id":"53-node-19"},"header_bytes":1024,"size_bytes":32289,"endorsement":null,"transactions":["49","50","51","52","53","54","55","56","57","58","59","60","61","62"]}}
+{"time_s":69.001,"message":{"type":"RBGenerated","id":"69-node-17","slot":69,"producer":"node-17","vrf":118637506647182620,"parent":{"id":"53-node-19"},"header_bytes":1024,"size_bytes":32289,"tx_payload_bytes":31265,"endorsement":null,"transactions":[49,50,51,52,53,54,55,56,57,58,59,60,61,62]}}
 {"time_s":69.002,"message":{"type":"TXReceived","id":"62","sender":"node-21","recipient":"node-9"}}
 {"time_s":69.002,"message":{"type":"CpuTaskScheduled","task":{"node":"node-9","index":810},"task_type":"ValTX","subtasks":1}}
 {"time_s":69.002,"message":{"type":"Cpu","task":{"node":"node-9","index":810},"node":"node-9","cpu_time_s":0.0015,"task_label":"ValTX: node-9-810-0","task_type":"ValTX","id":"node-9-810-0"}}
@@ -187732,7 +187732,7 @@
 {"time_s":75.0,"message":{"type":"CpuTaskScheduled","task":{"node":"node-19","index":725},"task_type":"GenRB","subtasks":1}}
 {"time_s":75.0,"message":{"type":"Cpu","task":{"node":"node-19","index":725},"node":"node-19","cpu_time_s":0.001,"task_label":"GenRB: node-19-725-0","task_type":"GenRB","id":"node-19-725-0"}}
 {"time_s":75.001,"message":{"type":"CpuTaskFinished","task":{"node":"node-19","index":725},"task_type":"GenRB","cpu_time_s":0.001,"wall_time_s":0.001,"extra":""}}
-{"time_s":75.001,"message":{"type":"RBGenerated","id":"75-node-19","slot":75,"producer":"node-19","vrf":116332180144994232,"parent":{"id":"69-node-17"},"header_bytes":1024,"size_bytes":9157,"endorsement":null,"transactions":["63","64","65","66","67"]}}
+{"time_s":75.001,"message":{"type":"RBGenerated","id":"75-node-19","slot":75,"producer":"node-19","vrf":116332180144994232,"parent":{"id":"69-node-17"},"header_bytes":1024,"size_bytes":9157,"tx_payload_bytes":8133,"endorsement":null,"transactions":[63,64,65,66,67]}}
 {"time_s":75.009,"message":{"type":"RBSent","id":"75-node-19","slot":75,"producer":"node-19","sender":"node-19","recipient":"node-49","msg_size_bytes":9157}}
 {"time_s":75.013,"message":{"type":"RBReceived","id":"75-node-19","slot":75,"producer":"node-19","sender":"node-19","recipient":"node-49"}}
 {"time_s":75.013,"message":{"type":"CpuTaskScheduled","task":{"node":"node-49","index":887},"task_type":"ValRB","subtasks":1}}

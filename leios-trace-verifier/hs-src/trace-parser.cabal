@@ -22,6 +22,7 @@ data-dir:
 data-files:
   config.yaml
   topology.yaml
+  topologies/*.yaml
   valid/*.jsonl
   invalid/*.jsonl
 

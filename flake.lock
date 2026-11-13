@@ -20,17 +20,17 @@
     "CHaP-tv": {
       "flake": false,
       "locked": {
-        "lastModified": 1785784703,
-        "narHash": "sha256-Nqftjz5u71ys+VY1dw3s9unnmulBSZstAIESrIZxxqc=",
+        "lastModified": 1791557770,
+        "narHash": "sha256-sOy9L/Q5G2okYvZ4PlH/XEFQQFUOasifDfcMipqz3MY=",
         "owner": "intersectmbo",
         "repo": "cardano-haskell-packages",
-        "rev": "60ad9c29de7b30cb480547110cffad0cb6c71ab2",
+        "rev": "0f444414db3931fb70d8667f4791dec49e1e23bf",
         "type": "github"
       },
       "original": {
         "owner": "intersectmbo",
         "repo": "cardano-haskell-packages",
-        "rev": "60ad9c29de7b30cb480547110cffad0cb6c71ab2",
+        "rev": "0f444414db3931fb70d8667f4791dec49e1e23bf",
         "type": "github"
       }
     },
@@ -685,16 +685,17 @@
     "categorical-crypto": {
       "flake": false,
       "locked": {
-        "lastModified": 1774441400,
-        "narHash": "sha256-t0HXmhW3C4VPkl1IMiwa16lgZVomxuu74O30qwoEeNU=",
+        "lastModified": 1793358738,
+        "narHash": "sha256-pRwTBx5QhwVVb6bw3dRWA8wXrC2sXiwEnKCXUhNWMyo=",
         "owner": "input-output-hk",
         "repo": "categorical-crypto",
-        "rev": "6cdf63785fb39f5e340240667e7a0c5aed473d90",
+        "rev": "7b90368f931a47bcc3861c3b99abc64d13785d78",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "categorical-crypto",
+        "rev": "7b90368f931a47bcc3861c3b99abc64d13785d78",
         "type": "github"
       }
     },
@@ -1448,17 +1449,17 @@
     "hackage_2": {
       "flake": false,
       "locked": {
-        "lastModified": 1785861789,
-        "narHash": "sha256-mVgzj67M3FVQXtM5LHFi4JWwjaUeCz5FreNnb/b+DFw=",
+        "lastModified": 1791402162,
+        "narHash": "sha256-M+4DJW/9npu4P7B85F297CafsmQbCBEdpg4Nu01x++I=",
         "owner": "input-output-hk",
         "repo": "hackage.nix",
-        "rev": "956836e90e902e23b7bf080a0c9d0a88ddf0273a",
+        "rev": "309393e86ccda97e642ff30dfb0c0aee16d0b94b",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "hackage.nix",
-        "rev": "956836e90e902e23b7bf080a0c9d0a88ddf0273a",
+        "rev": "309393e86ccda97e642ff30dfb0c0aee16d0b94b",
         "type": "github"
       }
     },
@@ -3319,17 +3320,17 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1788438859,
-        "narHash": "sha256-3ORbos6Om/OkJ/sK4ADIeohRKSUEmiwNyG3Tu9cT9XA=",
+        "lastModified": 1793697113,
+        "narHash": "sha256-Y1vxegueJ0cERn+MxTDsYABRrgcMR7ZpjAl9nSOicek=",
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "73d61e931ebd93ea58dacf2ad3e2562dbbdc0fbe",
+        "rev": "426f3756655d8b6b562d49b33243f796c5ab39b3",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "73d61e931ebd93ea58dacf2ad3e2562dbbdc0fbe",
+        "rev": "426f3756655d8b6b562d49b33243f796c5ab39b3",
         "type": "github"
       }
     },
@@ -4617,6 +4618,23 @@
         "type": "github"
       }
     },
+    "praos-spec-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1781223391,
+        "narHash": "sha256-nBNg4oOGKBxrSxr5YzwrXRnxvHKf5JYLhq04KYUlbyE=",
+        "owner": "input-output-hk",
+        "repo": "ouroboros-praos-formal-spec",
+        "rev": "847697eec805983c6ac2afa793443e4da954d11a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "input-output-hk",
+        "repo": "ouroboros-praos-formal-spec",
+        "rev": "847697eec805983c6ac2afa793443e4da954d11a",
+        "type": "github"
+      }
+    },
     "pre-commit-hooks": {
       "inputs": {
         "flake-compat": [
@@ -4712,6 +4730,7 @@
         "leios-spec": "leios-spec",
         "nixpkgs": "nixpkgs_9",
         "ouroboros-consensus": "ouroboros-consensus",
+        "praos-spec-src": "praos-spec-src",
         "pre-commit-hooks": "pre-commit-hooks_2"
       }
     },
@@ -5009,16 +5028,17 @@
     "standard-library-meta": {
       "flake": false,
       "locked": {
-        "lastModified": 1754406588,
-        "narHash": "sha256-YH8OqGsQ2DKhKqhSUWBDTimQSZsNCnqwZqNqQwnnVS0=",
+        "lastModified": 1788253692,
+        "narHash": "sha256-jA65FwnhoIxahmJtkaCnoDvo+PvmejeO6JJPh4aPvJI=",
         "owner": "agda",
         "repo": "agda-stdlib-meta",
-        "rev": "ba0159a198c99185bda86541362f8e0a4a82538a",
+        "rev": "97e2f65f5c8a1cc07aacec32b4974668ef32979b",
         "type": "github"
       },
       "original": {
         "owner": "agda",
         "repo": "agda-stdlib-meta",
+        "rev": "97e2f65f5c8a1cc07aacec32b4974668ef32979b",
         "type": "github"
       }
     },

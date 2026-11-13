@@ -18,21 +18,29 @@
 
     iogx.url = "github:input-output-hk/iogx";
 
-    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=73d61e931ebd93ea58dacf2ad3e2562dbbdc0fbe";
+    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=426f3756655d8b6b562d49b33243f796c5ab39b3";
+
+    # The Praos formal spec, used by leios-trace-verifier's Leios.Base.Praos
+    # to wrap the real Praos node as a Leios BaseMachine (see
+    # leios-trace-verifier/docs/praos-base-machine-sketch.md).
+    praos-spec-src = {
+      url = "github:input-output-hk/ouroboros-praos-formal-spec/847697eec805983c6ac2afa793443e4da954d11a";
+      flake = false;
+    };
 
     # Trace verifier only: it links cardano-api against the Leios prototype
     # node's pins (cabal.project.trace-verifier), which need newer
     # CHaP/hackage snapshots than iogx's. A dedicated haskell.nix instance
     # keeps the rest of this flake identical to main. Snapshots must be
     # at/after cabal.project.trace-verifier's index-states
-    # (hackage 2026-07-15T21:58:35Z / CHaP 2026-07-27T20:44:57Z, the
-    # prototype-2026w32 node's pins).
+    # (hackage 2026-09-02T14:05:07Z / CHaP 2026-10-09T14:30:01Z, the
+    # cardano-node 11.2.0.164 release pins).
     haskell-nix-tv = {
       url = "github:input-output-hk/haskell.nix/ef52c36b9835c77a255befe2a20075ba71e3bfab";
-      inputs.hackage.url = "github:input-output-hk/hackage.nix/956836e90e902e23b7bf080a0c9d0a88ddf0273a";
+      inputs.hackage.url = "github:input-output-hk/hackage.nix/309393e86ccda97e642ff30dfb0c0aee16d0b94b";
     };
     CHaP-tv = {
-      url = "github:intersectmbo/cardano-haskell-packages/60ad9c29de7b30cb480547110cffad0cb6c71ab2";
+      url = "github:intersectmbo/cardano-haskell-packages/0f444414db3931fb70d8667f4791dec49e1e23bf";
       flake = false;
     };
 

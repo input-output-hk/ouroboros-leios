@@ -46,8 +46,8 @@ data ChainData = ChainData
   --   all — chiefly on a young network, where pool stake has not activated yet. Not
   --   fatal: eligibility then comes from the node's leadership record in the log.
   , cdNumParties :: Integer
-  , cdStakeDistribution :: [(Text, Integer)]
-  -- ^ Per-party stake, keyed @node-i@. Load-bearing beyond block production: vote
+  , cdStakeDistribution :: [Integer]
+  -- ^ Per-party stake, by party index. Load-bearing beyond block production: vote
   --   eligibility is the CIP-0164 committee, computed from these figures.
   , cdSutIndex :: Integer
   , cdEpochLength :: Integer
@@ -159,7 +159,7 @@ checkpointEvery = 20
 --   epoch covers every obligation able to straddle a boundary.
 --   The voting window is a range, not a single slot: it opens at
 --   @ebSlot + 3 * Lhdr@ and the deadline is @ebSlot + 3 * Lhdr + Lvote@, after which
---   'Roles₃' no longer licenses deferral and a vote is forced. So an obligation can
+--   'VT-Defer' no longer licenses deferral and a vote is forced. So an obligation can
 --   fall due as late as @3 * Lhdr + Lvote@ slots after the EB's own slot, and its
 --   acquisition may lag the election by up to @Lhdr@.
 --

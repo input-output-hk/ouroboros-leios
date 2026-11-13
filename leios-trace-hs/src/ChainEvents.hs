@@ -25,9 +25,17 @@
 --   composed at each vote event to resolve rbHash -> (ebHash, ebSlot).
 --   Unresolvable votes (linkage missing, e.g. truncated log prefix) are
 --   dropped rather than guessed.
+--
+--   The selection events also feed the verifier's Praos node, which needs
+--   every block the node adopted with its parent.  ChainDB lists the adopted
+--   headers, oldest first, only at @detail: DDetailed@; the parse then keeps
+--   the selected chain by block number, so the parent of the first header is
+--   the chain's block one below it (the fork point, on a switch) and that of
+--   every later one is the header before it.  A selection event without the
+--   headers yields 'CUndetailed', which the driver refuses.
 module ChainEvents where
 
-import Data.Aeson (Object, Value, decode, withObject, (.:))
+import Data.Aeson (Object, Value (String), decode, parseJSON, withObject, (.:), (.:?))
 import Data.Aeson.Types (Parser, parseMaybe)
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import Data.List (mapAccumL)
@@ -72,12 +80,13 @@ data ChainEvent
     --   (@chainTipDoesNotAnnounce@ once the chain has extended past the announcer,
     --   @tooLate@, @notOnCommittee@). Corroborates a closed voting window.
     CNotVoted !Text !Word64 !Text
-  | -- | @ChainDB.AddBlockEvent.AddedToCurrentChain@ / @SwitchedToAFork@: the SUT's
-    --   selected chain now has this tip slot. In Linear Leios a cert is valid only
-    --   in the ranking block that directly extends the announcer, so once the tip
-    --   advances past an announced EB that EB can no longer be certified — the
-    --   verifier uses this to close the EB's voting window.
-    CChainExtended !Word64
+  | -- | A ranking block the SUT adopted into its selected chain (hash, slot,
+    --   parent hash), from the headers of @ChainDB.AddBlockEvent.AddedToCurrentChain@
+    --   / @SwitchedToAFork@, oldest first.  The parent is 'Nothing' where the log
+    --   has not shown it, as for the first block of a log.
+    CAdopted !Text !Word64 !(Maybe Text)
+  | -- | The tip of the SUT's selected chain after a selection event (hash, slot).
+    CNewTip !Text !Word64
   | -- | The (min, max) mempool size in bytes observed during one slot, aggregated
     --   from @Mempool.AddedTx@ / @Mempool.RemoveTxs@ (both report the resulting size
     --   absolutely, not as a delta). A range rather than a point because the node
@@ -85,6 +94,9 @@ data ChainEvent
     --   single reading would be a guess at what it saw. Emitted immediately before
     --   the slot tick that closes the slot it describes.
     CMempoolRange !Word64 !Word64
+  | -- | A selection event without its headers: the node logs ChainDB at a
+    --   detail below @DDetailed@, which the Praos layer cannot work from.
+    CUndetailed
   deriving (Eq, Show, Generic)
 
 -- | Internal: one parsed line — a directly-emittable event, a linkage fact
@@ -93,9 +105,10 @@ data Raw
   = RawEvent !ChainEvent
   | -- | announcement accepted: election slot, ebHash
     RawAnn !Word64 !Text
-  | -- | chain linkage: rbHash, new tip slot. Records rbHash -> slot for vote
-    --   resolution AND surfaces the tip advance as 'CChainExtended'.
-    RawRb !Text !Word64
+  | -- | a new selection: the tip (rbHash, slot) and, at @DDetailed@, the
+    --   adopted headers (hash, slot, block number), oldest first.  Records
+    --   rbHash -> slot for vote resolution and feeds the Praos node.
+    RawSel !Text !Word64 !(Maybe [(Text, Word64, Word64)])
   | -- | vote (True = cast by the SUT, False = acquired from a peer): rbHash
     RawVote !Bool !Text
   | -- | deliberate abstention: ebHash, election slot, reason. EB-keyed.
@@ -113,10 +126,12 @@ data LinkState = LinkState
   , lsMemLast :: !(Maybe Word64)
   -- ^ Most recent reading, which seeds the next slot's range: the mempool as it
   --   stood when that slot began counts as one of its readings.
+  , lsChain :: !(Map.Map Word64 Text)
+  -- ^ The selected chain as far as the log has shown it, by block number.
   }
 
 emptyLinkState :: LinkState
-emptyLinkState = LinkState Map.empty Map.empty Nothing Nothing
+emptyLinkState = LinkState Map.empty Map.empty Nothing Nothing Map.empty
 
 -- | Parse a whole node.log, keeping only the Leios events and preserving order.
 --
@@ -152,10 +167,16 @@ parseNodeLog =
       ( st{lsEbBySlot = Map.insert slot ebHash (lsEbBySlot st)}
       , [CAnnouncementAccepted ebHash slot]
       )
-    RawRb rbHash slot ->
-      ( st{lsSlotByRb = Map.insert rbHash slot (lsSlotByRb st)}
-      , [CChainExtended slot]
+    RawSel tipHash tipSlot Nothing ->
+      ( st{lsSlotByRb = Map.insert tipHash tipSlot (lsSlotByRb st)}
+      , [CUndetailed, CNewTip tipHash tipSlot]
       )
+    RawSel tipHash tipSlot (Just hdrs) ->
+      let (chain', adopted) = adopt (lsChain st) hdrs
+          slots = foldr (\(h, s, _) -> Map.insert h s) (lsSlotByRb st) hdrs
+       in ( st{lsSlotByRb = Map.insert tipHash tipSlot slots, lsChain = chain'}
+          , adopted <> [CNewTip tipHash tipSlot]
+          )
     RawVote ours rbHash ->
       ( st
       , maybeToList $ do
@@ -165,6 +186,20 @@ parseNodeLog =
       )
     RawNotVoted ebHash slot reason ->
       (st, [CNotVoted ebHash slot reason])
+
+-- | Adopt headers, oldest first, into the selected chain: the first replaces
+--   the chain from its block number on (a fork switch rolls back to there) and
+--   links to the block below it, every later one links to the one before.
+adopt :: Map.Map Word64 Text -> [(Text, Word64, Word64)] -> (Map.Map Word64 Text, [ChainEvent])
+adopt chain [] = (chain, [])
+adopt chain hdrs@((_, _, bn0) : _) =
+  let kept = fst (Map.split bn0 chain)
+      parent0 = if bn0 == 0 then Nothing else Map.lookup (bn0 - 1) kept
+      go _ [] = []
+      go p ((h, s, _) : rest) = CAdopted h s p : go (Just h) rest
+   in ( foldr (\(h, _, bn) -> Map.insert bn h) kept hdrs
+      , go parent0 hdrs
+      )
 
 -- | Parse a single log line; @Nothing@ for non-JSON banners and unrelated events.
 parseRaw :: BSL8.ByteString -> Maybe Raw
@@ -201,8 +236,8 @@ pRaw = withObject "logline" $ \o -> do
     -- advance retires any EB the superseded announcer carried, and the adopted
     -- RB is what a vote is keyed on. Ignoring the fork-switch case silently
     -- drops every vote for an RB that arrived on a fork.
-    "ChainDB.AddBlockEvent.AddedToCurrentChain" -> newtip d
-    "ChainDB.AddBlockEvent.SwitchedToAFork" -> newtip d
+    "ChainDB.AddBlockEvent.AddedToCurrentChain" -> selection d
+    "ChainDB.AddBlockEvent.SwitchedToAFork" -> selection d
     -- pre-w31 envelope (kept for older logs)
     "Consensus.LeiosKernel.TraceLeiosKernel" -> do
       kind <- d .: "kind"
@@ -224,11 +259,31 @@ mempoolBytes d = do
   ms <- d .: "mempoolSize"
   RawMempool <$> ms .: "bytes"
 
--- | The newly adopted tip, shared by ChainDB's two selection-change events.
-newtip :: Object -> Parser Raw
-newtip d = do
+-- | A selection change, shared by ChainDB's two events: the newly adopted tip
+--   and, at @DDetailed@, the headers adopted with it.
+selection :: Object -> Parser Raw
+selection d = do
   tip <- d .: "newtip"
-  maybe (fail "unparseable newtip") (pure . uncurry RawRb) (parseTip tip)
+  (h, s) <- maybe (fail "unparseable newtip") pure (parseTip tip)
+  hdrs <- d .:? "headers"
+  RawSel h s <$> traverse (mapM header) hdrs
+
+-- | One adopted header: hash, slot and block number, which the node renders
+--   as decimal strings.  The node renders the hash with its own quotes around
+--   it (@"\"6652…\""@), unlike @newtip@, so they are dropped.
+header :: Value -> Parser (Text, Word64, Word64)
+header = withObject "header" $ \o ->
+  (,,)
+    <$> (T.dropAround (== '"') <$> o .: "hash")
+    <*> (o .: "slotNo" >>= number)
+    <*> (o .: "blockNo" >>= number)
+
+-- | A natural number, as a JSON number or a decimal string.
+number :: Value -> Parser Word64
+number (String t) = case TR.decimal t of
+  Right (n, rest) | T.null rest -> pure n
+  _ -> fail "not a decimal"
+number v = parseJSON v
 
 -- | @"\<64 hex chars\>@\<decimal slot\>"@ from ChainDB's @newtip@ field.
 parseTip :: Text -> Maybe (Text, Word64)

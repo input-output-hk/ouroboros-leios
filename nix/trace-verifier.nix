@@ -57,7 +57,7 @@ let
       cp -r . $out
       # Copy the test data.
       mkdir -p $out/leios-trace-verifier/dist/haskell/data
-      cp -r leios-trace-verifier/conformance-traces/{config.yaml,topology.yaml,valid,invalid} $out/leios-trace-verifier/dist/haskell/data/
+      cp -r leios-trace-verifier/conformance-traces/{config.yaml,topology.yaml,topologies,valid,invalid} $out/leios-trace-verifier/dist/haskell/data/
     '';
     installPhase = ''
       # Add the MAlonzo modules to the cabal file.
@@ -80,7 +80,9 @@ let
       "https://chap.intersectmbo.org/" = inputs.CHaP-tv;
     };
     name = "leios-trace-verifier";
-    compiler-nix-name = lib.mkDefault "ghc9101";
+    # The node release builds with GHC 9.6.7; its ledger needs -fno-spec-eval,
+    # which GHC 9.10.1 lacks.
+    compiler-nix-name = lib.mkDefault "ghc967";
     modules = [
       {
         # cardano-rpc (a subdir of the cardano-api pin) depends on
@@ -117,8 +119,8 @@ in
 {
   inherit cabalProject;
 
-  # Flat names used by CI (conformance.yaml) and scripts, plus the raw
-  # cabal-component names (trace-parser:exe:...) from the project flake.
+  # Flat names used by scripts (e.g. run.sh), plus the raw cabal-component
+  # names (trace-parser:exe:...) from the project flake.
   packages = tvFlake.packages // {
     linear-leios-trace-verifier = tvFlake.packages."trace-parser:exe:linear-leios-trace-verifier";
     linear-leios-trace-verifier-chain =

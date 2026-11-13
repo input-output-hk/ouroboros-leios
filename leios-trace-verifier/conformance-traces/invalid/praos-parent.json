@@ -1,0 +1,8 @@
+#
+# The SUT mints on top of a block it never received
+#
+{"message": {"type": "Slot", "node": "node-0", "slot": 0}, "time_s": 1.0}
+{"message": {"type": "RBGenerated", "producer": "node-1", "slot": 1, "id": "1-node-1", "endorsement": null, "parent": null, "size_bytes": 864, "tx_payload_bytes": 0, "transactions": []}, "time_s": 1.001}
+{"message": {"type": "Slot", "node": "node-0", "slot": 1}, "time_s": 2.0}
+{"message": {"type": "RBGenerated", "producer": "node-0", "slot": 2, "id": "2-node-0", "endorsement": null, "parent": {"id": "1-node-1"}, "size_bytes": 864, "tx_payload_bytes": 0, "transactions": []}, "time_s": 2.001}
+{"message": {"type": "Slot", "node": "node-0", "slot": 2}, "time_s": 3.0}

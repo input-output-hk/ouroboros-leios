@@ -6,5 +6,6 @@ depend:
   abstract-set-theory
   iog-prelude
   leios-spec
+  praos-spec
 include:
   src

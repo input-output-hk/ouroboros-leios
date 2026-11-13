@@ -15,7 +15,7 @@ define agdaToHs
     cp -r hs-src/* $(HS_DIR)/
     cp hs-src/$(CABAL_FILE) $(HS_DIR)/
     mkdir -p $(HS_DIR)/data
-    cp -r conformance-traces/{config.yaml,topology.yaml,valid,invalid} $(HS_DIR)/data/
+    cp -r conformance-traces/{config.yaml,topology.yaml,topologies,valid,invalid} $(HS_DIR)/data/
     $(AGDA_RUN) -c --ghc-dont-call-ghc --compile-dir $(HS_DIST) $<
     find $(HS_DIST)/MAlonzo -name "*.hs" -print\
       | sed "s#^$(HS_DIST)/#        #;s#\.hs##;s#/#.#g"\
@@ -31,3 +31,19 @@ clean:
 
 $(HS_LEIOS): src/trace-parser.agda
 	$(call agdaToHs,trace-parser)
+
+# Leios.Base.Praos (see docs/praos-base-machine-sketch.md), checked one module
+# at a time.  Praos.agda is --safe; Instance.agda isn't (Praos's
+# chainFromBlock is TERMINATING).
+.PHONY: praos-base praos-instance praos-assumptions praos-machine
+praos-base:
+	$(AGDA) src/Leios/Base/Praos.agda
+
+praos-instance:
+	$(AGDA) src/Leios/Base/Praos/Instance.agda
+
+praos-assumptions:
+	$(AGDA) src/Leios/Base/Praos/Assumptions.agda
+
+praos-machine:
+	$(AGDA) src/Leios/Base/Praos/Machine.agda
