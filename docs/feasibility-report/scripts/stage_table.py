@@ -183,13 +183,13 @@ def classes(outputs, name):
     validation by class, passed through from validation_classes.md."""
     d = os.path.join(outputs, name)
     fleet = read(os.path.join(d, "closure_fleet_per_eb.csv"))
-    print("The 6,000-and-up class split at the reference cap, %s:\n" % name)
+    print("The 6,000-and-up class split at S_EB, %s:\n" % name)
     print("| EB size | EBs | certified | closure never at 90 % of nodes | nodes that received the EB (p50) | received its body (p50) | completed its closure (p50) |")
     print("|---|---|---|---|---|---|---|")
     if fleet is None or "nodes_body" not in fleet[0]:
         print("| n/a | | | | | | |")
     else:
-        for lo, hi, lab in [(6000, 8550, "6,000 to 8,549 references"), (8550, 1e12, "at the reference cap, 8,550 references and up")]:
+        for lo, hi, lab in [(6000, 8550, "6,000 to 8,549 references"), (8550, 1e12, "at S_EB, 8,550 references and up")]:
             rs = [r for r in fleet if lo <= float(r["txs"]) < hi]
             if not rs:
                 continue

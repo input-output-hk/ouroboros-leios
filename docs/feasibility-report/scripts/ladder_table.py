@@ -40,7 +40,8 @@ def annotate(level, d, rung):
     if level == "parameter ceiling":
         return "p = %.3f" % d["p_model"]
     if level == "workload ceiling":
-        return "%s at %.0f B/tx" % (d["binds"], d["tx_size"])
+        # the saved records name the binding cap in words; the report uses CIP-164's symbols
+        return "%s binds at %.0f B/tx" % ({"payload cap": "S_EB-tx", "reference cap": "S_EB"}.get(d["binds"], d["binds"]), d["tx_size"])
     if level == "observed spacing":
         return "1 RB / %.1f s, p = %.3f" % (1 / d["f_observed"], d["p_obs"])
     if level == "voting-adjusted, mix":

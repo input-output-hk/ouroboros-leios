@@ -227,23 +227,24 @@ three to eight times above it.
 ## Where the measured parameter sets sit on paper
 
 The report measures three parameter sets. Each is named by the two
-caps that define it. The first is the reference list an endorser block
-may carry, which caps its transaction count at 36 or 37 bytes per
-reference, depending on the transaction's size. The second is the
-bytes of its closure, the transactions it brings into the chain.
+caps that define it, in the symbols of CIP-164. The first, S_EB, caps
+the bytes of the reference list an endorser block may carry, and so
+its transaction count, at 36 or 37 bytes per reference depending on
+the transaction's size. The second, S_EB-tx, caps the bytes of its
+closure, the transactions it brings into the chain.
 
 Table 1.4 gives each set's parameter ceiling, the rate it would carry
 with every endorser block full and every one certified, beside the
 targets of the previous subsection.
 
-| parameter set | reference cap | closure cap | parameter ceiling, kB/s | tx/s at 877 B |
+| parameter set | S_EB | S_EB-tx | parameter ceiling, kB/s | tx/s at 877 B |
 |---|---|---|---|---|
 | 40 kB / 260 kB | 40,000 B (1,111 txs) | 260 kB | 8.9 | 10 |
 | 100 kB / 1 MB | 100,000 B (2,777 txs) | 1,000 kB | 27.9 | 32 |
 | 308 kB / 2 MB | 308,000 B (8,555 txs) | 2,000 kB | 53.5 | 61 |
 
-Table 1.4. The parameter ceiling is the closure cap times f times p,
-plus the plain Praos block's share at its 90,112 B limit. Here
+Table 1.4. The parameter ceiling is S_EB-tx times f times p, plus the
+plain Praos block's share at its 90,112 B limit. Here
 p = 0.513 is the probability that the next block arrives 14 slots or
 more later, late enough for the certificate to be included. Section [2](#what-is-assessed-and-what-to-expect)
 defines the ceiling and the corrections that take it down to a
@@ -317,20 +318,30 @@ one row per stage for that reason.
 ## The constraint set
 
 A Leios parameter set is more than the two caps that name it. Table
-2.1 lists its parameters with the stage of 2.1 each one binds.
+2.1 lists its parameters, with the names and symbols CIP-164 gives
+them, and the stage of the pipeline each one binds.
 
-| parameter | what it bounds | stage it binds |
-|---|---|---|
-| reference cap (bytes of the EB body) | the number of transactions an EB may reference, at 36 or 37 B each | snapshot; body diffusion |
-| closure cap (bytes of the EB's transactions) | the bytes an EB brings into the chain | closure diffusion; validation; adoption |
-| reference-script cap | the bytes of reference scripts the closure may pull in | validation |
-| Plutus steps and memory budgets | the script computation the closure may require | validation |
-| timings L_hdr, L_vote, L_diff | when votes are cast and by when | validation and voting |
-| certification gap | how far the next RB must be for a certificate to count | tally |
-| committee size and quorum | how much stake must vote, and how it is spread | tally |
-| the Praos block limit and f | the plain block's share and the RB rate | all, as the clock |
+| parameter | symbol | what it bounds | stage it binds |
+|---|---|---|---|
+| maximum endorser block size | S_EB | the bytes of the reference list, so the transactions an EB may reference at 36 or 37 B each | snapshot; body diffusion |
+| maximum total transaction size per EB | S_EB-tx | the bytes of the closure, what an EB brings into the chain | closure diffusion; validation; adoption |
+| maximum reference script size per EB | S_EB-ref | the bytes of reference scripts the closure may pull in | validation |
+| maximum Plutus steps and memory per EB | none | the script computation the closure may require | validation |
+| header, voting and diffusion period lengths | L_hdr, L_vote, L_diff | when votes are cast and by when | validation and voting |
+| committee size | N_c | how many pools vote | tally |
+| quorum stake threshold | τ | how much stake must vote | tally |
 
-Table 2.1. The parameters of a Leios set and the stage each one binds.
+Table 2.1. The parameters of a Leios set, in CIP-164's names and
+symbols, and the stage each one binds. The two caps that name a set
+are S_EB and S_EB-tx.
+
+Two timings follow from the three periods. The vote window opens
+3 L_hdr after the EB's slot and closes at 3 L_hdr + L_vote. The
+certification gap, the earliest the certificate can be included, is
+3 L_hdr + L_vote + L_diff after the announcing RB, 14 slots at the
+deployed values. Underneath them Praos keeps its own parameters: the
+block limit, maxBlockBodySize at 90,112 B, and the active slot
+coefficient f, which set the plain block's share and the RB rate.
 
 The measurements exercise the two caps, the timings at their deployed
 values, the certification gap at 14 slots and the committee with each
@@ -362,15 +373,15 @@ caps it measures, not as dimensions it has confirmed.
 
 The rate a parameter set can carry on paper follows from the pipeline above.
 Each RB either certifies the EB announced by the previous one, with
-probability p, and brings its closure of up to E bytes, or does not and
-carries a plain block of up to R bytes; RBs come at the rate f per slot. The
-parameter ceiling is therefore
+probability p, and brings its closure of up to S_EB-tx bytes, or does
+not and carries a plain block of up to R bytes, the Praos block limit.
+RBs come at the rate f per slot. The parameter ceiling is therefore
 
-    f x (p x E + (1 - p) x R)
+    f × (p × S_EB-tx + (1 − p) × R)
 
-bytes per second, with p = 0.513 under the fourteen-slot gap, E the closure
-cap and R the Praos block limit of 90,112 B, against which the plain
-block's fullness is also read in the rungs below. It assumes every EB full
+bytes per second, with p = 0.513 under the fourteen-slot gap and
+R = 90,112 B, against which the plain block's fullness is also read in
+the rungs below. It assumes every EB full
 and every eligible EB certified. The chain carries less than this for reasons that can be
 named one at a time, and the report presents them as a ladder of rungs,
 each a correction applied on top of the previous one:
@@ -378,10 +389,10 @@ each a correction applied on top of the previous one:
 | rung | what it replaces | what the loss means |
 |---|---|---|
 | parameter ceiling | nothing: the caps, f and p on paper | the protocol's rate at this parameter set |
-| workload ceiling | E by the cap that actually binds at the measured transaction size | at small transactions the reference cap fills before the closure cap, and the EB carries fewer bytes than the closure cap allows |
+| workload ceiling | S_EB-tx by the cap that actually binds at the measured transaction size | at small transactions S_EB binds before S_EB-tx, and the EB carries fewer bytes than S_EB-tx allows |
 | observed spacing | f and p by the RB rate and gap share actually observed | the chain's own randomness in the window: more or fewer RBs than expected, more or fewer of them far enough apart |
 | voting-adjusted | p by p times the share of eligible EBs that were certified | EBs that reached no quorum in time: the voting stage's loss; shown for full EBs, and for the actual mix when the two differ |
-| load-adjusted | E and R by the bytes the EBs and plain blocks actually held, and the share of RBs that announced | the load offered to the forgers fell short of the caps: the generator's or the mempools' loss, not the protocol's |
+| load-adjusted | S_EB-tx and R by the bytes the EBs and plain blocks actually held, and the share of RBs that announced | the load offered to the forgers fell short of the caps: the generator's or the mempools' loss, not the protocol's |
 | measured | all of the above by the bytes counted on the chain | what the chain carried |
 
 Table 2.2. The throughput ladder. Each rung is computed from the chain
@@ -479,8 +490,8 @@ The testnet is a Leios network run by stake pool operators and by IOG, on
 a chain restarted with a new genesis on 2026-10-18. Its protocol parameters
 are those of the sets named in section [1](#mainnet-baseline-and-targets), with a committee of 900 seats, a
 quorum of three quarters of the committee's weight, timings of 1, 4 and 7 s,
-a certification gap of 14 slots and a reference-script cap of 1 MiB. The
-reference and closure caps were 40 kB and 260 kB from the restart, and
+and a certification gap of 14 slots. S_EB and S_EB-tx were 40 kB and
+260 kB from the restart, and
 308 kB and 2 MB from the epoch boundary of 2026-10-24 00:00 UTC. The
 committee seats the pools with the most stake, one seat per pool and up to
 900 of them, and each seat's vote carries the weight of its pool's stake.
@@ -555,8 +566,8 @@ three IOG relays in different regions during the even UTC hours, with a
 transaction size set per window: value transactions of 250 to 435 B in the
 first two windows, and from 2026-10-28 transactions of about 1 kB carrying
 metadata, with a second generator submitting 230 to 260 B transactions at
-the same time, so that EBs of 1 kB transactions bound by the closure cap and
-EBs of small transactions bound by the reference cap coexist in every hour
+the same time, so that EBs of 1 kB transactions bound by S_EB-tx and
+EBs of small transactions bound by S_EB coexist in every hour
 of that window. Because the injection points are IOG relays, the IOG hosts'
 mempools fill first and hold the most transactions when an EB is announced,
 which places them at the low end of the fleet's validation cost in section
@@ -629,8 +640,8 @@ saturating the caps throughout a run. Table
 | 100 kB / 1 MB, 200 B | 100 kB references, 1 MB closure | 200 B, one input, one output | 14 slots | 2026-10-20 21:00 to 10-21 14:47 (17.8 h) | 3,079 |
 | 100 kB / 1 MB, 374 B | the same | 374 B, two inputs, two outputs | 14 slots | 2026-10-21 16:39 to 10-22 09:50 (17.2 h) | 2,968 |
 
-Table 3.4. The cluster runs. At 200 B the reference cap binds and the
-closures stay well under their cap; at 374 B the closure cap binds, the
+Table 3.4. The cluster runs. At 200 B S_EB binds and the
+closures stay well under their cap; at 374 B S_EB-tx binds, the
 first run on any population where it did.
 
 The cluster's instrument is the per-node trace database the team delivers
@@ -716,8 +727,8 @@ are regenerated by `scripts/ladder_table.py` and `scripts/stage_table.py`.
 
 The smallest set ran on the cluster at 200 B transactions and on the
 testnet during the loaded hours of 2026-10-21 and 22, at 257 B. On the
-cluster the reference cap binds (1,111 transactions, 222 kB closures); on
-the testnet the closure cap does (about 1,000 transactions at 260 kB).
+cluster S_EB binds (1,111 transactions, 222 kB closures); on
+the testnet S_EB-tx does (about 1,000 transactions at 260 kB).
 Every certified closure on the cluster was 222 kB; on the testnet the
 median certified closure was 260 kB and the tenth percentile 153 kB.
 
@@ -729,7 +740,7 @@ in a fraction of the time available.
 | rung, kB/s | cluster 40 kB / 260 kB, 200 B | testnet 40 kB / 260 kB, loaded hours |
 |---|---|---|
 | parameter ceiling | 8.6 (p = 0.488) | 8.9 (p = 0.513) |
-| workload ceiling | 7.7 (reference cap at 200 B/tx) | 8.9 (payload cap at 257 B/tx) |
+| workload ceiling | 7.7 (S_EB binds at 200 B/tx) | 8.9 (S_EB-tx binds at 257 B/tx) |
 | observed spacing | 7.6 (1 RB / 20.7 s, p = 0.506) | 8.3 (1 RB / 22.9 s, p = 0.586) |
 | voting-adjusted, full | 7.6 (s_full = 0.995) | 8.2 (s_full = 0.976) |
 | load-adjusted | 7.5 (announcing 1.00, EB 1.00, plain RB 0.98) | 7.2 (announcing 0.99, EB 0.90, plain RB 0.82) |
@@ -795,15 +806,15 @@ to unobserved weight and one is unexplained.
 ## 100 kB references, 1 MB closures
 
 The middle set ran on the cluster only, twice: at 200 B transactions,
-where the reference cap binds (2,777 transactions, 555 kB closures), and
+where S_EB binds (2,777 transactions, 555 kB closures), and
 at 374 B two-input transactions, where for the first time on any
-population the closure cap bound, with certified closures of exactly 1 MB
+population S_EB-tx bound, with certified closures of exactly 1 MB
 from the median up (2,673 transactions). No testnet window exists at this
 set with closures near the cap; the chain ran it with 204 B transactions
-before its restart, bound by the reference cap at 567 kB, and that period
+before its restart, bound by S_EB at 567 kB, and that period
 is not comparable on other grounds.
 
-Expected: 27.9 kB/s on paper, 16.5 with the reference cap binding at
+Expected: 27.9 kB/s on paper, 16.5 with S_EB binding at
 200 B; and, from the hosts' cost per transaction applied in full, measured
 at 1.8 ms on this cluster, a share of the EBs failing, since validating
 2,700 transactions from scratch takes longer than the four seconds between
@@ -813,7 +824,7 @@ each at the same count.
 | rung, kB/s | cluster 100 kB / 1 MB, 200 B | cluster 100 kB / 1 MB, 374 B |
 |---|---|---|
 | parameter ceiling | 27.9 (p = 0.513) | 27.9 (p = 0.513) |
-| workload ceiling | 16.5 (reference cap at 200 B/tx) | 27.9 (payload cap at 374 B/tx) |
+| workload ceiling | 16.5 (S_EB binds at 200 B/tx) | 27.9 (S_EB-tx binds at 374 B/tx) |
 | observed spacing | 16.4 (1 RB / 20.8 s, p = 0.538) | 27.6 (1 RB / 20.8 s, p = 0.533) |
 | voting-adjusted, full | 12.6 (s_full = 0.689) | 16.9 (s_full = 0.540) |
 | load-adjusted | 12.2 (announcing 0.99, EB 0.97, plain RB 0.97) | 15.5 (announcing 0.99, EB 0.94, plain RB 0.98) |
@@ -864,7 +875,7 @@ the certifying RB's cost at adoption, which grows with the closure.
 ## 308 kB references, 2 MB closures
 
 The largest set ran on the testnet only, in two windows: the loaded hours
-of 2026-10-24 to 26 at 318 B transactions, where the closure cap binds at
+of 2026-10-24 to 26 at 318 B transactions, where S_EB-tx binds at
 6,284 transactions, and the window of 2026-10-28 in which the generator
 moved to transactions of about 1 kB while a second generator kept
 submitting small ones. The second window is presented in 4.3.1 for the one
@@ -878,7 +889,7 @@ operator population spans a wider range of hosts than the cluster.
 | rung, kB/s | testnet 308 kB / 2 MB, loaded hours | testnet 308 kB / 2 MB, 1 kB transactions |
 |---|---|---|
 | parameter ceiling | 53.5 (p = 0.513) | 53.5 (p = 0.513) |
-| workload ceiling | 53.5 (payload cap at 318 B/tx) | - |
+| workload ceiling | 53.5 (S_EB-tx binds at 318 B/tx) | - |
 | observed spacing | 49.5 (1 RB / 25.5 s, p = 0.613) | 52.0 (1 RB / 22.6 s, p = 0.569) |
 | voting-adjusted, mix | 25.9 (s_all = 0.485) | 25.8 (s_all = 0.454) |
 | voting-adjusted, full | 9.9 (s_full = 0.138) | - |
@@ -894,7 +905,7 @@ shown because they differ here: "full" is the survival of EBs at the cap,
 sizes (Table 3.1). Three rungs read an EB's bytes from its references at
 the mean size: the cap that binds, the threshold for a full EB and the
 EBs' load factor. In the loaded hours the sizes are 247 and 506 B and
-the closure cap binds for both, so the mean misreads the 506 B-heavy
+S_EB-tx binds for both, so the mean misreads the 506 B-heavy
 EBs, a quarter of the transactions, as 0.6 to 0.8 of their bytes: the
 full rung then counts the 247 B EBs of 6,200 transactions and up, the
 ones costliest to validate, and the load-adjusted rung is an estimate
@@ -991,7 +1002,7 @@ From 2026-10-28 18:00 UTC the generator submitted transactions of about
 transactions of 230 to 260 B. In every hour of the window, EBs of three
 kinds were therefore eligible: closures made of the 1 kB transactions,
 which fill the 2 MB cap at about 2,000 of them; closures of the small
-transactions, which fill the reference cap at 8,555; and mixed ones. Table
+transactions, which fill S_EB at 8,555 references; and mixed ones. Table
 4.8 gives each kind, with every eligible EB classed by its reference count
 from the chain and the exact composition of every certified closure from
 the chain database.
@@ -1023,7 +1034,7 @@ hand before the vote window opens in 84 to 91 % of the validations in all
 three classes, so the larger counts carry the slower voters past the
 deadline: 96 %, 91 % and 75 % of the validations complete within 7 s of
 the slot. The last row of Table 4.9 is a different failure. Of its 43 EBs,
-32 sit at the reference cap, 8,550 references and up, and their body never
+32 sit at the S_EB cap, 8,550 references and up, and their body never
 reached the nodes: at the median such EB no reporting node received the
 body, against 77 nodes for the 11 EBs of 6,000 to 8,549 references, of
 which one certified. The EBs at the cap never entered the closure stage
@@ -1047,7 +1058,7 @@ of the inputs move together here, and the window does not separate them.
 | 6,000 and up | 43 | 2 % | 1,528 kB | never | 19 % | 9 % |
 
 Table 4.9. Closure diffusion by EB size in the 1 kB window, as Table 4.7.
-The "never" of the last row is 32 EBs at the reference cap whose body
+The "never" of the last row is 32 EBs at the S_EB cap whose body
 never arrived at any reporting node and 11 EBs of 6,000 to 8,549
 references that did.
 
@@ -2491,7 +2502,7 @@ node with about a hundred upstream peers sees the closure at 19 s at
 2 MB and runs at 0.7 of a core, saturated by what its peers send
 (section [6.3](#diffusion-by-population)).
 
-The EBs at the reference cap whose body reaches no reporting node are a
+The EBs at the S_EB cap whose body reaches no reporting node are a
 failure of the fetch logic that no voter speed touches (section [4.3.1](#the-1-kb-transaction-window-transaction-count-not-bytes)).
 
 The thread question is the largest unpriced lever on the validation
@@ -2648,7 +2659,7 @@ Table 9.3 is the rerun's ladder beside the unchanged run's.
 | rung, kB/s | cluster 100 kB / 1 MB, 374 B | cluster 100 kB / 1 MB, 374 B, changed build |
 |---|---|---|
 | parameter ceiling | 27.9 (p = 0.513) | 27.9 (p = 0.513) |
-| workload ceiling | 27.9 (payload cap at 374 B/tx) | 27.9 (payload cap at 374 B/tx) |
+| workload ceiling | 27.9 (S_EB-tx binds at 374 B/tx) | 27.9 (S_EB-tx binds at 374 B/tx) |
 | observed spacing | 27.6 (1 RB / 20.8 s, p = 0.533) | 27.2 (1 RB / 19.9 s, p = 0.494) |
 | voting-adjusted, full | 16.9 (s_full = 0.540) | 27.0 (s_full = 0.992) |
 | load-adjusted | 15.5 (announcing 0.99, EB 0.94, plain RB 0.98) | 26.6 (announcing 0.99, EB 1.00, plain RB 0.97) |
@@ -2854,7 +2865,7 @@ certification rate, the RB kinds and the pairs on the chain.
 **The committee.** One seat per pool per epoch, ranked by active stake
 descending with ties broken by the pool id, the seat's weight being the
 pool's share of the total stake, together with the epoch's Leios
-parameters (the reference and closure caps, the committee size, the
+parameters (S_EB, S_EB-tx, N_c, the
 quorum threshold, the period lengths). The stake comes from the
 explorer's stake distribution for the epochs up to 2026-10-27 and from a
 db-sync instance from 2026-10-28, with the newest epoch common to both
@@ -2986,8 +2997,8 @@ announced count is RBs with an EB announcement, the eligible count those
 with the gap, p observed = eligible over announced. The survival of the
 mix is certified over eligible; the survival of full EBs is the same
 ratio over EBs whose reference bytes are at least 99 % of the binding
-capacity, which is the reference cap when the reference cap binds and
-the closure cap over the transaction size when the closure cap does. The
+capacity, which is S_EB when S_EB binds and
+S_EB-tx over the transaction size when S_EB-tx does. The
 transaction size is the certified closures' bytes over their
 transactions. The load factors are the share of RBs announcing an EB,
 the mean reference bytes over the binding capacity, and the mean plain
@@ -3331,7 +3342,7 @@ available to reviewers on request.
 | body and closure diffusion per node, vote rate | period database or cluster run, chain cache | `diffusion_nodes.py` | `stage_table.py` |
 | applied share, validation after the closure | period database or cluster run | `validation_pairs.sql`, `cluster_validation_pairs.sql` | `stage_table.py` |
 | vote tally reaches the quorum, quorums that became certificates | period database or cluster run, chain cache | `tally_quorum.sql`, `cluster_tally_quorum.sql` | `stage_table.py` |
-| closure at 90 and 95 % of the nodes by EB size; the body and closure reach of the EBs at the reference cap | period database, chain cache | `closure_fleet.sql` | `stage_table.py`, `--classes` for the reference-cap split |
+| closure at 90 and 95 % of the nodes by EB size; the body and closure reach of the EBs at the S_EB cap | period database, chain cache | `closure_fleet.sql` | `stage_table.py`, `--classes` for the reference-cap split |
 | the forgers of the EBs whose body reached no node, by pool | chain cache, the per-EB closure output, the window's slot leaders from db-sync | `eb_forgers.py` | read directly |
 | validation by EB size class | the per-record validation output of a window | `validation_classes.py` | `stage_table.py --classes` |
 | voter stages: where each voter lost the EB, the vote's outcome by cause, by EB size | period database or cluster run, chain cache | `voter_stages.sql`, `voter_stages.py` | `stage_table.py --voters` |
