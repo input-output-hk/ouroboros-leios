@@ -1,0 +1,29 @@
+# Pandoc settings for the PDF, after the Leios design document's recipe
+# (docs/leios-design/metadata.yaml in the ouroboros-leios repository):
+# the same class, page, margins and link colours. Pandoc numbers the
+# sections; scripts/build.py marks the summary and the appendix unnumbered
+# so that the numbers match the text's references. The T1 font encoding of
+# that recipe is left out: XeTeX sets the text in Unicode fonts and loses
+# the curly quotes under it. Tables are set one size smaller than the text.
+toc: true
+toc-depth: 3
+numbersections: true
+highlight-style: haddock
+documentclass: scrartcl
+fontsize: 11pt
+geometry:
+  - margin=2.5cm
+  - top=3cm
+  - bottom=3cm
+colorlinks: true
+linkcolor: NavyBlue
+urlcolor: NavyBlue
+citecolor: NavyBlue
+toccolor: black
+papersize: a4
+linestretch: 1.15
+indent: false
+header-includes: |
+  \usepackage{microtype}
+  \usepackage{etoolbox}
+  \AtBeginEnvironment{longtable}{\small\renewcommand{\arraystretch}{1.3}\setlength{\tabcolsep}{10pt}}
