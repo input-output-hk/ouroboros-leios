@@ -23,10 +23,10 @@ import LinearLeiosChain (
   carryAcross,
   checkpointEvery,
   combinedSchedule,
-  segmentInput,
   overlapSlots,
   runSegmented,
   segmentAuthoritative,
+  segmentInput,
  )
 import LinearLeiosLib (verifyChainStreamFromSlot, verifyChainTraceFromSlot)
 import Test.Hspec (Spec, describe, it, shouldBe, shouldNotBe)
@@ -549,4 +549,3 @@ chainSegments = do
       -- Long epochs, so that the wait does not run into the next boundary.
       ps <- collectLagging 10000 (10000 + boundaryWaitSlots + 50) (ticks 9990 (10000 + boundaryWaitSlots + 10))
       authoritative ps `shouldBe` [True, False]
-

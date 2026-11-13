@@ -501,8 +501,9 @@ runSegmented report ts query = loop [] Nothing Nothing Batch 0 []
                   (seg, tally') <- startSegmentWith tally sl carry cd Nothing
                   loop tally' (Just seg) (Just sl) Batch n' seen' rest
     _ -> case mode of
-      Streaming st | Just seg <- mseg ->
-        loop tally mseg mlast (Streaming (noteEvent seg ev st)) (n + 1) (ev : seen) rest
+      Streaming st
+        | Just seg <- mseg ->
+            loop tally mseg mlast (Streaming (noteEvent seg ev st)) (n + 1) (ev : seen) rest
       _ -> loop tally mseg mlast mode (n + 1) (ev : seen) rest
 
   -- Keep only what a boundary may carry: the events back to the tick 'overlap'
