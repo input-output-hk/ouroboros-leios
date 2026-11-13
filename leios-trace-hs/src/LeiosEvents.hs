@@ -158,10 +158,16 @@ data Event where
   deriving (Eq, Show)
   deriving (Generic)
 
+-- The field label is first reduced to the field name as written.  With
+-- 'DuplicateRecordFields', Template Haskell on GHC 9.6 names a duplicated field
+-- by its selector, @$sel:<field>:<Con>@, and aeson would take that for the JSON
+-- key; GHC 9.10 gives the plain name.  Without this no event decoded under 9.6,
+-- and every trace verified as empty.  (Inline: a splice cannot call a function
+-- of its own module.)
 $( deriveJSON
      defaultOptions
        { sumEncoding = defaultTaggedObject{tagFieldName = "type"}
-       , fieldLabelModifier = \fl -> case fl of
+       , fieldLabelModifier = \fl -> case (case fl of ('$' : 's' : 'e' : 'l' : ':' : rest) -> takeWhile (/= ':') rest; _ -> fl) of
            ('b' : 'l' : 'o' : 'c' : 'k' : '_' : xs) -> xs
            "bytes" -> "size_bytes"
            "payload_bytes" -> "tx_payload_bytes"
@@ -181,9 +187,22 @@ data TraceEvent = TraceEvent
 
 type EventLog = [TraceEvent]
 
--- | Discards lines that do not parse.
+-- | Discards lines that do not parse, which may be events of a kind this
+--   type does not know.  Fails if events were expected but none parsed: that is
+--   a broken decoder, and a trace with no events verifies trivially.
 decodeJSONL :: BSL8.ByteString -> [TraceEvent]
-decodeJSONL = mapMaybe decode . BSL8.lines
+decodeJSONL s = case mapMaybe decode lns of
+  [] | (l : _) <- content -> case eitherDecode l :: Either String TraceEvent of
+    Left err -> error ("decodeJSONL: no line parses as an event; the first fails with: " <> err)
+    Right _ -> []
+  evs -> evs
+ where
+  lns = BSL8.lines s
+  content = filter isContent lns
+  isContent l = case BSL8.uncons (BSL8.dropWhile (== ' ') l) of
+    Nothing -> False
+    Just ('#', _) -> False
+    Just _ -> True
 
 encodeJSONL :: [TraceEvent] -> BSL8.ByteString
 encodeJSONL = BSL8.unlines . map encode
