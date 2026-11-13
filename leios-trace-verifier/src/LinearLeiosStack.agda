@@ -231,21 +231,39 @@ baseEntries s n = case certRequest s of λ where
 toEntry : Action → StackInput → Entry
 toEntry a m = ⟨ hintsFor a , m ⟩
 
+-- A verification in progress: the state reached, and the entries read since
+-- the last ranking-block step, which are verified together at the next one.
+-- Kept in reverse.
+record Cursor : Type where
+  constructor cursor
+  field state   : Machine.State Stack
+        pending : Trace
+
+flushItems : ⦃ Show Hash ⦄ → Machine.State Stack → Trace → String ⊎ Machine.State Stack
+flushItems s es = case verifyTrace s es of λ where
+  (inj₁ err)      → inj₁ (traceMsg err)
+  (inj₂ (s′ , _)) → inj₂ s′
+
+-- Read further items, verifying at each ranking-block step.  Reading a list
+-- in pieces verifies exactly what reading it whole does, which is what lets a
+-- stream be verified as it arrives rather than by re-reading its prefix.
+stepItems : ⦃ Show Hash ⦄ → Cursor → List Item → String ⊎ Cursor
+stepItems c []                                 = inj₂ c
+stepItems (cursor s pending) (entry a m ∷ items) =
+  stepItems (cursor s (toEntry a m ∷ pending)) items
+stepItems (cursor s pending) (deliver h bs ∷ items) =
+  stepItems (cursor s (⟨ deliverᴴ h ∷ [] , netᵢ bs ⟩ ∷ pending)) items
+stepItems (cursor s pending) (base n ∷ items) = case flushItems s (L.reverse pending) of λ where
+  (inj₁ err) → inj₁ err
+  (inj₂ s′)  → stepItems (cursor s′ (L.reverse (baseEntries (leiosState s′) n))) items
+
+-- Verify the entries still pending, at the end of the input.
+finishItems : ⦃ Show Hash ⦄ → Cursor → String ⊎ Machine.State Stack
+finishItems (cursor s pending) = flushItems s (L.reverse pending)
+
 -- Verify the items from the given state, returning the final state or the
 -- message of the first error.
 verifyItems : ⦃ Show Hash ⦄ → Machine.State Stack → List Item → String ⊎ Machine.State Stack
-verifyItems s = go s []
-  where
-    flush : Machine.State Stack → Trace → String ⊎ Machine.State Stack
-    flush s es = case verifyTrace s es of λ where
-      (inj₁ err)      → inj₁ (traceMsg err)
-      (inj₂ (s′ , _)) → inj₂ s′
-
-    -- The entries not yet verified are kept in reverse.
-    go : Machine.State Stack → Trace → List Item → String ⊎ Machine.State Stack
-    go s pending []                  = flush s (L.reverse pending)
-    go s pending (entry a m ∷ items) = go s (toEntry a m ∷ pending) items
-    go s pending (deliver h bs ∷ items) = go s (⟨ deliverᴴ h ∷ [] , netᵢ bs ⟩ ∷ pending) items
-    go s pending (base n ∷ items)    = case flush s (L.reverse pending) of λ where
-      (inj₁ err) → inj₁ err
-      (inj₂ s′)  → go s′ (L.reverse (baseEntries (leiosState s′) n)) items
+verifyItems s items = case stepItems (cursor s []) items of λ where
+  (inj₁ err) → inj₁ err
+  (inj₂ c)   → finishItems c

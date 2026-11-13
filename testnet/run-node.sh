@@ -64,5 +64,6 @@ echo "  log file:  $LOG_FILE"
     --topology topology.json \
     --database-path db \
     --socket-path node.socket \
+    "$@" \
     2>&1
 } | tee -a "$LOG_FILE"

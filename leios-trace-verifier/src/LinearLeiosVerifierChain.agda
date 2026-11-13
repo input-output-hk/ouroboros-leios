@@ -341,7 +341,8 @@ module LinearLeiosVerifierChain where
           minted bs = "mints (parent, slot) " ◇ show bs
 
       open import LinearLeiosStack d-SpecStructure params node⁻ nodeᶜ nothing nodeMsg using
-        (Stack; Item; entry; deliver; base; ffdᵢ; voteᵢ; ioᵢ; verifyItems)
+        (Stack; Item; entry; deliver; base; ffdᵢ; voteᵢ; ioᵢ; verifyItems;
+         Cursor; cursor; stepItems; finishItems)
 
       blksToHeaderAndBodyList : List Blk → List (FFDA.Header ⊎ FFDA.Body)
       blksToHeaderAndBodyList []              = []
@@ -487,6 +488,24 @@ module LinearLeiosVerifierChain where
       headOf : Accumulator → Maybe EBId
       headOf a = tipNow a >>= λ h → ids a ⁉ h >>= λ (sl , _) → annBySlot a ⁉ sl
 
+      -- An EB reaches the spec as its header ('EB-Blk' diffuses 'ebHeader'), and
+      -- Slot ingestion records it in EBs' with the current slot: the slot' that
+      -- VT-Role bounds by Lhdr.  The node logs the header (the announcement) and
+      -- the body separately, the body often slots later, so the EB is received
+      -- at whichever comes first, and once.  This says nothing about the EB being
+      -- announced on the chain: that is the ranking block's, which the Praos node
+      -- selects.
+      receive : Accumulator → EBId → SlotNo → Accumulator
+      receive a h s = case EB-refs a ⁉ h of λ where
+        (just _) → a
+        nothing  →
+          let eb = mkEBrec (fakeProducer a s) h s
+          in record a
+               { EB-refs = (h , eb) ∷ EB-refs a
+               ; EB-received = (h , curSlot a) ∷ EB-received a
+               ; FFD-blks = EB-Blk eb ∷ FFD-blks a
+               }
+
       traceEvent→action : Accumulator → ChainEvent → Accumulator × List Item
       traceEvent→action a (CSlot s) =
         if not (started a)
@@ -507,19 +526,12 @@ module LinearLeiosVerifierChain where
       traceEvent→action a (CEBForged h s) =
         let eb = mkEBrec SUT-id h s
         in (record a { EB-refs = (h , eb) ∷ EB-refs a ; forgedEB = just eb } , [])
-      -- Acquiring an EB means its body is in hand, which is what Slot ingestion
-      -- models. It says nothing about the EB being announced on the chain: that
-      -- is the ranking block's, which the Praos node selects.
-      traceEvent→action a (CEBAcquired h s) =
-        let eb = mkEBrec (fakeProducer a s) h s
-        in (record a
-              { EB-refs = (h , eb) ∷ EB-refs a
-              ; EB-received = (h , curSlot a) ∷ EB-received a
-              ; FFD-blks = EB-Blk eb ∷ FFD-blks a
-              } , [])
-      -- The ranking block of this election slot announces the EB.
+      -- The EB was received: see 'receive'.
+      traceEvent→action a (CEBAcquired h s) = (receive a h s , [])
+      -- The ranking block of this election slot announces the EB, and the
+      -- announcement carries its header.
       traceEvent→action a (CAnnouncementAccepted h s) =
-        (record a { annBySlot = (primWord64ToNat s , h) ∷ annBySlot a } , [])
+        (receive (record a { annBySlot = (primWord64ToNat s , h) ∷ annBySlot a }) h s , [])
       -- 'closeSlot' emits at most one VT-Role per slot, the spec recording VT-Role
       -- upkeep once per slot, so where a slot holds several votes only one can be
       -- adjudicated.  The one for the EB the chain head announced when the slot
@@ -616,6 +628,52 @@ module LinearLeiosVerifierChain where
         ; started = false ; memRange = nothing ; forgedEB = nothing ; votedEB = nothing
         ; ids = [] ; inbox = [] ; late = [] ; forgedRB = nothing ; tipNow = nothing
         ; annBySlot = [] ; headEB = nothing }
+
+      -- What the stream reports, per slot tick read and once more at the end of
+      -- the input: the number of items the event yielded, and the verdict so far.
+      -- A violation carries the items of the slots around it and ends the list.
+      StreamReport : Type
+      StreamReport = Pair ℕ (Pair (List String) (Pair String String))
+
+      -- Verify the events as they arrive, carrying the translation's accumulator
+      -- and the stack's state from one event to the next, so that each event is
+      -- read once.  It adjudicates exactly what 'verifyChainTrace'' false does on
+      -- every prefix of the input, without re-reading the prefix; the list it
+      -- returns is produced as the input is consumed, so it can be read lazily
+      -- against a live log.
+      --
+      -- Its parameters must not depend on the log: 'l' is unused only where the
+      -- queried schedule governs ('scheduleAuthoritative'), and log-derived
+      -- eligibility looks at the whole log by design.
+      verifyChainStream : LeiosState → List ChainEvent → List StreamReport
+      verifyChainStream s = go (n₀ (LeiosState.slot s)) (cursor (stack₀ s) []) []
+        where
+          isTick : ChainEvent → Bool
+          isTick (CSlot _) = true
+          isTick _         = false
+
+          failed : ℕ → List Item → String → List StreamReport
+          failed n recent err = (n , (L.map showItem recent , (err , "error verifyChainTrace"))) ∷ []
+
+          -- 'recent' is the last non-empty batch of items: the entries still
+          -- pending are verified at the next ranking-block step, so a violation
+          -- can lie in the slot before the one being read.
+          go : Accumulator → Cursor → List Item → List ChainEvent → List StreamReport
+          go a c recent [] = case finishItems c of λ where
+            (inj₁ err) → failed 0 recent err
+            (inj₂ _)   → (0 , ([] , ("ok" , ""))) ∷ []
+          go a c recent (ev ∷ evs) =
+            let (a′ , αs) = traceEvent→action a ev
+            in case stepItems c αs of λ where
+                 (inj₁ err) → failed (L.length αs) (recent ++ αs) err
+                 (inj₂ c′)  →
+                   let recent′ = if null αs then recent else αs
+                       rest    = go a′ c′ recent′ evs
+                   in if isTick ev then (L.length αs , ([] , ("ok" , ""))) ∷ rest else rest
+
+      verifyChainStreamFromSlot : SlotNumber → List ChainEvent → List StreamReport
+      verifyChainStreamFromSlot n = verifyChainStream (record s₀ { slot = n })
+      {-# COMPILE GHC verifyChainStreamFromSlot as verifyChainStreamFromSlot #-}
 
       opaque
         unfolding List-Model
