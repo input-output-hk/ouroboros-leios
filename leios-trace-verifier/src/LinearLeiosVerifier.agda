@@ -300,18 +300,17 @@ module LinearLeiosVerifier where
         test₁ : concatList (1 ∷ 7 ∷ 3 ∷ []) ≡ 173
         test₁ = refl
 
-      -- Negative {EB,VT} event, if there is no {EB,VT}Generated event
+      -- Negative {EB,VT} event, if there is no {EB,VT}Generated event.  A 'case',
+      -- not a 'with', as in 'traceEvent→action' below.
       negative-events-EB : List Blk → SlotNo → List Item
-      negative-events-EB l s
-        with Any.any? isEB? l
-      ... | yes _ = []
-      ... | no  _ = entry (No-EB-Role-Action (primWord64ToNat s)) (ffdᵢ FFDT.SLOT) ∷ []
+      negative-events-EB l s = case Any.any? isEB? l of λ where
+        (yes _) → []
+        (no _)  → entry (No-EB-Role-Action (primWord64ToNat s)) (ffdᵢ FFDT.SLOT) ∷ []
 
       negative-events-VT : List Blk → SlotNo → List Item
-      negative-events-VT l s
-        with Any.any? isVT? l
-      ... | yes _ = []
-      ... | no  _ = entry (No-VT-Role-Action (primWord64ToNat s)) (ffdᵢ FFDT.SLOT) ∷ []
+      negative-events-VT l s = case Any.any? isVT? l of λ where
+        (yes _) → []
+        (no _)  → entry (No-VT-Role-Action (primWord64ToNat s)) (ffdᵢ FFDT.SLOT) ∷ []
 
       -- The blocks the SUT minted in slot 'n', by parent and slot, in the
       -- order of the log.  A slot's 'RBGenerated' precedes its 'Slot' event.
@@ -337,49 +336,61 @@ module LinearLeiosVerifier where
           deliver (just (suc n , mintedAt l (suc n) , tt)) (inbox l) ∷ []
 
       traceEvent→action : Accumulator → TraceEvent → Accumulator × List Item
-      traceEvent→action l record { message = Slot p s }
-        with p ≟ SUT
-      ... | yes _ =
-        let (l' , delivered) = delivery l (primWord64ToNat s)
-        in record l' { FFD-blks = [] ; currentSlot = suc (currentSlot l) } ,
-          negative-events-EB (FFD-blks l) s ++ negative-events-VT (FFD-blks l) s ++
-            base (primWord64ToNat s)
-          ∷ delivered
-          ++ entry (Slot-Action (primWord64ToNat s)) (ffdᵢ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks l))))
-          ∷ []
-      ... | no _  = l , []
+      -- Every clause branches with 'case', not 'with': 'with' normalises the whole
+      -- module context before abstracting, which made this function take some
+      -- twenty minutes to check.
+      traceEvent→action l record { message = Slot p s } = case p ≟ SUT of λ where
+        (yes _) →
+          let (l' , delivered) = delivery l (primWord64ToNat s)
+          in record l' { FFD-blks = [] ; currentSlot = suc (currentSlot l) } ,
+            negative-events-EB (FFD-blks l) s ++ negative-events-VT (FFD-blks l) s ++
+              base (primWord64ToNat s)
+            ∷ delivered
+            ++ entry (Slot-Action (primWord64ToNat s)) (ffdᵢ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks l))))
+            ∷ []
+        (no _) → l , []
 
       -- EBs
-      traceEvent→action l record { message = EBGenerated p i s _ _ ibs ebs transactions }
-        with (RB-refs l) ⁉ i
-      ... | nothing = l , [] -- Assumption: the log respects the order RBGenerated, EBGenerated !
-      ... | just rb =
-        let eb = record
-                   { slotNumber = primWord64ToNat s
-                   ; producerID = nodeId p
-                   ; lotteryPf  = tt
-                   ; txs        = map primWord64ToNat transactions
-                   ; signature  = tt
-                   }
-        in record l
-          { EB-refs = (i , eb) ∷ EB-refs l
-          ; RB-refs = (i , record rb { announcedEB = just (hash eb) }) ∷ RB-refs l -- Correct RB with EB hash
-          } , []
-      traceEvent→action l record { message = EBReceived s p _ _ i _ }
-        with p ≟ SUT | EB-refs l ⁉ i | RB-refs l ⁉ i
-      ... | yes _ | just eb | just rb =
-        record l { FFD-blks = EB-Blk eb ∷ FFD-blks l ; EB-received = (i , currentSlot l) ∷ (EB-received l) } , entry (EB-Role-Action (currentSlot l) eb) (ffdᵢ FFDT.SLOT) ∷ []
-      ... | _ | _ | _ = l , []
+      traceEvent→action l record { message = EBGenerated p i s _ _ ibs ebs transactions } =
+        case RB-refs l ⁉ i of λ where
+          nothing → l , [] -- Assumption: the log respects the order RBGenerated, EBGenerated !
+          (just rb) →
+            let eb = record
+                       { slotNumber = primWord64ToNat s
+                       ; producerID = nodeId p
+                       ; lotteryPf  = tt
+                       ; txs        = map primWord64ToNat transactions
+                       ; signature  = tt
+                       }
+            in record l
+              { EB-refs = (i , eb) ∷ EB-refs l
+              ; RB-refs = (i , record rb { announcedEB = just (hash eb) }) ∷ RB-refs l -- Correct RB with EB hash
+              } , []
+      traceEvent→action l record { message = EBReceived s p _ _ i _ } =
+        case p ≟ SUT of λ where
+          (no _)  → l , []
+          (yes _) → case EB-refs l ⁉ i of λ where
+            nothing   → l , []
+            (just eb) → case RB-refs l ⁉ i of λ where
+              nothing  → l , []
+              (just _) →
+                record l { FFD-blks = EB-Blk eb ∷ FFD-blks l ; EB-received = (i , currentSlot l) ∷ (EB-received l) } , entry (EB-Role-Action (currentSlot l) eb) (ffdᵢ FFDT.SLOT) ∷ []
 
       -- VTs
       -- The spec does not inspect vote contents, so the voted EB's hash is left empty.
       traceEvent→action l record { message = VTBundleGenerated p i s _ _ vts } =
         let vt = map (const (nodeId p , [])) (elems vts)
         in record l { VT-refs = (i , vt) ∷ VT-refs l } , []
-      traceEvent→action l record { message = VTBundleReceived _ p _ _ i _ }
-        with p ≟ SUT | VT-refs l ⁉ i | EB-refs l ⁉ i | EB-received l ⁉ i
-      ... | yes _ | just vt | just eb | just slot' = record l { FFD-blks = VT-Blk vt ∷ FFD-blks l } , entry (VT-Role-Action (currentSlot l) eb slot') (ffdᵢ FFDT.SLOT) ∷ []
-      ... | _ | _ | _ | _ = l , []
+      traceEvent→action l record { message = VTBundleReceived _ p _ _ i _ } =
+        case p ≟ SUT of λ where
+          (no _)  → l , []
+          (yes _) → case VT-refs l ⁉ i of λ where
+            nothing   → l , []
+            (just vt) → case EB-refs l ⁉ i of λ where
+              nothing   → l , []
+              (just eb) → case EB-received l ⁉ i of λ where
+                nothing      → l , []
+                (just slot') → record l { FFD-blks = VT-Blk vt ∷ FFD-blks l } , entry (VT-Role-Action (currentSlot l) eb slot') (ffdᵢ FFDT.SLOT) ∷ []
 
       -- RBs
       traceEvent→action l record { message = RBGenerated p i s _ eb _ _ parent txs } =
@@ -397,17 +408,18 @@ module LinearLeiosVerifier where
         -- record of them only serves as parents of blocks it receives.
         in l' , []
 
-      traceEvent→action l record { message = RBReceived s p _ _ i _ }
-        with p ≟ SUT | buildBlk l i
-      ... | yes _ | just blk = record l { inbox = blk ∷ inbox l } , []
-      ... | _ | _ = l , []
+      traceEvent→action l record { message = RBReceived s p _ _ i _ } =
+        case p ≟ SUT of λ where
+          (no _)  → l , []
+          (yes _) → case buildBlk l i of λ where
+            nothing    → l , []
+            (just blk) → record l { inbox = blk ∷ inbox l } , []
 
       -- TXs
       traceEvent→action l record { message = TXGenerated _ _ } = l , []
-      traceEvent→action l record { message = TXReceived i _ p }
-        with p ≟ SUT
-      ... | yes _ = l , entry (Mempool-Action (currentSlot l)) (ioᵢ (SubmitTxs (concatList (map primCharToNat (S.toList i)) ∷ []))) ∷ []
-      ... | _     = l , []
+      traceEvent→action l record { message = TXReceived i _ p } = case p ≟ SUT of λ where
+        (yes _) → l , entry (Mempool-Action (currentSlot l)) (ioᵢ (SubmitTxs (concatList (map primCharToNat (S.toList i)) ∷ []))) ∷ []
+        (no _)  → l , []
 
       traceEvent→action l record { message = Cpu _ _ _ _ }                = l , []
       traceEvent→action l record { message = IBReceived _ _ _ _ _ _ }     = l , []
