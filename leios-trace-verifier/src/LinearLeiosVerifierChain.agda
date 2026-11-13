@@ -487,6 +487,24 @@ module LinearLeiosVerifierChain where
       headOf : Accumulator → Maybe EBId
       headOf a = tipNow a >>= λ h → ids a ⁉ h >>= λ (sl , _) → annBySlot a ⁉ sl
 
+      -- An EB reaches the spec as its header ('EB-Blk' diffuses 'ebHeader'), and
+      -- Slot ingestion records it in EBs' with the current slot: the slot' that
+      -- VT-Role bounds by Lhdr.  The node logs the header (the announcement) and
+      -- the body separately, the body often slots later, so the EB is received
+      -- at whichever comes first, and once.  This says nothing about the EB being
+      -- announced on the chain: that is the ranking block's, which the Praos node
+      -- selects.
+      receive : Accumulator → EBId → SlotNo → Accumulator
+      receive a h s = case EB-refs a ⁉ h of λ where
+        (just _) → a
+        nothing  →
+          let eb = mkEBrec (fakeProducer a s) h s
+          in record a
+               { EB-refs = (h , eb) ∷ EB-refs a
+               ; EB-received = (h , curSlot a) ∷ EB-received a
+               ; FFD-blks = EB-Blk eb ∷ FFD-blks a
+               }
+
       traceEvent→action : Accumulator → ChainEvent → Accumulator × List Item
       traceEvent→action a (CSlot s) =
         if not (started a)
@@ -507,19 +525,12 @@ module LinearLeiosVerifierChain where
       traceEvent→action a (CEBForged h s) =
         let eb = mkEBrec SUT-id h s
         in (record a { EB-refs = (h , eb) ∷ EB-refs a ; forgedEB = just eb } , [])
-      -- Acquiring an EB means its body is in hand, which is what Slot ingestion
-      -- models. It says nothing about the EB being announced on the chain: that
-      -- is the ranking block's, which the Praos node selects.
-      traceEvent→action a (CEBAcquired h s) =
-        let eb = mkEBrec (fakeProducer a s) h s
-        in (record a
-              { EB-refs = (h , eb) ∷ EB-refs a
-              ; EB-received = (h , curSlot a) ∷ EB-received a
-              ; FFD-blks = EB-Blk eb ∷ FFD-blks a
-              } , [])
-      -- The ranking block of this election slot announces the EB.
+      -- The EB was received: see 'receive'.
+      traceEvent→action a (CEBAcquired h s) = (receive a h s , [])
+      -- The ranking block of this election slot announces the EB, and the
+      -- announcement carries its header.
       traceEvent→action a (CAnnouncementAccepted h s) =
-        (record a { annBySlot = (primWord64ToNat s , h) ∷ annBySlot a } , [])
+        (receive (record a { annBySlot = (primWord64ToNat s , h) ∷ annBySlot a }) h s , [])
       -- 'closeSlot' emits at most one VT-Role per slot, the spec recording VT-Role
       -- upkeep once per slot, so where a slot holds several votes only one can be
       -- adjudicated.  The one for the EB the chain head announced when the slot
