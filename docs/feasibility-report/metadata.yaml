@@ -26,4 +26,4 @@ indent: false
 header-includes: |
   \usepackage{microtype}
   \usepackage{etoolbox}
-  \AtBeginEnvironment{longtable}{\small\renewcommand{\arraystretch}{1.3}}
+  \AtBeginEnvironment{longtable}{\small\renewcommand{\arraystretch}{1.3}\setlength{\tabcolsep}{10pt}}
