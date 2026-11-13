@@ -23,14 +23,17 @@ module LinearLeiosChain (
   surplusVotesPerSlot,
   verifySegment,
   runSegmented,
+  boundaryWaitSlots,
+  combinedSchedule,
+  segmentInput,
 ) where
 
 import ChainEvents (ChainEvent (..))
 import Control.Monad (when)
 import Data.List (dropWhileEnd)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Text (Text)
-import LinearLeiosLib (verifyChainTraceFromSlot)
+import LinearLeiosLib (verifyChainStreamFromSlot, verifyChainTraceFromSlot)
 
 -- | Protocol timings, as the spec parameterises them.
 data Timings = Timings
@@ -276,18 +279,89 @@ verifySegment ts seg prefix =
         prefix
         (segStart seg)
 
+-- | How long, at an epoch boundary, to wait for the node to answer for the new
+--   epoch before verifying it with eligibility from the log instead.  The node
+--   answers for the epoch of its chain tip, which crosses the boundary only with
+--   the first block of the new epoch, so a query at the boundary tick almost always
+--   describes the outgoing epoch.  Against an old log the node never catches up,
+--   and this bounds what waiting costs there.
+boundaryWaitSlots :: Integer
+boundaryWaitSlots = 600
+
+-- | The schedule governing a segment, if any: one obtained for its epoch and, if
+--   the segment carries a tail of the previous epoch, that epoch's schedule too.
+--   The carried slots are then judged against the schedule they belong to, so the
+--   two schedules together govern the segment.
+combinedSchedule :: Bool -> Integer -> Maybe [Integer] -> Integer -> ChainData -> Maybe [Integer]
+combinedSchedule spans start prev ep cd
+  | not (segmentAuthoritative False ep cd) = Nothing
+  | not spans = cdWinningSlots cd
+  | otherwise = do
+      p <- prev
+      new <- cdWinningSlots cd
+      pure ([s | s <- p, s >= start] <> new)
+
+-- | The events a streamed segment reads after its first tick: everything up to the
+--   tick that ends it, which is included because it completes the segment's last
+--   slot.  The rules are those of 'runSegmented', which reads the same events: a
+--   tick that does not advance is dropped, and one that changes the epoch or skips
+--   a slot ends the segment.  Being lazy, it is read as the log arrives.
+segmentInput :: Integer -> Integer -> Integer -> [ChainEvent] -> [ChainEvent]
+segmentInput epochLen ep = go
+ where
+  go _ [] = []
+  go l (e@(CSlot sl) : es)
+    | s <= l = go l es
+    | s `div` epochLen /= ep || s /= l + 1 = [e]
+    | otherwise = e : go s es
+   where
+    s = toInteger sl
+  go l (e : es) = e : go l es
+
+-- | What the streaming verifier says per slot tick read, and once at the end of
+--   its input: the number of items the event yielded, and the verdict so far.
+type StreamReport = (Integer, ([Text], (Text, Text)))
+
+-- | A segment verified as it is read.
+data Stream = Stream
+  { stReports :: [StreamReport]
+  -- ^ The verifier's reports still to be read.
+  , stActions :: Int
+  , stFailed :: Bool
+  -- ^ A violation was reported; the verifier reads no further.
+  , stSurplus :: Int
+  -- ^ Votes beyond the first per slot, over the slots closed so far.
+  , stVotes :: Int
+  -- ^ Votes in the slot being read.
+  , stStraddling :: Int
+  , stRanges :: Bool
+  }
+
+-- | How the current segment is verified.
+data Mode
+  = -- | Eligibility from the log: re-verified from the segment start at checkpoints.
+    Batch
+  | -- | Eligibility from the node's schedule: verified as it is read.
+    Streaming Stream
+  | -- | At a boundary, waiting for the node to answer for the new epoch.  Carries
+    --   the tail of the previous epoch, the previous segment's schedule if one
+    --   governed it, and the boundary slot.
+    Waiting Carry (Maybe [Integer]) Integer
+
 -- | Verify a node.log event stream one epoch-segment at a time.
 --
 --   At each boundary the chain data is re-fetched, since the schedule and stake
 --   distribution are per-epoch, and a fresh segment is started — carrying
 --   'overlapSlots' of the outgoing epoch so obligations crossing the seam are still
---   checked. Re-verification cost therefore stays bounded per epoch rather than
---   growing over the whole run.
+--   checked.
 --
---   A segment is re-verified from its start at every slot tick. That is quadratic
---   within an epoch, and load-bearing: the trailing slot is still in progress at a
---   checkpoint, so a conclusion drawn about it is provisional and only corrected by
---   redoing the prefix once its events have arrived.
+--   A segment governed by the node's schedule is verified as it is read, each event
+--   once (see 'verifyChainStream' in "LinearLeiosVerifierChain"), which is what
+--   keeps up with a live node.  A segment whose eligibility comes from the log is
+--   re-verified from its start at every checkpoint instead: the log-derived
+--   eligibility is a parameter of the spec instance and reads the whole log, so a
+--   verdict on a prefix can change as the log grows.  That is quadratic within an
+--   epoch, and what checkpoint throttling exists for.
 runSegmented ::
   -- | Report progress; rendering and aborting are the caller's business.
   (Progress -> IO ()) ->
@@ -296,76 +370,233 @@ runSegmented ::
   (Integer -> IO ChainData) ->
   [ChainEvent] ->
   IO ()
-runSegmented report ts query = loop [] Nothing Nothing []
+runSegmented report ts query = loop [] Nothing Nothing Batch 0 []
  where
   overlap = overlapSlots ts
 
-  loop tally mseg mlast seen [] = do
-    finishSeg mseg (reverse seen)
-    report (Summary (reverse tally))
-  loop tally mseg mlast seen (ev : rest) = do
+  -- The state: the per-epoch tally, the current segment, the last tick, how the
+  -- segment is verified, its event count, and its events newest first (in a
+  -- streamed segment only the tail a boundary may carry).
+  loop tally mseg _ mode n seen [] = do
+    tally' <- case mode of
+      Waiting carry _ boundary -> do
+        -- The input ended before the node answered for the new epoch.
+        (seg, tally') <- startSegment tally boundary carry Nothing
+        finishSeg (Just seg) Batch n (reverse seen)
+        pure tally'
+      _ -> do
+        finishSeg mseg mode n (reverse seen)
+        pure tally
+    report (Summary (reverse tally'))
+  loop tally mseg mlast mode n seen (ev : rest) = do
     report (Saw ev)
-    case ev of
-      -- A tick that does not advance — a duplicate, or out of order, as concatenated
-      -- or overlapping logs produce. It is neither a continuation nor a gap, and
-      -- without this it fell through to the boundary path and silently restarted a
-      -- segment mid-epoch. There is nothing to verify backwards, so drop it and say
-      -- so; the segment state is left exactly as it was.
-      CSlot s
-        | Just l <- mlast
-        , toInteger s <= l -> do
-            report (NonMonotonicSlot l (toInteger s))
-            loop tally mseg mlast seen rest
-      CSlot s
-        | Just seg <- mseg
-        , toInteger s `div` cdEpochLength (segCD seg) == segEpoch seg
-        , maybe True (\l -> toInteger s == l + 1) mlast -> do
-            -- Same epoch and the next slot in sequence: extend the segment, and
-            -- periodically re-check it. Not at every tick — see 'checkpointEvery'.
-            let seen' = ev : seen
-            when (toInteger s `mod` checkpointEvery == 0) $
-              checkSeg seg (reverse seen')
-            loop tally mseg (Just (toInteger s)) seen' rest
-        | otherwise -> do
-            -- First segment, an epoch boundary, or a gap in the slot ticks. This tick
-            -- is what completes the outgoing segment's last slot, so give that
-            -- segment one final check with the tick appended; otherwise the last slot
-            -- before every boundary would go unverified, a streaming check never
-            -- adjudicating the slot still in progress.
-            case mseg of
-              Just old -> checkSeg old (reverse (ev : seen))
-              Nothing -> pure ()
-            -- A gap carries nothing. The spec advances one slot at a time, so a
-            -- carried tail from before the gap would still contain it and the verifier
-            -- would reject the jump — which is what a missing tick looked like before
-            -- this: "8 : Err-Slot / Base₁-Action". Obligations straddling the gap are
-            -- lost, unavoidably: there is no record of the slot to verify against.
-            let gapped = maybe False (\l -> toInteger s > l + 1) mlast
-                carry
-                  -- Carrying nothing is exactly 'carryAcross' over no events.
-                  | gapped = carryAcross overlap (toInteger s) []
-                  | otherwise = carryAcross overlap (toInteger s) seen
-            case mlast of
-              Just l | gapped -> report (SlotGap l (toInteger s))
-              _ -> pure ()
-            -- No check on the new segment yet: its carried slots were just
-            -- adjudicated by the outgoing one, and the boundary slot is in progress.
-            (seg, tally') <- newSegment tally (toInteger s) carry
-            loop tally' (Just seg) (Just (toInteger s)) (ev : carryEvents carry) rest
-      _ -> loop tally mseg mlast (ev : seen) rest
+    step tally mseg mlast mode n seen ev rest
 
-  newSegment tally boundary carry = do
+  step tally mseg mlast mode n seen ev rest = case ev of
+    -- A tick that does not advance — a duplicate, or out of order, as concatenated
+    -- or overlapping logs produce. It is neither a continuation nor a gap, and
+    -- without this it fell through to the boundary path and silently restarted a
+    -- segment mid-epoch. There is nothing to verify backwards, so drop it and say
+    -- so; the segment state is left exactly as it was.
+    CSlot s
+      | Just l <- mlast
+      , toInteger s <= l -> do
+          report (NonMonotonicSlot l (toInteger s))
+          loop tally mseg mlast mode n seen rest
+    CSlot s
+      | Waiting carry prev boundary <- mode
+      , Just l <- mlast
+      , toInteger s == l + 1
+      , toInteger s < boundary + boundaryWaitSlots -> do
+          -- Still waiting: keep reading, and ask again now and then.
+          let sl = toInteger s
+              seen' = ev : seen
+              n' = n + 1
+          mcd <-
+            if (sl - boundary) `mod` checkpointEvery == 0
+              then Just <$> query boundary
+              else pure Nothing
+          case mcd >>= \cd -> (,) cd <$> combinedSchedule (carrySpans carry) (carryStart carry) prev (boundary `div` cdEpochLength cd) cd of
+            Just (cd, ws) -> do
+              (seg, tally') <- startSegmentWith tally boundary carry cd (Just ws)
+              st <- openStream seg n' (reverse seen') (segmentInput (cdEpochLength cd) (segEpoch seg) sl rest)
+              loop tally' (Just seg) (Just sl) st n' (trimSeen sl seen') rest
+            Nothing -> loop tally mseg (Just sl) mode n' seen' rest
+      | Waiting carry _ boundary <- mode -> do
+          -- Waited long enough, or the ticks broke off: verify what was read with
+          -- eligibility from the log, and take this tick as usual.
+          (seg, tally') <- startSegment tally boundary carry Nothing
+          step tally' (Just seg) mlast Batch n seen ev rest
+    CSlot s
+      | Just seg <- mseg
+      , toInteger s `div` cdEpochLength (segCD seg) == segEpoch seg
+      , maybe True (\l -> toInteger s == l + 1) mlast -> do
+          -- Same epoch and the next slot in sequence: extend the segment.
+          let sl = toInteger s
+              seen' = ev : seen
+              n' = n + 1
+              atCheckpoint = sl `mod` checkpointEvery == 0
+          case mode of
+            Streaming st -> do
+              st' <- advance n' (noteEvent seg ev st) 1
+              when (atCheckpoint && not (stFailed st')) $ do
+                reportNotes st'
+                report (Verified n' (stActions st'))
+              loop tally mseg (Just sl) (Streaming st') n' (trimSeen sl seen') rest
+            _ -> do
+              -- Periodically re-check it. Not at every tick — see 'checkpointEvery'.
+              when atCheckpoint $ checkSeg seg (reverse seen')
+              loop tally mseg (Just sl) mode n' seen' rest
+      | otherwise -> do
+          -- First segment, an epoch boundary, or a gap in the slot ticks. This tick
+          -- is what completes the outgoing segment's last slot, so give that
+          -- segment one final check with the tick appended; otherwise the last slot
+          -- before every boundary would go unverified, a streaming check never
+          -- adjudicating the slot still in progress.
+          case (mseg, mode) of
+            (Just old, Streaming st) -> do
+              st' <- advanceAll (n + 1) (noteEvent old ev st)
+              when (not (stFailed st')) $ do
+                reportNotes st'
+                report (Verified (n + 1) (stActions st'))
+            (Just old, _) -> checkSeg old (reverse (ev : seen))
+            _ -> pure ()
+          -- A gap carries nothing. The spec advances one slot at a time, so a
+          -- carried tail from before the gap would still contain it and the verifier
+          -- would reject the jump — which is what a missing tick looked like before
+          -- this: "8 : Err-Slot / Base₁-Action". Obligations straddling the gap are
+          -- lost, unavoidably: there is no record of the slot to verify against.
+          let sl = toInteger s
+              gapped = maybe False (\l -> sl > l + 1) mlast
+              carry
+                -- Carrying nothing is exactly 'carryAcross' over no events.
+                | gapped = carryAcross overlap sl []
+                | otherwise = carryAcross overlap sl seen
+              -- The outgoing segment's schedule, for the slots it hands over.
+              prev = case (mseg, mode) of
+                (Just old, Streaming _) | segAuthoritative old -> cdWinningSlots (segCD old)
+                _ -> Nothing
+              seen' = ev : carryEvents carry
+              n' = length seen'
+          case mlast of
+            Just l | gapped -> report (SlotGap l sl)
+            _ -> pure ()
+          cd <- query sl
+          let ep = sl `div` cdEpochLength cd
+          case combinedSchedule (carrySpans carry) (carryStart carry) prev ep cd of
+            -- No verdict on the new segment yet: its carried slots were just
+            -- adjudicated by the outgoing one, and the boundary slot is in progress.
+            Just ws -> do
+              (seg, tally') <- startSegmentWith tally sl carry cd (Just ws)
+              st <- openStream seg n' (reverse seen') (segmentInput (cdEpochLength cd) ep sl rest)
+              loop tally' (Just seg) (Just sl) st n' (trimSeen sl seen') rest
+            Nothing
+              -- The node has not crossed the boundary yet, and its schedule will
+              -- govern once it has: wait for it.
+              | isJust (cdWinningSlots cd)
+              , cdNodeEpoch cd < ep
+              , not (carrySpans carry) || isJust prev ->
+                  loop tally Nothing (Just sl) (Waiting carry prev sl) n' seen' rest
+              | otherwise -> do
+                  (seg, tally') <- startSegmentWith tally sl carry cd Nothing
+                  loop tally' (Just seg) (Just sl) Batch n' seen' rest
+    _ -> case mode of
+      Streaming st | Just seg <- mseg ->
+        loop tally mseg mlast (Streaming (noteEvent seg ev st)) (n + 1) (ev : seen) rest
+      _ -> loop tally mseg mlast mode (n + 1) (ev : seen) rest
+
+  -- Keep only what a boundary may carry: the events back to the tick 'overlap'
+  -- slots ago.
+  trimSeen sl = go
+   where
+    go [] = []
+    go (e@(CSlot t) : es)
+      | toInteger t <= sl - overlap = [e]
+      | otherwise = e : go es
+    go (e : es) = e : go es
+
+  startSegment tally boundary carry ws = do
     cd <- query boundary
+    startSegmentWith tally boundary carry cd ws
+
+  -- A segment with a governing schedule ('Just') is authoritative, the schedule
+  -- replacing the queried one, which covers the new epoch only.
+  startSegmentWith tally boundary carry cd ws = do
     let ep = boundary `div` cdEpochLength cd
         seg =
           Segment
             { segEpoch = ep
             , segStart = carryStart carry
-            , segCD = cd
-            , segAuthoritative = segmentAuthoritative (carrySpans carry) ep cd
+            , segCD = maybe cd (\s -> cd{cdWinningSlots = Just s}) ws
+            , segAuthoritative = isJust ws
             }
     report (SegmentStarted seg (carrySpans carry))
     pure (seg, (ep, segAuthoritative seg) : tally)
+
+  -- Start the streaming verifier on a segment whose events so far, oldest first,
+  -- are 'already', and read its reports for the ticks among them.
+  openStream seg n already more = do
+    let cd = segCD seg
+        reports =
+          verifyChainStreamFromSlot
+            (cdNumParties cd)
+            (cdSutIndex cd)
+            (cdStakeDistribution cd)
+            (tLhdr ts)
+            (tLvote ts)
+            (tLdiff ts)
+            (fromMaybe [] (cdWinningSlots cd))
+            True
+            (cdMaxRBBody cd)
+            []
+            (segStart seg)
+            (already <> more)
+        st0 =
+          Stream
+            { stReports = reports
+            , stActions = 0
+            , stFailed = False
+            , stSurplus = 0
+            , stVotes = 0
+            , stStraddling = 0
+            , stRanges = False
+            }
+    Streaming <$> advance n (foldl (flip (noteEvent seg)) st0 already) (length [() | CSlot _ <- already])
+
+  -- Read the reports of the next k ticks, stopping at a violation.
+  advance :: Int -> Stream -> Int -> IO Stream
+  advance _ st 0 = pure st
+  advance n st k
+    | stFailed st = pure st
+    | otherwise = case stReports st of
+        [] -> pure st
+        ((items, (acts, (status, detail))) : rs) -> do
+          let st' = st{stReports = rs, stActions = stActions st + fromInteger items}
+          if status == "ok"
+            then advance n st' (k - 1)
+            else do
+              report (Violation n acts status detail)
+              pure st'{stFailed = True}
+
+  -- Read the reports to the end of the verifier's input.
+  advanceAll n st = advance n st (length (stReports st))
+
+  -- The notes' counts, kept as the events are read rather than over the prefix.
+  noteEvent seg ev st = case ev of
+    CSlot _ -> st{stSurplus = stSurplus st + max 0 (stVotes st - 1), stVotes = 0}
+    CVoted _ _ -> st{stVotes = stVotes st + 1}
+    CMempoolRange mn mx ->
+      let cap = cdMaxRBBody (segCD seg)
+          straddles = toInteger mn <= cap && cap < toInteger mx
+       in st{stRanges = True, stStraddling = stStraddling st + fromEnum straddles}
+    _ -> st
+
+  reportNotes st = do
+    let surplus = stSurplus st + max 0 (stVotes st - 1)
+    when (surplus > 0) $ report (SurplusVotesInSlot surplus)
+    if not (stRanges st)
+      then report NoMempoolReadings
+      else when (stStraddling st > 0) $ report (EBOwedUndecided (stStraddling st))
 
   -- The EB-role gate lives in the translator, which cannot report. Say so wherever a
   -- prefix is verified, rather than letting leader slots be silently exempted. Both
@@ -419,8 +650,13 @@ runSegmented report ts query = loop [] Nothing Nothing []
       then report (Verified (length prefix) (length acts))
       else report (Violation (length prefix) acts status detail)
 
-  finishSeg Nothing _ = report NothingToVerify
-  finishSeg (Just seg) prefix = do
+  finishSeg Nothing _ _ _ = report NothingToVerify
+  finishSeg (Just _) (Streaming st) n _ = do
+    st' <- advanceAll n st
+    when (not (stFailed st')) $ do
+      reportNotes st'
+      report (StreamEnded [])
+  finishSeg (Just seg) _ _ prefix = do
     reportIfLeiosInactive seg prefix
     reportSurplusVotes prefix
     reportMempoolGaps seg prefix

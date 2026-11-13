@@ -19,12 +19,16 @@ import LinearLeiosChain (
   Progress (..),
   Segment (..),
   Timings (..),
+  boundaryWaitSlots,
   carryAcross,
   checkpointEvery,
+  combinedSchedule,
+  segmentInput,
   overlapSlots,
   runSegmented,
   segmentAuthoritative,
  )
+import LinearLeiosLib (verifyChainStreamFromSlot, verifyChainTraceFromSlot)
 import Test.Hspec (Spec, describe, it, shouldBe, shouldNotBe)
 
 -- | The timings the chain app uses. An announced EB's voting window opens at
@@ -62,6 +66,66 @@ collectWith epochLen evs = do
 
 collect :: [ChainEvent] -> IO [Progress]
 collect = collectWith 10
+
+-- | Run the driver with the node answering for every epoch with the given
+--   schedule, so that every segment is governed by it and streamed.
+collectStreamed :: Integer -> [Integer] -> [ChainEvent] -> IO [Progress]
+collectStreamed epochLen ws evs = do
+  ref <- newIORef []
+  runSegmented
+    (\p -> modifyIORef' ref (p :))
+    timings
+    ( \b ->
+        pure
+          stubChainData
+            { cdEpochLength = epochLen
+            , cdWinningSlots = Just [s | s <- ws, s `div` epochLen == b `div` epochLen]
+            , cdNodeEpoch = b `div` epochLen
+            }
+    )
+    evs
+  reverse <$> readIORef ref
+
+-- | The node lags the boundary: it answers for the outgoing epoch until the tick
+--   given, and only then for the new one.
+collectLagging :: Integer -> Integer -> [ChainEvent] -> IO [Progress]
+collectLagging epochLen caughtUp evs = do
+  ref <- newIORef []
+  clock <- newIORef (0 :: Integer)
+  runSegmented
+    ( \p -> do
+        case p of
+          Saw (CSlot s) -> modifyIORef' clock (const (toInteger s))
+          _ -> pure ()
+        modifyIORef' ref (p :)
+    )
+    timings
+    ( \_ -> do
+        now <- readIORef clock
+        -- Before catching up, the tip is still in the epoch before 'caughtUp'.
+        let ep
+              | now >= caughtUp = now `div` epochLen
+              | otherwise = min (now `div` epochLen) (caughtUp `div` epochLen - 1)
+        pure stubChainData{cdEpochLength = epochLen, cdWinningSlots = Just [], cdNodeEpoch = ep}
+    )
+    evs
+  reverse <$> readIORef ref
+
+-- | The verdict of the batch verifier on a whole log, and that of the streaming
+--   verifier reading it once: the first violation's status, or "ok".
+batchVerdict, streamVerdict :: [Integer] -> [ChainEvent] -> Text
+batchVerdict ws evs =
+  fst (snd (verifyChainTraceFromSlot 3 2 stakes 1 4 7 ws True 100 evs 0))
+streamVerdict ws evs =
+  case [st | (_, (_, (st, _))) <- verifyChainStreamFromSlot 3 2 stakes 1 4 7 ws True 100 [] 0 evs, st /= "ok"] of
+    [] -> "ok"
+    (st : _) -> st
+
+stakes :: [Integer]
+stakes = [1000000000, 1000000000, 1000000000]
+
+authoritative :: [Progress] -> [Bool]
+authoritative ps = [segAuthoritative s | SegmentStarted s _ <- ps]
 
 violations :: [Progress] -> [Text]
 violations ps = [status | Violation _ _ status _ <- ps]
@@ -400,3 +464,89 @@ chainSegments = do
       -- state, the obligation is invisible, and the abstention passes vacuously.
       ps <- collect straddlingUnvoted
       violations ps `shouldNotBe` []
+
+  describe "streaming a segment governed by the node's schedule" $ do
+    let fixtures =
+          [ ("straddlingVoted", straddlingVoted)
+          , ("straddlingUnvoted", straddlingUnvoted)
+          , ("twoAnnouncementsInOneSlot", twoAnnouncementsInOneSlot)
+          , ("supersededBeforeVotable", supersededBeforeVotable)
+          , ("voteForUnannouncedEB", voteForUnannouncedEB)
+          , ("leiosActiveThenSilentLeader", leiosActiveThenSilentLeader)
+          , ("lateDeadlineStraddling", lateDeadlineStraddling)
+          , ("twoVotesOneSlot", twoVotesOneSlot)
+          , ("twoVotesOneSlotHeadFirst", twoVotesOneSlotHeadFirst)
+          ]
+        leaders evs = [toInteger s | CNodeIsLeader s <- evs]
+    mapM_
+      ( \(name, evs) ->
+          it ("reaches the batch verdict on " <> name) $
+            streamVerdict (leaders evs) evs `shouldBe` batchVerdict (leaders evs) evs
+      )
+      fixtures
+    it "reaches the batch verdict on every prefix" $
+      sequence_
+        [ streamVerdict (leaders p) p `shouldBe` batchVerdict (leaders p) p
+        | (_, evs) <- fixtures
+        , k <- [1 .. length evs]
+        , let p = take k evs
+        ]
+    it "reads each event once: it reports one verdict per tick, and one at the end" $
+      length (verifyChainStreamFromSlot 3 2 stakes 1 4 7 [] True 100 [] 0 (ticks 0 45))
+        `shouldBe` 47
+    it "streams every segment when the node answers for each epoch" $ do
+      ps <- collectStreamed 10 [] straddlingVoted
+      authoritative ps `shouldBe` [True, True]
+    it "accepts a straddling vote that was cast" $ do
+      ps <- collectStreamed 10 [] straddlingVoted
+      violations ps `shouldBe` []
+    it "rejects a straddling vote that was withheld" $ do
+      ps <- collectStreamed 10 [] straddlingUnvoted
+      violations ps `shouldNotBe` []
+    it "sees an obligation whose deadline falls well past the boundary" $ do
+      ps <- collectStreamed 10 [] lateDeadlineStraddling
+      violations ps `shouldNotBe` []
+    it "rejects a vote for an EB the chain never announced" $ do
+      ps <- collectStreamed 100 [] voteForUnannouncedEB
+      violations ps `shouldNotBe` []
+    it "enforces the EB role in a slot the schedule gives the node" $ do
+      ps <- collectStreamed 100 [4] leiosActiveThenSilentLeader
+      violations ps `shouldNotBe` []
+    it "restarts after a gap without rejecting the jump" $ do
+      ps <- collectStreamed 100 [] tickGap
+      (violations ps, segmentStarts ps) `shouldBe` ([], [0, 5])
+    it "drops ticks that do not advance" $ do
+      ps <- collectStreamed 100 [] nonMonotonicTicks
+      (violations ps, segmentStarts ps) `shouldBe` ([], [0])
+    it "still reports at end of input" $ do
+      ps <- collectStreamed 100 [] (ticks 0 45)
+      streamEndedCount ps `shouldBe` 1
+
+  describe "the schedule governing a segment" $ do
+    let cd = stubChainData{cdWinningSlots = Just [12], cdNodeEpoch = 1}
+    it "is the queried one when nothing is carried" $
+      combinedSchedule False 10 Nothing 1 cd `shouldBe` Just [12]
+    it "joins the outgoing schedule for the carried slots" $
+      combinedSchedule True 3 (Just [1, 4, 8]) 1 cd `shouldBe` Just [4, 8, 12]
+    it "is none when the outgoing epoch had none" $
+      combinedSchedule True 3 Nothing 1 cd `shouldBe` Nothing
+    it "is none when the node answered for another epoch" $
+      combinedSchedule False 10 Nothing 2 cd `shouldBe` Nothing
+
+  describe "a streamed segment's input" $ do
+    it "ends with the tick that changes the epoch" $
+      segmentInput 10 0 7 (ticks 8 12) `shouldBe` ticks 8 10
+    it "ends with the tick after a gap" $
+      segmentInput 10 0 2 (ticks 3 4 <> ticks 6 8) `shouldBe` ticks 3 4 <> [CSlot 6]
+    it "drops ticks that do not advance" $
+      segmentInput 100 0 2 ([CSlot 3, CSlot 3, CSlot 2] <> ticks 4 5) `shouldBe` ticks 3 5
+
+  describe "a node that has not crossed the boundary yet" $ do
+    it "is waited for, and the epoch streamed once it has" $ do
+      ps <- collectLagging 100 105 (ticks 90 130)
+      (authoritative ps, violations ps) `shouldBe` ([True, True], [])
+    it "is given up on after a while, the epoch then verified from the log" $ do
+      -- Long epochs, so that the wait does not run into the next boundary.
+      ps <- collectLagging 10000 (10000 + boundaryWaitSlots + 50) (ticks 9990 (10000 + boundaryWaitSlots + 10))
+      authoritative ps `shouldBe` [True, False]
+

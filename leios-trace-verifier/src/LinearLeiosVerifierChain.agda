@@ -341,7 +341,8 @@ module LinearLeiosVerifierChain where
           minted bs = "mints (parent, slot) " ◇ show bs
 
       open import LinearLeiosStack d-SpecStructure params node⁻ nodeᶜ nothing nodeMsg using
-        (Stack; Item; entry; deliver; base; ffdᵢ; voteᵢ; ioᵢ; verifyItems)
+        (Stack; Item; entry; deliver; base; ffdᵢ; voteᵢ; ioᵢ; verifyItems;
+         Cursor; cursor; stepItems; finishItems)
 
       blksToHeaderAndBodyList : List Blk → List (FFDA.Header ⊎ FFDA.Body)
       blksToHeaderAndBodyList []              = []
@@ -627,6 +628,52 @@ module LinearLeiosVerifierChain where
         ; started = false ; memRange = nothing ; forgedEB = nothing ; votedEB = nothing
         ; ids = [] ; inbox = [] ; late = [] ; forgedRB = nothing ; tipNow = nothing
         ; annBySlot = [] ; headEB = nothing }
+
+      -- What the stream reports, per slot tick read and once more at the end of
+      -- the input: the number of items the event yielded, and the verdict so far.
+      -- A violation carries the items of the slots around it and ends the list.
+      StreamReport : Type
+      StreamReport = Pair ℕ (Pair (List String) (Pair String String))
+
+      -- Verify the events as they arrive, carrying the translation's accumulator
+      -- and the stack's state from one event to the next, so that each event is
+      -- read once.  It adjudicates exactly what 'verifyChainTrace'' false does on
+      -- every prefix of the input, without re-reading the prefix; the list it
+      -- returns is produced as the input is consumed, so it can be read lazily
+      -- against a live log.
+      --
+      -- Its parameters must not depend on the log: 'l' is unused only where the
+      -- queried schedule governs ('scheduleAuthoritative'), and log-derived
+      -- eligibility looks at the whole log by design.
+      verifyChainStream : LeiosState → List ChainEvent → List StreamReport
+      verifyChainStream s = go (n₀ (LeiosState.slot s)) (cursor (stack₀ s) []) []
+        where
+          isTick : ChainEvent → Bool
+          isTick (CSlot _) = true
+          isTick _         = false
+
+          failed : ℕ → List Item → String → List StreamReport
+          failed n recent err = (n , (L.map showItem recent , (err , "error verifyChainTrace"))) ∷ []
+
+          -- 'recent' is the last non-empty batch of items: the entries still
+          -- pending are verified at the next ranking-block step, so a violation
+          -- can lie in the slot before the one being read.
+          go : Accumulator → Cursor → List Item → List ChainEvent → List StreamReport
+          go a c recent [] = case finishItems c of λ where
+            (inj₁ err) → failed 0 recent err
+            (inj₂ _)   → (0 , ([] , ("ok" , ""))) ∷ []
+          go a c recent (ev ∷ evs) =
+            let (a′ , αs) = traceEvent→action a ev
+            in case stepItems c αs of λ where
+                 (inj₁ err) → failed (L.length αs) (recent ++ αs) err
+                 (inj₂ c′)  →
+                   let recent′ = if null αs then recent else αs
+                       rest    = go a′ c′ recent′ evs
+                   in if isTick ev then (L.length αs , ([] , ("ok" , ""))) ∷ rest else rest
+
+      verifyChainStreamFromSlot : SlotNumber → List ChainEvent → List StreamReport
+      verifyChainStreamFromSlot n = verifyChainStream (record s₀ { slot = n })
+      {-# COMPILE GHC verifyChainStreamFromSlot as verifyChainStreamFromSlot #-}
 
       opaque
         unfolding List-Model
