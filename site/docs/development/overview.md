@@ -4,6 +4,12 @@ sidebar_position: 1
 
 # Overview
 
+:::note
+
+This section contains historic material from the research phase of the project. It remains a valid reference wherever it has not been superseded by material in the [Development](./) section.
+
+:::
+
 Ouroboros Leios project is a research and development project, which was kicked off in 2024 by the Input | Output Research (IOR) team conducting feasibility studies. This work included modeling the growth of transactions, the economics of stake pools, and the dynamics of ledger size over multiple epochs. 
 
 The original research areas included:

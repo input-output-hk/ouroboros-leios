@@ -132,6 +132,12 @@ const config: Config = {
           label: "Research and development",
         },
         {
+          type: "docSidebar",
+          sidebarId: "developmentMaterialSidebar",
+          position: "right",
+          label: "Development",
+        },
+        {
           to: "/blog",
           label: "Blog",
           position: "right",
@@ -217,7 +223,7 @@ const config: Config = {
           ],
         },
         {
-          title: "Development",
+          title: "Research and development",
           items: [
             {
               label: "Overview",
@@ -230,6 +236,19 @@ const config: Config = {
             {
               label: "Simulation demonstration",
               to: "/docs/development/simulation-demonstration",
+            },
+          ],
+        },
+        {
+          title: "Development",
+          items: [
+            {
+              label: "Overview",
+              to: "/docs/development/",
+            },
+            {
+              label: "Benchmark reports",
+              to: "/docs/development/benchmark-reports",
             },
             {
               label: "Cost estimator",
