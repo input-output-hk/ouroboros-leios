@@ -1,0 +1,27 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    mininet \
+    bridge-utils \
+    ethtool \
+    iperf3 \
+    iproute2 \
+    iputils-ping \
+    net-tools \
+    tcpdump \
+    python3 \
+    python3-dev \
+    gcc \
+    make \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /sim
+COPY Makefile node.c node.h diffusion.c scheduler_bridge.c scheduler_bridge.h cJSON.c cJSON.h ./
+RUN make
+
+COPY topo_config.py mininet_topo.py FetchScheduler.py OnePeerScheduler.py FullHedgeScheduler.py ./
+
+ENTRYPOINT ["python3", "mininet_topo.py"]
