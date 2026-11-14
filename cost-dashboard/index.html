@@ -38,17 +38,22 @@
           <span class="unit">slots</span>
         </div>
         <div class="field">
-          <label title="Probability that an EB is certified: (1-f)^voting_window.">Certification probability</label>
+          <label title="Probability that an EB is certified: no RB in the slots between, (1-f)^(voting_window − 1). CIP-164: 0.95^13 ≈ 51%.">Certification probability</label>
           <span class="value" id="uiPcert">?</span>
           <span class="unit">%</span>
         </div>
         <div class="field">
-          <label title="Average voting committee size per EB. Based on wFA+LS sortition.">Voting committee size</label>
+          <label title="leiosCommitteeSize: seats on the voting committee, one vote per seat per EB. 600 for launch, below CIP-164&#x27;s 900, to limit vote traffic: about 95% of active stake. Votes and the certificate grow with it.">Committee size</label>
           <input id="uiVotesPerEB" type="number" min="0" max="3000" value="600" step="10"/>
-          <span class="unit">voters</span>
+          <span class="unit">seats</span>
         </div>
         <div class="field">
-          <label title="Transaction kilobytes per second reaching the ledger via certified EBs.">Confirmed throughput</label>
+          <label title="maxBlockBodySize: transaction bytes per ranking block. Mainnet: 90,112 B. EBs appear only when transactions don&#x27;t fit in the RB.">Max RB body</label>
+          <input id="uiMaxRbBody" type="number" min="0" max="200000" value="90112" step="1024"/>
+          <span class="unit">B</span>
+        </div>
+        <div class="field">
+          <label title="Transaction kilobytes per second reaching the ledger, in RBs and certified EBs.">Confirmed throughput</label>
           <input id="uiThroughput" type="number" min="1" max="500" value="100" step="1"/>
           <span class="unit">TxkB/s</span>
         </div>
@@ -62,55 +67,55 @@
           <span class="value" id="uiTxPerSec">?</span>
           <span class="unit">Tx/s</span>
         </div>
+        <div class="field">
+          <label title="CIP-164 announces EBs only when transactions don&#x27;t fit in the RB, above Praos capacity (4.51 TxkB/s today).">Leios active</label>
+          <span class="value" id="uiLeios">?</span>
+          <span class="unit"></span>
+        </div>
       </div>
     </div>
 
     <div class="card">
-      <h2>Sizes &amp; Validation</h2>
+      <h2>Sizes &amp; Validation (fixed)</h2>
       <div class="fields">
         <div class="field">
           <label title="Ranking Block header (doubles as EB header in CIP-164).">RB header size</label>
-          <input id="uiRbHeaderSize" type="number" min="0" max="5000" value="1024" step="1"/>
+          <span class="value" id="uiRbHeaderSize">?</span>
           <span class="unit">B/RB</span>
         </div>
         <div class="field">
-          <label title="Endorsement Block header size.">EB header size</label>
-          <input id="uiEbHeaderSize" type="number" min="0" max="2000" value="240" step="1"/>
-          <span class="unit">B/EB</span>
-        </div>
-        <div class="field">
-          <label title="32-byte Tx hash reference in EB body.">Tx hash reference</label>
-          <input id="uiTxRefSize" type="number" min="0" max="100" value="32" step="1"/>
+          <label title="A 32 B Tx hash plus the Tx size, as an EB body encodes it: 37 B on every EB of two P&amp;T cluster runs (2026-11-06, 2026-11-09).">Tx reference</label>
+          <span class="value" id="uiTxRefSize">?</span>
           <span class="unit">B/ref</span>
         </div>
         <div class="field">
-          <label title="Per voter per EB. CDDL non-persistent worst case.">Vote size</label>
-          <input id="uiVoteSize" type="number" min="0" max="1000" value="164" step="1"/>
+          <label title="88 B vote (RB hash, seat, BLS signature; consensus golden test) plus 3 B framing, one vote per message.">Vote size</label>
+          <span class="value" id="uiVoteSize">?</span>
           <span class="unit">B/vote</span>
         </div>
         <div class="field">
-          <label title="Certificate size from wFA+LS sortition worst case.">Certificate size</label>
-          <input id="uiCertSize" type="number" min="0" max="50000" value="8000" step="100"/>
+          <label title="54 B plus one bit per seat. MusashiNet certificate: 75 B with a 21 B bitfield (block 95445).">Certificate size</label>
+          <span class="value" id="uiCertSize">?</span>
           <span class="unit">B/cert</span>
         </div>
         <div class="field">
-          <label title="Full Tx validation at mempool ingestion. OLS on mainnet Apply data.">Tx apply</label>
-          <input id="uiTxApply" type="number" min="0" max="10" value="0.6201" step="0.0001"/>
+          <label title="Full validation at mempool ingestion, scripts included: mainnet mean (OLS on Apply data).">Tx apply time</label>
+          <span class="value" id="uiTxApply">?</span>
           <span class="unit">ms/Tx</span>
         </div>
         <div class="field">
-          <label title="EB/RB header validation. From db-analyser empty block stats.">EB header validation</label>
-          <input id="uiEbHeaderVal" type="number" min="0" max="10" value="0.4438" step="0.0001"/>
-          <span class="unit">ms/EB</span>
+          <label title="Per block header. db-analyser empty-block statistics.">Header validation time</label>
+          <span class="value" id="uiEbHeaderVal">?</span>
+          <span class="unit">ms/header</span>
         </div>
         <div class="field">
-          <label title="Individual BLS vote verification. Non-persistent worst case.">Vote validation</label>
-          <input id="uiVoteVal" type="number" min="0" max="20" value="2.9" step="0.1"/>
+          <label title="One BLS signature check per vote. Rust benchmark (2025), until Haskell numbers are published.">Vote validation time</label>
+          <span class="value" id="uiVoteVal">?</span>
           <span class="unit">ms/vote</span>
         </div>
         <div class="field">
-          <label title="Certificate validation from cryptography benchmarks.">Certificate validation</label>
-          <input id="uiCertVal" type="number" min="0" max="500" value="157.2" step="0.1"/>
+          <label title="Computed from the committee size: 0.9 ms plus 1.9 µs per seat (Haskell verifyLeiosCert, ouroboros-consensus, 2026-10).">Certificate validation time</label>
+          <span class="value" id="uiCertVal">?</span>
           <span class="unit">ms/cert</span>
         </div>
       </div>
@@ -120,19 +125,14 @@
       <h2>Network Topology</h2>
       <div class="fields">
         <div class="field">
-          <label title="Downstream (inbound) connections per relay. Headers pushed to all; bodies fetched by subset.">Inbound peers</label>
-          <input id="uiInboundPeers" type="number" min="1" max="500" value="100" step="1"/>
+          <label title="Downstream connections per relay; headers and votes go to all of them. 60: a mid-level pool&#x27;s relay. The best-connected relays of large pools carry about 100 (MusashiNet&#x27;s IOG relays: 92 hot, 115 inbound).">Inbound peers</label>
+          <input id="uiInboundPeers" type="number" min="1" max="500" value="60" step="1"/>
           <span class="unit">peers</span>
         </div>
         <div class="field">
-          <label title="Simultaneous upstream fetch sources per inbound peer. M=1 lean, M=4 beefy.">Fetch multiplicity</label>
-          <input id="uiFetchMult" type="number" min="1" max="8" value="1" step="1"/>
+          <label title="How many upstream peers each node fetches the same EB body from, so a relay serves it to inbound × M / 25 peers. 2: the egress devnet measured 1.5–2 copies per EB; MusashiNet&#x27;s relays downloaded 3.25. Praos blocks always use 1.">Fetch multiplicity</label>
+          <input id="uiFetchMult" type="number" min="1" max="8" value="2" step="1"/>
           <span class="unit">M</span>
-        </div>
-        <div class="field">
-          <label title="Spanning-tree redundancy for vote gossip. Typically 2x.">Vote redundancy</label>
-          <input id="uiVoteRedundancy" type="number" min="1" max="10" value="2" step="1"/>
-          <span class="unit">&times;</span>
         </div>
       </div>
     </div>
@@ -248,7 +248,7 @@
           <span class="unit">ms/s</span>
         </div>
         <div class="field">
-          <label>Endorsement block headers</label>
+          <label>Block headers</label>
           <span class="value" id="uiCpuEbHeader">?</span>
           <span class="unit">ms/s</span>
         </div>
