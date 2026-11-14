@@ -5,6 +5,7 @@ var Controller = (function() {
   'use strict'
 
   var GiB = 1024 * 1024 * 1024            //  B/GiB
+  var GB_PER_GIB = GiB / 1e9              //  1.073741824: volumes are in GiB, prices per GB
   var T_month = 365.24 / 12 * 24 * 3600   //  s/month = 2,629,728
 
   // Updated 2026-11 (docs/cost-estimate/README.md, "November 2026 update")
@@ -241,11 +242,11 @@ var Controller = (function() {
     //  Bulk disk (immutable path): the chain today plus its growth at the average load
     r.chainGrowth = compression * mix(hi.storageMonthly, lo.storageMonthly)   //  GiB/month per node
     r.chainOverhead = compression * mix(hi.storageOverhead, lo.storageOverhead)   //  of it, EB references and certificates
-    var bulkAt = function(months) { return nodes * (compression * getFloat(uiCurrentChain) + r.chainGrowth * months) }
+    var bulkAt = function(months) { return nodes * (compression * getFloat(uiCurrentChain) / GB_PER_GIB + r.chainGrowth * months) }   //  the current chain is given in GB
 
     //  Each disk's bill after `months` of growth, at its own price
-    var fastCost = function(months) { return fastAt(months) * getFloat(uiStorageFast) }
-    var bulkCost = function(months) { return bulkAt(months) * getFloat(uiStorage) }
+    var fastCost = function(months) { return fastAt(months) * getFloat(uiStorageFast) * GB_PER_GIB }
+    var bulkCost = function(months) { return bulkAt(months) * getFloat(uiStorage) * GB_PER_GIB }
     var avgMonths = (horizon - 1) / 2 + margin
     r.fast = fastAt(margin); r.bulk = bulkAt(margin)                  //  GiB, first month
     //  $/mo: average over the horizon, first month, added each month
@@ -255,7 +256,7 @@ var Controller = (function() {
 
     //  Egress on the average; peak bandwidth per relay at the peak
     r.egress = relays * mix(hi.egressMonthly, lo.egressMonthly)
-    r.costEgress = r.egress * getFloat(uiEgress)
+    r.costEgress = r.egress * GB_PER_GIB * getFloat(uiEgress)
     r.nic = headroom * hi.egressMonthly * GiB / T_month * 8 / 1e6   //  Mb/s
 
     //  IOPS at the peak
@@ -366,7 +367,9 @@ var Controller = (function() {
     uiCostVcpu.innerText = r.costVcpu.toFixed(2)
     uiCostRam.innerText = r.costRam.toFixed(2)
     var bill = function(first, growth) { return '$/mo (month 1: ' + first.toFixed(2) + ', +' + growth.toFixed(2) + ' a month)' }
-    uiCostFast.innerText = r.costFast.toFixed(2);        uiCostFastUnit.innerText = bill(r.costFastFirst, r.costFastGrowth)
+    uiCostFast.innerText = r.costFast.toFixed(2)
+    uiCostFastUnit.innerText = getFloat(uiStorageFast) > 0 ? bill(r.costFastFirst, r.costFastGrowth)
+      : "$/mo, in the plan's local disk"                //  discount plans include a local SSD in their price
     uiCostBulk.innerText = r.costBulk.toFixed(2);        uiCostBulkUnit.innerText = bill(r.costBulkFirst, r.costBulkGrowth)
     uiCostIops.innerText = r.costIops.toFixed(2)
     uiCostEgress.innerText = r.costEgress.toFixed(2)
@@ -417,11 +420,29 @@ var Controller = (function() {
     calculate()
   }
 
-  // Cloud price presets. RAM and the fast SSD, priced since this update, use the average list
-  // prices of each group, checked 2026-11-10.
+  // Prices checked 2026-11-10: each preset value is the average of the on-demand list prices of
+  // AWS, GCP and Azure (hyperscale) or DigitalOcean, Akamai and Hetzner (discount). Disk prices
+  // are per GB: AWS EBS, Azure managed disks and DigitalOcean volumes bill per GiB, so their
+  // prices are divided by 1.074 first (units checked 2026-11-14). IOPS and discount egress are
+  // the average of what a node pays: 0, because every one of those plans includes more than a
+  // node uses. Min, average and max per price: docs/cost-estimate/README.md, "November 2026 update".
   var PRESETS = {
-    Hyperscale: { uiVcpu: "20", uiRam: "2.23", uiStorageFast: "0.087", uiStorage: "0.12", uiIops: "0.05", uiEgress: "0.09" },
-    Discount:   { uiVcpu: "20", uiRam: "2.53", uiStorageFast: "0.00",  uiStorage: "0.10", uiIops: "0.00", uiEgress: "0.00" }
+    Hyperscale: {
+      uiVcpu:        "22.74",   //  15.92 (GCP E2) – 26.80 (AWS)
+      uiRam:         "2.23",    //  1.90 (Azure) – 2.66 (AWS)
+      uiStorageFast: "0.0831",  //  per GB: 0.0745 (AWS gp3, 0.080/GiB) – 0.100 (GCP pd-balanced)
+      uiStorage:     "0.0397",  //  per GB: 0.0373 (Azure, 0.040/GiB) – 0.0419 (AWS st1, 0.045/GiB)
+      uiIops:        "0.00",    //  3,000 IOPS included per volume; a node uses fewer
+      uiEgress:      "0.099"    //  0.087 (Azure) – 0.120 (GCP Premium)
+    },
+    Discount: {
+      uiVcpu:        "22.86",   //  17.42 (Hetzner) – 30.71 (Akamai)
+      uiRam:         "2.53",    //  1.74 (Hetzner) – 3.07 (Akamai)
+      uiStorageFast: "0.00",    //  the plan's local disk at all three
+      uiStorage:     "0.0857",  //  per GB: 0.064 (Hetzner) – 0.10 (Akamai); DigitalOcean 0.10/GiB = 0.093/GB
+      uiIops:        "0.00",    //  not billed
+      uiEgress:      "0.00"     //  12–60 TB included per pool; a pool sends less
+    }
   }
 
   function applyPreset(name) {
