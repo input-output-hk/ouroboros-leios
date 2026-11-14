@@ -242,6 +242,30 @@ main {
   border-bottom: 1px solid #f1edf5;
 }
 
+.warn {
+  margin: 4px 12px 8px;
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: #8a1c1c;
+  background: #fdf0f0;
+  border-radius: 4px;
+}
+
+.warn[hidden] { display: none; }
+.field[hidden] { display: none; }
+
+.price-note {
+  margin: 0;
+  padding: 6px 12px 8px;
+  font-size: 0.7rem;
+  color: #555;
+  line-height: 1.45;
+  border-bottom: 1px solid #f1edf5;
+}
+
+.price-note a { color: #8c02c2; }
+
 .presets button {
   flex: 1;
   padding: 8px 8px;
@@ -261,6 +285,13 @@ main {
   background: #f1edf5;
   border-color: #8c02c2;
   color: #8c02c2;
+}
+
+.presets button.active,
+.presets button.active:hover {
+  background: #8c02c2;
+  border-color: #8c02c2;
+  color: #fff;
 }
 
 /* --- Responsive --- */
@@ -298,6 +329,7 @@ main {
 
   .field label {
     font-size: 0.8rem;
+    white-space: normal;      /* long labels wrap instead of losing their end and help mark */
   }
 
   .field .unit {

@@ -11,7 +11,7 @@
 
 <header>
   <h1>Leios Cost Estimator</h1>
-  <p class="note">Interactive tool for estimating operating costs of a Linear Leios (CIP-164) node. Default values represent conservative upper bounds based on the <a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/cost-estimate">detailed cost analysis</a>. Questions <a href="https://discord.com/channels/826816523368005654/1247688618621927505">on Discord</a>, issues on <a href="https://github.com/input-output-hk/ouroboros-leios/issues">GitHub</a>.</p>
+  <p class="note">Interactive tool for estimating what it costs to run a stake pool on Linear Leios (CIP-164). Default values are central estimates for the launch design, based on the <a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/cost-estimate">detailed cost analysis</a>; egress is likely understated. Questions <a href="https://discord.com/channels/826816523368005654/1247688618621927505">on Discord</a>, issues on <a href="https://github.com/input-output-hk/ouroboros-leios/issues">GitHub</a>.</p>
 </header>
 
 <main>
@@ -20,45 +20,147 @@
   <div class="input-col">
 
     <div class="card">
-      <h2>Protocol &amp; Throughput</h2>
+      <h2>Protocol &amp; Capacity</h2>
+      <div class="presets">
+        <button id="uiSetPraos" onclick="Controller.set('Praos')" aria-pressed="false" title="As if Leios had never been deployed: Praos alone on the same LSM node, capacity f × max RB body (1× mainnet). Leios settings are disabled.">Praos only</button>
+        <button id="uiSetM0" onclick="Controller.set('M0')" aria-pressed="false" title="Mainnet graduation step M0: EB transactions 260 kB, EB references 40 kB, L_diff 7 s.">M0</button>
+        <button id="uiSetM1" onclick="Controller.set('M1')" aria-pressed="false" title="Mainnet graduation step M1: EB transactions 1 MB, EB references 154 kB (× 40/260), L_diff 7 s.">M1</button>
+        <button id="uiSetM2" onclick="Controller.set('M2')" aria-pressed="false" title="Mainnet graduation step M2: EB transactions 3 MB, EB references 462 kB (× 40/260), L_diff 7 s.">M2</button>
+        <button id="uiSetCustom" onclick="Controller.set('Custom')" aria-pressed="false" title="Leios with the values in the fields below, when they match no graduation step.">Custom</button>
+      </div>
       <div class="fields">
         <div class="field">
-          <label title="Probability of producing a block (EB/RB) in each slot.">Active slot coefficient</label>
+          <label title="Probability that a slot has a ranking block, which can announce an EB. Mainnet: 0.05.">Active slot coefficient</label>
           <input id="uiASC" type="number" min="0.01" max="0.20" value="0.05" step="0.01"/>
-          <span class="unit">EB/slot</span>
+          <span class="unit"></span>
         </div>
         <div class="field">
-          <label title="Duration of a Praos/Leios slot.">Slot length</label>
-          <input id="uiSlotRate" type="number" min="1" max="1" value="1" step="1"/>
-          <span class="unit">slot/s</span>
+          <label title="slotLength (genesis): seconds per slot. Mainnet: 1 s. The timing periods below are in seconds.">Slot length</label>
+          <input id="uiSlotLength" type="number" min="0.1" max="10" value="1" step="0.1"/>
+          <span class="unit">s</span>
         </div>
         <div class="field">
-          <label title="Slots between EB announcement and certification deadline (3*L_hdr + L_vote + L_diff).">Voting window</label>
-          <input id="uiVotingWindow" type="number" min="1" max="100" value="14" step="1"/>
+          <label title="leiosAnnouncementPeriodLength (L_hdr): time for an EB announcement to cross the network. CIP-164: 1 s.">Header period</label>
+          <input id="uiLHdr" type="number" min="0" max="10" value="1" step="0.1"/>
+          <span class="unit">s</span>
+        </div>
+        <div class="field">
+          <label title="leiosVotePeriodLength (L_vote): voters fetch and validate the EB within 3·L_hdr + L_vote of its slot. CIP-164: 4 s.">Voting period</label>
+          <input id="uiLVote" type="number" min="0" max="20" value="4" step="0.1"/>
+          <span class="unit">s</span>
+        </div>
+        <div class="field">
+          <label title="leiosDiffusionPeriodLength (L_diff): time for a certified EB's closure to reach the rest of the network. CIP-164: 7 s.">Diffusion period</label>
+          <input id="uiLDiff" type="number" min="0" max="30" value="7" step="0.1"/>
+          <span class="unit">s</span>
+        </div>
+        <div class="field">
+          <label title="leiosCommitteeSize: seats on the voting committee, one vote per seat per EB. 600 for launch, below CIP-164&#x27;s 900, to limit vote traffic: about 95% of active stake. Votes and the certificate grow with it.">Committee size</label>
+          <input id="uiVotesPerEB" type="number" min="0" max="3000" value="600" step="10"/>
+          <span class="unit">seats</span>
+        </div>
+        <div class="field">
+          <label title="maxBlockBodySize: transaction bytes per ranking block. Mainnet: 90,112 B. EBs appear only when transactions don&#x27;t fit in the RB.">Max RB body</label>
+          <input id="uiMaxRbBody" type="number" min="0" max="200000" value="90112" step="1024"/>
+          <span class="unit">B</span>
+        </div>
+        <div class="field">
+          <label title="maxEndorserBlockReferencesSize: 37 B per transaction reference in an EB. M0: 40 kB, 1,081 Txs. Typing a capacity sets it to one reference per average-size Tx.">Max EB references</label>
+          <input id="uiMaxEbRefs" type="number" min="0" max="1000000" value="40000" step="1000"/>
+          <span class="unit">B</span>
+        </div>
+        <div class="field">
+          <label title="maxEndorserBlockTxsSize: transaction bytes per EB. M0 260 kB, M1 1 MB, M2 3 MB; CIP-164 feasible 12 MB. Typing a capacity sizes it to carry that.">Max EB transactions</label>
+          <input id="uiMaxEbTxs" type="number" min="0" max="20000000" value="260000" step="10000"/>
+          <span class="unit">B</span>
+        </div>
+        <div class="field">
+          <label title="Most TxkB/s these parameters confirm: RB rate · [P(cert) · EB capacity + (1 − P(cert)) · max RB body], with RB rate = f ÷ slot length. Typing a value sizes the EB limits for it.">Capacity</label>
+          <input id="uiCapacity" type="number" min="1" max="500" value="8.87" step="0.01"/>
+          <span class="unit">TxkB/s</span>
+        </div>
+        <div class="field">
+          <label title="Capacity as a multiple of mainnet today: 90,112 B every 20 s = 4.51 TxkB/s. Typing a multiple sizes the EB limits. M0 1.97×, M1 6.18×, M2 17.6×.">Capacity vs mainnet</label>
+          <input id="uiCapacityX" type="number" min="0" max="100" value="1.97" step="1"/>
+          <span class="unit">&times; mainnet</span>
+        </div>
+        <div class="field">
+          <label title="minFeeA: lovelace charged per transaction byte. Mainnet: 44.">Fee per byte</label>
+          <input id="uiFeePerByte" type="number" min="0" max="1000" value="44" step="1"/>
+          <span class="unit">lovelace/B</span>
+        </div>
+        <div class="field">
+          <label title="minFeeB: lovelace charged per transaction, whatever its size. Mainnet: 155,381.">Fee per transaction</label>
+          <input id="uiFeePerTx" type="number" min="0" max="10000000" value="155381" step="1000"/>
+          <span class="unit">lovelace/Tx</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Load</h2>
+      <div class="presets">
+        <button id="uiUtil10" onclick="Controller.utilization(10)" aria-pressed="false">10%</button>
+        <button id="uiUtil25" onclick="Controller.utilization(25)" aria-pressed="false">25%</button>
+        <button id="uiUtil50" onclick="Controller.utilization(50)" aria-pressed="false">50%</button>
+        <button id="uiUtil75" onclick="Controller.utilization(75)" aria-pressed="false">75%</button>
+        <button id="uiUtil100" onclick="Controller.utilization(100)" aria-pressed="false">100%</button>
+        <button id="uiUtilSpikes" onclick="Controller.spikes()" aria-pressed="false" title="Market events: a few hours per epoch at full capacity, the rest of the time at a load Praos can carry.">Spikes</button>
+      </div>
+      <div class="fields">
+        <div class="field" id="uiUtilRow">
+          <label title="Share of capacity in use, all the time. Mainnet averaged 9.2% of Praos capacity over epochs 589–661.">Utilization</label>
+          <input id="uiUtil" type="number" min="0" max="100" value="100" step="1"/>
+          <span class="unit">% of capacity</span>
+        </div>
+        <div class="field" id="uiSpikeHoursRow" hidden>
+          <label title="Hours per epoch at full capacity. vCPU, IOPS, bandwidth and EBs held are sized for them; egress and disk growth follow the epoch average.">High-load hours</label>
+          <input id="uiSpikeHours" type="number" min="0" max="120" value="5" step="1"/>
+          <span class="unit">h/epoch</span>
+        </div>
+        <div class="field" id="uiBaseLoadRow" hidden>
+          <label title="Load the rest of the epoch, as a share of Praos capacity, so Leios is idle then. 100%: full Praos blocks.">Load outside them</label>
+          <input id="uiBaseLoad" type="number" min="0" max="100" value="100" step="5"/>
+          <span class="unit">% of Praos</span>
+        </div>
+        <div class="field">
+          <label title="Total bytes ÷ transactions: turns throughput into Tx/s. Mainnet epochs 589–661: 1,132 B (db-sync). At least 200 B, about the smallest possible transaction.">Average Tx size</label>
+          <input id="uiTxSize" type="number" min="200" max="16384" value="1132" step="1"/>
+          <span class="unit">B/Tx</span>
+        </div>
+        <div class="field">
+          <label title="CIP-164 announces EBs only when transactions don&#x27;t fit in the RB, above Praos capacity (4.51 TxkB/s today). With spikes: during the high-load hours.">Leios active</label>
+          <span class="value" id="uiLeios">?</span>
+          <span class="unit"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Derived</h2>
+      <div class="fields">
+        <div class="field">
+          <label title="3·L_hdr + L_vote + L_diff, in slots. An EB certifies only if the next RB comes at least this many slots after the one that announced it.">Certification window</label>
+          <span class="value" id="uiVotingWindow">?</span>
           <span class="unit">slots</span>
         </div>
         <div class="field">
-          <label title="Probability that an EB is certified: (1-f)^voting_window.">Certification probability</label>
+          <label title="Probability that an EB is certified: no RB in the slots between, (1 − f) ^ (certification window − 1). CIP-164: 0.95^13 ≈ 51%.">Certification probability</label>
           <span class="value" id="uiPcert">?</span>
           <span class="unit">%</span>
         </div>
         <div class="field">
-          <label title="Average voting committee size per EB. Based on wFA+LS sortition.">Voting committee size</label>
-          <input id="uiVotesPerEB" type="number" min="0" max="3000" value="600" step="10"/>
-          <span class="unit">voters</span>
+          <label title="Utilization × capacity, or full capacity during high-load hours. Nodes are sized for it.">Peak throughput</label>
+          <span class="value" id="uiPeakTp">?</span>
+          <span class="unit" id="uiPeakTpUnit">TxkB/s</span>
         </div>
         <div class="field">
-          <label title="Transaction kilobytes per second reaching the ledger via certified EBs.">Confirmed throughput</label>
-          <input id="uiThroughput" type="number" min="1" max="500" value="100" step="1"/>
-          <span class="unit">TxkB/s</span>
+          <label title="Throughput averaged over the epoch. Egress, chain growth and UTxO growth follow it.">Average throughput</label>
+          <span class="value" id="uiAvgTp">?</span>
+          <span class="unit" id="uiAvgTpUnit">TxkB/s</span>
         </div>
         <div class="field">
-          <label title="Average transaction size in bytes.">Average Tx size</label>
-          <input id="uiTxSize" type="number" min="100" max="16384" value="800" step="100"/>
-          <span class="unit">B/Tx</span>
-        </div>
-        <div class="field">
-          <label title="Derived from confirmed throughput and average Tx size.">Tx per second</label>
+          <label title="At peak throughput and average Tx size.">Tx per second, peak</label>
           <span class="value" id="uiTxPerSec">?</span>
           <span class="unit">Tx/s</span>
         </div>
@@ -66,73 +168,57 @@
     </div>
 
     <div class="card">
-      <h2>Sizes &amp; Validation</h2>
+      <h2>Sizes &amp; Validation (fixed)</h2>
       <div class="fields">
         <div class="field">
           <label title="Ranking Block header (doubles as EB header in CIP-164).">RB header size</label>
-          <input id="uiRbHeaderSize" type="number" min="0" max="5000" value="1024" step="1"/>
+          <span class="value" id="uiRbHeaderSize">?</span>
           <span class="unit">B/RB</span>
         </div>
         <div class="field">
-          <label title="Endorsement Block header size.">EB header size</label>
-          <input id="uiEbHeaderSize" type="number" min="0" max="2000" value="240" step="1"/>
-          <span class="unit">B/EB</span>
-        </div>
-        <div class="field">
-          <label title="32-byte Tx hash reference in EB body.">Tx hash reference</label>
-          <input id="uiTxRefSize" type="number" min="0" max="100" value="32" step="1"/>
+          <label title="A 32 B Tx hash plus the Tx size, as an EB body encodes it: 37 B on every EB of two P&amp;T cluster runs (2026-11-06, 2026-11-09).">Tx reference</label>
+          <span class="value" id="uiTxRefSize">?</span>
           <span class="unit">B/ref</span>
         </div>
         <div class="field">
-          <label title="Per voter per EB. CDDL non-persistent worst case.">Vote size</label>
-          <input id="uiVoteSize" type="number" min="0" max="1000" value="164" step="1"/>
+          <label title="88 B vote (RB hash, seat, BLS signature; consensus golden test) plus 3 B framing, one vote per message.">Vote size</label>
+          <span class="value" id="uiVoteSize">?</span>
           <span class="unit">B/vote</span>
         </div>
         <div class="field">
-          <label title="Certificate size from wFA+LS sortition worst case.">Certificate size</label>
-          <input id="uiCertSize" type="number" min="0" max="50000" value="8000" step="100"/>
+          <label title="54 B plus one bit per seat. MusashiNet certificate: 75 B with a 21 B bitfield (block 95445).">Certificate size</label>
+          <span class="value" id="uiCertSize">?</span>
           <span class="unit">B/cert</span>
         </div>
         <div class="field">
-          <label title="Full Tx validation at mempool ingestion. OLS on mainnet Apply data.">Tx apply</label>
-          <input id="uiTxApply" type="number" min="0" max="10" value="0.6201" step="0.0001"/>
+          <label title="Full validation, scripts included: at mempool ingestion, and again when an RB body is adopted. Mainnet mean (OLS on Apply data). Feasibility report, no scripts: 0.34–0.36 ms on c5d with the voting-loop fix, 0.65–3.42 ms without it.">Tx apply time</label>
+          <span class="value" id="uiTxApply">?</span>
           <span class="unit">ms/Tx</span>
         </div>
         <div class="field">
-          <label title="EB/RB header validation. From db-analyser empty block stats.">EB header validation</label>
-          <input id="uiEbHeaderVal" type="number" min="0" max="10" value="0.4438" step="0.0001"/>
+          <label title="Reapply of a Tx already validated: in each closure validation before the vote, and when a certified EB's closure is adopted. The lowest voting-loop reading in the feasibility report (PR #1156), c5d hosts, Tables 7.2b and 7.3; its regressions give 0.19–0.21 ms, and it times adoption at 0.04–0.11 ms.">Tx reapply time</label>
+          <span class="value" id="uiTxReapply">?</span>
+          <span class="unit">ms/Tx</span>
+        </div>
+        <div class="field">
+          <label title="Fixed part of validating an EB's closure before the vote, on top of its Txs. Feasibility report, section 8.2.">Closure validation time</label>
+          <span class="value" id="uiClosureVal">?</span>
           <span class="unit">ms/EB</span>
         </div>
         <div class="field">
-          <label title="Individual BLS vote verification. Non-persistent worst case.">Vote validation</label>
-          <input id="uiVoteVal" type="number" min="0" max="20" value="2.9" step="0.1"/>
+          <label title="Per block header. db-analyser empty-block statistics.">Header validation time</label>
+          <span class="value" id="uiEbHeaderVal">?</span>
+          <span class="unit">ms/header</span>
+        </div>
+        <div class="field">
+          <label title="One BLS signature check per vote. Rust benchmark (2025), until Haskell numbers are published.">Vote validation time</label>
+          <span class="value" id="uiVoteVal">?</span>
           <span class="unit">ms/vote</span>
         </div>
         <div class="field">
-          <label title="Certificate validation from cryptography benchmarks.">Certificate validation</label>
-          <input id="uiCertVal" type="number" min="0" max="500" value="157.2" step="0.1"/>
+          <label title="Computed from the committee size: 0.9 ms plus 1.9 µs per seat (Haskell verifyLeiosCert, ouroboros-consensus, 2026-10).">Certificate validation time</label>
+          <span class="value" id="uiCertVal">?</span>
           <span class="unit">ms/cert</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Network Topology</h2>
-      <div class="fields">
-        <div class="field">
-          <label title="Downstream (inbound) connections per relay. Headers pushed to all; bodies fetched by subset.">Inbound peers</label>
-          <input id="uiInboundPeers" type="number" min="1" max="500" value="100" step="1"/>
-          <span class="unit">peers</span>
-        </div>
-        <div class="field">
-          <label title="Simultaneous upstream fetch sources per inbound peer. M=1 lean, M=4 beefy.">Fetch multiplicity</label>
-          <input id="uiFetchMult" type="number" min="1" max="8" value="1" step="1"/>
-          <span class="unit">M</span>
-        </div>
-        <div class="field">
-          <label title="Spanning-tree redundancy for vote gossip. Typically 2x.">Vote redundancy</label>
-          <input id="uiVoteRedundancy" type="number" min="1" max="10" value="2" step="1"/>
-          <span class="unit">&times;</span>
         </div>
       </div>
     </div>
@@ -145,27 +231,38 @@
     <div class="card">
       <h2>Cloud Costs</h2>
       <div class="presets">
-        <button onclick="Controller.hyperscaleCosts()">Hyperscale</button>
-        <button onclick="Controller.discountCosts()">Discount</button>
+        <button id="uiPresetHyperscale" onclick="Controller.hyperscaleCosts()" aria-pressed="false">Hyperscale</button>
+        <button id="uiPresetDiscount" onclick="Controller.discountCosts()" aria-pressed="false" title="Average of DigitalOcean, Akamai and Hetzner, on dedicated-CPU plans. These providers save on egress, which their plans include, not on CPU or disk: vCPU costs about the same as at the hyperscalers, and bulk disk is SSD block storage at about twice their hard-drive price.">Discount</button>
       </div>
+      <p class="price-note">Each preset is the average of on-demand list prices checked 2026-11-10: hyperscale across AWS, GCP and Azure; discount across DigitalOcean, Akamai and Hetzner. Each field's help gives the min and max; the <a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/cost-estimate">cost analysis</a> has the table.</p>
       <div class="fields">
         <div class="field">
-          <label title="Monthly cost of a virtual CPU.">vCPU</label>
-          <input id="uiVcpu" type="number" min="0" max="100" value="20" step="0.01"/>
+          <label title="Per vCPU, without RAM. Presets: average list price, checked 2026-11-10. Hyperscale 15.92–26.80, discount 17.42–30.71.">vCPU</label>
+          <input id="uiVcpu" type="number" min="0" max="100" value="22.86" step="0.01"/>
           <span class="unit">$/vCPU/mo</span>
         </div>
         <div class="field">
-          <label title="Monthly cost of cloud disk storage.">Storage</label>
-          <input id="uiStorage" type="number" min="0" max="1" value="0.10" step="0.01"/>
+          <label title="Per GiB; each node needs 8 GiB with LSM. Presets: average list price, checked 2026-11-10. Hyperscale 1.90–2.66, discount 1.74–3.07.">RAM</label>
+          <input id="uiRam" type="number" min="0" max="20" value="2.53" step="0.01"/>
+          <span class="unit">$/GiB/mo</span>
+        </div>
+        <div class="field">
+          <label title="SSD for the volatile path: UTxO tables, snapshots, VolatileDB, recent EBs. Presets: average list price per GB, 2026-11-10; AWS and Azure bill per GiB, converted. Hyperscale 0.0745–0.100; discount 0 (local disk).">Fast SSD</label>
+          <input id="uiStorageFast" type="number" min="0" max="1" value="0.00" step="0.001"/>
           <span class="unit">$/GB/mo</span>
         </div>
         <div class="field">
-          <label title="Monthly IOPS capacity cost. Usually zero (base IOPS suffice).">IOPS</label>
+          <label title="Disk for the immutable chain. Presets: average list price per GB, checked 2026-11-10; AWS, Azure and DigitalOcean bill per GiB, converted. Hyperscale 0.0373–0.0419, discount 0.064–0.10.">Bulk disk</label>
+          <input id="uiStorage" type="number" min="0" max="1" value="0.0857" step="0.001"/>
+          <span class="unit">$/GB/mo</span>
+        </div>
+        <div class="field">
+          <label title="Per IOPS. 0 in both presets: hyperscale SSD volumes include 3,000 IOPS, more than a node uses; discount providers don&#x27;t bill IOPS. 2026-11-10.">IOPS</label>
           <input id="uiIops" type="number" min="0" max="0.5" value="0.00" step="0.001"/>
           <span class="unit">$/IOPS/mo</span>
         </div>
         <div class="field">
-          <label title="Cost per GB of network egress.">Network egress</label>
+          <label title="Per GB. Presets: hyperscale average list price, 0.087–0.120; discount 0, since plans include 12–60 TB per pool, more than a pool sends. 2026-11-10.">Network egress</label>
           <input id="uiEgress" type="number" min="0" max="1" value="0.00" step="0.01"/>
           <span class="unit">$/GB</span>
         </div>
@@ -186,45 +283,66 @@
           <span class="unit">nodes</span>
         </div>
         <div class="field">
-          <label title="CPU/IOPS overprovisioning for burst load.">Spike factor</label>
+          <label title="Provisioned on every node, Praos and Leios alike. cardano-node 11.1.3 minimum: two cores, 2 GHz or faster for a pool or relay.">vCPU per node</label>
+          <input id="uiVcpuPerNode" type="number" min="1" max="64" value="2" step="1"/>
+          <span class="unit">vCPU</span>
+        </div>
+        <div class="field">
+          <label title="Capacity provisioned above the peak for vCPU, IOPS and bandwidth.">Headroom</label>
           <input id="uiSpike" type="number" min="1" max="10" value="2" step="1"/>
-          <span class="unit">&times;</span>
-        </div>
-        <div class="field">
-          <label title="Percentage of total staked ADA at this pool.">Stake fraction</label>
-          <input id="uiStake" type="number" min="0" max="0.2" value="0.1" step="0.01"/>
-          <span class="unit">%</span>
-        </div>
-        <div class="field">
-          <label title="Percentage of epoch rewards retained by the pool.">Retained fees</label>
-          <input id="uiRetained" type="number" min="0" max="100" value="20.92" step="0.1"/>
-          <span class="unit">%</span>
+          <span class="unit">&times; peak</span>
         </div>
       </div>
     </div>
 
     <div class="card">
-      <h2>Scenario</h2>
+      <h2>Network Topology</h2>
       <div class="fields">
         <div class="field">
-          <label title="Current total chain size on disk (blocks + ledger state). Starting point for storage projections.">Current chain size</label>
-          <input id="uiCurrentChain" type="number" min="0" max="2000" value="200" step="1"/>
+          <label title="Downstream connections per relay; headers and votes go to all of them. 60: a mid-level pool&#x27;s relay. The best-connected relays of large pools carry about 100 (MusashiNet&#x27;s IOG relays: 92 hot, 115 inbound).">Inbound peers</label>
+          <input id="uiInboundPeers" type="number" min="1" max="500" value="60" step="1"/>
+          <span class="unit">peers</span>
+        </div>
+        <div class="field">
+          <label title="How many upstream peers each node fetches the same EB body from, so a relay serves it to inbound × M / 25 peers. 2: the egress devnet measured 1.5–2 copies per EB; MusashiNet&#x27;s relays downloaded 3.25. Praos blocks always use 1.">Fetch multiplicity</label>
+          <input id="uiFetchMult" type="number" min="1" max="8" value="2" step="1"/>
+          <span class="unit">M</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Chain Storage</h2>
+      <div class="fields">
+        <div class="field">
+          <label title="Immutable chain on disk today: 235 GB on a mainnet node (2026-11-10). It starts the bulk disk.">Current chain size</label>
+          <input id="uiCurrentChain" type="number" min="0" max="2000" value="235" step="1"/>
           <span class="unit">GB</span>
         </div>
         <div class="field">
-          <label title="Average fee per kilobyte from the Cardano fee formula.">Transaction fee</label>
-          <input id="uiTxFee" type="number" min="0" max="20" value="0.148" step="0.001"/>
-          <span class="unit">ADA/kB</span>
-        </div>
-        <div class="field">
-          <label title="Disk compression ratio. >70% feasible; 50% conservative.">Compression</label>
-          <input id="uiCompression" type="number" min="0" max="100" value="50" step="0.1"/>
+          <label title="Share of chain growth saved by a compressing filesystem; the node doesn&#x27;t compress its ImmutableDB. Default 0.">Compression</label>
+          <input id="uiCompression" type="number" min="0" max="100" value="0" step="0.1"/>
           <span class="unit">%</span>
         </div>
         <div class="field">
-          <label title="Current market price of ADA.">ADA price</label>
-          <input id="uiAda" type="number" min="0" max="10" value="0.25" step="0.01"/>
-          <span class="unit">USD/ADA</span>
+          <label title="The disks hold what the node needs today plus this many months of growth at this load, and are enlarged as the chain grows: cloud volumes resize in place. A full day at M2 capacity adds about 7 GB per node.">Disk margin</label>
+          <input id="uiDiskMargin" type="number" min="0" max="24" value="2" step="1"/>
+          <span class="unit">months of growth</span>
+        </div>
+        <div class="field">
+          <label title="At constant load the storage bill rises every month while the other costs stay the same. Storage, the total, the Praos-only baseline and Added by Leios are averages over this many months from today.">Averaged over</label>
+          <input id="uiHorizon" type="number" min="1" max="60" value="12" step="1"/>
+          <span class="unit">months</span>
+        </div>
+        <div class="field">
+          <label title="Mainnet LSM node, 2026-11-11: 10.86 M entries, about 316 B each. The fast SSD holds it twice over so a full LSM merge fits.">UTxO set (LSM tables)</label>
+          <span class="value" id="uiUtxoTables">?</span>
+          <span class="unit">GiB</span>
+        </div>
+        <div class="field">
+          <label title="Ledger state outside the UTxO set, same node. Two kept plus one being written: three on the fast SSD.">Ledger snapshot</label>
+          <span class="value" id="uiLedgerSnapshot">?</span>
+          <span class="unit">GiB</span>
         </div>
       </div>
     </div>
@@ -235,20 +353,25 @@
   <div class="output-col">
 
     <div class="card">
-      <h2>CPU per Node</h2>
+      <h2>CPU per Block Producer (peak)</h2>
       <div class="fields">
         <div class="field">
-          <label>Tx apply</label>
+          <label title="Every Tx validated in full at mempool ingestion.">Tx apply</label>
           <span class="value" id="uiCpuApply">?</span>
           <span class="unit">ms/s</span>
         </div>
         <div class="field">
-          <label>Tx reapply</label>
-          <span class="value" id="uiCpuReapply">?</span>
+          <label title="Every announced EB's closure, validated before the vote: per EB, plus a reapply per Tx. Block producers only: relays don't vote.">Closure validation</label>
+          <span class="value" id="uiCpuClosure">?</span>
           <span class="unit">ms/s</span>
         </div>
         <div class="field">
-          <label>Endorsement block headers</label>
+          <label title="Every Tx once more when its block is adopted: a Tx in an RB body is validated in full again, as in Praos (consensus ApplyVal); a Tx in a certified EB's closure is reapplied (ValidateNone).">Block adoption</label>
+          <span class="value" id="uiCpuAdoption">?</span>
+          <span class="unit">ms/s</span>
+        </div>
+        <div class="field">
+          <label>Block headers</label>
           <span class="value" id="uiCpuEbHeader">?</span>
           <span class="unit">ms/s</span>
         </div>
@@ -272,41 +395,62 @@
           <span class="value" id="uiCpuPercent">?</span>
           <span class="unit">%</span>
         </div>
+        <div class="field total">
+          <label title="Total CPU × headroom, in cores, against the vCPU provisioned per node. Within them, Leios adds no vCPU. A relay needs less: the total without closure validation.">vCPU needed</label>
+          <span class="value" id="uiVcpuNeeded">?</span>
+          <span class="unit" id="uiVcpuNeededUnit">vCPU</span>
+        </div>
+        <div class="field total">
+          <label title="One core validating an EB at the peak with none of it in the mempool, every Tx applied, against the voting period.">EB validation, worst case</label>
+          <span class="value" id="uiEbVal">?</span>
+          <span class="unit" id="uiEbValUnit">s</span>
+        </div>
       </div>
+      <div class="warn" id="uiEbValWarn" hidden>Over the voting period: a voter applying the whole EB on one core would vote late at this EB size.</div>
     </div>
 
     <div class="card">
       <h2>Resources (all nodes)</h2>
       <div class="fields">
         <div class="field">
-          <label>Compute</label>
+          <label title="vCPU per node × nodes, raised only if the peak × headroom needs more.">Compute</label>
           <span class="value" id="uiTotalVcpu">?</span>
-          <span class="unit">vCPU/mo</span>
+          <span class="unit" id="uiTotalVcpuUnit">vCPU</span>
         </div>
         <div class="field">
-          <label title="Maximum new chain data per month per node (compressed). Assumes 100% block utilization at this throughput consistently.">Max chain growth</label>
+          <label title="8 GiB per node, the LSM-backend baseline. Not yet measured with M2&#x27;s 3 MB EBs, which may need more.">RAM</label>
+          <span class="value" id="uiTotalRam">?</span>
+          <span class="unit" id="uiTotalRamUnit">GiB</span>
+        </div>
+        <div class="field">
+          <label title="Provisioned in the first month and enlarged as the UTxO set grows (growth per month after the comma). Per node: 10 GiB (UTxO tables twice over, snapshots, VolatileDB), the disk margin&#x27;s months of UTxO growth, EBs held.">Fast SSD (first month)</label>
+          <span class="value" id="uiFastStorage">?</span>
+          <span class="unit" id="uiFastStorageUnit">GiB</span>
+        </div>
+        <div class="field">
+          <label title="New chain data per month, all nodes (compressed), at the average throughput.">Chain growth</label>
           <span class="value" id="uiChainGrowth">?</span>
-          <span class="unit">GiB/mo</span>
+          <span class="unit" id="uiChainGrowthUnit">GiB/mo</span>
         </div>
         <div class="field">
-          <label title="Hypothetical total disk per SPO after 1 year consistently at this throughput: (current chain + 12 × monthly growth) × nodes.">Disk (after 1 year)</label>
+          <label title="Provisioned in the first month: (current chain + the disk margin&#x27;s months of growth) × nodes, then enlarged by the chain growth above every month.">Bulk disk (first month)</label>
           <span class="value" id="uiTotalStorage">?</span>
-          <span class="unit">GiB</span>
+          <span class="unit" id="uiTotalStorageUnit">GiB</span>
         </div>
         <div class="field">
-          <label>IOPS</label>
+          <label title="At the peak load × headroom, all nodes.">IOPS</label>
           <span class="value" id="uiTotalIops">?</span>
-          <span class="unit">IOPS</span>
+          <span class="unit" id="uiTotalIopsUnit">IOPS</span>
         </div>
         <div class="field">
-          <label>Egress</label>
+          <label title="All relays, at the average throughput.">Egress</label>
           <span class="value" id="uiTotalEgress">?</span>
-          <span class="unit">GiB/mo</span>
+          <span class="unit" id="uiTotalEgressUnit">GiB/mo</span>
         </div>
         <div class="field">
-          <label>Peak bandwidth</label>
+          <label title="Egress bandwidth at the peak load × headroom, all relays.">Peak bandwidth</label>
           <span class="value" id="uiNic">?</span>
-          <span class="unit">Mb/s</span>
+          <span class="unit" id="uiNicUnit">Mb/s</span>
         </div>
       </div>
     </div>
@@ -320,9 +464,14 @@
           <span class="unit">$/mo</span>
         </div>
         <div class="field">
-          <label title="Hypothetical monthly storage bill after 1 year consistently at this throughput.">Disk (after 1 year)</label>
-          <span class="value" id="uiCostStorage">?</span>
+          <label>RAM</label>
+          <span class="value" id="uiCostRam">?</span>
           <span class="unit">$/mo</span>
+        </div>
+        <div class="field">
+          <label title="Average monthly bill over the months set in Averaged over, with both disks enlarged as the chain grows. In brackets: the first month&#x27;s bill and how much it rises each month.">Storage (average)</label>
+          <span class="value" id="uiCostStorage">?</span>
+          <span class="unit" id="uiCostStorageUnit">$/mo</span>
         </div>
         <div class="field">
           <label>IOPS</label>
@@ -339,36 +488,56 @@
           <span class="value" id="uiCost">?</span>
           <span class="unit">$/mo</span>
         </div>
+        <div class="field" id="uiCostPraosRow">
+          <label title="Leios never deployed: Praos alone carrying the same load, capped at Praos capacity, on the same nodes and prices. Press Praos only for its breakdown.">Praos-only baseline</label>
+          <span class="value" id="uiCostPraos">?</span>
+          <span class="unit">$/mo</span>
+        </div>
+        <div class="field" id="uiCostAddedRow">
+          <label title="Total minus the Praos-only baseline. &#x27;idle&#x27; when the load always fits in RBs, so Leios sends no EBs or votes.">Added by Leios</label>
+          <span class="value" id="uiCostAdded">?</span>
+          <span class="unit" id="uiCostAddedUnit">$/mo</span>
+        </div>
       </div>
     </div>
 
     <div class="card">
-      <h2>Economics</h2>
+      <h2>Transaction Fees (system level)</h2>
       <div class="fields">
         <div class="field">
-          <label>Cost per Tx</label>
-          <span class="value" id="uiCostTxUsd">?</span>
-          <span class="unit">USD/Tx</span>
+          <label title="Transaction fees per epoch with every RB full: (fee per byte × bytes + fee per Tx × Txs) × 1.47, what mainnet paid over epochs 589–661 for scripts, reference scripts and overpayment. Not staking rewards.">Max, Praos capacity</label>
+          <span class="value" id="uiFeesPraos">?</span>
+          <span class="unit">ADA/epoch</span>
         </div>
         <div class="field">
-          <label>Cost per Tx</label>
-          <span class="value" id="uiCostTxAda">?</span>
-          <span class="unit">ADA/Tx</span>
+          <label title="The same at the capacity these parameters allow, certified EBs full. Size-based fees × 1.47, as mainnet paid. Not staking rewards.">Max, this capacity</label>
+          <span class="value" id="uiFeesLeios">?</span>
+          <span class="unit">ADA/epoch</span>
         </div>
         <div class="field">
-          <label>Retained fees</label>
-          <span class="value" id="uiFees">?</span>
-          <span class="unit">$/mo</span>
+          <label title="Transaction fees per epoch at this load&#x27;s average throughput. Size-based fees × 1.47, as mainnet paid. Not staking rewards.">At this load</label>
+          <span class="value" id="uiFeesLoad">?</span>
+          <span class="unit">ADA/epoch</span>
         </div>
         <div class="field">
-          <label>Fees &minus; cost</label>
-          <span class="value" id="uiProfit">?</span>
-          <span class="unit">$/mo</span>
+          <label title="Reference, not computed: average transaction fees mainnet collected per epoch over a year, epochs 589–661, Oct 2025 – Oct 2026 (db-sync).">Mainnet, last year</label>
+          <span class="value">48,040</span>
+          <span class="unit">ADA/epoch</span>
         </div>
-        <div class="field total">
-          <label>Fees &divide; cost</label>
-          <span class="value" id="uiReturn">?</span>
-          <span class="unit">%</span>
+        <div class="field" id="uiFeesGrowthRow">
+          <label title="Fees at this load ÷ the fees Praos alone would collect at the same demand, capped at Praos capacity.">Fees vs Praos</label>
+          <span class="value" id="uiFeesGrowth">?</span>
+          <span class="unit" id="uiFeesGrowthUnit">× Praos</span>
+        </div>
+        <div class="field" id="uiCostGrowthRow">
+          <label title="This pool&#x27;s total monthly cost ÷ its Praos-only baseline, from the costs panel.">Costs vs Praos</label>
+          <span class="value" id="uiCostGrowth">?</span>
+          <span class="unit" id="uiCostGrowthUnit">× Praos</span>
+        </div>
+        <div class="field total" id="uiFeeCostRow">
+          <label title="Fee growth ÷ cost growth. Above 1, fees grow faster than running costs. Today reserve rewards, not fees, are most of a pool&#x27;s income.">Fees ÷ costs, vs Praos</label>
+          <span class="value" id="uiFeeCost">?</span>
+          <span class="unit" id="uiFeeCostUnit">×</span>
         </div>
       </div>
     </div>
