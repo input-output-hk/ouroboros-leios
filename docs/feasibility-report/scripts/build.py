@@ -117,7 +117,9 @@ def main():
             fh.write(page)
         print("wrote %s (%d kB)" % (html_out, len(page) // 1000))
     if a.pdf:
-        pdf_body = re.sub(r"(\d) %", "\\1\u00a0%", pdf_tables(pdf_headings(body)))  # a percent sign stays with its number
+        body_pdf = re.sub(r"\A(>.*\n)+\n*", "", body)  # the repository note at the top of README.md is not part of the document
+        body_pdf = body_pdf.replace("<!-- pagebreak -->", "\\clearpage")  # a page break asked for in the source, invisible elsewhere
+        pdf_body = re.sub(r"(\d) %", "\\1\u00a0%", pdf_tables(pdf_headings(body_pdf)))  # a percent sign stays with its number
         # the text font has no Greek and no Unicode minus: the symbols are set as math, the minus as a hyphen
         pdf_body = pdf_body.replace("τ", "$\\tau$").replace("Δ", "$\\Delta$").replace("−", "-")
         pdf_src, pdf_out = a.out + ".pdf.md", a.out + ".pdf"

@@ -52,12 +52,14 @@ python3 "$HERE/diffusion_nodes.py" --db "$DB" --from "$FROM" --to "$TO" --chain 
     --percentiles 90,95,99 --before 3,4,5,7 --sort p90 $EXCL --out diffusion.md --csv diffusion.csv
 python3 "$HERE/diffusion_nodes.py" --db "$DB" --from "$FROM" --to "$TO" --chain "$CHAIN" --slot0 $SLOT0 --tickers "$TICKERS" \
     --percentiles 90,95,99 --before 3,4,5,7 --sort p90 $EXCL --stage body --out diffusion-body.md --csv diffusion-body.csv
+echo "-- reporting coverage (voters.csv: the pools' weights, read by the closure-fleet and voter-stages steps)"
+duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/coverage.sql" > coverage.md
 echo "-- validation (per-node summary), tally, closure fleet, never-completed closures"
 duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/validation_pairs.sql" > validation.md
 if [ -z "$ARCHIVE_ONLY" ]; then
   echo "-- voter stages (8.1): per vote scheduled, where the voter lost the EB, by EB size"
   duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/voter_stages.sql" > voter_stages.md
-  python3 "$HERE/voter_stages.py" voter_stages_pairs.csv --chain "$CHAIN" --csv voter_stages.csv >> voter_stages.md
+  python3 "$HERE/voter_stages.py" voter_stages_pairs.csv --chain "$CHAIN" --voters voters.csv --csv voter_stages.csv >> voter_stages.md
   echo "-- validation by applied share (6.1) and the per-transaction cost on closures of one size (7), from the per-pair file"
   python3 "$HERE/validation_bins.py" validation_pairs.csv --hosts "$REPO/data/hosts.csv" > validation_bins.md
   # validation by EB size class (4.3.1's prose): closure arrival and validation time per class
@@ -116,8 +118,6 @@ if [ -z "$ARCHIVE_ONLY" ]; then
     python3 "$HERE/forge_path.py" --data "$DATA" --win "$WIN" > forge_path.md
   fi
 fi
-echo "-- reporting coverage"
-duckdb -readonly -markdown "$DB" -c "$V" -f "$HERE/coverage.sql" > coverage.md
 if [ -z "$ARCHIVE_ONLY" ]; then
   echo "-- the hosts' upstream peers, the diffusion bins and upstream groups (section 6.3)"
   python3 "$HERE/peers_upstream.py" "$DATA/grafana/archive/loki/peers/$KEY" "$FROM" "$TO" > upstream_hosts.csv

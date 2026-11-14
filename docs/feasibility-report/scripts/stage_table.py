@@ -35,21 +35,26 @@ Inputs under <outputs>/<WINDOW>/, written by the instruments:
   voter_stages.csv                      instruments/voter_stages.py (--voters)
 A missing input prints n/a for its rows.
 
-Rows follow the layout agreed on 2026-10-30: no p50; diffusion at the median
-reporting node with the share of nodes whose p90 clears the deadline; the
-validation row is the p90 of (validated - max(closure, slot + 3 s)) per node
-(100+ records), median and quartiles across nodes; the tally row the p90 per
-node (50+ EBs with a quorum) of the age at which the node's own tally reached
-0.75; the vote rate the median node's share of eligible EBs voted; the last
-row the certified share of the eligible EBs whose quorum some reporting node
-saw.
+Rows follow the layout settled on 2026-11-13: every per-node value is read
+at the node on the unfavourable quartile of the row's statistic, one node
+one count (the 75th-percentile node for a time and for the applied share,
+the 25th for the vote rate: three nodes in four are faster, apply less,
+vote more). The two arrival rows give the
+p90 over the node's EBs at that node and the share of the committee's
+weight (from voters.csv; equal weights on the cluster) whose p90 is under
+the deadline; the validation row is the p90 of (validated - max(closure,
+slot + 3 s)) per node (100+ records); the tally row the p90 per node (50+
+EBs with a quorum) of the age at which the node's own tally reached 0.75;
+the vote rate the p25 node's share of eligible EBs voted; the last row the
+certified share of the eligible EBs whose quorum some reporting node saw.
 """
 import argparse, csv, os, statistics as st, sys
 
 WINDOWS = {
     "f1-high": dict(label="testnet 40 kB / 260 kB, loaded hours"),
     "f2-high": dict(label="testnet 308 kB / 2 MB, loaded hours"),
-    "1kb": dict(label="testnet 308 kB / 2 MB, 1 kB transactions"),
+    # the 1 kB window's sub-table (Table 4.9) leaves the closure sizes to its composition table (Table 4.8)
+    "1kb": dict(label="testnet 308 kB / 2 MB, 1 kB transactions", sizes_elsewhere=True),
     # cluster runs: all nodes observed, no archive-only variant, no closure-fleet or voters table
     "cluster-40k260k": dict(label="cluster 40 kB / 260 kB, 200 B", cluster=True),
     "cluster-100k1m": dict(label="cluster 100 kB / 1 MB, 200 B", cluster=True),
@@ -57,12 +62,12 @@ WINDOWS = {
     "cluster-100k1m-374-patched": dict(label="cluster 100 kB / 1 MB, 374 B, changed build", cluster=True),
 }
 OUTPUTS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "outputs"))
-ROWS = ["body: p90 / p95; nodes with p90 under 3 s",
-        "closure: p90 / p95; nodes with p90 under 3 s / 7 s; not completed",
-        "applied share at the closure",
-        "validation, start to validated, p90",
-        "vote tally reaches the quorum, p90",
-        "vote rate on eligible EBs",
+ROWS = ["body arrival: p90; weight under 3 s",
+        "closure arrival: p90; weight under 3 s / 7 s",
+        "applied share",
+        "validation: p90",
+        "vote rate on eligible EBs, p25 node",
+        "tally reaches the quorum: p90",
         "quorums that became certificates"]
 BINS = [(0, 2000, "under 2,000 txs"), (2000, 4000, "2,000-4,000"), (4000, 6000, "4,000-6,000"), (6000, 1e12, "6,000 and up")]
 
@@ -93,18 +98,34 @@ def pct(n, d):
     return "%.1f %%" % v if n != d and round(v) == 100 else "%.0f %%" % v
 
 
-def diffusion_row(rows, befores):
+def pool_weights(voters, rows):
+    """{pool: weight} averaged over the window's sub-windows, and the committee's total weight;
+    on the cluster (no voters file) every node weighs the same."""
+    if voters is None:
+        n = len(rows) if rows else 1
+        return {r["pool"]: 1.0 / n for r in rows}, 1.0
+    acc, wins = {}, set()
+    for v in voters:
+        wins.add(v["win"])
+        acc.setdefault(v["pool_id"], []).append(float(v["weight"]))
+    w = {p: sum(x) / len(wins) for p, x in acc.items()}
+    return w, sum(w.values())
+
+
+def diffusion_row(rows, befores, weights, total):
+    """The p90 at the p75 node and, per deadline, the share of the committee's weight whose p90 is under it."""
     if rows is None:
         return "n/a"
     p90 = [float(r["p90"]) for r in rows]
-    p95 = [float(r["p95"]) for r in rows]
-    shares = " / ".join(pct(sum(p < b for p in p90), len(p90)) for b in befores)
-    return "%.2f / %.2f s; %s" % (st.median(p90), st.median(p95), shares)
+    pools = [r["pool"] for r in rows]
+    wt = " / ".join("%.2f" % (sum(weights.get(pl, 0.0) for p, pl in zip(p90, pools) if p < b) / total) for b in befores)
+    return "%.2f s; %s" % (q(p90, 0.75), wt)
 
 
 def column(outputs, name, archive_only):
     w = WINDOWS[name]
     d = os.path.join(outputs, name, "archive-only") if archive_only and not w.get("cluster") else os.path.join(outputs, name)
+    folder = d  # `d` is reused below for the windows' dicts
     val = read(os.path.join(d, "validation_nodes.csv"))
     tn = read(os.path.join(d, "tally_quorum_nodes.csv"))
     te = read(os.path.join(d, "tally_quorum_ebs.csv"))
@@ -113,28 +134,28 @@ def column(outputs, name, archive_only):
     clo = read(os.path.join(d, "diffusion.csv"))
     body = read(os.path.join(d, "diffusion-body.csv"))
     out = {}
-    out[ROWS[0]] = diffusion_row(body, [3])
+    weights, total = pool_weights(voters, clo or body or [])
+    out[ROWS[0]] = diffusion_row(body, [3], weights, total)
     if clo is not None:
-        never = st.median(float(r["never"]) for r in clo)
-        out[ROWS[1]] = diffusion_row(clo, [3, 7]) + "; %.0f %%" % never
+        out[ROWS[1]] = diffusion_row(clo, [3, 7], weights, total)
         votes = [float(r["vote_pct"]) for r in clo if r["vote_pct"] not in ("", None)]
-        out[ROWS[5]] = pct(st.median(votes), 100.0) if votes else "n/a"
+        out[ROWS[4]] = pct(q(votes, 0.25), 100.0) if votes else "n/a"  # the unfavourable quartile: the node voting least
     else:
-        out[ROWS[1]] = out[ROWS[5]] = "n/a"
+        out[ROWS[1]] = out[ROWS[4]] = "n/a"
     if val is not None:
         # per node (100+ records): the p90 of the duration and the applied share, from the instrument's per-node summary
         nodes = [r for r in val if int(r["records"]) >= 100]
         p90 = [float(r["p90"]) for r in nodes]
         applied = [100.0 * float(r["applied"]) / max(1.0, float(r["applied"]) + float(r["reapplied"])) for r in nodes]
-        out[ROWS[2]] = "%.0f %%" % st.median(applied)
-        out[ROWS[3]] = "%.2f s, nodes' quartiles %.2f to %.2f" % (st.median(p90), q(p90, 0.25), q(p90, 0.75))
+        out[ROWS[2]] = "%.0f %%" % q(applied, 0.75)
+        out[ROWS[3]] = "%.2f s" % q(p90, 0.75)
     else:
         out[ROWS[2]] = out[ROWS[3]] = "n/a"
     if tn is not None:
         p90 = [float(r["p90"]) for r in tn if int(r["ebs_with_quorum"]) >= 50]
-        out[ROWS[4]] = "%.2f s, nodes' quartiles %.2f to %.2f" % (st.median(p90), q(p90, 0.25), q(p90, 0.75)) if p90 else "n/a"
+        out[ROWS[5]] = "%.2f s" % q(p90, 0.75) if p90 else "n/a"
     else:
-        out[ROWS[4]] = "n/a"
+        out[ROWS[5]] = "n/a"
     if te is not None:
         qs = [r for r in te if r["quorum_somewhere"] == "true"]
         cert = sum(r["certified"] == "1" for r in qs)
@@ -162,18 +183,28 @@ def column(outputs, name, archive_only):
         cap.append("committee of %s pools per window, reporting weight %s" % (rng(sizes, "%d"), rng(ws, "%.2f")))
     sub = None
     if fleet is not None:
+        # the per-EB sub-table (Tables 4.7 and 4.9): per bin, the median over EBs of the committee weight that
+        # held the closure by 3 s and by 7 s (closure_fleet_per_eb.csv, w_by3 / w_by7) and that voted by 7 s
+        # (voter_stages.csv, w_voted_p50, the bins in the same order); the certified closures' bytes unless
+        # the window's composition table holds them (sizes_elsewhere)
+        vs = read(os.path.join(folder, "voter_stages.csv")) or []
+        w_voted = {i: r.get("w_voted_p50") for i, r in enumerate(vs)}
         sub = []
-        for lo, hi, lab in BINS:
+        for i, (lo, hi, lab) in enumerate(BINS):
             rs = [r for r in fleet if lo <= float(r["txs"]) < hi]
             if not rs:
                 continue
             cert = [r for r in rs if r["certified"] in ("1", "true")]
-            t90 = [float(r["t90"]) for r in rs]
-            t95 = [float(r["t95"]) for r in rs]
-            kb = ("%s kB" % format(round(q([float(r["closure"]) for r in cert], 0.5) / 1e3), ",")) if cert and "closure" in rs[0] else "n/a"
-            t90p50 = q(t90, 0.5)
-            sub.append((lab, len(rs), pct(len(cert), len(rs)), kb, "%.2f s" % t90p50 if t90p50 < 1e8 else "never",
-                        pct(sum(t < 7 for t in t90), len(rs)), pct(sum(t < 7 for t in t95), len(rs))))
+            kb = [float(r["closure"]) for r in cert] if cert and "closure" in rs[0] else []
+            kbq = " / ".join(format(round(q(kb, p) / 1e3), ",") for p in (0.25, 0.5, 0.75)) if kb else "n/a"
+            if "w_by7" in rs[0]:
+                arrival = "%.2f / %.2f" % (q([float(r["w_by3"]) for r in rs], 0.5), q([float(r["w_by7"]) for r in rs], 0.5))
+            else:
+                arrival = "n/a"  # outputs written before the weights were recorded (the archive-only copies)
+            voted = ("%.2f" % float(w_voted[i])) if w_voted.get(i) else "n/a"
+            row = [lab, len(rs), pct(len(cert), len(rs))] + ([] if w.get("sizes_elsewhere") else [kbq]) + [arrival, voted]
+            sub.append(tuple(row))
+        sub = (sub, "no sizes" if w.get("sizes_elsewhere") else "sizes")
     return w["label"], out, "; ".join(cap), sub
 
 
@@ -243,10 +274,15 @@ def main():
     for name, c in zip(a.windows, cols):
         print("\nCaption, %s%s: %s." % (name, " (archive only)" if a.archive_only else "", c[2] or "n/a"))
         if c[3]:
-            print("\nClosure at 90 %% of nodes by EB size, %s:\n" % name)
-            print("| EB size | EBs | certified | certified closure p50 | 90 % of nodes hold it by (p50 over EBs) | EBs held by 90 % within 7 s | by 95 % within 7 s |")
-            print("|---|---|---|---|---|---|---|")
-            for row in c[3]:
+            rows, kind = c[3]
+            print("\nClosure and vote by EB size, committee weight, %s:\n" % name)
+            if kind == "no sizes":
+                print("| EB size | EBs | certified | weight holding the closure by 3 s / 7 s | weight voted by 7 s |")
+                print("|---|---:|---:|---:|---:|")
+            else:
+                print("| EB size | EBs | certified | certified closure, kB | weight holding the closure by 3 s / 7 s | weight voted by 7 s |")
+                print("|---|---:|---:|---:|---:|---:|")
+            for row in rows:
                 print("| " + " | ".join(str(x) for x in row) + " |")
 
 
