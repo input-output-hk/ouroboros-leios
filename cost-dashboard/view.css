@@ -201,6 +201,15 @@ main {
   box-shadow: 0 0 0 2px rgba(140, 2, 194, 0.15);
 }
 
+.field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  justify-self: end;
+  accent-color: #8c02c2;
+  cursor: pointer;
+}
+
 .field input:disabled {
   background: #f1edf5;
   color: #888;
@@ -245,7 +254,19 @@ main {
   border-bottom: 1px solid #f1edf5;
 }
 
+.warn {
+  margin: 4px 12px 8px;
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: #8a1c1c;
+  background: #fdf0f0;
+  border-radius: 4px;
+}
+
+.warn[hidden] { display: none; }
 .field[hidden] { display: none; }
+.field.part label { padding-left: 14px; }   /* a row that breaks down the one above */
 
 .presets button {
   flex: 1;
