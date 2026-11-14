@@ -20,27 +20,39 @@
   <div class="input-col">
 
     <div class="card">
-      <h2>Protocol &amp; Throughput</h2>
+      <h2>Protocol &amp; Capacity</h2>
+      <div class="presets">
+        <button id="uiSetPraos" onclick="Controller.set('Praos')" aria-pressed="false" title="As if Leios had never been deployed: Praos alone on the same LSM node, capacity f × max RB body (1× mainnet). Leios settings are disabled.">Praos only</button>
+        <button id="uiSetM0" onclick="Controller.set('M0')" aria-pressed="false" title="Mainnet graduation step M0: EB transactions 260 kB, EB references 40 kB, L_diff 7 s.">M0</button>
+        <button id="uiSetM1" onclick="Controller.set('M1')" aria-pressed="false" title="Mainnet graduation step M1: EB transactions 1 MB, EB references 154 kB (× 40/260), L_diff 7 s.">M1</button>
+        <button id="uiSetM2" onclick="Controller.set('M2')" aria-pressed="false" title="Mainnet graduation step M2: EB transactions 3 MB, EB references 462 kB (× 40/260), L_diff 7 s.">M2</button>
+        <button id="uiSetCustom" onclick="Controller.set('Custom')" aria-pressed="false" title="Leios with the values in the fields below, when they match no graduation step.">Custom</button>
+      </div>
       <div class="fields">
         <div class="field">
-          <label title="Probability of producing a block (EB/RB) in each slot.">Active slot coefficient</label>
+          <label title="Probability that a slot has a ranking block, which can announce an EB. Mainnet: 0.05.">Active slot coefficient</label>
           <input id="uiASC" type="number" min="0.01" max="0.20" value="0.05" step="0.01"/>
-          <span class="unit">EB/slot</span>
+          <span class="unit"></span>
         </div>
         <div class="field">
-          <label title="Duration of a Praos/Leios slot.">Slot length</label>
-          <input id="uiSlotRate" type="number" min="1" max="1" value="1" step="1"/>
-          <span class="unit">slot/s</span>
+          <label title="slotLength (genesis): seconds per slot. Mainnet: 1 s. The timing periods below are in seconds.">Slot length</label>
+          <input id="uiSlotLength" type="number" min="0.1" max="10" value="1" step="0.1"/>
+          <span class="unit">s</span>
         </div>
         <div class="field">
-          <label title="Slots between EB announcement and certification deadline (3*L_hdr + L_vote + L_diff).">Voting window</label>
-          <input id="uiVotingWindow" type="number" min="1" max="100" value="14" step="1"/>
-          <span class="unit">slots</span>
+          <label title="leiosAnnouncementPeriodLength (L_hdr): time for an EB announcement to cross the network. CIP-164: 1 s.">Header period</label>
+          <input id="uiLHdr" type="number" min="0" max="10" value="1" step="0.1"/>
+          <span class="unit">s</span>
         </div>
         <div class="field">
-          <label title="Probability that an EB is certified: no RB in the slots between, (1-f)^(voting_window − 1). CIP-164: 0.95^13 ≈ 51%.">Certification probability</label>
-          <span class="value" id="uiPcert">?</span>
-          <span class="unit">%</span>
+          <label title="leiosVotePeriodLength (L_vote): voters fetch and validate the EB within 3·L_hdr + L_vote of its slot. CIP-164: 4 s.">Voting period</label>
+          <input id="uiLVote" type="number" min="0" max="20" value="4" step="0.1"/>
+          <span class="unit">s</span>
+        </div>
+        <div class="field">
+          <label title="leiosDiffusionPeriodLength (L_diff): time for a certified EB's closure to reach the rest of the network. CIP-164: 7 s.">Diffusion period</label>
+          <input id="uiLDiff" type="number" min="0" max="30" value="7" step="0.1"/>
+          <span class="unit">s</span>
         </div>
         <div class="field">
           <label title="leiosCommitteeSize: seats on the voting committee, one vote per seat per EB. 600 for launch, below CIP-164&#x27;s 900, to limit vote traffic: about 95% of active stake. Votes and the certificate grow with it.">Committee size</label>
@@ -53,24 +65,94 @@
           <span class="unit">B</span>
         </div>
         <div class="field">
-          <label title="Transaction kilobytes per second reaching the ledger, in RBs and certified EBs.">Confirmed throughput</label>
-          <input id="uiThroughput" type="number" min="1" max="500" value="100" step="1"/>
+          <label title="maxEndorserBlockReferencesSize: 37 B per transaction reference in an EB. M0: 40 kB, 1,081 Txs. Typing a capacity sets it to one reference per average-size Tx.">Max EB references</label>
+          <input id="uiMaxEbRefs" type="number" min="0" max="1000000" value="40000" step="1000"/>
+          <span class="unit">B</span>
+        </div>
+        <div class="field">
+          <label title="maxEndorserBlockTxsSize: transaction bytes per EB. M0 260 kB, M1 1 MB, M2 3 MB; CIP-164 feasible 12 MB. Typing a capacity sizes it to carry that.">Max EB transactions</label>
+          <input id="uiMaxEbTxs" type="number" min="0" max="20000000" value="260000" step="10000"/>
+          <span class="unit">B</span>
+        </div>
+        <div class="field">
+          <label title="Most TxkB/s these parameters confirm: RB rate · [P(cert) · EB capacity + (1 − P(cert)) · max RB body], with RB rate = f ÷ slot length. Typing a value sizes the EB limits for it.">Capacity</label>
+          <input id="uiCapacity" type="number" min="1" max="500" value="8.87" step="0.01"/>
           <span class="unit">TxkB/s</span>
         </div>
         <div class="field">
-          <label title="Average transaction size in bytes.">Average Tx size</label>
-          <input id="uiTxSize" type="number" min="100" max="16384" value="800" step="100"/>
+          <label title="Capacity as a multiple of mainnet today: 90,112 B every 20 s = 4.51 TxkB/s. Typing a multiple sizes the EB limits. M0 1.97×, M1 6.18×, M2 17.6×.">Capacity vs mainnet</label>
+          <input id="uiCapacityX" type="number" min="0" max="100" value="1.97" step="1"/>
+          <span class="unit">&times; mainnet</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Load</h2>
+      <div class="presets">
+        <button id="uiUtil10" onclick="Controller.utilization(10)" aria-pressed="false">10%</button>
+        <button id="uiUtil25" onclick="Controller.utilization(25)" aria-pressed="false">25%</button>
+        <button id="uiUtil50" onclick="Controller.utilization(50)" aria-pressed="false">50%</button>
+        <button id="uiUtil75" onclick="Controller.utilization(75)" aria-pressed="false">75%</button>
+        <button id="uiUtil100" onclick="Controller.utilization(100)" aria-pressed="false">100%</button>
+        <button id="uiUtilSpikes" onclick="Controller.spikes()" aria-pressed="false" title="Market events: a few hours per epoch at full capacity, the rest of the time at a load Praos can carry.">Spikes</button>
+      </div>
+      <div class="fields">
+        <div class="field" id="uiUtilRow">
+          <label title="Share of capacity in use, all the time. Mainnet averaged 9.2% of Praos capacity over epochs 589–661.">Utilization</label>
+          <input id="uiUtil" type="number" min="0" max="100" value="100" step="1"/>
+          <span class="unit">% of capacity</span>
+        </div>
+        <div class="field" id="uiSpikeHoursRow" hidden>
+          <label title="Hours per epoch at full capacity. vCPU, IOPS and bandwidth are sized for them; egress and disk growth follow the epoch average.">High-load hours</label>
+          <input id="uiSpikeHours" type="number" min="0" max="120" value="5" step="1"/>
+          <span class="unit">h/epoch</span>
+        </div>
+        <div class="field" id="uiBaseLoadRow" hidden>
+          <label title="Load the rest of the epoch, as a share of Praos capacity, so Leios is idle then. 100%: full Praos blocks.">Load outside them</label>
+          <input id="uiBaseLoad" type="number" min="0" max="100" value="100" step="5"/>
+          <span class="unit">% of Praos</span>
+        </div>
+        <div class="field">
+          <label title="Total bytes ÷ transactions: turns throughput into Tx/s. Mainnet epochs 589–661: 1,132 B (db-sync). At least 200 B, about the smallest possible transaction.">Average Tx size</label>
+          <input id="uiTxSize" type="number" min="200" max="16384" value="1132" step="1"/>
           <span class="unit">B/Tx</span>
         </div>
         <div class="field">
-          <label title="Derived from confirmed throughput and average Tx size.">Tx per second</label>
-          <span class="value" id="uiTxPerSec">?</span>
-          <span class="unit">Tx/s</span>
-        </div>
-        <div class="field">
-          <label title="CIP-164 announces EBs only when transactions don&#x27;t fit in the RB, above Praos capacity (4.51 TxkB/s today).">Leios active</label>
+          <label title="CIP-164 announces EBs only when transactions don&#x27;t fit in the RB, above Praos capacity (4.51 TxkB/s today). With spikes: during the high-load hours.">Leios active</label>
           <span class="value" id="uiLeios">?</span>
           <span class="unit"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Derived</h2>
+      <div class="fields">
+        <div class="field">
+          <label title="3·L_hdr + L_vote + L_diff, in slots. An EB certifies only if the next RB comes at least this many slots after the one that announced it.">Certification window</label>
+          <span class="value" id="uiVotingWindow">?</span>
+          <span class="unit">slots</span>
+        </div>
+        <div class="field">
+          <label title="Probability that an EB is certified: no RB in the slots between, (1 − f) ^ (certification window − 1). CIP-164: 0.95^13 ≈ 51%.">Certification probability</label>
+          <span class="value" id="uiPcert">?</span>
+          <span class="unit">%</span>
+        </div>
+        <div class="field">
+          <label title="Utilization × capacity, or full capacity during high-load hours. Nodes are sized for it.">Peak throughput</label>
+          <span class="value" id="uiPeakTp">?</span>
+          <span class="unit" id="uiPeakTpUnit">TxkB/s</span>
+        </div>
+        <div class="field">
+          <label title="Throughput averaged over the epoch. Egress and chain growth follow it.">Average throughput</label>
+          <span class="value" id="uiAvgTp">?</span>
+          <span class="unit" id="uiAvgTpUnit">TxkB/s</span>
+        </div>
+        <div class="field">
+          <label title="At peak throughput and average Tx size.">Tx per second, peak</label>
+          <span class="value" id="uiTxPerSec">?</span>
+          <span class="unit">Tx/s</span>
         </div>
       </div>
     </div>
@@ -121,22 +203,6 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>Network Topology</h2>
-      <div class="fields">
-        <div class="field">
-          <label title="Downstream connections per relay; headers and votes go to all of them. 60: a mid-level pool&#x27;s relay. The best-connected relays of large pools carry about 100 (MusashiNet&#x27;s IOG relays: 92 hot, 115 inbound).">Inbound peers</label>
-          <input id="uiInboundPeers" type="number" min="1" max="500" value="60" step="1"/>
-          <span class="unit">peers</span>
-        </div>
-        <div class="field">
-          <label title="How many upstream peers each node fetches the same EB body from, so a relay serves it to inbound × M / 25 peers. 2: the egress devnet measured 1.5–2 copies per EB; MusashiNet&#x27;s relays downloaded 3.25. Praos blocks always use 1.">Fetch multiplicity</label>
-          <input id="uiFetchMult" type="number" min="1" max="8" value="2" step="1"/>
-          <span class="unit">M</span>
-        </div>
-      </div>
-    </div>
-
   </div>
 
   <!-- ============ INPUT COLUMN 2 ============ -->
@@ -145,8 +211,8 @@
     <div class="card">
       <h2>Cloud Costs</h2>
       <div class="presets">
-        <button onclick="Controller.hyperscaleCosts()">Hyperscale</button>
-        <button onclick="Controller.discountCosts()">Discount</button>
+        <button id="uiPresetHyperscale" onclick="Controller.hyperscaleCosts()" aria-pressed="false">Hyperscale</button>
+        <button id="uiPresetDiscount" onclick="Controller.discountCosts()" aria-pressed="false">Discount</button>
       </div>
       <div class="fields">
         <div class="field">
@@ -186,9 +252,25 @@
           <span class="unit">nodes</span>
         </div>
         <div class="field">
-          <label title="CPU/IOPS overprovisioning for burst load.">Spike factor</label>
+          <label title="Capacity provisioned above the peak for vCPU, IOPS and bandwidth.">Headroom</label>
           <input id="uiSpike" type="number" min="1" max="10" value="2" step="1"/>
-          <span class="unit">&times;</span>
+          <span class="unit">&times; peak</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Network Topology</h2>
+      <div class="fields">
+        <div class="field">
+          <label title="Downstream connections per relay; headers and votes go to all of them. 60: a mid-level pool&#x27;s relay. The best-connected relays of large pools carry about 100 (MusashiNet&#x27;s IOG relays: 92 hot, 115 inbound).">Inbound peers</label>
+          <input id="uiInboundPeers" type="number" min="1" max="500" value="60" step="1"/>
+          <span class="unit">peers</span>
+        </div>
+        <div class="field">
+          <label title="How many upstream peers each node fetches the same EB body from, so a relay serves it to inbound × M / 25 peers. 2: the egress devnet measured 1.5–2 copies per EB; MusashiNet&#x27;s relays downloaded 3.25. Praos blocks always use 1.">Fetch multiplicity</label>
+          <input id="uiFetchMult" type="number" min="1" max="8" value="2" step="1"/>
+          <span class="unit">M</span>
         </div>
       </div>
     </div>
@@ -215,7 +297,7 @@
   <div class="output-col">
 
     <div class="card">
-      <h2>CPU per Node</h2>
+      <h2>CPU per Node (peak)</h2>
       <div class="fields">
         <div class="field">
           <label>Tx apply</label>
@@ -259,34 +341,34 @@
       <h2>Resources (all nodes)</h2>
       <div class="fields">
         <div class="field">
-          <label>Compute</label>
+          <label title="vCPU per node × nodes, raised only if the peak × headroom needs more.">Compute</label>
           <span class="value" id="uiTotalVcpu">?</span>
-          <span class="unit">vCPU/mo</span>
+          <span class="unit" id="uiTotalVcpuUnit">vCPU</span>
         </div>
         <div class="field">
-          <label title="Maximum new chain data per month per node (compressed). Assumes 100% block utilization at this throughput consistently.">Max chain growth</label>
+          <label title="New chain data per month, all nodes (compressed), at the average throughput.">Chain growth</label>
           <span class="value" id="uiChainGrowth">?</span>
-          <span class="unit">GiB/mo</span>
+          <span class="unit" id="uiChainGrowthUnit">GiB/mo</span>
         </div>
         <div class="field">
-          <label title="Hypothetical total disk per SPO after 1 year consistently at this throughput: (current chain + 12 × monthly growth) × nodes.">Disk (after 1 year)</label>
+          <label title="Total disk after a year at this load: (current chain + 12 × monthly growth) × nodes.">Disk (after 1 year)</label>
           <span class="value" id="uiTotalStorage">?</span>
-          <span class="unit">GiB</span>
+          <span class="unit" id="uiTotalStorageUnit">GiB</span>
         </div>
         <div class="field">
-          <label>IOPS</label>
+          <label title="At the peak load × headroom, all nodes.">IOPS</label>
           <span class="value" id="uiTotalIops">?</span>
-          <span class="unit">IOPS</span>
+          <span class="unit" id="uiTotalIopsUnit">IOPS</span>
         </div>
         <div class="field">
-          <label>Egress</label>
+          <label title="All relays, at the average throughput.">Egress</label>
           <span class="value" id="uiTotalEgress">?</span>
-          <span class="unit">GiB/mo</span>
+          <span class="unit" id="uiTotalEgressUnit">GiB/mo</span>
         </div>
         <div class="field">
-          <label>Peak bandwidth</label>
+          <label title="Egress bandwidth at the peak load × headroom, all relays.">Peak bandwidth</label>
           <span class="value" id="uiNic">?</span>
-          <span class="unit">Mb/s</span>
+          <span class="unit" id="uiNicUnit">Mb/s</span>
         </div>
       </div>
     </div>
@@ -300,7 +382,7 @@
           <span class="unit">$/mo</span>
         </div>
         <div class="field">
-          <label title="Hypothetical monthly storage bill after 1 year consistently at this throughput.">Disk (after 1 year)</label>
+          <label title="Monthly storage bill after a year at this load.">Disk (after 1 year)</label>
           <span class="value" id="uiCostStorage">?</span>
           <span class="unit">$/mo</span>
         </div>
@@ -318,6 +400,16 @@
           <label>Total</label>
           <span class="value" id="uiCost">?</span>
           <span class="unit">$/mo</span>
+        </div>
+        <div class="field" id="uiCostPraosRow">
+          <label title="Leios never deployed: Praos alone carrying the same load, capped at Praos capacity, on the same nodes and prices. Press Praos only for its breakdown.">Praos-only baseline</label>
+          <span class="value" id="uiCostPraos">?</span>
+          <span class="unit">$/mo</span>
+        </div>
+        <div class="field" id="uiCostAddedRow">
+          <label title="Total minus the Praos-only baseline. &#x27;idle&#x27; when the load always fits in RBs, so Leios sends no EBs or votes.">Added by Leios</label>
+          <span class="value" id="uiCostAdded">?</span>
+          <span class="unit" id="uiCostAddedUnit">$/mo</span>
         </div>
       </div>
     </div>
