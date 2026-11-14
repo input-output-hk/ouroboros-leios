@@ -11,7 +11,7 @@
 
 <header>
   <h1>Leios Cost Estimator</h1>
-  <p class="note">Interactive tool for estimating operating costs of a Linear Leios (CIP-164) node. Default values represent conservative upper bounds based on the <a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/cost-estimate">detailed cost analysis</a>. Questions <a href="https://discord.com/channels/826816523368005654/1247688618621927505">on Discord</a>, issues on <a href="https://github.com/input-output-hk/ouroboros-leios/issues">GitHub</a>.</p>
+  <p class="note">Interactive tool for estimating what it costs to run a stake pool on Linear Leios (CIP-164). Default values are central estimates for the launch design, based on the <a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/cost-estimate">detailed cost analysis</a>; egress is likely understated. Questions <a href="https://discord.com/channels/826816523368005654/1247688618621927505">on Discord</a>, issues on <a href="https://github.com/input-output-hk/ouroboros-leios/issues">GitHub</a>.</p>
 </header>
 
 <main>
@@ -190,21 +190,11 @@
           <input id="uiSpike" type="number" min="1" max="10" value="2" step="1"/>
           <span class="unit">&times;</span>
         </div>
-        <div class="field">
-          <label title="Percentage of total staked ADA at this pool.">Stake fraction</label>
-          <input id="uiStake" type="number" min="0" max="0.2" value="0.1" step="0.01"/>
-          <span class="unit">%</span>
-        </div>
-        <div class="field">
-          <label title="Percentage of epoch rewards retained by the pool.">Retained fees</label>
-          <input id="uiRetained" type="number" min="0" max="100" value="20.92" step="0.1"/>
-          <span class="unit">%</span>
-        </div>
       </div>
     </div>
 
     <div class="card">
-      <h2>Scenario</h2>
+      <h2>Chain Storage</h2>
       <div class="fields">
         <div class="field">
           <label title="Current total chain size on disk (blocks + ledger state). Starting point for storage projections.">Current chain size</label>
@@ -212,19 +202,9 @@
           <span class="unit">GB</span>
         </div>
         <div class="field">
-          <label title="Average fee per kilobyte from the Cardano fee formula.">Transaction fee</label>
-          <input id="uiTxFee" type="number" min="0" max="20" value="0.148" step="0.001"/>
-          <span class="unit">ADA/kB</span>
-        </div>
-        <div class="field">
           <label title="Disk compression ratio. >70% feasible; 50% conservative.">Compression</label>
           <input id="uiCompression" type="number" min="0" max="100" value="50" step="0.1"/>
           <span class="unit">%</span>
-        </div>
-        <div class="field">
-          <label title="Current market price of ADA.">ADA price</label>
-          <input id="uiAda" type="number" min="0" max="10" value="0.25" step="0.01"/>
-          <span class="unit">USD/ADA</span>
         </div>
       </div>
     </div>
@@ -338,37 +318,6 @@
           <label>Total</label>
           <span class="value" id="uiCost">?</span>
           <span class="unit">$/mo</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Economics</h2>
-      <div class="fields">
-        <div class="field">
-          <label>Cost per Tx</label>
-          <span class="value" id="uiCostTxUsd">?</span>
-          <span class="unit">USD/Tx</span>
-        </div>
-        <div class="field">
-          <label>Cost per Tx</label>
-          <span class="value" id="uiCostTxAda">?</span>
-          <span class="unit">ADA/Tx</span>
-        </div>
-        <div class="field">
-          <label>Retained fees</label>
-          <span class="value" id="uiFees">?</span>
-          <span class="unit">$/mo</span>
-        </div>
-        <div class="field">
-          <label>Fees &minus; cost</label>
-          <span class="value" id="uiProfit">?</span>
-          <span class="unit">$/mo</span>
-        </div>
-        <div class="field total">
-          <label>Fees &divide; cost</label>
-          <span class="value" id="uiReturn">?</span>
-          <span class="unit">%</span>
         </div>
       </div>
     </div>
