@@ -5,7 +5,23 @@ var Controller = (function() {
   'use strict'
 
   var GiB = 1024 * 1024 * 1024            //  B/GiB
-  var T_month = 365.24 / 12 * 24 * 3600   //  s/month  ≈ 2,628,000
+  var T_month = 365.24 / 12 * 24 * 3600   //  s/month = 2,629,728
+
+  // Fixed values, shown read-only: formats and benchmarks, not settings of the system
+  var RB_HEADER_SIZE = 1024               //  B, also announces the EB (CIP-164 has no separate EB header)
+  var TX_REF_SIZE = 37                    //  B per transaction reference in an EB body: 32 B hash + the Tx size, measured
+                                          //  on every EB of two P&T cluster runs (2026-11-06 a0c13, 2026-11-09 2a1ad)
+  var VOTE_SIZE = 91                      //  B: 88 B vote (consensus golden test) + 3 B MsgLeiosVotes framing
+  var TX_APPLY_MS = 0.6201                //  ms/tx: full validation at mempool ingestion, mainnet mean (OLS on mainnet Apply data)
+  var EB_HEADER_VAL_MS = 0.4438           //  ms per header: db-analyser empty-block statistics
+  var VOTE_VAL_MS = 0.67                  //  ms per vote: one BLS signature check
+  var CERT_FIXED = 54                     //  B: certificate = 54 B + 1 bit per seat (75 B on MusashiNet, 21 B bitfield)
+  var CERT_VAL_BASE = 0.9                 //  ms: certificate validation = 0.9 ms + 1.9 µs per seat (Haskell verifyLeiosCert)
+  var CERT_VAL_PER_SEAT = 0.0019          //  ms/seat
+  var OUTBOUND_PEERS = 25                 //  upstream peers per node
+  // Reapply model (CIP-164 configuration: eb-body-validation-cpu-time-ms-*)
+  var REAPPLY_CONST_MS = 0.3539           //  ms per EB
+  var REAPPLY_PER_BYTE_MS = 0.00002151    //  ms/B
 
   function getFloat(el) {
     return parseFloat(el.value)
@@ -17,65 +33,60 @@ var Controller = (function() {
 
     var f = getFloat(uiASC)                          //  active slot coefficient
     var slotRate = getFloat(uiSlotRate)               //  slot/s
-    var ebRate = f * slotRate                         //  EB/s  =  RB/s
+    var rbRate = f * slotRate                         //  RB/s
     var votingWindow = getFloat(uiVotingWindow)       //  slots
-    var votesPerEB = getFloat(uiVotesPerEB)           //  votes/EB
-    var pCert = Math.pow(1 - f, votingWindow)         //  P(EB certified)
-    var rCert = ebRate * pCert                        //  certified EB/s
+    //  P(EB certified): the next RB comes votingWindow slots or more after the announcing one, so the
+    //  votingWindow − 1 slots between have no RB (CIP-164: 0.95^13 ≈ 51%)
+    var pCert = Math.pow(1 - f, Math.max(0, votingWindow - 1))
+    var seats = getFloat(uiVotesPerEB)                //  committee seats = votes per EB
+    var maxRbBody = getFloat(uiMaxRbBody)             //  B: maxBlockBodySize
+    var certSize = CERT_FIXED + Math.ceil(seats / 8)  //  B/certificate: grows with the committee
+    var certValMs = CERT_VAL_BASE + CERT_VAL_PER_SEAT * seats   //  ms/cert
 
     uiPcert.innerText = (pCert * 100).toFixed(1)
 
     // === Throughput ===
 
     var txkBps = getFloat(uiThroughput)               //  confirmed TxkB/s
+    var B = txkBps * 1000                             //  B/s of transactions
     var txSize = getFloat(uiTxSize)                   //  B/tx
-    var txPerSec = txkBps * 1000 / txSize             //  tx/s  (1 kB = 1000 B)
+    var txPerSec = B / txSize                         //  tx/s  (1 kB = 1000 B)
     uiTxPerSec.innerText = Math.round(txPerSec)
 
-    // === Component Sizes (bytes) ===
-
-    var voteSize = getFloat(uiVoteSize)               //  B/vote
-    var ebHeaderSize = getFloat(uiEbHeaderSize)       //  B/EB header
-    var txRefSize = getFloat(uiTxRefSize)             //  B/tx hash reference
-    var certSize = getFloat(uiCertSize)               //  B/certificate
-    var rbHeaderSize = getFloat(uiRbHeaderSize)       //  B/RB header
-
-    // === Validation Times (ms) ===
-
-    var txApplyMs = getFloat(uiTxApply)               //  ms/tx
-    var ebHeaderValMs = getFloat(uiEbHeaderVal)       //  ms/EB
-    var voteValMs = getFloat(uiVoteVal)               //  ms/vote
-    var certValMs = getFloat(uiCertVal)               //  ms/cert
-
-    // Reapply constants (from CIP-164 config: eb-body-validation-cpu-time-ms-*)
-    var reapplyConstMs = 0.3539                       //  ms/EB
-    var reapplyPerByteMs = 0.00002151                 //  ms/B
+    // EBs are announced only when transactions don't fit in the RB (CIP-164). Below that,
+    // there are no EBs, votes or certificates, and transactions travel in RB bodies.
+    var leios = B > rbRate * maxRbBody
+    var ebRate = leios ? rbRate : 0                   //  EB/s announced
+    var rCert = ebRate * pCert                        //  certified EB/s
+    //  Txs in each announced EB: what certified EBs must carry beyond the RBs
+    var ebBytes = leios ? Math.max(0, (B / rbRate - (1 - pCert) * maxRbBody) / pCert) : 0
+    var txsPerEb = ebBytes / txSize
+    uiLeios.innerText = leios ? 'yes' : 'no'
 
     // === Network Topology ===
 
     var inboundPeers = getFloat(uiInboundPeers)      //  downstream peers per relay
-    var fetchMult = getFloat(uiFetchMult)             //  fetch multiplicity M
-    var voteRedundancy = getFloat(uiVoteRedundancy)   //  spanning-tree redundancy
-    var outboundPeers = 25                            //  upstream peers (fixed)
-    var bodyFetchPeers = inboundPeers * fetchMult / outboundPeers
+    var ebFetchPeers = inboundPeers * getFloat(uiFetchMult) / OUTBOUND_PEERS   //  EB bodies: fetch multiplicity M
+    var rbFetchPeers = inboundPeers / OUTBOUND_PEERS  //  Praos blocks: BlockFetch asks one peer (MaxConcurrencyDeadline 1)
+
+    // === Sizes & Validation (fixed) ===
+
+    uiRbHeaderSize.innerText = RB_HEADER_SIZE
+    uiTxRefSize.innerText = TX_REF_SIZE; uiVoteSize.innerText = VOTE_SIZE
+    uiCertSize.innerText = certSize
+    uiTxApply.innerText = TX_APPLY_MS; uiEbHeaderVal.innerText = EB_HEADER_VAL_MS; uiVoteVal.innerText = VOTE_VAL_MS
+    uiCertVal.innerText = certValMs.toFixed(2)
 
 
     // ================================================================
     //  CPU  (ms/s per node)
     // ================================================================
-    //
-    //  Five components from the CIP-164 cost analysis:
-    //  1. Tx Apply       — full validation at mempool ingestion
-    //  2. Tx Reapply     — ledger application when EB is certified
-    //  3. EB header      — EB/RB header validation
-    //  4. Vote           — individual BLS vote verification
-    //  5. Certificate    — certificate validation
 
-    var cpuApply    = txPerSec * txApplyMs
-    var cpuReapply  = ebRate * reapplyConstMs + reapplyPerByteMs * txkBps * 1000
-    var cpuEbHeader = ebRate * ebHeaderValMs
-    var cpuVote     = votesPerEB * ebRate * voteValMs
-    var cpuCert     = ebRate * certValMs
+    var cpuApply    = txPerSec * TX_APPLY_MS                                   //  full validation at mempool ingestion
+    var cpuReapply  = leios ? ebRate * REAPPLY_CONST_MS + REAPPLY_PER_BYTE_MS * B : 0   //  EB body validation
+    var cpuEbHeader = rbRate * EB_HEADER_VAL_MS                                //  EB/RB header validation
+    var cpuVote     = seats * ebRate * VOTE_VAL_MS                             //  one BLS check per vote
+    var cpuCert     = rCert * certValMs                                        //  certificate validation, one per certified EB
     var cpuTotal    = cpuApply + cpuReapply + cpuEbHeader + cpuVote + cpuCert
 
     uiCpuApply.innerText    = cpuApply.toFixed(2)
@@ -88,51 +99,49 @@ var Controller = (function() {
 
 
     // ================================================================
-    //  Storage  (GiB/month per node — new data only)
+    //  Storage  (GiB/month per node, new data only)
     // ================================================================
     //
-    //  Only confirmed data is persisted.  P(cert) cancels for EB body
-    //  storage (certified EBs are larger).  Votes are ephemeral.
+    //  Only confirmed data is persisted: every transaction once, and the bodies of certified
+    //  EBs, which reference only the transactions RBs don't carry. Votes are ephemeral.
 
-    var storageTx     = txkBps * 1000 * T_month / GiB                                //  tx closure data
-    var storageEbBody = txPerSec * txRefSize * T_month / GiB                          //  EB body (tx hashes)
-    var storageEbHdr  = rCert * ebHeaderSize * T_month / GiB                          //  certified EB headers
-    var storageRb     = ebRate * (rbHeaderSize + certSize) * T_month / GiB            //  RB headers + certs
-    var storageMonthly = storageTx + storageEbBody + storageEbHdr + storageRb
+    var storageMonthly = (B                                         //  tx closure data
+      + rCert * txsPerEb * TX_REF_SIZE                              //  certified EB bodies (tx references)
+      + rbRate * RB_HEADER_SIZE + rCert * certSize) * T_month / GiB   //  RB headers (they announce the EBs) + certs
 
 
     // ================================================================
     //  Egress  (GiB/month per relay node)
     // ================================================================
     //
-    //  Five traffic components with different peer models:
-    //  1. Tx mempool diffusion  — 1 effective peer (fetch-from-one)
-    //  2. Vote gossip           — spanning-tree × redundancy
-    //  3. EB bodies (tx refs)   — bodyFetchPeers, ×1/P(cert) overcounting
-    //  4. RB/EB headers         — pushed to all inbound peers
-    //  5. RB cert bodies        — certified RBs only, bodyFetchPeers
+    //  - Txs: 1 effective peer (fetch-from-one)
+    //  - votes: pushed once to every downstream peer, the one it came from included (consensus PR #2430)
+    //  - EB bodies (tx refs): every announced EB, certified or not; ebFetchPeers
+    //  - RB/EB headers: pushed to every downstream peer
+    //  - RB bodies: certificates, and the transactions RBs carry; rbFetchPeers. While Leios is
+    //    active, every RB without a certificate is full (as in the capacity), so its transactions
+    //    are sent again in its body, as in Praos
 
-    var egressTx      = txkBps * 1000 * 1 * T_month / GiB
-    var egressVotes   = votesPerEB * voteSize * ebRate * voteRedundancy * T_month / GiB
-    var egressEbBody  = txPerSec * txRefSize / pCert * bodyFetchPeers * T_month / GiB
-    var egressRbHdr   = ebRate * rbHeaderSize * inboundPeers * T_month / GiB
-    var egressRbCert  = rCert * certSize * bodyFetchPeers * T_month / GiB
-    var egressMonthly = egressTx + egressVotes + egressEbBody + egressRbHdr + egressRbCert
+    var rbTxBytes = leios ? (1 - pCert) * rbRate * maxRbBody : B   //  B/s of transactions in RB bodies
+    var egressMonthly = (B
+      + seats * VOTE_SIZE * ebRate * inboundPeers
+      + ebRate * txsPerEb * TX_REF_SIZE * ebFetchPeers
+      + rbRate * RB_HEADER_SIZE * inboundPeers
+      + rCert * certSize * rbFetchPeers
+      + rbTxBytes * rbFetchPeers) * T_month / GiB
 
 
     // ================================================================
-    //  IOPS  (IO/s per node — with UTxO-HD)
+    //  IOPS  (IO/s per node, with UTxO-HD)
     // ================================================================
     //
     //  UTxO state updates dominate (~88% of total).
 
-    var iopsTxData  = txkBps * 1000 / 4096 * 1.1                                //  tx data write + read-back
-    var iopsUtxo    = txPerSec * 3                                               //  UTxO-HD inserts/deletes
-    var ebBodyBytes = txPerSec / ebRate * txRefSize                              //  bytes per EB body
-    var iopsEbBody  = ebRate * Math.ceil(ebBodyBytes / 4096) * 1.2               //  EB body writes
-    var iopsRb      = ebRate * 2 * 1.2                                           //  RB writes/reads
-    var iopsEbHdr   = rCert * 1.2                                                //  certified EB header writes
-    var iopsTotal   = iopsTxData + iopsUtxo + iopsEbBody + iopsRb + iopsEbHdr
+    var ebBodyBytes = txsPerEb * TX_REF_SIZE         //  every fetched EB is written
+    var iopsTotal = B / 4096 * 1.1                    //  tx data write + read-back
+      + txPerSec * 3                                  //  UTxO-HD inserts/deletes
+      + ebRate * Math.ceil(ebBodyBytes / 4096) * 1.2  //  EB body writes
+      + rbRate * 2 * 1.2                              //  RB writes/reads
 
 
     // ================================================================
@@ -225,17 +234,13 @@ var Controller = (function() {
     [
       uiASC
     , uiAda
-    , uiCertSize
-    , uiCertVal
     , uiCompression
-    , uiEbHeaderSize
-    , uiEbHeaderVal
     , uiEgress
     , uiFetchMult
     , uiInboundPeers
     , uiIops
+    , uiMaxRbBody
     , uiProducers
-    , uiRbHeaderSize
     , uiCurrentChain
     , uiRelays
     , uiRetained
@@ -244,14 +249,9 @@ var Controller = (function() {
     , uiStake
     , uiStorage
     , uiThroughput
-    , uiTxApply
     , uiTxFee
-    , uiTxRefSize
     , uiTxSize
     , uiVcpu
-    , uiVoteRedundancy
-    , uiVoteSize
-    , uiVoteVal
     , uiVotesPerEB
     , uiVotingWindow
     ].forEach(function(el) { el.addEventListener("input", calculate) })
