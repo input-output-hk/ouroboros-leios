@@ -2,7 +2,7 @@
 //
 // Chained after leios_voting_process, same reasoning: these are sub-kinds of the
 // node stream, not a separate service, so enriching inline keeps the single write.
-// Only the four diffusion kinds are touched; every other line passes straight
+// Only the seven diffusion kinds are touched; every other line passes straight
 // through to forward_to untouched, never dropped.
 //
 // Covers the part of the certification story the voting facet cannot see. Voting
@@ -10,10 +10,9 @@
 // and what the fetch path cost to get it there.
 //
 //   Input  : cardano_node_process output -- body = decoded data, kind label set.
-//   Output : same line; the service is refined on the three kinds this facet owns.
-//   Labels : service=cardano-node/leios-diffusion on LeiosBodyHits,
-//            LeiosFetchDecision and LeiosPeerAnnouncement; equivocation on
-//            LeiosPeerAnnouncement.
+//   Output : same line; the service is refined on the six kinds this facet owns.
+//   Labels : service=cardano-node/leios-diffusion on every owned kind except
+//            LeiosEbValidated; equivocation on LeiosPeerAnnouncement.
 //   Metrics: peer_announcements_total, fetch_decision_duration_seconds,
 //            fetch_tracked, fetch_missing_bodies, fetch_peers_inflight,
 //            fetch_inflight_total, fetch_offers_total, fetch_requests_total,
@@ -21,7 +20,10 @@
 //            fetch_tx_bytes_total, body_txs_total, body_tracked_total,
 //            body_acquired_total, body_validated_total, body_mempool_hits_total,
 //            body_missed_both_total, tx_cache_entries, tx_cache_load,
-//            eb_validation_reapplied_total, eb_validation_applied_total.
+//            eb_validation_reapplied_total, eb_validation_applied_total,
+//            body_age_seconds, closure_age_seconds, announcement_age_seconds,
+//            body_age_last_seconds, closure_age_last_seconds,
+//            announcement_age_last_seconds.
 //
 // The service refinement is scoped rather than applied to the whole selector, so
 // the facet becomes discoverable without claiming a kind that voting already owns.
@@ -30,15 +32,17 @@
 // Cardinality: equivocation is the only label whose values are new, and it is a
 // bool. The service refinement costs no extra streams, since service is already
 // determined by kind and kind is itself a label, so the streams are split that way
-// regardless. ebHash, electionPool and peer.connectionId all stay in the body.
-// connectionId in particular is per-connection and unbounded, so it must never
-// become a label; electionPool is roughly one value per pool and belongs in a query
-// aggregation, not an index. The module is a few tens of series per host,
-// dominated by the one histogram.
+// regardless. The age histograms and gauges add no label at all, so each costs
+// only its own shape: a histogram is its bucket count plus three per host, for the
+// +Inf bucket and the sum and count, and a gauge is one. ebHash, electionPool and
+// peer.connectionId all stay in the body. connectionId in particular is
+// per-connection and unbounded, so it must never become a label; electionPool is
+// roughly one value per pool and belongs in a query aggregation, not an index. The
+// histograms dominate what this module costs.
 //
 // Absent kinds cost nothing: no matching lines means stage.match never fires and
 // the series is never created, so this is safe to deploy ahead of any node that
-// does not emit one of the four.
+// does not emit one of the seven.
 declare "leios_diffusion_process" {
 	argument "forward_to" { }
 
@@ -48,22 +52,22 @@ declare "leios_diffusion_process" {
 
 	loki.process "enrich" {
 		stage.match {
-			selector = `{kind=~"LeiosBodyHits|LeiosEbValidated|LeiosFetchDecision|LeiosPeerAnnouncement"}`
+			selector = `{kind=~"LeiosAnnouncementAccepted|LeiosBlockAcquired|LeiosBlockTxsAcquired|LeiosBodyHits|LeiosEbValidated|LeiosFetchDecision|LeiosPeerAnnouncement"}`
 
-			// Refines the service on the three kinds this facet exclusively owns. The
+			// Refines the service on the six kinds this facet exclusively owns. The
 			// point is discovery rather than selection: Grafana's Logs Drilldown builds
 			// its browse list from this label, so the facet gets a
 			// cardano-node/leios-diffusion entry beside leios-voting and call-tracing
-			// without anyone writing a query. Nothing selects these three kinds today,
-			// so the refinement breaks no existing panel.
+			// without anyone writing a query. Every panel that reads these kinds
+			// selects on kind, so the refinement breaks none of them.
 			//
-			// LeiosEbValidated is deliberately excluded. It belongs to this facet and to
+			// LeiosEbValidated is the one exclusion. It belongs to this facet and to
 			// voting, and a single valued label has to pick one owner:
 			// leios_voting_process runs earlier in the chain and stamps it, and the
 			// throughput dashboard selects it that way. The two counters this module
 			// derives from it read the kind label, which is unaffected either way.
 			stage.match {
-				selector = `{kind=~"LeiosBodyHits|LeiosFetchDecision|LeiosPeerAnnouncement"}`
+				selector = `{kind=~"LeiosAnnouncementAccepted|LeiosBlockAcquired|LeiosBlockTxsAcquired|LeiosBodyHits|LeiosFetchDecision|LeiosPeerAnnouncement"}`
 
 				stage.static_labels {
 					values = {
@@ -392,6 +396,114 @@ declare "leios_diffusion_process" {
 						action            = "add"
 						source            = "applied"
 						max_idle_duration = "24h"
+					}
+				}
+			}
+
+			// How long diffusion actually took, which the counters above cannot say.
+			// All three kinds report the latency already computed, so these are
+			// histograms over a field rather than a timestamp join across streams: an
+			// announcement is seen at announcementAgeSeconds after its EB's slot, the
+			// body is fully downloaded at bodyAgeSeconds, and the whole referenced tx
+			// closure is in hand at closureAgeSeconds. Closure minus body is what the
+			// tx fetch path costs on top of the body itself.
+			//
+			// Body and closure share a bucket set, which is what makes them comparable
+			// on one panel: identical bounds mean both quantile curves interpolate the
+			// same way, so the gap between them is a real difference rather than an
+			// artefact, and the shared le values let the two be subtracted bucket for
+			// bucket. Their resolution is finest where the bulk of the distribution
+			// sits and coarsens into a tail that still has to stay visible, because a
+			// closure arriving late is a vote not cast. Announcement age is a much
+			// quicker signal, so it takes its own finer and lower set rather than
+			// spending every bucket below the first bound. If a distribution moves far
+			// enough that the bounds no longer straddle it, the buckets want revisiting
+			// rather than the panels reinterpreting.
+			//
+			// The gauges exist because a histogram cannot report above its largest
+			// finite bucket: an EB body arriving at 45s lands in +Inf and
+			// histogram_quantile reads it as the top bound, hiding the outlier
+			// exactly when the tail is what matters. A set gauge carries the last
+			// observed value, so max_over_time gives a true peak and the value is
+			// exact rather than interpolated. These kinds arrive at a rate comparable
+			// to the scrape interval, so a set gauge samples rather than records
+			// everything: it characterises a tail over a window without guaranteeing
+			// any single spike is caught.
+			//
+			// Their 5m idle duration is the same deliberate choice as the fetch
+			// gauges above, for the same reason: a gauge keeps exposing its last value,
+			// so a long window would make a stalled pipeline read as steady state.
+			//
+			// ebHash and ebSlot stay in the body. ebHash is one value per EB, so
+			// labelling it would grow without bound; per-EB work is a query-time
+			// `| json` on the lines, which are indexed by kind regardless.
+			stage.match {
+				selector = `{kind=~"LeiosAnnouncementAccepted|LeiosBlockAcquired|LeiosBlockTxsAcquired"}`
+
+				stage.json {
+					expressions = {
+						announcementAgeSeconds = "announcementAgeSeconds",
+						bodyAgeSeconds         = "bodyAgeSeconds",
+						closureAgeSeconds      = "closureAgeSeconds",
+					}
+					drop_malformed = true
+				}
+
+				stage.metrics {
+					// Each kind carries only its own field, so the others are absent and
+					// the metrics they feed simply do not observe that line.
+					metric.histogram {
+						name              = "body_age_seconds"
+						description       = "Age of an EB body when its download completed, in seconds since the EB slot"
+						prefix            = "leios_logmetrics_diffusion_"
+						source            = "bodyAgeSeconds"
+						buckets           = [0.5, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0, 7.0, 10.0]
+						max_idle_duration = "24h"
+					}
+
+					metric.histogram {
+						name              = "closure_age_seconds"
+						description       = "Age of an EB tx closure when the last referenced tx was acquired, in seconds since the EB slot"
+						prefix            = "leios_logmetrics_diffusion_"
+						source            = "closureAgeSeconds"
+						buckets           = [0.5, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0, 7.0, 10.0]
+						max_idle_duration = "24h"
+					}
+
+					metric.histogram {
+						name              = "announcement_age_seconds"
+						description       = "Age of an EB announcement when this node accepted it, in seconds since the EB slot"
+						prefix            = "leios_logmetrics_diffusion_"
+						source            = "announcementAgeSeconds"
+						buckets           = [0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0]
+						max_idle_duration = "24h"
+					}
+
+					metric.gauge {
+						name              = "body_age_last_seconds"
+						description       = "Age of the most recently completed EB body download, for true peaks via max_over_time"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "set"
+						source            = "bodyAgeSeconds"
+						max_idle_duration = "5m"
+					}
+
+					metric.gauge {
+						name              = "closure_age_last_seconds"
+						description       = "Age of the most recently completed EB tx closure, for true peaks via max_over_time"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "set"
+						source            = "closureAgeSeconds"
+						max_idle_duration = "5m"
+					}
+
+					metric.gauge {
+						name              = "announcement_age_last_seconds"
+						description       = "Age of the most recently accepted EB announcement, for true peaks via max_over_time"
+						prefix            = "leios_logmetrics_diffusion_"
+						action            = "set"
+						source            = "announcementAgeSeconds"
+						max_idle_duration = "5m"
 					}
 				}
 			}
