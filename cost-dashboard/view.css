@@ -255,6 +255,17 @@ main {
 .warn[hidden] { display: none; }
 .field[hidden] { display: none; }
 
+.price-note {
+  margin: 0;
+  padding: 6px 12px 8px;
+  font-size: 0.7rem;
+  color: #555;
+  line-height: 1.45;
+  border-bottom: 1px solid #f1edf5;
+}
+
+.price-note a { color: #8c02c2; }
+
 .presets button {
   flex: 1;
   padding: 8px 8px;

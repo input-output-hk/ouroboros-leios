@@ -222,36 +222,37 @@
       <h2>Cloud Costs</h2>
       <div class="presets">
         <button id="uiPresetHyperscale" onclick="Controller.hyperscaleCosts()" aria-pressed="false">Hyperscale</button>
-        <button id="uiPresetDiscount" onclick="Controller.discountCosts()" aria-pressed="false">Discount</button>
+        <button id="uiPresetDiscount" onclick="Controller.discountCosts()" aria-pressed="false" title="Average of DigitalOcean, Akamai and Hetzner, on dedicated-CPU plans. These providers save on egress, which their plans include, not on CPU or disk: vCPU costs about the same as at the hyperscalers, and bulk disk is SSD block storage at about twice their hard-drive price.">Discount</button>
       </div>
+      <p class="price-note">Each preset is the average of on-demand list prices checked 2026-11-10: hyperscale across AWS, GCP and Azure; discount across DigitalOcean, Akamai and Hetzner. Each field's help gives the min and max; the <a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/cost-estimate">cost analysis</a> has the table.</p>
       <div class="fields">
         <div class="field">
-          <label title="Monthly cost of a virtual CPU.">vCPU</label>
-          <input id="uiVcpu" type="number" min="0" max="100" value="20" step="0.01"/>
+          <label title="Per vCPU, without RAM. Presets: average list price, checked 2026-11-10. Hyperscale 15.92–26.80, discount 17.42–30.71.">vCPU</label>
+          <input id="uiVcpu" type="number" min="0" max="100" value="22.86" step="0.01"/>
           <span class="unit">$/vCPU/mo</span>
         </div>
         <div class="field">
-          <label title="Per GiB; each node needs 8 GiB with LSM.">RAM</label>
+          <label title="Per GiB; each node needs 8 GiB with LSM. Presets: average list price, checked 2026-11-10. Hyperscale 1.90–2.66, discount 1.74–3.07.">RAM</label>
           <input id="uiRam" type="number" min="0" max="20" value="2.53" step="0.01"/>
           <span class="unit">$/GiB/mo</span>
         </div>
         <div class="field">
-          <label title="SSD for the volatile path: UTxO tables, snapshots, VolatileDB, recent EBs.">Fast SSD</label>
+          <label title="SSD for the volatile path: UTxO tables, snapshots, VolatileDB, recent EBs. Presets: average list price per GB, 2026-11-10; AWS and Azure bill per GiB, converted. Hyperscale 0.0745–0.100; discount 0 (local disk).">Fast SSD</label>
           <input id="uiStorageFast" type="number" min="0" max="1" value="0.00" step="0.001"/>
           <span class="unit">$/GB/mo</span>
         </div>
         <div class="field">
-          <label title="Disk for the immutable chain.">Bulk disk</label>
-          <input id="uiStorage" type="number" min="0" max="1" value="0.10" step="0.001"/>
+          <label title="Disk for the immutable chain. Presets: average list price per GB, checked 2026-11-10; AWS, Azure and DigitalOcean bill per GiB, converted. Hyperscale 0.0373–0.0419, discount 0.064–0.10.">Bulk disk</label>
+          <input id="uiStorage" type="number" min="0" max="1" value="0.0857" step="0.001"/>
           <span class="unit">$/GB/mo</span>
         </div>
         <div class="field">
-          <label title="Monthly IOPS capacity cost. Usually zero (base IOPS suffice).">IOPS</label>
+          <label title="Per IOPS. 0 in both presets: hyperscale SSD volumes include 3,000 IOPS, more than a node uses; discount providers don&#x27;t bill IOPS. 2026-11-10.">IOPS</label>
           <input id="uiIops" type="number" min="0" max="0.5" value="0.00" step="0.001"/>
           <span class="unit">$/IOPS/mo</span>
         </div>
         <div class="field">
-          <label title="Cost per GB of network egress.">Network egress</label>
+          <label title="Per GB. Presets: hyperscale average list price, 0.087–0.120; discount 0, since plans include 12–60 TB per pool, more than a pool sends. 2026-11-10.">Network egress</label>
           <input id="uiEgress" type="number" min="0" max="1" value="0.00" step="0.01"/>
           <span class="unit">$/GB</span>
         </div>
