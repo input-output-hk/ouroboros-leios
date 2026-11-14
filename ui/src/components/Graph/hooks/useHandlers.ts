@@ -11,6 +11,7 @@ const getHighestPriorityMessageType = (counts: {
   const MESSAGE_PRIORITY_ORDER = [
     EMessageType.RB, // Highest priority
     EMessageType.Announcement,
+    EMessageType.Offer,
     EMessageType.EB,
     EMessageType.Txs, // EB txs, pulled once the EB is known
     EMessageType.Votes, // Lowest priority
@@ -155,6 +156,9 @@ export const useHandlers = () => {
             case EMessageType.Announcement:
               context.strokeStyle = EMessageColor.ANNOUNCEMENT;
               break;
+            case EMessageType.Offer:
+              context.strokeStyle = EMessageColor.OFFER;
+              break;
             default:
               context.strokeStyle = ELinkColor.LINK_DEFAULT;
           }
@@ -220,6 +224,9 @@ export const useHandlers = () => {
             case EMessageType.Announcement:
               context.fillStyle = EMessageColor.ANNOUNCEMENT;
               break;
+            case EMessageType.Offer:
+              context.fillStyle = EMessageColor.OFFER;
+              break;
             default:
               context.fillStyle = node.data.stake
                 ? ENodeColor.STAKE_NODE
@@ -266,13 +273,18 @@ export const useHandlers = () => {
         case EMessageType.Announcement:
           context.fillStyle = EMessageColor.ANNOUNCEMENT;
           break;
+        case EMessageType.Offer:
+          context.fillStyle = EMessageColor.OFFER;
+          break;
       }
 
-      // Votes and announcements: small fixed-size circles (no bandwidth
-      // scaling) — both are lightweight control messages, not bulk data.
+      // Votes, announcements and offers: small fixed-size circles (no
+      // bandwidth scaling) — all are lightweight control messages, not bulk
+      // data.
       if (
         message.type === EMessageType.Votes ||
-        message.type === EMessageType.Announcement
+        message.type === EMessageType.Announcement ||
+        message.type === EMessageType.Offer
       ) {
         const radius = Math.min((0.4 / canvasScale) * 6, 0.4);
         context.beginPath();

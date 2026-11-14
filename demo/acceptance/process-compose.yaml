@@ -1,0 +1,14 @@
+# Merged into proto-devnet's process-compose.yaml by run.sh.
+
+version: "0.5"
+
+processes:
+  Acceptance:
+    command: bash "${ACCEPTANCE_DIR}/scripts/check-acceptance.sh"
+    depends_on:
+      Node1:
+        condition: process_started
+      Node2:
+        condition: process_started
+      Node3:
+        condition: process_started

@@ -10,6 +10,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 const MESSAGE_TYPE_LABEL: Record<EMessageType, string> = {
   [EMessageType.Txs]: "Txs",
   [EMessageType.Announcement]: "Announcements",
+  [EMessageType.Offer]: "Offers",
   [EMessageType.EB]: "Endorser Blocks",
   [EMessageType.Votes]: "Votes",
   [EMessageType.RB]: "Blocks",
@@ -18,6 +19,7 @@ const MESSAGE_TYPE_LABEL: Record<EMessageType, string> = {
 const MESSAGE_TYPE_COLOR: Record<EMessageType, EMessageColor> = {
   [EMessageType.Txs]: EMessageColor.TXS,
   [EMessageType.Announcement]: EMessageColor.ANNOUNCEMENT,
+  [EMessageType.Offer]: EMessageColor.OFFER,
   [EMessageType.EB]: EMessageColor.EB,
   [EMessageType.Votes]: EMessageColor.VOTES,
   [EMessageType.RB]: EMessageColor.RB,

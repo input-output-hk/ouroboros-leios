@@ -7,6 +7,7 @@ export enum EMessageColor {
   VOTES = "#9b59b6",
   RB = "#fc5c65",
   ANNOUNCEMENT = "#f7b731",
+  OFFER = "#0fb9b1",
 }
 
 export enum ENodeColor {

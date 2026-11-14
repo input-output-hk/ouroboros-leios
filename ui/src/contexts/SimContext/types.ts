@@ -4,13 +4,14 @@ import { Dispatch, RefObject } from "react";
 // Types of messages submitted between nodes
 // Declaration order is display order: panels iterate the enum rather than
 // listing types themselves, so this is the one place that decides it. Ordered
-// along the Leios pipeline -- an EB is announced, the EB itself follows, its
-// txs are pulled, votes elect it, and an RB certifies it.
+// along the Leios pipeline -- an EB is announced, offered, the EB itself
+// follows, its txs are pulled, votes elect it, and an RB certifies it.
 //
 // This is not the link-colouring priority, which ranks RB first; that order
 // lives in MESSAGE_PRIORITY_ORDER.
 export enum EMessageType {
   Announcement = "announcement",
+  Offer = "offer",
   EB = "eb",
   Txs = "txs",
   Votes = "votes",
@@ -104,6 +105,7 @@ export interface IMessageTypeCounts {
   [EMessageType.Votes]: number;
   [EMessageType.Txs]: number;
   [EMessageType.Announcement]: number;
+  [EMessageType.Offer]: number;
 }
 
 export interface IEdgeState {
