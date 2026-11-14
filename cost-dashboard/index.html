@@ -104,7 +104,7 @@
           <span class="unit">% of capacity</span>
         </div>
         <div class="field" id="uiSpikeHoursRow" hidden>
-          <label title="Hours per epoch at full capacity. vCPU, IOPS and bandwidth are sized for them; egress and disk growth follow the epoch average.">High-load hours</label>
+          <label title="Hours per epoch at full capacity. vCPU, IOPS, bandwidth and EBs held are sized for them; egress and disk growth follow the epoch average.">High-load hours</label>
           <input id="uiSpikeHours" type="number" min="0" max="120" value="5" step="1"/>
           <span class="unit">h/epoch</span>
         </div>
@@ -145,7 +145,7 @@
           <span class="unit" id="uiPeakTpUnit">TxkB/s</span>
         </div>
         <div class="field">
-          <label title="Throughput averaged over the epoch. Egress and chain growth follow it.">Average throughput</label>
+          <label title="Throughput averaged over the epoch. Egress, chain growth and UTxO growth follow it.">Average throughput</label>
           <span class="value" id="uiAvgTp">?</span>
           <span class="unit" id="uiAvgTpUnit">TxkB/s</span>
         </div>
@@ -181,9 +181,19 @@
           <span class="unit">B/cert</span>
         </div>
         <div class="field">
-          <label title="Full validation at mempool ingestion, scripts included: mainnet mean (OLS on Apply data).">Tx apply time</label>
+          <label title="Full validation, scripts included: at mempool ingestion, and again when an RB body is adopted. Mainnet mean (OLS on Apply data). Feasibility report, no scripts: 0.34–0.36 ms on c5d with the voting-loop fix, 0.65–3.42 ms without it.">Tx apply time</label>
           <span class="value" id="uiTxApply">?</span>
           <span class="unit">ms/Tx</span>
+        </div>
+        <div class="field">
+          <label title="Reapply of a Tx already validated: in each closure validation before the vote, and when a certified EB's closure is adopted. The lowest voting-loop reading in the feasibility report (PR #1156), c5d hosts, Tables 7.2b and 7.3; its regressions give 0.19–0.21 ms, and it times adoption at 0.04–0.11 ms.">Tx reapply time</label>
+          <span class="value" id="uiTxReapply">?</span>
+          <span class="unit">ms/Tx</span>
+        </div>
+        <div class="field">
+          <label title="Fixed part of validating an EB's closure before the vote, on top of its Txs. Feasibility report, section 8.2.">Closure validation time</label>
+          <span class="value" id="uiClosureVal">?</span>
+          <span class="unit">ms/EB</span>
         </div>
         <div class="field">
           <label title="Per block header. db-analyser empty-block statistics.">Header validation time</label>
@@ -221,8 +231,18 @@
           <span class="unit">$/vCPU/mo</span>
         </div>
         <div class="field">
-          <label title="Monthly cost of cloud disk storage.">Storage</label>
-          <input id="uiStorage" type="number" min="0" max="1" value="0.10" step="0.01"/>
+          <label title="Per GiB; each node needs 8 GiB with LSM.">RAM</label>
+          <input id="uiRam" type="number" min="0" max="20" value="2.53" step="0.01"/>
+          <span class="unit">$/GiB/mo</span>
+        </div>
+        <div class="field">
+          <label title="SSD for the volatile path: UTxO tables, snapshots, VolatileDB, recent EBs.">Fast SSD</label>
+          <input id="uiStorageFast" type="number" min="0" max="1" value="0.00" step="0.001"/>
+          <span class="unit">$/GB/mo</span>
+        </div>
+        <div class="field">
+          <label title="Disk for the immutable chain.">Bulk disk</label>
+          <input id="uiStorage" type="number" min="0" max="1" value="0.10" step="0.001"/>
           <span class="unit">$/GB/mo</span>
         </div>
         <div class="field">
@@ -252,6 +272,11 @@
           <span class="unit">nodes</span>
         </div>
         <div class="field">
+          <label title="Provisioned on every node, Praos and Leios alike. cardano-node 11.1.3 minimum: two cores, 2 GHz or faster for a pool or relay.">vCPU per node</label>
+          <input id="uiVcpuPerNode" type="number" min="1" max="64" value="2" step="1"/>
+          <span class="unit">vCPU</span>
+        </div>
+        <div class="field">
           <label title="Capacity provisioned above the peak for vCPU, IOPS and bandwidth.">Headroom</label>
           <input id="uiSpike" type="number" min="1" max="10" value="2" step="1"/>
           <span class="unit">&times; peak</span>
@@ -279,14 +304,34 @@
       <h2>Chain Storage</h2>
       <div class="fields">
         <div class="field">
-          <label title="Current total chain size on disk (blocks + ledger state). Starting point for storage projections.">Current chain size</label>
-          <input id="uiCurrentChain" type="number" min="0" max="2000" value="200" step="1"/>
+          <label title="Immutable chain on disk today: 235 GB on a mainnet node (2026-11-10). It starts the bulk disk.">Current chain size</label>
+          <input id="uiCurrentChain" type="number" min="0" max="2000" value="235" step="1"/>
           <span class="unit">GB</span>
         </div>
         <div class="field">
-          <label title="Disk compression ratio. >70% feasible; 50% conservative.">Compression</label>
-          <input id="uiCompression" type="number" min="0" max="100" value="50" step="0.1"/>
+          <label title="Share of chain growth saved by a compressing filesystem; the node doesn&#x27;t compress its ImmutableDB. Default 0.">Compression</label>
+          <input id="uiCompression" type="number" min="0" max="100" value="0" step="0.1"/>
           <span class="unit">%</span>
+        </div>
+        <div class="field">
+          <label title="The disks hold what the node needs today plus this many months of growth at this load, and are enlarged as the chain grows: cloud volumes resize in place. A full day at M2 capacity adds about 7 GB per node.">Disk margin</label>
+          <input id="uiDiskMargin" type="number" min="0" max="24" value="2" step="1"/>
+          <span class="unit">months of growth</span>
+        </div>
+        <div class="field">
+          <label title="At constant load the storage bill rises every month while the other costs stay the same. Storage, the total, the Praos-only baseline and Added by Leios are averages over this many months from today.">Averaged over</label>
+          <input id="uiHorizon" type="number" min="1" max="60" value="12" step="1"/>
+          <span class="unit">months</span>
+        </div>
+        <div class="field">
+          <label title="Mainnet LSM node, 2026-11-11: 10.86 M entries, about 316 B each. The fast SSD holds it twice over so a full LSM merge fits.">UTxO set (LSM tables)</label>
+          <span class="value" id="uiUtxoTables">?</span>
+          <span class="unit">GiB</span>
+        </div>
+        <div class="field">
+          <label title="Ledger state outside the UTxO set, same node. Two kept plus one being written: three on the fast SSD.">Ledger snapshot</label>
+          <span class="value" id="uiLedgerSnapshot">?</span>
+          <span class="unit">GiB</span>
         </div>
       </div>
     </div>
@@ -297,16 +342,21 @@
   <div class="output-col">
 
     <div class="card">
-      <h2>CPU per Node (peak)</h2>
+      <h2>CPU per Block Producer (peak)</h2>
       <div class="fields">
         <div class="field">
-          <label>Tx apply</label>
+          <label title="Every Tx validated in full at mempool ingestion.">Tx apply</label>
           <span class="value" id="uiCpuApply">?</span>
           <span class="unit">ms/s</span>
         </div>
         <div class="field">
-          <label>Tx reapply</label>
-          <span class="value" id="uiCpuReapply">?</span>
+          <label title="Every announced EB's closure, validated before the vote: per EB, plus a reapply per Tx. Block producers only: relays don't vote.">Closure validation</label>
+          <span class="value" id="uiCpuClosure">?</span>
+          <span class="unit">ms/s</span>
+        </div>
+        <div class="field">
+          <label title="Every Tx once more when its block is adopted: a Tx in an RB body is validated in full again, as in Praos (consensus ApplyVal); a Tx in a certified EB's closure is reapplied (ValidateNone).">Block adoption</label>
+          <span class="value" id="uiCpuAdoption">?</span>
           <span class="unit">ms/s</span>
         </div>
         <div class="field">
@@ -334,7 +384,18 @@
           <span class="value" id="uiCpuPercent">?</span>
           <span class="unit">%</span>
         </div>
+        <div class="field total">
+          <label title="Total CPU × headroom, in cores, against the vCPU provisioned per node. Within them, Leios adds no vCPU. A relay needs less: the total without closure validation.">vCPU needed</label>
+          <span class="value" id="uiVcpuNeeded">?</span>
+          <span class="unit" id="uiVcpuNeededUnit">vCPU</span>
+        </div>
+        <div class="field total">
+          <label title="One core validating an EB at the peak with none of it in the mempool, every Tx applied, against the voting period.">EB validation, worst case</label>
+          <span class="value" id="uiEbVal">?</span>
+          <span class="unit" id="uiEbValUnit">s</span>
+        </div>
       </div>
+      <div class="warn" id="uiEbValWarn" hidden>Over the voting period: a voter applying the whole EB on one core would vote late at this EB size.</div>
     </div>
 
     <div class="card">
@@ -346,12 +407,22 @@
           <span class="unit" id="uiTotalVcpuUnit">vCPU</span>
         </div>
         <div class="field">
+          <label title="8 GiB per node, the LSM-backend baseline. Not yet measured with M2&#x27;s 3 MB EBs, which may need more.">RAM</label>
+          <span class="value" id="uiTotalRam">?</span>
+          <span class="unit" id="uiTotalRamUnit">GiB</span>
+        </div>
+        <div class="field">
+          <label title="Provisioned in the first month and enlarged as the UTxO set grows (growth per month after the comma). Per node: 10 GiB (UTxO tables twice over, snapshots, VolatileDB), the disk margin&#x27;s months of UTxO growth, EBs held.">Fast SSD (first month)</label>
+          <span class="value" id="uiFastStorage">?</span>
+          <span class="unit" id="uiFastStorageUnit">GiB</span>
+        </div>
+        <div class="field">
           <label title="New chain data per month, all nodes (compressed), at the average throughput.">Chain growth</label>
           <span class="value" id="uiChainGrowth">?</span>
           <span class="unit" id="uiChainGrowthUnit">GiB/mo</span>
         </div>
         <div class="field">
-          <label title="Total disk after a year at this load: (current chain + 12 × monthly growth) × nodes.">Disk (after 1 year)</label>
+          <label title="Provisioned in the first month: (current chain + the disk margin&#x27;s months of growth) × nodes, then enlarged by the chain growth above every month.">Bulk disk (first month)</label>
           <span class="value" id="uiTotalStorage">?</span>
           <span class="unit" id="uiTotalStorageUnit">GiB</span>
         </div>
@@ -382,9 +453,14 @@
           <span class="unit">$/mo</span>
         </div>
         <div class="field">
-          <label title="Monthly storage bill after a year at this load.">Disk (after 1 year)</label>
-          <span class="value" id="uiCostStorage">?</span>
+          <label>RAM</label>
+          <span class="value" id="uiCostRam">?</span>
           <span class="unit">$/mo</span>
+        </div>
+        <div class="field">
+          <label title="Average monthly bill over the months set in Averaged over, with both disks enlarged as the chain grows. In brackets: the first month&#x27;s bill and how much it rises each month.">Storage (average)</label>
+          <span class="value" id="uiCostStorage">?</span>
+          <span class="unit" id="uiCostStorageUnit">$/mo</span>
         </div>
         <div class="field">
           <label>IOPS</label>

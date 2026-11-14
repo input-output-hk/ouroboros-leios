@@ -242,6 +242,17 @@ main {
   border-bottom: 1px solid #f1edf5;
 }
 
+.warn {
+  margin: 4px 12px 8px;
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: #8a1c1c;
+  background: #fdf0f0;
+  border-radius: 4px;
+}
+
+.warn[hidden] { display: none; }
 .field[hidden] { display: none; }
 
 .presets button {

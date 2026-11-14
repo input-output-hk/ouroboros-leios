@@ -16,7 +16,15 @@ var Controller = (function() {
   var TX_REF_SIZE = 37                    //  B per transaction reference in an EB body: 32 B hash + the Tx size, measured
                                           //  on every EB of two P&T cluster runs (2026-11-06 a0c13, 2026-11-09 2a1ad)
   var VOTE_SIZE = 91                      //  B: 88 B vote (consensus golden test) + 3 B MsgLeiosVotes framing
-  var TX_APPLY_MS = 0.6201                //  ms/tx: full validation at mempool ingestion, mainnet mean (OLS on mainnet Apply data)
+  //  Tx apply: full validation at mempool ingestion, the mainnet mean with scripts included (OLS on
+  //  mainnet Apply data). The feasibility report (ouroboros-leios PR #1156) measures no scripts: with
+  //  the voting-loop fix (ouroboros-consensus 7b91f3619) 0.34–0.36 ms on c5d, 0.41 ms with two inputs;
+  //  without it 0.65–3.42 ms. So 0.6201 ms covers the report's figures only if the fix is in the release.
+  var TX_APPLY_MS = 0.6201                //  ms/tx
+  //  Measured in the feasibility report on c5d, the oldest host class it measured (three generations old):
+  //  its lowest voting-loop reading; the report's regressions give 0.19–0.21 ms
+  var TX_REAPPLY_MS = 0.147               //  ms/tx: reapply of a validated Tx, voting loop (Tables 7.2b, 7.3)
+  var CLOSURE_VAL_MS = 20                 //  ms per EB: fixed part of a closure validation (section 8.2)
   var EB_HEADER_VAL_MS = 0.4438           //  ms per header: db-analyser empty-block statistics
   var VOTE_VAL_MS = 0.67                  //  ms per vote: one BLS signature check
   var CERT_FIXED = 54                     //  B: certificate = 54 B + 1 bit per seat (75 B on MusashiNet, 21 B bitfield)
@@ -24,9 +32,18 @@ var Controller = (function() {
   var CERT_VAL_PER_SEAT = 0.0019          //  ms/seat
   var MIN_TX_SIZE = 200                   //  B: about the smallest possible transaction, the floor for the average
   var OUTBOUND_PEERS = 25                 //  upstream peers per node
-  // Reapply model (CIP-164 configuration: eb-body-validation-cpu-time-ms-*)
-  var REAPPLY_CONST_MS = 0.3539           //  ms per EB
-  var REAPPLY_PER_BYTE_MS = 0.00002151    //  ms/B
+  var RAM_PER_NODE = 8                    //  GiB: LSM-backend node baseline (P&T recommendation)
+  // Fast SSD = the node's volatile path (--volatile-database-path); the ImmutableDB sits on bulk disk
+  // (--immutable-database-path). Measured on an LSM mainnet node, cardano-node 11.0.1 (V2LSM), 2026-11-11
+  var UTXO_TABLES = 3.2                   //  GiB: UTxO set in LSM tables
+  var UTXO_ENTRIES = 10.86e6              //  entries in it
+  var UTXO_ENTRY_BYTES = UTXO_TABLES * GiB / UTXO_ENTRIES   //  ≈ 316 B per entry
+  var TX_BYTES_PER_UTXO = 11630           //  B of Txs per net new UTxO entry: mainnet epochs 589–661 (db-sync), slope of each epoch's
+                                          //  net new entries on its bytes, +85.9 per MB (the year's net is −7.9 per MB)
+  var LEDGER_SNAPSHOT = 0.49              //  GiB per ledger snapshot (ledger state outside the UTxO)
+  var FAST_LEDGER = 10                    //  GiB/node: needs 2 × UTxO tables + 3 snapshots (NumOfDiskSnapshots 2, plus one
+                                          //  being written) + 2,160 full RBs = 8.05 GiB, rest for UTxO growth
+  var K_SECURITY = 2160                   //  blocks: fetched EBs stay on the fast tier until this deep (≈ 12 h)
   var EPOCH_SLOTS = 432000                //  slots per epoch (mainnet epochLength)
 
   // Mainnet graduation plan (site/docs/parameter-graduation.mdx): EB references = EB txs × 40/260,
@@ -96,16 +113,25 @@ var Controller = (function() {
     //  Txs in each announced EB: what certified EBs must carry beyond the RBs (as capacity), capped by the EB limits
     var ebBytes = leios ? Math.min(p.ebCapacity, Math.max(0, (B / p.rbRate - (1 - p.pCert) * p.maxRbBody) / p.pCert)) : 0
     var txsPerEb = ebBytes / p.txSize
+    //  Adoption: chain selection fully validates a block it hasn't validated before (consensus
+    //  ApplyVal), so Txs in RB bodies are applied again, as in Praos; a certified EB's closure is
+    //  applied with ValidateNone, a reapply. RBs without a certificate carry a full body.
+    var rbTxBytes = leios ? p.rbRate * (1 - p.pCert) * p.maxRbBody : B   //  B/s in RB bodies
+    var ebTxBytes = Math.max(0, B - rbTxBytes)                          //  B/s in certified closures
 
     //  CPU (ms/s per node)
     var cpu = {
       apply:    txPerSec * TX_APPLY_MS,               //  full validation at mempool ingestion
-      reapply:  leios ? ebRate * REAPPLY_CONST_MS + REAPPLY_PER_BYTE_MS * B : 0,   //  EB body validation
+      closure:  ebRate * (CLOSURE_VAL_MS + txsPerEb * TX_REAPPLY_MS),   //  every announced EB's closure, validated before the vote (block producers only)
+      adoption: (rbTxBytes * TX_APPLY_MS + ebTxBytes * TX_REAPPLY_MS) / p.txSize,   //  block adoption
       ebHeader: p.rbRate * EB_HEADER_VAL_MS,          //  EB/RB header validation
       vote:     p.seats * ebRate * VOTE_VAL_MS,       //  one BLS check per vote
       cert:     rCert * p.certValMs                   //  certificate validation, one per certified EB
     }
-    cpu.total = cpu.apply + cpu.reapply + cpu.ebHeader + cpu.vote + cpu.cert
+    cpu.total = cpu.apply + cpu.closure + cpu.adoption + cpu.ebHeader + cpu.vote + cpu.cert
+
+    //  One core, one EB: validating the closure with none of it in the mempool, every Tx applied (s)
+    var ebValSeconds = leios ? (CLOSURE_VAL_MS + txsPerEb * TX_APPLY_MS) / 1000 : 0
 
     //  New chain data (GiB/month per node). Only confirmed data is persisted: every transaction
     //  once, and the bodies of certified EBs, which reference only the transactions RBs don't
@@ -114,6 +140,11 @@ var Controller = (function() {
       + rCert * txsPerEb * TX_REF_SIZE                              //  certified EB bodies (tx references)
       + p.rbRate * RB_HEADER_SIZE + rCert * p.certSize) * T_month / GiB   //  RB headers (they announce the EBs) + certs
 
+    //  Held on the fast SSD until K_SECURITY blocks deep (GiB/node, at this throughput sustained): the
+    //  body of every fetched EB, certified or not, and the transactions of the EB closures, each once,
+    //  since the LeiosDb stores a transaction's bytes once however many EBs carry it
+    var ebWindow = (ebTxBytes + ebRate * txsPerEb * TX_REF_SIZE) * (K_SECURITY / p.rbRate) / GiB
+
     //  Egress (GiB/month per relay):
     //  - Txs: 1 effective peer (fetch-from-one)
     //  - votes: pushed once to every downstream peer, the one it came from included (consensus PR #2430)
@@ -121,8 +152,7 @@ var Controller = (function() {
     //  - RB/EB headers: pushed to every downstream peer
     //  - RB bodies: certificates, and the transactions RBs carry; rbFetchPeers. While Leios is
     //    active, every RB without a certificate is full (as in the capacity), so its transactions
-    //    are sent again in its body, as in Praos
-    var rbTxBytes = leios ? (1 - p.pCert) * p.rbRate * p.maxRbBody : B   //  B/s of transactions in RB bodies
+    //    are sent again in its body, as in Praos (rbTxBytes, above)
     var egressMonthly = (B
       + p.seats * VOTE_SIZE * ebRate * p.inboundPeers
       + ebRate * txsPerEb * TX_REF_SIZE * p.ebFetchPeers
@@ -137,16 +167,18 @@ var Controller = (function() {
       + ebRate * Math.ceil(ebBodyBytes / 4096) * 1.2  //  EB body writes
       + p.rbRate * 2 * 1.2                            //  RB writes/reads
 
-    return { txkBps: txkBps, txPerSec: txPerSec, leios: leios, cpu: cpu, txsPerEb: txsPerEb,
-             storageMonthly: storageMonthly, egressMonthly: egressMonthly, iops: iops }
+    return { txkBps: txkBps, txPerSec: txPerSec, leios: leios, cpu: cpu, txsPerEb: txsPerEb, ebValSeconds: ebValSeconds,
+             storageMonthly: storageMonthly,
+             ebWindow: ebWindow, egressMonthly: egressMonthly, iops: iops }
   }
 
   // ================================================================
   //  A load profile: a peak phase for a share of the time, a rest phase otherwise
   // ================================================================
   //
-  //  Provisioned for the peak: vCPU, IOPS and peak bandwidth. Billed on the average: egress
-  //  and chain growth.
+  //  Provisioned for the peak: vCPU, IOPS, peak bandwidth and the EBs held on the fast SSD
+  //  (no more than the peak's duration of them). Billed on the average: egress, and the chain
+  //  and UTxO growth that the disks grow with.
 
   function profile(p) {
     if (!spikes) {
@@ -171,16 +203,44 @@ var Controller = (function() {
     var producers = getFloat(uiProducers), relays = getFloat(uiRelays), nodes = producers + relays
     r.nodes = nodes; r.relays = relays
 
-    //  vCPU: at least 2 per node, more if the peak with headroom needs it
-    r.coresNeeded = headroom * hi.cpu.total / 1000    //  per node
-    r.vcpu = nodes * Math.max(2, Math.ceil(r.coresNeeded))
+    //  vCPU: a fixed number per node, Praos and Leios alike; raised only if the peak with headroom needs more.
+    //  A block producer validates every announced EB's closure before it votes; a relay doesn't vote
+    r.vcpuPerNode = getFloat(uiVcpuPerNode)
+    r.coresNeeded = headroom * hi.cpu.total / 1000                         //  per block producer
+    var relayCores = headroom * (hi.cpu.total - hi.cpu.closure) / 1000     //  per relay
+    r.vcpu = producers * Math.max(r.vcpuPerNode, Math.ceil(r.coresNeeded))
+           + relays * Math.max(r.vcpuPerNode, Math.ceil(relayCores))
     r.costVcpu = r.vcpu * getFloat(uiVcpu)
 
-    //  Disk: the chain today plus a year of growth at the average load
+    //  RAM: LSM-backend baseline on every node
+    r.ram = nodes * RAM_PER_NODE
+    r.costRam = r.ram * getFloat(uiRam)
+
+    //  Disks grow with the chain: each month they hold what the node needs today plus `margin`
+    //  months of growth at the average load, and are enlarged as it grows (cloud volumes resize
+    //  in place). Month m holds m − 1 + margin months of growth, so the average over the first
+    //  `horizon` months holds (horizon − 1) / 2 + margin.
+    var margin = Math.max(0, getFloat(uiDiskMargin)), horizon = Math.max(1, getFloat(uiHorizon))
+
+    //  Fast SSD (volatile path): FAST_LEDGER, plus UTxO growth at the average load (each new entry
+    //  held twice over, like the tables), plus the EBs held at the peak
+    var heldShare = Math.min(1, prof.peakSeconds / (K_SECURITY / p.rbRate))
+    r.utxoGrowth = r.avgKBps * 1000 * T_month / TX_BYTES_PER_UTXO * 2 * UTXO_ENTRY_BYTES / GiB   //  GiB/month per node
+    r.ebHeld = Math.max(hi.ebWindow * heldShare, lo.ebWindow)                                     //  GiB/node
+    var fastAt = function(months) { return nodes * (FAST_LEDGER + r.utxoGrowth * months + r.ebHeld) }
+
+    //  Bulk disk (immutable path): the chain today plus its growth at the average load
     var compression = 1 - getFloat(uiCompression) / 100
     r.chainGrowth = compression * mix(hi.storageMonthly, lo.storageMonthly)   //  GiB/month per node
-    r.bulk = nodes * (getFloat(uiCurrentChain) + r.chainGrowth * 12)          //  GiB after a year
-    r.costStorage = r.bulk * getFloat(uiStorage)
+    var bulkAt = function(months) { return nodes * (getFloat(uiCurrentChain) + r.chainGrowth * months) }
+
+    var storageCost = function(months) {
+      return fastAt(months) * getFloat(uiStorageFast) + bulkAt(months) * getFloat(uiStorage)
+    }
+    r.fast = fastAt(margin); r.bulk = bulkAt(margin)                  //  GiB, first month
+    r.costStorage = storageCost((horizon - 1) / 2 + margin)           //  $/mo, average over the horizon
+    r.costStorageFirst = storageCost(margin)                          //  $/mo, first month
+    r.costStorageGrowth = storageCost(1) - storageCost(0)             //  $/mo added each month
 
     //  Egress on the average; peak bandwidth per relay at the peak
     r.egress = relays * mix(hi.egressMonthly, lo.egressMonthly)
@@ -191,7 +251,7 @@ var Controller = (function() {
     r.iops = headroom * nodes * hi.iops
     r.costIops = r.iops * getFloat(uiIops)
 
-    r.cost = r.costVcpu + r.costStorage + r.costIops + r.costEgress
+    r.cost = r.costVcpu + r.costRam + r.costStorage + r.costIops + r.costEgress
     return r
   }
 
@@ -237,18 +297,31 @@ var Controller = (function() {
     uiRbHeaderSize.innerText = RB_HEADER_SIZE
     uiTxRefSize.innerText = TX_REF_SIZE; uiVoteSize.innerText = VOTE_SIZE
     uiCertSize.innerText = p.certSize
+    uiUtxoTables.innerText = UTXO_TABLES; uiLedgerSnapshot.innerText = LEDGER_SNAPSHOT
     uiTxApply.innerText = TX_APPLY_MS; uiEbHeaderVal.innerText = EB_HEADER_VAL_MS; uiVoteVal.innerText = VOTE_VAL_MS
+    uiTxReapply.innerText = TX_REAPPLY_MS; uiClosureVal.innerText = CLOSURE_VAL_MS
     uiCertVal.innerText = p.certValMs.toFixed(2)
 
     // CPU per node, at the peak
     var cpu = r.hi.cpu
     uiCpuApply.innerText    = cpu.apply.toFixed(2)
-    uiCpuReapply.innerText  = cpu.reapply.toFixed(2)
+    uiCpuClosure.innerText  = cpu.closure.toFixed(2)
+    uiCpuAdoption.innerText = cpu.adoption.toFixed(2)
     uiCpuEbHeader.innerText = cpu.ebHeader.toFixed(3)
     uiCpuVote.innerText     = cpu.vote.toFixed(1)
     uiCpuCert.innerText     = cpu.cert.toFixed(2)
     uiCpuTotal.innerText    = cpu.total.toFixed(1)
     uiCpuPercent.innerText  = (cpu.total / 10).toFixed(1)
+    uiVcpuNeeded.innerText  = r.coresNeeded.toFixed(2)
+    uiVcpuNeededUnit.innerText = 'of ' + r.vcpuPerNode + ' vCPU'
+    if (r.hi.leios) {
+      uiEbVal.innerText = r.hi.ebValSeconds.toFixed(2)
+      uiEbValUnit.innerText = 's of ' + p.voteWindow + ' s, ' + Math.round(r.hi.txsPerEb).toLocaleString('en-US') + ' Txs'
+    } else {
+      uiEbVal.innerText = 'no EBs'
+      uiEbValUnit.innerText = ''
+    }
+    uiEbValWarn.hidden = !(r.hi.leios && r.hi.ebValSeconds > p.voteWindow)
 
     // Resources and costs, all nodes
     // All nodes, with the share of one node (or relay) in brackets
@@ -257,13 +330,17 @@ var Controller = (function() {
     var perRelay = function(v, d) { return per(v, r.relays, d, 'relay') }
     var chainGrowth = r.chainGrowth * r.nodes, nic = r.nic * r.relays
     uiTotalVcpu.innerText = r.vcpu;                      uiTotalVcpuUnit.innerText = 'vCPU' + perNode(r.vcpu, 0)
+    uiTotalRam.innerText = r.ram;                        uiTotalRamUnit.innerText = 'GiB' + perNode(r.ram, 0)
+    uiFastStorage.innerText = r.fast.toFixed(2);         uiFastStorageUnit.innerText = 'GiB' + perNode(r.fast, 1) + ', +' + (r.utxoGrowth * r.nodes).toFixed(2) + '/mo'
     uiChainGrowth.innerText = chainGrowth.toFixed(2);    uiChainGrowthUnit.innerText = 'GiB/mo' + perNode(chainGrowth, 2)
     uiTotalStorage.innerText = r.bulk.toFixed(2);        uiTotalStorageUnit.innerText = 'GiB' + perNode(r.bulk, 1)
     uiTotalIops.innerText = Math.round(r.iops);          uiTotalIopsUnit.innerText = 'IOPS' + perNode(r.iops, 0)
     uiTotalEgress.innerText = r.egress.toFixed(2);       uiTotalEgressUnit.innerText = 'GiB/mo' + perRelay(r.egress, 1)
     uiNic.innerText = nic.toFixed(1);                    uiNicUnit.innerText = 'Mb/s' + perRelay(nic, 1)
     uiCostVcpu.innerText = r.costVcpu.toFixed(2)
+    uiCostRam.innerText = r.costRam.toFixed(2)
     uiCostStorage.innerText = r.costStorage.toFixed(2)
+    uiCostStorageUnit.innerText = '$/mo (month 1: ' + r.costStorageFirst.toFixed(2) + ', +' + r.costStorageGrowth.toFixed(2) + ' a month)'
     uiCostIops.innerText = r.costIops.toFixed(2)
     uiCostEgress.innerText = r.costEgress.toFixed(2)
     uiCost.innerText = r.cost.toFixed(2)
@@ -313,10 +390,11 @@ var Controller = (function() {
     calculate()
   }
 
-  // Cloud price presets
+  // Cloud price presets. RAM and the fast SSD, priced since this update, use the average list
+  // prices of each group, checked 2026-11-10.
   var PRESETS = {
-    Hyperscale: { uiVcpu: "20", uiStorage: "0.12", uiIops: "0.05", uiEgress: "0.09" },
-    Discount:   { uiVcpu: "20", uiStorage: "0.10", uiIops: "0.00", uiEgress: "0.00" }
+    Hyperscale: { uiVcpu: "20", uiRam: "2.23", uiStorageFast: "0.087", uiStorage: "0.12", uiIops: "0.05", uiEgress: "0.09" },
+    Discount:   { uiVcpu: "20", uiRam: "2.53", uiStorageFast: "0.00",  uiStorage: "0.10", uiIops: "0.00", uiEgress: "0.00" }
   }
 
   function applyPreset(name) {
@@ -380,8 +458,10 @@ var Controller = (function() {
     , uiBaseLoad
     , uiCompression
     , uiCurrentChain
+    , uiDiskMargin
     , uiEgress
     , uiFetchMult
+    , uiHorizon
     , uiInboundPeers
     , uiIops
     , uiLDiff
@@ -391,14 +471,17 @@ var Controller = (function() {
     , uiMaxEbTxs
     , uiMaxRbBody
     , uiProducers
+    , uiRam
     , uiRelays
     , uiSpike
     , uiSpikeHours
     , uiStorage
     , uiSlotLength
+    , uiStorageFast
     , uiTxSize
     , uiUtil
     , uiVcpu
+    , uiVcpuPerNode
     , uiVotesPerEB
     ].forEach(function(el) { el.addEventListener("input", calculate) })
 
