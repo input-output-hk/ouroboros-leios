@@ -5,6 +5,18 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## rc-2026w46 - 2026-11-15
+
+Small consensus release: Voters validate large endorser blocks much faster, and a memory leak in the LeiosNotify server is fixed.
+
+- Voters validate an endorser block's transactions at a constant cost per transaction, instead of one that grows with the endorser block [consensus#2498](https://github.com/IntersectMBO/ouroboros-consensus/pull/2498)
+  - Fewer votes arrive `tooLate` on large endorser blocks.
+- The LeiosNotify server no longer leaks memory through its busy counter [consensus#2500](https://github.com/IntersectMBO/ouroboros-consensus/pull/2500)
+
+> [!NOTE]
+>
+> No resync, no respin. Nodes of this and the w45 release can talk to each other, and a w45 configuration loads unchanged.
+
 ## rc-2026w45 - 2026-11-06
 
 Small release with a few consensus internal changes: Adaptive endorsements react only to missed quorums, block producers stop fetching their own endorser blocks back, and the mempool waits for a committee that can reach a quorum.
