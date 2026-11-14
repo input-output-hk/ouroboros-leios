@@ -18,10 +18,9 @@
 ## Understanding IOPS 
 
 IOPS (Input/Output Operations Per Second) in cloud environments are measured
-based on standard-sized blocks of data. For AWS EBS volumes and similar cloud
-storage services, the block size is typically 4 KiB (4,096 bytes). Each read
-or write operation to a block counts as one IOPS, regardless of how much data
-is actually accessed within that block.
+in operations on blocks of data. This analysis counts one operation per 4 KiB
+(4,096 bytes) read or written. That is conservative: AWS EBS counts an SSD
+I/O of up to 256 KiB as one operation.
 
 ### IOPS Conversion Formula
 
@@ -45,14 +44,14 @@ per-transaction UTxO inserts/deletes written to the LSM-tree on disk.
 | Block header read   | 0.05×0.1/s | $0.05 \times 0.1 = 0.005$         |
 | Block body write    | 0.05/s     | $0.05 \times 22 = 1.10$           |
 | Block body read     | 0.05×0.1/s | $0.05 \times 2.2 = 0.11$          |
-| UTxO state updates  | 3/tx       | $(4{,}500/1{,}500) \times 3 = 9.0$ |
-| **Total**           |            | **≈ 10.3 IOPS/s**                 |
+| UTxO state updates  | 3/tx       | $(4{,}500/1{,}132) \times 3 = 11.9$ |
+| **Total**           |            | **≈ 13.2 IOPS/s**                 |
 
 ### Praos IOPS Calculation (0.05 blocks/s, UTxO-HD)
 
-$$IOPS_{\text{praos}} = 1.265 + 9.0 \approx 10.3 \text{ IOPS/s}$$
+$$IOPS_{\text{praos}} = 1.265 + 11.9 \approx 13.2 \text{ IOPS/s}$$
 
-The UTxO state updates dominate at 87%, identical to the Leios pattern — because
+The UTxO state updates dominate at 90%, identical to the Leios pattern — because
 UTxO writes scale with confirmed transaction rate regardless of protocol.
 
 ## Ouroboros Leios
@@ -67,9 +66,8 @@ each confirmed transaction triggers UTxO state updates on disk.
 | ----------------------- | ---------------------------------------------- | ------------ |
 | Tx data writes          | Raw confirmed transaction bytes to disk        | TxkB/s       |
 | UTxO state updates      | Insert/delete UTxO entries (LSM tree writes)   | Tx/s         |
-| EB body writes          | Tx hash references in certified EB bodies      | TxkB/s       |
-| RB writes/reads         | Ranking blocks with embedded certificates      | Fixed        |
-| EB header writes/reads  | EB headers (small, fixed rate)                 | Fixed        |
+| EB body writes          | Tx references in every fetched EB body         | TxkB/s       |
+| RB writes/reads         | Ranking blocks (their headers announce the EBs) with embedded certificates | Fixed |
 
 ### IOPS Formulas
 
@@ -81,79 +79,83 @@ each confirmed transaction triggers UTxO state updates on disk.
 
 2. **UTxO State Update IOPS** (dominant — per confirmed tx, LSM tree writes):
 
-   $$IOPS_{\text{utxo}} = \frac{\text{TxkB/s} \times 1{,}000}{1{,}500} \times 3$$
+   $$IOPS_{\text{utxo}} = \frac{\text{TxkB/s} \times 1{,}000}{1{,}132} \times 3$$
 
-   where 1,500 bytes is the average tx size and 3 IOPS/tx estimates the
-   combined UTxO inserts and deletes per transaction.
+   where 1,132 bytes is the average tx size (the mainnet mean over epochs
+   589–661) and 3 IOPS/tx estimates the
+   combined UTxO inserts and deletes per transaction. A mainnet transaction
+   touches 5.4 UTxO entries (2.71 inputs and 2.70 outputs, epochs 589–661).
 
    > [!Note]
-   > UTxO-HD uses an LSM tree structure. In practice, writes are batched into
-   > memtables and flushed periodically, so peak IOPS is lower than the raw
-   > per-tx count above. The formula gives a conservative upper bound.
+   > UTxO-HD uses an LSM tree structure. Writes are batched into memtables and
+   > flushed periodically, so the operations per transaction stay below the 5.4
+   > entries it touches. 3 per transaction is an estimate, not a measurement.
 
-3. **EB Body IOPS** (tx hash references; P(cert) cancels, use $R_{\text{eb}}$):
+3. **EB Body IOPS** (tx references, every fetched EB):
 
-   At 200 TxkB/s, EB body ≈ $\frac{133}{0.05} \times 32 = 85{,}333$ bytes → 21 blocks.
-   $$IOPS_{\text{eb-body}} = 0.05 \times 21 \times 1.2 \approx 1.26 \text{ IOPS/s}$$
+   Every fetched EB is written, certified or not: it stays on the fast SSD until
+   $k$ blocks deep. Each EB references the throughput above the 2.19 TxkB/s that RBs
+   carry, divided by the certified EB rate ($0.513 \times 0.05$/s), at 37 B per
+   transaction. At 200 TxkB/s, EB body ≈ $\frac{(200{,}000 - 2{,}193) / 1{,}132}{0.513 \times 0.05} \times 37 = 251{,}896$ bytes → 62 blocks.
+   $$IOPS_{\text{eb-body}} = 0.05 \times 62 \times 1.2 = 3.72 \text{ IOPS/s}$$
 
-4. **RB IOPS** (fixed):
+4. **RB IOPS** (fixed; the RB header announces the EB, so there is no separate
+   EB header to write):
 
    $$IOPS_{\text{rb}} = 0.05 \times 2 \times 1.2 = 0.12 \text{ IOPS/s}$$
-
-5. **EB Header IOPS** (certified EBs only):
-
-   Uncertified EB headers are not written to disk; only certified ones persist.
-   $$IOPS_{\text{eb-hdr}} = R_{\text{cert}} \times 1 \times 1.2 = 0.024 \times 1 \times 1.2 = 0.029 \text{ IOPS/s}$$
 
 ### IOPS at 5 TxkB/s (Leios Baseline)
 
 1. **Tx data**: $\frac{5{,}000}{4{,}096} \times 1.1 = 1.34 \text{ IOPS/s}$
 
-2. **UTxO state**: $\frac{5{,}000}{1{,}500} \times 3 = 10.0 \text{ IOPS/s}$
+2. **UTxO state**: $\frac{5{,}000}{1{,}132} \times 3 = 13.25 \text{ IOPS/s}$
 
-3. **EB body**: $0.05 \times \lceil 2{,}133 / 4{,}096 \rceil \times 1.2 = 0.05 \times 1 \times 1.2 = 0.06 \text{ IOPS/s}$
+3. **EB body**: $0.05 \times \lceil 3{,}575 / 4{,}096 \rceil \times 1.2 = 0.05 \times 1 \times 1.2 = 0.06 \text{ IOPS/s}$
 
-4. **RB + EB headers**: $0.12 + 0.029 = 0.149 \text{ IOPS/s}$
+4. **RB**: $0.12 \text{ IOPS/s}$
 
-5. **Total**: $1.34 + 10.0 + 0.06 + 0.149 \approx 11.55 \text{ IOPS/s}$
+5. **Total**: $1.34 + 13.25 + 0.06 + 0.12 \approx 14.77 \text{ IOPS/s}$
 
 At 5 TxkB/s, Leios requires only ~12% more IOPS than Praos at 4.5 TxkB/s
-(11.6 vs 10.3 IOPS/s) when both use UTxO-HD. The small difference comes from
+(14.8 vs 13.2 IOPS/s) when both use UTxO-HD. The small difference comes from
 the slightly higher throughput (5 vs 4.5 TxkB/s) plus EB overhead.
 
 ### IOPS Requirements at Different Confirmed Throughputs
 
 | TxkB/s      | Tx/s | Tx Data IOPS | UTxO IOPS | EB Body IOPS | Fixed IOPS | Total IOPS/s |
 |-------------|------|--------------|-----------|--------------|------------|--------------|
-| 4.5 (Praos) | 3    | 1.27         | 9.0       | —            | —          | 10.3         |
-| 5           | 3    | 1.34         | 10.0      | 0.06         | 0.15       | 11.55        |
-| 50          | 33   | 13.4         | 100.0     | 0.36         | 0.15       | 113.9        |
-| 100         | 67   | 26.9         | 200.0     | 0.66         | 0.15       | 227.7        |
-| 200         | 133  | 53.7         | 400.0     | 1.26         | 0.15       | 455.1        |
-| 300         | 200  | 80.6         | 600.0     | 1.92         | 0.15       | 682.7        |
+| 4.5 (Praos) | 4    | 1.27         | 11.9      | —            | —          | 13.2         |
+| 5           | 4    | 1.34         | 13.25     | 0.06         | 0.12       | 14.77        |
+| 50          | 44   | 13.4         | 132.5     | 0.90         | 0.12       | 147.0        |
+| 100         | 88   | 26.9         | 265.0     | 1.86         | 0.12       | 293.9        |
+| 200         | 177  | 53.7         | 530.0     | 3.72         | 0.12       | 587.6        |
+| 300         | 265  | 80.6         | 795.1     | 5.58         | 0.12       | 881.3        |
 
 > [!Note]
 >
 > - Both Praos and Leios modeled with UTxO-HD; UTxO state IOPS dominates for
->   both (~87–88% of total) — this is a property of UTxO-HD, not of Leios
-> - Tx/s assumes average transaction size of 1,500 bytes
+>   both (~90% of total) — this is a property of UTxO-HD, not of Leios
+> - Tx/s assumes average transaction size of 1,132 bytes
 > - The Praos "Tx Data IOPS" column captures block body writes/reads (0.05 blocks/s
 >   × 22 blocks/body × 1.1 read-back); Leios uses mempool gossip writes instead
 > - All throughput levels fit within the base IOPS included with standard
 >   cloud storage volumes (typically 3,000–5,000 IOPS), so no additional
 >   provisioned IOPS are required for this workload alone
-> - The 3 IOPS/tx UTxO estimate is a conservative upper bound; LSM tree
->   batching in practice results in lower effective IOPS
+> - The 3 IOPS/tx UTxO estimate sits below the 5.4 entries a mainnet
+>   transaction touches; LSM batching keeps the operations below that. Even at
+>   5.4 per transaction and the estimator's 2× headroom, a node needs about 800
+>   IOPS at M2 capacity, 2,000 at 200 TxkB/s and 3,035 at 300 TxkB/s, just over
+>   the 3,000 included with a volume
 
 ### IOPS Component Analysis at 200 TxkB/s
 
 | Component       | IOPS/s    | % of Total |
 |-----------------|-----------|------------|
-| UTxO State      | 400.0     | 87.9%      |
-| Tx Data Writes  | 53.7      | 11.8%      |
-| EB Body         | 1.26      | 0.3%       |
-| RB + EB Headers | 0.15      | < 0.1%     |
-| **Total**       | **455.1** | **100%**   |
+| UTxO State      | 530.0     | 90.2%      |
+| Tx Data Writes  | 53.7      | 9.1%       |
+| EB Body         | 3.72      | 0.6%       |
+| RB              | 0.12      | < 0.1%     |
+| **Total**       | **587.6** | **100%**   |
 
 ## Monthly Cost by Cloud Provider ($)
 
@@ -162,39 +164,41 @@ cloud SSD volumes. No additional provisioned IOPS are required.
 
 | Provider     | Storage Type      | Included IOPS | 4.5 (Praos) | 5 TxkB/s | 50 TxkB/s | 100 TxkB/s | 200 TxkB/s | 300 TxkB/s |
 | ------------ | ----------------- | ------------- | ----------- | --------- | --------- | ---------- | ---------- | ---------- |
-| AWS          | gp3               | 3,000         | $10         | $10       | $10       | $10        | $10        | $10        |
-| GCP          | Standard PD       | 3,000         | $15         | $15       | $15       | $15        | $15        | $15        |
-| Azure        | Standard SSD E    | 3,000         | $12         | $12       | $12       | $12        | $12        | $12        |
-| DigitalOcean | Standard SSD      | 5,000         | $8          | $8        | $8        | $8         | $8         | $8         |
-| Linode       | Standard Volume   | 5,000         | $7          | $7        | $7        | $7         | $7         | $7         |
-| Hetzner      | Standard volumes  | 4,000         | $5          | $5        | $5        | $5         | $5         | $5         |
+| AWS          | gp3               | 3,000         | $0          | $0        | $0        | $0         | $0         | $0         |
+| GCP          | pd-balanced       | 3,000         | $0          | $0        | $0        | $0         | $0         | $0         |
+| Azure        | Premium SSD v2    | 3,000         | $0          | $0        | $0        | $0         | $0         | $0         |
+| DigitalOcean | Plan's local disk | Not billed    | $0          | $0        | $0        | $0         | $0         | $0         |
+| Akamai (Linode) | Plan's local disk | Not billed | $0          | $0        | $0        | $0         | $0         | $0         |
+| Hetzner      | Plan's local NVMe | Not billed    | $0          | $0        | $0        | $0         | $0         | $0         |
 
 > [!Note]
 >
-> - Costs include the storage volume (~1 TB) and base IOPS provisioning
-> - The maximum required IOPS (681.5/s at 300 TxkB/s) is well within all
->   providers' included base IOPS, so the cost is flat across throughput levels
-> - For comparison, Leios at 300 TxkB/s requires ~682 IOPS/s peak vs the 3,000+
->   IOPS included as standard — a comfortable 4× headroom
+> - IOPS only; the volumes themselves are priced in [03-storage.md](./03-storage.md).
+>   The hyperscalers bill IOPS only above the 3,000 included with each volume, and
+>   the other three providers don't bill IOPS (prices checked on 2026-11-10)
+> - The maximum required IOPS (881.3/s at 300 TxkB/s) is within all providers'
+>   included base IOPS, so the cost is flat across throughput levels
+> - With the estimator's 2× headroom, Leios at 300 TxkB/s needs about 1,760 IOPS
+>   against the 3,000 included as standard: 1.7× to spare
 
 ### Storage Cost Sources
 
 | Provider     | Storage Type      | Source                                                      | Last Updated |
 | ------------ | ----------------- | ----------------------------------------------------------- | ------------ |
-| AWS          | gp3               | https://aws.amazon.com/ebs/pricing/                         | Apr 2025     |
-| GCP          | Standard PD       | https://cloud.google.com/compute/disks-image-pricing        | Apr 2025     |
-| Azure        | Standard SSD      | https://azure.microsoft.com/pricing/details/managed-disks/  | Apr 2025     |
-| DigitalOcean | Standard SSD      | https://www.digitalocean.com/pricing/volumes                | Apr 2025     |
-| Linode       | Block Storage     | https://www.linode.com/pricing/#storage                     | Apr 2025     |
-| Hetzner      | Standard volumes  | https://www.hetzner.com/cloud/pricing                       | Apr 2025     |
+| AWS          | gp3               | https://aws.amazon.com/ebs/pricing/                         | Nov 2026     |
+| GCP          | pd-balanced       | https://cloud.google.com/compute/disks-image-pricing        | Nov 2026     |
+| Azure        | Premium SSD v2    | https://azure.microsoft.com/pricing/details/managed-disks/  | Nov 2026     |
+| DigitalOcean | Plan's local disk | https://www.digitalocean.com/pricing/volumes                | Nov 2026     |
+| Akamai (Linode) | Plan's local disk | https://www.linode.com/pricing/#storage                  | Nov 2026     |
+| Hetzner      | Plan's local NVMe | https://www.hetzner.com/cloud/pricing                       | Nov 2026     |
 
 ## Key Findings
 
-- **Praos at 4.5 TxkB/s (UTxO-HD)**: ~10.3 IOPS/s — dominated by UTxO state
+- **Praos at 4.5 TxkB/s (UTxO-HD)**: ~13.2 IOPS/s — dominated by UTxO state
   updates, same as Leios at the same throughput
-- **Leios at 5 TxkB/s**: ~11.6 IOPS/s — only ~12% more than Praos at 4.5
+- **Leios at 5 TxkB/s**: ~14.8 IOPS/s — only ~12% more than Praos at 4.5
   TxkB/s; the small difference comes from slightly higher throughput and EB overhead
-- **Leios at 300 TxkB/s**: ~683 IOPS/s, still within base cloud IOPS budgets
+- **Leios at 300 TxkB/s**: ~880 IOPS/s, still within base cloud IOPS budgets
 - IOPS is not a cost driver for either protocol — standard SSD volumes are
   sufficient at all throughput levels up to the CIP-164 capacity ceiling
 - UTxO state IOPS dominates at all loads for both protocols — this is a
