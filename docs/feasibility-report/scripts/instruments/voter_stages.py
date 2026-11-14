@@ -41,7 +41,8 @@ from collections import defaultdict
 BINS = [(0, 2000, "under 2,000"), (2000, 4000, "2,000 to 4,000"), (4000, 6000, "4,000 to 6,000"), (6000, 10**9, "6,000 and up")]
 COUNTS = ["votes", "by3", "after3", "never_closure", "val4", "val_long", "never_val",
           "voted", "late", "late_closure", "late_val", "late_never"]
-FIELDS = ["bin", "ebs", "voters_p50"] + COUNTS + ["late_over_margin", "known", "eligible", "certified"]
+FIELDS = ["bin", "ebs", "voters_p50"] + COUNTS + ["late_over_margin", "known", "eligible", "certified",
+                                                  "w_voted_p25", "w_voted_p50", "w_voted_p75"]
 STAGES_HEAD = "| EB size, txs | EBs | voters per EB | closure by 3 s / after 3 s / after 7 s or never | validation within 4 s / longer / never |"
 OUTCOME_HEAD = ("| EB size, txs | EBs | voted in time / too late | late: closure arrived after 7 s / validation past 7 s / never validated "
                 "| EBs with late voters over a quarter | certified, of the EBs the chain could certify |")
@@ -51,8 +52,26 @@ def fnum(s):
     return float(s) if s not in ("", None) else None
 
 
-def summarise(pairs_path, chain_path, gap, margin):
-    """The per-bin counts of FIELDS from the per-(voter, EB) records and the chain cache."""
+def pool_weights(voters_path):
+    """{pool: share of the committee's weight}, averaged over the window's sub-windows (voters.csv of
+    coverage.sql); None without a file, when every voter weighs the same (the cluster)."""
+    if not voters_path:
+        return None
+    acc, wins = defaultdict(list), set()
+    with open(voters_path, newline="") as f:
+        for v in csv.DictReader(f):
+            wins.add(v["win"])
+            acc[v["pool_id"]].append(float(v["weight"]))
+    w = {p: sum(x) / len(wins) for p, x in acc.items()}
+    total = sum(w.values())
+    return {p: x / total for p, x in w.items()}
+
+
+def summarise(pairs_path, chain_path, gap, margin, voters_path=None):
+    """The per-bin counts of FIELDS from the per-(voter, EB) records and the chain cache. With a voters
+    file, also the committee weight of the voters that voted in time per EB, as quartiles over the bin's
+    EBs (w_voted_*); without one, each voter weighs one over the EB's voters."""
+    weights = pool_weights(voters_path)
     ebs = defaultdict(list)
     txs = {}
     with open(pairs_path, newline="") as f:
@@ -61,7 +80,7 @@ def summarise(pairs_path, chain_path, gap, margin):
             t = fnum(r["txs"])
             if t is not None:
                 txs[eb] = max(txs.get(eb, 0), t)
-            ebs[eb].append((fnum(r["closure_s"]), fnum(r["validated_s"]), fnum(r["duration_s"]), r["outcome"]))
+            ebs[eb].append((fnum(r["closure_s"]), fnum(r["validated_s"]), fnum(r["duration_s"]), r["outcome"], r.get("pool")))
 
     # per announced EB: eligible if the next RB came --gap slots or more after the announcing one; certified if that RB carried the certificate
     chain = {}
@@ -78,19 +97,23 @@ def summarise(pairs_path, chain_path, gap, margin):
         n = len(vs)
         if n == 0 or eb not in txs:
             continue
-        by3 = sum(1 for c, _, _, _ in vs if c is not None and c <= 3)
-        by7 = sum(1 for c, _, _, _ in vs if c is not None and c <= 7)
-        val4 = sum(1 for c, v, d, _ in vs if d is not None and d <= 4)
-        val_long = sum(1 for c, v, d, _ in vs if d is not None and d > 4)
-        late = [(c, v, d) for c, v, d, o in vs if o == "tooLate"]
+        by3 = sum(1 for c, _, _, _, _ in vs if c is not None and c <= 3)
+        by7 = sum(1 for c, _, _, _, _ in vs if c is not None and c <= 7)
+        val4 = sum(1 for c, v, d, _, _ in vs if d is not None and d <= 4)
+        val_long = sum(1 for c, v, d, _, _ in vs if d is not None and d > 4)
+        late = [(c, v, d) for c, v, d, o, _ in vs if o == "tooLate"]
         late_closure = sum(1 for c, v, d in late if c is None or c > 7)
         late_val = sum(1 for c, v, d in late if c is not None and c <= 7 and v is not None)
+        if weights is None:
+            w_voted = sum(1 for _, _, _, o, _ in vs if o == "voted") / n
+        else:
+            w_voted = sum(weights.get(pl, 0.0) for _, _, _, o, pl in vs if o == "voted")
         per_eb.append(dict(txs=txs[eb], votes=n,
                            by3=by3, after3=by7 - by3, never_closure=n - by7,
                            val4=val4, val_long=val_long, never_val=n - val4 - val_long,
-                           voted=sum(1 for _, _, _, o in vs if o == "voted"), late=len(late),
+                           voted=sum(1 for _, _, _, o, _ in vs if o == "voted"), late=len(late),
                            late_closure=late_closure, late_val=late_val, late_never=len(late) - late_closure - late_val,
-                           chain=chain.get(eb)))
+                           w_voted=w_voted, chain=chain.get(eb)))
 
     rows = []
     for lo, hi, lab in BINS:
@@ -104,6 +127,9 @@ def summarise(pairs_path, chain_path, gap, margin):
             row[k] = sum(r[k] for r in rs)
         row["late_over_margin"] = sum(r["late"] > margin * r["votes"] for r in rs)
         row["known"], row["eligible"], row["certified"] = len(known), len(eligible), sum(r["chain"][1] for r in eligible)
+        ws = sorted(r["w_voted"] for r in rs)
+        for k, p in (("w_voted_p25", 0.25), ("w_voted_p50", 0.5), ("w_voted_p75", 0.75)):
+            row[k] = "%.4f" % ws[min(len(ws) - 1, int(round((len(ws) - 1) * p)))]
         rows.append(row)
     return rows
 
@@ -135,10 +161,12 @@ def main():
     ap.add_argument("--gap", type=int, default=14, help="certification gap in slots: an EB is eligible when the next RB is this far or more (default 14)")
     ap.add_argument("--margin", type=float, default=0.25, help="late share above which an EB cannot reach the quorum (default 0.25)")
     ap.add_argument("--csv", help="write the per-bin counts here (the printer's input); default none")
+    ap.add_argument("--voters", help="the window's voters.csv (coverage.sql), for the committee weight that voted in time per EB; "
+                                     "without it every voter weighs one over the EB's voters (the cluster)")
     ap.add_argument("--table", choices=["stages", "outcome", "both"], default="both", help="which table to print (default both)")
     a = ap.parse_args()
 
-    rows = summarise(a.pairs, a.chain, a.gap, a.margin)
+    rows = summarise(a.pairs, a.chain, a.gap, a.margin, a.voters)
     if a.csv:
         with open(a.csv, "w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=FIELDS)

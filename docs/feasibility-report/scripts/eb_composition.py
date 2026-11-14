@@ -25,7 +25,7 @@ Composition: transactions of 700 B or more count as the 1 kB kind, under
 import argparse, csv, os, sqlite3
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CLASSES = [(0, 2500, "under 2,500 references (1 kB closures)"), (2500, 6000, "2,500-6,000 references (mixed)"), (6000, 10 ** 9, "6,000 references and up (small transactions)")]
+CLASSES = [(0, 2000, "under 2,000 txs"), (2000, 4000, "2,000-4,000"), (4000, 6000, "4,000-6,000"), (6000, 10 ** 9, "6,000 and up")]  # the bins of Tables 4.7 and 4.9
 
 
 def q(xs, p):
@@ -56,20 +56,20 @@ def main():
         rows = [r for r in rows if ((a.slot0 + r[1]) // 3600) % 2 == 0]
     with open(a.composition, newline="") as f:
         comp = {int(r["block_no"]): {k: int(v) for k, v in r.items()} for r in csv.DictReader(f)}
-    print("| EB class | eligible EBs | certified | certified closure p50 | transactions p50 (certified) | of which about 1 kB / small, p50 | closures that are mixed |")
-    print("|---|---|---|---|---|---|---|")
+    # the EB counts, certified shares and closure sizes per bin are Table 4.9's; this table is the composition only
+    print("| EB size | certified closure, kB | transactions p50 (certified closures) | of which about 1 kB / small, p50 |")
+    print("|---|---:|---:|---:|")
     for lo, hi, label in CLASSES:
         rs = [r for r in rows if lo <= r[2] < hi]
         cert = [r for r in rs if r[4] == 1]
         # the certifying RB is the next block
         cs = [comp[r[0] + 1] for r in cert if r[0] + 1 in comp]
-        mixed = sum(1 for c in cs if c["big"] and c["small"])
-        print("| %s | %d | %d (%.0f %%) | %s | %s | %s | %s |" % (
-            label, len(rs), len(cert), 100.0 * len(cert) / len(rs) if rs else 0,
-            ("%s kB" % format(round(q([r[3] for r in cert if r[3]], 0.5) / 1e3), ",")) if cert else "-",
+        kb = [r[3] for r in cert if r[3]]
+        print("| %s | %s | %s | %s |" % (
+            label,
+            " / ".join(format(round(q(kb, p) / 1e3), ",") for p in (0.25, 0.5, 0.75)) if kb else "-",
             format(round(q([c["txs"] for c in cs], 0.5)), ",") if cs else "-",
-            ("%s / %s" % (format(round(q([c["big"] for c in cs], 0.5)), ","), format(round(q([c["small"] for c in cs], 0.5)), ","))) if cs else "-",
-            ("%d of %d" % (mixed, len(cs))) if cs else "-"))
+            ("%s / %s" % (format(round(q([c["big"] for c in cs], 0.5)), ","), format(round(q([c["small"] for c in cs], 0.5)), ","))) if cs else "-"))
     print("\n%d eligible EBs, %d certified; composition from db-sync for %d certified closures." % (len(rows), sum(1 for r in rows if r[4] == 1), sum(1 for r in rows if r[4] == 1 and r[0] + 1 in comp)))
 
 

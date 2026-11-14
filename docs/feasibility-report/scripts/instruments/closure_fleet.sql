@@ -1,12 +1,14 @@
 -- The per-EB view of closure diffusion for under the stage table (the tail):
 -- for each eligible EB over the loaded hours of a testnet period, the age
--- (seconds after its slot) by which 90 % and 95 % of the reporting nodes
--- that received it (announcement age <= 60 s, 40+ nodes) held its closure
--- (BlockTxsAcquired.closureAgeSeconds; a node that never completed counts
--- as infinite, shown as 1e9), then the distribution of those ages over EBs,
--- the share of EBs whose closure 90 % of the nodes held by 3 s and by 7 s,
--- and the same by EB size (transactions = reference bytes / 36) with the
--- certified closures' median bytes; then the 6,000-and-up class split at the
+-- (seconds after its slot) by which 75 %, 90 % and 95 % of the reporting
+-- nodes that received it (announcement age <= 60 s, 40+ nodes) held its
+-- closure (BlockTxsAcquired.closureAgeSeconds; a node that never completed
+-- counts as infinite, shown as 1e9), then the distribution of those ages
+-- over EBs, the share of EBs whose closure 75 % and 90 % of the nodes held
+-- by 7 s, and the same by EB size (transactions = reference bytes / 36) with
+-- the quartiles of the certified closures' bytes and of the 75 % age over the
+-- bin's EBs (the 75 % threshold is the quorum's, three nodes in four; the
+-- report's Tables 4.7 and 4.9); then the 6,000-and-up class split at the
 -- reference cap (8,550 references and up), with the nodes that received the
 -- body (BlockAcquired) and the closure per EB, since the EBs at the cap mostly
 -- never deliver their body (read in 4.3.1's prose; eb_forgers.py joins them
@@ -15,7 +17,10 @@
 --
 -- Variables as in validation_pairs.sql: t0, t1, win, gap (default 14), slot0
 -- (default 1792281600), chain (default chain-2026-10-18/blocks.sqlite under the
--- working directory, the data folder).
+-- working directory, the data folder), and voters (the window's voters.csv
+-- from coverage.sql, default voters.csv in the working directory): each
+-- node's pool weight gives, per EB, the share of the committee's weight that
+-- held the closure by 3 s and by 7 s (w_by3, w_by7; Tables 4.7 and 4.9).
 --
 --   duckdb -readonly -markdown archive/f2-high-merged.duckdb \
 --     -c "set variable t0 = '2026-10-24 12:00:00'; set variable t1 = '2026-10-26 13:00:00'; set variable win = 'windows-f2-high.txt';" \
@@ -37,35 +42,47 @@ create temp table ebs as
   where b.eb_announcement_hash is not null and n.slot_no - b.slot_no >= p.gap
     and exists (select 1 from win w where p.slot0 + b.slot_no >= w.s and p.slot0 + b.slot_no < w.e);
 -- extract first, then filter: a filter on data->>x straight on trace makes DuckDB cast other namespaces' payloads
+-- each reporting pool's share of the committee's weight, averaged over the window's sub-windows
+-- (voters.csv, written by coverage.sql; variable `voters`, default voters.csv in the working directory)
+create temp table weight as
+  select pool_id pool, sum(weight) / (select count(distinct win) from read_csv(coalesce(getvariable('voters'), 'voters.csv'))) w
+  from read_csv(coalesce(getvariable('voters'), 'voters.csv')) group by 1;
 create temp table ev as
-  select agent, ns, data->>'$.ebHash' eb, try_cast(data->>'$.closureAgeSeconds' as double) age,
+  select agent, pool, ns, data->>'$.ebHash' eb, try_cast(data->>'$.closureAgeSeconds' as double) age,
          try_cast(data->>'$.bodyAgeSeconds' as double) body,
          try_cast(data->>'$.announcementAgeSeconds' as double) ann
   from trace, p where ns in ('Consensus.LeiosKernel.AnnouncementAccepted', 'Consensus.LeiosKernel.BlockAcquired', 'Consensus.LeiosKernel.BlockTxsAcquired')
     and t >= p.t0 and t < p.t1 + interval 1 hour;
 create temp table pair as
-  select eb, agent,
+  select eb, agent, any_value(pool) pool,
          min(age) filter (where ns = 'Consensus.LeiosKernel.BlockTxsAcquired') closure_s,
          min(body) filter (where ns = 'Consensus.LeiosKernel.BlockAcquired') body_s,
          min(ann) filter (where ns = 'Consensus.LeiosKernel.AnnouncementAccepted') ann_s
   from ev where eb in (select eb from ebs) group by 1, 2 having
          min(ann) filter (where ns = 'Consensus.LeiosKernel.AnnouncementAccepted') <= 60;
+-- per EB: the node counts and ages, and the share of the committee's weight held by the nodes that had the
+-- closure by 3 s and by 7 s (w_by3, w_by7, over the committee's total weight, so the ceiling is the
+-- reporting weight; an EB nobody completed reads 0)
 create temp table per_eb as
   select eb, txs, closure, certified, count(*) nodes, count(body_s) nodes_body, count(closure_s) nodes_closure,
-         quantile_cont(coalesce(closure_s, 1e9), 0.9) t90, quantile_cont(coalesce(closure_s, 1e9), 0.95) t95
-  from pair join ebs using (eb) group by 1, 2, 3, 4 having count(*) >= 40;
+         quantile_cont(coalesce(closure_s, 1e9), 0.75) t75,
+         quantile_cont(coalesce(closure_s, 1e9), 0.9) t90, quantile_cont(coalesce(closure_s, 1e9), 0.95) t95,
+         coalesce(sum(coalesce(w.w, 0)) filter (where closure_s <= 3), 0) / (select sum(w) from weight) w_by3,
+         coalesce(sum(coalesce(w.w, 0)) filter (where closure_s <= 7), 0) / (select sum(w) from weight) w_by7
+  from pair join ebs using (eb) left join weight w using (pool) group by 1, 2, 3, 4 having count(*) >= 40;
 copy (select * from per_eb order by eb) to 'closure_fleet_per_eb.csv' (header, delimiter ',');
 select 'EBs' what, count(*) n, round(100.0 * avg(certified)) pct_certified,
-       round(quantile_cont(t90, 0.5), 2) t90_p50, round(quantile_cont(t90, 0.9), 2) t90_p90,
-       round(quantile_cont(t95, 0.5), 2) t95_p50, round(quantile_cont(t95, 0.9), 2) t95_p90,
-       round(100.0 * sum(t90 < 3) / count(*)) pct_ebs_t90_lt3, round(100.0 * sum(t90 < 7) / count(*)) pct_ebs_t90_lt7,
-       round(100.0 * sum(t95 < 7) / count(*)) pct_ebs_t95_lt7
+       round(quantile_cont(w_by3, 0.5), 2) w_by3_p50, round(quantile_cont(w_by7, 0.5), 2) w_by7_p50,
+       round(quantile_cont(t75, 0.5), 2) t75_p50, round(quantile_cont(t90, 0.5), 2) t90_p50
 from per_eb;
 select case when txs < 2000 then 'a under 2,000 txs' when txs < 4000 then 'b 2,000-4,000' when txs < 6000 then 'c 4,000-6,000' else 'd 6,000 and up' end eb_txs,
        count(*) ebs, round(100.0 * avg(certified)) pct_certified,
-       round(quantile_cont(closure, 0.5) filter (where certified = 1) / 1e3) closure_kB_certified_p50,
-       round(quantile_cont(t90, 0.5), 2) t90_p50, round(quantile_cont(t90, 0.9), 2) t90_p90,
-       round(100.0 * sum(t90 < 7) / count(*)) pct_ebs_t90_lt7, round(100.0 * sum(t95 < 7) / count(*)) pct_ebs_t95_lt7
+       round(quantile_cont(closure, 0.25) filter (where certified = 1) / 1e3) || ' / ' ||
+       round(quantile_cont(closure, 0.5) filter (where certified = 1) / 1e3) || ' / ' ||
+       round(quantile_cont(closure, 0.75) filter (where certified = 1) / 1e3) closure_kB_certified_q,
+       round(quantile_cont(w_by3, 0.25), 2) || ' / ' || round(quantile_cont(w_by3, 0.5), 2) || ' / ' || round(quantile_cont(w_by3, 0.75), 2) w_by3_q,
+       round(quantile_cont(w_by7, 0.25), 2) || ' / ' || round(quantile_cont(w_by7, 0.5), 2) || ' / ' || round(quantile_cont(w_by7, 0.75), 2) w_by7_q,
+       round(quantile_cont(t75, 0.5), 2) t75_p50, round(100.0 * sum(t90 < 7) / count(*)) pct_ebs_t90_lt7
 from per_eb group by 1 order by 1;
 -- the 6,000-and-up class split at the reference cap: how many nodes received the body and the closure
 select case when txs >= 8550 then 'b at the reference cap, 8,550 references and up' else 'a 6,000 to 8,549' end eb_txs,
