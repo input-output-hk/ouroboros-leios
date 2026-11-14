@@ -46,6 +46,7 @@ var Controller = (function() {
                                           //  being written) + 2,160 full RBs = 8.05 GiB, rest for UTxO growth
   var K_SECURITY = 2160                   //  blocks: fetched EBs stay on the fast tier until this deep (≈ 12 h)
   var EPOCH_SLOTS = 432000                //  slots per epoch (mainnet epochLength)
+  var FEE_RATIO = 1.47                    //  fees paid ÷ size-based minimum: scripts, reference scripts, overpayment (mainnet epochs 589–661, db-sync)
 
   // Mainnet graduation plan (site/docs/parameter-graduation.mdx): EB references = EB txs × 40/260,
   // L_hdr fixed at 1 s, L_vote = L_diff − 3·L_hdr
@@ -294,6 +295,27 @@ var Controller = (function() {
     uiLeios.innerText = r.lo.leios ? 'yes'
       : r.hi.leios ? (prof.share < 1 ? +(prof.peakSeconds / 3600).toFixed(1) + ' h/epoch' : 'yes') : 'no'
 
+    // Transaction fees the whole chain collects per epoch: minFeeA per byte plus minFeeB per Tx of
+    // average size, times the fee ratio for script execution, reference scripts and overpayment
+    var feePerByte = getFloat(uiFeePerByte), feePerTx = getFloat(uiFeePerTx)   //  lovelace
+    var fees = function(kBps) { return kBps * 1000 * p.epochSeconds * (feePerByte + feePerTx / p.txSize) * FEE_RATIO / 1e6 }   //  ADA
+    uiFeesPraos.innerText = Math.round(fees(p.praosCap)).toLocaleString('en-US')
+    uiFeesLeios.innerText = Math.round(fees(p.capacity)).toLocaleString('en-US')
+    uiFeesLoad.innerText = Math.round(fees(r.avgKBps)).toLocaleString('en-US')
+
+    // Growth over Praos alone at the same demand: fees against this pool's running costs
+    ;[uiFeesGrowthRow, uiCostGrowthRow, uiFeeCostRow].forEach(function(el) { el.hidden = p.praos })
+    if (r.hi.leios || r.lo.leios) {
+      var feeGrowth = fees(r.avgKBps) / fees(base.avgKBps), costGrowth = r.cost / base.cost
+      var ratio = function(x) { return isFinite(x) ? x.toFixed(2) : 'n/a' }   //  no Praos fees or costs to compare with
+      uiFeesGrowth.innerText = ratio(feeGrowth); uiFeesGrowthUnit.innerText = '× Praos'
+      uiCostGrowth.innerText = ratio(costGrowth); uiCostGrowthUnit.innerText = '× Praos'
+      uiFeeCost.innerText = ratio(feeGrowth / costGrowth); uiFeeCostUnit.innerText = '×'
+    } else {
+      ;[uiFeesGrowth, uiCostGrowth, uiFeeCost].forEach(function(el) { el.innerText = 'idle' })
+      ;[uiFeesGrowthUnit, uiCostGrowthUnit, uiFeeCostUnit].forEach(function(el) { el.innerText = '' })
+    }
+
     // Sizes & Validation (fixed)
     uiRbHeaderSize.innerText = RB_HEADER_SIZE
     uiTxRefSize.innerText = TX_REF_SIZE; uiVoteSize.innerText = VOTE_SIZE
@@ -479,6 +501,8 @@ var Controller = (function() {
     , uiCurrentChain
     , uiDiskMargin
     , uiEgress
+    , uiFeePerByte
+    , uiFeePerTx
     , uiFetchMult
     , uiHorizon
     , uiInboundPeers

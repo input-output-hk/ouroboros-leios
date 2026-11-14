@@ -84,6 +84,16 @@
           <input id="uiCapacityX" type="number" min="0" max="100" value="1.97" step="1"/>
           <span class="unit">&times; mainnet</span>
         </div>
+        <div class="field">
+          <label title="minFeeA: lovelace charged per transaction byte. Mainnet: 44.">Fee per byte</label>
+          <input id="uiFeePerByte" type="number" min="0" max="1000" value="44" step="1"/>
+          <span class="unit">lovelace/B</span>
+        </div>
+        <div class="field">
+          <label title="minFeeB: lovelace charged per transaction, whatever its size. Mainnet: 155,381.">Fee per transaction</label>
+          <input id="uiFeePerTx" type="number" min="0" max="10000000" value="155381" step="1000"/>
+          <span class="unit">lovelace/Tx</span>
+        </div>
       </div>
     </div>
 
@@ -487,6 +497,47 @@
           <label title="Total minus the Praos-only baseline. &#x27;idle&#x27; when the load always fits in RBs, so Leios sends no EBs or votes.">Added by Leios</label>
           <span class="value" id="uiCostAdded">?</span>
           <span class="unit" id="uiCostAddedUnit">$/mo</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Transaction Fees (system level)</h2>
+      <div class="fields">
+        <div class="field">
+          <label title="Transaction fees per epoch with every RB full: (fee per byte × bytes + fee per Tx × Txs) × 1.47, what mainnet paid over epochs 589–661 for scripts, reference scripts and overpayment. Not staking rewards.">Max, Praos capacity</label>
+          <span class="value" id="uiFeesPraos">?</span>
+          <span class="unit">ADA/epoch</span>
+        </div>
+        <div class="field">
+          <label title="The same at the capacity these parameters allow, certified EBs full. Size-based fees × 1.47, as mainnet paid. Not staking rewards.">Max, this capacity</label>
+          <span class="value" id="uiFeesLeios">?</span>
+          <span class="unit">ADA/epoch</span>
+        </div>
+        <div class="field">
+          <label title="Transaction fees per epoch at this load&#x27;s average throughput. Size-based fees × 1.47, as mainnet paid. Not staking rewards.">At this load</label>
+          <span class="value" id="uiFeesLoad">?</span>
+          <span class="unit">ADA/epoch</span>
+        </div>
+        <div class="field">
+          <label title="Reference, not computed: average transaction fees mainnet collected per epoch over a year, epochs 589–661, Oct 2025 – Oct 2026 (db-sync).">Mainnet, last year</label>
+          <span class="value">48,040</span>
+          <span class="unit">ADA/epoch</span>
+        </div>
+        <div class="field" id="uiFeesGrowthRow">
+          <label title="Fees at this load ÷ the fees Praos alone would collect at the same demand, capped at Praos capacity.">Fees vs Praos</label>
+          <span class="value" id="uiFeesGrowth">?</span>
+          <span class="unit" id="uiFeesGrowthUnit">× Praos</span>
+        </div>
+        <div class="field" id="uiCostGrowthRow">
+          <label title="This pool&#x27;s total monthly cost ÷ its Praos-only baseline, from the costs panel.">Costs vs Praos</label>
+          <span class="value" id="uiCostGrowth">?</span>
+          <span class="unit" id="uiCostGrowthUnit">× Praos</span>
+        </div>
+        <div class="field total" id="uiFeeCostRow">
+          <label title="Fee growth ÷ cost growth. Above 1, fees grow faster than running costs. Today reserve rewards, not fees, are most of a pool&#x27;s income.">Fees ÷ costs, vs Praos</label>
+          <span class="value" id="uiFeeCost">?</span>
+          <span class="unit" id="uiFeeCostUnit">×</span>
         </div>
       </div>
     </div>
