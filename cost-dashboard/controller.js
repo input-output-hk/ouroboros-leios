@@ -191,27 +191,6 @@ var Controller = (function() {
     //  Total
     var cost = costVcpu + costStorage + costIops + costEgress
     uiCost.innerText = cost.toFixed(2)
-
-
-    // ================================================================
-    //  Economic Metrics
-    // ================================================================
-
-    var txFeePerKB = getFloat(uiTxFee)                                          //  ADA/kB
-    var txFee      = txFeePerKB * txSize / 1000                                 //  ADA/tx
-    var price      = getFloat(uiAda)                                            //  USD/ADA
-    var totalFees  = txPerSec * txFee * price * T_month                         //  USD/month (network)
-    var fraction   = getFloat(uiStake) / 100 * getFloat(uiRetained) / 100       //  SPO share
-    var retained   = fraction * totalFees                                        //  USD/month
-
-    uiFees.innerText   = retained.toFixed(2)
-    uiProfit.innerText = (retained - cost).toFixed(2)
-    uiReturn.innerText = (100 * retained / cost).toFixed(2)
-
-    var txCostUSD = cost / fraction / txPerSec / T_month                         //  USD/tx
-    var txCostADA = txCostUSD / price                                            //  ADA/tx
-    uiCostTxUsd.innerText = txCostUSD.toFixed(4)
-    uiCostTxAda.innerText = txCostADA.toFixed(4)
   }
 
   function hyperscaleCosts() {
@@ -233,7 +212,6 @@ var Controller = (function() {
   function initialize() {
     [
       uiASC
-    , uiAda
     , uiCompression
     , uiEgress
     , uiFetchMult
@@ -243,13 +221,10 @@ var Controller = (function() {
     , uiProducers
     , uiCurrentChain
     , uiRelays
-    , uiRetained
     , uiSlotRate
     , uiSpike
-    , uiStake
     , uiStorage
     , uiThroughput
-    , uiTxFee
     , uiTxSize
     , uiVcpu
     , uiVotesPerEB
