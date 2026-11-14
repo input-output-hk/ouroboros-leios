@@ -164,6 +164,14 @@ if [ "$TC" = "1" ]; then
 fi
 export TOOL_PATH IP_BIN
 
+# Same sudo-drops-the-environment problem as ip/tc above, but for cardano-node
+# itself: run-node.sh invokes it by bare name, which only resolves under a
+# PATH-only devshell build when the process is not elevated. Resolve it here,
+# while still running in the caller's own (non-elevated) shell, and pass the
+# absolute path down inline like NODE_DIR/IP/PORT.
+CARDANO_NODE_BIN=$(command -v cardano-node)
+export CARDANO_NODE_BIN
+
 # Copy genesis files and set start time. Skipped on resume: a new systemStart
 # would orphan every persisted chain.
 if [ "$RESUME" != "1" ]; then
