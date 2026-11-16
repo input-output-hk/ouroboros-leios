@@ -52,23 +52,23 @@ OUT = OUTPUTS  # set from --outputs in main
 
 WINDOWS = {
     "f1-high": dict(label="testnet 40 kB / 260 kB, loaded hours", period=("2026-10-21T12:00:00", "2026-10-22T01:00:00"),
-                    cert_bin="a certifies, closure < 0.5 MB", cert_label="closure under 0.5 MB"),
+                    cert_bin="a certifies, closure < 0.5 MB", cert_label="under 0.5 MB"),
     "f2-high": dict(label="testnet 308 kB / 2 MB, loaded hours", period=("2026-10-24T12:00:00", "2026-10-26T13:00:00"),
-                    cert_bin="d certifies, closure 1.5-2 MB", cert_label="closure 1.5-2 MB"),
+                    cert_bin="d certifies, closure 1.5-2 MB", cert_label="1.5-2 MB"),
     "1kb": dict(label="testnet 308 kB / 2 MB, 1 kB transactions", period=("2026-10-28T18:00:00", "2026-10-29T01:00:00"),
-                cert_bin="d certifies, closure 1.5-2 MB", cert_label="closure 1.5-2 MB"),
+                cert_bin="d certifies, closure 1.5-2 MB", cert_label="1.5-2 MB"),
     "cluster-40k260k": dict(label="cluster 40 kB / 260 kB, 200 B",
                             run="cluster/2026-10-17-21-38-cf576-notag-value-leios-workload-all-n2n-40k260k-1i1o1w-nomadperf-dira-nom",
-                            cert_bin="c0 certifies, closure under 300 kB", cert_label="closure 222 kB"),
+                            cert_bin="c0 certifies, closure under 300 kB", cert_label="222 kB"),
     "cluster-100k1m": dict(label="cluster 100 kB / 1 MB, 200 B",
                            run="cluster/2026-10-20-20-42-81787-w42notxsub-value-leios-workload-all-n2n-100k1m-1i1o1w-nomadperf-dira-nom",
-                           cert_bin="c2 certifies, closure 500 kB to 1 MB", cert_label="closure 555 kB"),
+                           cert_bin="c2 certifies, closure 500 kB to 1 MB", cert_label="555 kB"),
     "cluster-100k1m-374": dict(label="cluster 100 kB / 1 MB, 374 B",
                                run="cluster/2026-10-21-16-22-81787-w42notxsub-value-leios-workload-all-n2n-100k1m-2i2o2w-nomadperf-dira-nom",
-                               cert_bin="c2 certifies, closure 500 kB to 1 MB", cert_label="closure 0.5-1 MB"),
+                               cert_bin="c2 certifies, closure 500 kB to 1 MB", cert_label="0.5-1 MB"),
     "cluster-100k1m-374-patched": dict(label="cluster 100 kB / 1 MB, 374 B, changed build",
                                        run="cluster/2026-11-09-16-29-2a1ad-w45ezenotxsu-value-leios-workload-all-n2n-100k1m-2i2o2w-nomadperf-dira-nom",
-                                       cert_bin="c2 certifies, closure 500 kB to 1 MB", cert_label="closure 1 MB"),
+                                       cert_bin="c2 certifies, closure 500 kB to 1 MB", cert_label="1 MB"),
 }
 PLAIN_FULL = ("f plain RB, 80-88 kB", "p1 plain RB, full (80 kB and up)")
 
@@ -82,13 +82,12 @@ CONTROL = [
     ("RB size, mean", "88,956 B", "42,688 B", "65,120 B"),
     ("RBs certifying the predecessor's EB", "0", "0.527", "0.273"),
     ("height and slot battles per RB", "0.00091", "0.00524", "0.0218"),
+    ("mempool snapshot, the team's event", "0.042 s", "0.00004 s", "0.00003 s"),
     ("leadership to forged", "0.0008 s", "0.349 s", "0.586 s"),
     ("slot start to header announced", "0.063 s", "0.395 s", "0.690 s"),
     ("adopted by half the cluster", "0.61 s", "0.83 s", "1.28 s"),
     ("adopted by 90 % of the cluster", "1.07 s", "1.14 s", "1.63 s"),
     ("adopted by the whole cluster", "1.11 s", "1.21 s", "1.79 s"),
-    ("process CPU, share of one core", "2.4 %", "7.8 %", "22.9 %"),
-    ("kernel resident set", "8.2 GB", "11.6 GB", "12.2 GB"),
 ]
 CONTROL_COLS = ("Praos control", "Leios 40 kB / 260 kB, 374 B", "Leios 100 kB / 1 MB, 374 B")
 
@@ -187,8 +186,8 @@ def fullness(size):
 
 
 def kinds(root, names):
-    print("| window | certifies, announces | certifies, no EB | plain, announces: full / partial / small | plain, no EB: full / partial / small |")
-    print("|---|---|---|---|---|")
+    print("| window | certifies, announces | certifies, no EB | plain, announces, full | plain, no EB |")
+    print("|---|---:|---:|---:|---:|")
     for name in names:
         rows, _ = chain(root, name)
         n = {}
@@ -197,10 +196,10 @@ def kinds(root, names):
             n[k] = n.get(k, 0) + 1
         ca = sum(v for k, v in n.items() if k[0] == "c" and k[1])
         cn = sum(v for k, v in n.items() if k[0] == "c" and not k[1])
-        pa = [n.get(("p", True, f), 0) for f in ("full", "partial", "small")]
-        pn = [n.get(("p", False, f), 0) for f in ("full", "partial", "small")]
+        pa_full = n.get(("p", True, "full"), 0)
+        pn = sum(v for k, v in n.items() if k[0] == "p" and not k[1])
         print("| %s | %s | %s | %s | %s |" % (WINDOWS[name]["label"], "{:,}".format(ca), "{:,}".format(cn),
-                                            " / ".join("{:,}".format(v) for v in pa), " / ".join("{:,}".format(v) for v in pn)))
+                                            "{:,}".format(pa_full), "{:,}".format(pn)))
 
 
 def adoption_rows(root, name):
@@ -209,8 +208,8 @@ def adoption_rows(root, name):
 
 
 def adoption(root, names):
-    print("| window | certifying RB (closure) | certifying RBs | adopted p50 / p90 | within 1 s | full plain RB, p50 / p90 | within 1 s | full plain RBs |")
-    print("|---|---|---|---|---|---|---|---|")
+    print("| window | closure bin (RBs in it) | certifying p50 / p90 | within 1 s | full plain p50 / p90 | within 1 s |")
+    print("|---|---:|---:|---:|---:|---:|")
     for name in names:
         c = WINDOWS[name]
         r, path = adoption_rows(root, name)
@@ -220,9 +219,9 @@ def adoption(root, names):
             print("| %s | n/a (%s) | | | | | | |" % (c["label"], os.path.relpath(path, root)))
             continue
         s = lambda v: "%.2f" % float(v)
-        print("| %s | %s | %s | %s / %s s | %.0f %% | %s / %s s | %.0f %% | %s |" % (
+        print("| %s | %s (%s) | %s / %s s | %.0f %% | %s / %s s | %.0f %% |" % (
             c["label"], c["cert_label"], "{:,}".format(int(cert["rbs"])), s(cert["delay_p50"]), s(cert["delay_p90"]), float(cert["within_1s_pct"]),
-            s(plain["delay_p50"]), s(plain["delay_p90"]), float(plain["within_1s_pct"]), "{:,}".format(int(plain["rbs"]))))
+            s(plain["delay_p50"]), s(plain["delay_p90"]), float(plain["within_1s_pct"])))
 
 
 def pairs_row(root, name):
@@ -239,7 +238,7 @@ def frac(forked, on_chain):
 
 def pairs(root, names):
     print("| window | share forked among all consecutive-slot pairs | among the pairs led by a certifying RB | among the pairs led by a plain RB |")
-    print("|---|---|---|---|")
+    print("|---|---:|---:|---:|")
     for name in names:
         c = WINDOWS[name]
         r, path = pairs_row(root, name)
@@ -252,8 +251,10 @@ def pairs(root, names):
 
 
 def density(root, names, trickle=False):
-    print("| window | observed hosts: leader slots / forged | RBs on the chain | expected at f = 0.05 (sd) | chain density | orphans seen by two or more observed hosts |")
-    print("|---|---|---|---|---|---|")
+    # the lottery's mean f N and standard deviation sqrt(N f (1 - f)) over the window's N slots, in RBs
+    sd = lambda slots: (slots * F * (1 - F)) ** 0.5
+    print("| window | observed hosts: leader slots / forged | RBs on the chain | lottery mean (sd) | chain density | orphans seen by two or more observed hosts |")
+    print("|---|---|---:|---:|---:|---:|")
     for name in names:
         c = WINDOWS[name]
         rows, slots = chain(root, name)
@@ -262,8 +263,8 @@ def density(root, names, trickle=False):
             # the chain alone: the leader-slot and orphan outputs are read over the loaded windows only
             trows, tslots = chain(root, name, trickle=True)
             texp = tslots * F
-            print("| %s, trickle hours of the same period | - | %s | %s (%.1f %%) | %.2f | - |" % (
-                c["label"].replace(", loaded hours", "").replace(", 1 kB transactions", " (1 kB period)"), "{:,}".format(len(trows)), "{:,.0f}".format(texp), 100 * texp ** 0.5 / texp, len(trows) / texp))
+            print("| %s, trickle hours of the same period | - | %s | %s (%.0f) | %.2f | - |" % (
+                c["label"].replace(", loaded hours", "").replace(", 1 kB transactions", " (1 kB period)"), "{:,}".format(len(trows)), "{:,.0f}".format(texp), sd(tslots), len(trows) / texp))
         a, _ = adoption_rows(root, name)
         lead = rows_of(os.path.join(OUT, name, "adoption.md"), "leader_slots")
         lead = next(iter(lead.values()), None)
@@ -275,9 +276,9 @@ def density(root, names, trickle=False):
             t = [t for t in tables(os.path.join(OUT, name, "pairs.md")) if t and "forks" in t[0]]
             orphans = sum(int(x["forks"]) for x in t[-1]) if t else None
             hosts = "%s reporting hosts" % lead["hosts"] if lead else "reporting hosts"
-        print("| %s | %s: %s / %s | %s | %s (%.1f %%) | %.2f | %s |" % (
+        print("| %s | %s: %s / %s | %s | %s (%.0f) | %.2f | %s |" % (
             c["label"], hosts, "{:,}".format(int(lead["leader_slots"])) if lead else "n/a", "{:,}".format(int(lead["forged"])) if lead else "n/a",
-            "{:,}".format(len(rows)), "{:,.0f}".format(exp), 100 * exp ** 0.5 / exp, len(rows) / exp,
+            "{:,}".format(len(rows)), "{:,.0f}".format(exp), sd(slots), len(rows) / exp,
             "{:,}".format(orphans) if orphans is not None else "n/a"))
 
 
