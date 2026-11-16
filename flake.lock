@@ -3337,17 +3337,17 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1794844434,
+        "lastModified": 1794846065,
         "narHash": "sha256-i2qTR0fIdUs8KkU051G4bp8NQPllDgjLZGWu665syds=",
         "ref": "yveshauser/ledger-committee",
-        "rev": "b247098bf4f5253e991b6131843637d9a90855e1",
-        "revCount": 347,
+        "rev": "e13c3547dbc1d5a6706faa0c8d289837fa636345",
+        "revCount": 348,
         "type": "git",
         "url": "file:///home/yves/code/ouroboros-leios-formal-spec"
       },
       "original": {
         "ref": "yveshauser/ledger-committee",
-        "rev": "b247098bf4f5253e991b6131843637d9a90855e1",
+        "rev": "e13c3547dbc1d5a6706faa0c8d289837fa636345",
         "type": "git",
         "url": "file:///home/yves/code/ouroboros-leios-formal-spec"
       }

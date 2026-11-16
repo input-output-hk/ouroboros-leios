@@ -21,7 +21,7 @@
     # LOCAL PIN: branch yveshauser/ledger-committee of the formal spec (the
     # committee from the Dijkstra ledger spec), not yet pushed.  Repin to the
     # github: URL once it is.
-    leios-spec.url = "git+file:///home/yves/code/ouroboros-leios-formal-spec?ref=yveshauser/ledger-committee&rev=b247098bf4f5253e991b6131843637d9a90855e1";
+    leios-spec.url = "git+file:///home/yves/code/ouroboros-leios-formal-spec?ref=yveshauser/ledger-committee&rev=e13c3547dbc1d5a6706faa0c8d289837fa636345";
 
     # The Praos formal spec, used by leios-trace-verifier's Leios.Base.Praos
     # to wrap the real Praos node as a Leios BaseMachine (see
