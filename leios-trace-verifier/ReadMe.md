@@ -125,6 +125,18 @@ node has to run with the following in its `TraceOptions`:
 The configurations in `testnet/config/` and `demo/*-devnet/config/` set them.
 The verifier refuses a log whose selections carry no headers.
 
+Beside Linear Leios and its base runs the validation functionality
+(`src/Leios/Ledger/Validation.agda`), which answers whether an EB is `Valid`,
+`Invalid`, `InProgress` or `Unknown`, and in which validation stays in progress
+for at most one voting window (`3 * Lhdr + Lvote` slots) after the EB is
+submitted.  The log drives it: the node submits the EBs it acquires or forges,
+and every vote it casts must be for an EB it submitted.  A `NotVoted` with the
+reason `tooLate` must come while the EB's validation may still be in progress,
+so the verifier rejects one logged past the bound.  The Dijkstra-era ledger
+specification instantiates the functionality in
+`src/Leios/Ledger/Validation/Dijkstra.agda`, which needs the formal-ledger
+library and is checked with `make ledger-validation LEDGER_LIBRARIES=<file>`.
+
 
 ## Test cases for trace verify and conformance tests
 
