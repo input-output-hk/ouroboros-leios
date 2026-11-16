@@ -34,8 +34,12 @@ import System.Exit (exitFailure)
 import System.IO (BufferMode (LineBuffering), hPutStrLn, hSetBuffering, stderr, stdout)
 
 import qualified Cardano.Api as Api
-import Cardano.Ledger.Dijkstra.PParams (ppLeiosCommitteeSizeL)
-import Lens.Micro ((^.))
+import Cardano.Crypto.Leios (LeiosCommittee (..), LeiosSeat (..))
+import Cardano.Ledger.Api.State.Query (QueryResultLeiosCommittee (..), QueryResultStakePoolState (..))
+import Cardano.Ledger.BaseTypes (StrictMaybe (..))
+import Cardano.Ledger.Keys (KeyHash, StakePool)
+import Cardano.Ledger.State (BlsKey (..), BlsKeyState (..))
+import qualified Data.Vector.Strict as VS
 import qualified Data.ByteString as BS (ByteString, readFile)
 import qualified Data.ByteString.Char8 as BSC (pack)
 import qualified Data.List as List (findIndex)
@@ -300,8 +304,8 @@ data LeadershipOpts = LeadershipOpts
 queryChain :: IORef Bool -> LeadershipOpts -> IO ChainData
 queryChain explained opts = do
   (cd, mlerr) <- queryChainOnce opts
-  when (cdCommitteeSize cd == Nothing) $
-    hPutStrLn stderr "the chain is before the Dijkstra era and has no Leios committee size; every pool gets a seat."
+  when (cdSeated cd == Nothing) $
+    hPutStrLn stderr "the chain is before the Dijkstra era and has no Leios committee; every pool gets a seat."
   case mlerr of
     Nothing -> pure ()
     Just lerr -> do
@@ -348,8 +352,8 @@ scheduleUnavailable LeadershipOpts{..} lerr mSlots =
 
 -- | One attempt at the chain query (via the cardano-api local-state-query protocol):
 --   the SUT's leadership schedule (the slots in which its pool is an eligible
---   leader), the on-chain stake distribution and the Leios committee size (a
---   Dijkstra-era protocol parameter), over a single connection. Mirrors
+--   leader), the on-chain stake distribution and the Leios voting committee of
+--   the current epoch, over a single connection. Mirrors
 --   cardano-cli's @runQueryLeadershipScheduleCmd@ / @runQueryStakeDistributionCmd@.
 --   Returns the data alongside the leadership error, if any: only the schedule part
 --   can fail this way, and it is recoverable, so the stake distribution and party
@@ -378,7 +382,7 @@ queryChainOnce LeadershipOpts{..} = do
         ( Either Api.LeadershipError (Set.Set Api.SlotNo)
         , Map.Map (Api.Hash Api.StakePoolKey) Rational
         , Api.EpochNo
-        , Maybe Integer
+        , Maybe (Set.Set (Api.Hash Api.StakePoolKey))
         )
     ) <-
     Api.executeLocalStateQueryExpr connInfo Api.VolatileTip $ do
@@ -399,10 +403,13 @@ queryChainOnce LeadershipOpts{..} = do
                 "pool distribution"
                 (Api.queryPoolDistribution beo (Just (Set.singleton loStakePoolId)))
             stakeDistr <- expectQueryEra "stake distribution" (Api.queryStakeDistribution sbe)
-            -- The Leios committee size exists from the Dijkstra era on.
-            let committeeSize = case sbe of
-                  Api.ShelleyBasedEraDijkstra -> Just (toInteger (pparams ^. ppLeiosCommitteeSizeL))
-                  _ -> Nothing
+            -- The Leios committee exists from the Dijkstra era on.
+            seated <- case sbe of
+              Api.ShelleyBasedEraDijkstra -> do
+                lc <- expectQueryEra "Leios committee" (Api.queryLeiosCommittee sbe)
+                pools <- expectQueryEra "stake pool state" (Api.queryStakePoolState sbe Nothing False)
+                pure (Just (seatedPools pools (qrlcCurrentLeiosCommittee lc)))
+              _ -> pure Nothing
             let schedule =
                   case loWhich of
                     CurrentEpoch ->
@@ -418,12 +425,12 @@ queryChainOnce LeadershipOpts{..} = do
                         currentEpoch
                     NextEpoch ->
                       error "next-epoch schedule not yet implemented"
-            pure (schedule, stakeDistr, currentEpoch, committeeSize)
+            pure (schedule, stakeDistr, currentEpoch, seated)
         )
         era
   case result of
     Left err -> die ("local state query failed: " <> show err)
-    Right (eSlots, stakeDistr, nodeEpoch, committeeSize) ->
+    Right (eSlots, stakeDistr, nodeEpoch, seated) ->
       let
         -- Stake registered in epoch e becomes active in epoch e+2, so before
         -- epoch 2 a pool that will have stake still reports as having none. The
@@ -453,7 +460,7 @@ queryChainOnce LeadershipOpts{..} = do
               maxRBBody
               (toInteger (Api.unEpochNo nodeEpoch))
               mSlots
-              committeeSize
+              seated
               stakeDistr
           , mErr
           )
@@ -468,10 +475,10 @@ buildChainData ::
   Integer ->
   Integer ->
   Maybe [Integer] ->
-  Maybe Integer ->
+  Maybe (Set.Set (Api.Hash Api.StakePoolKey)) ->
   Map.Map (Api.Hash Api.StakePoolKey) Rational ->
   ChainData
-buildChainData sutPool epochLength maxRBBody nodeEpoch winning committeeSize m =
+buildChainData sutPool epochLength maxRBBody nodeEpoch winning seated m =
   -- A SUT absent from the distribution (no stake at all) joins as a
   -- zero-stake party at the end: keeps the party set total for the spec
   -- side, and the committee arithmetic correctly excludes it.
@@ -497,9 +504,28 @@ buildChainData sutPool epochLength maxRBBody nodeEpoch winning committeeSize m =
         , cdSutIndex = sutIdx
         , cdEpochLength = epochLength
         , cdMaxRBBody = maxRBBody
-        , cdCommitteeSize = committeeSize
+        , -- A seated pool outside the stake distribution is no party, and
+          -- cannot be the SUT, which always is one.
+          cdSeated = fmap (\s -> [i | (i, (p, _)) <- Prelude.zip [0 ..] pairs, p `Set.member` s]) seated
         , cdNodeEpoch = nodeEpoch
         }
+
+-- | The pools holding a seat of the committee with a voting key.  A seat names
+--   no pool, only its key, so each is matched to the pool that registered that
+--   BLS key (keys are unique per pool, CIP-0164).  A keyless seat cannot vote
+--   and is left out.
+seatedPools ::
+  Map.Map (KeyHash StakePool) (QueryResultStakePoolState era) ->
+  LeiosCommittee ->
+  Set.Set (Api.Hash Api.StakePoolKey)
+seatedPools pools committee =
+  Set.fromList
+    [ Api.StakePoolKeyHash pid
+    | LeiosSeat _ (SJust vk) <- VS.toList (leiosCommitteeSeats committee)
+    , (pid, st) <- Map.toList pools
+    , SJust bks <- [qrspsBlsKey st]
+    , blsPubKey (bksKey bks) == vk
+    ]
 
 expectQuery ::
   Show e =>

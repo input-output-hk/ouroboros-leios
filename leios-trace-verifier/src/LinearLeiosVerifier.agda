@@ -19,6 +19,7 @@ open import Parser
 open import TraceTypes
 
 open import Leios.Ledger.Validation using (acceptAll; Valid)
+open import Leios.Ledger.Dijkstra.Verifier using (CommitteeSource; selectedBy)
 
 module LinearLeiosVerifier where
 
@@ -138,11 +139,11 @@ module LinearLeiosVerifier where
           ; Ldiff = Ldiff
           }
 
-      -- The ledger's committee size ('leiosCommitteeSize').  A simulation
-      -- has no ledger to read it from, so every party gets a seat and the
-      -- committee is decided by the voting keys alone.
-      committeeSize : ℕ
-      committeeSize = numberOfParties
+      -- The voting committee.  A simulation has no chain to read it from,
+      -- so it is the ledger's selection with a seat for every party, and the
+      -- voting keys alone decide it.
+      committee : CommitteeSource
+      committee = selectedBy numberOfParties
 
       -- EB-production eligibility ("winning") slots for the SUT.  When a
       -- leadership schedule is supplied (e.g. from `cardano-cli query
@@ -178,7 +179,7 @@ module LinearLeiosVerifier where
           ; winning-slots = winning-slots-of
           }
 
-      open import Defaults params testParams rb-slots-of committeeSize using
+      open import Defaults params testParams rb-slots-of committee using
         (d-SpecStructure; FFDBuffers; isb; hpe; hrb; txRef; rbRef; certFor; hashList; Show-Hash; Show-Cert;
          module PraosNode; mkPraosBlock; praosBlockHash; genesisHash;
          node⁻; module Check; praosHeader; initNodeState)

@@ -48,13 +48,12 @@ fitting :: ChainEvent
 fitting = CMempoolRange 50 50
 
 verify :: [Integer] -> Bool -> [ChainEvent] -> Text
-verify = verifyWith 3
+verify = verifyWith Nothing
 
--- | Verify with the given committee size.  The three pools have equal stake, so
---   ties decide the seats, by ascending key hash: the SUT, party 2, is seated
---   only by a committee of all three.
-verifyWith :: Integer -> [Integer] -> Bool -> [ChainEvent] -> Text
-verifyWith committeeSize slots authoritative evs =
+-- | Verify with the committee as the chain has it: the parties holding a keyed
+--   seat, or 'Nothing' for a chain without one, where every party is seated.
+verifyWith :: Maybe [Integer] -> [Integer] -> Bool -> [ChainEvent] -> Text
+verifyWith seated slots authoritative evs =
   fst
     ( snd
         ( verifyChainTraceFinalFromSlot
@@ -67,7 +66,7 @@ verifyWith committeeSize slots authoritative evs =
             slots
             authoritative
             capacity
-            committeeSize
+            seated
             evs
             0
         )
@@ -87,7 +86,7 @@ verifyFrom :: Integer -> [ChainEvent] -> Text
 verifyFrom from evs =
   fst
     ( snd
-        (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 [] False capacity 3 evs from)
+        (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 [] False capacity Nothing evs from)
     )
 
 -- | An EB announced and acquired in slot 1 and voted in slot 4, the first slot of its
@@ -335,12 +334,14 @@ chainVerifier = do
       fromLog votedNotAdopted `shouldNotBe` "ok"
 
   describe "the voting committee" $ do
-    it "seats the node when the committee has a seat for every pool" $
-      verifyWith 3 [] False announcedAndVoted `shouldBe` "ok"
-    it "refuses a vote by a node that ties lose a seat" $
-      verifyWith 2 [] False announcedAndVoted `shouldSatisfy` notInCommittee
-    it "refuses every vote when the committee is empty" $
-      verifyWith 0 [] False announcedAndVoted `shouldSatisfy` notInCommittee
+    it "accepts a vote by a node the chain's committee seats" $
+      verifyWith (Just [0, 1, 2]) [] False announcedAndVoted `shouldBe` "ok"
+    it "refuses a vote by a node the chain's committee leaves out" $
+      verifyWith (Just [0, 1]) [] False announcedAndVoted `shouldSatisfy` notInCommittee
+    it "refuses every vote when the chain's committee is empty" $
+      verifyWith (Just []) [] False announcedAndVoted `shouldSatisfy` notInCommittee
+    it "seats every pool on a chain without a committee" $
+      verifyWith Nothing [] False announcedAndVoted `shouldBe` "ok"
   describe "validation" $ do
     it "refuses a vote for an EB whose body the node never acquired" $
       fromLog votedNotAcquired `shouldSatisfy` rejectedByValidation

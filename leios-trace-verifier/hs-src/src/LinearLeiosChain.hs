@@ -10,7 +10,6 @@
 module LinearLeiosChain (
   Timings (..),
   ChainData (..),
-  committeeSizeOf,
   Segment (..),
   Progress (..),
   Carry (..),
@@ -59,20 +58,15 @@ data ChainData = ChainData
   -- ^ The ranking block's body capacity in bytes. Decides whether a forge without an
   --   EB was owed one: an EB is required only when the mempool could not have fitted
   --   into the RB.
-  , cdCommitteeSize :: Maybe Integer
-  -- ^ The ledger's Leios committee size ('leiosCommitteeSize'), a Dijkstra-era
-  --   protocol parameter.  'Nothing' before the Dijkstra era, which has no Leios
-  --   committee; every party then gets a seat ('committeeSizeOf').
+  , cdSeated :: Maybe [Integer]
+  -- ^ The Leios voting committee as the chain has it: the parties (by index)
+  --   holding a seat with a voting key.  'Nothing' before the Dijkstra era,
+  --   which has no Leios committee; every party then gets a seat.
   , cdNodeEpoch :: Integer
   -- ^ The epoch the node itself answered for. This is the epoch of the /chain tip/,
   --   not of the wall clock, so it lags whenever block production is sparse — which
   --   is why a queried schedule so often fails to describe the epoch under test.
   }
-
--- | The committee size the verifier uses: the chain's, or a seat for every party
---   when the chain has none.
-committeeSizeOf :: ChainData -> Integer
-committeeSizeOf cd = fromMaybe (cdNumParties cd) (cdCommitteeSize cd)
 
 -- | A verification segment: one epoch, plus a carried tail of the previous one.
 data Segment = Segment
@@ -286,7 +280,7 @@ verifySegment ts seg prefix =
         (fromMaybe [] (cdWinningSlots cd))
         (segAuthoritative seg)
         (cdMaxRBBody cd)
-        (committeeSizeOf cd)
+        (cdSeated cd)
         prefix
         (segStart seg)
 
@@ -560,7 +554,7 @@ runSegmented report ts query = loop [] Nothing Nothing Batch 0 []
             (fromMaybe [] (cdWinningSlots cd))
             True
             (cdMaxRBBody cd)
-            (committeeSizeOf cd)
+            (cdSeated cd)
             []
             (segStart seg)
             (already <> more)

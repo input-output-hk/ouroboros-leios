@@ -21,6 +21,11 @@
      a party with a keyed seat.
 
    - 'unsignedCert': the certificate body the traces can supply.
+
+   - 'CommitteeSource', 'inCommitteeFrom': where a verifier takes the committee
+     from.  The chain verifier reads it from the node, which seats it by the
+     same rule ('seated'); a verifier without a chain selects it here
+     ('selectedBy').
 -}
 module Leios.Ledger.Dijkstra.Verifier where
 
@@ -162,3 +167,22 @@ module _ {n : ℕ} (stake : TotalMap (Fin n) ℕ) (committeeSize : ℕ) where
 
   inCommittee? : ∀ i → Dec (inCommittee i)
   inCommittee? i = anyˡ? (λ s → (s .pool ≟ keyOf i) ×-dec MAny.dec (λ _ → yes tt) (s .key)) committeeOf
+
+-- Where the verifier takes the voting committee from.
+data CommitteeSource : Type where
+  -- The ledger's selection, with this committee size, for runs without a
+  -- chain to read the committee from.
+  selectedBy : ℕ → CommitteeSource
+  -- The committee as the chain has it: the parties holding a seat with a
+  -- voting key.
+  seated     : List ℕ → CommitteeSource
+
+module _ {n : ℕ} where
+
+  inCommitteeFrom : CommitteeSource → TotalMap (Fin n) ℕ → Fin n → Type
+  inCommitteeFrom (selectedBy k) sd i = inCommittee sd k i
+  inCommitteeFrom (seated ps)    _  i = Anyˡ (_≡ toℕ i) ps
+
+  inCommitteeFrom? : ∀ c sd i → Dec (inCommitteeFrom c sd i)
+  inCommitteeFrom? (selectedBy k) sd i = inCommittee? sd k i
+  inCommitteeFrom? (seated ps)    _  i = anyˡ? (_≟ toℕ i) ps

@@ -49,7 +49,7 @@ stubChainData =
     , cdSutIndex = 2
     , cdEpochLength = 10
     , cdMaxRBBody = 100
-    , cdCommitteeSize = Nothing
+    , cdSeated = Nothing
     , cdNodeEpoch = 0
     }
 
@@ -116,9 +116,9 @@ collectLagging epochLen caughtUp evs = do
 --   verifier reading it once: the first violation's status, or "ok".
 batchVerdict, streamVerdict :: [Integer] -> [ChainEvent] -> Text
 batchVerdict ws evs =
-  fst (snd (verifyChainTraceFromSlot 3 2 stakes 1 4 7 ws True 100 3 evs 0))
+  fst (snd (verifyChainTraceFromSlot 3 2 stakes 1 4 7 ws True 100 Nothing evs 0))
 streamVerdict ws evs =
-  case [st | (_, (_, (st, _))) <- verifyChainStreamFromSlot 3 2 stakes 1 4 7 ws True 100 3 [] 0 evs, st /= "ok"] of
+  case [st | (_, (_, (st, _))) <- verifyChainStreamFromSlot 3 2 stakes 1 4 7 ws True 100 Nothing [] 0 evs, st /= "ok"] of
     [] -> "ok"
     (st : _) -> st
 
@@ -493,7 +493,7 @@ chainSegments = do
         , let p = take k evs
         ]
     it "reads each event once: it reports one verdict per tick, and one at the end" $
-      length (verifyChainStreamFromSlot 3 2 stakes 1 4 7 [] True 100 3 [] 0 (ticks 0 45))
+      length (verifyChainStreamFromSlot 3 2 stakes 1 4 7 [] True 100 Nothing [] 0 (ticks 0 45))
         `shouldBe` 47
     it "streams every segment when the node answers for each epoch" $ do
       ps <- collectStreamed 10 [] straddlingVoted

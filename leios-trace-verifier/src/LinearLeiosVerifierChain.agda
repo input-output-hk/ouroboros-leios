@@ -17,6 +17,7 @@ open import Parser using (SlotNo; Bytes)
 open import TraceTypes
 
 open import Leios.Ledger.Validation using (acceptAll; ValidationResult; Valid; InProgress; Unknown)
+open import Leios.Ledger.Dijkstra.Verifier using (CommitteeSource; selectedBy; seated)
 
 open import Tactic.Defaults
 open import Tactic.Derive.Show
@@ -80,11 +81,14 @@ module LinearLeiosVerifierChain where
     -- only when the mempool does not fit in the RB, so this is what separates a forge
     -- without an EB that is a violation from one that is ordinary behaviour.
     (maxRBBody : ByteCount)
-    -- The ledger's committee size ('leiosCommitteeSize'), from the chain's
-    -- protocol parameters: the voting committee is the top 'committeeSize'
-    -- pools by stake ('Defaults', 'Leios.Ledger.Dijkstra.Verifier').
-    (committeeSize : ℕ)
+    -- The voting committee as the chain has it: the parties holding a seat
+    -- with a voting key ('GetLeiosCommittee').  'nothing' before the Dijkstra
+    -- era, which has no committee; every party then gets a seat.
+    (seatedParties : Maybe (List ℕ))
     where
+
+    committee : CommitteeSource
+    committee = maybe seated (selectedBy numberOfParties) seatedParties
 
     from-id : ℕ → Fin numberOfParties
     from-id n =
@@ -222,7 +226,7 @@ module LinearLeiosVerifierChain where
           then fromList winningSlots
           else fromList (allLeaderSlots l)
 
-      open import Defaults params testParams rb-slots-of committeeSize using
+      open import Defaults params testParams rb-slots-of committee using
         (d-SpecStructure; FFDBuffers; isb; hpe; d-blockHash; txRef; rbRef; Show-Hash; Show-Cert;
          module PraosNode; mkPraosBlock; genesisHash; tipHash;
          node⁻; module Check; praosHeader; initNodeState)

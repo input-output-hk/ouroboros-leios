@@ -44,16 +44,19 @@ open import Data.Fin.Base using (toℕ)
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
+import Leios.Ledger.Dijkstra.Verifier as LV
+open LV using (CommitteeSource)
+
 module Defaults
   (params : Params) (let open Params params)
   (testParams : TestParams params) (let open TestParams testParams)
   -- The slots in which the SUT leads, and mints a ranking block.
   (rb-slots : ℙ ℕ)
-  -- The ledger's committee size ('leiosCommitteeSize').
-  (committeeSize : ℕ)
+  -- Where the voting committee comes from: the chain, or the ledger's
+  -- selection with a committee size.
+  (committee : CommitteeSource)
   where
 
-import Leios.Ledger.Dijkstra.Verifier as LV
 import Leios.Ledger.Dijkstra LV.verifierGov as LD
 
 -- What the Leios protocol needs and the ledger does not provide.  Voting
@@ -346,6 +349,6 @@ d-SpecStructure = record
       ; isValidityChecked         = λ _ _ → ⊤
       ; isValidityChecked?        = λ _ _ → yes tt
       -- The ledger's committee, for the stake distribution in force.
-      ; inCommittee               = λ sd p → LV.inCommittee sd committeeSize p
-      ; inCommittee?              = λ sd p → LV.inCommittee? sd committeeSize p
+      ; inCommittee               = LV.inCommitteeFrom committee
+      ; inCommittee?              = LV.inCommitteeFrom? committee
       }
