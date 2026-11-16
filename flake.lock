@@ -1152,6 +1152,23 @@
         "type": "github"
       }
     },
+    "formal-ledger-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794005511,
+        "narHash": "sha256-6LCGb8RWLiiAQQDZ+MZktgVHFgI34v47XjFSIxySNIM=",
+        "owner": "IntersectMBO",
+        "repo": "formal-ledger-specifications",
+        "rev": "ec066122d49631e9846a0218100901aedd2c5cce",
+        "type": "github"
+      },
+      "original": {
+        "owner": "IntersectMBO",
+        "repo": "formal-ledger-specifications",
+        "rev": "ec066122d49631e9846a0218100901aedd2c5cce",
+        "type": "github"
+      }
+    },
     "gentle-introduction": {
       "flake": false,
       "locked": {
@@ -4724,6 +4741,7 @@
         "cardano-node-leios": "cardano-node-leios",
         "deltaq-src": "deltaq-src",
         "flake-parts": "flake-parts_2",
+        "formal-ledger-src": "formal-ledger-src",
         "haskell-nix-tv": "haskell-nix-tv",
         "iogx": "iogx",
         "jupyenv": "jupyenv",

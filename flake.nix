@@ -28,6 +28,14 @@
       flake = false;
     };
 
+    # The Cardano formal ledger spec (Dijkstra era), used by
+    # leios-trace-verifier for the ledger types and validation of Leios
+    # transactions.  Built with our Agda toolchain (see nix/agda.nix).
+    formal-ledger-src = {
+      url = "github:IntersectMBO/formal-ledger-specifications/ec066122d49631e9846a0218100901aedd2c5cce";
+      flake = false;
+    };
+
     # Trace verifier only: it links cardano-api against the Leios prototype
     # node's pins (cabal.project.trace-verifier), which need newer
     # CHaP/hackage snapshots than iogx's. A dedicated haskell.nix instance
