@@ -39,18 +39,14 @@ analysis, and remaining validation gaps.
 
 The experiments span different environments and prototype revisions:
 
-- **Simulation:** controlled topology, timing, and transaction workloads; useful
-  for protocol design and behavior assessments, but not proof of Haskell node implementation correctness.
-- **Piranha-only clusters:** real networking between Rust test nodes with
+- **Simulation:** A Rust implementation with controlled topology, timing, and transaction workloads; useful for protocol design and behavior assessments, but not proof of Haskell node implementation correctness. Simulated networking.
+- **Emulation:** Rust test nodes running complete Leios protocols with real networking,
   simplified ledger behavior, including emulated validation. These experiments
   establish attack mechanisms and performance effects within that model.
-- **Mixed proto-devnet:** adversarial Rust nodes interacting with real Haskell
-  nodes. Several experiments use one 20% stake adversary and three Haskell pools
-  holding 80% collectively; this is a test configuration, not a network-wide
-  security threshold.
-- **Musashi testnet:** real Haskell implementation and network behavior, with
-  less experimental control and potentially confounding changes in load,
-  connectivity, and voting participation.
+- **Mixed proto-devnet:** Adversarial Rust nodes interacting with real Haskell
+  nodes on a single machine with traffic shaped network delays. Several experiments
+  use one 20% stake adversary and three Haskell pools holding 80% collectively in a test configuration complete with Haskell relays.
+- **Musashi testnet:** Adversarial Rust nodes running on hosted servers interacting with real Haskell nodes on the Mushahi test network. As many as 10 nodes, configured both with and without relays, performed coordinated attacks on Haskell nodes (typically the IOG nodes); this focussed primarily on attacks at scale.
 
 Results on prototypes w32, w34, and w38 are historical observations, not an
 assessment of every subsequent release. No new attack or regression experiment
@@ -65,9 +61,7 @@ Negative findings below are limited to the exercised cases and conditions.
 
 ## Executive summary
 
-T1-T34 comprise four final assessments, seven preliminary assessments, six
-investigations in progress, six threats pending analysis or feasibility
-assessment, and eleven threats outside scope. Assessment status does not imply
+T1-T34 comprise final assessments, investigations still in progress, pending analysis or feasibility assessment, and eleven threats outside scope. Assessment status does not imply
 that every security property or mitigation has been validated.
 
 The strongest completed implementation checks concern **certificate rejection**.
