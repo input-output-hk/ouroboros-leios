@@ -23,9 +23,11 @@ create temp table win as
   from read_csv(coalesce(getvariable('win'), '/dev/null'), delim = ' ', header = false, columns = {'s': 'varchar', 'e': 'varchar'}, ignore_errors = true)
   where s not like '#%';
 
+-- A node adopts an RB when it adds it to its chain or when it switches to
+-- the fork carrying it; both events count, as in cluster_adoption.sql.
 create temp table adopt as
   select agent, split_part(data->>'$.newtip', '@', 1) hash, min(t) t
-  from trace, p where ns = 'ChainDB.AddBlockEvent.AddedToCurrentChain'
+  from trace, p where ns in ('ChainDB.AddBlockEvent.AddedToCurrentChain', 'ChainDB.AddBlockEvent.SwitchedToAFork')
     and t >= p.t0 and t < p.t1 group by 1, 2;
 
 create temp table rb as
