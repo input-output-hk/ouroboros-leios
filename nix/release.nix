@@ -55,15 +55,16 @@
               #
               #   $(nix build .#cardano-node-leios-image --print-out-paths) | docker load
               #
-              # The image carries only the two binaries plus minimal /etc
-              # files (ca-certs, /etc/passwd, /etc/group, tmp dirs). No shell,
-              # no package manager — overlays add what they need.
+              # The image carries the node, CLI and snapshot converter plus
+              # minimal /etc files, a shell and core utilities. Overlays add
+              # what they need.
               cardano-node-leios-image = pkgs.dockerTools.streamLayeredImage {
                 name = "cardano-node-leios";
                 tag = "latest";
                 contents = [
                   muslJobs.cardano-node
                   muslJobs.cardano-cli
+                  muslJobs.snapshot-converter
                   # ca-certificates for TLS to bootstrap relays / Hydra / etc.
                   pkgs.cacert
                   # /etc/passwd + /etc/group + /tmp so things that expect a
@@ -116,7 +117,7 @@
                   tar -xzf ${upstream}/*.tar.gz -C work
 
                   rm -rf work/share
-                  # The node and CLI to run a pool, plus tx-firehose and its
+                  # The node, CLI and snapshot converter, plus tx-firehose and its
                   # mempool-monitor observer for the fragmentation experiment.
                   # Keep every *.dylib too — on macOS the dylibs live next to
                   # the executables (referenced as @executable_path/libfoo) and
@@ -126,6 +127,7 @@
                   find work/bin -mindepth 1 -maxdepth 1 \
                     ! -name cardano-node ! -name cardano-cli \
                     ! -name tx-firehose ! -name mempool-monitor \
+                    ! -name snapshot-converter \
                     ! -name '*.dylib' \
                     -exec rm {} +
 
