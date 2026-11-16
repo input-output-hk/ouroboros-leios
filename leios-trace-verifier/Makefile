@@ -47,3 +47,11 @@ praos-assumptions:
 
 praos-machine:
 	$(AGDA) src/Leios/Base/Praos/Machine.agda
+
+# Leios.Ledger.Dijkstra: leios-spec's abstract interface at the Dijkstra
+# ledger types (formal-ledger-specifications), not yet part of the verifier.
+# LEDGER_LIBRARIES must name a libraries file listing the verifier's
+# libraries, this directory's trace-parser.agda-lib and formal-ledger.
+.PHONY: ledger-dijkstra
+ledger-dijkstra:
+	$(AGDA) --library-file=$(LEDGER_LIBRARIES) -l trace-parser -l formal-ledger src/Leios/Ledger/Dijkstra/Foreign.agda
