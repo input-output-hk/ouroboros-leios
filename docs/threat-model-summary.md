@@ -32,22 +32,20 @@ that the issue's threat-modeling and validation objectives are complete.
 
 ## Scope and evidence
 
-The threat inventory is version 0.5 of the threat model, read from
-`ouroboros-leios` main at
+The assessment covers version 0.5 of the public threat model at
 [`78c44ddd4518203b72e451aa004d1ee1eacd2dd3`](https://github.com/input-output-hk/ouroboros-leios/blob/78c44ddd4518203b72e451aa004d1ee1eacd2dd3/docs/threat-model.md).
-The status and risk labels come from the team's status table supplied on 29 October
-2026. The assessments below summarize the available Red Team experiment records
-and mechanism analysis, including tested conditions, outcomes, and limitations.
+The assessments summarize tested conditions, observed outcomes, mechanism
+analysis, and remaining validation gaps.
 
 The experiments span different environments and prototype revisions:
 
 - **Simulation:** controlled topology, timing, and transaction workloads; useful
   for protocol design and behavior assessments, but not proof of Haskell node implementation correctness.
-- **Piranha-only clusters:** real networking between Rust test nodes, with the
-  ledger simplifications described in the source reports. These establish attack
-  mechanisms and performance effects within that model.
+- **Piranha-only clusters:** real networking between Rust test nodes with
+  simplified ledger behavior, including emulated validation. These experiments
+  establish attack mechanisms and performance effects within that model.
 - **Mixed proto-devnet:** adversarial Rust nodes interacting with real Haskell
-  nodes. Several reports use one 20% stake adversary and three Haskell pools
+  nodes. Several experiments use one 20% stake adversary and three Haskell pools
   holding 80% collectively; this is a test configuration, not a network-wide
   security threshold.
 - **Musashi testnet:** real Haskell implementation and network behavior, with
@@ -56,9 +54,9 @@ The experiments span different environments and prototype revisions:
 
 Results on prototypes w32, w34, and w38 are historical observations, not an
 assessment of every subsequent release. No new attack or regression experiment
-was run to prepare this document. Where a report lacks an exact tested revision,
-that limitation remains open. A proposal, a working attack tool, a unit test, and
-a successful end-to-end attack are distinct kinds of evidence.
+was run to prepare this document. Where the exact tested revision is unknown,
+release-specific conclusions remain limited. A proposal, a working attack tool,
+a unit test, and a successful end-to-end attack are distinct kinds of evidence.
 
 A certificate being observed is also distinct from its inclusion in a ranking
 block and application of its transactions by an honest ledger. Likewise, a node
@@ -67,19 +65,19 @@ Negative findings below are limited to the exercised cases and conditions.
 
 ## Executive summary
 
-For T1-T34, the supplied status table records four final reports, seven preliminary reports,
-six investigations in progress, six threats pending analysis or feasibility
-assessment, and eleven threats outside this assessment's scope. These are
-reporting states, not counts of independently validated security properties.
+T1-T34 comprise four final assessments, seven preliminary assessments, six
+investigations in progress, six threats pending analysis or feasibility
+assessment, and eleven threats outside scope. Assessment status does not imply
+that every security property or mitigation has been validated.
 
 The strongest completed implementation checks concern **certificate rejection**.
 On the w38 mixed devnet, four certificate variants produced 27 distinct invalid
 certificate-bearing blocks that reached honest-ledger validation; all were
 rejected and none adopted. Seven of these are the T15 single-signature test,
-shared with the T14 report and counted only once. One non-member test run had no
+also covered under T14 and counted only once. One non-member test run had no
 samples reach validation. These results support the tested validation gates,
-without establishing that every certificate encoding or context is covered.
-See [T14](#t14-include-invalid-certificate-in-rb) and
+without establishing that every certificate encoding or context is covered. See
+[T14](#t14-include-invalid-certificate-in-rb) and
 [T15](#t15-forge-certificate-without-quorum).
 
 **Loss of Leios throughput does not necessarily imply loss of Praos liveness.**
@@ -91,16 +89,15 @@ a permanent stall or independently prove the proposed mempool-fragmentation mech
 See [T10](#t10-decline-to-vote) and
 [T27](#t27-mempool-partitioning-via-network-control).
 
-**Historical implementation defects must be reconciled with the team's supplied
-risk labels.** Reports under T11 and T13 record item-count handling faults,
-connection disruption, and malformed-transaction process crashes on older
-prototypes. The available evidence does not establish a fix revision and
-complete regression coverage. Separately,
+**Historical implementation defects require fix validation.** T11 and T13
+experiments demonstrated item-count handling faults, connection disruption, and
+malformed-transaction process crashes on older prototypes. An identified fix
+revision and complete regression coverage remain to be established. Separately,
 T12-related tests recorded acceptance and memory retention of correctly signed
-votes for unknown targets. These are version-specific findings requiring
-closure evidence, not grounds to claim that the current release is vulnerable
-or that these risks have been resolved.
-See [T11](#t11-create-invalid-eb), [T12](#t12-create-invalid-vote), and
+votes for unknown targets. These are version-specific findings requiring closure
+evidence, not grounds to claim that the current release is vulnerable or that
+these risks have been resolved. See [T11](#t11-create-invalid-eb),
+[T12](#t12-create-invalid-vote), and
 [T13](#t13-reference-invalid-transactions-in-eb).
 
 **Within this assessment's scope, priority validation gaps include selective
@@ -113,12 +110,11 @@ sections separate model mitigations from mitigations actually exercised.
 
 ## Threat status
 
-The table preserves the team's supplied status and risk labels alongside this
-report's evidence assessment. The individual assessments explain
-where supporting evidence is incomplete, narrower than the threat, or in tension
-with the supplied label.
+The table summarizes assessment status, risk, and evidence for each threat. The
+individual assessments describe the findings, tested conditions, and remaining
+validation gaps.
 
-| Threat # | Threat summary | Team report status | Team risk label | Evidence assessment |
+| Threat # | Threat summary | Status | Risk | Evidence assessment |
 |---|---|---|---|---|
 | [T1](#t1-any-threat-to-praos) | Any threat to Praos | out of scope | — | No independent Praos assessment |
 | [T2](#t2-vrf-grinding-on-eb-eligibility) | VRF grinding on EB eligibility | out of scope | — | Grinding resistance not assessed |
@@ -128,7 +124,7 @@ with the supplied label.
 | [T6](#t6-vote-equivocation) | Vote equivocation | TODO | — | Feasibility and scope unresolved |
 | [T7](#t7-double-voting) | Double voting | TODO | — | No completed Haskell result |
 | [T8](#t8-bls-key-compromise) | BLS key compromise | out of scope | — | Key theft and recovery not assessed |
-| [T9](#t9-decline-to-create-eb) | Decline to create EB | final | Negative | Supporting final report unavailable |
+| [T9](#t9-decline-to-create-eb) | Decline to create EB | final | Negative | Empirical confirmation pending |
 | [T10](#t10-decline-to-vote) | Decline to vote | final | Negative | Praos continued during observed certification loss; incentives unvalidated |
 | [T11](#t11-create-invalid-eb) | Create invalid EB | prelim | Negative | Mixed historical results; fix validation pending |
 | [T12](#t12-create-invalid-vote) | Create invalid vote | TODO | — | Historical unknown-target vote retention; full assessment pending |
@@ -143,7 +139,7 @@ with the supplied label.
 | [T21](#t21-selectively-withhold-data-from-voting-committee) | Selectively withhold data from voting committee | TODO | — | Harness and plans; no completed result |
 | [T22](#t22-selectively-withhold-data-from-most-honest-nodes) | Selectively withhold data from most honest nodes | in progress | — | Mechanism described; timing and mitigation validation pending |
 | [T23](#t23-withhold-then-release-large-number-of-ebs) | Withhold then release large number of EBs | prelim | Negative | No measured harm at tested scale; sustained congestion untested |
-| [T24](#t24-submit-duplicate-transactions) | Submit duplicate transactions | prelim | Negative | Supporting results pending collection |
+| [T24](#t24-submit-duplicate-transactions) | Submit duplicate transactions | prelim | Negative | Duplicate-handling validation pending |
 | [T25](#t25-submit-invalid-transactions) | Submit invalid transactions | prelim | Negative | No isolated real-node result established |
 | [T26](#t26-submit-conflicting-transactions) | Submit conflicting transactions | in progress | — | Simulator inference; Haskell validation and resource cost pending |
 | [T27](#t27-mempool-partitioning-via-network-control) | Mempool partitioning via network control | final | Positive | Temporary simulated disruption; real-implementation partition validation pending |
@@ -155,30 +151,23 @@ with the supplied label.
 | [T33](#t33-silently-accumulate-vrf-keys-for-eligibility) | Silently accumulate VRF keys for eligibility | out of scope | — | Adaptive security and rotation effectiveness unvalidated |
 | [T34](#t34-fork-to-extract-mev-from-a-recent-block) | Fork to extract MEV from a recent block | ? | — | Scope and feasibility pending; no mitigation validated |
 
-**Legend:** Threat # = identifier in threat model version 0.5; EB = endorser block;
-RB = ranking block; VRF = verifiable random function; BLS =
+**Legend:** Threat # = identifier in threat model version 0.5; EB = endorser
+block; RB = ranking block; VRF = verifiable random function; BLS =
 Boneh-Lynn-Shacham signature scheme; SPO = stake pool operator; MEV = maximal
-extractable value. Team report status describes report progress: **final** = final
-report recorded by the team; **prelim** = preliminary report; **in progress** = active
-investigation; **TODO** = pending analysis, not started; **?** = pending analysis
-of feasibility or scope; **out of scope** = excluded from this assessment.
-Team risk label preserves the team's convention: **Negative** = no risk;
-**Positive** = risk identified; **—** = no risk assessment supplied. These labels
-do not grade severity. "No risk" records the team's assessment, not a universal guarantee
-across untested variants, implementations, or releases. Evidence assessment states
-what the reviewed material supports and what remains unresolved; it does not
-replace or redefine the team's supplied labels.
+extractable value. Status describes assessment progress: **final** = final
+assessment; **prelim** = preliminary assessment; **in progress** = active
+investigation; **TODO** = pending analysis, not started; **?** = pending
+analysis of feasibility or scope; **out of scope** = excluded from this
+assessment. Risk: **Negative** = no risk; **Positive** = risk identified; **—**
+= risk not yet assessed. These labels do not grade severity. A negative
+assessment applies to its evaluated conditions, not every variant,
+implementation, or release. The evidence assessment identifies validation gaps
+and historical failures that require follow-up, including those under threats
+with a negative risk label.
 
 ## Threat assessments
 
 ### T1: Any threat to Praos
-
-**Description.** Leios inherits Praos safety and liveness assumptions. Attacks on
-the underlying consensus can therefore affect Leios independently of its added
-transaction-processing mechanisms.
-
-**Recommendation.** Maintain the dependency on Praos security analysis and
-validate that Leios processing does not invalidate its timing assumptions.
 
 **Assessment.** Out of scope for a separate Praos assessment. This exclusion does
 not remove the Leios-specific timing questions assessed under T21-T23 and T27.
@@ -186,13 +175,7 @@ No independent Praos security conclusion is made here. Source: [threat model](th
 
 ### T2: VRF grinding on EB eligibility
 
-**Description.** Manipulating eligibility randomness may increase the adversary's
-block-production opportunities and amplify other threats.
-
-**Recommendation.** Track the threat model's Ouroboros Phalanx research dependency
-and its applicability to Leios eligibility.
-
-**Assessment.** Out of scope for this implementation assessment. Randomness
+**Assessment.** Out of scope. Randomness
 manipulation and grinding resistance require separate protocol and security
 analysis. Neither grinding resistance nor the proposed
 countermeasure was tested
@@ -200,28 +183,15 @@ here. Source: [threat model](threat-model.md).
 
 ### T3: VRF grinding on voting eligibility
 
-**Description.** Eligibility manipulation may concentrate voting power beyond the
-adversary's nominal stake share.
-
-**Recommendation.** Evaluate the voting-selection implications alongside the
-randomness and grinding work referenced by the threat model.
-
-**Assessment.** Out of scope for this implementation assessment. Randomness
+**Assessment.** Out of scope. Randomness
 manipulation and grinding resistance require separate protocol and security
 analysis. No empirical or cryptographic validation of the
 mitigation is claimed. Source: [threat model](threat-model.md).
 
 ### T4: VRF key compromise
 
-**Description.** Compromised eligibility keys can give an attacker control over
-another participant's production or selection opportunities.
-
-**Recommendation.** Apply strong key management and assess operational compromise
-and recovery through the responsible security program.
-
-**Assessment.** Out of scope.
-The Red Team reports summarized here do not audit
-VRF cryptography or key custody. Source: [threat model](threat-model.md).
+**Assessment.** Out of scope. VRF cryptography and key custody have not been
+assessed. Source: [threat model](threat-model.md).
 
 ### T5: EB equivocation
 
@@ -235,9 +205,8 @@ creates a hash mismatch, not two valid competing announcements.
 peer delivery and record each honest node's detection, voting, and chain choice.
 Measure resource use and throughput against a matched baseline.
 
-**Assessment.** Preliminary/Negative in the team's supplied status table.
-Mechanism analysis is available, but direct EB-equivocation validation and its
-resource impact remain unestablished by the evidence summarized here.
+**Assessment.** Preliminary. The mechanism is described above; direct
+EB-equivocation validation and its resource impact remain unestablished.
 
 ### T6: Vote equivocation
 
@@ -254,8 +223,8 @@ the current protocol, then test replay, duplicate accounting, and conflicting
 votes against honest receivers.
 
 **Assessment.** Pending analysis. No final feasibility decision or complete
-implementation result is available; mechanism analysis alone does not validate
-Haskell vote accounting.
+implementation result has been established; mechanism analysis alone does not
+validate Haskell vote accounting.
 
 ### T7: Double voting
 
@@ -275,27 +244,21 @@ Source: [threat model](threat-model.md).
 
 ### T8: BLS key compromise
 
-**Description.** A stolen voting key permits unauthorized signatures. This is
-different from submitting an invalid signature or falsifying a signer bitmap.
-
-**Recommendation.** Assess key protection, rotation, and recovery, including the
-threat model's defensive-equivocation proposal.
-
 **Assessment.** Out of scope. T14 and T15 test certificate validation; they do not
 establish resistance to theft of genuine keys. Source: [threat model](threat-model.md).
 
 ### T9: Decline to create EB
 
 **Description.** An eligible producer omits an EB, reducing the additional
-throughput available from Leios. The team's supplied status table records
-final/Negative. Supporting empirical evidence was unavailable for this summary.
+throughput available from Leios.
 
 **Recommendation.** Document the tested conditions and observations. Distinguish
 continued ranking-block production from lost EB throughput, and validate any
 claimed economic deterrent separately.
 
-**Assessment.** Final in the team's supplied status table; the recorded negative
-assessment has not been independently confirmed here.
+**Assessment.** The negative risk assessment awaits empirical confirmation. The
+effect on throughput and the effectiveness of economic deterrents remain to be
+quantified.
 
 ### T10: Decline to vote
 
@@ -313,9 +276,9 @@ abstention experiment; the threshold describes that deployment.
 Validate incentives separately: continued Praos operation does not demonstrate
 that rewards deter abstention.
 
-**Assessment.** Final/Negative in the team's supplied status table. The evidence
-supports continued base-chain operation at the observed moderate load despite lost certification;
-it does not show that Leios throughput is unaffected by missing quorum.
+**Assessment.** Base-chain operation continued at the observed moderate load
+despite lost certification; it does not show that Leios throughput is unaffected
+by missing quorum.
 
 ### T11: Create invalid EB
 
@@ -340,7 +303,7 @@ total error handling, and repeat boundary tests against the target release.
 
 **Assessment.** Preliminary, with mixed historical evidence. The byte-size and
 allocation probes have bounded negative results; item-count and size-mismatch
-fixes have not been validated by the reviewed reports.
+fixes remain unvalidated.
 
 ### T12: Create invalid vote
 
@@ -348,18 +311,17 @@ fixes have not been validated by the reviewed reports.
 context, while bounding retained state. A current committee-key holder can sign
 fresh, arbitrary ranking-block hashes rather than replaying identical votes.
 
-**Evidence.** A related w34 test against three local Haskell nodes submitted such
-votes in batches small enough to pass the wire-size guard. Membership and
-signature checks accepted them despite the unknown targets. One run grew
-from 12 to 129,012 acquired votes per node, with sampled memory rising from about
-160 MB to 310 MB and no observed reclaim during a 70-second post-test interval.
-The report infers retained-state growth from these observations; it does not
-measure internal collection cardinality or demonstrate eventual exhaustion.
-The nodes survived; restarting the affected nodes was the documented way to
-release accumulated memory. Stopping the sender alone did not reclaim it during
-the measured interval.
-This is a semantic-admission and lifecycle finding, not evidence of a bad
-signature passing verification.
+**Evidence.** A related w34 test against three local Haskell nodes submitted
+such votes in batches small enough to pass the wire-size guard. Membership and
+signature checks accepted them despite the unknown targets. One run grew from 12
+to 129,012 acquired votes per node, with sampled memory rising from about 160 MB
+to 310 MB and no observed reclaim during a 70-second post-test interval. These
+observations suggest retained-state growth, but internal collection cardinality
+was not measured and eventual exhaustion was not demonstrated. The nodes
+survived. The recovery procedure calls for restarting affected nodes to release
+accumulated state. Stopping the sender alone did not reclaim memory during the
+measured interval. This is a semantic-admission and lifecycle finding, not
+evidence of a bad signature passing verification.
 
 **Recommendation.** Validate target, committee, and temporal context; bound
 retained vote state. Test malformed signatures and voter identifiers separately,
@@ -395,8 +357,8 @@ trust boundaries. Verify both rejection and process survival with confirmed
 delivery, including restart conditions; separately verify honest ledger
 non-application.
 
-**Assessment.** Preliminary/Negative in the team's supplied status table, with
-historical failures requiring explicit reconciliation and a pinned fix/regression record.
+**Assessment.** Preliminary. Historical crashes require an identified fix and
+regression tests confirming rejection, process survival, and recovery.
 
 ### T14: Include invalid certificate in RB
 
@@ -450,23 +412,22 @@ with `InvalidSignature`, with none adopted.
 **Recommendation.** Retain this as an interoperability regression for signer-set
 binding and repeat it when committee or certificate encoding changes.
 
-**Assessment.** Final/Negative in the team's supplied status table. The tested
-one-key/full-committee forgery was rejected. This is an implementation check, not a proof of BLS cryptographic
-security or a test of stolen quorum keys.
+**Assessment.** The tested one-key/full-committee forgery was rejected. This is
+an implementation check, not a proof of BLS cryptographic security or a test of
+stolen quorum keys.
 
 ### T16: Omit targeted transactions from RB and EB
 
 **Description.** A producer can delay selected transactions by omitting them.
 The model expects honest mempool persistence and distributed production to limit
 censorship, but even temporary delay can affect time-sensitive transactions.
-The team's supplied status is undecided.
 
 **Recommendation.** Define the intended censorship duration, adversarial stake,
 and workload, including deadline-sensitive transactions, before selecting an
 experiment.
 
-**Assessment.** Pending analysis of scope and feasibility; no negative risk
-assessment is supplied. Source: [threat model](threat-model.md).
+**Assessment.** Scope, feasibility, and risk remain to be assessed. Source:
+[threat model](threat-model.md).
 
 ### T17: Reorder transactions in EB
 
@@ -478,9 +439,9 @@ valid ordering changes alone do not establish a ledger-safety violation.
 extraction and assess application-layer protections such as batch auctions and
 slippage limits.
 
-**Assessment.** In progress in the team's supplied status table; conclusions
-remain pending. No completed economic or implementation result is established
-here. Source: [threat model](threat-model.md).
+**Assessment.** In progress; conclusions remain pending. No completed economic
+or implementation result is established here. Source: [threat
+model](threat-model.md).
 
 ### T18: Insert or replace transactions in EB
 
@@ -492,9 +453,9 @@ ledger constraints and application economics.
 user loss and producer gain, including conflicts that prevent both transactions
 from succeeding.
 
-**Assessment.** In progress in the team's supplied status table; conclusions
-remain pending. The availability of transaction-injection tools does not
-establish an economic or implementation result. Source: [threat model](threat-model.md).
+**Assessment.** In progress; conclusions remain pending. The availability of
+transaction-injection tools does not establish an economic or implementation
+result. Source: [threat model](threat-model.md).
 
 ### T19: Omit available EB certificate and fill RB with own transactions
 
@@ -520,10 +481,10 @@ stake points describe that experiment, not universal protocol bounds.
 certificates, attach incentives to inclusion, and publish omission statistics.
 Test targeted producer choices with realistic application value and timing.
 
-**Assessment.** In progress in the team's supplied status table; conclusions
-about the broader threat remain pending. The negative historical mechanism
-experiment does not validate incentive compatibility or the proposed
-mitigations. Source: [threat model](threat-model.md).
+**Assessment.** In progress; conclusions about the broader threat remain
+pending. The negative historical mechanism experiment does not validate
+incentive compatibility or the proposed mitigations. Source: [threat
+model](threat-model.md).
 
 ### T20: Withhold announced EB or endorsed transactions
 
@@ -543,9 +504,8 @@ effect was difficult to separate from ordinary degradation.
 behavior under bounded bandwidth, with a healthy baseline and real Haskell
 validation. Measure fresh-data completion before the voting deadline.
 
-**Assessment.** Preliminary/Negative in the team's supplied status table. Retry
-behavior is a supported mitigation in the modeled environment; real-node
-validation and throughput bounds remain open.
+**Assessment.** Preliminary. Retry behavior is a supported mitigation in the
+modeled environment; real-node validation and throughput bounds remain open.
 
 ### T21: Selectively withhold data from voting committee
 
@@ -560,9 +520,8 @@ attack delivery and a healthy baseline, and measure whether alternate sources
 restore data before the deadline. Validate the model's redundant-connectivity
 and monitoring mitigations.
 
-**Assessment.** Pending analysis. Tooling and experimental plans are not evidence
-that the proposed defenses are sufficient. A completed validation result was not
-available for this assessment.
+**Assessment.** Pending analysis. The proposed defenses have not been validated
+against selective delivery to voting committee members.
 
 ### T22: Selectively withhold data from most honest nodes
 
@@ -578,8 +537,8 @@ under adverse topology and realistic bandwidth. Validate the diffusion allowance
 against worst-case origins, not only average propagation, and distinguish
 occasional delays from persistent violations of Praos assumptions.
 
-**Assessment.** In progress. A completed validation result was not available;
-neither the timing violation nor the proposed mitigation is established here.
+**Assessment.** In progress. Neither the timing violation nor the effectiveness
+of the proposed mitigation has been established.
 
 ### T23: Withhold then release large number of EBs
 
@@ -600,44 +559,41 @@ measure fresh-EB delivery and Praos ranking-block propagation latency at finer
 resolution under congestion, and verify traffic prioritization
 explicitly. Delay alone does not reproduce bandwidth congestion.
 
-**Assessment.** Preliminary/Negative in the team's supplied status table. No harm
-was measured at this scale, and no released EB was certified in the inspected
-log. Protection under sustained congestion remains unverified.
+**Assessment.** Preliminary. No harm was measured at this scale, and no released
+EB was certified in the inspected log. Protection under sustained congestion
+remains unverified.
 
 ### T24: Submit duplicate transactions
 
-**Description.** Repeated submission can waste processing and bandwidth. The
-available work establishes transaction-generation and replay tooling and a plan
-to submit the same valid signed transaction repeatedly. A completed Haskell
-result measuring duplicate admission, propagation, and cost was not available.
+**Description.** Repeated submission can waste processing and bandwidth.
+Transaction-generation and replay tools can submit the same valid signed
+transaction repeatedly. Haskell duplicate admission, propagation, and rejection
+cost remain to be measured.
 
-**Recommendation.** Attach the existing preliminary evidence, or measure duplicate
-admission, propagation, and resource use using a valid transaction. Rejection of
-malformed data must not be mistaken for successful duplicate handling.
+**Recommendation.** Measure duplicate admission, propagation, and resource use
+using a valid transaction. Rejection of malformed data must not be mistaken for
+successful duplicate handling.
 
-**Assessment.** Preliminary in the team's supplied status table; supporting
-results pending collection.
-Pull-based diffusion and duplicate detection remain model mitigations rather than
-independently verified outcomes in this consolidation.
+**Assessment.** Preliminary. Pull-based diffusion and duplicate detection remain
+proposed mitigations awaiting real-node validation.
 
 ### T25: Submit invalid transactions
 
 **Description.** Invalid submissions test validation before propagation and the
 cost of rejection. Random malformed bytes may stop at decoding; decodable but
-invalid transactions are needed to exercise later validation stages. The
-available tooling and plans distinguish these cases, but a completed Haskell
-experiment isolating their rejection costs was not available. Ledger-less Rust
-clusters emulate validation and cannot establish rejection before propagation.
-The EB-carried malformed-data findings in [T13](#t13-reference-invalid-transactions-in-eb)
-exercise a different path from transaction submission.
+invalid transactions are needed to exercise later validation stages. The tooling
+distinguishes these cases, but their rejection costs have not been isolated in a
+Haskell experiment. Ledger-less Rust clusters emulate validation and cannot
+establish rejection before propagation. The EB-carried malformed-data findings
+in [T13](#t13-reference-invalid-transactions-in-eb) exercise a different path
+from transaction submission.
 
 **Recommendation.** Isolate invalid submissions, verify which validation path
 rejects them, and compare propagation and resource cost against a matched honest
 load.
 
-**Assessment.** Preliminary/Negative in the team's supplied status table. A
-dedicated result supporting that label remains unavailable; tooling readiness
-does not establish mitigation effectiveness.
+**Assessment.** Preliminary. Rejection before propagation and its resource cost
+require isolated real-node validation.
 
 ### T26: Submit conflicting transactions
 
@@ -696,18 +652,11 @@ implementations. Extend simulation across seeds, topologies, and recurrent
 partitions; isolate transaction-load effects with controlled comparisons. Record
 per-input finalized spends to directly check the inferred single-spend behavior.
 
-**Assessment.** Final/Positive in the team's supplied status table. The simulation
-demonstrates recoverable certification disruption and prolonged transaction delay
-under the tested conditions. Real-implementation partition validation and
-mitigation effectiveness remain open.
+**Assessment.** The simulation demonstrates recoverable certification disruption
+and prolonged transaction delay under the tested conditions. Real-implementation
+partition validation and mitigation effectiveness remain open.
 
 ### T28: Honeypot contract creating transaction races
-
-**Description.** An application can encourage many mutually conflicting
-transactions, consuming resources despite only some being eligible to succeed.
-
-**Recommendation.** Assess contract incentives, costs, and realistic user behavior
-in an application-focused economic analysis.
 
 **Assessment.** Out of scope. Generic conflicting-transaction tests do not establish
 the economics or resource impact of such a contract.
@@ -715,34 +664,15 @@ Source: [threat model](threat-model.md).
 
 ### T29: Exploit implementation differences between node versions
 
-**Description.** Different node behavior during deployment can cause chain
-divergence. Routine Rust/Haskell interoperability work provides useful tooling,
-but is not an adversarial mixed-version assessment.
-
-**Recommendation.** Maintain conformance and staged-deployment testing across the
-supported release combinations, with explicit divergence checks.
-
 **Assessment.** Out of scope. No cross-version safety conclusion is made by this
 report. Source: [threat model](threat-model.md).
 
 ### T30: Coordinate governance attacks to prevent hard fork
 
-**Description.** Governance influence or deployment coordination failures can
-prevent an upgrade or leave incompatible populations of nodes.
-
-**Recommendation.** Evaluate governance procedures, readiness signaling, and
-communication through the relevant governance and rollout reviews.
-
 **Assessment.** Out of scope. Network attack experiments do not validate these
 social and organizational mitigations. Source: [threat model](threat-model.md).
 
 ### T31: Honest demand exceeds SPO storage capabilities
-
-**Description.** Sustained successful throughput can impose storage requirements
-that force less-resourced operators offline.
-
-**Recommendation.** Validate retention, growth, and long-term operating costs
-across representative operator hardware before increasing capacity parameters.
 
 **Assessment.** Out of scope. Short attack runs and transient memory measurements
 are not evidence of long-term storage sustainability.
@@ -750,23 +680,11 @@ Source: [threat model](threat-model.md).
 
 ### T32: Silently accumulate BLS keys to forge certificate
 
-**Description.** An adaptive adversary may collect enough genuine signing keys
-over time to produce a quorum certificate without visible earlier misuse.
-
-**Recommendation.** Resolve the adaptive-security analysis and evaluate whether
-rotation and compromise detection adequately bound usable accumulated keys.
-
 **Assessment.** Out of scope. The threat model explicitly leaves adaptive security
 and rotation effectiveness for further research. T15 does not test this case:
 a stolen quorum uses genuine signatures. Source: [threat model](threat-model.md).
 
 ### T33: Silently accumulate VRF keys for eligibility
-
-**Description.** Accumulating eligibility keys may give the adversary influence
-beyond its nominal stake without an immediately observable attack.
-
-**Recommendation.** Validate rotation and compromise assumptions in the adaptive
-security model, including the period for which old keys remain useful.
 
 **Assessment.** Out of scope. No empirical or formal mitigation validation is
 claimed. Source: [threat model](threat-model.md).
@@ -796,9 +714,9 @@ following validation gaps.
 
 | Assessment area | Evidence available | What remains to establish |
 |---|---|---|
-| Coverage of agreed inventory | All T1-T34 entries represented with the supplied status | Inventory coverage does not establish threat-model completeness |
+| Coverage of agreed inventory | All T1-T34 entries assessed or explicitly marked pending or out of scope | Inventory coverage does not establish threat-model completeness |
 | Certificate verification | All 27 delivered invalid-certificate blocks rejected on w38 | Remaining malformed encodings and contexts; resource cost and throughput under repeated attack; current-release regression evidence |
-| Invalid data handling | Historical rejection, connection-fault, and process-crash observations | Reconcile supplied risk labels with failures; identify fixes and independently reproduce rejection and survival |
+| Invalid data handling | Historical rejection, connection-fault, and process-crash observations | Identify fixes and independently reproduce rejection, process survival, and recovery |
 | Vote admission and retention | Historical unknown-target acceptance and memory growth | Current target/context checks, bounded lifecycle, and recovery evidence |
 | Withholding and diffusion | Rust-cluster retry experiments, burst tests, partition simulations | Realistic bandwidth and topology; certified-data availability to non-voters; validated diffusion allowance |
 | Inaction and incentives | Praos continued during voting loss | Quantified throughput impact and evidence for economic deterrence |
@@ -806,8 +724,8 @@ following validation gaps.
 | Evidence completeness | Test conditions and outcomes summarized for completed experiments | Establish T9 and T24/T25 results; identify exact tested revisions and complete fix-validation records |
 
 **Legend:** T1-T34 = the threat identifiers covered here; w38 = the prototype
-release label recorded by the certificate reports; Praos = the underlying
-Ouroboros chain-consensus protocol. "Delivered" means an attack block reached
+release tested in the certificate experiments; Praos = the underlying Ouroboros
+chain-consensus protocol. "Delivered" means an attack block reached
 honest-ledger validation. "Current-release" refers to the release selected for a
 new validation campaign, not a claim that one was tested for this draft.
 
@@ -827,10 +745,10 @@ where these were recorded. Corrected experiments supersede invalid initial
 attempts; repeated descriptions of the same samples are not independent evidence.
 T14 and T15 share seven delivered blocks, counted once in the combined total.
 
-This is a synthesis of recorded results, not a new experiment or an independent
-reanalysis of all raw logs. Observations without available supporting records
-are excluded from the empirical conclusions. Missing results remain unresolved,
-regardless of the team's supplied risk label.
+This assessment combines experiments and mechanism analysis; no new experiment
+or independent reanalysis of all raw logs was performed. Empirical conclusions
+are limited to supported observations. Untested cases and missing measurements
+remain unresolved regardless of the risk classification.
 
 Prototype release labels do not establish the behavior of later builds. Closing
 an implementation finding requires an identified fix and a regression that
