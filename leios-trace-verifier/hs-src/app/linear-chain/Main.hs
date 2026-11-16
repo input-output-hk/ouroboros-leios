@@ -34,6 +34,8 @@ import System.Exit (exitFailure)
 import System.IO (BufferMode (LineBuffering), hPutStrLn, hSetBuffering, stderr, stdout)
 
 import qualified Cardano.Api as Api
+import Cardano.Ledger.Dijkstra.PParams (ppLeiosCommitteeSizeL)
+import Lens.Micro ((^.))
 import qualified Data.ByteString as BS (ByteString, readFile)
 import qualified Data.ByteString.Char8 as BSC (pack)
 import qualified Data.List as List (findIndex)
@@ -298,6 +300,8 @@ data LeadershipOpts = LeadershipOpts
 queryChain :: IORef Bool -> LeadershipOpts -> IO ChainData
 queryChain explained opts = do
   (cd, mlerr) <- queryChainOnce opts
+  when (cdCommitteeSize cd == Nothing) $
+    hPutStrLn stderr "the chain is before the Dijkstra era and has no Leios committee size; every pool gets a seat."
   case mlerr of
     Nothing -> pure ()
     Just lerr -> do
@@ -344,7 +348,8 @@ scheduleUnavailable LeadershipOpts{..} lerr mSlots =
 
 -- | One attempt at the chain query (via the cardano-api local-state-query protocol):
 --   the SUT's leadership schedule (the slots in which its pool is an eligible
---   leader) and the on-chain stake distribution, over a single connection. Mirrors
+--   leader), the on-chain stake distribution and the Leios committee size (a
+--   Dijkstra-era protocol parameter), over a single connection. Mirrors
 --   cardano-cli's @runQueryLeadershipScheduleCmd@ / @runQueryStakeDistributionCmd@.
 --   Returns the data alongside the leadership error, if any: only the schedule part
 --   can fail this way, and it is recoverable, so the stake distribution and party
@@ -373,6 +378,7 @@ queryChainOnce LeadershipOpts{..} = do
         ( Either Api.LeadershipError (Set.Set Api.SlotNo)
         , Map.Map (Api.Hash Api.StakePoolKey) Rational
         , Api.EpochNo
+        , Maybe Integer
         )
     ) <-
     Api.executeLocalStateQueryExpr connInfo Api.VolatileTip $ do
@@ -393,6 +399,10 @@ queryChainOnce LeadershipOpts{..} = do
                 "pool distribution"
                 (Api.queryPoolDistribution beo (Just (Set.singleton loStakePoolId)))
             stakeDistr <- expectQueryEra "stake distribution" (Api.queryStakeDistribution sbe)
+            -- The Leios committee size exists from the Dijkstra era on.
+            let committeeSize = case sbe of
+                  Api.ShelleyBasedEraDijkstra -> Just (toInteger (pparams ^. ppLeiosCommitteeSizeL))
+                  _ -> Nothing
             let schedule =
                   case loWhich of
                     CurrentEpoch ->
@@ -408,12 +418,12 @@ queryChainOnce LeadershipOpts{..} = do
                         currentEpoch
                     NextEpoch ->
                       error "next-epoch schedule not yet implemented"
-            pure (schedule, stakeDistr, currentEpoch)
+            pure (schedule, stakeDistr, currentEpoch, committeeSize)
         )
         era
   case result of
     Left err -> die ("local state query failed: " <> show err)
-    Right (eSlots, stakeDistr, nodeEpoch) ->
+    Right (eSlots, stakeDistr, nodeEpoch, committeeSize) ->
       let
         -- Stake registered in epoch e becomes active in epoch e+2, so before
         -- epoch 2 a pool that will have stake still reports as having none. The
@@ -443,6 +453,7 @@ queryChainOnce LeadershipOpts{..} = do
               maxRBBody
               (toInteger (Api.unEpochNo nodeEpoch))
               mSlots
+              committeeSize
               stakeDistr
           , mErr
           )
@@ -457,9 +468,10 @@ buildChainData ::
   Integer ->
   Integer ->
   Maybe [Integer] ->
+  Maybe Integer ->
   Map.Map (Api.Hash Api.StakePoolKey) Rational ->
   ChainData
-buildChainData sutPool epochLength maxRBBody nodeEpoch winning m =
+buildChainData sutPool epochLength maxRBBody nodeEpoch winning committeeSize m =
   -- A SUT absent from the distribution (no stake at all) joins as a
   -- zero-stake party at the end: keeps the party set total for the spec
   -- side, and the committee arithmetic correctly excludes it.
@@ -485,6 +497,7 @@ buildChainData sutPool epochLength maxRBBody nodeEpoch winning m =
         , cdSutIndex = sutIdx
         , cdEpochLength = epochLength
         , cdMaxRBBody = maxRBBody
+        , cdCommitteeSize = committeeSize
         , cdNodeEpoch = nodeEpoch
         }
 

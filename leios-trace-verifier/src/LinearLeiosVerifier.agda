@@ -138,9 +138,9 @@ module LinearLeiosVerifier where
           ; Ldiff = Ldiff
           }
 
-      -- The ledger's committee size ('leiosCommitteeSize'): every party
-      -- gets a seat, so the committee is decided by the voting keys alone.
-      -- A protocol parameter of the ledger; to be read from the chain.
+      -- The ledger's committee size ('leiosCommitteeSize').  A simulation
+      -- has no ledger to read it from, so every party gets a seat and the
+      -- committee is decided by the voting keys alone.
       committeeSize : ℕ
       committeeSize = numberOfParties
 

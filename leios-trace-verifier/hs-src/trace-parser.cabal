@@ -66,8 +66,10 @@ executable linear-leios-trace-verifier-chain
       , base
       , bytestring
       , cardano-api
+      , cardano-ledger-dijkstra
       , containers
       , leios-trace-hs
+      , microlens
       , optparse-applicative
       , text
       , trace-parser

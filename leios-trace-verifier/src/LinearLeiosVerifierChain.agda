@@ -80,6 +80,10 @@ module LinearLeiosVerifierChain where
     -- only when the mempool does not fit in the RB, so this is what separates a forge
     -- without an EB that is a violation from one that is ordinary behaviour.
     (maxRBBody : ByteCount)
+    -- The ledger's committee size ('leiosCommitteeSize'), from the chain's
+    -- protocol parameters: the voting committee is the top 'committeeSize'
+    -- pools by stake ('Defaults', 'Leios.Ledger.Dijkstra.Verifier').
+    (committeeSize : ℕ)
     where
 
     from-id : ℕ → Fin numberOfParties
@@ -129,11 +133,6 @@ module LinearLeiosVerifierChain where
           ; Ldiff = Ldiff
           }
 
-      -- The ledger's committee size ('leiosCommitteeSize'): every party
-      -- gets a seat, so the committee is decided by the voting keys alone.
-      -- A protocol parameter of the ledger; to be read from the chain.
-      committeeSize : ℕ
-      committeeSize = numberOfParties
 
       -- Slots at which the log shows the Leios subsystem itself doing something.
       -- Praos events — NodeIsLeader, RBForged — deliberately do not count.

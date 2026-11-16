@@ -48,7 +48,13 @@ fitting :: ChainEvent
 fitting = CMempoolRange 50 50
 
 verify :: [Integer] -> Bool -> [ChainEvent] -> Text
-verify slots authoritative evs =
+verify = verifyWith 3
+
+-- | Verify with the given committee size.  The three pools have equal stake, so
+--   ties decide the seats, by ascending key hash: the SUT, party 2, is seated
+--   only by a committee of all three.
+verifyWith :: Integer -> [Integer] -> Bool -> [ChainEvent] -> Text
+verifyWith committeeSize slots authoritative evs =
   fst
     ( snd
         ( verifyChainTraceFinalFromSlot
@@ -61,10 +67,15 @@ verify slots authoritative evs =
             slots
             authoritative
             capacity
+            committeeSize
             evs
             0
         )
     )
+
+-- | Whether the vote rule rejected the run for want of a committee seat.
+notInCommittee :: Text -> Bool
+notInCommittee = T.isInfixOf "Not in the voting committee"
 
 -- | Eligibility taken from the log, as happens for any epoch the queried schedule
 --   cannot cover.
@@ -76,7 +87,7 @@ verifyFrom :: Integer -> [ChainEvent] -> Text
 verifyFrom from evs =
   fst
     ( snd
-        (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 [] False capacity evs from)
+        (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 [] False capacity 3 evs from)
     )
 
 -- | An EB announced and acquired in slot 1 and voted in slot 4, the first slot of its
@@ -323,6 +334,13 @@ chainVerifier = do
     it "refuses a vote for an EB whose ranking block the node never adopted" $
       fromLog votedNotAdopted `shouldNotBe` "ok"
 
+  describe "the voting committee" $ do
+    it "seats the node when the committee has a seat for every pool" $
+      verifyWith 3 [] False announcedAndVoted `shouldBe` "ok"
+    it "refuses a vote by a node that ties lose a seat" $
+      verifyWith 2 [] False announcedAndVoted `shouldSatisfy` notInCommittee
+    it "refuses every vote when the committee is empty" $
+      verifyWith 0 [] False announcedAndVoted `shouldSatisfy` notInCommittee
   describe "validation" $ do
     it "refuses a vote for an EB whose body the node never acquired" $
       fromLog votedNotAcquired `shouldSatisfy` rejectedByValidation
