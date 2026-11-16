@@ -51,11 +51,11 @@ WINDOWS_DIR = os.path.normpath(os.path.join(HERE, "..", "data", "windows"))
 OUT = OUTPUTS  # set from --outputs in main
 
 WINDOWS = {
-    "f1-high": dict(label="testnet 40 kB / 260 kB, loaded hours", period=("2026-10-21T12:00:00", "2026-10-22T01:00:00"),
+    "f1-high": dict(label="testnet 40 kB / 260 kB, 257 B", period=("2026-10-21T12:00:00", "2026-10-22T01:00:00"),
                     cert_bin="a certifies, closure < 0.5 MB", cert_label="under 0.5 MB"),
-    "f2-high": dict(label="testnet 308 kB / 2 MB, loaded hours", period=("2026-10-24T12:00:00", "2026-10-26T13:00:00"),
+    "f2-high": dict(label="testnet 308 kB / 2 MB, 318 B", period=("2026-10-24T12:00:00", "2026-10-26T13:00:00"),
                     cert_bin="d certifies, closure 1.5-2 MB", cert_label="1.5-2 MB"),
-    "1kb": dict(label="testnet 308 kB / 2 MB, 1 kB transactions", period=("2026-10-28T18:00:00", "2026-10-29T01:00:00"),
+    "1kb": dict(label="testnet 308 kB / 2 MB, 1 kB", period=("2026-10-28T18:00:00", "2026-10-29T01:00:00"),
                 cert_bin="d certifies, closure 1.5-2 MB", cert_label="1.5-2 MB"),
     "cluster-40k260k": dict(label="cluster 40 kB / 260 kB, 200 B",
                             run="cluster/2026-10-17-21-38-cf576-notag-value-leios-workload-all-n2n-40k260k-1i1o1w-nomadperf-dira-nom",
@@ -264,7 +264,7 @@ def density(root, names, trickle=False):
             trows, tslots = chain(root, name, trickle=True)
             texp = tslots * F
             print("| %s, trickle hours of the same period | - | %s | %s (%.0f) | %.2f | - |" % (
-                c["label"].replace(", loaded hours", "").replace(", 1 kB transactions", " (1 kB period)"), "{:,}".format(len(trows)), "{:,.0f}".format(texp), sd(tslots), len(trows) / texp))
+                c["label"].replace(", 257 B", "").replace(", 318 B", "").replace(", 1 kB", " (1 kB period)"),"{:,}".format(len(trows)), "{:,.0f}".format(texp), sd(tslots), len(trows) / texp))
         a, _ = adoption_rows(root, name)
         lead = rows_of(os.path.join(OUT, name, "adoption.md"), "leader_slots")
         lead = next(iter(lead.values()), None)

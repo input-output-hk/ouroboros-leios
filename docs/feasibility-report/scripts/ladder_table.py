@@ -21,9 +21,9 @@ full and mix agree) print as a dash.
 import argparse, json, os
 
 LADDERS = {
-    "f1-high": "testnet 40 kB / 260 kB, loaded hours",
-    "f2-high": "testnet 308 kB / 2 MB, loaded hours",
-    "1kb": "testnet 308 kB / 2 MB, 1 kB transactions",
+    "f1-high": "testnet 40 kB / 260 kB, 257 B",
+    "f2-high": "testnet 308 kB / 2 MB, 318 B",
+    "1kb": "testnet 308 kB / 2 MB, 1 kB",
     "cluster-40k260k": "cluster 40 kB / 260 kB, 200 B",
     "cluster-100k1m": "cluster 100 kB / 1 MB, 200 B",
     "cluster-100k1m-374": "cluster 100 kB / 1 MB, 374 B",

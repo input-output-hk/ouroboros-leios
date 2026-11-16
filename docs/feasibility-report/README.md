@@ -495,9 +495,9 @@ S_EB / S_EB-tx as in Table 1.4.
 
 | window | loaded hours (UTC) | transaction size (mean over the certified closures) | pools in the committee | weight of the 14 IOG and PIR pools |
 |---|---|---|---|---|
-| 40 kB / 260 kB | 2026-10-21 12:00-13:00, 17:00-21:00, 10-22 00:00-01:00 (6 h) | 257 B | 100-108 | 0.45-0.48 |
-| 308 kB / 2 MB | 25 even hours from 2026-10-24 12:00 to 10-26 13:00 | 318 B | 145-148 | 0.35-0.36 |
-| 308 kB / 2 MB, 1 kB transactions | 2026-10-28 18:00, 20:00, 22:00, 10-29 00:00 (4 h) | 810 B | 150 | 0.35 |
+| 40 kB / 260 kB, 257 B | 2026-10-21 12:00-13:00, 17:00-21:00, 10-22 00:00-01:00 (6 h) | 257 B | 100-108 | 0.45-0.48 |
+| 308 kB / 2 MB, 318 B | 25 even hours from 2026-10-24 12:00 to 10-26 13:00 | 318 B | 145-148 | 0.35-0.36 |
+| 308 kB / 2 MB, 1 kB | 2026-10-28 18:00, 20:00, 22:00, 10-29 00:00 (4 h) | 810 B | 150 | 0.35 |
 
 Table 3.1. The testnet load windows. The loaded hours are those in which
 the generator ran; the odd hours between them carried residual load only
@@ -577,9 +577,9 @@ is captioned with reporting nodes and weight, these are the figures.
 
 | window | reporting pools | pools in the committee | committee weight observed | largest weight not observed |
 |---|---|---|---|---|
-| 40 kB / 260 kB | 83 | 100-108 | 0.73-0.75 | PIR0, 0.13 |
-| 308 kB / 2 MB | 89 | 145-148 | 0.63 | PIR0, 0.10 |
-| 308 kB / 2 MB, 1 kB transactions | 85 | 150 | 0.61 | PIR0, 0.10 |
+| 40 kB / 260 kB, 257 B | 83 | 100-108 | 0.73-0.75 | PIR0, 0.13 |
+| 308 kB / 2 MB, 318 B | 89 | 145-148 | 0.63 | PIR0, 0.10 |
+| 308 kB / 2 MB, 1 kB | 85 | 150 | 0.61 | PIR0, 0.10 |
 
 Table 3.3. Reporting coverage of the testnet per window, both sources
 merged. A pool counts as observed when its node's votes are in the data;
@@ -706,7 +706,7 @@ in a fraction of the time available.
 
 Table 4.1 is the ladder of the two populations.
 
-| rung, kB/s | cluster 40 kB / 260 kB, 200 B | testnet 40 kB / 260 kB, loaded hours |
+| rung, kB/s | cluster 40 kB / 260 kB, 200 B | testnet 40 kB / 260 kB, 257 B |
 |---|---|---|
 | parameter ceiling | 8.6 (p = 0.488) | 8.9 (p = 0.513) |
 | workload ceiling | 7.7 (S_EB binds at 200 B/tx) | 8.9 (S_EB-tx binds at 257 B/tx) |
@@ -726,7 +726,7 @@ rows unchanged. Transactions per second at the measured size: 37.4 and
 
 Table 4.2 is the stage table of the same populations.
 
-| stage | cluster 40 kB / 260 kB, 200 B | testnet 40 kB / 260 kB, loaded hours |
+| stage | cluster 40 kB / 260 kB, 200 B | testnet 40 kB / 260 kB, 257 B |
 |---|---|---|
 | body arrival: p90; weight under 3 s | 2.34 s; 1.00 | 2.24 s; 0.71 |
 | closure arrival: p90; weight under 3 s / 7 s | 3.20 s; 0.67 / 1.00 | 2.78 s; 0.67 / 0.73 |
@@ -881,7 +881,7 @@ first to test the closure stage.
 
 Table 4.5 is the ladder of the two windows.
 
-| rung, kB/s | testnet 308 kB / 2 MB, loaded hours | testnet 308 kB / 2 MB, 1 kB transactions |
+| rung, kB/s | testnet 308 kB / 2 MB, 318 B | testnet 308 kB / 2 MB, 1 kB |
 |---|---|---|
 | parameter ceiling | 53.5 (p = 0.513) | 53.5 (p = 0.513) |
 | workload ceiling | 53.5 (S_EB-tx binds at 318 B/tx) | - |
@@ -891,14 +891,14 @@ Table 4.5 is the ladder of the two windows.
 | load-adjusted | 15.9 (announcing 0.98, EB 0.59, plain RB 0.90) | - |
 | measured | 12.0 | 22.0 |
 
-Table 4.5. The ladder at 308 kB / 2 MB. Loaded hours: the 25 even hours
+Table 4.5. The ladder at 308 kB / 2 MB. 318 B window: the 25 even hours
 from 2026-10-24 12:00 to 10-26 13:00 UTC, 2,128 eligible EBs, 1,033
 certified. 1 kB window: the four even hours from 10-28 18:00 to 10-29
 01:00 UTC, 361 eligible, 164 certified. Both voting-adjusted rungs are
 shown because they differ here: "full" is the survival of EBs at the cap,
 "mix" of all eligible EBs as forged. Both columns carry two transaction
 sizes (Table 3.1). The rungs that read an EB's bytes from its reference
-count at the mean size misread the loaded hours' 506 B EBs by at most a
+count at the mean size misread the 318 B window's 506 B EBs by at most a
 quarter of their bytes, and give no reading in the 1 kB window, whose
 rungs are left out and read by EB class in 4.3.1; the appendix's ladder
 entry states the reading. The measured rung is exact. Transactions per
@@ -906,7 +906,7 @@ second at the measured size: 38.0 and 29.6.
 
 Table 4.6 is the stage table of the same windows.
 
-| stage | testnet 308 kB / 2 MB, loaded hours | testnet 308 kB / 2 MB, 1 kB transactions |
+| stage | testnet 308 kB / 2 MB, 318 B | testnet 308 kB / 2 MB, 1 kB |
 |---|---|---|
 | body arrival: p90; weight under 3 s | 4.08 s; 0.39 | 3.28 s; 0.47 |
 | closure arrival: p90; weight under 3 s / 7 s | 7.16 s; 0.14 / 0.51 | 5.12 s; 0.30 / 0.53 |
@@ -916,14 +916,14 @@ Table 4.6 is the stage table of the same windows.
 | tally reaches the quorum: p90 | 7.60 s | 7.10 s |
 | quorums that became certificates | 93 %, 1,033 of 1,107 quorums seen | 90 %, 164 of 182 quorums seen |
 
-Table 4.6. The stages at 308 kB / 2 MB. Loaded hours: 89 reporting
+Table 4.6. The stages at 308 kB / 2 MB. 318 B window: 89 reporting
 pools of the 145 to 148 in the committee, holding 0.63 of its weight;
 1 kB window: 85 of 150, holding 0.61 (Table 3.3).
 Read as Table 4.2, at the unfavourable-quartile reporting node. The
 weight share is of the whole committee, so its ceiling is the observed
 weight.
 
-Measured, in the loaded hours: 12.0 kB/s, 22 % of the parameter
+Measured, in the 318 B window: 12.0 kB/s, 22 % of the parameter
 ceiling, with 0.485 of the eligible EBs certified as forged and 0.138
 of the full ones. The ladder splits the loss in two: the EBs were at
 0.59 of the cap on average, and of what was forged, half failed. The
@@ -945,7 +945,7 @@ stage by EB size.
 | 4,000-6,000 | 739 | 25 % | 1,291 / 1,707 / 2,000 | 0.37 / 0.44 | 0.41 |
 | 6,000 and up | 295 | 17 % | 1,571 / 1,668 / 1,718 | 0.34 / 0.41 | 0.41 |
 
-Table 4.7. Closure and vote by EB size, loaded hours, sizes by
+Table 4.7. Closure and vote by EB size in the 318 B window, sizes by
 reference count. The certified closures' bytes are p25 / p50 / p75
 over the bin's EBs. The two weight cells are, per EB, the share of
 the committee's weight held by the reporting nodes that had the
@@ -963,7 +963,7 @@ Table 4.7 places the loss at arrival. As the EBs grow, the weight
 holding the closure by 7 s falls from 0.51 to 0.41, out of about 0.50
 present. The weight that votes is within 0.03 of it in every bin, so
 once the closure has arrived the vote follows: validation loses
-nothing visible in the loaded hours. The closures with more
+nothing visible in the 318 B window. The closures with more
 transactions are also the ones with more bytes, so this window cannot
 say which of the two costs the arrival; 4.3.1 can.
 
@@ -1169,11 +1169,11 @@ that announces. Table 5.1 gives the counts.
 | window | certifies, announces | certifies, no EB | plain, announces, full | plain, no EB |
 |---|---:|---:|---:|---:|
 | cluster 40 kB / 260 kB, 200 B | 1,539 | 0 | 1,521 | 23 |
-| testnet 40 kB / 260 kB, loaded hours | 527 | 2 | 331 | 7 |
+| testnet 40 kB / 260 kB, 257 B | 527 | 2 | 331 | 7 |
 | cluster 100 kB / 1 MB, 200 B | 1,128 | 0 | 1,916 | 35 |
 | cluster 100 kB / 1 MB, 374 B | 820 | 0 | 2,125 | 23 |
-| testnet 308 kB / 2 MB, loaded hours | 1,014 | 17 | 2,275 | 46 |
-| testnet 308 kB / 2 MB, 1 kB transactions | 159 | 2 | 441 | 0 |
+| testnet 308 kB / 2 MB, 318 B | 1,014 | 17 | 2,275 | 46 |
+| testnet 308 kB / 2 MB, 1 kB | 159 | 2 | 441 | 0 |
 
 Table 5.1. RBs on the chain by kind, from the chain of each window. A
 plain RB is full from 80 kB (the limit is 90,112 B); the plain
@@ -1195,11 +1195,11 @@ closure and for the full plain RB of the same window.
 | window | closure bin (RBs in it) | certifying p50 / p90 | within 1 s | full plain p50 / p90 | within 1 s |
 |---|---:|---:|---:|---:|---:|
 | cluster 40 kB / 260 kB, 200 B | 222 kB (1,539) | 0.92 / 1.21 s | 61 % | 1.03 / 1.70 s | 46 % |
-| testnet 40 kB / 260 kB, loaded hours | under 0.5 MB (529) | 0.66 / 1.25 s | 78 % | 0.91 / 2.04 s | 58 % |
+| testnet 40 kB / 260 kB, 257 B | under 0.5 MB (529) | 0.66 / 1.25 s | 78 % | 0.91 / 2.04 s | 58 % |
 | cluster 100 kB / 1 MB, 200 B | 555 kB (1,015) | 1.20 / 1.52 s | 9 % | 1.13 / 1.84 s | 31 % |
 | cluster 100 kB / 1 MB, 374 B | 0.5-1 MB (810) | 1.28 / 1.56 s | 3 % | 1.12 / 1.76 s | 32 % |
-| testnet 308 kB / 2 MB, loaded hours | 1.5-2 MB (161) | 1.58 / 2.45 s | 3 % | 1.17 / 2.51 s | 30 % |
-| testnet 308 kB / 2 MB, 1 kB transactions | 1.5-2 MB (124) | 0.62 / 1.55 s | 75 % | 0.62 / 2.14 s | 73 % |
+| testnet 308 kB / 2 MB, 318 B | 1.5-2 MB (161) | 1.58 / 2.45 s | 3 % | 1.17 / 2.51 s | 30 % |
+| testnet 308 kB / 2 MB, 1 kB | 1.5-2 MB (124) | 0.62 / 1.55 s | 75 % | 0.62 / 2.14 s | 73 % |
 
 Table 5.2. Adoption delay after the RB's slot, over all (node, RB) pairs
 of the window: the cluster's 51 nodes, the testnet's reporting nodes
@@ -1265,11 +1265,11 @@ the one the second leader had to adopt.
 | window | share forked among all consecutive-slot pairs | among the pairs led by a certifying RB | among the pairs led by a plain RB |
 |---|---:|---:|---:|
 | cluster 40 kB / 260 kB, 200 B | 62 of 137 (45 %) | 18 of 64 (28 %) | 44 of 73 (60 %) |
-| testnet 40 kB / 260 kB, loaded hours | 5 of 31 (16 %) | 1 of 10 (10 %) | 4 of 21 (19 %) |
+| testnet 40 kB / 260 kB, 257 B | 5 of 31 (16 %) | 1 of 10 (10 %) | 4 of 21 (19 %) |
 | cluster 100 kB / 1 MB, 200 B | 122 of 173 (71 %) | 56 of 67 (84 %) | 66 of 106 (62 %) |
 | cluster 100 kB / 1 MB, 374 B | 129 of 182 (71 %) | 50 of 53 (94 %) | 79 of 129 (61 %) |
-| testnet 308 kB / 2 MB, loaded hours | 46 of 122 (38 %) | 22 of 43 (51 %) | 24 of 79 (30 %) |
-| testnet 308 kB / 2 MB, 1 kB transactions | 5 of 25 (20 %) | 1 of 5 (20 %) | 4 of 20 (20 %) |
+| testnet 308 kB / 2 MB, 318 B | 46 of 122 (38 %) | 22 of 43 (51 %) | 24 of 79 (30 %) |
+| testnet 308 kB / 2 MB, 1 kB | 5 of 25 (20 %) | 1 of 5 (20 %) | 4 of 20 (20 %) |
 
 Table 5.3. Consecutive-slot leader pairs: the forked pairs over all the
 pairs of that kind, on the chain and forked together. A forked pair is an
@@ -1313,11 +1313,11 @@ nodes.
 | window | observed hosts: leader slots / forged | RBs on the chain | lottery mean (sd) | chain density | orphans seen by two or more observed hosts |
 |---|---|---:|---:|---:|---:|
 | cluster 40 kB / 260 kB, 200 B | all 51 nodes: 3,233 / 3,233 | 3,083 | 3,198 (55) | 0.96 | 150 |
-| testnet 40 kB / 260 kB, loaded hours | 13 reporting hosts: 369 / 369 | 944 | 1,080 (32) | 0.87 | 23 |
+| testnet 40 kB / 260 kB, 257 B | 13 reporting hosts: 369 / 369 | 944 | 1,080 (32) | 0.87 | 23 |
 | cluster 100 kB / 1 MB, 200 B | all 51 nodes: 3,291 / 3,291 | 3,079 | 3,203 (55) | 0.96 | 212 |
 | cluster 100 kB / 1 MB, 374 B | all 51 nodes: 3,175 / 3,175 | 2,968 | 3,093 (54) | 0.96 | 207 |
-| testnet 308 kB / 2 MB, loaded hours | 13 reporting hosts: 1,185 / 1,185 | 3,536 | 4,500 (65) | 0.79 | 101 |
-| testnet 308 kB / 2 MB, 1 kB transactions | 13 reporting hosts: 168 / 168 | 636 | 720 (26) | 0.88 | 15 |
+| testnet 308 kB / 2 MB, 318 B | 13 reporting hosts: 1,185 / 1,185 | 3,536 | 4,500 (65) | 0.79 | 101 |
+| testnet 308 kB / 2 MB, 1 kB | 13 reporting hosts: 168 / 168 | 636 | 720 (26) | 0.88 | 15 |
 
 Table 5.4. Leader slots, RBs and chain density. Chain density is RBs on
 the chain per slot over f; the deviation is in RBs. On the testnet only the
@@ -1489,7 +1489,7 @@ the applied share alone. The IOG and PIR hosts are shown by instance class,
 the IOG producers behind their relays apart from the PIR hosts in the open
 network; the operators as the median and quartile nodes of one node set.
 
-**Table 6.1a.** testnet 40 kB / 260 kB, loaded hours (257 B, one input, no scripts): EBs of 1,000 to 1,500 transactions, the window's most common size class, 617 EBs; a cell in which a host has fewer than 30 records is marked tentative.
+**Table 6.1a.** testnet 40 kB / 260 kB, 257 B (257 B, one input, no scripts): EBs of 1,000 to 1,500 transactions, the window's most common size class, 617 EBs; a cell in which a host has fewer than 30 records is marked tentative.
 
 | validation time per EB, s (median; records in brackets) | applied share under 10 % | applied share 10 to 30 % | applied share 30 to 50 % | applied share 50 to 70 % | applied share 70 % and over |
 |---|---|---|---|---|---|
@@ -1508,7 +1508,7 @@ operator node; one that holds less than a third, in 0.2 to 0.9 s on the
 hosts and 0.65 s at the median operator node. Every cell is well inside
 the window.
 
-**Table 6.1b.** testnet 308 kB / 2 MB, loaded hours (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts): EBs of 4,500 to 5,000 transactions, the window's most common size class, 367 EBs; a cell in which a host has fewer than 30 records is marked tentative.
+**Table 6.1b.** testnet 308 kB / 2 MB, 318 B (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts): EBs of 4,500 to 5,000 transactions, the window's most common size class, 367 EBs; a cell in which a host has fewer than 30 records is marked tentative.
 
 | validation time per EB, s (median; records in brackets) | applied share under 10 % | applied share 10 to 30 % | applied share 30 to 50 % | applied share 50 to 70 % | applied share 70 % and over |
 |---|---|---|---|---|---|
@@ -1530,10 +1530,10 @@ hosts and 10.5 s at the median operator node, past the four-second
 window. The upper-quartile operator node is at 11 s applying half the EB
 and 19 s applying more than two thirds. The certified EBs of this class
 are mostly closures in which the 506 B kind dominates (37 of 57 in the
-loaded hours; 13 are pure 247 B), so this table reads the heavier mix;
+318 B window; 13 are pure 247 B), so this table reads the heavier mix;
 section [7](#models-against-measurements-deltaq-and-the-cip-cost-model) separates the two kinds.
 
-**Table 6.1c.** testnet 308 kB / 2 MB, 1 kB transactions (about 1 kB with metadata, and 235 to 260 B, mixed): EBs of 1,500 to 2,000 transactions, the window's most common size class, 178 EBs; a cell in which a host has fewer than 30 records is marked tentative.
+**Table 6.1c.** testnet 308 kB / 2 MB, 1 kB (about 1 kB with metadata, and 235 to 260 B, mixed): EBs of 1,500 to 2,000 transactions, the window's most common size class, 178 EBs; a cell in which a host has fewer than 30 records is marked tentative.
 
 | validation time per EB, s (median; records in brackets) | applied share under 10 % | applied share 10 to 30 % | applied share 30 to 50 % | applied share 50 to 70 % | applied share 70 % and over |
 |---|---|---|---|---|---|
@@ -1663,7 +1663,7 @@ Table 6.3 counts the nodes of each population by their own 90th
 percentile of the closure age, the time after the EB's slot at which
 the node held every transaction.
 
-| nodes by their own p90 of the closure age | cluster 40 kB / 260 kB, 200 B | testnet 40 kB / 260 kB, loaded hours | cluster 100 kB / 1 MB, 200 B | cluster 100 kB / 1 MB, 374 B | testnet 308 kB / 2 MB, loaded hours | testnet 308 kB / 2 MB, 1 kB transactions |
+| nodes by their own p90 of the closure age | cluster 40 kB / 260 kB, 200 B | testnet 40 kB / 260 kB, 257 B | cluster 100 kB / 1 MB, 200 B | cluster 100 kB / 1 MB, 374 B | testnet 308 kB / 2 MB, 318 B | testnet 308 kB / 2 MB, 1 kB |
 |---|---|---|---|---|---|---|
 | under 2 s | 0 | 0 | 0 | 0 | 0 | 0 |
 | 2 to 3 s | 34 | 71 | 0 | 0 | 14 | 35 |
@@ -1691,21 +1691,21 @@ peers that delivered each node's announcements.
 
 | window | peers delivering the node's announcements | nodes | closure p90, median node | closure p90, 90th-percentile node | body p90, median node | never completed, median node | vote rate, median node | vote rate, 10th-percentile node | share of the committee's weight |
 |---|---|---|---|---|---|---|---|---|---|
-| testnet 40 kB / 260 kB, loaded hours | 1 upstream peer | 18 | 3.00 s | 7.31 s | 2.38 s | 6.3 % | 92 % | 68 % | 0.10 |
-| testnet 40 kB / 260 kB, loaded hours | 2 to 3 | 13 | 2.63 s | 2.85 s | 2.02 s | 6.2 % | 93 % | 93 % | 0.07 |
-| testnet 40 kB / 260 kB, loaded hours | 4 to 10 | 3 | 2.36 s | 2.40 s | 1.87 s | 6.7 % | 93 % | 92 % | 0.27 |
-| testnet 40 kB / 260 kB, loaded hours | 11 to 30 | 4 | 2.34 s | 2.41 s | 1.95 s | 6.1 % | 93 % | 93 % | 0.02 |
-| testnet 40 kB / 260 kB, loaded hours | 31 and more | 45 | 2.37 s | 2.79 s | 2.00 s | 6.3 % | 93 % | 84 % | 0.28 |
-| testnet 308 kB / 2 MB, loaded hours | 1 upstream peer | 20 | 9.30 s | 19.23 s | 5.10 s | 4.7 % | 51 % | 21 % | 0.10 |
-| testnet 308 kB / 2 MB, loaded hours | 2 to 3 | 13 | 4.33 s | 4.40 s | 3.11 s | 4.7 % | 84 % | 84 % | 0.06 |
-| testnet 308 kB / 2 MB, loaded hours | 4 to 10 | 3 | 3.02 s | 3.11 s | 2.65 s | 8.4 % | 90 % | 90 % | 0.21 |
-| testnet 308 kB / 2 MB, loaded hours | 11 to 30 | 1 | 3.25 s | 3.25 s | 2.81 s | 10.4 % | 76 % | 76 % | 0.01 |
-| testnet 308 kB / 2 MB, loaded hours | 31 and more | 52 | 3.38 s | 11.44 s | 2.90 s | 11.9 % | 74 % | 23 % | 0.25 |
-| testnet 308 kB / 2 MB, 1 kB transactions | 1 upstream peer | 23 | 5.87 s | 15.20 s | 3.44 s | 12.7 % | 69 % | 22 % | 0.11 |
-| testnet 308 kB / 2 MB, 1 kB transactions | 2 to 3 | 13 | 4.68 s | 4.76 s | 2.34 s | 12.6 % | 77 % | 76 % | 0.06 |
-| testnet 308 kB / 2 MB, 1 kB transactions | 4 to 10 | 3 | 2.93 s | 3.00 s | 2.21 s | 13.5 % | 80 % | 80 % | 0.20 |
-| testnet 308 kB / 2 MB, 1 kB transactions | 11 to 30 | 4 | 2.87 s | 3.01 s | 2.21 s | 12.6 % | 79 % | 75 % | 0.02 |
-| testnet 308 kB / 2 MB, 1 kB transactions | 31 and more | 42 | 2.87 s | 5.72 s | 2.25 s | 12.5 % | 79 % | 56 % | 0.20 |
+| testnet 40 kB / 260 kB, 257 B | 1 upstream peer | 18 | 3.00 s | 7.31 s | 2.38 s | 6.3 % | 92 % | 68 % | 0.10 |
+| testnet 40 kB / 260 kB, 257 B | 2 to 3 | 13 | 2.63 s | 2.85 s | 2.02 s | 6.2 % | 93 % | 93 % | 0.07 |
+| testnet 40 kB / 260 kB, 257 B | 4 to 10 | 3 | 2.36 s | 2.40 s | 1.87 s | 6.7 % | 93 % | 92 % | 0.27 |
+| testnet 40 kB / 260 kB, 257 B | 11 to 30 | 4 | 2.34 s | 2.41 s | 1.95 s | 6.1 % | 93 % | 93 % | 0.02 |
+| testnet 40 kB / 260 kB, 257 B | 31 and more | 45 | 2.37 s | 2.79 s | 2.00 s | 6.3 % | 93 % | 84 % | 0.28 |
+| testnet 308 kB / 2 MB, 318 B | 1 upstream peer | 20 | 9.30 s | 19.23 s | 5.10 s | 4.7 % | 51 % | 21 % | 0.10 |
+| testnet 308 kB / 2 MB, 318 B | 2 to 3 | 13 | 4.33 s | 4.40 s | 3.11 s | 4.7 % | 84 % | 84 % | 0.06 |
+| testnet 308 kB / 2 MB, 318 B | 4 to 10 | 3 | 3.02 s | 3.11 s | 2.65 s | 8.4 % | 90 % | 90 % | 0.21 |
+| testnet 308 kB / 2 MB, 318 B | 11 to 30 | 1 | 3.25 s | 3.25 s | 2.81 s | 10.4 % | 76 % | 76 % | 0.01 |
+| testnet 308 kB / 2 MB, 318 B | 31 and more | 52 | 3.38 s | 11.44 s | 2.90 s | 11.9 % | 74 % | 23 % | 0.25 |
+| testnet 308 kB / 2 MB, 1 kB | 1 upstream peer | 23 | 5.87 s | 15.20 s | 3.44 s | 12.7 % | 69 % | 22 % | 0.11 |
+| testnet 308 kB / 2 MB, 1 kB | 2 to 3 | 13 | 4.68 s | 4.76 s | 2.34 s | 12.6 % | 77 % | 76 % | 0.06 |
+| testnet 308 kB / 2 MB, 1 kB | 4 to 10 | 3 | 2.93 s | 3.00 s | 2.21 s | 13.5 % | 80 % | 80 % | 0.20 |
+| testnet 308 kB / 2 MB, 1 kB | 11 to 30 | 4 | 2.87 s | 3.01 s | 2.21 s | 12.6 % | 79 % | 75 % | 0.02 |
+| testnet 308 kB / 2 MB, 1 kB | 31 and more | 42 | 2.87 s | 5.72 s | 2.25 s | 12.5 % | 79 % | 56 % | 0.20 |
 
 Table 6.4. The testnet's nodes grouped by the number of peers that
 delivered their EB announcements in the window, with the group's closure
@@ -1751,11 +1751,11 @@ population.
 | population | nodes | resident set at the node's peak, GB: p10 / median / p90 / max | GC live data at the peak, GB, median node | process CPU, cores, median node's median interval | GC share, median node |
 |---|---|---|---|---|---|
 | cluster 40 kB / 260 kB, 200 B | 51 | 12.5 / 12.9 / 13.3 / 13.5 | 9.0 | 0.10 | 0.10 |
-| testnet 40 kB / 260 kB, loaded hours (operator nodes) | 81 | 1.1 / 1.5 / 3.4 / 18.3 | 0.8 | 0.12 | 0.02 |
+| testnet 40 kB / 260 kB, 257 B (operator nodes) | 81 | 1.1 / 1.5 / 3.4 / 18.3 | 0.8 | 0.12 | 0.02 |
 | cluster 100 kB / 1 MB, 200 B | 51 | 13.4 / 13.8 / 14.3 / 14.4 | 9.4 | 0.22 | 0.08 |
 | cluster 100 kB / 1 MB, 374 B | 51 | 13.6 / 14.1 / 14.5 / 14.7 | 9.4 | 0.23 | 0.08 |
-| testnet 308 kB / 2 MB, loaded hours (operator nodes) | 90 | 1.6 / 2.5 / 6.8 / 20.8 | 1.0 | 0.20 | 0.03 |
-| testnet 308 kB / 2 MB, 1 kB transactions (operator nodes) | 89 | 1.4 / 2.1 / 5.5 / 18.8 | 0.9 | 0.31 | 0.03 |
+| testnet 308 kB / 2 MB, 318 B (operator nodes) | 90 | 1.6 / 2.5 / 6.8 / 20.8 | 1.0 | 0.20 | 0.03 |
+| testnet 308 kB / 2 MB, 1 kB (operator nodes) | 89 | 1.4 / 2.1 / 5.5 / 18.8 | 0.9 | 0.31 | 0.03 |
 
 Table 6.5. Memory and CPU per population: the node's resident set at its
 peak sample, the GC live data, the process CPU as cores over the sampling
@@ -1923,7 +1923,7 @@ clear groups and each group keeps enough EBs to measure on; the 50 % line
 understates the old-input cost a little on some hosts, but no placement
 of the lines closes the gap perfectly.
 
-**Table 7.2a.** testnet 40 kB / 260 kB, loaded hours (257 B, one input, no scripts): EBs of 1,000 to 1,499 transactions: chained closures, certified closures in which 80 % or more of the inputs spend an output of the same block, 147 EBs; old-input closures, certified closures in which 50 % or less of the inputs spend an output of the same block, 156 EBs; a host cell resting on fewer than 10 EBs reads too few.
+**Table 7.2a.** testnet 40 kB / 260 kB, 257 B (257 B, one input, no scripts): EBs of 1,000 to 1,499 transactions: chained closures, certified closures in which 80 % or more of the inputs spend an output of the same block, 147 EBs; old-input closures, certified closures in which 50 % or less of the inputs spend an output of the same block, 156 EBs; a host cell resting on fewer than 10 EBs reads too few.
 
 | host class (instance, vCPU, generation) | hosts | chained closures: per applied transaction, milliseconds (EBs per host) | per reapplied transaction, microseconds (EBs per host) | old-input closures: per applied transaction, milliseconds (EBs per host) | per reapplied transaction, microseconds (EBs per host) |
 |---|---|---|---|---|---|
@@ -1934,7 +1934,7 @@ of the lines closes the gap perfectly.
 | c5d.2xlarge, 8 vCPU, three older (PIR) | PIR7, PIR9 | 0.33 to 0.37 (54 to 71) | 135 to 141 (15 to 21) | 0.65 to 1.01 (31 to 36) | 147 to 148 (48 to 94) |
 | operators (21 nodes with enough EBs under both selections): lower quartile / median / upper quartile node |  | 0.41 / 0.90 / 1.19 | 242 / 494 / 642 | 0.99 / 1.77 / 2.69 | 226 / 508 / 669 |
 
-**Table 7.2b.** testnet 308 kB / 2 MB, loaded hours (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts): EBs of 2,000 to 4,999 transactions: chained closures, certified closures in which 80 % or more of the inputs spend an output of the same block, 263 EBs; old-input closures, certified closures in which 50 % or less of the inputs spend an output of the same block, 179 EBs; a host cell resting on fewer than 10 EBs reads too few.
+**Table 7.2b.** testnet 308 kB / 2 MB, 318 B (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts): EBs of 2,000 to 4,999 transactions: chained closures, certified closures in which 80 % or more of the inputs spend an output of the same block, 263 EBs; old-input closures, certified closures in which 50 % or less of the inputs spend an output of the same block, 179 EBs; a host cell resting on fewer than 10 EBs reads too few.
 
 | host class (instance, vCPU, generation) | hosts | chained closures: per applied transaction, milliseconds (EBs per host) | per reapplied transaction, microseconds (EBs per host) | old-input closures: per applied transaction, milliseconds (EBs per host) | per reapplied transaction, microseconds (EBs per host) |
 |---|---|---|---|---|---|
@@ -2252,10 +2252,10 @@ to the loop.
 
 | set | EB size, txs | EBs | voters per EB | closure by 3 s / after 3 s / after 7 s or never | validation within 4 s / longer / never |
 |---|---|---:|---:|---:|---:|
-| testnet 308 kB / 2 MB, loaded hours | under 2,000 | 907 | 70 | 73 / 13 / 13 % | 84 / 0 / 15 % |
-| testnet 308 kB / 2 MB, loaded hours | 2,000 to 4,000 | 900 | 70 | 68 / 22 / 10 % | 83 / 5 / 12 % |
-| testnet 308 kB / 2 MB, loaded hours | 4,000 to 6,000 | 1,190 | 68 | 62 / 21 / 17 % | 66 / 16 / 18 % |
-| testnet 308 kB / 2 MB, loaded hours | 6,000 and up | 531 | 66 | 52 / 26 / 22 % | 71 / 6 / 23 % |
+| testnet 308 kB / 2 MB, 318 B | under 2,000 | 907 | 70 | 73 / 13 / 13 % | 84 / 0 / 15 % |
+| testnet 308 kB / 2 MB, 318 B | 2,000 to 4,000 | 900 | 70 | 68 / 22 / 10 % | 83 / 5 / 12 % |
+| testnet 308 kB / 2 MB, 318 B | 4,000 to 6,000 | 1,190 | 68 | 62 / 21 / 17 % | 66 / 16 / 18 % |
+| testnet 308 kB / 2 MB, 318 B | 6,000 and up | 531 | 66 | 52 / 26 / 22 % | 71 / 6 / 23 % |
 | cluster 100 kB / 1 MB, 374 B | under 2,000 | 192 | 51 | 50 / 49 / 1 % | 83 / 7 / 10 % |
 | cluster 100 kB / 1 MB, 374 B | 2,000 to 4,000 | 2,881 | 51 | 81 / 19 / 0 % | 65 / 33 / 2 % |
 
@@ -2271,10 +2271,10 @@ over 36 B per reference on the cluster.
 
 | set | EB size, txs | EBs | voted in time / too late | late: closure arrived after 7 s / validation past 7 s / never validated | EBs with late voters over a quarter | certified, of the EBs the chain could certify |
 |---|---|---:|---:|---:|---:|---:|
-| testnet 308 kB / 2 MB, loaded hours | under 2,000 | 907 | 83 / 16 % | 13 / 1 / 1 % | 19 % | 77 % |
-| testnet 308 kB / 2 MB, loaded hours | 2,000 to 4,000 | 900 | 79 / 19 % | 10 / 8 / 1 % | 26 % | 73 % |
-| testnet 308 kB / 2 MB, loaded hours | 4,000 to 6,000 | 1,190 | 62 / 37 % | 16 / 20 / 1 % | 72 % | 26 % |
-| testnet 308 kB / 2 MB, loaded hours | 6,000 and up | 531 | 65 / 34 % | 22 / 12 / 0 % | 76 % | 17 % |
+| testnet 308 kB / 2 MB, 318 B | under 2,000 | 907 | 83 / 16 % | 13 / 1 / 1 % | 19 % | 77 % |
+| testnet 308 kB / 2 MB, 318 B | 2,000 to 4,000 | 900 | 79 / 19 % | 10 / 8 / 1 % | 26 % | 73 % |
+| testnet 308 kB / 2 MB, 318 B | 4,000 to 6,000 | 1,190 | 62 / 37 % | 16 / 20 / 1 % | 72 % | 26 % |
+| testnet 308 kB / 2 MB, 318 B | 6,000 and up | 531 | 65 / 34 % | 22 / 12 / 0 % | 76 % | 17 % |
 | cluster 100 kB / 1 MB, 374 B | under 2,000 | 192 | 76 / 24 % | 1 / 13 / 9 % | 36 % | 68 % |
 | cluster 100 kB / 1 MB, 374 B | 2,000 to 4,000 | 2,881 | 63 / 37 % | 0 / 35 / 2 % | 50 % | 51 % |
 
@@ -2372,7 +2372,7 @@ gap between the two apply costs to the loop's pass over the closure's
 input table, so the chained cost is the apply cost without that pass
 (measurement made in section [9](#a-change-to-the-voting-loop-and-where-it-has-run)).
 
-**Table 8.3a.** testnet 308 kB / 2 MB, loaded hours (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts).
+**Table 8.3a.** testnet 308 kB / 2 MB, 318 B (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts).
 
 | row | in time | out of time | closure at, s: p50 / p90 | validation, s: p50 / p90 / max |
 |---|---|---|---|---|
@@ -2385,7 +2385,7 @@ input table, so the chained cost is the apply cost without that pass
 | loop's cost removed, c6id | 81.7 % | 1.4 % | 6.4 / 6.9 | 0.60 / 1.15 / 2.9 |
 | loop's cost removed, c5d | 81.5 % | 1.6 % | 6.3 / 6.9 | 0.69 / 1.30 / 3.3 |
 
-**Table 8.3b.** testnet 308 kB / 2 MB, 1 kB transactions (about 1 kB with metadata, and 235 to 260 B, mixed).
+**Table 8.3b.** testnet 308 kB / 2 MB, 1 kB (about 1 kB with metadata, and 235 to 260 B, mixed).
 
 | row | in time | out of time | closure at, s: p50 / p90 | validation, s: p50 / p90 / max |
 |---|---|---|---|---|
@@ -2399,7 +2399,7 @@ input table, so the chained cost is the apply cost without that pass
 | loop's cost removed, c5d | 90.9 % | 0.5 % | 6.7 / 6.9 | 0.44 / 0.74 / 3.0 |
 
 Tables 8.3a and 8.3b. The testnet votes repriced: 223,343 votes on
-3,528 EBs from 87 nodes in the loaded hours, 42,795 on 606 EBs from 84
+3,528 EBs from 87 nodes in the 318 B window, 42,795 on 606 EBs from 84
 nodes in the 1 kB window. "As recorded" reads the recorded validation
 times, Table 8.2 pooled over the window. "Closures as recorded, hosts
 at least current generation" keeps each voter's recorded time and
@@ -2418,7 +2418,7 @@ deadline and the vote past it, whatever the closure's arrival.
 "Closure at": when those out-of-time votes' closures arrived after the
 slot, which says whether they are long validations or late arrivals.
 Two late shares no row moves and the table leaves out: the votes whose
-closure arrived after the deadline or never, 15.0 % in the loaded hours
+closure arrived after the deadline or never, 15.0 % in the 318 B window
 and 7.1 % in the 1 kB window, and the votes whose validation never
 finished and so has no counts to reprice, 1.9 and 1.5 %; in 19.2 and
 11.9 % of the votes the closure arrived between the 3 s mark and the
@@ -2438,7 +2438,7 @@ longer than 3.3 s. The votes still out of time had their closure at
 6.3 s at the median, a late arrival and not a long validation. The 1 kB
 window reads the same.
 
-**Table 8.3c.** testnet 308 kB / 2 MB, loaded hours (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts), the EBs of 4,000 to 6,000 transactions.
+**Table 8.3c.** testnet 308 kB / 2 MB, 318 B (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts), the EBs of 4,000 to 6,000 transactions.
 
 | row | in time | out of time | closure at, s: p50 / p90 | validation, s: p50 / p90 / max |
 |---|---|---|---|---|
@@ -3115,7 +3115,7 @@ transactions per second use the same quantities in transactions.
 Three rungs read an EB's bytes from its reference count at the
 window's mean transaction size: the cap that binds, the threshold for
 a full EB and the EBs' load factor. A window with two transaction
-sizes is misread by them. In the 2 MB loaded hours the sizes are 247
+sizes is misread by them. In the 318 B window the sizes are 247
 and 506 B and S_EB-tx binds for both, so the mean reads the 506 B-heavy
 EBs, a quarter of the transactions, at 0.6 to 0.8 of their bytes: the
 full rung then counts the 247 B EBs of 6,200 transactions and up, the

@@ -50,9 +50,9 @@ import argparse, os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUTPUTS = os.path.normpath(os.path.join(HERE, "..", "outputs"))
 WINDOWS = {
-    "f1-high": dict(label="testnet 40 kB / 260 kB, loaded hours", shape="257 B, one input, no scripts"),
-    "f2-high": dict(label="testnet 308 kB / 2 MB, loaded hours", shape="247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts"),
-    "1kb": dict(label="testnet 308 kB / 2 MB, 1 kB transactions", shape="about 1 kB with metadata, and 235 to 260 B, mixed"),
+    "f1-high": dict(label="testnet 40 kB / 260 kB, 257 B", shape="257 B, one input, no scripts"),
+    "f2-high": dict(label="testnet 308 kB / 2 MB, 318 B", shape="247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts"),
+    "1kb": dict(label="testnet 308 kB / 2 MB, 1 kB", shape="about 1 kB with metadata, and 235 to 260 B, mixed"),
     "cluster-40k260k": dict(label="cluster 40 kB / 260 kB, 200 B", shape="200 B, one input, one output", cluster=True),
     "cluster-100k1m": dict(label="cluster 100 kB / 1 MB, 200 B", shape="200 B, one input, one output", cluster=True),
     "cluster-100k1m-374": dict(label="cluster 100 kB / 1 MB, 374 B", shape="374 B, two inputs, two outputs", cluster=True),

@@ -51,10 +51,10 @@ certified share of the eligible EBs whose quorum some reporting node saw.
 import argparse, csv, os, statistics as st, sys
 
 WINDOWS = {
-    "f1-high": dict(label="testnet 40 kB / 260 kB, loaded hours"),
-    "f2-high": dict(label="testnet 308 kB / 2 MB, loaded hours"),
+    "f1-high": dict(label="testnet 40 kB / 260 kB, 257 B"),
+    "f2-high": dict(label="testnet 308 kB / 2 MB, 318 B"),
     # the 1 kB window's sub-table (Table 4.9) leaves the closure sizes to its composition table (Table 4.8)
-    "1kb": dict(label="testnet 308 kB / 2 MB, 1 kB transactions", sizes_elsewhere=True),
+    "1kb": dict(label="testnet 308 kB / 2 MB, 1 kB", sizes_elsewhere=True),
     # cluster runs: all nodes observed, no archive-only variant, no closure-fleet or voters table
     "cluster-40k260k": dict(label="cluster 40 kB / 260 kB, 200 B", cluster=True),
     "cluster-100k1m": dict(label="cluster 100 kB / 1 MB, 200 B", cluster=True),
