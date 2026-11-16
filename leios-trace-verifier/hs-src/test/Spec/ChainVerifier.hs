@@ -15,8 +15,9 @@ module Spec.ChainVerifier (
 
 import ChainEvents (ChainEvent (..))
 import Data.Text (Text)
+import qualified Data.Text as T
 import LinearLeiosLib (verifyChainTraceFinalFromSlot)
-import Test.Hspec (Spec, describe, it, shouldBe, shouldNotBe)
+import Test.Hspec (Spec, describe, it, shouldBe, shouldNotBe, shouldSatisfy)
 
 -- | Three equal-stake pools with the SUT last, mirroring the devnet the chain
 --   verifier is exercised against. The figures have to be non-zero: vote
@@ -210,6 +211,25 @@ votedNotAdopted =
   , CSlot 5
   ]
 
+-- | 'announcedAndVoted' with the EB's body never acquired: the node votes on an
+--   EB it cannot have validated, since it never submitted it for validation.
+votedNotAcquired :: [ChainEvent]
+votedNotAcquired = filter (/= CEBAcquired "eb" 1) announcedAndVoted
+
+-- | 'adoptedPastAnnouncer', in which no vote is forced, with the node putting its
+--   abstention down to being too late in the given slot.  The EB was acquired in
+--   slot 1, and validation is bounded by the voting window, @3 * Lhdr + Lvote == 7@
+--   slots, so it may still be in progress up to slot 7 but not at slot 8.
+tooLateAt :: Integer -> [ChainEvent]
+tooLateAt n = concatMap at adoptedPastAnnouncer
+ where
+  at ev@(CSlot s) | s == fromInteger n = [ev, CNotVoted "eb" 1 "tooLate"]
+  at ev = [ev]
+
+-- | Whether the validation machine rejected the run.
+rejectedByValidation :: Text -> Bool
+rejectedByValidation = T.isInfixOf "validation of EB"
+
 -- | The node forges a ranking block in a slot it leads, on the tip it selected.
 forgedOnTip :: [ChainEvent]
 forgedOnTip =
@@ -302,6 +322,19 @@ chainVerifier = do
       verifyFrom 16 windowOfVotedTwiceFar `shouldBe` "ok"
     it "refuses a vote for an EB whose ranking block the node never adopted" $
       fromLog votedNotAdopted `shouldNotBe` "ok"
+
+  describe "validation" $ do
+    it "refuses a vote for an EB whose body the node never acquired" $
+      fromLog votedNotAcquired `shouldSatisfy` rejectedByValidation
+    it "accepts a too-late abstention while validation may be in progress" $
+      fromLog (tooLateAt 4) `shouldBe` "ok"
+    it "accepts a too-late abstention at the last slot validation may take" $
+      fromLog (tooLateAt 7) `shouldBe` "ok"
+    it "refuses a too-late abstention past the bound on validation" $
+      fromLog (tooLateAt 8) `shouldSatisfy` rejectedByValidation
+    it "ignores an abstention for another reason" $
+      fromLog (map (\e -> if e == CNotVoted "eb" 1 "tooLate" then CNotVoted "eb" 1 "notOnCommittee" else e) (tooLateAt 8))
+        `shouldBe` "ok"
 
   describe "the Praos layer" $ do
     it "accepts a ranking block forged on the selected tip" $

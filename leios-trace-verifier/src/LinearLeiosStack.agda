@@ -29,6 +29,23 @@
    internal step of an input, in order: a step of a wire, of the base
    machine, or of Leios with its 'Action'.  'hintsFor' derives them from the
    Leios action, since the rule fixes where each output goes.
+
+   Beside it runs the validation functionality ('Leios.Ledger.Validation'),
+   which answers whether an EB is 'Valid', 'Invalid', 'InProgress' or
+   'Unknown':
+
+      ┌───────────────────────────────┐   ┌────────────┐
+      │      LinearLeios ∘ Below      │ ⊗ │ validation │
+      └───────────────────────────────┘   └────────────┘
+
+   The pinned spec's Linear Leios has no port to it: its vote rule asks the
+   static oracle 'isValidityChecked' instead.  So the log stands in for
+   Leios on the validation port: it submits the EBs the node acquires,
+   advances the clock with every slot, and queries the EB of every vote,
+   which must be 'Valid', and of every abstention the node puts down to late
+   validation, which must still be in progress.  Once the spec's Linear
+   Leios has the port, the validation machine moves under it, into 'Below',
+   and these queries become Leios's own.
 -}
 
 open import Leios.Prelude hiding (id; _⊗_; _>>=_; return)
@@ -45,6 +62,8 @@ open MT using (Checker; Checkable)
 open import CategoricalCrypto.Machine.Trace.Compose
 open import Data.List.NonEmpty using (List⁺; _∷_)
 
+open import Leios.Ledger.Validation
+
 module LinearLeiosStack
   (⋯ : SpecStructure) (let open SpecStructure ⋯) (params : Params)
   (BaseM : Machine (BaseAbstract.BaseNetwork B') (BaseAbstract.BaseIO B'))
@@ -54,6 +73,9 @@ module LinearLeiosStack
   (baseH : Checkable.Hint baseᶜ)
   -- Why the base machine rejects a step with the given hint.
   (baseMsg : Checkable.Hint baseᶜ → String)
+  -- The ledger that validates EBs, and how long validation may stay in
+  -- progress after an EB is submitted.
+  (valBackend : Backend (SpecStructure.EndorserBlock ⋯)) (Δ : ℕ)
   where
 
 open import Leios.Linear.Trace.Verifier ⋯ params as V
@@ -98,11 +120,21 @@ Below = (CC.id ⊗₁ BaseM) ⊗₁ CC.id
 belowᶜ : Checker Below
 belowᶜ = (idᶜ ⊗ᶜ baseᶜ) ⊗ᶜ idᶜ
 
-Stack : Machine ((FFD ⊗₀ BaseNetwork) ⊗₀ VotingC) (IO ⊗₀ Adv)
-Stack = LinearLeios CC.∘ Below
+Core : Machine ((FFD ⊗₀ BaseNetwork) ⊗₀ VotingC) (IO ⊗₀ Adv)
+Core = LinearLeios CC.∘ Below
+
+coreᶜ : Checker Core
+coreᶜ = leiosᶜ ∘ᶜ belowᶜ
+
+-- The validation functionality, on EBs by their hash.
+module VF = Functionality EndorserBlock EBRef getEBRef valBackend Δ
+open VF public using (ValM; valᶜ; ValState; ValHint; initValState; SUBMIT; QUERY; TICK; DONE)
+
+Stack : Machine (((FFD ⊗₀ BaseNetwork) ⊗₀ VotingC) ⊗₀ VF.ValObs) ((IO ⊗₀ Adv) ⊗₀ VF.ValIO)
+Stack = Core ⊗₁ ValM
 
 stackᶜ : Checker Stack
-stackᶜ = leiosᶜ ∘ᶜ belowᶜ
+stackᶜ = coreᶜ ⊗ᶜ valᶜ
 
 -- The hint of one internal step.
 H : Type
@@ -146,17 +178,35 @@ hintsFor a@(Chain-Action _)       = leiosᴴ a ∷ []
 -- The inputs of the stack, flattened as in 'TestInput': from the network
 -- below (FFD messages, blocks for the base machine, voting answers) or from
 -- the node's environment above.
+-- And the inputs of the validation machine: what the environment reports
+-- of validation, and the requests the log makes in Leios's stead.
 data StackInput : Type where
   ffdᵢ  : FFDT Out → StackInput
   netᵢ  : List BaseMsg → StackInput
   voteᵢ : VotingT In → StackInput
   ioᵢ   : IOT In → StackInput
+  obsᵢ  : VF.ValObsF In → StackInput
+  valᵢ  : VF.ValIOF Out → StackInput
+
+-- The inputs of the two machines, as inputs of the stack.
+opaque
+  unfolding _⊗₀_
+
+  liftCore : MT.Input Core → MT.Input Stack
+  liftCore (inj₁ a) = inj₁ (inj₁ a)
+  liftCore (inj₂ b) = inj₂ (inj₁ b)
+
+  liftVal : MT.Input ValM → MT.Input Stack
+  liftVal (inj₁ c) = inj₁ (inj₂ c)
+  liftVal (inj₂ d) = inj₂ (inj₂ d)
 
 toStackInput : StackInput → MT.Input Stack
-toStackInput (ffdᵢ i)  = ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ i
-toStackInput (netᵢ bs) = ((L⊗ ϵ) ⊗R) ⊗R ↑ᵢ bs
-toStackInput (ioᵢ i)   = L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ i
-toStackInput (voteᵢ i) = (L⊗ ϵ) ⊗R ↑ᵢ i
+toStackInput (ffdᵢ i)  = liftCore (((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ i)
+toStackInput (netᵢ bs) = liftCore (((L⊗ ϵ) ⊗R) ⊗R ↑ᵢ bs)
+toStackInput (ioᵢ i)   = liftCore (L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ i)
+toStackInput (voteᵢ i) = liftCore ((L⊗ ϵ) ⊗R ↑ᵢ i)
+toStackInput (obsᵢ o)  = liftVal (VF.obsInput o)
+toStackInput (valᵢ r)  = liftVal (VF.reqInput r)
 
 stack : MT.Checkable Stack toStackInput
 stack = record
@@ -169,12 +219,17 @@ stack = record
 open MT.Verifier Stack stack public
 
 leiosState : Machine.State Stack → LeiosState
-leiosState = proj₂
+leiosState = proj₂ ∘ proj₁
+
+-- The stack with the given state of the core, and the validation machine's
+-- clock at the given slot.
+initStack : Machine.State Core → ℕ → Machine.State Stack
+initStack c n = c , initValState n
 
 ------------------------------------------------------------------------------
 -- Error messages
 
--- The checker of the two layers side by side, whose loop is 'stackᶜ'.
+-- The checker of the two layers side by side, whose loop is 'coreᶜ'.
 Layers : Machine (((FFD ⊗₀ BaseNetwork) ⊗₀ VotingC) ⊗₀ ((FFD ⊗₀ BaseIO) ⊗₀ VotingC))
                  ((IO ⊗₀ Adv) ⊗₀ ((FFD ⊗₀ BaseIO) ⊗₀ VotingC))
 Layers = modifyStepRel ∘σ (Below ⊗₁ LinearLeios)
@@ -203,33 +258,82 @@ module _ ⦃ _ : Show Hash ⦄ where
   loopMsg (short _ _)   = "an output is fed back, but no hint is left for its step"
   loopMsg (long _ _)    = "an output leaves the node, but hints are left over"
 
+  showResult : ValidationResult → String
+  showResult Valid      = "Valid"
+  showResult Invalid    = "Invalid"
+  showResult InProgress = "InProgress"
+  showResult Unknown    = "Unknown"
+
+  -- Why the validation machine rejects a step: the log implies another
+  -- answer to a query than the machine gives.
+  submittedMsg : Maybe ℕ → String
+  submittedMsg nothing  = " (the EB was never submitted)"
+  submittedMsg (just m) = " (submitted at slot " ◇ show m ◇ ", validation is bounded by "
+                            ◇ show Δ ◇ " slots)"
+
+  valMsg : ∀ h i s → Checkable.Err valᶜ h i s → String
+  valMsg h i s _ = case VF.queried i of λ where
+    nothing  → "the validation machine rejects a step"
+    (just r) → "validation of EB " ◇ show r ◇ " at slot " ◇ show (ValState.clock s)
+                 ◇ ": the log implies " ◇ maybe showResult "no answer" h
+                 ◇ ", but the validation machine answers " ◇ showResult (VF.status s r)
+                 ◇ submittedMsg (VF.submittedAt s r)
+
+  -- Either machine of the stack rejects a step.
+  stepMsg : ∀ h i s → Checkable.Err stackᶜ h i s → String
+  stepMsg (inj₁ _) i s e
+    with side {(FFD ⊗₀ BaseNetwork) ⊗₀ VotingC} {IO ⊗₀ Adv} {VF.ValObs} {VF.ValIO} {Core} {ValM} i
+  ... | inj₁ _ = loopMsg e
+  ... | inj₂ _ = "a step of the validation machine with a hint for Leios and its base"
+  stepMsg (inj₂ h) i s e
+    with side {(FFD ⊗₀ BaseNetwork) ⊗₀ VotingC} {IO ⊗₀ Adv} {VF.ValObs} {VF.ValIO} {Core} {ValM} i
+  ... | inj₂ (m , _) = valMsg h m (proj₂ s) e
+  ... | inj₁ _       = "a step of Leios and its base with a hint for the validation machine"
+
   traceMsg : ∀ {s es} → TraceErr s es → String
-  traceMsg (here e)    = loopMsg e
+  traceMsg {s} (here {h = h} {m = m} e) = stepMsg h (toStackInput m) s e
   traceMsg (there _ e) = traceMsg e
 
 ------------------------------------------------------------------------------
 -- Running a trace read off a log
 
 -- An input with the action Leios takes on it, a batch of blocks for the base
--- machine with the hint of its step there, or the ranking-block step of the
--- given slot.
+-- machine with the hint of its step there, the ranking-block step of the
+-- given slot, or an input of the validation machine with the answer the log
+-- implies, if it is a query.
 data Item : Type where
   entry   : Action → StackInput → Item
   deliver : Checkable.Hint baseᶜ → List BaseMsg → Item
   base    : ℕ → Item
+  val     : ValHint → StackInput → Item
+
+-- The log's requests to the validation machine, in Leios's stead, and its
+-- reports of completed validation.
+submitᵥ : EndorserBlock → Item
+submitᵥ eb = val nothing (valᵢ (SUBMIT eb))
+
+tickᵥ : Item
+tickᵥ = val nothing (obsᵢ TICK)
+
+doneᵥ : EBRef → Item
+doneᵥ h = val nothing (obsᵢ (DONE h))
+
+-- A query, to which the log implies the given answer.
+expectᵥ : ValidationResult → EBRef → Item
+expectᵥ r h = val (just r) (valᵢ (QUERY h))
 
 -- The ranking-block step of a slot is 'Base₁' when the tip calls for no
 -- certificate, else 'Base₂' answered by 'CERT nothing' (see
 -- 'LinearLeiosTrace', which does the same for Leios alone).
 baseEntries : LeiosState → ℕ → Trace
 baseEntries s n = case certRequest s of λ where
-  nothing  → ⟨ hintsFor (Base₁-Action n) , ffdᵢ FFDT.SLOT ⟩ ∷ []
-  (just _) → ⟨ hintsFor (Base₂-Action n) , ffdᵢ FFDT.SLOT ⟩
-           ∷ ⟨ hintsFor (Cert₁-Action n) , voteᵢ (CERT nothing) ⟩
+  nothing  → ⟨ inj₁ (hintsFor (Base₁-Action n)) , ffdᵢ FFDT.SLOT ⟩ ∷ []
+  (just _) → ⟨ inj₁ (hintsFor (Base₂-Action n)) , ffdᵢ FFDT.SLOT ⟩
+           ∷ ⟨ inj₁ (hintsFor (Cert₁-Action n)) , voteᵢ (CERT nothing) ⟩
            ∷ []
 
 toEntry : Action → StackInput → Entry
-toEntry a m = ⟨ hintsFor a , m ⟩
+toEntry a m = ⟨ inj₁ (hintsFor a) , m ⟩
 
 -- A verification in progress: the state reached, and the entries read since
 -- the last ranking-block step, which are verified together at the next one.
@@ -252,7 +356,9 @@ stepItems c []                                 = inj₂ c
 stepItems (cursor s pending) (entry a m ∷ items) =
   stepItems (cursor s (toEntry a m ∷ pending)) items
 stepItems (cursor s pending) (deliver h bs ∷ items) =
-  stepItems (cursor s (⟨ deliverᴴ h ∷ [] , netᵢ bs ⟩ ∷ pending)) items
+  stepItems (cursor s (⟨ inj₁ (deliverᴴ h ∷ []) , netᵢ bs ⟩ ∷ pending)) items
+stepItems (cursor s pending) (val h m ∷ items) =
+  stepItems (cursor s (⟨ inj₂ h , m ⟩ ∷ pending)) items
 stepItems (cursor s pending) (base n ∷ items) = case flushItems s (L.reverse pending) of λ where
   (inj₁ err) → inj₁ err
   (inj₂ s′)  → stepItems (cursor s′ (L.reverse (baseEntries (leiosState s′) n))) items

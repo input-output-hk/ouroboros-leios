@@ -18,6 +18,8 @@ open import Tactic.Derive.Show
 open import Parser
 open import TraceTypes
 
+open import Leios.Ledger.Validation using (acceptAll; Valid)
+
 module LinearLeiosVerifier where
 
   postulate
@@ -245,11 +247,20 @@ module LinearLeiosVerifier where
           minted [] = "mints no block"
           minted bs = "mints (parent, slot) " ◇ show bs
 
+      -- How long validation of an EB may stay in progress after the SUT
+      -- receives it: the length of the voting window, from the EB's slot.
+      Δᵥ : ℕ
+      Δᵥ = 3 * Params.Lhdr params + Params.Lvote params
+
       -- Linear Leios stacked on the Praos node: the node, not the trace,
       -- answers Leios's requests for the ledger and takes its blocks, and
-      -- the trace's record of the blocks it mints is checked.
-      open import LinearLeiosStack d-SpecStructure params node⁻ nodeᶜ nothing nodeMsg using
-        (Stack; Item; entry; deliver; base; ffdᵢ; voteᵢ; ioᵢ; verifyItems)
+      -- the trace's record of the blocks it mints is checked.  Beside them
+      -- runs the validation machine, which the trace drives: the SUT submits
+      -- the EBs it receives, and validated the EB of every vote it casts.
+      -- The trace records no transaction bodies, so validation accepts.
+      open import LinearLeiosStack d-SpecStructure params node⁻ nodeᶜ nothing nodeMsg acceptAll Δᵥ using
+        (Stack; Core; Item; entry; deliver; base; ffdᵢ; voteᵢ; ioᵢ; verifyItems;
+         submitᵥ; tickᵥ; doneᵥ; expectᵥ; initStack)
 
       instance
         Show-EBCert : Show (Maybe EBCert)
@@ -347,6 +358,7 @@ module LinearLeiosVerifier where
               base (primWord64ToNat s)
             ∷ delivered
             ++ entry (Slot-Action (primWord64ToNat s)) (ffdᵢ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks l))))
+            ∷ tickᵥ
             ∷ []
         (no _) → l , []
 
@@ -374,7 +386,8 @@ module LinearLeiosVerifier where
             (just eb) → case RB-refs l ⁉ i of λ where
               nothing  → l , []
               (just _) →
-                record l { FFD-blks = EB-Blk eb ∷ FFD-blks l ; EB-received = (i , currentSlot l) ∷ (EB-received l) } , entry (EB-Role-Action (currentSlot l) eb) (ffdᵢ FFDT.SLOT) ∷ []
+                record l { FFD-blks = EB-Blk eb ∷ FFD-blks l ; EB-received = (i , currentSlot l) ∷ (EB-received l) } ,
+                  submitᵥ eb ∷ entry (EB-Role-Action (currentSlot l) eb) (ffdᵢ FFDT.SLOT) ∷ []
 
       -- VTs
       -- The spec does not inspect vote contents, so the voted EB's hash is left empty.
@@ -390,7 +403,10 @@ module LinearLeiosVerifier where
               nothing   → l , []
               (just eb) → case EB-received l ⁉ i of λ where
                 nothing      → l , []
-                (just slot') → record l { FFD-blks = VT-Blk vt ∷ FFD-blks l } , entry (VT-Role-Action (currentSlot l) eb slot') (ffdᵢ FFDT.SLOT) ∷ []
+                -- The vote shows that the SUT validated the EB.
+                (just slot') → record l { FFD-blks = VT-Blk vt ∷ FFD-blks l } ,
+                  doneᵥ (hash eb) ∷ expectᵥ Valid (hash eb) ∷
+                  entry (VT-Role-Action (currentSlot l) eb slot') (ffdᵢ FFDT.SLOT) ∷ []
 
       -- RBs
       traceEvent→action l record { message = RBGenerated p i s _ eb _ _ parent txs } =
@@ -444,9 +460,10 @@ module LinearLeiosVerifier where
       s₀ = initLeiosState tt exampleDistr (L.tabulate (λ i → (i , tt)))
 
       -- The stack in Leios state 's', with the Praos node's clock one slot
-      -- behind (see 'delivery').
+      -- behind (see 'delivery'), and the validation machine's at the slot.
       stack₀ : LeiosState → Machine.State Stack
-      stack₀ s = ((tt , record initNodeState { clock = LeiosState.slot s ∸ 1 }) , tt) , s
+      stack₀ s = initStack (((tt , record initNodeState { clock = LeiosState.slot s ∸ 1 }) , tt) , s)
+                           (LeiosState.slot s)
 
       check : LeiosState → List Item → Pair String String
       check s αs = [ (λ e → (e , "error verifyTrace")) , (λ _ → ("ok" , "")) ]′ (verifyItems (stack₀ s) αs)

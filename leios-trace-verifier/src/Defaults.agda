@@ -300,11 +300,11 @@ d-SpecStructure = record
       ; BM                        = d-BaseFunctionality
       ; K'                        = d-KeyRegistration
       ; KF                        = d-KeyRegistrationFunctionality
-      -- The verifier cannot observe validation completion from the trace; the
-      -- node's own gate ensures it only votes after validating, so a logged
-      -- vote is taken as evidence of completed validation. To be refined via
-      -- the asynchronous Validation functionality (see the
-      -- yveshauser/validation-functionality spec branch).
+      -- The pinned spec's vote rule asks this static oracle, which cannot
+      -- read the state of a validation functionality.  The verifier runs the
+      -- validation machine (Leios.Ledger.Validation) beside Linear Leios
+      -- instead, and checks the EB of every vote against it there (see
+      -- LinearLeiosStack); here every EB counts as validated.
       ; isValidityChecked         = λ _ _ → ⊤
       ; isValidityChecked?        = λ _ _ → yes tt
       }

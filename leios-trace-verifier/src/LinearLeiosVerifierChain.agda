@@ -16,6 +16,8 @@ open import Foreign.Haskell.Pair
 open import Parser using (SlotNo; Bytes)
 open import TraceTypes
 
+open import Leios.Ledger.Validation using (acceptAll; ValidationResult; Valid; InProgress; Unknown)
+
 open import Tactic.Defaults
 open import Tactic.Derive.Show
 
@@ -304,6 +306,10 @@ module LinearLeiosVerifierChain where
               -- The EB the chain head announced when the slot opened: the one a
               -- vote of the slot can be for.
               headEB      : Maybe EBId
+              -- ── The validation machine ──
+              -- The EBs whose body the node acquired or forged, which it has
+              -- submitted for validation.
+              submitted   : List EBId
 
       open Accumulator
 
@@ -340,9 +346,20 @@ module LinearLeiosVerifierChain where
           minted [] = "mints no block"
           minted bs = "mints (parent, slot) " ◇ show bs
 
-      open import LinearLeiosStack d-SpecStructure params node⁻ nodeᶜ nothing nodeMsg using
-        (Stack; Item; entry; deliver; base; ffdᵢ; voteᵢ; ioᵢ; verifyItems;
-         Cursor; cursor; stepItems; finishItems)
+      -- How long validation of an EB may stay in progress after the node
+      -- acquires it: the length of the voting window, from the EB's slot.
+      Δᵥ : ℕ
+      Δᵥ = 3 * Params.Lhdr params + Params.Lvote params
+
+      -- The validation machine runs beside Leios and its base, driven by the
+      -- log: the node submits the EBs it acquires and forges, validated the
+      -- EB of every vote it casts, and had not validated the EB of an
+      -- abstention it puts down to being too late.  The log records no
+      -- transaction bodies, so validation accepts.
+      open import LinearLeiosStack d-SpecStructure params node⁻ nodeᶜ nothing nodeMsg acceptAll Δᵥ using
+        (Stack; Item; entry; deliver; base; val; ffdᵢ; voteᵢ; ioᵢ; verifyItems;
+         Cursor; cursor; stepItems; finishItems;
+         submitᵥ; tickᵥ; doneᵥ; expectᵥ; initStack)
 
       blksToHeaderAndBodyList : List Blk → List (FFDA.Header ⊎ FFDA.Body)
       blksToHeaderAndBodyList []              = []
@@ -456,9 +473,12 @@ module LinearLeiosVerifierChain where
               nothing                  → just (s , [] , tipTreeHash a)
             praos : List Item
             praos = if s N.≡ᵇ 0 then [] else deliver round (inbox a) ∷ []
+            -- A vote shows that the node validated the EB, and it must have
+            -- submitted it.
             vtRole : List Item
             vtRole = case votedEB a of λ where
-              (just (eb , slot')) → entry (VT-Role-Action s eb slot') (ffdᵢ FFDT.SLOT) ∷ []
+              (just (eb , slot')) → doneᵥ (hash eb) ∷ expectᵥ Valid (hash eb)
+                                  ∷ entry (VT-Role-Action s eb slot') (ffdᵢ FFDT.SLOT) ∷ []
               nothing             → entry (No-VT-Role-Action s) (ffdᵢ FFDT.SLOT) ∷ []
         -- 'ebRole' precedes the ranking-block step: 'Base₁' and 'Base₂' require the
         -- EB role to be settled for the slot ('hasUpkeep EB-Role'), so that the RB
@@ -469,7 +489,8 @@ module LinearLeiosVerifierChain where
            ++ ebRole
            ++ base s ∷ praos
            ++ vtRole
-           ++ entry (Slot-Action s) (ffdᵢ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks a)))) ∷ []
+           ++ entry (Slot-Action s) (ffdᵢ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks a))))
+           ∷ tickᵥ ∷ []
 
       -- Fake producer for acquired EBs: distinct for EBs sharing a slot (so an
       -- honest slot battle does not register as equivocation, which requires
@@ -506,6 +527,12 @@ module LinearLeiosVerifierChain where
                ; FFD-blks = EB-Blk eb ∷ FFD-blks a
                }
 
+      -- What a query answers for an EB the node had not validated.
+      notValidated : Accumulator → EBId → ValidationResult
+      notValidated a h = case Any.any? (h ≟_) (submitted a) of λ where
+        (yes _) → InProgress
+        (no  _) → Unknown
+
       traceEvent→action : Accumulator → ChainEvent → Accumulator × List Item
       traceEvent→action a (CSlot s) =
         if not (started a)
@@ -523,11 +550,19 @@ module LinearLeiosVerifierChain where
                   ; forgedRB = nothing
                   ; headEB = headOf a
                   } , steps)
+      -- The node validates the EB it forges.
       traceEvent→action a (CEBForged h s) =
         let eb = mkEBrec SUT-id h s
-        in (record a { EB-refs = (h , eb) ∷ EB-refs a ; forgedEB = just eb } , [])
-      -- The EB was received: see 'receive'.
-      traceEvent→action a (CEBAcquired h s) = (receive a h s , [])
+        in (record a { EB-refs = (h , eb) ∷ EB-refs a ; forgedEB = just eb
+                     ; submitted = h ∷ submitted a } ,
+            submitᵥ eb ∷ doneᵥ (hash eb) ∷ [])
+      -- The EB was received: see 'receive'.  With its body acquired, the
+      -- node submits it for validation.
+      traceEvent→action a (CEBAcquired h s) =
+        let a′ = receive a h s
+        in case EB-refs a′ ⁉ h of λ where
+             nothing   → (a′ , [])
+             (just eb) → (record a′ { submitted = h ∷ submitted a′ } , submitᵥ eb ∷ [])
       -- The ranking block of this election slot announces the EB, and the
       -- announcement carries its header.
       traceEvent→action a (CAnnouncementAccepted h s) =
@@ -576,9 +611,14 @@ module LinearLeiosVerifierChain where
                  nothing  → (record a′ { inbox = blk ∷ inbox a } , [])
                  (just _) → (record a′ { late = blk ∷ late a } , [])
       traceEvent→action a (CNewTip h _) = (record a { tipNow = just h } , [])
-      -- A deliberate, protocol-legal abstention the node logged. It drives no
-      -- state: VT-Role and No-VT-Role decide against the selected chain.
-      traceEvent→action a (CNotVoted _ _ _) = (a , [])
+      -- A deliberate, protocol-legal abstention the node logged.  It drives no
+      -- Leios state: VT-Role and No-VT-Role decide against the selected chain.
+      -- An abstention for being too late says that the node had not
+      -- validated the EB: its validation is still in progress, or it was
+      -- never submitted.  Validation is bounded, so this is checked.
+      traceEvent→action a (CNotVoted h _ reason) = case reason S.≟ "tooLate" of λ where
+        (no _)  → (a , [])
+        (yes _) → (a , expectᵥ (notValidated a h) (ebHash h) ∷ [])
       -- The mempool range for the slot now ending; the parser emits it just ahead of
       -- the tick that closes that slot, so 'closeSlot' sees the right one.
       traceEvent→action a (CMempoolRange mn mx) =
@@ -594,9 +634,11 @@ module LinearLeiosVerifierChain where
       s₀ = initLeiosState tt stakeDistribution' (L.tabulate (λ i → (i , tt)))
 
       -- The stack in Leios state 's', with the Praos node's clock one slot
-      -- behind (see 'LinearLeiosStack').
+      -- behind (see 'LinearLeiosStack'), and the validation machine's at the
+      -- slot.
       stack₀ : LeiosState → Machine.State Stack
-      stack₀ s = ((tt , record initNodeState { clock = LeiosState.slot s ∸ 1 }) , tt) , s
+      stack₀ s = initStack (((tt , record initNodeState { clock = LeiosState.slot s ∸ 1 }) , tt) , s)
+                           (LeiosState.slot s)
 
       check : LeiosState → List Item → Pair String String
       check s αs = [ (λ e → (e , "error verifyChainTrace")) , (λ _ → ("ok" , "")) ]′ (verifyItems (stack₀ s) αs)
@@ -621,13 +663,14 @@ module LinearLeiosVerifierChain where
       showItem (entry a _)   = showAction a
       showItem (deliver h _) = "Praos@" ◇ maybe (λ (n , _) → show n) "?" h
       showItem (base n)      = "Base@" ◇ show n
+      showItem (val _ _)     = "Validation"
 
       n₀ : SlotNumber → Accumulator
       n₀ st = record
         { EB-refs = [] ; EB-received = [] ; FFD-blks = [] ; curSlot = st
         ; started = false ; memRange = nothing ; forgedEB = nothing ; votedEB = nothing
         ; ids = [] ; inbox = [] ; late = [] ; forgedRB = nothing ; tipNow = nothing
-        ; annBySlot = [] ; headEB = nothing }
+        ; annBySlot = [] ; headEB = nothing ; submitted = [] }
 
       -- What the stream reports, per slot tick read and once more at the end of
       -- the input: the number of items the event yielded, and the verdict so far.
