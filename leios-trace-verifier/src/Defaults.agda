@@ -12,6 +12,15 @@
    leader may put the transactions in the ranking block and announce no EB,
    so these slots carry no EB obligation.  See 'd-winner' below.
 
+   The types of the abstract interface are the Dijkstra-era ledger
+   specification's ('Leios.Ledger.Dijkstra', at 'Leios.Ledger.Dijkstra.Verifier.verifierGov'):
+   a transaction is a reference (hash, declared size), an EB is identified by
+   its references, EB identifiers and ranking-block hashes are kept apart
+   ('Hash = EBHash ⊎ RBHeaderHash'), and a certificate is the ledger's,
+   tagged with the ranking block it certifies.  The traces record transaction
+   ids but no sizes, and certificates but no signers, so sizes are 0 and
+   certificates unsigned ('txRef', 'certFor').
+
    The cryptographic components stay abstract: hashing is the identity on the
    relevant payloads, signatures/proofs are the unit type. The base layer is
    the real Praos node from ouroboros-praos-formal-spec, wrapped as a
@@ -45,30 +54,52 @@ module Defaults
   where
 
 import Leios.Ledger.Dijkstra.Verifier as LV
+import Leios.Ledger.Dijkstra LV.verifierGov as LD
 
-instance
-  htx : Hashable (List ℕ) (List ℕ)
-  htx = record { hash = id }
-
-d-Abstract : LeiosAbstract
-d-Abstract =
+-- What the Leios protocol needs and the ledger does not provide.  Voting
+-- keys are the party's, the SUT is the only voter.
+d-OffLedger : LD.OffLedger
+d-OffLedger =
   record
-    { Tx                = ℕ
-    ; PoolID            = Fin numberOfParties
-    ; BodyHash          = List ℕ
-    ; VrfPf             = ⊤
-    ; PrivKey           = BlockType × ⊤
-    ; Sig               = ⊤
-    ; Hash              = List ℕ
-    ; EBCert            = List ℕ
-    ; getCertRef        = id
-    ; Vote              = Fin numberOfParties × List ℕ
-    ; vote              = λ _ h → sutId , h
-    ; sign              = λ _ _ → tt
-    ; splitTxs          = λ l → [] , l
+    { n         = numberOfParties
+    ; keyOf     = LV.keyOf
+    ; LVrfPf    = ⊤
+    ; LPrivKey  = BlockType × ⊤
+    ; LSig      = ⊤
+    ; LBodyHash = List ℕ
+    ; voterOf   = λ _ → sutId
+    ; lsign     = λ _ _ → tt
+    ; lsplitTxs = λ l → [] , l
     }
 
+d-Abstract : LeiosAbstract
+d-Abstract = LD.dijkstraAbstract d-OffLedger
+
 open LeiosAbstract d-Abstract public
+
+-- A transaction as a trace records it: its id, with no declared size.
+txRef : ℕ → Tx
+txRef t = t , 0
+
+-- A ranking-block hash.
+rbRef : List ℕ → Hash
+rbRef = inj₂
+
+-- The hash's payload, whichever kind it is.
+hashList : Hash → List ℕ
+hashList = [ id , id ]′
+
+-- The certificate for the ranking block with this hash, as a trace records it.
+certFor : List ℕ → EBCert
+certFor r = LD.⟨ r , LV.unsignedCert ⟩ᶜ
+
+instance
+  Show-Hash : Show Hash
+  Show-Hash .show (inj₁ h) = "EB " ◇ show ⦃ Show-List ⦄ h
+  Show-Hash .show (inj₂ h) = "RB " ◇ show ⦃ Show-List ⦄ h
+
+  Show-Cert : Show EBCert
+  Show-Cert .show c = "Cert " ◇ show ⦃ Show-List ⦄ (LD.certRef c)
 
 open import Leios.VRF d-Abstract public
 
@@ -159,8 +190,8 @@ d-winner⁇² {p} {Nat.suc sl} .dec with p ≟ sutId | Nat.suc sl ∈? rb-slots
 -- blocks with the payload Leios submitted, which the log does not record,
 -- while the blocks of other parties name them as parents by their log id.
 -- Two blocks of one producer in one slot (equivocation) are not told apart.
-d-blockHash : ℕ → Fin numberOfParties → RankingBlock → List ℕ
-d-blockHash sl pid _ = sl ∷ toℕ pid ∷ []
+d-blockHash : ℕ → Fin numberOfParties → RankingBlock → Hash
+d-blockHash sl pid _ = rbRef (sl ∷ toℕ pid ∷ [])
 
 import Leios.Base.Praos.Machine as PraosMachine
 module PM = PraosMachine d-Abstract d-VRF numberOfParties d-winner
@@ -213,12 +244,14 @@ instance
       ; lotteryPf  = λ _ → tt
       }
 
+  -- The ledger's EB identifier: the EB's references ('hashEB').
   hpe : Hashable PreEndorserBlock Hash
-  hpe .hash = EndorserBlockOSig.txs
+  hpe = LD.Hashable-PreEndorserBlock d-OffLedger
 
   -- Votes sign the announcing RB's hash: body payload plus announced-EB hash.
   hrb : Hashable RankingBlock Hash
-  hrb .hash rb = let open RankingBlock rb in [ id , id ]′ txsOrEbCert ++ maybe id [] announcedEB
+  hrb .hash rb = let open RankingBlock rb in
+    rbRef ([ L.map proj₁ , LD.certRef ]′ txsOrEbCert ++ maybe hashList [] announcedEB)
 
 record FFDBuffers : Type where
   field inEBs : List EndorserBlock

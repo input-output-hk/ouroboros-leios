@@ -224,7 +224,7 @@ module LinearLeiosVerifierChain where
           else fromList (allLeaderSlots l)
 
       open import Defaults params testParams rb-slots-of committeeSize using
-        (d-SpecStructure; FFDBuffers; isb; hpe; d-blockHash;
+        (d-SpecStructure; FFDBuffers; isb; hpe; d-blockHash; txRef; rbRef; Show-Hash; Show-Cert;
          module PraosNode; mkPraosBlock; genesisHash; tipHash;
          node⁻; module Check; praosHeader; initNodeState)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
@@ -248,7 +248,7 @@ module LinearLeiosVerifierChain where
       -- attributable to 'canProduceEB' alone. Where no EB was owed the proposal set
       -- is empty instead — see 'ebOwed'.
       placeholderTxs : List Tx
-      placeholderTxs = 0 ∷ []
+      placeholderTxs = txRef 0 ∷ []
 
       -- EB payload, derived injectively from the EB hash string. 'Defaults' hashes
       -- an EB to its transaction list, so a constant payload collapses every EB to
@@ -257,7 +257,7 @@ module LinearLeiosVerifierChain where
       -- as 'Already voted' because 'VotedEBs' already holds that hash. The leading
       -- zero keeps the list non-empty, EBs being non-empty per the CIP.
       synthTxs : EBId → List Tx
-      synthTxs h = 0 ∷ L.map C.toℕ (S.toList h)
+      synthTxs h = L.map txRef (0 ∷ L.map C.toℕ (S.toList h))
 
       mkEBrec : Party → EBId → SlotNo → EndorserBlock
       mkEBrec p h s = record
@@ -321,6 +321,9 @@ module LinearLeiosVerifierChain where
         _ = Show-×
 
       instance
+        Show-MaybeHash : Show (Maybe Hash)
+        Show-MaybeHash = Show-Maybe
+
         Show-EBCert : Show (Maybe EBCert)
         Show-EBCert .show nothing  = "No EBCert"
         Show-EBCert .show (just c) = show c
@@ -588,7 +591,7 @@ module LinearLeiosVerifierChain where
       -- The spec does not inspect vote contents, and the log names neither the
       -- voter nor the signed RB.
       traceEvent→action a (CVoteAcquired _ _) =
-        (record a { FFD-blks = VT-Blk ((SUT-id , []) ∷ []) ∷ FFD-blks a } , [])
+        (record a { FFD-blks = VT-Blk ((SUT-id , rbRef []) ∷ []) ∷ FFD-blks a } , [])
       -- The SUT forged a ranking block on the tip it had selected.  It is the
       -- block the Praos node mints, under the SUT's identity.
       traceEvent→action a (CRBForged h s) =

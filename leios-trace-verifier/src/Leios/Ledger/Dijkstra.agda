@@ -82,6 +82,20 @@ record LeiosCert : Type where
 
 open LeiosCert public
 
+instance
+  DecEq-DijkstraEBCert : DecEq DijkstraEBCert
+  DecEq-DijkstraEBCert ._≟_ record { signers = s ; sig = g } record { signers = s' ; sig = g' }
+    with s ≟ s' | g ≟ g'
+  ... | yes refl | yes refl = yes refl
+  ... | no ¬p    | _        = no λ where refl → ¬p refl
+  ... | _        | no ¬q    = no λ where refl → ¬q refl
+
+  DecEq-LeiosCert : DecEq LeiosCert
+  DecEq-LeiosCert ._≟_ ⟨ r , c ⟩ᶜ ⟨ r' , c' ⟩ᶜ with r ≟ r' | c ≟ c'
+  ... | yes refl | yes refl = yes refl
+  ... | no ¬p    | _        = no λ where refl → ¬p refl
+  ... | _        | no ¬q    = no λ where refl → ¬q refl
+
 -- What the Leios protocol layer needs and the ledger specification does not
 -- provide.
 record OffLedger : Type₁ where

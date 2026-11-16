@@ -19,6 +19,8 @@
 
    - 'inCommittee': the 'SpecStructure' field of the same name, membership of
      a party with a keyed seat.
+
+   - 'unsignedCert': the certificate body the traces can supply.
 -}
 module Leios.Ledger.Dijkstra.Verifier where
 
@@ -58,8 +60,13 @@ open GovStructure verifierGov using (PParams; KeyHash; Credential)
 open Credential using (KeyHashObj)
 open import Ledger.Dijkstra.Specification.Certs verifierGov using (Pools; StakePoolState)
 open import Ledger.Dijkstra.Specification.Leios verifierGov
-  using (LeiosSeat; LeiosCommittee; selectCommittee)
+  using (LeiosSeat; LeiosCommittee; selectCommittee; EBCert)
 open LeiosSeat
+
+-- A certificate as a trace records it: no signers, no signature.  The
+-- traces name the certified EB, never the votes behind the certificate.
+unsignedCert : EBCert
+unsignedCert = record { signers = ∅ ; sig = 0 }
 
 -- Protocol parameters with the given committee size, all others zero.
 verifierPParams : ℕ → PParams
@@ -113,10 +120,11 @@ verifierPParams nc = record
   }
   where open import Data.Rational using () renaming (0ℚ to 0ℚ)
 
-module _ {n : ℕ} (stake : TotalMap (Fin n) ℕ) (committeeSize : ℕ) where
+-- The pool of a party.
+keyOf : ∀ {n} → Fin n → KeyHash
+keyOf = toℕ
 
-  keyOf : Fin n → KeyHash
-  keyOf = toℕ
+module _ {n : ℕ} (stake : TotalMap (Fin n) ℕ) (committeeSize : ℕ) where
 
   private
     parties : List (Fin n)

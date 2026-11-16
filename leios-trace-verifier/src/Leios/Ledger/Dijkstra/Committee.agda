@@ -30,17 +30,10 @@
    injective and covers the support of 'pd'; the proof needs a lemma on
    'indexedSumᵛ'' over 'fromList' that neither library provides.
 
-   Disagreement with leios-spec: leios-spec decides membership by
-   'Leios.Config.inVotingCommittee params (stake s)', stake-coverage
-   truncation by σc (σc-num / σc-den: all pools whose richer pools do not yet
-   cover σc of the stake, ties at the boundary included), from the SUT's
-   stake alone.  Dijkstra takes a fixed number of seats ('leiosCommitteeSize',
-   ties broken by key hash) and additionally requires an honoured BLS key for
-   a seat to sign.  The two agree only for parameters where the σc prefix
-   happens to have 'leiosCommitteeSize' pools and no tie straddles the
-   boundary.  'inLedgerCommittee' is the Dijkstra predicate in the shape
-   leios-spec's 'CanVote' would need; 'CanVote' hard-wires
-   'inVotingCommittee', so using it is a spec change, not an instance choice.
+   leios-spec takes the committee from the ledger: 'CanVote' asks the
+   'SpecStructure' field 'inCommittee', which the verifier's 'Defaults'
+   supplies from 'selectCommittee' ('Leios.Ledger.Dijkstra.Verifier').
+   'inLedgerCommittee' is the same predicate, here with the lemmas above.
 -}
 {-# OPTIONS --safe #-}
 
