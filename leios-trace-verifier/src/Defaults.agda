@@ -3,8 +3,9 @@
    Concrete instantiation of the Leios 'SpecStructure' obligations used by the
    trace verifier. It mirrors the spec's own 'Test.Defaults' (so the verifier
    does not depend on a testing module), with one deliberate difference: voting
-   (VT) eligibility follows the deterministic, epoch-fixed committee of CIP-0164
-   computed from the stake distribution, whereas block production (EB) is
+   (VT) eligibility follows the voting committee of the Dijkstra-era ledger
+   specification, selected from the stake distribution
+   ('Leios.Ledger.Dijkstra.Verifier'), whereas block production (EB) is
    decided by the 'winning-slots' oracle (the Praos VRF leadership schedule)
    supplied through 'TestParams'. See 'sortition' below.  The slots in which
    the SUT mints a ranking block, 'rb-slots', are a separate parameter: a
@@ -39,7 +40,11 @@ module Defaults
   (testParams : TestParams params) (let open TestParams testParams)
   -- The slots in which the SUT leads, and mints a ranking block.
   (rb-slots : ℙ ℕ)
+  -- The ledger's committee size ('leiosCommitteeSize').
+  (committeeSize : ℕ)
   where
+
+import Leios.Ledger.Dijkstra.Verifier as LV
 
 instance
   htx : Hashable (List ℕ) (List ℕ)
@@ -72,8 +77,8 @@ sutStake = TotalMap.lookup stakeDistribution sutId
 
 -- Eligibility for block production (EB): the Praos VRF leadership schedule
 -- supplied through the 'winning-slots' oracle. Voting (VT) eligibility does
--- not go through the VRF at all: it is the explicit CIP-0164 stake-truncation
--- committee, `inVotingCommittee` in Leios.Config.
+-- not go through the VRF at all: it is the ledger's committee ('inCommittee'
+-- below).
 sortition : ℕ → ℕ
 sortition n with n ∈? winning-slots
 ... | yes _ = 0
@@ -307,4 +312,7 @@ d-SpecStructure = record
       -- LinearLeiosStack); here every EB counts as validated.
       ; isValidityChecked         = λ _ _ → ⊤
       ; isValidityChecked?        = λ _ _ → yes tt
+      -- The ledger's committee, for the stake distribution in force.
+      ; inCommittee               = λ sd p → LV.inCommittee sd committeeSize p
+      ; inCommittee?              = λ sd p → LV.inCommittee? sd committeeSize p
       }

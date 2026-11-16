@@ -18,7 +18,10 @@
 
     iogx.url = "github:input-output-hk/iogx";
 
-    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=426f3756655d8b6b562d49b33243f796c5ab39b3";
+    # LOCAL PIN: branch yveshauser/ledger-committee of the formal spec (the
+    # committee from the Dijkstra ledger spec), not yet pushed.  Repin to the
+    # github: URL once it is.
+    leios-spec.url = "git+file:///home/yves/code/ouroboros-leios-formal-spec?ref=yveshauser/ledger-committee&rev=b247098bf4f5253e991b6131843637d9a90855e1";
 
     # The Praos formal spec, used by leios-trace-verifier's Leios.Base.Praos
     # to wrap the real Praos node as a Leios BaseMachine (see

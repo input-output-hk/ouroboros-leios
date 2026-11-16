@@ -127,10 +127,13 @@ module LinearLeiosVerifierChain where
           ; Lhdr  = Lhdr
           ; Lvote = Lvote
           ; Ldiff = Ldiff
-          -- CIP-0164 feasible value σc = 0.99 (committee stake coverage)
-          ; σc-num = 99
-          ; σc-den = 100
           }
+
+      -- The ledger's committee size ('leiosCommitteeSize'): every party
+      -- gets a seat, so the committee is decided by the voting keys alone.
+      -- A protocol parameter of the ledger; to be read from the chain.
+      committeeSize : ℕ
+      committeeSize = numberOfParties
 
       -- Slots at which the log shows the Leios subsystem itself doing something.
       -- Praos events — NodeIsLeader, RBForged — deliberately do not count.
@@ -220,7 +223,7 @@ module LinearLeiosVerifierChain where
           then fromList winningSlots
           else fromList (allLeaderSlots l)
 
-      open import Defaults params testParams rb-slots-of using
+      open import Defaults params testParams rb-slots-of committeeSize using
         (d-SpecStructure; FFDBuffers; isb; hpe; d-blockHash;
          module PraosNode; mkPraosBlock; genesisHash; tipHash;
          node⁻; module Check; praosHeader; initNodeState)

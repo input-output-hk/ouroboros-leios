@@ -3337,18 +3337,19 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1793697113,
-        "narHash": "sha256-Y1vxegueJ0cERn+MxTDsYABRrgcMR7ZpjAl9nSOicek=",
-        "owner": "input-output-hk",
-        "repo": "ouroboros-leios-formal-spec",
-        "rev": "426f3756655d8b6b562d49b33243f796c5ab39b3",
-        "type": "github"
+        "lastModified": 1794844434,
+        "narHash": "sha256-i2qTR0fIdUs8KkU051G4bp8NQPllDgjLZGWu665syds=",
+        "ref": "yveshauser/ledger-committee",
+        "rev": "b247098bf4f5253e991b6131843637d9a90855e1",
+        "revCount": 347,
+        "type": "git",
+        "url": "file:///home/yves/code/ouroboros-leios-formal-spec"
       },
       "original": {
-        "owner": "input-output-hk",
-        "repo": "ouroboros-leios-formal-spec",
-        "rev": "426f3756655d8b6b562d49b33243f796c5ab39b3",
-        "type": "github"
+        "ref": "yveshauser/ledger-committee",
+        "rev": "b247098bf4f5253e991b6131843637d9a90855e1",
+        "type": "git",
+        "url": "file:///home/yves/code/ouroboros-leios-formal-spec"
       }
     },
     "lowdown-src": {
