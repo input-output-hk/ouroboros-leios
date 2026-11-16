@@ -47,3 +47,20 @@ praos-assumptions:
 
 praos-machine:
 	$(AGDA) src/Leios/Base/Praos/Machine.agda
+
+# The validation functionality (src/Leios/Ledger/Validation*).  The machine
+# and its backend from a decidable transition system are part of the
+# verifier's build.  The Dijkstra-backed instance needs the formal-ledger
+# library (formal-ledger-specifications), which the verifier's build does
+# not have: LEDGER_LIBRARIES names a libraries file that lists it next to
+# the verifier's dependencies.
+LEDGER_LIBRARIES?=
+LEDGER_LIBS=standard-library standard-library-classes standard-library-meta \
+  abstract-set-theory iog-prelude categorical-crypto leios-spec formal-ledger
+.PHONY: validation ledger-validation
+validation:
+	$(AGDA) src/Leios/Ledger/Validation/STS.agda
+
+ledger-validation:
+	$(AGDA) --library-file=$(LEDGER_LIBRARIES) $(addprefix -l ,$(LEDGER_LIBS)) -i src \
+	  src/Leios/Ledger/Validation/Dijkstra.agda
