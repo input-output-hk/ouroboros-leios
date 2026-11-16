@@ -7,5 +7,6 @@ depend:
   iog-prelude
   leios-spec
   praos-spec
+  formal-ledger
 include:
   src
