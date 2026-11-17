@@ -44,6 +44,9 @@ module LinearLeiosVerifierChain where
     CAdopted              : RBId → SlotNo → Maybe RBId → ChainEvent
     CNewTip               : RBId → SlotNo → ChainEvent
     CMempoolRange         : Bytes → Bytes → ChainEvent
+    -- How the SUT split its mempool when it forged: slot, mempool and EB
+    -- transaction counts ('take-rb-eb-txs').
+    CForgePartition       : SlotNo → Bytes → Bytes → ChainEvent
     CUndetailed           : ChainEvent
 
   {-# FOREIGN GHC import qualified ChainEvents #-}
@@ -60,6 +63,7 @@ module LinearLeiosVerifierChain where
         | ChainEvents.CAdopted
         | ChainEvents.CNewTip
         | ChainEvents.CMempoolRange
+        | ChainEvents.CForgePartition
         | ChainEvents.CUndetailed
         ) #-}
 
@@ -287,6 +291,9 @@ module LinearLeiosVerifierChain where
               started     : Bool
               -- (min , max) mempool bytes observed during the slot being accumulated.
               memRange    : Maybe (ByteCount × ByteCount)
+              -- The EB transaction count of the forge's mempool split in the
+              -- slot being accumulated, where the log has it.
+              split       : Maybe ℕ
               forgedEB    : Maybe EndorserBlock
               votedEB     : Maybe (EndorserBlock × SlotNumber)
               -- ── The Praos node ──
@@ -452,12 +459,19 @@ module LinearLeiosVerifierChain where
             --
             -- No reading at all (a log without the Mempool traces) is likewise not
             -- owed: EB-role enforcement then lapses rather than firing on a guess.
+            --
+            -- Where the forge's own mempool split is in the log, it decides: the EB
+            -- is owed exactly when the split put transactions in it.  The readings
+            -- describe the mempool, not the snapshot the node forged from, which
+            -- under load can lag behind it and come back empty.
             forged = maybe (λ _ → true) false (forgedRB a)
             ebOwed : Bool
-            ebOwed = case memRange a of λ where
-              nothing           → false
-              (just (mn , mx))  →
-                maxRBBody N.<ᵇ (if forged then mx else mn)
+            ebOwed = case split a of λ where
+              (just ebTxs) → 0 N.<ᵇ ebTxs
+              nothing      → case memRange a of λ where
+                nothing           → false
+                (just (mn , mx))  →
+                  maxRBBody N.<ᵇ (if forged then mx else mn)
             submit : List Tx → List Item
             submit txs = entry (Mempool-Action s) (ioᵢ (SubmitTxs txs)) ∷ []
             mempool : List Item
@@ -552,6 +566,7 @@ module LinearLeiosVerifierChain where
                   { curSlot = primWord64ToNat s
                   ; FFD-blks = []
                   ; memRange = nothing
+                  ; split = nothing
                   ; forgedEB = nothing
                   ; votedEB = nothing
                   ; inbox = (if curSlot a N.≡ᵇ 0 then late a ++ inbox a else late a)
@@ -632,6 +647,11 @@ module LinearLeiosVerifierChain where
       -- the tick that closes that slot, so 'closeSlot' sees the right one.
       traceEvent→action a (CMempoolRange mn mx) =
         (record a { memRange = just (primWord64ToNat mn , primWord64ToNat mx) } , [])
+      -- The forge's mempool split, for the slot it was called for.
+      traceEvent→action a (CForgePartition s _ ebTxs) =
+        if primWord64ToNat s N.≡ᵇ curSlot a
+          then (record a { split = just (primWord64ToNat ebTxs) } , [])
+          else (a , [])
       -- The driver refuses a log without the adopted headers before it gets here.
       traceEvent→action a CUndetailed = (a , [])
 
@@ -677,7 +697,7 @@ module LinearLeiosVerifierChain where
       n₀ : SlotNumber → Accumulator
       n₀ st = record
         { EB-refs = [] ; EB-received = [] ; FFD-blks = [] ; curSlot = st
-        ; started = false ; memRange = nothing ; forgedEB = nothing ; votedEB = nothing
+        ; started = false ; memRange = nothing ; split = nothing ; forgedEB = nothing ; votedEB = nothing
         ; ids = [] ; inbox = [] ; late = [] ; forgedRB = nothing ; tipNow = nothing
         ; annBySlot = [] ; headEB = nothing ; submitted = [] }
 

@@ -299,6 +299,19 @@ chainVerifier = do
     it "judges a slot with no forge by the low end of the range" $
       verify [0] True [CSlot 0, CMempoolRange 50 200, CSlot 1] `shouldBe` "ok"
 
+    -- The forge's own mempool split decides where the log has it: under load the
+    -- node can forge from a snapshot that lags its mempool and comes back empty,
+    -- whatever the readings show.  The same events as the overflowing forge
+    -- above, which the readings alone reject.
+    it "accepts a forge without an EB when the forge's mempool split was empty" $
+      verify [0] True [CSlot 0, CForgePartition 0 0 0, CRBForged "rb" 0, CMempoolRange 50 200, CSlot 1]
+        `shouldBe` "ok"
+    -- And the split catches what the readings would excuse: transactions put in
+    -- the EB, and no EB announced, with a mempool that fitted.
+    it "rejects a forge without an EB whose mempool split filled the EB" $
+      verify [0] True [CSlot 0, CForgePartition 0 500 300, CRBForged "rb" 0, fitting, CSlot 1]
+        `shouldSatisfy` T.isInfixOf "No-EB-Role"
+
   describe "voting" $ do
     it "accepts a vote cast in the first slot of the window" $
       fromLog announcedAndVoted `shouldBe` "ok"

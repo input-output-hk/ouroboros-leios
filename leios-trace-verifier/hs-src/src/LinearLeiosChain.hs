@@ -21,6 +21,7 @@ module LinearLeiosChain (
   segmentAuthoritative,
   gateSuppressesAnObligation,
   surplusVotesPerSlot,
+  emptySnapshotForges,
   verifySegment,
   runSegmented,
   boundaryWaitSlots,
@@ -33,6 +34,7 @@ import Control.Monad (when)
 import Data.List (dropWhileEnd)
 import Data.Maybe (fromMaybe, isJust)
 import Data.Text (Text)
+import Data.Word (Word64)
 import LinearLeiosLib (verifyChainStreamFromSlot, verifyChainTraceFromSlot)
 
 -- | Protocol timings, as the spec parameterises them.
@@ -117,6 +119,11 @@ data Progress
     --   measure of what the rule's one-sidedness costs on a given run: small means
     --   the EB-role check has teeth, large means it is mostly declining to look.
     EBOwedUndecided Int
+  | -- | Slots in which the SUT forged from an empty mempool split although the
+    --   mempool readings of the slot showed transactions: its forge snapshot lagged
+    --   behind the mempool.  Not a violation of the EB role, which the split
+    --   decides, but a node-side finding: a leader forging empty blocks under load.
+    EmptySnapshotForges Int
   | -- | The prefix carried no mempool readings at all, so EB-role enforcement in
     --   non-forging slots lapsed entirely. Expected for logs predating the Mempool
     --   traces; on a current log it means the check is silently inactive.
@@ -246,9 +253,11 @@ gateSuppressesAnObligation cap = any owed . slotGroups
   slotGroups (e : es) = let (g, rest) = break isCSlot es in (e : g) : slotGroups rest
   owed g =
     any isLeader g
-      && case [(toInteger mn, toInteger mx) | CMempoolRange mn mx <- g] of
-        [] -> False
-        rs
+      && case ([ebTxs | CForgePartition _ _ ebTxs <- g], [(toInteger mn, toInteger mx) | CMempoolRange mn mx <- g]) of
+        -- The forge's own split decides, where the log has it.
+        (ebTxs : _, _) -> ebTxs > 0
+        (_, []) -> False
+        (_, rs)
           | any isRBForged g -> cap < maximum (map snd rs)
           | otherwise -> cap < minimum (map fst rs)
   isLeader (CNodeIsLeader _) = True
@@ -265,6 +274,28 @@ surplusVotesPerSlot = sum . map surplus . slotGroups
   slotGroups [] = []
   slotGroups (e : es) = let (g, rest) = break isCSlot es in (e : g) : slotGroups rest
   surplus g = max 0 (length [() | CVoted _ _ <- g] - 1)
+
+-- | Slots in which the SUT forged from an empty mempool split while the slot's
+--   mempool readings showed transactions ('EmptySnapshotForges').
+emptySnapshotForges :: [ChainEvent] -> Int
+emptySnapshotForges = length . filter emptyForge . slotGroups
+ where
+  slotGroups [] = []
+  slotGroups (e : es) = let (g, rest) = break isCSlot es in (e : g) : slotGroups rest
+  emptyForge g =
+    or [mempoolTxs == 0 | CForgePartition _ mempoolTxs _ <- g]
+      && or [mx > 0 | CMempoolRange _ mx <- g]
+
+-- | Slots whose mempool range straddled the capacity and that no forge split
+--   decided ('EBOwedUndecided').
+straddlingSlots :: Integer -> [ChainEvent] -> Int
+straddlingSlots cap = length . filter undecided . slotGroups
+ where
+  slotGroups [] = []
+  slotGroups (e : es) = let (g, rest) = break isCSlot es in (e : g) : slotGroups rest
+  undecided g =
+    null [() | CForgePartition{} <- g]
+      && or [toInteger mn <= cap && cap < toInteger mx | CMempoolRange mn mx <- g]
 
 -- | Verify one segment's prefix against the spec.
 verifySegment :: Timings -> Segment -> [ChainEvent] -> ([Text], (Text, Text))
@@ -340,6 +371,9 @@ data Stream = Stream
   -- ^ Votes in the slot being read.
   , stStraddling :: Int
   , stRanges :: Bool
+  , stSplit :: Maybe Word64
+  -- ^ The mempool transaction count of the forge split in the slot being read.
+  , stEmptyForges :: Int
   }
 
 -- | How the current segment is verified.
@@ -567,6 +601,8 @@ runSegmented report ts query = loop [] Nothing Nothing Batch 0 []
             , stVotes = 0
             , stStraddling = 0
             , stRanges = False
+            , stSplit = Nothing
+            , stEmptyForges = 0
             }
     Streaming <$> advance n (foldl (flip (noteEvent seg)) st0 already) (length [() | CSlot _ <- already])
 
@@ -590,12 +626,19 @@ runSegmented report ts query = loop [] Nothing Nothing Batch 0 []
 
   -- The notes' counts, kept as the events are read rather than over the prefix.
   noteEvent seg ev st = case ev of
-    CSlot _ -> st{stSurplus = stSurplus st + max 0 (stVotes st - 1), stVotes = 0}
+    CSlot _ -> st{stSurplus = stSurplus st + max 0 (stVotes st - 1), stVotes = 0, stSplit = Nothing}
     CVoted _ _ -> st{stVotes = stVotes st + 1}
+    CForgePartition _ mempoolTxs _ -> st{stSplit = Just mempoolTxs}
+    -- The slot's range comes after its forge split, just ahead of the next tick.
     CMempoolRange mn mx ->
       let cap = cdMaxRBBody (segCD seg)
-          straddles = toInteger mn <= cap && cap < toInteger mx
-       in st{stRanges = True, stStraddling = stStraddling st + fromEnum straddles}
+          straddles = toInteger mn <= cap && cap < toInteger mx && stSplit st == Nothing
+          emptyForge = stSplit st == Just 0 && mx > 0
+       in st
+            { stRanges = True
+            , stStraddling = stStraddling st + fromEnum straddles
+            , stEmptyForges = stEmptyForges st + fromEnum emptyForge
+            }
     _ -> st
 
   reportNotes st = do
@@ -604,6 +647,7 @@ runSegmented report ts query = loop [] Nothing Nothing Batch 0 []
     if not (stRanges st)
       then report NoMempoolReadings
       else when (stStraddling st > 0) $ report (EBOwedUndecided (stStraddling st))
+    when (stEmptyForges st > 0) $ report (EmptySnapshotForges (stEmptyForges st))
 
   -- The EB-role gate lives in the translator, which cannot report. Say so wherever a
   -- prefix is verified, rather than letting leader slots be silently exempted. Both
@@ -642,11 +686,12 @@ runSegmented report ts query = loop [] Nothing Nothing Batch 0 []
   -- lost coverage — so say how much of it there is rather than let it go unseen.
   reportMempoolGaps seg prefix = do
     let cap = cdMaxRBBody (segCD seg)
-        ranges = [(toInteger mn, toInteger mx) | CMempoolRange mn mx <- prefix]
-        straddling = length [() | (mn, mx) <- ranges, mn <= cap, cap < mx]
-    if null ranges
+        straddling = straddlingSlots cap prefix
+        empties = emptySnapshotForges prefix
+    if null [() | CMempoolRange{} <- prefix]
       then report NoMempoolReadings
       else when (straddling > 0) $ report (EBOwedUndecided straddling)
+    when (empties > 0) $ report (EmptySnapshotForges empties)
 
   checkSeg seg prefix = do
     reportIfLeiosInactive seg prefix

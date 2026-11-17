@@ -140,6 +140,14 @@ render = \case
         <> "whether an EB was owed could not be settled; those slots were excused. "
         <> "The node decides from a snapshot the log does not pin down, so this is "
         <> "the cost of never flagging a slot we cannot show was in breach."
+  EmptySnapshotForges n ->
+    hPutStrLn stderr $
+      "note: in "
+        <> show n
+        <> " slot(s) the node forged from an empty mempool split although its mempool "
+        <> "held transactions: its forge snapshot lagged behind the mempool. The split "
+        <> "decides the EB role, so this is no violation, but a leader forging empty "
+        <> "blocks under load is a node-side finding."
   NoMempoolReadings ->
     hPutStrLn stderr $
       "warning: no mempool readings in this prefix, so EB-role enforcement lapses "
