@@ -39,13 +39,13 @@ import Cardano.Ledger.Api.State.Query (QueryResultLeiosCommittee (..), QueryResu
 import Cardano.Ledger.BaseTypes (StrictMaybe (..))
 import Cardano.Ledger.Keys (KeyHash, StakePool)
 import Cardano.Ledger.State (BlsKey (..), BlsKeyState (..))
-import qualified Data.Vector.Strict as VS
 import qualified Data.ByteString as BS (ByteString, readFile)
 import qualified Data.ByteString.Char8 as BSC (pack)
 import qualified Data.List as List (findIndex)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T (Text, drop, dropWhile, isInfixOf, pack, takeWhile, unpack)
+import qualified Data.Vector.Strict as VS
 
 -- | Run the CLI: stream-verify the node.log from stdin, re-querying the node's
 --   leadership schedule and stake distribution at each epoch boundary.
