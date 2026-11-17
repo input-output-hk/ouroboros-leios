@@ -3339,17 +3339,16 @@
       "locked": {
         "lastModified": 1794846065,
         "narHash": "sha256-i2qTR0fIdUs8KkU051G4bp8NQPllDgjLZGWu665syds=",
-        "ref": "yveshauser/ledger-committee",
+        "owner": "input-output-hk",
+        "repo": "ouroboros-leios-formal-spec",
         "rev": "e13c3547dbc1d5a6706faa0c8d289837fa636345",
-        "revCount": 348,
-        "type": "git",
-        "url": "file:///home/yves/code/ouroboros-leios-formal-spec"
+        "type": "github"
       },
       "original": {
-        "ref": "yveshauser/ledger-committee",
+        "owner": "input-output-hk",
+        "repo": "ouroboros-leios-formal-spec",
         "rev": "e13c3547dbc1d5a6706faa0c8d289837fa636345",
-        "type": "git",
-        "url": "file:///home/yves/code/ouroboros-leios-formal-spec"
+        "type": "github"
       }
     },
     "lowdown-src": {
