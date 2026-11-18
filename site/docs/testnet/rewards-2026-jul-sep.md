@@ -74,7 +74,7 @@ Block counts come from KleioScan (kleioscan.com) for the MusashiNet networks tha
 | 40 | `pool1eay9exv7p7jhw6c4nggdglwvpgggsccax8t50n03wmjysm8xagh` | ✅ | ❌ | ❌ | ❌ | ❌ | 0 | Replaced in its registration by pool185ztd8n…, the pool the operator ran with the same application code; not paid |
 | 41 | `pool1ecp2e7yv75sw3y32kfx7hy8vc5fewflrm9wa7jps2r8ukn92y3z` | ✅ | ❌ | ✅ | ✅ | ❌ | 100 | Jul: no blocks; Sep: no Metsuke data |
 | 42 | `pool1ectn8ffx5w0x8xf4maczug5p4f5qscpe8wzm8kzwz4ydxdctkvg` | ✅ | ❌ | ❌ | ❌ | ❌ | 0 | Jul: no blocks; Aug: no blocks; Sep: no blocks |
-| 43 | `pool1eglx5vk8wfm959q8rngvq4et8j80qftjrakl37ehhammkqu8u0v` | ❌ | ❌ | ❌ | ✅ | ✅ | 0 | KYC not completed |
+| 43 | `pool1eglx5vk8wfm959q8rngvq4et8j80qftjrakl37ehhammkqu8u0v` | ✅ | ❌ | ❌ | ✅ | ✅ | 0 | KYC approved after payout calculations: no rewards for this period. Qualifies for October to December |
 | 44 | `pool1ektalsfq2dtz939ng9ms4yzj0sudytxs376q4jmxmcea67jd35a` | ✅ | ✅ | ✅ | ✅ | ✅ | 300 |  |
 | 45 | `pool1evtdu3h7qpqajatunktdcrmp6ef2dgwnurkdk62qm8hzzptp3dl` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks |
 | 46 | `pool1f6wrh4zus9cadzefllya2v40pj9ldfply3svlkk53282u3nyuke` | ✅ | ❌ | ❌ | ✅ | ✅ | 100 | Jul: no blocks; Aug: no blocks |
@@ -88,10 +88,10 @@ Block counts come from KleioScan (kleioscan.com) for the MusashiNet networks tha
 | 54 | `pool1gfeygmd86hgcg2dft2g3vx7u824rl29m2llzy9rl0mhcc2nh8s4` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks; Sep data shared in October, counted for September |
 | 55 | `pool1gfgvkydaj24yypsyjcawg4dnjyrpcs9h7j8ldzuty7j5xaf5luf` | ✅ | ✅ | ✅ | ✅ | ✅ | 300 | Aug: shared relay 109.228.52.195:3010 with pool1qvh8lse… for 1.5 h; relay 109.228.52.195:3010 with pool15svjdp7… for 0.1 h, under the 48-hour limit; no deduction |
 | 56 | `pool1gjymgja7vq9k6ajy3d5ygqxymctpdsqvja5yw8qf4kx3kpjc6su` | ❌ | ❌ | ✅ | ✅ | ❌ | 0 | KYC not completed; Sep: shared relay 178.168.53.97:3010 with pool16ag9njq… for 45 h, under the 48-hour limit; no deduction |
-| 57 | `pool1gt5lq6dl9mlfy770xwu4lvzn3l03nxxhkhj07rd4wpr8yv6aw0j` | ❌ | ❌ | ❌ | ✅ | ✅ | 0 | KYC not completed |
+| 57 | `pool1gt5lq6dl9mlfy770xwu4lvzn3l03nxxhkhj07rd4wpr8yv6aw0j` | ✅ | ❌ | ❌ | ✅ | ✅ | 0 | KYC approved after payout calculations: no rewards for this period. Qualifies for October to December |
 | 58 | `pool1gv4dg0u9egfts87d8jukzu68sa85hhtvvlpunmq7vry4zpfu4my` | ✅ | ❌ | ❌ | ✅ | ❌ | 0 | Jul: no blocks; Aug: no blocks; Sep: no Metsuke data |
 | 59 | `pool1gvagur2fvv2yf8cd0zleljfmgygmq727ct0d5te7dfaaz6xapg7` | ✅ | ❌ | ❌ | ❌ | ❌ | 0 | Over the 3-pool limit for its participant (the latest registration's pools take priority), not paid |
-| 60 | `pool1h9mquxald2tcu0lsccfzf6ntr8r7mu8qu3htj5z6fay26mqkxep` | ❌ | ❌ | ❌ | ✅ | ✅ | 0 | KYC not completed |
+| 60 | `pool1h9mquxald2tcu0lsccfzf6ntr8r7mu8qu3htj5z6fay26mqkxep` | ✅ | ❌ | ❌ | ✅ | ✅ | 0 | KYC approved after payout calculations: no rewards for this period. Qualifies for October to December |
 | 61 | `pool1hfk89ygm2xmn36grhyp7wmycdpc5u4kg5wldpscmfeajshemh4k` | ✅ | ❌ | ✅ | ✅ | ❌ | 100 | Jul: no blocks; Sep: no Metsuke data; Sep: shared relay 169.58.239.205:3010 with pool156c7dvm… for 75 h; relay 169.58.239.205:3010 with pool1450xdy6… for 75 h, over the 48-hour limit; allowed as a temporary move, each pool on its own relay for the rest of the month |
 | 62 | `pool1hts9z229runn8lrh2h5kcr9am9hypfr48080nxeerarpklym2sd` | ✅ | ❌ | ✅ | ✅ | ✅ | 200 | Jul: no blocks |
 | 63 | `pool1jmatwe3tygtufld2n5xaf7ac4568elg64zprvrup76wqqkcj3m9` | ✅ | ✅ | ✅ | ✅ | ✅ | 300 | Sep data shared in October, counted for September |
