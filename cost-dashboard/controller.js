@@ -10,7 +10,10 @@ var Controller = (function() {
 
   // Updated 2026-11 (docs/cost-estimate/README.md, "November 2026 update")
   var MAINNET_RB_BODY = 90112             //  B: mainnet maxBlockBodySize today
-  var MAINNET_TXKBPS = MAINNET_RB_BODY * 0.05 / 1000   //  TxkB/s: mainnet capacity today (f = 0.05, 1 s slots), the "× mainnet" yardstick
+  // Genesis constants (Shelley genesis), shown read-only: a hard fork changes them, governance doesn't
+  var ACTIVE_SLOT_COEFF = 0.05            //  f: probability that a slot has a ranking block
+  var SLOT_LENGTH = 1                     //  s per slot
+  var MAINNET_TXKBPS = MAINNET_RB_BODY * ACTIVE_SLOT_COEFF / SLOT_LENGTH / 1000   //  TxkB/s: mainnet capacity today, the "× mainnet" yardstick
 
   // Fixed values, shown read-only: formats and benchmarks, not settings of the system
   var RB_HEADER_SIZE = 1024               //  B, also announces the EB (CIP-164 has no separate EB header)
@@ -52,7 +55,7 @@ var Controller = (function() {
   // Mainnet graduation plan (site/docs/parameter-graduation.mdx): EB references = EB txs × 40/260,
   // L_hdr fixed at 1 s, L_vote = L_diff − 3·L_hdr; with mainnet's f, slot length and max RB body,
   // and the 600-seat committee
-  var MAINNET = { uiASC: 0.05, uiSlotLength: 1, uiMaxRbBody: 90112, uiVotesPerEB: 600 }
+  var MAINNET = { uiMaxRbBody: 90112, uiVotesPerEB: 600 }
   var SETS = {
     M0: Object.assign({ uiMaxEbTxs: 260000,  uiMaxEbRefs: 40000,  uiLHdr: 1, uiLVote: 4, uiLDiff: 7 }, MAINNET),
     M1: Object.assign({ uiMaxEbTxs: 1000000, uiMaxEbRefs: 153846, uiLHdr: 1, uiLVote: 4, uiLDiff: 7 }, MAINNET),
@@ -83,8 +86,8 @@ var Controller = (function() {
     var p = {}
     p.praos = praos
     p.producer = producer                             //  a block producer votes and forwards no Txs
-    p.f = getFloat(uiASC)                             //  active slot coefficient
-    p.slotRate = 1 / getFloat(uiSlotLength)           //  slot/s
+    p.f = ACTIVE_SLOT_COEFF                           //  active slot coefficient
+    p.slotRate = 1 / SLOT_LENGTH                      //  slot/s
     p.rbRate = p.f * p.slotRate                       //  RB/s
     p.votingWindow = Math.ceil((3 * getFloat(uiLHdr) + getFloat(uiLVote) + getFloat(uiLDiff)) * p.slotRate)   //  slots
     //  P(EB certified): the next RB comes votingWindow slots or more after the announcing one, so the
@@ -282,12 +285,11 @@ var Controller = (function() {
 
   // The page shows the chosen parameters under the chosen load. Below the total: Praos alone
   // carrying the same demand, capped at what Praos can carry, on the same LSM node.
-  //  While a field is being retyped (empty, or a slot length or slot coefficient of 0 or less) the
-  //  page keeps its last figures rather than show NaN
+  //  While a field is being retyped (empty) the page keeps its last figures rather than show NaN
   function ready() {
     for (var i = 0; i < numericInputs.length; i++)
       if (numericInputs[i].type === "number" && isNaN(parseFloat(numericInputs[i].value))) return false
-    return getFloat(uiASC) > 0 && getFloat(uiSlotLength) > 0
+    return true
   }
 
   function calculate() {
@@ -345,6 +347,7 @@ var Controller = (function() {
     }
 
     // Sizes & Validation (fixed)
+    uiASC.innerText = ACTIVE_SLOT_COEFF; uiSlotLength.innerText = SLOT_LENGTH
     uiRbHeaderSize.innerText = RB_HEADER_SIZE
     uiTxRefSize.innerText = TX_REF_SIZE; uiVoteSize.innerText = VOTE_SIZE
     uiCertSize.innerText = p.certSize
@@ -537,8 +540,7 @@ var Controller = (function() {
 
   function initialize() {
     numericInputs = [
-      uiASC
-    , uiBaseLoad
+      uiBaseLoad
     , uiCompression
     , uiCurrentChain
     , uiDiskMargin
@@ -559,7 +561,6 @@ var Controller = (function() {
     , uiSpike
     , uiSpikeHours
     , uiStorage
-    , uiSlotLength
     , uiStorageFast
     , uiTxSize
     , uiUtil

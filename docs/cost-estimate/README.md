@@ -122,11 +122,12 @@ tables below are the November 2026 ones listed under **Prices**.
 - **Protocol and capacity:** buttons load a parameter set: Praos only (as if Leios had
   never been deployed), or the mainnet graduation steps M0, M1 and M2
   (maxEndorserBlockTxsSize 260 kB, 1 MB, 3 MB; maxEndorserBlockReferencesSize × 40/260;
-  L_diff 7 s, with mainnet's active slot coefficient, slot length and maxBlockBodySize and the
-  600-seat committee), for capacities of 8.87, 27.9 and 79.2 TxkB/s (1.97×, 6.18×, 17.6× mainnet's
-  4.51 TxkB/s). The fields hold only what can be set: the active slot coefficient and slot
-  length, L_hdr / L_vote / L_diff, committee size, maxBlockBodySize, the EB caps and the
-  fee parameters (minFeeA 44 lovelace/B, minFeeB 155,381 lovelace). The capacity can be
+  L_diff 7 s, with mainnet's maxBlockBodySize and the 600-seat committee), for capacities of
+  8.87, 27.9 and 79.2 TxkB/s (1.97×, 6.18×, 17.6× mainnet's 4.51 TxkB/s). The fields hold
+  only what can be set: L_hdr / L_vote / L_diff, committee size, maxBlockBodySize, the EB caps
+  and the fee parameters (minFeeA 44 lovelace/B, minFeeB 155,381 lovelace). The active slot
+  coefficient (0.05) and slot length (1 s) are fixed in the Shelley genesis and shown
+  read-only. The capacity can be
   typed in TxkB/s or × mainnet, which sizes the EB caps for it: maxEndorserBlockTxsSize to
   what certified EBs must carry beyond the RBs, maxEndorserBlockReferencesSize to one
   37 B reference per Tx of average size (a 32 B hash plus the Tx size, measured on every EB
