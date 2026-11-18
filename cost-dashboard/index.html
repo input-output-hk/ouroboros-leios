@@ -28,15 +28,16 @@
         <button id="uiSetM2" onclick="Controller.set('M2')" aria-pressed="false" title="Mainnet graduation step M2, preliminary: EB transactions 3 MB, EB references 462 kB (× 40/260), L_diff 7 s.">M2</button>
         <button id="uiSetCustom" onclick="Controller.set('Custom')" aria-pressed="false" title="Leios with the values in the fields below, when they match no graduation step.">Custom</button>
       </div>
+      <p class="card-note">M0, M1 and M2 are preliminary. They come from the <a href="https://leios.cardano-scaling.org/docs/parameter-graduation">parameter graduation plan</a>.</p>
       <div class="fields">
         <div class="field">
-          <label title="Probability that a slot has a ranking block, which can announce an EB. Mainnet: 0.05.">Active slot coefficient</label>
-          <input id="uiASC" type="number" min="0.01" max="0.20" value="0.05" step="0.01"/>
+          <label title="activeSlotsCoeff: probability that a slot has a ranking block, which can announce an EB. Fixed in the Shelley genesis: 0.05.">Active slot coefficient</label>
+          <span class="value" id="uiASC">0.05</span>
           <span class="unit"></span>
         </div>
         <div class="field">
-          <label title="slotLength (genesis): seconds per slot. Mainnet: 1 s. The timing periods below are in seconds.">Slot length</label>
-          <input id="uiSlotLength" type="number" min="0.1" max="10" value="1" step="0.1"/>
+          <label title="slotLength: seconds per slot. Fixed in the Shelley genesis: 1 s. The timing periods below are in seconds.">Slot length</label>
+          <span class="value" id="uiSlotLength">1</span>
           <span class="unit">s</span>
         </div>
         <div class="field">

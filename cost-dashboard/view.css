@@ -268,7 +268,8 @@ main {
 .field[hidden] { display: none; }
 .field.part label { padding-left: 14px; }   /* a row that breaks down the one above */
 
-.price-note {
+.price-note,
+.card-note {
   margin: 0;
   padding: 6px 12px 8px;
   font-size: 0.7rem;
@@ -277,7 +278,8 @@ main {
   border-bottom: 1px solid #f1edf5;
 }
 
-.price-note a { color: #8c02c2; }
+.price-note a,
+.card-note a { color: #8c02c2; }
 
 .presets button {
   flex: 1;
