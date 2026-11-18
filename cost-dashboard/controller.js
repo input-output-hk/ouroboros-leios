@@ -60,6 +60,12 @@ var Controller = (function() {
   }
   var UTILIZATIONS = [10, 25, 50, 75, 100]
 
+  //  Downstream peers each node type starts with: a mid-level pool's relay, and a block producer
+  //  that serves only its own relays
+  var RELAY_PEERS = 60
+  var PRODUCER_PEERS = 2
+
+  var producer = false                    //  the node costed: a block producer (true) or a relay (false)
   var praosOnly = false                   //  Praos-only parameter set: Leios never deployed
   var spikes = false                      //  load: high-load hours per epoch instead of a steady utilization
   var cap = {}                            //  parameters from the last calculate(), for capacity -> EB sizing
@@ -76,6 +82,7 @@ var Controller = (function() {
   function readParams(praos) {
     var p = {}
     p.praos = praos
+    p.producer = producer                             //  a block producer votes and forwards no Txs
     p.f = getFloat(uiASC)                             //  active slot coefficient
     p.slotRate = 1 / getFloat(uiSlotLength)           //  slot/s
     p.rbRate = p.f * p.slotRate                       //  RB/s
@@ -89,7 +96,7 @@ var Controller = (function() {
     p.txSize = txSize > MIN_TX_SIZE ? txSize : MIN_TX_SIZE   //  B/tx, at least the floor
     p.certSize = CERT_FIXED + Math.ceil(p.seats / 8)  //  B/certificate: grows with the committee
     p.certValMs = CERT_VAL_BASE + CERT_VAL_PER_SEAT * p.seats   //  ms/cert
-    p.inboundPeers = getFloat(uiInboundPeers)         //  downstream peers per relay
+    p.inboundPeers = getFloat(uiInboundPeers)         //  downstream peers of this node
     p.ebFetchPeers = p.inboundPeers * getFloat(uiFetchMult) / OUTBOUND_PEERS   //  EB bodies: fetch multiplicity M
     p.rbFetchPeers = p.inboundPeers / OUTBOUND_PEERS  //  Praos blocks: BlockFetch asks one peer (MaxConcurrencyDeadline 1)
     p.epochSeconds = EPOCH_SLOTS / p.slotRate
@@ -152,15 +159,16 @@ var Controller = (function() {
     //  since the LeiosDb stores a transaction's bytes once however many EBs carry it
     var ebWindow = (ebTxBytes + ebRate * txsPerEb * TX_REF_SIZE) * (K_SECURITY / p.rbRate) / GiB
 
-    //  Egress (GiB/month per relay):
-    //  - Txs: 1 effective peer (fetch-from-one)
+    //  Egress (GiB/month per node), to its downstream peers: a relay's, or a block producer's own relays:
+    //  - Txs: 1 effective peer (fetch-from-one). A block producer forwards none: its only upstream
+    //    peers are its own relays, which already hold every Tx it has
     //  - votes: pushed once to every downstream peer, the one it came from included (consensus PR #2430)
     //  - EB bodies (tx refs): every announced EB, certified or not; ebFetchPeers
     //  - RB/EB headers: pushed to every downstream peer
     //  - RB bodies: certificates, and the transactions RBs carry; rbFetchPeers. While Leios is
     //    active, every RB without a certificate is full (as in the capacity), so its transactions
     //    are sent again in its body, as in Praos (rbTxBytes, above)
-    var egressMonthly = (B
+    var egressMonthly = ((p.producer ? 0 : B)
       + p.seats * VOTE_SIZE * ebRate * p.inboundPeers
       + ebRate * txsPerEb * TX_REF_SIZE * p.ebFetchPeers
       + p.rbRate * RB_HEADER_SIZE * p.inboundPeers
@@ -207,20 +215,20 @@ var Controller = (function() {
     var r = { hi: hi, lo: lo, avgKBps: mix(hi.txkBps, lo.txkBps) }
 
     var headroom = getFloat(uiSpike)                //  capacity provisioned above the peak
-    var producers = getFloat(uiProducers), relays = getFloat(uiRelays), nodes = producers + relays
-    r.nodes = nodes; r.relays = relays
 
-    //  vCPU: a fixed number per node, Praos and Leios alike; raised only if the peak with headroom needs more.
-    //  A block producer validates every announced EB's closure before it votes; a relay doesn't vote
+    //  One node: a block producer or a relay. The CPU it uses at the peak: a block producer validates
+    //  every announced EB's closure before it votes; a relay doesn't vote, so it skips that
+    r.cpu = Object.assign({}, hi.cpu)
+    if (!p.producer) { r.cpu.total -= r.cpu.closure; r.cpu.closure = 0 }
+
+    //  vCPU: a fixed number per node, Praos and Leios alike; raised only if the peak with headroom needs more
     r.vcpuPerNode = getFloat(uiVcpuPerNode)
-    r.coresNeeded = headroom * hi.cpu.total / 1000                         //  per block producer
-    var relayCores = headroom * (hi.cpu.total - hi.cpu.closure) / 1000     //  per relay
-    r.vcpu = producers * Math.max(r.vcpuPerNode, Math.ceil(r.coresNeeded))
-           + relays * Math.max(r.vcpuPerNode, Math.ceil(relayCores))
+    r.coresNeeded = headroom * r.cpu.total / 1000
+    r.vcpu = Math.max(r.vcpuPerNode, Math.ceil(r.coresNeeded))
     r.costVcpu = r.vcpu * getFloat(uiVcpu)
 
-    //  RAM: LSM-backend baseline on every node
-    r.ram = nodes * RAM_PER_NODE
+    //  RAM: LSM-backend baseline
+    r.ram = RAM_PER_NODE
     r.costRam = r.ram * getFloat(uiRam)
 
     //  Disks grow with the chain: each month they hold what the node needs today plus `margin`
@@ -238,12 +246,12 @@ var Controller = (function() {
     var heldShare = Math.min(1, prof.peakSeconds / (K_SECURITY / p.rbRate))
     r.utxoGrowth = compression * r.avgKBps * 1000 * T_month / TX_BYTES_PER_UTXO * 2 * UTXO_ENTRY_BYTES / GiB   //  GiB/month per node
     r.ebHeld = compression * Math.max(hi.ebWindow * heldShare, lo.ebWindow)                                     //  GiB/node
-    var fastAt = function(months) { return nodes * (compression * FAST_LEDGER + r.utxoGrowth * months + r.ebHeld) }
+    var fastAt = function(months) { return compression * FAST_LEDGER + r.utxoGrowth * months + r.ebHeld }
 
     //  Bulk disk (immutable path): the chain today plus its growth at the average load
     r.chainGrowth = compression * mix(hi.storageMonthly, lo.storageMonthly)   //  GiB/month per node
     r.chainOverhead = compression * mix(hi.storageOverhead, lo.storageOverhead)   //  of it, EB references and certificates
-    var bulkAt = function(months) { return nodes * (compression * getFloat(uiCurrentChain) / GB_PER_GIB + r.chainGrowth * months) }   //  the current chain is given in GB
+    var bulkAt = function(months) { return compression * getFloat(uiCurrentChain) / GB_PER_GIB + r.chainGrowth * months }   //  the current chain is given in GB
 
     //  Each disk's bill after `months` of growth, at its own price
     var fastCost = function(months) { return fastAt(months) * getFloat(uiStorageFast) * GB_PER_GIB }
@@ -255,13 +263,13 @@ var Controller = (function() {
     r.costBulk = bulkCost(avgMonths); r.costBulkFirst = bulkCost(margin); r.costBulkGrowth = bulkCost(1) - bulkCost(0)
     r.costStorage = r.costFast + r.costBulk
 
-    //  Egress on the average; peak bandwidth per relay at the peak
-    r.egress = relays * mix(hi.egressMonthly, lo.egressMonthly)
+    //  Egress on the average; peak bandwidth at the peak
+    r.egress = mix(hi.egressMonthly, lo.egressMonthly)
     r.costEgress = r.egress * GB_PER_GIB * getFloat(uiEgress)
     r.nic = headroom * hi.egressMonthly * GiB / T_month * 8 / 1e6   //  Mb/s
 
     //  IOPS at the peak
-    r.iops = headroom * nodes * hi.iops
+    r.iops = headroom * hi.iops
     r.costIops = r.iops * getFloat(uiIops)
 
     r.cost = r.costVcpu + r.costRam + r.costStorage + r.costIops + r.costEgress
@@ -345,8 +353,8 @@ var Controller = (function() {
     uiTxReapply.innerText = TX_REAPPLY_MS; uiClosureVal.innerText = CLOSURE_VAL_MS
     uiCertVal.innerText = p.certValMs.toFixed(2)
 
-    // CPU per node, at the peak
-    var cpu = r.hi.cpu
+    // CPU of this node, at the peak (a relay's without closure validation)
+    var cpu = r.cpu
     uiCpuApply.innerText    = cpu.apply.toFixed(2)
     uiCpuClosure.innerText  = cpu.closure.toFixed(2)
     uiCpuAdoption.innerText = cpu.adoption.toFixed(2)
@@ -364,28 +372,23 @@ var Controller = (function() {
       uiEbVal.innerText = 'no EBs'
       uiEbValUnit.innerText = ''
     }
-    uiEbValWarn.hidden = !(r.hi.leios && r.hi.ebValSeconds > p.voteWindow)
+    uiEbValWarn.hidden = !(p.producer && r.hi.leios && r.hi.ebValSeconds > p.voteWindow)
+    uiEbValRow.hidden = !p.producer                   //  a voter's deadline: relays don't vote
 
-    // Resources and costs, all nodes
-    // All nodes, with the share of one node (or relay) in brackets
-    var per = function(v, n, d, who) { return n > 0 ? ' (' + (v / n).toFixed(v / n >= 100 ? 0 : d) + '/' + who + ')' : '' }
-    var perNode = function(v, d) { return per(v, r.nodes, d, 'node') }
-    var perRelay = function(v, d) { return per(v, r.relays, d, 'relay') }
-    var chainGrowth = r.chainGrowth * r.nodes, nic = r.nic * r.relays
-    uiTotalVcpu.innerText = r.vcpu;                      uiTotalVcpuUnit.innerText = 'vCPU' + perNode(r.vcpu, 0)
-    uiTotalRam.innerText = r.ram;                        uiTotalRamUnit.innerText = 'GiB' + perNode(r.ram, 0)
-    uiFastStorage.innerText = r.fast.toFixed(2);         uiFastStorageUnit.innerText = 'GiB' + perNode(r.fast, 1) + ', +' + (r.utxoGrowth * r.nodes).toFixed(2) + '/mo'
-    uiChainGrowth.innerText = chainGrowth.toFixed(2);    uiChainGrowthUnit.innerText = 'GiB/mo' + perNode(chainGrowth, 2)
+    // Resources and costs of this node
+    uiTotalVcpu.innerText = r.vcpu
+    uiTotalRam.innerText = r.ram
+    uiFastStorage.innerText = r.fast.toFixed(2);         uiFastStorageUnit.innerText = 'GiB, +' + r.utxoGrowth.toFixed(2) + '/mo'
+    uiChainGrowth.innerText = r.chainGrowth.toFixed(2)
     //  Chain growth split: the Praos-only baseline's (same demand, up to Praos capacity), and the rest
-    var praosGrowth = base.chainGrowth * r.nodes, leiosGrowth = chainGrowth - praosGrowth
+    var leiosGrowth = r.chainGrowth - base.chainGrowth
     uiChainPraosRow.hidden = uiChainLeiosRow.hidden = p.praos
-    uiChainPraos.innerText = praosGrowth.toFixed(2);     uiChainPraosUnit.innerText = 'GiB/mo' + perNode(praosGrowth, 2)
-    uiChainLeios.innerText = leiosGrowth.toFixed(2)
-    uiChainLeiosUnit.innerText = 'GiB/mo' + perNode(leiosGrowth, 2) + ', ' + (r.chainOverhead * r.nodes).toFixed(2) + ' of it overhead'
-    uiTotalStorage.innerText = r.bulk.toFixed(2);        uiTotalStorageUnit.innerText = 'GiB' + perNode(r.bulk, 1)
-    uiTotalIops.innerText = Math.round(r.iops);          uiTotalIopsUnit.innerText = 'IOPS' + perNode(r.iops, 0)
-    uiTotalEgress.innerText = r.egress.toFixed(2);       uiTotalEgressUnit.innerText = 'GiB/mo' + perRelay(r.egress, 1)
-    uiNic.innerText = nic.toFixed(1);                    uiNicUnit.innerText = 'Mb/s' + perRelay(nic, 1)
+    uiChainPraos.innerText = base.chainGrowth.toFixed(2)
+    uiChainLeios.innerText = leiosGrowth.toFixed(2);     uiChainLeiosUnit.innerText = 'GiB/mo, ' + r.chainOverhead.toFixed(2) + ' of it overhead'
+    uiTotalStorage.innerText = r.bulk.toFixed(2)
+    uiTotalIops.innerText = Math.round(r.iops)
+    uiTotalEgress.innerText = r.egress.toFixed(2)
+    uiNic.innerText = r.nic.toFixed(1)
     uiCostVcpu.innerText = r.costVcpu.toFixed(2)
     uiCostRam.innerText = r.costRam.toFixed(2)
     var bill = function(first, growth) { return '$/mo (month 1: ' + first.toFixed(2) + ', +' + growth.toFixed(2) + ' a month)' }
@@ -442,6 +445,13 @@ var Controller = (function() {
     calculate()
   }
 
+  //  The node costed. Its downstream peers start at its type's count and stay editable
+  function setNode(name) {
+    producer = name === "producer"
+    uiInboundPeers.value = producer ? PRODUCER_PEERS : RELAY_PEERS
+    calculate()
+  }
+
   // Prices checked 2026-11-10: each preset value is the average of the on-demand list prices of
   // AWS, GCP and Azure (hyperscale) or DigitalOcean, Akamai and Hetzner (discount). Disk prices
   // are per GB: AWS EBS, Azure managed disks and DigitalOcean volumes bill per GiB, so their
@@ -463,7 +473,7 @@ var Controller = (function() {
       uiStorageFast: "0.00",    //  the plan's local disk at all three
       uiStorage:     "0.0857",  //  per GB: 0.064 (Hetzner) – 0.10 (Akamai); DigitalOcean 0.10/GiB = 0.093/GB
       uiIops:        "0.00",    //  not billed
-      uiEgress:      "0.00"     //  12–60 TB included per pool; a pool sends less
+      uiEgress:      "0.00"     //  4–20 TB included per node; a relay sends less
     }
   }
 
@@ -501,6 +511,8 @@ var Controller = (function() {
     var util = Math.min(100, Math.max(0, getFloat(uiUtil) || 0))   //  as profile() clamps it
     UTILIZATIONS.forEach(function(u) { press(document.getElementById("uiUtil" + u), !spikes && util === u) })
     press(uiUtilSpikes, spikes)
+    press(uiNodeProducer, producer)
+    press(uiNodeRelay, !producer)
     uiUtilRow.hidden = spikes
     uiSpikeHoursRow.hidden = !spikes
     uiBaseLoadRow.hidden = !spikes
@@ -543,9 +555,7 @@ var Controller = (function() {
     , uiMaxEbRefs
     , uiMaxEbTxs
     , uiMaxRbBody
-    , uiProducers
     , uiRam
-    , uiRelays
     , uiSpike
     , uiSpikeHours
     , uiStorage
@@ -600,6 +610,7 @@ var Controller = (function() {
     set: applySet,
     utilization: setUtilization,
     spikes: setSpikes,
+    node: setNode,
     initialize: initialize
   }
 
