@@ -665,6 +665,42 @@ Furthermore, the existing `forgeBlock` method and/or the `BlockForging` interfac
 >
 > FIXME: also write about including certificates in blocks when available, also link to certification and subsequent sections on chain selection/block validation
 
+#### Adaptive endorsements
+
+Leios is an optimistic protocol overlaid on Praos: when conditions are good, EBs add throughput, and when they are not, the chain falls back to Praos. How much work Leios puts on voters is bounded by its [protocol parameters](#new-protocol-parameters), and most of that work is conserved by the [transaction cache](#transaction-cache): a transaction's size, scripts and signatures are validated once, when it is first seen, and a voter re-applies it afterwards, which skips script evaluation and signature checks (see [Transaction validation levels](#transaction-validation-levels)). What remains is the number of transactions an EB references, bounded by $S_\text{EB}$, and the time to re-apply each of them. A voter must get through all of them within $L_\text{vote}$, and an EB is certifiable only by the block succeeding its announcement (see [Voting and certification](#voting-and-certification)), so it gets no second chance.
+
+That residual work makes the number of transactions in an EB a cliff rather than a slope. Below some count, the committee votes in time and the EB is certified; above it, most voters miss the deadline at once, the quorum is missed, and every transaction in the EB waits for another opportunity. A missed quorum also repeats itself: the transactions stay in the Mempool, so the next EB is just as full and misses as well. If the protocol parameters admit more than the committee can process, quorums are reached less and less often, and throughput degrades to Praos levels. This is not a matter of safety or basic liveness, but of the availability of high throughput. Where the cliff lies is not fixed either. It moves with the network's topology, with the stake that is online and voting, and with the hardware behind it, so no single EB capacity, protocol parameter or otherwise, sits safely below it at all times.
+
+An honest block producer can instead adapt the optimism of Leios to the conditions it witnesses, and turn that cliff into a slope, with a node-local controller that scales the EB capacity it forges with (**NEW-LeiosAdaptiveEbCapacity**). As long as quorums are reached, the capacity stays at the protocol limit; when they are missed, EBs shrink until the committee keeps up again, and grow back as it does. It changes no protocol rule, since an EB smaller than the limit is always valid, and so it can be enabled per node.
+
+Each block producer keeps a scale `s` between a floor and one, and forges EBs with the whole EB capacity measure scaled by it (a class method alongside the [EB capacity measure](#block-production), not a transaction count). It samples every announcement on its selected chain, whoever forged it, once the succeeding block arrives and tells it how much stake voted:
+
+```haskell
+data AdaptiveEndorsements = AdaptiveEndorsements
+  { decrease :: Rational  -- factor per missed quorum (0.8)
+  , increase :: Rational  -- step per quorum reached (0.02)
+  , minScale :: Rational  -- floor of the scale (0.1)
+  }
+
+step :: AdaptiveEndorsements -> Sample -> Rational -> Rational
+step cfg sample s
+  | reachedQuorum sample = min 1 (s + increase cfg)
+  | certifiable sample   = max (minScale cfg) (s * decrease cfg)
+  | otherwise            = s
+```
+
+An announcement is `certifiable` when the succeeding block came late enough for a certificate, at least $3 L_\text{hdr} + L_\text{vote} + L_\text{diff}$ after it. A block arriving earlier cuts the voting short and says nothing about the EB, so such a miss is ignored. A `reachedQuorum` counts either way, since a quorum reached early is a success all the same, and counting it speeds up recovery. Samples are only taken while the node is caught up, since a syncing node learns nothing about the current committee from history.
+
+A few considerations went into this design:
+
+1. **Reactive only.** We chose to react to missed quorums only, rather than trying to anticipate them. Reading participation as a continuous signal would allow cutting before the cliff, but it needs a reference for what an honest network reaches, either a target participation or the stake that recently voted at all. We do not know either, both are likely to move with the same changes in topology and availability that move the cliff, and ordinary vote jitter around them would read as lost margin. A missed quorum, on the other hand, is unambiguous, and it is also exactly the outcome we want to avoid.
+
+1. **Additive increase, multiplicative decrease (AIMD).** The controller is not novel: it is the AIMD scheme TCP has long used for congestion control, which reacts to a lost packet the way this one reacts to a missed quorum. A yes-or-no input offers no error size for a proportional or derivative term to work with, which leaves an integrator of successes and misses, and AIMD is such an integrator with different gains up and down. That asymmetry suits the costs here too: a missed quorum loses a whole EB, whereas an EB a tenth too small loses only a tenth of one, and since the backlog keeps EBs full after a miss, a cautious cut could leave them above the cliff for several more rounds. Under sustained overload, the scale should settle where cuts and steps back balance, at a miss rate of about `increase / (increase + (1 - decrease) * s)`, so the step back is the knob trading recovery after a surge against how often the cliff is probed while overloaded. Whether the increase is additive or multiplicative seems to matter less here than in TCP, where additive increase lets competing flows converge to a fair share, since all block producers read the same samples from the chain and move in lockstep.
+
+1. **Bounded, not filtered.** An adversary can drive the controller, and we opted to bound what that costs rather than to filter it out. Stake withholding its votes cannot cause a miss while it stays below the quorum margin, and at the margin it would block every certificate whatever the EB size. An adversary can, however, announce EBs that collect no votes (invalid, with a closure it never serves, or simply oversized), each of which counts as a miss for every honest producer. Filtering those out would require a node to tell an EB it could not vote on from one nobody could, which would bring back the kind of local judgement we wanted to avoid. Instead, with a share `b` of the blocks and a share `q` of announcements certifiable, we expect the adversary to hold the scale at about `increase * (1 - b) / (b * q * (1 - decrease))`, and never below the floor. As EBs nobody votes on are visible on chain, we consider such an attack temporary and something to be dealt with outside the controller.
+
+The gains `decrease` and `increase`, as well as the floor `minScale`, are configurable per node, so operators can adapt them to the load and the network they see as required.
+
 ### Endorser block diffusion
 
 ![](./fetching-chain-selection-component-diagram.svg)
