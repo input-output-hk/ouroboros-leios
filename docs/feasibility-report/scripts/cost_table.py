@@ -80,6 +80,39 @@ def tables(path):
     return out
 
 
+HOST_ROW = re.compile(r"^(\w+)\.\w+, \d+ vCPU, [^:]+: (.+)$")
+NODES_ROW = re.compile(r"^(operator nodes|all nodes), the (\d+) with .* median node$")
+
+
+def short_row(label):
+    """The report's row label for a validation_bins.md row: the host group and its instance class
+    ("PIR hosts, c8id"), or the node set and its size ("operator nodes, median of 13"); the saved
+    output keeps the hosts, vCPUs and generations (Table 3.2 lists them)."""
+    m = HOST_ROW.match(label)
+    if m:
+        hosts = m.group(2).split(", ")
+        kind = "IOG producer" if all(h.startswith("IOG") for h in hosts) else "PIR host"
+        return "%s%s, %s" % (kind, "s" if len(hosts) > 1 else "", m.group(1))
+    m = NODES_ROW.match(label)
+    if m:
+        return "%s, median of %s" % (m.group(1), m.group(2))
+    return label
+
+
+BIN_CELL = re.compile(r"^(\S+)(?: to (\S+))? \((\d+)(, t)?\)$")
+
+
+def short_cell(cell):
+    """The report's cell for a validation_bins.md cell: the median or the range of medians, with the
+    tentative marker and without the record count ("2.90 to 3.18 t"); a range whose ends coincide
+    prints once. The saved output keeps the counts."""
+    m = BIN_CELL.match(cell)
+    if not m:
+        return cell
+    lo, hi, _, t = m.groups()
+    return (lo if hi is None or hi == lo else "%s - %s" % (lo, hi)) + (" t" if t else "")
+
+
 def bins(outputs, names):
     for i, name in enumerate(names):
         w = WINDOWS[name]
@@ -92,9 +125,10 @@ def bins(outputs, names):
         print("**Table 6.1%s.** %s (%s): %s\n" % ("abcdefgh"[i], w["label"], w["shape"], lead))
         for tab in t:
             print("| " + " | ".join(tab[0]) + " |")
-            print("|---|" + "---|" * (len(tab[0]) - 1))
+            # the dash counts set the PDF's relative column widths: the data columns wider than the host column
+            print("|---|" + "----:|" * (len(tab[0]) - 1))
             for row in tab[1:]:
-                print("| " + " | ".join(row) + " |")
+                print("| " + " | ".join([short_row(row[0])] + [short_cell(c) for c in row[1:]]) + " |")
             print()
 
 
