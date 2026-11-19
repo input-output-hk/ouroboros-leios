@@ -13,7 +13,7 @@ Per group: the median over the records in the group, for each named host
 (--hosts, the IOG and PIR producers, printed by instance class and
 deployment, the IOG producers behind their relays apart from the PIR hosts
 in the open network; a cell is
-marked tentative when a host in it has fewer than 30 records, and left
+marked "t", tentative, when a host in it has fewer than 30 records, and left
 blank when every host has fewer than 10) and for the other nodes as a
 distribution over one node set,
 the nodes with 20 or more records in every group (per node the median of
@@ -26,7 +26,7 @@ Markdown.
 import argparse, csv, statistics as st
 from collections import defaultdict
 
-BINS = [(0, .1, "under 10 %"), (.1, .3, "10 to 30 %"), (.3, .5, "30 to 50 %"), (.5, .7, "50 to 70 %"), (.7, 1.01, "70 % and over")]
+BINS = [(0, .1, "0 to 10 %"), (.1, .3, "10 to 30 %"), (.3, .5, "30 to 50 %"), (.5, .7, "50 to 70 %"), (.7, 1.01, "70 to 100 %")]
 
 
 def q(v, p):
@@ -76,8 +76,8 @@ def main():
                 ebs_by_class[int(x[2] // 500) * 500].add(x[3])
     mode = max(ebs_by_class, key=lambda c: len(ebs_by_class[c]))
     lo_n, hi_n = mode, mode + 499
-    print("EBs of %s to %s transactions, the window's most common size class, %d EBs; a cell in which a host has fewer than %d records is marked tentative.\n" % ("{:,}".format(lo_n), "{:,}".format(hi_n + 1), len(ebs_by_class[mode]), a.min_host_records))
-    print("| validation time per EB, s (median; records in brackets) | " + " | ".join("applied share " + n for n in names) + " |")
+    print("EBs of %s to %s transactions, the window's most common size class, %d EBs; a cell in which a host has fewer than %d records is marked t.\n" % ("{:,}".format(lo_n), "{:,}".format(hi_n + 1), len(ebs_by_class[mode]), a.min_host_records))
+    print("| host | " + " | ".join("applied " + n for n in names) + " |")
     print("|---|" + "---|" * len(names))
     inband = lambda rs: [x for x in rs if lo_n <= x[2] <= hi_n]
     for (inst, vcpu, gen, dep), hs in sorted(cls.items(), key=lambda kv: (kv[0][2] != "current", kv[0][1], kv[0][3], kv[0][0])):
@@ -86,7 +86,7 @@ def main():
             vals = [q([x[1] for x in inband(byb[b])], .5) for _, byb in hs if len(inband(byb[b])) >= 10]
             n = sum(len(inband(byb[b])) for _, byb in hs)
             firm = all(len(inband(byb[b])) >= a.min_host_records for _, byb in hs if len(inband(byb[b])) >= 10)
-            mark = "" if firm else ", tentative"
+            mark = "" if firm else ", t"
             cells.append("-" if not vals else ("%.2f (%d%s)" % (vals[0], n, mark) if len(vals) == 1 else "%.2f to %.2f (%d%s)" % (min(vals), max(vals), n, mark)))
         print("| %s, %s vCPU, %s: %s | %s |" % (inst, vcpu, gen, ", ".join(sorted(h for h, _ in hs)), " | ".join(cells)))
     # the other nodes: the same set in every column (nodes with the minimum records in every group), so that a
