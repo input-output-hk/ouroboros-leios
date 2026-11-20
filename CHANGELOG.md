@@ -5,6 +5,17 @@ We are using the ouroboros-leios repository to cut releases on preliminary versi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 As a minor extension, we may also keep `UNRELEASED` changes on top of it.
 
+## rc-2026w47 - 2026-11-20
+
+Hotfix to mitigate vote storms, but also improves reactivity of the fetch loop. Both should lead to lower diffusion times and highe resiliency.
+
+- Less naiive dedup of votes [consensus#2534](https://github.com/IntersectMBO/ouroboros-consensus/pull/2534) and only decompress signatures of relevant votes [consensus#2535](https://github.com/IntersectMBO/ouroboros-consensus/pull/2536)
+- Reduce fetch loop interval for higher reactivity [consensus#2531](https://github.com/IntersectMBO/ouroboros-consensus/pull/2531)
+
+> [!NOTE]
+>
+> No resync, no respin.
+
 ## rc-2026w46 - 2026-11-15
 
 Small consensus release: Voters validate large endorser blocks much faster, and a memory leak in the LeiosNotify server is fixed.
