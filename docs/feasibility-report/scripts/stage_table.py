@@ -238,17 +238,25 @@ def voters(outputs, names):
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "instruments"))
     import voter_stages as vs
     sets = [(WINDOWS[n]["label"], read(os.path.join(outputs, n, "voter_stages.csv")) or []) for n in names]
-    print(vs.STAGES_HEAD.replace("| EB size", "| set | EB size", 1))
+    # the report's form: short headers (the captions define the cells), the set's label on its first row only,
+    # without the voters-per-EB and voted-in-time columns of the instrument's output
+    pct3 = lambda r, keys: "%.0f / %.0f / %.0f %%" % tuple(100.0 * float(r[k]) / float(r["votes"]) for k in keys)
+    print("| set | EB size, txs | EBs | closure: by 3 s / by 7 s / later | validation: within 4 s / longer / never |")
+    print("|---|---|---:|---:|---:|")
+    for label, rows in sets:
+        for i, r in enumerate(rows):
+            print("| %s | %s | %s | %s | %s |" % (label if i == 0 else "", r["bin"], format(int(r["ebs"]), ","),
+                                                pct3(r, ("by3", "after3", "never_closure")), pct3(r, ("val4", "val_long", "never_val"))))
+    print()
+    print("| set | EB size, txs | EBs | late votes: closure / validation / never | EBs with > 25 % late voters | certified |")
     print("|---|---|---:|---:|---:|---:|")
     for label, rows in sets:
-        for r in rows:
-            print(vs.stages_row(r, label))
-    print()
-    print(vs.OUTCOME_HEAD.replace("| EB size", "| set | EB size", 1))
-    print("|---|---|---:|---:|---:|---:|---:|")
-    for label, rows in sets:
-        for r in rows:
-            print(vs.outcome_row(r, label))
+        for i, r in enumerate(rows):
+            eligible, certified = float(r["eligible"]), float(r["certified"])
+            print("| %s | %s | %s | %s | %.0f %% | %s |" % (label if i == 0 else "", r["bin"], format(int(r["ebs"]), ","),
+                                                         pct3(r, ("late_closure", "late_val", "late_never")),
+                                                         100.0 * float(r["late_over_margin"]) / float(r["ebs"]),
+                                                         ("%.0f %%" % (100.0 * certified / eligible)) if eligible else "-"))
 
 
 def main():

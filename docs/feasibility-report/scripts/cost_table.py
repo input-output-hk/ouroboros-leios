@@ -314,14 +314,15 @@ def unseen(outputs, names):
             print("| %s | %s | %s | %s |" % (w["label"] if i == 0 else "", row[0], row[1], row[2]))
 
 
-SPEED_COLS = "certification | kB/s | tx/s | quorum voter validated at, s: p50 / p90"
+SPEED_COLS = "certification | kB/s | quorum voter validated at, s: p50 / p90"
 
 
 def speed(outputs, names, path="host_speed.md"):
     """The cluster repricing (host_speed.md, section 8): one row per lever, the runs given side by side, with the
-    certification, the throughput at the run's transaction size and the time at which the voter completing
-    the quorum has validated (the saved output's last column, the transactions that voter could have
-    validated by the deadline, is not printed: the repricing keeps the reapplied counts, so it misreads)."""
+    certification, the throughput in kB/s and the time at which the voter completing the quorum has validated
+    (the saved output's tx/s column, which no sentence reads, and its last column, the transactions that voter
+    could have validated by the deadline, are not printed: the repricing keeps the reapplied counts, so the
+    latter misreads)."""
     runs = []
     for name in names:
         t = tables(os.path.join(outputs, name, path))
@@ -330,7 +331,7 @@ def speed(outputs, names, path="host_speed.md"):
     if not runs:
         return
     print("| voters' speed | " + " | ".join("%s: %s" % (label, SPEED_COLS) for label, _ in runs) + " |")
-    print("|---|" + "---|" * (4 * len(runs)))
+    print("|---|" + "---:|" * (3 * len(runs)))
     rows = {}
     order = []
     for label, tab in runs:
@@ -338,11 +339,11 @@ def speed(outputs, names, path="host_speed.md"):
             if row[0] not in rows:
                 rows[row[0]] = {}
                 order.append(row[0])
-            rows[row[0]][label] = row[4:8]
+            rows[row[0]][label] = [row[4], row[5], row[7]]  # certification, kB/s, quorum voter; tx/s (6) left out
     for key in order:
         cells = []
         for label, _ in runs:
-            cells.extend(rows[key].get(label, ["-"] * 4))
+            cells.extend(rows[key].get(label, ["-"] * 3))
         print("| %s | %s |" % (key, " | ".join(cells)))
 
 
@@ -362,7 +363,8 @@ def hardware(outputs, names):
             print("%s: n/a\n" % w["label"])
             continue
         print("**Table 8.3%s.** %s (%s).\n" % (next(letters), w["label"], w["shape"]))
-        print("| voters' speed and closures | %s | with the loop's cost removed: %s |" % (SPEED_COLS, SPEED_COLS))
+        cols = "certification | kB/s | tx/s | quorum voter validated at, s: p50 / p90"  # the output's own columns
+        print("| voters' speed and closures | %s | with the loop's cost removed: %s |" % (cols, cols))
         print("|---|" + "---|" * 10)
         for row in t[0][1:]:
             print("| %s | %s | %s |" % (row[0], " | ".join(row[2:7]), " | ".join(row[8:13])))
