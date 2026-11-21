@@ -56,11 +56,11 @@ python3 "$HERE/ladder.py" sizes --chain blocks.sqlite --from "$T0" --to "$T1" --
 echo "-- validation by applied share, the per-transaction cost on the modal EB class, the host-speed counterfactual (sections 6.1, 7, 8 and 6.2)"
 python3 "$HERE/validation_bins.py" validation_pairs.csv > "$OUT/validation_bins.md"
 python3 "$HERE/validation_shape.py" validation_pairs.csv > "$OUT/validation_shape.md"
-# the size series (Table 7.3): the same readings per 500-transaction class, the classes the run populates
+# the size series (Table 7.2): the same readings per 500-transaction class, the classes the run populates
 python3 "$HERE/validation_shape.py" validation_pairs.csv --class 1000 1499 --class 1500 1999 --class 2000 2499 --class 2500 2999 > "$OUT/validation_shape_series.md"
 # the records repriced on faster hosts and with the loop's cost removed (Table 8.4): the run's costs per applied and reapplied
-# transaction (Table 7.3), the hardware factors of Table 7.2 (c6id 0.85, current 0.6 of c5d on both
-# operations) and the loop fix (apply at the c5d hosts' chained cost of Table 7.2b, 0.35 ms, reapply unchanged)
+# transaction (Table 7.2), the hardware factors of Table 6.2 (c6id 0.85, current 0.6 of c5d on both
+# operations) and the loop fix (apply at the c5d hosts' chained cost of Table 6.2b, 0.35 ms, reapply unchanged)
 case $KEY in
   cluster-40k260k)     COSTS="0.91 152"; FIX=0.38;;
   cluster-100k1m)      COSTS="1.85 144"; FIX=0.19;;
@@ -73,7 +73,7 @@ python3 "$HERE/host_speed.py" validation_pairs.csv "$OUT/ladder.jsonl" "$E_KB" -
   "the loop's cost removed, on the run hosts:$FIX:1" "validation started at the closure arrival:1:1:closure" > "$OUT/host_speed.md"
 if [ "$KEY" = cluster-100k1m ]; then
   # the loop fix combined with each host generation's measured costs (Table 8.5): apply at the class's chained
-  # cost and reapply at its cost (Table 7.2b: 0.35/147, 0.31/128, 0.20/85) relative to the run's 1.85 ms / 144 us
+  # cost and reapply at its cost (Table 6.2b: 0.35/147, 0.31/128, 0.20/85) relative to the run's 1.85 ms / 144 us
   python3 "$HERE/host_speed.py" validation_pairs.csv "$OUT/ladder.jsonl" "$E_KB" --costs $COSTS "as measured:1:1" \
     "the loop's cost removed, on the run c5d hosts:0.189:1.0" "the loop's cost removed, on c6id hosts:0.168:0.889" \
     "the loop's cost removed, on current-generation hosts:0.108:0.590" > "$OUT/host_speed_combined.md"

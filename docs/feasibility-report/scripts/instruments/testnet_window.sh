@@ -64,7 +64,7 @@ if [ -z "$ARCHIVE_ONLY" ]; then
   python3 "$HERE/validation_bins.py" validation_pairs.csv --hosts "$REPO/data/hosts.csv" > validation_bins.md
   # validation by EB size class (4.3.1's prose): closure arrival and validation time per class
   python3 "$HERE/validation_classes.py" validation_pairs.csv > validation_classes.md
-  # the per-transaction cost by input provenance (Table 7.2): the EB size class per window, the
+  # the per-transaction cost by input provenance (Tables 6.2a and 6.2b): the EB size class per window, the
   # chained closures (80 % or more of the inputs spend an output of the same block) and the old-input
   # ones (half or less) side by side; eb_shape_dbsync.csv is the saved db-sync composition of the
   # window's certified closures (DATA.md), fetched outside this repository
@@ -76,21 +76,27 @@ if [ -z "$ARCHIVE_ONLY" ]; then
   SHAPE="validation_pairs.csv --hosts $REPO/data/hosts.csv --shape eb_shape_dbsync.csv --chain $CHAIN"
   python3 "$HERE/validation_shape.py" $SHAPE $CLASS --provenance 0.8 0.5 > validation_shape.md
   if [ "$KEY" = f1-high ]; then
-    # the within-kind check read in 7.2's prose: closures of the 247 B transaction alone, by their same-block share
+    # the within-kind check read in 6.2's prose: closures of the 247 B transaction alone, by their same-block share
     : > validation_shape_kind.md
     for band in "0 0.1" "0.1 0.5" "0.5 0.8" "0.8 1"; do
       python3 "$HERE/validation_shape.py" $SHAPE $CLASS --min-size 200 --max-size 260 --same-block-min ${band% *} --same-block-max ${band#* } >> validation_shape_kind.md
     done
   fi
   if [ "$KEY" = f2-high ]; then
-    # the size series (read in 7.2 and 7.3): chained closures of one transaction size across the EB size classes
+    # the size series (read in 6.2 and 7.3): chained closures of one transaction size across the EB size classes
     python3 "$HERE/validation_shape.py" $SHAPE --class 1000 1999 --class 2000 2999 --class 3000 3999 --class 5500 6999 \
       --min-size 200 --max-size 260 --same-block-min 0.8 > validation_shape_series.md
   fi
+  # the windows' large EBs (read in 6.2's prose): the kinds of the certified closures of the largest class, the
+  # 318 B window's of 5,500 to 6,999 transactions and the 1 kB window's of 4,000 to 5,999
+  case $KEY in
+    f2-high) python3 "$HERE/validation_shape.py" $SHAPE --class 5500 6999 --provenance 0.8 0.5 > validation_shape_large.md;;
+    1kb)     python3 "$HERE/validation_shape.py" $SHAPE --class 4000 5999 --provenance 0.8 0.5 > validation_shape_large.md;;
+  esac
   # the records repriced by host class (Tables 8.3a, 8.3b): per class the cost per applied transaction on old-input
   # closures, on chained closures, and per reapplied transaction, in ms / ms / us. The 2 MB windows take the
-  # cluster's c5d old-input reading at 2,500 to 3,000 transactions (Table 7.3, 1.85 ms) scaled by the hardware
-  # factors (0.85, 0.6), the chained and reapply costs of Table 7.2b; the 260 kB window its own Table 7.2a
+  # cluster's c5d old-input reading at 2,500 to 3,000 transactions (Table 7.2, 1.85 ms) scaled by the hardware
+  # factors (0.85, 0.6), the chained and reapply costs of Table 6.2b; the 260 kB window its own Table 6.2a
   # readings (the current generation's old-input cost from the c5d reading and the hardware factor)
   case $KEY in
     f1-high) COSTS=("current:0.50:0.19:88" "two older:0.75:0.30:135" "three older:0.83:0.35:140");;

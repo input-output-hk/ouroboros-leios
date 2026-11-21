@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The cost of validating one transaction at the vote on EBs of one size,
-one transaction shape and one input provenance (report section 7): per host
+one transaction shape and one input provenance (report sections 6.2 and 7.2): per host
 class, two readings over the per-(node, EB) validation records of a window
 or run (validation_pairs.csv of validation_pairs.sql /
 cluster_validation_pairs.sql), restricted to EBs of one size class and, on
@@ -46,6 +46,9 @@ part, about 10 ms on the testnet hosts, is inside them).
          closures (share <= OLD_MAX), each under the size band if given;
          the operators' row is then over one node set, the nodes with
          enough EBs under both selections
+With --shape the lead line also counts the class in the composition file
+itself: the certified closures of the class, how many of them each
+selection keeps and their median transaction size (read in section 6.2).
 The apply cost is printed in milliseconds per transaction and the reapply
 cost in microseconds, the units spelled out in the table headers.
 A record is one node validating one EB; the tables count them as EBs per
@@ -117,11 +120,12 @@ def main():
         eb_of = dict(con.execute("select c.block_no, p.eb_announcement_hash from block c join block p on p.block_no = c.block_no - 1 where c.has_leios_cert = 1"))
         for r in csv.DictReader(open(a.shape, newline="")):
             if int(r["block_no"]) in eb_of and r["txs"] and int(r["txs"]) > 0:
-                rows_shape.append((eb_of[int(r["block_no"])], float(r["min_size"]), float(r["max_size"]), float(r["same_block"]) if r["same_block"] else None))
+                rows_shape.append((eb_of[int(r["block_no"])], float(r["min_size"]), float(r["max_size"]), float(r["same_block"]) if r["same_block"] else None,
+                                   int(r["txs"]), float(r["p50"]) if r["p50"] else None))
 
     def select(sb_min, sb_max):
         keep, desc = set(), []
-        for eb, mn, mx, sb in rows_shape:
+        for eb, mn, mx, sb, _, _ in rows_shape:
             if a.min_size is not None and not (a.min_size <= mn and mx <= a.max_size):
                 continue
             if sb_min is not None and not (sb is not None and sb >= sb_min):
@@ -179,6 +183,17 @@ def main():
             lead += ", %s, %s EBs" % (selections[0][1][1], "{:,}".format(ebs[0]))
         else:
             lead += ", %s EBs" % "{:,}".format(ebs[0])
+        if a.shape:
+            # the composition's own count of the class, before any validation record: the certified closures of
+            # the class in the db-sync file, and how many of them each selection keeps, with their median transaction size
+            in_class = [(eb, p50) for eb, _, _, _, n, p50 in rows_shape if lo <= n <= hi]
+            parts = []
+            for name, (keep, _) in selections:
+                sel = [p50 for eb, p50 in in_class if eb in keep]
+                sizes = [p for p in sel if p is not None]
+                parts.append("%s %s%s" % (name or "under the selection", "{:,}".format(len(sel)),
+                                          " (median transaction size %s B)" % "{:,}".format(int(med(sizes))) if sizes else ""))
+            lead += "; the db-sync composition holds %s certified closures of the class, %s" % ("{:,}".format(len(in_class)), " and ".join(parts))
         print(lead + "; a host cell resting on fewer than %d EBs is marked tentative.\n" % a.min_records)
         groups = [name for name, _ in selections]
         head = "| host class (instance, vCPU, generation) | hosts | " + " | ".join(

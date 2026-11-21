@@ -1,4 +1,4 @@
-EBs of 1,000 to 1,999 transactions, certified closures whose transactions are all of 200 to 260 B and in which 80 % or more of the inputs spend an output of the same block, 55 EBs; a host cell resting on fewer than 10 EBs is marked tentative.
+EBs of 1,000 to 1,999 transactions, certified closures whose transactions are all of 200 to 260 B and in which 80 % or more of the inputs spend an output of the same block, 55 EBs; the db-sync composition holds 320 certified closures of the class, under the selection 84 (median transaction size 247 B); a host cell resting on fewer than 10 EBs is marked tentative.
 
 | host class (instance, vCPU, generation) | hosts | per applied transaction, milliseconds (EBs per host) | per reapplied transaction, microseconds (EBs per host) | EBs validated per host |
 |---|---|---|---|---|
@@ -9,7 +9,7 @@ EBs of 1,000 to 1,999 transactions, certified closures whose transactions are al
 | c5d.2xlarge, 8 vCPU, three older (PIR) | PIR7, PIR9 | 0.39 (5 to 13) tentative | 143 to 145 (32 to 42) | 55 |
 | operators (13 nodes): lower quartile / median / upper quartile node | | 0.29 / 0.35 / 0.88 | 124 / 185 / 375 | 43 to 134 |
 
-EBs of 2,000 to 2,999 transactions, certified closures whose transactions are all of 200 to 260 B and in which 80 % or more of the inputs spend an output of the same block, 60 EBs; a host cell resting on fewer than 10 EBs is marked tentative.
+EBs of 2,000 to 2,999 transactions, certified closures whose transactions are all of 200 to 260 B and in which 80 % or more of the inputs spend an output of the same block, 60 EBs; the db-sync composition holds 315 certified closures of the class, under the selection 87 (median transaction size 247 B); a host cell resting on fewer than 10 EBs is marked tentative.
 
 | host class (instance, vCPU, generation) | hosts | per applied transaction, milliseconds (EBs per host) | per reapplied transaction, microseconds (EBs per host) | EBs validated per host |
 |---|---|---|---|---|
@@ -20,7 +20,7 @@ EBs of 2,000 to 2,999 transactions, certified closures whose transactions are al
 | c5d.2xlarge, 8 vCPU, three older (PIR) | PIR7, PIR9 | 0.36 to 0.43 (9 to 18) tentative | 143 to 149 (34 to 38) | 60 to 63 |
 | operators (15 nodes): lower quartile / median / upper quartile node | | 0.32 / 0.36 / 0.56 | 126 / 162 / 274 | 51 to 143 |
 
-EBs of 3,000 to 3,999 transactions, certified closures whose transactions are all of 200 to 260 B and in which 80 % or more of the inputs spend an output of the same block, 64 EBs; a host cell resting on fewer than 10 EBs is marked tentative.
+EBs of 3,000 to 3,999 transactions, certified closures whose transactions are all of 200 to 260 B and in which 80 % or more of the inputs spend an output of the same block, 64 EBs; the db-sync composition holds 234 certified closures of the class, under the selection 85 (median transaction size 247 B); a host cell resting on fewer than 10 EBs is marked tentative.
 
 | host class (instance, vCPU, generation) | hosts | per applied transaction, milliseconds (EBs per host) | per reapplied transaction, microseconds (EBs per host) | EBs validated per host |
 |---|---|---|---|---|
@@ -31,7 +31,7 @@ EBs of 3,000 to 3,999 transactions, certified closures whose transactions are al
 | c5d.2xlarge, 8 vCPU, three older (PIR) | PIR7, PIR9 | 0.32 to 0.34 (23 to 24) | 144 to 155 (27) | 64 to 66 |
 | operators (30 nodes): lower quartile / median / upper quartile node | | 0.25 / 0.31 / 0.34 | 126 / 160 / 177 | 41 to 161 |
 
-EBs of 5,500 to 6,999 transactions, certified closures whose transactions are all of 200 to 260 B and in which 80 % or more of the inputs spend an output of the same block, 36 EBs; a host cell resting on fewer than 10 EBs is marked tentative.
+EBs of 5,500 to 6,999 transactions, certified closures whose transactions are all of 200 to 260 B and in which 80 % or more of the inputs spend an output of the same block, 36 EBs; the db-sync composition holds 129 certified closures of the class, under the selection 52 (median transaction size 247 B); a host cell resting on fewer than 10 EBs is marked tentative.
 
 | host class (instance, vCPU, generation) | hosts | per applied transaction, milliseconds (EBs per host) | per reapplied transaction, microseconds (EBs per host) | EBs validated per host |
 |---|---|---|---|---|

@@ -12,18 +12,18 @@ TABLE    bins      validation time per EB by the share of the EB the voter
                    vote on EBs of one size class, per host class and the
                    operators' quartiles, on the chained closures and on the
                    old-input closures side by side, one block per testnet
-                   window (validation_shape.md; Tables 7.2a and 7.2b) and one
-                   block for the cluster runs (Table 7.3); a host cell resting
+                   window (validation_shape.md; Tables 6.2a and 6.2b) and one
+                   block for the cluster runs (Table 7.2); a host cell resting
                    on fewer than 10 EBs reads "too few EBs" and the EBs
                    each host validated are left out, with --full the expanded
                    tables as the instrument prints them
          series    the same on the chained closures of one transaction size
                    across the EB size classes and on the classes the cluster
-                   runs populate (validation_shape_series.md); read in 7.2's
-                   and 7.3's prose
+                   runs populate (validation_shape_series.md); read in 6.2's
+                   and 7.2's prose
          kind      the within-kind check: one window's closures of one
                    transaction size by their same-block input share
-                   (validation_shape_kind.md); read in 7.2's prose
+                   (validation_shape_kind.md); read in 6.2's prose
          resources the memory and CPU distributions per population (resources.md)
          unseen    the EBs that fail by the share of their transactions the
                    voters applied in full, cluster runs (host_speed.md, second table)
@@ -158,6 +158,38 @@ def compact_lead(lead):
     return lead.replace(m.group(0), "a host cell resting on fewer than %s EBs reads too few" % m.group(1)) if m else lead
 
 
+SHAPE_ROW = re.compile(r"^(\w+)\.\w+, \d+ vCPU, [^(]+\((IOG|PIR)\)$")
+SHAPE_OPS = re.compile(r"^operators \((\d+) nodes")
+SHAPE_CELL = re.compile(r"^(\S+)(?: to (\S+))? \([^)]*\)$")
+
+
+def shape_row(label, hosts):
+    """The report's row label for a validation_shape.md row: "IOG producers, c8id", "PIR hosts, c5d",
+    "operator nodes, quartiles of 21"; the saved output keeps the vCPUs, generations and host names."""
+    m = SHAPE_ROW.match(label)
+    if m:
+        n = len(hosts.split(", "))
+        kind = "IOG producer" if m.group(2) == "IOG" else "PIR host"
+        return "%s%s, %s" % (kind, "s" if n > 1 else "", m.group(1))
+    m = SHAPE_OPS.match(label)
+    return "operator nodes, quartiles of %s" % m.group(1) if m else label
+
+
+def shape_cell(cell):
+    """The report's cell: the median or the range of medians without the EB counts ("0.16 - 0.17"),
+    "too few" for a tentative cell; the operators' quartile cells and blanks pass through."""
+    if TENTATIVE.match(cell):
+        return "too few"
+    m = SHAPE_CELL.match(cell)
+    if not m:
+        return cell
+    lo, hi = m.groups()
+    return lo if hi is None or hi == lo else "%s - %s" % (lo, hi)
+
+
+SHAPE_HEAD = ["host", "chained closures: apply, ms", "reapply, µs", "old-input closures: apply, ms", "reapply, µs"]
+
+
 def shape(outputs, names, full=False):
     """One block per testnet window: the lead line and the table of validation_shape.md, the hosts by
     class and the operators' quartiles under the two selections (chained and old-input closures) side
@@ -176,15 +208,30 @@ def shape(outputs, names, full=False):
             print("%s: n/a\n" % w["label"])
             continue
         # the report's form drops the last column (the EBs of the class each host validated) with the tentative costs
-        print("**Table 7.2%s.** %s (%s): %s\n" % (next(letters), w["label"], w["shape"], ld[0] if full else compact_lead(ld[0])))
-        head = t[0][0] if full else t[0][0][:-1]
-        print("| " + " | ".join(head) + " |")
-        print("|---|" + "---|" * (len(head) - 1))
-        for row in t[0][1:]:
-            print("| " + " | ".join(row if full else [blank(c) for c in row[:-1]]) + " |")
+        print("**Table 6.2%s.** %s (%s): %s\n" % (next(letters), w["label"], w["shape"], ld[0] if full else compact_lead(ld[0])))
+        if full:
+            head = t[0][0]
+            print("| " + " | ".join(head) + " |")
+            print("|---|" + "---|" * (len(head) - 1))
+            for row in t[0][1:]:
+                print("| " + " | ".join(row) + " |")
+        else:
+            # the report's form: the host group and class, the four costs without their EB counts
+            print("| " + " | ".join(SHAPE_HEAD) + " |")
+            # the dash counts set the PDF's relative column widths: the data columns wider than the host column
+            print("|--|" + "-----:|" * (len(SHAPE_HEAD) - 1))
+            for row in t[0][1:]:
+                m = SHAPE_OPS.match(row[0])
+                if m:
+                    # the operators' quartile cells ("lo / median / hi") as three rows, as Tables 6.1a to 6.1c print them
+                    q = [c.split(" / ") for c in row[2:-1]]
+                    for i, label in ((1, "operator nodes, median of %s" % m.group(1)), (0, "lower quartile node"), (2, "upper quartile node")):
+                        print("| " + " | ".join([label] + [c[i] if len(c) == 3 else "/".join(c) for c in q]) + " |")
+                else:
+                    print("| " + " | ".join([shape_row(row[0], row[1])] + [shape_cell(c) for c in row[2:-1]]) + " |")
         print()
     if cluster:
-        print("**Table 7.3.** the cluster runs, c5d.2xlarge at two capabilities, every node: the lower quartile, median and upper quartile node of the run's most common EB size class.\n")
+        print("**Table 7.2.** the cluster runs, c5d.2xlarge at two capabilities, every node: the lower quartile, median and upper quartile node of the run's most common EB size class.\n")
         print("| run | EBs | per applied transaction, milliseconds | per reapplied transaction, microseconds |" + (" EBs validated per node |" if full else ""))
         print("|---|---|---|---|" + ("---|" if full else ""))
         for name in cluster:
@@ -217,7 +264,7 @@ def kind(outputs, names):
 def series(outputs, names):
     """The size series (validation_shape_series.md): the chained closures of one transaction size
     across the EB size classes on the testnet, and the classes the cluster runs populate, one row per
-    population, class and host class with both costs; read in 7.2's and 7.3's prose, not a table of
+    population, class and host class with both costs; read in 6.2's and 7.2's prose, not a table of
     the report."""
     print("| population | EB class | host class (instance, vCPU, generation) | hosts | per applied transaction, milliseconds (EBs per host) | per reapplied transaction, microseconds (EBs per host) | EBs validated per host |")
     print("|---|---|---|---|---|---|---|")
@@ -230,22 +277,23 @@ def series(outputs, names):
                     print("| %s | %s | %s | %s | %s | %s | %s |" % (w["label"], class_cell(lead), row[0], row[1], row[2], row[3], row[4]))
 
 
-def resources(outputs, names):
-    print("| population | nodes | resident set at the node's peak, GB: p10 / median / p90 / max | GC live data at the peak, GB, median node | process CPU, cores, median node's median interval | GC share, median node |")
-    print("|---|---|---|---|---|---|")
+def resources(outputs, names, full=False):
+    """Table 6.6; --full adds the GC share column, which the report does not cite."""
+    print("| population | nodes | resident set at the node's peak, GB: p10 / median / p90 / max | GC live data at the peak, GB, median node | process CPU, cores, median node's median interval |" + (" GC share, median node |" if full else ""))
+    print("|---|---:|---:|---:|---:|" + ("---:|" if full else ""))
     for name in names:
         w = WINDOWS[name]
         t = tables(os.path.join(outputs, name, "resources.md"))
         if not t:
-            print("| %s | n/a | | | | |" % w["label"])
+            print("| %s | n/a | | | |" % w["label"] + (" |" if full else ""))
             continue
         rows = {r[0]: r[1:] for r in t[0][1:]}
         n = re.search(r"(\d+) nodes", t[0][0][0]).group(1)
         peak = rows.get("resident set at the node's peak sample, GB", ["-"] * 4)
-        print("| %s | %s | %s / %s / %s / %s | %s | %s | %s |" % (
+        print("| %s | %s | %s / %s / %s / %s | %s | %s |" % (
             w["label"] + (" (operator nodes)" if not w.get("cluster") else ""), n, peak[0], peak[1], peak[2], peak[3],
-            rows.get("GC live data at the peak, GB", ["-", "-"])[1], rows.get("process CPU, cores, the node's median interval", ["-", "-"])[1],
-            rows.get("GC share of the process CPU time", ["-", "-"])[1]))
+            rows.get("GC live data at the peak, GB", ["-", "-"])[1], rows.get("process CPU, cores, the node's median interval", ["-", "-"])[1])
+            + (" %s |" % rows.get("GC share of the process CPU time", ["-", "-"])[1] if full else ""))
 
 
 def unseen(outputs, names):
@@ -257,11 +305,13 @@ def unseen(outputs, names):
             continue
         tab = t[1]
         if first:
-            print("| run | " + " | ".join(tab[0][:2]) + " | fail as recorded |")
+            # the report's header; the share's definition (the mean over the EB's voters) is in the caption
+            print("| run | applied share | EBs | failed |")
             print("|---|---|---|---|")
             first = False
-        for row in tab[1:]:
-            print("| %s | %s | %s | %s |" % (w["label"], row[0], row[1], row[2]))
+        for i, row in enumerate(tab[1:]):
+            # the run's label on its first row only
+            print("| %s | %s | %s | %s |" % (w["label"] if i == 0 else "", row[0], row[1], row[2]))
 
 
 SPEED_COLS = "certification | kB/s | tx/s | quorum voter validated at, s: p50 / p90"
@@ -352,9 +402,9 @@ def votes(outputs, names, size_bin="4,000 to 6,000"):
                 print("\nCaption, %s: %s\n" % (name, l))
 
 
-# the apply cost per transaction by host class, ms, with the loop's cost (old-input closures, Table 7.2b and the
-# c5d reading of Table 7.3 scaled by the hardware factors, as the 2 MB windows' repricing takes them) and with it
-# removed (the chained cost of Table 7.2b)
+# the apply cost per transaction by host class, ms, with the loop's cost (old-input closures, Table 6.2b and the
+# c5d reading of Table 7.2 scaled by the hardware factors, as the 2 MB windows' repricing takes them) and with it
+# removed (the chained cost of Table 6.2b)
 CAPACITY = [("c5d", 1.85, 0.35), ("c6id", 1.57, 0.31), ("current generation", 1.11, 0.20)]
 
 
@@ -373,7 +423,7 @@ def main():
     ap.add_argument("table", choices=["bins", "shape", "series", "kind", "resources", "unseen", "speed", "combined", "hardware", "votes", "capacity"])
     ap.add_argument("windows", nargs="*", metavar="WINDOW")
     ap.add_argument("--outputs", default=OUTPUTS)
-    ap.add_argument("--full", action="store_true", help="shape: the expanded tables (the tentative cells' costs and the EBs validated per host)")
+    ap.add_argument("--full", action="store_true", help="shape: the expanded tables (the tentative cells' costs and the EBs validated per host); resources: the GC share column")
     ap.add_argument("--size-bin", default="4,000 to 6,000",
                     help="votes: the EB size bin of Table 8.3c, as the instrument labels it (default '4,000 to 6,000')")
     a = ap.parse_intermixed_args()
@@ -391,7 +441,10 @@ def main():
         return
     if not a.windows:
         sys.exit("a window is needed")
-    {"bins": bins, "series": series, "kind": kind, "resources": resources, "unseen": unseen, "speed": speed, "combined": combined, "hardware": hardware}[a.table](a.outputs, a.windows)
+    if a.table == "resources":
+        resources(a.outputs, a.windows, a.full)
+        return
+    {"bins": bins, "series": series, "kind": kind, "unseen": unseen, "speed": speed, "combined": combined, "hardware": hardware}[a.table](a.outputs, a.windows)
 
 
 if __name__ == "__main__":

@@ -12,9 +12,9 @@ Per record: validated' = max(closure, 3 s) + duration', where duration is
 the recorded validation time after that start and duration' scales its
 apply part and its reapply part separately: the record's time is split
 between the two operations in proportion to applied x APPLY_MS and
-reapplied x REAPPLY_US, the run's measured costs (Table 7.3), and each part
+reapplied x REAPPLY_US, the run's measured costs (Table 7.2), and each part
 is multiplied by its ratio. A row 'c6id:0.85:0.85' is the run on hosts two
-generations newer (the hardware factor of Table 7.2 on both operations), a
+generations newer (the hardware factor of Table 6.2 on both operations), a
 row 'loop fix:0.19:1' the loop with its apply cost at the chained level of
 the same hosts (section 7.3's mechanism removed) and reapply unchanged; a
 row ending in ':closure' starts the validation when the closure arrived
