@@ -44,6 +44,12 @@
       "topology": "topologies/musashi.yaml",
       "duration": 300,
       "loki": "localhost:3101"
+    },
+    {
+      "name": "Demo Acceptance",
+      "topology": "topologies/acceptance.yaml",
+      "duration": 300,
+      "loki": "localhost:3101"
     }
   ]
 }

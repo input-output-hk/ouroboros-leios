@@ -112,6 +112,8 @@ const BASE_VISUALIZATION_EVENTS = new Set([
   EServerMessageType.VotesReceived,
   EServerMessageType.AnnouncementSent,
   EServerMessageType.AnnouncementReceived,
+  EServerMessageType.OfferSent,
+  EServerMessageType.OfferReceived,
 ]);
 
 // Txs events (optional)

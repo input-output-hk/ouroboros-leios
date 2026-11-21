@@ -1,0 +1,41 @@
+# Acceptance: proto-devnet in a line, Node1 - Node2 - Node3, with Node2 the
+# relay under test. Matches demo/acceptance (run.sh). Node2 has no stake here
+# because it neither forges nor votes, although pool2 keeps its stake on chain.
+#
+# Locations are a west-to-east line, Sao Paulo - Frankfurt - Tokyo, whose real
+# round trips of roughly 200 and 230ms match the 100ms one-way delay that
+# proto-devnet applies with tc (DELAY=100ms). Latency below is that configured
+# value, not derived from the coordinates.
+nodes:
+  Node1:
+    stake: 30000000000000
+    location:
+      # Sao Paulo
+      - -23.5505
+      - -46.6333
+    producers:
+      Node2:
+        latency-ms: 100.0
+        bandwidth-bytes-per-second: 6250000
+  Node2:
+    location:
+      # Frankfurt
+      - 50.1109
+      - 8.6821
+    producers:
+      Node1:
+        latency-ms: 100.0
+        bandwidth-bytes-per-second: 6250000
+      Node3:
+        latency-ms: 100.0
+        bandwidth-bytes-per-second: 6250000
+  Node3:
+    stake: 30000000000000
+    location:
+      # Tokyo
+      - 35.6762
+      - 139.6503
+    producers:
+      Node2:
+        latency-ms: 100.0
+        bandwidth-bytes-per-second: 6250000
