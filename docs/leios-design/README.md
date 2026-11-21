@@ -1284,11 +1284,29 @@ Note that the PoP checks probably are done at the certificate level, and that th
 
 ### Node-to-client
 
-> [!WARNING]
+Leios changes what an on-chain block looks like. Clients keep receiving normal blocks with their transactions in the body, as today.
+
+- **REQ-N2CBackwardCompatible** A client on any existing N2C version sees no Leios-specific change to the message format, beyond the new Dijkstra era.
+- **REQ-N2CInlineCertifiedEbs** When `LocalChainSync` sends a CertRB, it puts the certified EB's transactions in the CertRB's body. All other blocks are sent as they are on chain.
+- **REQ-N2CCertifiedOnly** No N2C mini-protocol exposes transactions from an EB that is not certified on the node's selected chain.
+
+#### Inlining certified EB transactions
+
+A change is needed in the `LocalChainSync` server (**UPD-LeiosN2cChainSyncServer**). Before it sends a CertRB, it adds the EB's transactions to the block. The client gets a normal Dijkstra block: the EB's transactions are in the body's transaction list, and the certificate stays in the body ([`block_body`](https://github.com/IntersectMBO/cardano-ledger/blob/3c222f0aebbdff62a2db6e8664e4be2d7db8107d/eras/dijkstra/impl/cddl/data/dijkstra.cddl#L113-L117): `[transactions, leios_certificate / nil, peras_certificate / nil]`).
+
+- **The server always has the transactions.** A node never adopts a CertRB without the EB's transactions (**NEW-LeiosCertRbStagingArea**, see [Chain selection](#chain-selection)).
+- **No extra rollbacks.** The EB's transactions are sent once, with the CertRB. When an EB is certified, the client doesn't have to undo any block it already has. `RollBackward` is still only used for chain reorgs.
+- **Apply the EB's transactions before the tick.** A CertRB has no transactions of its own. The committee checked the EB's transactions against the ledger state after the announcing RB, which is the block just before the CertRB. So the ledger applies them to that same state first, then ticks to the CertRB's slot (**REQ-LedgerUntickedEBValidation**). Clients that run their own ledger must do the same. Clients that only record transactions (such as indexers) will see the EB's transactions in the CertRB, and so at the CertRB's slot. This is expected: the ledger applied them a little earlier, right after the announcing RB. Both blocks are always in the same epoch, because an EB can't be certified across an epoch boundary ([`PolyPraos.hs`](https://github.com/IntersectMBO/ouroboros-consensus/blob/840e789b1cd112e161820a20d30d4546f30e6209/ouroboros-consensus-protocol/src/ouroboros-consensus-protocol/Ouroboros/Consensus/Protocol/PolyPraos.hs#L568-L587)), so this doesn't change which epoch they count in.
+
+> [!NOTE]
 >
-> TODO: concrete discussion on how the `cardano-node` will need to change on the N2C interface, based on [client interfaces](#client-interfaces)
+> The header's `block_body_hash` covers only the on-chain body, so it matches every block except a CertRB. N2C is a trusted local connection: the node has already validated the block, so clients don't need to recheck the hash. Mithril doesn't check it.
 >
-> - Mithril, for example, does use N2C `LocalChainSync`, but does not check hash consistency and thus would be compatible with our plans.
+> For the same reason, a CertRB sent over N2C has both a certificate and transactions. On chain, a block can't have both: consensus rejects it ([`blockMatchesHeader`](https://github.com/IntersectMBO/ouroboros-consensus/blob/ca727c68bea65277ecf0c573a24e6eb92c581cc7/ouroboros-consensus-cardano/src/shelley/Ouroboros/Consensus/Shelley/Ledger/Block.hs#L224-L236)), and so will the ledger once [cardano-ledger#6202](https://github.com/IntersectMBO/cardano-ledger/pull/6202) is merged. Clients that re-validate blocks must skip these checks for CertRBs.
+
+#### Announced (uncertified) EBs
+
+Out of scope for now; certified transactions come first. A later N2C version can add them, as a new optional mini-protocol or a `LocalChainSync` option, without changing what existing clients see.
 
 ### Feature flags and configuration
 
