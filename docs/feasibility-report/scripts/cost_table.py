@@ -377,6 +377,12 @@ def votes(outputs, names, size_bin="4,000 to 6,000"):
     lead line as the caption's figures; then the first window's table for the EB size bin named (Table 8.3c)."""
     letters = iter("abcdefgh")
     first = None
+
+    def left_out(arrival, never, shortened):
+        # the shares no lever moves, on the table's lead line
+        return ("Left out of every row: %s %% of the votes whose closure arrived after the deadline or never, %s %% whose "
+                "validation never finished. In %s %% of the votes the closure arrived between the 3 s mark and the deadline." % (arrival, never, shortened))
+
     for name in names:
         w = WINDOWS[name]
         path = os.path.join(outputs, name, "voter_reprice.md")
@@ -384,24 +390,28 @@ def votes(outputs, names, size_bin="4,000 to 6,000"):
         if not t:
             print("%s: n/a\n" % w["label"])
             continue
-        print("**Table 8.3%s.** %s (%s).\n" % (next(letters), w["label"], w["shape"]))
+        m = re.search(r"Votes ([\d,]+) on ([\d,]+) EBs from (\d+) nodes.*?([\d.]+) % of the votes whose closure.*?([\d.]+) % whose validation never finished.*?([\d.]+) % of the votes had the closure arrive", lead[0])
+        figures = ": %s votes on %s EBs from %s nodes. %s" % (m.group(1), m.group(2), m.group(3), left_out(m.group(4), m.group(5), m.group(6))) if m else "."
+        print("**Table 8.3%s.** %s (%s)%s\n" % (next(letters), w["label"], w["shape"], figures))
         print("| " + " | ".join(t[0][0]) + " |")
         print("|---|" + "---|" * (len(t[0][0]) - 1))
         for row in t[0][1:]:
             print("| " + " | ".join(row) + " |")
-        print("\nCaption, %s: %s\n" % (name, lead[0]))
+        print()
         if first is None:
             first = (name, w, t, lead)
     if first:
         name, w, t, lead = first
         for i, l in enumerate(lead[1:], 1):
             if l.startswith("EBs of %s transactions" % size_bin) and i < len(t):
-                print("**Table 8.3%s.** %s (%s), the EBs of %s transactions.\n" % (next(letters), w["label"], w["shape"], size_bin))
+                m = re.search(r", ([\d,]+) EBs; late in every row: ([\d.]+) % of the votes for the closure's arrival, ([\d.]+) % never validated; ([\d.]+) % had the closure", l)
+                figures = ": %s EBs. %s" % (m.group(1), left_out(m.group(2), m.group(3), m.group(4))) if m else "."
+                print("**Table 8.3%s.** %s (%s), the EBs of %s transactions%s\n" % (next(letters), w["label"], w["shape"], size_bin, figures))
                 print("| " + " | ".join(t[i][0]) + " |")
                 print("|---|" + "---|" * (len(t[i][0]) - 1))
                 for row in t[i][1:]:
                     print("| " + " | ".join(row) + " |")
-                print("\nCaption, %s: %s\n" % (name, l))
+                print()
 
 
 # the apply cost per transaction by host class, ms, with the loop's cost (old-input closures, Table 6.2b and the
