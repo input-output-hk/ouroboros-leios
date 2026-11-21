@@ -113,6 +113,55 @@ let
     '';
   };
 
+  # The Cardano formal ledger spec as an Agda library, restricted to the
+  # Dijkstra era and built with the same toolchain as the Leios spec.  The
+  # other eras, the Conformance modules and the top-level literate documents
+  # are dropped; Dijkstra only needs Conway's TokenAlgebra.Base and .Coin.
+  # The patch replaces the reflective `derive-DecEq` for NativeScript (a
+  # type nested through `List NativeScript`) with a hand-written instance:
+  # with our standard-library-meta the derivation exhausts any reasonable
+  # heap, while the ledger's own pin derives it in seconds.
+  ledgerSpec = pkgs.agdaPackages.mkDerivation {
+    inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
+    pname = "formal-ledger";
+    version = "dijkstra-0.1";
+    src = inputs.formal-ledger-src;
+    meta = { };
+    libraryFile = "formal-ledger.agda-lib";
+    everythingFile = "src/EverythingDijkstra.agda";
+    patches = [ ./formal-ledger-nativescript-deceq.patch ];
+    postPatch = ''
+      keep=src/Ledger/Conway/Specification/TokenAlgebra
+      mkdir -p tmp-keep
+      mv $keep/Base.lagda.md $keep/Coin.lagda.md tmp-keep/
+      rm -r src/Ledger/Conway src/Ledger/Conway.lagda.md \
+            src/Ledger/PreConway src/Ledger/PreConway.lagda.md \
+            src/Ledger.lagda.md src/Ledger/Introduction.lagda.md \
+            src/EssentialAgda.lagda.md
+      mkdir -p $keep
+      mv tmp-keep/* $keep/
+      rmdir tmp-keep
+      {
+        echo "module EverythingDijkstra where"
+        echo "import Ledger.Dijkstra.Specification"
+        echo "import Ledger.Dijkstra.Foreign"
+      } > src/EverythingDijkstra.agda
+    '';
+    buildInputs = [
+      (agdaWithPkgs.withPackages (p: [
+        p.standard-library
+        p.standard-library-classes
+        p.standard-library-meta
+        p.abstract-set-theory
+        p.iog-prelude
+      ]))
+    ];
+    # See praosSpec for why buildPhase is explicit.
+    buildPhase = ''
+      agda src/EverythingDijkstra.agda
+    '';
+  };
+
   agdaWithDeps = agdaWithPkgs.withPackages (p: [
     p.standard-library
     p.standard-library-classes
@@ -123,6 +172,7 @@ let
     p.categorical-crypto
     leiosSpec
     praosSpec
+    ledgerSpec
   ]);
 
   agdaTraceParser = pkgs.agdaPackages.mkDerivation {
@@ -161,6 +211,7 @@ in
   inherit
     leiosSpec
     praosSpec
+    ledgerSpec
     agdaWithDeps
     agdaTraceParser
     hsTraceParser

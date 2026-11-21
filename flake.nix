@@ -18,13 +18,21 @@
 
     iogx.url = "github:input-output-hk/iogx";
 
-    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=426f3756655d8b6b562d49b33243f796c5ab39b3";
+    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=e13c3547dbc1d5a6706faa0c8d289837fa636345";
 
     # The Praos formal spec, used by leios-trace-verifier's Leios.Base.Praos
     # to wrap the real Praos node as a Leios BaseMachine (see
     # leios-trace-verifier/docs/praos-base-machine-sketch.md).
     praos-spec-src = {
       url = "github:input-output-hk/ouroboros-praos-formal-spec/847697eec805983c6ac2afa793443e4da954d11a";
+      flake = false;
+    };
+
+    # The Cardano formal ledger spec (Dijkstra era), used by
+    # leios-trace-verifier for the ledger types and validation of Leios
+    # transactions.  Built with our Agda toolchain (see nix/agda.nix).
+    formal-ledger-src = {
+      url = "github:IntersectMBO/formal-ledger-specifications/ec066122d49631e9846a0218100901aedd2c5cce";
       flake = false;
     };
 

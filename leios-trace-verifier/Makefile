@@ -47,3 +47,17 @@ praos-assumptions:
 
 praos-machine:
 	$(AGDA) src/Leios/Base/Praos/Machine.agda
+
+# The Dijkstra ledger modules (src/Leios/Ledger/*): leios-spec's abstract
+# interface at the Dijkstra ledger types, and the validation functionality
+# with its backends.  They are not imported by src/trace-parser.agda, so
+# they are not compiled into the verifier.
+.PHONY: ledger-dijkstra validation ledger-validation
+ledger-dijkstra:
+	$(AGDA) src/Leios/Ledger/Dijkstra/Foreign.agda
+
+validation:
+	$(AGDA) src/Leios/Ledger/Validation/STS.agda
+
+ledger-validation:
+	$(AGDA) src/Leios/Ledger/Validation/Dijkstra.agda

@@ -16,6 +16,9 @@ open import Foreign.Haskell.Pair
 open import Parser using (SlotNo; Bytes)
 open import TraceTypes
 
+open import Leios.Ledger.Validation using (acceptAll; ValidationResult; Valid; InProgress; Unknown)
+open import Leios.Ledger.Dijkstra.Verifier using (CommitteeSource; selectedBy; seated)
+
 open import Tactic.Defaults
 open import Tactic.Derive.Show
 
@@ -41,6 +44,9 @@ module LinearLeiosVerifierChain where
     CAdopted              : RBId → SlotNo → Maybe RBId → ChainEvent
     CNewTip               : RBId → SlotNo → ChainEvent
     CMempoolRange         : Bytes → Bytes → ChainEvent
+    -- How the SUT split its mempool when it forged: slot, mempool and EB
+    -- transaction counts ('take-rb-eb-txs').
+    CForgePartition       : SlotNo → Bytes → Bytes → ChainEvent
     CUndetailed           : ChainEvent
 
   {-# FOREIGN GHC import qualified ChainEvents #-}
@@ -57,6 +63,7 @@ module LinearLeiosVerifierChain where
         | ChainEvents.CAdopted
         | ChainEvents.CNewTip
         | ChainEvents.CMempoolRange
+        | ChainEvents.CForgePartition
         | ChainEvents.CUndetailed
         ) #-}
 
@@ -78,7 +85,14 @@ module LinearLeiosVerifierChain where
     -- only when the mempool does not fit in the RB, so this is what separates a forge
     -- without an EB that is a violation from one that is ordinary behaviour.
     (maxRBBody : ByteCount)
+    -- The voting committee as the chain has it: the parties holding a seat
+    -- with a voting key ('GetLeiosCommittee').  'nothing' before the Dijkstra
+    -- era, which has no committee; every party then gets a seat.
+    (seatedParties : Maybe (List ℕ))
     where
+
+    committee : CommitteeSource
+    committee = maybe seated (selectedBy numberOfParties) seatedParties
 
     from-id : ℕ → Fin numberOfParties
     from-id n =
@@ -125,10 +139,8 @@ module LinearLeiosVerifierChain where
           ; Lhdr  = Lhdr
           ; Lvote = Lvote
           ; Ldiff = Ldiff
-          -- CIP-0164 feasible value σc = 0.99 (committee stake coverage)
-          ; σc-num = 99
-          ; σc-den = 100
           }
+
 
       -- Slots at which the log shows the Leios subsystem itself doing something.
       -- Praos events — NodeIsLeader, RBForged — deliberately do not count.
@@ -218,8 +230,8 @@ module LinearLeiosVerifierChain where
           then fromList winningSlots
           else fromList (allLeaderSlots l)
 
-      open import Defaults params testParams rb-slots-of using
-        (d-SpecStructure; FFDBuffers; isb; hpe; d-blockHash;
+      open import Defaults params testParams rb-slots-of committee using
+        (d-SpecStructure; FFDBuffers; isb; hpe; d-blockHash; txRef; rbRef; Show-Hash; Show-Cert;
          module PraosNode; mkPraosBlock; genesisHash; tipHash;
          node⁻; module Check; praosHeader; initNodeState)
       open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
@@ -243,7 +255,7 @@ module LinearLeiosVerifierChain where
       -- attributable to 'canProduceEB' alone. Where no EB was owed the proposal set
       -- is empty instead — see 'ebOwed'.
       placeholderTxs : List Tx
-      placeholderTxs = 0 ∷ []
+      placeholderTxs = txRef 0 ∷ []
 
       -- EB payload, derived injectively from the EB hash string. 'Defaults' hashes
       -- an EB to its transaction list, so a constant payload collapses every EB to
@@ -252,7 +264,7 @@ module LinearLeiosVerifierChain where
       -- as 'Already voted' because 'VotedEBs' already holds that hash. The leading
       -- zero keeps the list non-empty, EBs being non-empty per the CIP.
       synthTxs : EBId → List Tx
-      synthTxs h = 0 ∷ L.map C.toℕ (S.toList h)
+      synthTxs h = L.map txRef (0 ∷ L.map C.toℕ (S.toList h))
 
       mkEBrec : Party → EBId → SlotNo → EndorserBlock
       mkEBrec p h s = record
@@ -279,6 +291,9 @@ module LinearLeiosVerifierChain where
               started     : Bool
               -- (min , max) mempool bytes observed during the slot being accumulated.
               memRange    : Maybe (ByteCount × ByteCount)
+              -- The EB transaction count of the forge's mempool split in the
+              -- slot being accumulated, where the log has it.
+              split       : Maybe ℕ
               forgedEB    : Maybe EndorserBlock
               votedEB     : Maybe (EndorserBlock × SlotNumber)
               -- ── The Praos node ──
@@ -304,6 +319,10 @@ module LinearLeiosVerifierChain where
               -- The EB the chain head announced when the slot opened: the one a
               -- vote of the slot can be for.
               headEB      : Maybe EBId
+              -- ── The validation machine ──
+              -- The EBs whose body the node acquired or forged, which it has
+              -- submitted for validation.
+              submitted   : List EBId
 
       open Accumulator
 
@@ -312,6 +331,9 @@ module LinearLeiosVerifierChain where
         _ = Show-×
 
       instance
+        Show-MaybeHash : Show (Maybe Hash)
+        Show-MaybeHash = Show-Maybe
+
         Show-EBCert : Show (Maybe EBCert)
         Show-EBCert .show nothing  = "No EBCert"
         Show-EBCert .show (just c) = show c
@@ -340,9 +362,20 @@ module LinearLeiosVerifierChain where
           minted [] = "mints no block"
           minted bs = "mints (parent, slot) " ◇ show bs
 
-      open import LinearLeiosStack d-SpecStructure params node⁻ nodeᶜ nothing nodeMsg using
-        (Stack; Item; entry; deliver; base; ffdᵢ; voteᵢ; ioᵢ; verifyItems;
-         Cursor; cursor; stepItems; finishItems)
+      -- How long validation of an EB may stay in progress after the node
+      -- acquires it: the length of the voting window, from the EB's slot.
+      Δᵥ : ℕ
+      Δᵥ = 3 * Params.Lhdr params + Params.Lvote params
+
+      -- The validation machine runs beside Leios and its base, driven by the
+      -- log: the node submits the EBs it acquires and forges, validated the
+      -- EB of every vote it casts, and had not validated the EB of an
+      -- abstention it puts down to being too late.  The log records no
+      -- transaction bodies, so validation accepts.
+      open import LinearLeiosStack d-SpecStructure params node⁻ nodeᶜ nothing nodeMsg acceptAll Δᵥ using
+        (Stack; Item; entry; deliver; base; val; ffdᵢ; voteᵢ; ioᵢ; verifyItems;
+         Cursor; cursor; stepItems; finishItems;
+         submitᵥ; tickᵥ; doneᵥ; expectᵥ; initStack)
 
       blksToHeaderAndBodyList : List Blk → List (FFDA.Header ⊎ FFDA.Body)
       blksToHeaderAndBodyList []              = []
@@ -426,12 +459,19 @@ module LinearLeiosVerifierChain where
             --
             -- No reading at all (a log without the Mempool traces) is likewise not
             -- owed: EB-role enforcement then lapses rather than firing on a guess.
+            --
+            -- Where the forge's own mempool split is in the log, it decides: the EB
+            -- is owed exactly when the split put transactions in it.  The readings
+            -- describe the mempool, not the snapshot the node forged from, which
+            -- under load can lag behind it and come back empty.
             forged = maybe (λ _ → true) false (forgedRB a)
             ebOwed : Bool
-            ebOwed = case memRange a of λ where
-              nothing           → false
-              (just (mn , mx))  →
-                maxRBBody N.<ᵇ (if forged then mx else mn)
+            ebOwed = case split a of λ where
+              (just ebTxs) → 0 N.<ᵇ ebTxs
+              nothing      → case memRange a of λ where
+                nothing           → false
+                (just (mn , mx))  →
+                  maxRBBody N.<ᵇ (if forged then mx else mn)
             submit : List Tx → List Item
             submit txs = entry (Mempool-Action s) (ioᵢ (SubmitTxs txs)) ∷ []
             mempool : List Item
@@ -456,9 +496,12 @@ module LinearLeiosVerifierChain where
               nothing                  → just (s , [] , tipTreeHash a)
             praos : List Item
             praos = if s N.≡ᵇ 0 then [] else deliver round (inbox a) ∷ []
+            -- A vote shows that the node validated the EB, and it must have
+            -- submitted it.
             vtRole : List Item
             vtRole = case votedEB a of λ where
-              (just (eb , slot')) → entry (VT-Role-Action s eb slot') (ffdᵢ FFDT.SLOT) ∷ []
+              (just (eb , slot')) → doneᵥ (hash eb) ∷ expectᵥ Valid (hash eb)
+                                  ∷ entry (VT-Role-Action s eb slot') (ffdᵢ FFDT.SLOT) ∷ []
               nothing             → entry (No-VT-Role-Action s) (ffdᵢ FFDT.SLOT) ∷ []
         -- 'ebRole' precedes the ranking-block step: 'Base₁' and 'Base₂' require the
         -- EB role to be settled for the slot ('hasUpkeep EB-Role'), so that the RB
@@ -469,7 +512,8 @@ module LinearLeiosVerifierChain where
            ++ ebRole
            ++ base s ∷ praos
            ++ vtRole
-           ++ entry (Slot-Action s) (ffdᵢ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks a)))) ∷ []
+           ++ entry (Slot-Action s) (ffdᵢ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks a))))
+           ∷ tickᵥ ∷ []
 
       -- Fake producer for acquired EBs: distinct for EBs sharing a slot (so an
       -- honest slot battle does not register as equivocation, which requires
@@ -506,6 +550,12 @@ module LinearLeiosVerifierChain where
                ; FFD-blks = EB-Blk eb ∷ FFD-blks a
                }
 
+      -- What a query answers for an EB the node had not validated.
+      notValidated : Accumulator → EBId → ValidationResult
+      notValidated a h = case Any.any? (h ≟_) (submitted a) of λ where
+        (yes _) → InProgress
+        (no  _) → Unknown
+
       traceEvent→action : Accumulator → ChainEvent → Accumulator × List Item
       traceEvent→action a (CSlot s) =
         if not (started a)
@@ -516,6 +566,7 @@ module LinearLeiosVerifierChain where
                   { curSlot = primWord64ToNat s
                   ; FFD-blks = []
                   ; memRange = nothing
+                  ; split = nothing
                   ; forgedEB = nothing
                   ; votedEB = nothing
                   ; inbox = (if curSlot a N.≡ᵇ 0 then late a ++ inbox a else late a)
@@ -523,11 +574,19 @@ module LinearLeiosVerifierChain where
                   ; forgedRB = nothing
                   ; headEB = headOf a
                   } , steps)
+      -- The node validates the EB it forges.
       traceEvent→action a (CEBForged h s) =
         let eb = mkEBrec SUT-id h s
-        in (record a { EB-refs = (h , eb) ∷ EB-refs a ; forgedEB = just eb } , [])
-      -- The EB was received: see 'receive'.
-      traceEvent→action a (CEBAcquired h s) = (receive a h s , [])
+        in (record a { EB-refs = (h , eb) ∷ EB-refs a ; forgedEB = just eb
+                     ; submitted = h ∷ submitted a } ,
+            submitᵥ eb ∷ doneᵥ (hash eb) ∷ [])
+      -- The EB was received: see 'receive'.  With its body acquired, the
+      -- node submits it for validation.
+      traceEvent→action a (CEBAcquired h s) =
+        let a′ = receive a h s
+        in case EB-refs a′ ⁉ h of λ where
+             nothing   → (a′ , [])
+             (just eb) → (record a′ { submitted = h ∷ submitted a′ } , submitᵥ eb ∷ [])
       -- The ranking block of this election slot announces the EB, and the
       -- announcement carries its header.
       traceEvent→action a (CAnnouncementAccepted h s) =
@@ -550,7 +609,7 @@ module LinearLeiosVerifierChain where
       -- The spec does not inspect vote contents, and the log names neither the
       -- voter nor the signed RB.
       traceEvent→action a (CVoteAcquired _ _) =
-        (record a { FFD-blks = VT-Blk ((SUT-id , []) ∷ []) ∷ FFD-blks a } , [])
+        (record a { FFD-blks = VT-Blk ((SUT-id , rbRef []) ∷ []) ∷ FFD-blks a } , [])
       -- The SUT forged a ranking block on the tip it had selected.  It is the
       -- block the Praos node mints, under the SUT's identity.
       traceEvent→action a (CRBForged h s) =
@@ -576,13 +635,23 @@ module LinearLeiosVerifierChain where
                  nothing  → (record a′ { inbox = blk ∷ inbox a } , [])
                  (just _) → (record a′ { late = blk ∷ late a } , [])
       traceEvent→action a (CNewTip h _) = (record a { tipNow = just h } , [])
-      -- A deliberate, protocol-legal abstention the node logged. It drives no
-      -- state: VT-Role and No-VT-Role decide against the selected chain.
-      traceEvent→action a (CNotVoted _ _ _) = (a , [])
+      -- A deliberate, protocol-legal abstention the node logged.  It drives no
+      -- Leios state: VT-Role and No-VT-Role decide against the selected chain.
+      -- An abstention for being too late says that the node had not
+      -- validated the EB: its validation is still in progress, or it was
+      -- never submitted.  Validation is bounded, so this is checked.
+      traceEvent→action a (CNotVoted h _ reason) = case reason S.≟ "tooLate" of λ where
+        (no _)  → (a , [])
+        (yes _) → (a , expectᵥ (notValidated a h) (ebHash h) ∷ [])
       -- The mempool range for the slot now ending; the parser emits it just ahead of
       -- the tick that closes that slot, so 'closeSlot' sees the right one.
       traceEvent→action a (CMempoolRange mn mx) =
         (record a { memRange = just (primWord64ToNat mn , primWord64ToNat mx) } , [])
+      -- The forge's mempool split, for the slot it was called for.
+      traceEvent→action a (CForgePartition s _ ebTxs) =
+        if primWord64ToNat s N.≡ᵇ curSlot a
+          then (record a { split = just (primWord64ToNat ebTxs) } , [])
+          else (a , [])
       -- The driver refuses a log without the adopted headers before it gets here.
       traceEvent→action a CUndetailed = (a , [])
 
@@ -594,9 +663,11 @@ module LinearLeiosVerifierChain where
       s₀ = initLeiosState tt stakeDistribution' (L.tabulate (λ i → (i , tt)))
 
       -- The stack in Leios state 's', with the Praos node's clock one slot
-      -- behind (see 'LinearLeiosStack').
+      -- behind (see 'LinearLeiosStack'), and the validation machine's at the
+      -- slot.
       stack₀ : LeiosState → Machine.State Stack
-      stack₀ s = ((tt , record initNodeState { clock = LeiosState.slot s ∸ 1 }) , tt) , s
+      stack₀ s = initStack (((tt , record initNodeState { clock = LeiosState.slot s ∸ 1 }) , tt) , s)
+                           (LeiosState.slot s)
 
       check : LeiosState → List Item → Pair String String
       check s αs = [ (λ e → (e , "error verifyChainTrace")) , (λ _ → ("ok" , "")) ]′ (verifyItems (stack₀ s) αs)
@@ -621,13 +692,14 @@ module LinearLeiosVerifierChain where
       showItem (entry a _)   = showAction a
       showItem (deliver h _) = "Praos@" ◇ maybe (λ (n , _) → show n) "?" h
       showItem (base n)      = "Base@" ◇ show n
+      showItem (val _ _)     = "Validation"
 
       n₀ : SlotNumber → Accumulator
       n₀ st = record
         { EB-refs = [] ; EB-received = [] ; FFD-blks = [] ; curSlot = st
-        ; started = false ; memRange = nothing ; forgedEB = nothing ; votedEB = nothing
+        ; started = false ; memRange = nothing ; split = nothing ; forgedEB = nothing ; votedEB = nothing
         ; ids = [] ; inbox = [] ; late = [] ; forgedRB = nothing ; tipNow = nothing
-        ; annBySlot = [] ; headEB = nothing }
+        ; annBySlot = [] ; headEB = nothing ; submitted = [] }
 
       -- What the stream reports, per slot tick read and once more at the end of
       -- the input: the number of items the event yielded, and the verdict so far.
