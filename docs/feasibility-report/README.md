@@ -2636,8 +2636,8 @@ Validating on more than one core is the largest unpriced lever on the
 validation side. Today the validation of a closure runs on one core:
 the cluster's nodes at two capabilities pay the same per transaction
 as the testnet's hosts at eight (section [7.2](#the-cluster-against-the-testnet)). The sustained CPU
-of Table 6.6, a minute's average over all cores, cannot show a core
-busy for the seconds of a validation.
+of Table 6.6, a minute's average over all cores, cannot show how busy
+a core is for the seconds of a validation.
 
 Whether the loop can be parallelised is a question about the ledger's
 apply, which runs transactions in sequence. Which of its parts are
@@ -2658,40 +2658,34 @@ At 260 kB closures the build certifies 97 % of its EBs on the testnet
 as it is, with every voter class and every closure kind (section [4](#results-by-parameter-set),
 and the repricing of that window). Neither budget binds.
 
-At 1 MB on the cluster and in the testnet's 1 kB window the validation
-budget binds. The voting loop's own cost is the larger part of it.
-Removing that cost, to the chained level the report has measured,
-takes the cluster from 69 to 99 % certification at 1 MB on hosts three
+At 1 and 2 MB the validation budget binds: on the cluster at 1 MB, in
+the testnet's 1 kB window, and for the lighter voters of its 318 B
+window. The voting loop's own cost is the larger part of it. Removing
+that cost, to the chained level the report has measured, takes the
+cluster from 69 to 99 % certification at 1 MB on hosts three
 generations old. The quorum voter is then done by the middle of the
-window at the median. The build of section [9](#a-change-to-the-voting-loop-and-where-it-has-run) removes that cost
-where it has run.
+window at the median. On the testnet's 2 MB windows it removes
+validation as a cause of late votes, from 10 and 8 % of the reporting
+voters' votes to under 2 % whatever the hardware. The build of
+section [9](#a-change-to-the-voting-loop-and-where-it-has-run) removes that cost where it has run.
 
-On the testnet's 2 MB windows the same change removes validation as a
-cause of late votes, from 10 and 8 % of the reporting voters' votes to
-under 2 % whatever the hardware. In committee weight that is worth
-0.03 on the 318 B window, the gap between the weight holding the
-closure and the weight voting in Table 4.7: the voters the change
-flips hold little of this testnet's weight.
+What that buys a network in certification depends on where its weight
+sits (section [2.5](#what-to-expect-at-each-stage)). On the 1 kB window the weight is lost at
+validation, so the change addresses the loss itself, by an amount the
+unobserved weight leaves unprojected. On the 318 B window the voters
+it flips hold 0.03 of the committee's weight, the gap between the
+weight holding the closure and the weight voting in Table 4.7.
 
-What removing the loop's cost buys a network toward certification
-depends on where that network's weight sits (section [2.5](#what-to-expect-at-each-stage)). On the 1 kB window, where the
-weight is lost at validation, it is the loss itself, by an amount the
-unobserved weight leaves unprojected.
-
-On the testnet's 318 B window at 2 MB the weight is lost at the
-closure's arrival (Table 4.7). The validation budget is what the
-lighter voters spend. With the loop's cost removed the closure's
-arrival is the constraint there, as before it. The votes still late
-are the closure's arrival, 15 of the 17 % late. The levers for that
-are the unpriced ones of 8.4.
+What remains at 2 MB is the closure's arrival. The 318 B window loses
+its weight there (Table 4.7). With the loop's cost removed the votes
+still late are late arrivals, 15 of the 17 %. The levers for the
+arrival are the unpriced ones of 8.4.
 
 In section [1](#mainnet-baseline-and-targets)'s units, the cluster's 1 MB runs with the loop's cost
 removed carry 16 and 26 kB/s, against a six-times target of 27 kB/s and
 a ten-times target of 45 (Table 1.2). The testnet's 2 MB windows have
 no repriced figure, since their reading is per vote. They stand at
-their measured 12 and 22 kB/s (Table 4.5). What a change to the voters
-could add is bounded by the closure's arrival on the 318 B window and
-by the unobserved weight on the 1 kB one.
+their measured 12 and 22 kB/s (Table 4.5).
 
 The comparison is in bytes per second at the measured transactions,
 not at mainnet's mix. The transactions measured are value transfers of
@@ -2700,9 +2694,10 @@ mainnet needs a run of mainnet-like transactions, which the report has
 not made.
 
 The measurements therefore find the build measured feasible at 260 kB
-as it is, and at 1 and 2 MB once the loop's cost is removed. The closure's
-arrival on the testnet's 318 B window is the constraint no priced
-lever moves.
+as it is. At 1 MB feasibility depends on the loop's cost being
+removed, measured in section [9](#a-change-to-the-voting-loop-and-where-it-has-run). At 2 MB the same change makes the
+validation time manageable. The arrival levers appear needed on the
+2 MB set, unmeasured in this report.
 
 # A change to the voting loop, and where it has run
 
