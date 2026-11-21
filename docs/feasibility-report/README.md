@@ -2322,37 +2322,36 @@ last column is the certified share of the EBs whose next RB came 14
 slots or more after the announcing one, the ones the chain could
 certify, as section [4](#results-by-parameter-set)'s tallies.
 
-On the testnet's 318 B window both budgets are spent. Table 8.2 reads
-which one by EB size. On the EBs under 2,000 transactions nearly
-every late vote is the closure's arrival: 13 % of the votes are late
-because it arrived after 7 s or never, 1 % because the validation ran past the
-deadline. On the EBs of 4,000 to 6,000 more late votes are validation
-than arrival, 20 against 16 %. More than a quarter of the voters are
-late on 72 % of those EBs against 19 % of the small ones. On the
+On the testnet's 318 B window the budget a late vote spends depends
+on the EB's size. On the EBs under 2,000 transactions it is the
+closure's arrival: 13 % of the votes are late for it against 1 % for
+validation. On the EBs of 4,000 to 6,000 validation is the first
+cause, 20 against 16 %. There more than a quarter of the voters are
+late on 72 % of the EBs, against 19 % of the small ones. On the
 largest EBs arrival leads again, 22 against 12 %.
 
-In committee weight the same records read differently. Table 4.7 has
-the weight that votes within 0.03 of the weight holding the closure in
-every bin, so the voters late for validation hold little of it. The
-weight the window loses at 4,000 to 6,000 is lost at arrival. The certified
-share, 77 % to 26 %, follows the weight.
+The voters late for validation hold little of the committee's weight.
+Section [4.3](#308-kb-references-2-mb-closures) read the same window in weight and found the weight
+voting in time almost equal to the weight holding the closure in
+time, at every EB size. In weight the window's loss is therefore at
+arrival, and its certified share falls with the weight that holds the
+closure, not with the count of late voters. For this section that
+means a lever on validation moves many votes on this window but
+little of its weight. The arrival levers of 8.4 are what would move
+its certification.
 
-On the cluster the arrival budget is partly spent and the validation
-budget is where the votes are lost. No closure of the 2,000 to 4,000 EBs
-arrives after the deadline, but 19 % arrive after the 3 s mark, so a
-fifth of the voters start validating late. The validation itself takes
-longer than its 4 s on 33 % of the votes, whenever the closure arrived.
-35 % of the votes are late with the closure in hand, one node in three
-past the deadline on the typical EB. The late voters exceed the
-margin on half of the EBs. The certified share of 51 % follows.
+On the cluster the votes are lost at validation, not at arrival.
+Every closure arrives before the deadline, and one voter in three is
+late with the closure in hand on the typical EB of 2,000 to 4,000
+transactions. The quorum tolerates a quarter of the voters late, so
+half of those EBs fail, which is the run's 51 % certified.
 
-The four sets not shown add no third pattern. At 260 kB, on the testnet
-and on the cluster alike, 97 to 100 % of the votes are in time and
-certification is at its ceiling. The 200 B cluster run repeats the 374 B
-run with a smaller loss: no closure arrives late, 21 % of the votes are
-late for validation, 69 % of the EBs certify. The 1 kB window loses the
-same share of its 2,000 to 4,000 EBs to validation as the 318 B
-window, 9 % against 8 %.
+The four sets not shown add no third pattern. At 260 kB neither budget
+is spent on either population, with 97 to 100 % of the votes in time.
+The 200 B cluster run loses at validation as the 374 B one does, with
+fewer votes late. The 1 kB window loses at validation on its EBs of
+2,000 to 4,000 transactions as the 318 B window does on the same
+size.
 
 When the validation budget is lifted, the arrival budget is what
 remains. Section 8.2 measures how much of the failure it holds once
@@ -2367,15 +2366,18 @@ by host class of Tables 6.2a and 6.2b. The loop lever's is the gap
 between the chained and the old-input apply cost, which section [9.1](#the-change)
 traces to one step of the loop.
 
-To read what each lever would buy, this section reprices the recorded
-validations at the lever's cost per transaction and reads the votes
-again. A record is one voter validating one EB:
-how many transactions it applied, how many it reapplied, and when the
-closure arrived. The repricing keeps the
-counts and the arrival and changes the cost per transaction, so each
-voter's validation time becomes the chosen class's apply cost times the
-applied count plus its reapply cost times the reapplied count. The vote
-rule then says which votes are in time.
+This section prices each lever on the testnet's 2 MB windows and the
+cluster's 1 MB runs, vote by vote. Each vote has a record of its
+validation: how many transactions the voter applied, how many it
+reapplied, and when its closure arrived. The repricing keeps the EB's
+composition and the closure's arrival and replaces only the cost per
+transaction, as if the voter had run on faster hardware or on a
+validation loop without its own cost, at the costs section [6](#cross-cutting-explanations)
+measured per host class and per closure kind. Each voter's validation
+time is then its applied count times the new apply cost plus its
+reapplied count times the new reapply cost, and the vote is in time if
+that validation ends by 7 s. The result reads what each lever would
+have done to the same votes on the same EBs.
 
 On the cluster every node is observed, so the quorum says which EBs
 certify and the throughput follows.
@@ -2387,7 +2389,7 @@ late. No certification rate is projected from them. The unobserved
 voters run the same software on a similar spread of hardware, so either
 lever moves them in the same direction as the reporting ones. The
 per-vote reading says whether a lever removes validation as a cause of
-late votes or leaves it one.
+late votes or not.
 
 The hardware lever is measured by repricing every vote at one host
 class's costs, from the oldest class the report measured, c5d, to the
@@ -2490,13 +2492,11 @@ The other size bins are in the saved output.
 
 The loop's cost removed keeps validation inside its 4 s at every EB
 size the window carried. Table 8.3c takes the EBs of 4,000 to 6,000
-transactions, where validation is the first
-cause of a late vote as recorded: 19 % of the votes out of time, the
-validation at 6.7 s at the 90th percentile. With the loop's cost
-removed the longest validation is 2.8 s, inside the 4 s on the oldest
-class. The 1 to 2 % still out of time had the closure at 6.4 s. The
-largest EBs, 6,000 and up, read the same with the longest validation at
-3.3 s.
+transactions, where validation is the first cause of a late vote as
+recorded. With the loop's cost removed the longest validation there is
+2.8 s on the oldest class, and the votes still out of time are late
+arrivals, their closure at 6.4 s at the median. The largest EBs read
+the same.
 
 At 260 kB neither budget binds: 97 % of the votes are in time in every
 row (the per-vote output of that window).
@@ -2530,9 +2530,10 @@ one-input chained cost, since the two-input one is not measured.
 
 The cluster says the same with no population spread. On the one-input
 run, hosts of the current generation take certification from 69 to
-97 %. The loop's cost removed alone, on the run's own c5d hosts, takes
-it to 99 % and the throughput to 15.8 kB/s against the run's 16.5 kB/s
-workload ceiling (Table 4.3). The two-input run reads 84 and 97 %.
+97 %, and the loop's cost removed alone, on the run's own c5d hosts,
+takes it to 99 %, with the throughput at 15.8 kB/s against the run's
+16.5 kB/s workload ceiling (Table 4.3). The two-input run repeats the
+pattern.
 
 As measured the quorum voter finishes at the deadline's edge at the
 median and past it at the 90th percentile. With the loop's cost
