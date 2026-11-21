@@ -71,15 +71,14 @@ run. It reprices the votes measured on the build of section [4](#results-by-para
 latest build's validation cost. The same repricing predicted 97 % for
 the cluster run before that run existed, and the run gave 99 %. On the
 testnet's 2 MB windows the repricing takes validation out of the
-causes of late votes at every host class and EB size. In committee
-weight it removes the whole loss of the 1 kB window and little of the
-318 B window's, which loses its weight at arrival (section [8.5](#what-the-measurements-support)).
+causes of late votes at every host class and EB size. What remains at
+2 MB is the closure's arrival (section [8.5](#what-the-measurements-support)).
 
 On the build of section [4](#results-by-parameter-set) the closure's arrival keeps 22 % of the
-votes late on the largest EBs of the 318 B window (Table 8.2). Three
-changes aim at the arrival: forwarding the closure as it arrives,
-scheduling what a relay sends, and the upstream peer count. None is
-measured in this report (section [8.4](#the-levers-the-report-cannot-price)).
+votes late on the largest EBs of the 318 B window (Table 8.2). Changes
+aim at the arrival, forwarding the closure as it arrives and
+scheduling what a relay sends among them. None is measured in this
+report (section [8.4](#the-levers-the-report-cannot-price)).
 
 **What the measurements do not cover.** No window or run in this
 report exercised mainnet's transaction mix, with scripts. The
@@ -2227,19 +2226,18 @@ that change buys (section [9](#a-change-to-the-voting-loop-and-where-it-has-run)
 Sections [4](#results-by-parameter-set) to [7](#models-against-measurements-deltaq-and-the-cip-cost-model) measured where the testnet and the cluster stand: at
 260 kB closures nearly every EB certifies, at 1 and 2 MB about half do.
 Two things decide whether a voter makes the deadline. The first is the
-time it spends validating the closure before it votes, which is the
-loss on the cluster at 1 MB and in the testnet's 1 kB window, and is
-measured per transaction and per host. The second is when the closure
-reaches it, which is where the testnet's 318 B window loses its weight
-(section 4.4) and what remains once the validation cost is removed. This section turns those
-measurements into a statement about the protocol's feasibility: what
+time it spends validating the closure before it votes. That is the
+loss on the cluster at 1 MB and in the testnet's 1 kB window, measured
+per transaction and per host. The second is when the closure reaches
+it. That is where the testnet's 318 B window loses its weight (section
+4.4), and what remains once the validation cost is removed.
+
+This section turns those
+measurements into a statement about the feasibility of the build
+measured in section 4: what
 binds certification at the measured sizes, which of the changes
 available to the implementation and the operators would move it, and by
-how much, in the report's own units. The validation levers are priced by
-repricing the records. The arrival levers are left open: forwarding the
-closure as it arrives, scheduling what a relay sends and the number of
-upstream peers each have a measured gap to close, and none has a
-measured gain yet.
+how much, in the report's own units.
 
 Section [8.1](#two-budgets-in-one-window) reads the two
 budgets a voter has to meet inside the vote window; 8.2 prices the two
@@ -2253,13 +2251,13 @@ change to the loop that removes its own cost and where it has run.
 
 ## Two budgets in one window
 
-A voter has seven seconds from the EB's slot to vote, and it validates
-the closure in the last four of them: validation starts at the 3 s mark
-or when the closure arrives, whichever is later, and the vote must be
-cast by 7 s (section [2](#what-is-assessed-and-what-to-expect)). The window therefore holds two budgets. The
+A voter has seven seconds from the EB's slot to vote (section [2](#what-is-assessed-and-what-to-expect)).
+Validation starts at the 3 s mark or when the closure arrives,
+whichever is later. The vote must be cast by 7 s, so the closure is
+validated in the last four seconds at most. The window therefore holds two budgets. The
 first is the closure's arrival: every second it takes past the 3 s mark
 is a second less to validate in. The second is the validation itself,
-the cost per transaction of section [7](#models-against-measurements-deltaq-and-the-cip-cost-model) times the share of the closure the
+the cost per transaction of section [6.2](#what-the-node-pays-at-the-vote) times the share of the closure the
 voter has to apply (section [6.3](#mempool-coverage)), plus the reapply of the rest.
 
 Tables 8.1 and 8.2 read the two budgets per vote. One vote is one
@@ -2267,7 +2265,9 @@ count, over the reporting voters, whatever their weight: the question
 here is what a voter does, and 8.2 reads what the levers do on the
 same voters. Section [4](#results-by-parameter-set) reads the same records in committee
 weight, the unit certification is decided in, and the two readings
-differ where the slow voters are light. For every EB and
+differ where the slow voters are light.
+
+For every EB and
 every node that scheduled a vote on it, the record gives when the node
 held the closure, when it finished validating, and whether the vote was
 in time. The shares are over the voters of each EB, so a voter that
@@ -2276,68 +2276,74 @@ shown: the testnet's 318 B window, which 8.2 reprices, and the cluster run
 with two-input transactions, which section [9](#a-change-to-the-voting-loop-and-where-it-has-run) compares against the change
 to the loop.
 
-| set | EB size, txs | EBs | voters per EB | closure by 3 s / after 3 s / after 7 s or never | validation within 4 s / longer / never |
+| set | EB size, txs | EBs | closure: by 3 s / by 7 s / later | validation: within 4 s / longer / never |
+|---|---|---:|---:|---:|
+| testnet 308 kB / 2 MB, 318 B | under 2,000 | 907 | 73 / 13 / 13 % | 84 / 0 / 15 % |
+|  | 2,000 to 4,000 | 900 | 68 / 22 / 10 % | 83 / 5 / 12 % |
+|  | 4,000 to 6,000 | 1,190 | 62 / 21 / 17 % | 66 / 16 / 18 % |
+|  | 6,000 and up | 531 | 52 / 26 / 22 % | 71 / 6 / 23 % |
+| cluster 100 kB / 1 MB, 374 B | under 2,000 | 192 | 50 / 49 / 1 % | 83 / 7 / 10 % |
+|  | 2,000 to 4,000 | 2,881 | 81 / 19 / 0 % | 65 / 33 / 2 % |
+
+Table 8.1. Where the voters lost the EB, by EB size. Every cell is a
+share of the set's votes in the bin, and each group adds to 100 % up
+to rounding. The
+voters of an EB are the nodes that scheduled a vote on it, about 70
+reporting voters per EB on the testnet, and on the cluster the 51
+nodes that accepted its announcement, the build having no
+vote-scheduled event. Closure: the time after the EB's slot at which
+the node held the whole closure; "later" is after 7 s or never.
+Validation: the time from the later of the closure and the 3 s mark to
+the validated event, as Table 4.6. EB size in transactions, from the
+body hits on the testnet and the body's bytes over 36 B per reference
+on the cluster.
+
+| set | EB size, txs | EBs | late votes: closure / validation / never | EBs with > 25 % late voters | certified |
 |---|---|---:|---:|---:|---:|
-| testnet 308 kB / 2 MB, 318 B | under 2,000 | 907 | 70 | 73 / 13 / 13 % | 84 / 0 / 15 % |
-| testnet 308 kB / 2 MB, 318 B | 2,000 to 4,000 | 900 | 70 | 68 / 22 / 10 % | 83 / 5 / 12 % |
-| testnet 308 kB / 2 MB, 318 B | 4,000 to 6,000 | 1,190 | 68 | 62 / 21 / 17 % | 66 / 16 / 18 % |
-| testnet 308 kB / 2 MB, 318 B | 6,000 and up | 531 | 66 | 52 / 26 / 22 % | 71 / 6 / 23 % |
-| cluster 100 kB / 1 MB, 374 B | under 2,000 | 192 | 51 | 50 / 49 / 1 % | 83 / 7 / 10 % |
-| cluster 100 kB / 1 MB, 374 B | 2,000 to 4,000 | 2,881 | 51 | 81 / 19 / 0 % | 65 / 33 / 2 % |
+| testnet 308 kB / 2 MB, 318 B | under 2,000 | 907 | 13 / 1 / 1 % | 19 % | 77 % |
+|  | 2,000 to 4,000 | 900 | 10 / 8 / 1 % | 26 % | 73 % |
+|  | 4,000 to 6,000 | 1,190 | 16 / 20 / 1 % | 72 % | 26 % |
+|  | 6,000 and up | 531 | 22 / 12 / 0 % | 76 % | 17 % |
+| cluster 100 kB / 1 MB, 374 B | under 2,000 | 192 | 1 / 13 / 9 % | 36 % | 68 % |
+|  | 2,000 to 4,000 | 2,881 | 0 / 35 / 2 % | 50 % | 51 % |
 
-Table 8.1. Where the voters lost the EB, by EB size. The voters of an EB
-are the nodes that scheduled a vote on it, and on the cluster the nodes
-that accepted its announcement, the build having no vote-scheduled
-event. The shares are pooled over the set's votes in the bin and each
-group adds to 100 %. Closure: the time after the EB's slot at which the
-node held the whole closure. Validation: the time from the later of the
-closure and the 3 s mark to the validated event, as Table 4.6. EB size
-in transactions, from the body hits on the testnet and the body's bytes
-over 36 B per reference on the cluster.
+Table 8.2. The outcome of the same votes, as shares of the set's votes
+in the bin. A late vote is attributed to one cause: the closure came
+after the 7 s deadline or never; the closure was in hand and the
+validation finished past the deadline; the validation never finished.
+The votes in time are the remainder, less the votes rejected as
+already known and, on the testnet, the EBs the node found invalid, at
+most 2 % in any row. A voter whose chain tip moved to the next RB
+before it voted is not a voter of the EB and is in neither count. On
+the cluster an EB whose late voters exceed a quarter of its voters
+cannot reach the quorum; on the testnet the quorum is in weight, and
+the count only says how many of its reporting voters were late. The
+last column is the certified share of the EBs whose next RB came 14
+slots or more after the announcing one, the ones the chain could
+certify, as section [4](#results-by-parameter-set)'s tallies.
 
-| set | EB size, txs | EBs | voted in time / too late | late: closure arrived after 7 s / validation past 7 s / never validated | EBs with late voters over a quarter | certified, of the EBs the chain could certify |
-|---|---|---:|---:|---:|---:|---:|
-| testnet 308 kB / 2 MB, 318 B | under 2,000 | 907 | 83 / 16 % | 13 / 1 / 1 % | 19 % | 77 % |
-| testnet 308 kB / 2 MB, 318 B | 2,000 to 4,000 | 900 | 79 / 19 % | 10 / 8 / 1 % | 26 % | 73 % |
-| testnet 308 kB / 2 MB, 318 B | 4,000 to 6,000 | 1,190 | 62 / 37 % | 16 / 20 / 1 % | 72 % | 26 % |
-| testnet 308 kB / 2 MB, 318 B | 6,000 and up | 531 | 65 / 34 % | 22 / 12 / 0 % | 76 % | 17 % |
-| cluster 100 kB / 1 MB, 374 B | under 2,000 | 192 | 76 / 24 % | 1 / 13 / 9 % | 36 % | 68 % |
-| cluster 100 kB / 1 MB, 374 B | 2,000 to 4,000 | 2,881 | 63 / 37 % | 0 / 35 / 2 % | 50 % | 51 % |
-
-Table 8.2. The outcome of the same votes. A late vote is attributed to
-one cause: the closure came after the 7 s deadline or never; the closure
-was in hand and the validation finished past the deadline; the
-validation never finished. The remainder to 100 % are votes rejected as
-already known and, on the testnet, EBs the node found invalid, at most
-2 % in any row. A voter whose chain tip moved to the next RB before it
-voted is not a voter of the EB and is in neither count. On the cluster
-an EB whose late voters exceed a quarter of its voters cannot reach
-the quorum; on the testnet the quorum is in weight, and the count only
-says how many of its reporting voters were late. The last column is the certified share of
-the EBs whose next RB came 14 slots or more after the announcing one,
-the ones the chain could certify, as section [4](#results-by-parameter-set)'s tallies.
-
-On the testnet's 318 B window both budgets are spent; Table 8.2 reads
+On the testnet's 318 B window both budgets are spent. Table 8.2 reads
 which one by EB size. On the EBs under 2,000 transactions nearly
 every late vote is the closure's arrival: 13 % of the votes are late
 because it arrived after 7 s or never, 1 % because the validation ran past the
 deadline. On the EBs of 4,000 to 6,000 more late votes are validation
-than arrival, 20 against 16 %, and more than a quarter of the voters
-are late on 72 % of the EBs against 19 % of the small ones. On the
-largest EBs arrival leads again, 22 against 12 %. In committee weight
-the same records read differently: Table 4.7 has the weight that votes
-within 0.03 of the weight holding the closure in every bin, so the
-voters late for validation hold little of it, and the weight the
-window loses at 4,000 to 6,000 is lost at arrival. The certified
+than arrival, 20 against 16 %. More than a quarter of the voters are
+late on 72 % of those EBs against 19 % of the small ones. On the
+largest EBs arrival leads again, 22 against 12 %.
+
+In committee weight the same records read differently. Table 4.7 has
+the weight that votes within 0.03 of the weight holding the closure in
+every bin, so the voters late for validation hold little of it. The
+weight the window loses at 4,000 to 6,000 is lost at arrival. The certified
 share, 77 % to 26 %, follows the weight.
 
 On the cluster the arrival budget is partly spent and the validation
 budget is where the votes are lost. No closure of the 2,000 to 4,000 EBs
 arrives after the deadline, but 19 % arrive after the 3 s mark, so a
 fifth of the voters start validating late. The validation itself takes
-longer than its 4 s on 33 % of the votes, whenever the closure arrived,
-and 35 % of the votes are late with the closure in hand, one node in
-three past the deadline on the typical EB. The late voters exceed the
+longer than its 4 s on 33 % of the votes, whenever the closure arrived.
+35 % of the votes are late with the closure in hand, one node in three
+past the deadline on the typical EB. The late voters exceed the
 margin on half of the EBs. The certified share of 51 % follows.
 
 The four sets not shown add no third pattern. At 260 kB, on the testnet
@@ -2346,14 +2352,11 @@ certification is at its ceiling. The 200 B cluster run repeats the 374 B
 run with a smaller loss: no closure arrives late, 21 % of the votes are
 late for validation, 69 % of the EBs certify. The 1 kB window loses the
 same share of its 2,000 to 4,000 EBs to validation as the 318 B
-window, 9 % against 8 %, with four times the bytes per transaction,
-and in that window the weight is lost there as well (Table 4.9). That
-is section [7](#models-against-measurements-deltaq-and-the-cip-cost-model)'s reading once more: the count binds,
-not the bytes.
+window, 9 % against 8 %.
 
 When the validation budget is lifted, the arrival budget is what
-remains, and 8.2 measures how much of the failure it holds once the
-voters' cost is priced.
+remains. Section 8.2 measures how much of the failure it holds once
+the voters' cost is priced.
 
 ## The levers the report can price
 
@@ -2382,7 +2385,7 @@ cannot be repriced, so the reading stops at the votes: how
 many of the reporting voters' votes are in time, and why the rest are
 late. No certification rate is projected from them. The unobserved
 voters run the same software on a similar spread of hardware, so either
-lever moves them in the same direction as the reporting ones, and the
+lever moves them in the same direction as the reporting ones. The
 per-vote reading says whether a lever removes validation as a cause of
 late votes or leaves it one.
 
@@ -2390,13 +2393,15 @@ The hardware lever is measured by repricing every vote at one host
 class's costs, from the oldest class the report measured, c5d, to the
 current generation. The apply cost taken is the class's old-input
 cost, the most expensive one measured, which section [6.2](#what-the-node-pays-at-the-vote) says to plan
-on; so each class's row is its pessimistic case.
+on. Each class's row is therefore its pessimistic case. The hardware
+factor of a class is the ratio of its reapply cost to the c5d hosts'
+in Table 6.2b, 0.85 for c6id and 0.6 for the current generation.
 
 The loop lever is measured by repricing the same votes at the class's
 chained apply cost instead, reapply unchanged. Section [9.1](#the-change) traces the
 gap between the two apply costs to the loop's pass over the closure's
-input table, so the chained cost is the apply cost without that pass
-(measurement made in section [9](#a-change-to-the-voting-loop-and-where-it-has-run)).
+input table, so the chained cost is the apply cost without that pass.
+Section [9](#a-change-to-the-voting-loop-and-where-it-has-run) measures the change where it has run.
 
 **Table 8.3a.** testnet 308 kB / 2 MB, 318 B (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts).
 
@@ -2430,8 +2435,8 @@ nodes in the 1 kB window. "As recorded" reads the recorded validation
 times, Table 8.2 pooled over the window. "Closures as recorded, hosts
 at least current generation" keeps each voter's recorded time and
 scales down the voters slower than the current generation by the
-hardware factor their reapply cost gives (section [6.2](#what-the-node-pays-at-the-vote)), leaving faster
-voters as they were. The "old-input" rows rebuild every voter's time
+hardware factor their reapply cost gives, leaving faster voters as
+they were. The "old-input" rows rebuild every voter's time
 from its record's counts at one host class, the current generation
 (c8id, r8id), c6id or c5d: 20 ms per EB, the applied transactions at
 the class's old-input apply cost and the reapplied ones at its reapply
@@ -2459,7 +2464,7 @@ arrival do not move. The 1 kB window reads the same.
 
 The loop's cost removed takes validation out of the causes, on every
 host class. On the 318 B window the votes out of time fall from 10 % to
-under 2 % at c5d as at the current generation, and no validation runs
+under 2 % at c5d as at the current generation. No validation runs
 longer than 3.3 s. The votes still out of time had their closure at
 6.3 s at the median, a late arrival and not a long validation. The 1 kB
 window reads the same.
@@ -2489,7 +2494,7 @@ transactions, where validation is the first
 cause of a late vote as recorded: 19 % of the votes out of time, the
 validation at 6.7 s at the 90th percentile. With the loop's cost
 removed the longest validation is 2.8 s, inside the 4 s on the oldest
-class, and the 1 to 2 % still out of time had the closure at 6.4 s. The
+class. The 1 to 2 % still out of time had the closure at 6.4 s. The
 largest EBs, 6,000 and up, read the same with the longest validation at
 3.3 s.
 
@@ -2502,19 +2507,19 @@ throughput, since every node is observed. Table 8.4 gives the two
 generations, the loop's cost removed on the run's own hosts, and a
 fifth row for the lever 8.3 rules out.
 
-| voters' speed | cluster 100 kB / 1 MB, 200 B: certification | kB/s | tx/s | quorum voter validated at, s: p50 / p90 | cluster 100 kB / 1 MB, 374 B: certification | kB/s | tx/s | quorum voter validated at, s: p50 / p90 |
-|---|---|---|---|---|---|---|---|---|
-| as measured | 68.5 % | 12.2 | 60.8 | 6.07 / 8.10 | 51.6 % | 15.5 | 41.3 | 6.80 / 9.96 |
-| hosts two generations newer (c6id) | 81.3 % | 13.7 | 68.4 | 5.65 / 7.40 | 61.0 % | 17.5 | 46.9 | 6.25 / 8.98 |
-| hosts of the current generation | 97.4 % | 15.6 | 77.9 | 4.92 / 6.25 | 83.6 % | 22.5 | 60.3 | 5.36 / 7.31 |
-| the loop's cost removed, on the run hosts | 99.2 % | 15.8 | 79.0 | 3.88 / 4.76 | 96.9 % | 25.5 | 68.3 | 4.09 / 4.80 |
-| validation started at the closure arrival | 72.3 % | 12.6 | 63.1 | 5.74 / 8.02 | 57.2 % | 16.8 | 44.8 | 6.43 / 9.73 |
+| voters' speed | cluster 100 kB / 1 MB, 200 B: certification | kB/s | quorum voter validated at, s: p50 / p90 | cluster 100 kB / 1 MB, 374 B: certification | kB/s | quorum voter validated at, s: p50 / p90 |
+|---|---:|---:|---:|---:|---:|---:|
+| as measured | 68.5 % | 12.2 | 6.07 / 8.10 | 51.6 % | 15.5 | 6.80 / 9.96 |
+| hosts two generations newer (c6id) | 81.3 % | 13.7 | 5.65 / 7.40 | 61.0 % | 17.5 | 6.25 / 8.98 |
+| hosts of the current generation | 97.4 % | 15.6 | 4.92 / 6.25 | 83.6 % | 22.5 | 5.36 / 7.31 |
+| the loop's cost removed, on the run hosts | 99.2 % | 15.8 | 3.88 / 4.76 | 96.9 % | 25.5 | 4.09 / 4.80 |
+| validation started at the closure arrival | 72.3 % | 12.6 | 5.74 / 8.02 | 57.2 % | 16.8 | 6.43 / 9.73 |
 
 Table 8.4. The cluster records repriced on the two 100 kB / 1 MB runs, all 51 nodes
 and the run's quorum of 39. Each record's validation time is split
 between the two operations in proportion to the run's measured costs
 (Table 7.2) and each part scaled: the hardware rows scale both by the
-factors of Table 7.2 (0.85 for c6id, 0.6 for the current generation
+hardware factors (0.85 for c6id, 0.6 for the current generation
 against c5d), the row with the loop's cost removed scales the apply
 part to the c5d hosts' chained cost of Table 6.2b and leaves reapply;
 the last row keeps the costs and starts the validation when the closure
@@ -2526,24 +2531,23 @@ one-input chained cost, since the two-input one is not measured.
 The cluster says the same with no population spread. On the one-input
 run, hosts of the current generation take certification from 69 to
 97 %. The loop's cost removed alone, on the run's own c5d hosts, takes
-it to 99 %, the run's workload ceiling (Table 4.3). The two-input run
-reads 84 and 97 %.
+it to 99 % and the throughput to 15.8 kB/s against the run's 16.5 kB/s
+workload ceiling (Table 4.3). The two-input run reads 84 and 97 %.
 
-The quorum voter, which as measured finishes at the
-deadline's edge at the median and past it at the 90th percentile, has
-validated by 4.8 s at the 90th percentile with the loop's cost removed.
-The two seconds it no longer needs are margin for a closure arriving
-later.
+As measured the quorum voter finishes at the deadline's edge at the
+median and past it at the 90th percentile. With the loop's cost
+removed it has validated by 4.8 s at the 90th percentile, two seconds
+inside the deadline, margin for a closure arriving later.
 
 Table 8.5 puts the two levers together on the one-input run: the
 loop's cost removed on each host generation in turn.
 
-| voters' speed | cluster 100 kB / 1 MB, 200 B: certification | kB/s | tx/s | quorum voter validated at, s: p50 / p90 |
-|---|---|---|---|---|
-| as measured | 68.5 % | 12.2 | 60.8 | 6.07 / 8.10 |
-| the loop's cost removed, on the run c5d hosts | 99.2 % | 15.8 | 79.0 | 3.87 / 4.75 |
-| the loop's cost removed, on c6id hosts | 99.3 % | 15.8 | 79.0 | 3.78 / 4.66 |
-| the loop's cost removed, on current-generation hosts | 99.4 % | 15.8 | 79.1 | 3.51 / 4.39 |
+| voters' speed | cluster 100 kB / 1 MB, 200 B: certification | kB/s | quorum voter validated at, s: p50 / p90 |
+|---|---:|---:|---:|
+| as measured | 68.5 % | 12.2 | 6.07 / 8.10 |
+| the loop's cost removed, on the run c5d hosts | 99.2 % | 15.8 | 3.87 / 4.75 |
+| the loop's cost removed, on c6id hosts | 99.3 % | 15.8 | 3.78 / 4.66 |
+| the loop's cost removed, on current-generation hosts | 99.4 % | 15.8 | 3.51 / 4.39 |
 
 Table 8.5. The two levers combined on the one-input run: apply at each
 class's chained cost and reapply at its reapply cost (Table 6.2b: 0.35
@@ -2554,7 +2558,7 @@ With the loop's cost removed, hardware buys margin rather than
 certification at this EB size: the quorum voter finishes 0.4 s earlier
 on current-generation hosts than on c5d. That margin is what a later
 closure, a larger one, or one carrying script computation would draw
-on; the script budgets of section [2.2](#the-constraint-set) remain unmeasured, and this
+on. The script budgets of section [2.2](#the-constraint-set) remain unmeasured, and this
 margin is the room they would be set within. Table 8.6 sizes it in
 transactions: what a voter applies in the window's 4 s, or in the 2 or
 3 s a late closure leaves, at each class's apply cost, every
@@ -2578,14 +2582,11 @@ the 4 s budget covers 11,400 applied transactions against 2,200 with
 it, more than the largest EB the 2 MB windows carried, and a closure
 arriving at 5 s still leaves room for 5,700.
 
-Two measured effects contribute to the voters' cost and are not levers
-of the implementation. Transactions that spend outputs created in the
-same EB cost a third to a half as much to apply (section [6.2](#what-the-node-pays-at-the-vote)), and a
-voter that holds most of the closure before the EB arrives reapplies
-instead of applying (section [6.3](#mempool-coverage)); both depend on how the load is built
-and routed, not on the node, and the report plans without them. Where
-they occur they are a benefit on top of the levers above, not part of
-the feasibility argument.
+Tables 8.3a to 8.5 therefore place the validation budget within the
+implementation's reach. The loop's cost removed takes validation out
+of the causes of late votes on every host class, on both populations.
+Hardware alone removes two thirds of it. What remains is the closure's
+arrival, which section [8.4](#the-levers-the-report-cannot-price) leaves open.
 
 ## What the measurements rule out
 
@@ -2596,12 +2597,29 @@ on the one-input run and from 52 to 57 % on the two-input one
 voters, so the time gained is a fraction of a second against validation
 times of three to five.
 
-Memory and sustained CPU bind nothing at the measured sizes. The hosts'
-resident set is 1.7 to 2.2 GB at the median on hosts of 8 to 33 GB, the
-cluster's nodes hold a mainnet-sized ledger at 13.8 GB on hosts of
-15.2 GiB without failing on memory, and the sustained CPU is 0.1 to
-0.3 of a core at the median node of every population (Table 6.6); what binds is
-one core for the seconds of a validation, which the repricings price.
+Memory and sustained CPU bind nothing at the measured sizes. The
+testnet hosts' resident set is 1.7 to 2.2 GB at the median on hosts
+of 8 to 33 GB, with a ledger far smaller than mainnet's. The cluster's
+nodes hold a ledger of a million delegations at 13.8 GB on hosts of
+15.2 GiB. The sustained CPU is 0.1 to 0.3 of a core at the
+median node of every population (Table 6.6). What binds is one core
+for the seconds of a validation, the cost 8.2 reprices.
+
+Two measured effects contribute to the voters' cost and are not levers
+of the implementation. Transactions that spend outputs created in the
+same EB cost a third to a half as much to apply (section [6.2](#what-the-node-pays-at-the-vote)). A
+voter that holds most of the closure before the EB arrives reapplies
+instead of applying (section [6.3](#mempool-coverage)). Both depend on how the load is
+built and routed, not on the node, and the report plans without them.
+Where they occur they are a benefit on top of the levers of 8.2, not
+part of the feasibility argument.
+
+One loss sits outside every lever. The EBs at the S_EB cap whose
+forgers served the body to no reporting node fail before diffusion,
+and no voter speed touches them (section [4.3.1](#the-1-kb-transaction-window-transaction-count-not-bytes)).
+
+What the measurements leave as levers are therefore the two of 8.2 on
+the validation budget and the arrival levers of 8.4.
 
 ## The levers the report cannot price
 
@@ -2610,76 +2628,81 @@ and no measured gain, so none has a row above.
 
 Forwarding the closure as it arrives, before it is complete, and
 scheduling what a relay sends are aimed at the nodes with a single
-upstream relay. Their closure reaches the median such node at 9.3 s at
-the 90th percentile at 2 MB, against 3 to 4.4 s for nodes with two or
-more peers (Table 6.5).
-
-The EBs at the S_EB cap whose forgers served the body to no reporting
-node fail before diffusion, and no voter speed touches them (section [4.3.1](#the-1-kb-transaction-window-transaction-count-not-bytes)).
+upstream relay. Their closure reaches the median such node at 9.30 s
+at the 90th percentile at 2 MB, against 3.08 to 4.33 s for nodes with
+two or more peers (Table 6.5). The gap is measured and the changes are
+not, so whether they recover it is a run to make.
 
 The thread question is the largest unpriced lever on the validation
 side. The validation of a closure runs on one core: the nodes' sustained
 CPU is 0.1 to 0.3 of a core (Table 6.6), and the cluster's nodes at two
 capabilities pay the same per transaction as the testnet's hosts at
-eight (section [7.2](#the-cluster-against-the-testnet)). Whether the loop can be parallelised is a question
-about the ledger's apply, which runs transactions in sequence, and about
-which of its parts, witness and signature checks among them, are
-independent; the report has no measurement of it and makes no claim. A
-reading of the apply path's parallelisable parts would come before any
-number is put on it, and the loop in isolation (section [9.1](#the-change)) is where
-that number could be taken without a deployment.
+eight (section [7.2](#the-cluster-against-the-testnet)).
 
-The closure forwarding and egress scheduling changes are the other
-unpriced lever: the single-relay nodes' gap is measured and the changes
-are not, so whether they recover it is a run to make.
+Whether the loop can be parallelised is a question about the ledger's
+apply, which runs transactions in sequence. Which of its parts are
+independent, witness and signature checks among them, is not measured
+here, and the report makes no claim.
+
+Section 8.4 therefore leaves two questions open, whether forwarding
+and scheduling recover the single-relay nodes' gap and whether the
+apply path parallelises, and neither has a measurement in this report.
 
 ## What the measurements support
 
 As far as the transactions measured here represent, the measurements
-say three things about the protocol's feasibility at the sizes run.
+say three things about the feasibility of the build measured in
+section [4](#results-by-parameter-set), at the sizes run.
 
-At 260 kB closures the protocol certifies 97 % of its EBs on the testnet
-as it is, with every voter class and every closure kind (section [4](#results-by-parameter-set), and
-the repricing of that window), and neither budget binds.
+At 260 kB closures the build certifies 97 % of its EBs on the testnet
+as it is, with every voter class and every closure kind (section [4](#results-by-parameter-set),
+and the repricing of that window). Neither budget binds.
 
 At 1 MB on the cluster and in the testnet's 1 kB window the validation
-budget binds today, and the voting loop's own cost is the larger part
-of it. On the testnet's 318 B window at 2 MB the weight is lost at the
-closure's arrival (Table 4.7), and the validation budget is what the
-lighter voters spend. Removing that cost,
-to the chained level the report has measured, takes the cluster from 69 to 99 %
-certification at 1 MB on hosts three generations old, where the quorum
-voter is then done by the middle of the window at the median.
+budget binds. The voting loop's own cost is the larger part of it.
+Removing that cost, to the chained level the report has measured,
+takes the cluster from 69 to 99 % certification at 1 MB on hosts three
+generations old. The quorum voter is then done by the middle of the
+window at the median. The build of section [9](#a-change-to-the-voting-loop-and-where-it-has-run) removes that cost
+where it has run.
 
 On the testnet's 2 MB windows the same change removes validation as a
-cause of late votes, from 10 % of the reporting voters' votes to under
-2 % whatever the hardware. In committee weight that is worth 0.03 on
-the 318 B window, the gap between the weight holding the closure and
-the weight voting in Table 4.7: the voters the change flips hold
-little of this testnet's weight. What the change buys toward
-certification on a network depends on where its weight sits (section
-[2.5](#what-to-expect-at-each-stage)); on the 1 kB window, where the weight is lost at validation,
-it is the loss itself, by an amount the unobserved weight leaves
-unprojected.
+cause of late votes, from 10 and 8 % of the reporting voters' votes to
+under 2 % whatever the hardware. In committee weight that is worth
+0.03 on the 318 B window, the gap between the weight holding the
+closure and the weight voting in Table 4.7: the voters the change
+flips hold little of this testnet's weight.
 
-With the loop's cost removed the closure's arrival is the constraint,
-not CPU validation, on the 318 B window before the change as after
-it. There the votes still late are the closure's arrival, 15 of the
-17 % late, and the levers for that are the unpriced ones of 8.4.
+What removing the loop's cost buys a network toward certification
+depends on where that network's weight sits (section [2.5](#what-to-expect-at-each-stage)). On the 1 kB window, where the
+weight is lost at validation, it is the loss itself, by an amount the
+unobserved weight leaves unprojected.
+
+On the testnet's 318 B window at 2 MB the weight is lost at the
+closure's arrival (Table 4.7). The validation budget is what the
+lighter voters spend. With the loop's cost removed the closure's
+arrival is the constraint there, as before it. The votes still late
+are the closure's arrival, 15 of the 17 % late. The levers for that
+are the unpriced ones of 8.4.
 
 In section [1](#mainnet-baseline-and-targets)'s units, the cluster's 1 MB runs with the loop's cost
 removed carry 16 and 26 kB/s, against a six-times target of 27 kB/s and
 a ten-times target of 45 (Table 1.2). The testnet's 2 MB windows have
-no repriced figure, since their reading is per vote; they stand at
-their measured 12 and 22 kB/s (Table 4.5), and what a change to the
-voters could add is bounded by the closure's arrival on the 318 B
-window and by the unobserved weight on the 1 kB one.
+no repriced figure, since their reading is per vote. They stand at
+their measured 12 and 22 kB/s (Table 4.5). What a change to the voters
+could add is bounded by the closure's arrival on the 318 B window and
+by the unobserved weight on the 1 kB one.
 
 The comparison is in bytes per second at the measured transactions,
-not at mainnet's mix. The transactions measured are one-input value
-transfers without scripts. A like-for-like reading against mainnet
-needs a run of mainnet-like transactions, which the report has not
-made.
+not at mainnet's mix. The transactions measured are value transfers of
+one or two inputs without scripts. A like-for-like reading against
+mainnet needs a run of mainnet-like transactions, which the report has
+not made.
+
+The measurements therefore find the build measured feasible at 260 kB
+as it is, and at 1 and 2 MB once the loop's cost is removed. The closure's
+arrival on the testnet's 318 B window is the constraint no priced
+lever moves.
 
 # A change to the voting loop, and where it has run
 
