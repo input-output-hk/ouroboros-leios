@@ -264,7 +264,7 @@ def kind(outputs, names):
 def series(outputs, names):
     """The size series (validation_shape_series.md): the chained closures of one transaction size
     across the EB size classes on the testnet, and the classes the cluster runs populate, one row per
-    population, class and host class with both costs; read in 6.2's and 7.2's prose, not a table of
+    population, class and host class with both costs; read in 6.2's prose, not a table of
     the report."""
     print("| population | EB class | host class (instance, vCPU, generation) | hosts | per applied transaction, milliseconds (EBs per host) | per reapplied transaction, microseconds (EBs per host) | EBs validated per host |")
     print("|---|---|---|---|---|---|---|")
