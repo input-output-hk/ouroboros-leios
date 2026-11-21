@@ -1,0 +1,5 @@
+group,nodes,closure_p90_median_node,closure_p90_q3_node,body_p90_median_node,vote_pct_median_node,vote_pct_q1_node,committee_weight_share
+1 upstream peer,23,5.87,10.51,3.44,69,48,0.11
+2 to 3,13,4.68,4.74,2.34,77,77,0.06
+4 to 30,7,2.88,2.98,2.21,80,79,0.22
+31 and more,42,2.87,3.24,2.25,79,65,0.20
