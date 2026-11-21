@@ -19,7 +19,7 @@ transaction count on the records in which the node applied nothing, 10 or
 more), a host class's cost is the median over its hosts (data/hosts.csv, by
 generation), and the node's ratio is class cost / own cost, on the reapply
 cost because it does not depend on where the closure's inputs come from
-and so reads the hardware alone (section 7.2); a node without a reapply
+and so reads the hardware alone (section 6.2); a node without a reapply
 reading uses its apply cost, else is not moved (counted); faster nodes keep
 their own time. Per record validated' = max(closure, 3 s) + ratio x
 duration, with duration the recorded validation time after that start.

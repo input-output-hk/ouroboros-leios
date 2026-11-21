@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Diffusion by population without node identities (report section 6.3):
+"""Diffusion by population without node identities (report section 6.4):
 from a window's per-node diffusion tables (diffusion.csv for the closure
 stage and diffusion-body.csv for the body stage, written by
 diffusion_nodes.py) and its coverage table (voters.csv, testnet windows),
@@ -8,21 +8,24 @@ two CSVs:
   diffusion_bins.csv   per stage, the nodes counted by their own p90 of the
                        stage's age (seconds after the EB's slot) in bins, and
                        the median node's p50, p90 and never-completed share
+                       (the report prints the bins; the median rows are the
+                       expanded reading)
   upstream.csv         the nodes grouped by how many peers delivered their
                        announcements: count, the group's closure p90 at its
-                       median node and at its 90th-percentile node, its body
-                       p90 at the median node, its never-completed share at
-                       the median node, its vote rate at the median node and
-                       at the 10th-percentile node (the tail), and the share
-                       of the committee's weight its pools hold (testnet)
+                       median node and at its unfavourable-quartile node (the
+                       node three in four are faster than, as the stage
+                       tables of section 4 read), its body p90 at the median
+                       node, its vote rate at the median node and at the
+                       unfavourable-quartile node, and the share of the
+                       committee's weight its pools hold (testnet)
 
     diffusion_bins.py OUTPUT_DIR     (reads and writes in that window's outputs folder)
 """
 import argparse, csv, os, statistics as st
 
-BINS = [2, 3, 4, 7, 15, 60]
+BINS = [2, 3, 4, 7, 15]
 # upstream 0 = the peer is not in the node's records (the IOG and PIR hosts' monitoring events carry no source peer)
-GROUPS = [(1, 1, "1 upstream peer"), (2, 3, "2 to 3"), (4, 10, "4 to 10"), (11, 30, "11 to 30"), (31, 10 ** 9, "31 and more"), (0, 0, "not recorded (IOG and PIR hosts)")]
+GROUPS = [(1, 1, "1 upstream peer"), (2, 3, "2 to 3"), (4, 30, "4 to 30"), (31, 10 ** 9, "31 and more"), (0, 0, "not recorded (IOG and PIR hosts)")]
 
 
 def load(path, min_ebs=50):
@@ -85,7 +88,7 @@ def main():
     bodyp90 = {(r["agent"], r["pool"]): fl(r["p90"]) for r in body}
     with open(os.path.join(a.out, "upstream.csv"), "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["group", "nodes", "closure_p90_median_node", "closure_p90_p90_node", "body_p90_median_node", "never_median_node", "vote_pct_median_node", "vote_pct_p10_node", "committee_weight_share"])
+        w.writerow(["group", "nodes", "closure_p90_median_node", "closure_p90_q3_node", "body_p90_median_node", "vote_pct_median_node", "vote_pct_q1_node", "committee_weight_share"])
         for lo, hi, name in GROUPS:
             rows = [r for r in clo if lo <= int(r["upstream"]) <= hi]
             if not rows:
@@ -95,8 +98,9 @@ def main():
             bp = [x for x in bp if x is not None]
             vr = [fl(r["vote_pct"]) for r in rows if fl(r.get("vote_pct")) is not None]
             ws = sum(weight.get(r["pool"], 0.0) for r in rows) if weight else None
-            w.writerow([name, len(rows), "%.2f" % q(cp, .5), "%.2f" % q(cp, .9), "%.2f" % q(bp, .5) if bp else "",
-                        "%.1f" % st.median(fl(r["never"]) for r in rows), "%.0f" % st.median(vr) if vr else "", "%.0f" % q(vr, .1) if vr else "", "%.2f" % ws if ws is not None else ""])
+            # the unfavourable quartile of each statistic: the slower quartile of the closure, the lower of the vote rate
+            w.writerow([name, len(rows), "%.2f" % q(cp, .5), "%.2f" % q(cp, .75), "%.2f" % q(bp, .5) if bp else "",
+                        "%.0f" % st.median(vr) if vr else "", "%.0f" % q(vr, .25) if vr else "", "%.2f" % ws if ws is not None else ""])
     print("wrote diffusion_bins.csv and upstream.csv in %s (%d closure rows, %d body rows)" % (a.out, len(clo), len(body)))
 
 

@@ -23,7 +23,7 @@ Rows:
   as recorded              duration' = the recorded validation time
   closures as recorded,    the recorded time of every voter slower than the
   hosts at least current   current generation scaled by class cost / own
-  generation               cost, read on the reapply cost as section 7.2
+  generation               cost, read on the reapply cost as section 6.2
                            reads the hardware (a node without a reapply
                            reading uses its apply cost, else is not moved);
                            faster voters keep their own time

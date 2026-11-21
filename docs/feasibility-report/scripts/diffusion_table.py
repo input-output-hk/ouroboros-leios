@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The diffusion tables of report section 6.3, printed as Markdown from the
+"""The diffusion tables of report section 6.4, printed as Markdown from the
 saved outputs of instruments/diffusion_bins.py.
 
     diffusion_table.py [--outputs DIR] TABLE WINDOW [WINDOW ...]
@@ -40,25 +40,27 @@ def bins(outputs, names, stage):
     for name in names:
         rows = read(os.path.join(outputs, name, "diffusion_bins.csv"))
         cols[name] = {r["bin"]: r["nodes"] for r in rows if r["stage"] == stage}
-    order = [b for b in cols[names[0]]] if names else []
-    print("| nodes by their own p90 of the %s age | " % stage + " | ".join(WINDOWS[n] for n in names) + " |")
-    print("|---|" + "---|" * len(names))
-    for b in order:
-        label = b if b in ("nodes",) else (b if " s" in b else b)
-        if b == "median node p50":
-            continue
-        print("| %s | " % label + " | ".join((cols[n].get(b, "-") + (" s" if b == "median node p90" else " %" if "never" in b else "")) for n in names) + " |")
+    # the report's form, one row per population: the bins from 2 s up and the node count; the under-2 s bin
+    # (empty on every population) and the median node's rows stay in the instrument's output
+    order = [b for b in cols[names[0]] if not b.startswith("median node") and b != "under 2 s"] if names else []
+    # short bin headers ("2 - 3 s"); the statistic binned is named in the first column's header
+    head = lambda b: b if b == "nodes" else b.replace("15 s and over", "> 15 s").replace(" to ", " - ")
+    print("| population | " + " | ".join(head(b) for b in order) + " |")
+    print("|---|" + "---:|" * len(order))
+    for n in names:
+        print("| %s | " % WINDOWS[n] + " | ".join(cols[n].get(b, "-") for b in order) + " |")
 
 
 def upstream(outputs, names):
-    print("| window | peers delivering the node's announcements | nodes | closure p90, median node | closure p90, 90th-percentile node | body p90, median node | never completed, median node | vote rate, median node | vote rate, 10th-percentile node | share of the committee's weight |")
-    print("|---|---|---|---|---|---|---|---|---|---|")
-    pct = lambda v: (v + " %") if v else "-"
+    # per group: the closure p90 and the vote rate at the median node and at the unfavourable-quartile node (the
+    # quartile the stage tables of section 4 read), the body p90 at the median node, the committee weight
+    print("| window | upstream peers | nodes | closure p90, s: median / quartile node | body p90, s: median node | vote rate: median / quartile node | committee weight |")
+    print("|---|---|---:|---:|---:|---:|---:|")
     for name in names:
-        for r in read(os.path.join(outputs, name, "upstream.csv")):
-            print("| %s | %s | %s | %s s | %s s | %s s | %s %% | %s | %s | %s |" % (
-                WINDOWS[name], r["group"], r["nodes"], r["closure_p90_median_node"], r["closure_p90_p90_node"], r["body_p90_median_node"] or "-",
-                r["never_median_node"], pct(r["vote_pct_median_node"]), pct(r.get("vote_pct_p10_node", "")), r["committee_weight_share"] or "-"))
+        for i, r in enumerate(read(os.path.join(outputs, name, "upstream.csv"))):
+            print("| %s | %s | %s | %s / %s | %s | %s %% / %s %% | %s |" % (
+                WINDOWS[name] if i == 0 else "", r["group"].replace(" upstream peer", ""), r["nodes"], r["closure_p90_median_node"], r["closure_p90_q3_node"], r["body_p90_median_node"] or "-",
+                r["vote_pct_median_node"] or "-", r["vote_pct_q1_node"] or "-", r["committee_weight_share"] or "-"))
 
 
 def main():
