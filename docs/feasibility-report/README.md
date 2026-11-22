@@ -12,73 +12,72 @@ This report measures the Leios pipeline on the public testnet and on
 the benchmarking cluster at three parameter sets, named by the
 reference list an endorser block may carry and the bytes of its
 closure. Every transaction measured is a value transfer without
-scripts. The standard is the proposal's: a parameter set confirmed
-feasible, with a credible path upward.
+scripts. The standard of feasibility this report applies is the
+treasury proposal's, "IO: Consensus Initiative" (section [1](#mainnet-baseline-and-targets)): a
+parameter set confirmed feasible, with a credible path upward.
 
 | parameter set | ceiling, kB/s | measured, kB/s | certified of the eligible EBs |
 |---|---:|---:|---:|
-| 40 kB / 260 kB, cluster and testnet | 8.9 | 7.5 and 7.2 | 99 % and 97 % |
+| 40 kB / 260 kB, cluster and testnet | 8.6 and 8.9 | 7.5 and 7.2 | 99 % and 97 % |
 | 100 kB / 1 MB, cluster | 27.9 | 12.2 and 15.5; 26.6 on the latest build | 69 % and 52 %; 99 % on the latest build |
 | 308 kB / 2 MB, testnet | 53.5 | 12.0 and 22.0 | 49 % and 45 % |
 
 Table 0.1. The three sets against their parameter ceiling, the rate
 with every EB full and certified; two windows or runs per set (Tables
-1.4, 4.1, 4.3 and 4.5), and for the 100 kB / 1 MB set a third run on
-the latest build at the time of this report (Table 9.3). An EB is
+1.4, 4.1, 4.3 and 4.5, the certified shares from each population's
+tally output), and for the 100 kB / 1 MB set a third run on the
+latest build at the time of this report (Table 9.3). An EB is
 eligible when the next RB leaves it the certification gap; on the 2 MB
 set the EBs were at 0.6 of the cap on average.
 
-Leios is confirmed at twice the Praos ceiling on both populations. It
-is confirmed at six times on the cluster on the latest build at the
-time of this report. The testnet at that set is the next stage. The
-ten-times set is not confirmed as measured. It depends on that build
-and on the closure's diffusion. Sections [8](#what-binds-certification-and-what-would-move-it) and [9](#a-change-to-the-voting-loop-and-where-it-has-run) give evidence
-on the validation side. The ten-times line, 45 kB/s, lies
-under this set's ceiling of 53.5 (Table 1.4), so the 2 MB closures
-measured here are larger than that line needs.
+The twice-Praos set, 40 kB / 260 kB, is confirmed feasible on both
+populations as measured. The six-times set, 100 kB / 1 MB, is
+confirmed on the cluster on the latest build at the time of this
+report. Its testnet run is still to come. The largest set,
+308 kB / 2 MB, is not confirmed as measured, but the path of
+improvements toward it is scheduled for measurement. The ten-times
+line, 45 kB/s, lies under this set's ceiling of 53.5 (Table 1.4), so
+the 2 MB closures measured here are larger than that line needs.
 
 **The confirmed set.** At 40 kB / 260 kB, twice the Praos ceiling, every
 stage of the pipeline is inside its budget on both populations. The
-voting rung loses at most 2.4 % (Table 4.1).
+voting stage fails at most 2.4 % of the full EBs (Table 4.1).
 
 **What bound at the larger sets, and what the latest build changes.**
 On the build of section [4](#results-by-parameter-set), two stages bound certification at the two
-larger sets. Validation bound it on the cluster at 1 MB and in the
-testnet's 1 kB window at 2 MB. The closure's arrival bound it in the
-testnet's 318 B window at 2 MB. The arrival depends on how much of the
-closure a node still has to fetch. The 1 kB window's nodes held more
-of each closure, and its larger closures arrived in time at more of
-the committee's weight (section [4.4](#across-the-sets)).
+larger sets. Validation bound it on the cluster at 1 MB and in one of
+the testnet's two windows at 2 MB. The closure's arrival bound it in
+the other window.
 
 The latest build removes
 most of validation's cost: the cluster run at 100 kB / 1 MB certifies
 99 % of its eligible EBs where the build of section [4](#results-by-parameter-set) certified 52 %
-(section [9](#a-change-to-the-voting-loop-and-where-it-has-run)).
+(section [9](#a-change-to-the-voting-loop-and-where-it-has-run)). On the testnet the build is measured on one host, which validates
+every EB in time (section [9.2](#one-testnet-host-against-its-control)); its effect at the committee's scale
+is still to be measured.
 
 Section [5](#leios-on-praos) measures a cost to Praos on the build of section [4](#results-by-parameter-set), a slower
 forge path and a higher fork rate: the CIP's reapplication constraint
 holds at 260 kB closures and fails from 555 kB up. The latest build
 restores it at 1 MB where it has run (section [9.3](#the-cluster)).
 
-**What is not yet measured on the latest build.** At the time of this
-report the latest build runs on one testnet host and on every node of
-one cluster run at 100 kB / 1 MB. No cluster run exists at the
-308 kB / 2 MB set. Further experiments on it are scheduled, and this
+**What is not yet measured on the latest build.** No cluster run
+exists at the 308 kB / 2 MB set, and the testnet's committee has not
+run the build. Further experiments on both are scheduled, and this
 report makes no claim about the points they would measure.
 
 Section [8](#what-binds-certification-and-what-would-move-it) estimates what the latest build would do where it has not
 run. It reprices the votes measured on the build of section [4](#results-by-parameter-set) at the
-latest build's validation cost. The same repricing predicted 97 % for
+latest build's validation time. The same repricing predicted 97 % for
 the cluster run before that run existed, and the run gave 99 %. On the
 testnet's 2 MB windows the repricing takes validation out of the
-causes of late votes at every host class and EB size. What remains at
-2 MB is the closure's arrival (section [8.5](#what-the-measurements-support)).
+causes of late votes at every host class and EB size (section [8.5](#what-the-measurements-support)).
 
-On the build of section [4](#results-by-parameter-set) the closure's arrival keeps 22 % of the
-votes late on the largest EBs of the 318 B window (Table 8.2). Changes
-aim at the arrival, forwarding the closure as it arrives and
-scheduling what a relay sends among them. None is measured in this
-report (section [8.4](#the-levers-the-report-cannot-price)).
+What remains at 2 MB is the closure's arrival. On the build of
+section [4](#results-by-parameter-set) it keeps 22 % of the votes late on the largest EBs of one
+window (Table 8.2). Changes aim at it, forwarding the closure as it
+arrives and scheduling what a relay sends among them. None is
+measured in this report (section [8.4](#the-levers-the-report-cannot-price)).
 
 **What the measurements do not cover.** No window or run in this
 report exercised mainnet's transaction mix, with scripts. The
