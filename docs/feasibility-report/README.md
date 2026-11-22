@@ -2757,36 +2757,31 @@ deployment can tolerate once it is in, are left to further work.
 
 The voting loop carried the closure's input table inside the ledger
 state and made a pass over the whole table after every applied
-transaction: one entry per transaction on an old-input closure, the
-heads of the chains on a chained one, and never on the reapply path,
-which is why the old-input cost grows with the EB in section [7.2](#the-cluster-against-the-testnet) and the
-other two costs do not. The patch keeps the table outside the ledger
-state and hands each transaction its own inputs, which removes that
-pass; it is local to the loop. It is merged in
-the consensus repository's Leios branch as
+transaction. On an old-input closure the table holds one entry per
+transaction, on a chained one the heads of the chains, and the
+reapply path never makes the pass. That is why the old-input cost
+grows with the EB in section [7.2](#the-cluster-against-the-testnet) and the other two costs do not. The
+patch keeps the table outside the ledger state and hands each
+transaction its own inputs, which removes the pass. It is local to
+the loop. It is merged in the consensus repository's Leios branch as
 [commit 7b91f3619](https://github.com/IntersectMBO/ouroboros-consensus/commit/7b91f3619).
-On the loop in isolation its cost per applied transaction is flat at
-every closure size, at the chained level of Table 6.2b that section [8](#what-binds-certification-and-what-would-move-it)'s
-repricing takes.
 
 ## One testnet host against its control
 
 The change ran on one testnet host of the oldest class the report
-measured, c5d, from the evening of 2026-11-08, with a second host of the
-same class on the unchanged build as the control. Both are committee
+measured, c5d, from the evening of 2026-11-08. A second host of the
+same class ran the unchanged build as the control. Both are committee
 members and validated the same EBs, so the transactions are identical
-between them; the load was the one-input generator, a fifth of its
-transactions padded with metadata, no scripts, as a sample of the
-chain's transactions in the window confirms. Table 9.1 reads both hosts
-over the 10,770 EBs announced in the 66 hours from the changed host's
-restart, of which each validated about 9,500, the rest superseded by
-the next RB before the vote.
+between them. Table 9.1 reads both hosts over the 10,770 EBs
+announced in the 66 hours from the changed host's restart. Each
+validated about 9,500 of them; the next RB superseded the rest before
+the vote.
 
 | host, 2026-11-08 23:45 to 11-11 17:16 UTC | EBs validated | apply cost per transaction | reapply cost per transaction | EBs applying 500 or more with few reapplies: validation per applied transaction, p50 |
 |---|---:|---:|---:|---:|
 | the changed host | 9,492 | 0.34 ms | 0.20 ms | 0.36 ms |
 | the control | 9,472 | 1.41 ms | 0.21 ms | 1.11 ms |
-| Table 6.2b, c5d | | chained 0.35 / old-input 1.85 | 0.147 | |
+| c5d, Tables 6.2b and 7.2 | | chained 0.35 / old-input 1.85 | 0.147 | |
 
 Table 9.1. Each host's validation records regressed on the counts of
 applied and reapplied transactions (validation time = apply cost ×
@@ -2795,13 +2790,13 @@ validated in the window. The last column takes the EBs with 500 or more
 applied transactions and fewer reapplied than a third of that, where the
 validation is the apply cost, and divides the time by the applied count.
 
-The changed host applies at the chained level of section [7](#models-against-measurements-deltaq-and-the-cip-cost-model), 0.34 to
-0.36 ms per transaction on one-input transactions, and the control at
-the old-input level, 1.1 to 1.4 ms, on the same transactions. Reapply
-is unchanged within the noise on both.
+The changed host applies at the chained level of Table 6.2b, 0.34 to
+0.36 ms per transaction, and the control at the old-input level, 1.1
+to 1.4 ms, on the same transactions. Reapply is unchanged within the
+noise on both.
 
-The outcome follows the cost. Table 9.2 bins each host's EBs by the
-transactions it applied.
+The lower cost shows in the validation times. Table 9.2 bins each
+host's EBs by the transactions it applied.
 
 | transactions applied in the EB | the changed host: EBs | validation p50 / p90 | per applied transaction, p50 | the control: EBs | validation p50 / p90 | per applied transaction, p50 |
 |---|---:|---:|---:|---:|---:|---:|
@@ -2816,15 +2811,18 @@ shares of the same EBs; the per-transaction figure is the validation
 time over the applied count, so the reapplies are in it. The bins under
 100 applied are left out, where a fixed cost and the reapplies dominate.
 
-The changed host validated every EB of the window within 2.9 s, the
-largest one, 7,983 transactions with 5,326 applied, in 2.87 s, and
-voted on 9,439 of the 9,623 EBs it was to vote on. Of the 184 it
-missed, 149 had their closure arrive after the deadline, and 35 had it
-arrive inside the window but after 4.3 s, with the validation past the
-deadline. The control missed 509 of 9,620: 141 with the closure late,
-the same EBs as the changed host's within a few, and 368 with the
-closure in hand and the validation past the deadline, its largest
-validation 19.7 s on an EB of 8,555 transactions.
+On the changed host validation stops being a cause of late votes. It
+validated every EB of the window within 2.9 s, the largest one of
+7,983 transactions in 2.87 s. It missed 184 of its 9,623 votes, 149
+of them for a closure arriving after the deadline and 35 with the
+closure in hand. The control missed 509 of 9,620: 141 for the
+closure, the same EBs as the changed host's within a few, and 368
+with the closure in hand and the validation past the deadline. Its
+largest validation took 19.7 s.
+
+Tables 9.1 and 9.2 therefore show on one host what section [8](#what-binds-certification-and-what-would-move-it) priced
+for the c5d class: the apply cost at the chained level, and
+validation out of the causes of late votes, the late closures left.
 
 ## The cluster
 
@@ -2855,9 +2853,9 @@ second at 374 B: 41.3 and 71.1.
 
 The chain carried 26.6 kB/s against 15.5 on the unchanged build. That
 is 95 % of the parameter ceiling. The voting rung no longer takes a
-share: 0.992 of the full EBs certified, and every certified closure
-was at the 1 MB cap. What remains between the ceiling and the chain is
-the run's RB spacing.
+share, 0.992 of the full EBs certified. Every certified closure was
+at the 1 MB cap (Table 9.7). What remains between the ceiling and the
+chain is the run's RB spacing.
 
 Table 9.4 reads the stages of the pipeline on the two builds, as
 section [4](#results-by-parameter-set) does for every set.
@@ -2876,11 +2874,10 @@ Table 9.4. The stages of the two-input run on the two builds, as Table
 4.2: all 51 nodes, equal weight.
 
 Validation is the row that moved. It falls from 6.51 s to 1.25 s at
-the 75th-percentile node. The tally follows it, from the deadline's
-edge to 4.57 s. Three nodes in four vote on at least 58 % of the
-eligible EBs on the unchanged build and on at least 99.7 % on the
-changed one. Of the 137,053 votes scheduled on the run, eligible
-EBs and superseded ones alike, 215 were too late.
+the 75th-percentile node, and the vote rate follows it: three nodes
+in four vote on at least 99.7 % of the eligible EBs against 58 % on
+the unchanged build. Of the 137,053 votes scheduled on the run, 215
+were too late.
 
 The voters applied more of each EB in full on the changed build, 50 %
 against 37 %. They validated five times faster regardless.
@@ -2904,7 +2901,7 @@ size class.
 The apply cost on two-input transactions falls by a factor of eight,
 from 3.42 to 0.41 ms at the median node.
 
-The reapply cost rises by 15 %, from 163 to 190 µs. The patch touches
+The reapply cost rises by 17 %, from 163 to 190 µs. The patch touches
 that path too: it hands every transaction its own inputs, reapplied
 ones included. A cost per input would show more on these two-input
 transactions than on the testnet's one-input ones, where 9.2 reads no
@@ -2914,7 +2911,7 @@ The run is also the first test of section [8](#what-binds-certification-and-what
 priced this run with the loop's cost removed before the run existed
 (Table 8.4). Table 9.6 sets that prediction against the outcome.
 
-| | section [8](#what-binds-certification-and-what-would-move-it)'s repricing, the loop's cost removed on the run hosts | the rerun on the changed build |
+| | section [8](#what-binds-certification-and-what-would-move-it)'s repricing | the changed build's run |
 |---|---|---|
 | apply cost per transaction | 0.65 ms | 0.41 ms |
 | reapply cost per transaction | 163 µs | 190 µs |
@@ -2924,10 +2921,10 @@ priced this run with the loop's cost removed before the run existed
 | quorum voter validated at, p50 / p90 | 4.09 / 4.80 s | 3.97 / 4.45 s |
 
 Table 9.6. Section [8](#what-binds-certification-and-what-would-move-it)'s repricing of the two-input run against the
-rerun. The repricing row is Table 8.4's; the rerun's certification is
-over its eligible EBs, its throughput Table 9.3's measured rung, and
-its quorum voter the 39th voter to validate each EB, read as in
-Table 8.4.
+rerun. The repricing column is Table 8.4's row with the loop's cost
+removed on the run's hosts. The rerun's certification is over its
+eligible EBs, its throughput Table 9.3's measured rung, and its quorum
+voter the 39th voter to validate each EB, read as in Table 8.4.
 
 The prediction sits under the outcome on every line: by two points of
 certification, by one kilobyte per second, and by a few tenths of a
@@ -2953,7 +2950,8 @@ removes it. The patch does not touch the forge.
 Certification did not move with the branch's work. The team's reports
 count the announcements that came to carry a certificate. On the week
 45 build without the patch that share is 26.0 %. With the patch it is
-49.0 %, where the share of EBs eligible at all is 51 % on paper. The
+49.0 %, where the share of EBs eligible at all is 51 %, the p of
+Table 9.3. The
 unchanged build's run read 27.3 % of its RBs certifying (Table 5.5).
 Three weeks of the branch left certification where it was. The patch
 took it to the eligible share.
@@ -3000,6 +2998,12 @@ orphans on the chain halve, from 207 to 102 over the same number of
 RBs. The cost to Praos that section [5](#leios-on-praos) measures on the unchanged build,
 the slower forge and the forks it causes, is not there on the changed
 build.
+
+Tables 9.3 to 9.8 therefore read the changed build at 1 MB as section
+[8](#what-binds-certification-and-what-would-move-it) priced it and better. The patch takes certification to the
+eligible share, and the branch's forge change takes away the cost to
+Praos. Both are one run on the cluster's uniform hosts; 9.4 says what
+that leaves unmeasured.
 
 ## What is not measured
 
