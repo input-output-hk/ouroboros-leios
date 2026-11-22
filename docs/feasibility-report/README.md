@@ -3029,8 +3029,7 @@ This appendix states, for every quantity the report's tables and
 figures rest on, which records it was read from, what marks its start
 and its end, which records were kept or dropped, and how the result was
 aggregated, so that a reviewer can judge the approach and not only the
-numbers. It is written for sections [1](#mainnet-baseline-and-targets) to [7](#models-against-measurements-deltaq-and-the-cip-cost-model) and grows with the sections
-that follow. Its first part describes the sources and the records they
+numbers. Its first part describes the sources and the records they
 hold, the second the conventions every entry shares, the third the
 quantities themselves, and the fourth maps each quantity to the script
 or query that implements it.
@@ -3214,8 +3213,9 @@ no reading, those rungs are left out, and 4.3.1 reads the window by EB
 class.
 
 **EB and closure sizes (section [4](#results-by-parameter-set)).** From the chain: the eligible EBs'
-reference bytes over 36 as a transaction count, and the certified
-closures' bytes; percentiles over the window's EBs.
+reference bytes over the reference width the ladder measures, 36 or
+37 B, as a transaction count, and the certified closures' bytes;
+percentiles over the window's EBs.
 
 **Body and closure diffusion per node (section [4](#results-by-parameter-set), two rows).** Per
 node and EB, the first announcement accepted from a peer with its
@@ -3327,7 +3327,7 @@ chain; for the certified closures, the transactions of the certifying
 RB from a db-sync instance with their sizes, counted as the 1 kB kind at
 700 B and above and as the small kind under 400 B.
 
-**Reporting coverage (sections [3](#populations-and-instruments) and [4](#results-by-parameter-set)).** As in A.2: per window, the
+**Reporting coverage (sections [3](#populations-and-instruments) and [4](#results-by-parameter-set)).** As in the conventions: per window, the
 reporting nodes and the pools they report for, the pools in the
 committee, and the share of the committee's weight held by the pools
 whose votes or refusals are in the data.
@@ -3355,9 +3355,7 @@ won and, when it lost, from the orphan's size in the block-fetch
 completion event, a certifying RB fetching at about 1 kB and a plain one
 under load at 88 kB. Orphans adopted by a single node are left out as a
 node on its own stale chain. On the cluster the orphan's size comes from
-its forger's adoption event. The cluster archives also hold a resource
-trace per node, one row per second with the resident set, the live
-data and the cumulative CPU and GC centiseconds.
+its forger's adoption event.
 
 **Leader slots and chain density (section [5](#leios-on-praos)).** The observed hosts'
 leader-slot and forged-RB events counted per window; on the testnet
@@ -3495,7 +3493,7 @@ used, the closure arriving as it did; throughput is the ladder's
 formula of 4.1 with the EB term at the certified bytes per eligible EB
 and the plain-RB term at the certification share, pinned to the run's
 measured figure, at the run's transaction size. On the testnet the
-reporting voters hold 59 to 73 % of the committee weight and the rest
+reporting voters hold 61 to 75 % of the committee weight and the rest
 cannot be repriced, so the repricing reads the votes and projects no
 certification: it takes the per-vote records of the voter stages above,
 one per vote a node scheduled, and gives each a validation time per
@@ -3576,7 +3574,7 @@ available to reviewers on request.
 | validation time by applied share | the per-record validation output of a window or run, the hosts table | `validation_bins.py` | `cost_table.py bins` |
 | EBs failing by applied share; the cluster records repriced on faster hosts and with the loop's cost removed | the per-record validation output of a cluster run, its ladder export | `host_speed.py` | `cost_table.py unseen`, `speed`, `combined` |
 | the testnet votes repriced by host class, the pessimistic rebuild and the loop's cost removed, per vote and per EB size bin | the per-vote records of a window, the hosts table | `voter_reprice.py` | `cost_table.py votes` |
-| the changed host against its control: the costs per transaction, the validation time by applied count, the votes cast and missed | the archived voting events of the four hosts | `loop_hosts.py` | the same |
+| the changed host against its control: the costs per transaction, the validation time by applied count, the votes cast and missed | the archived voting events of the two hosts | `loop_hosts.py` | the same |
 | nodes by their closure p90, upstream-peer groups | the per-node diffusion outputs, the voters table; the archived per-peer announcement pulls | `diffusion_bins.py`, `peers_upstream.py` | `diffusion_table.py bins`, `upstream` |
 | memory and CPU | the period database's metrics, the archived monitoring series, the cluster's resource trace; the hosts table | `resources.py` | `cost_table.py resources` |
 | node versions | the period database's metrics | the node-versions query | read directly |
