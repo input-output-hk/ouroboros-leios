@@ -1,0 +1,3586 @@
+---
+title: "Leios technical feasibility: a measured assessment of the pipeline on the public testnet and the benchmarking cluster"
+sidebar_label: Feasibility report
+slug: /development/feasibility-report/d7465e086d18cd7c8b08e959e3a057e5d3e8ad5f
+format: md
+toc_max_heading_level: 3
+---
+
+Ezequiel Postan · [Source at commit `d7465e086d18cd7c8b08e959e3a057e5d3e8ad5f`](https://github.com/input-output-hk/ouroboros-leios/blob/d7465e086d18cd7c8b08e959e3a057e5d3e8ad5f/docs/feasibility-report/README.md)
+
+> **How this document is kept up to date.** This file is the report. Its tables are printed by the scripts under `scripts/` from the saved outputs under `outputs/`, which the instruments write from the data sets registered in `DATA.md`. To update a table, rerun its instrument and its printer as `scripts/README.md` describes and replace the table in place; that file lists which script prints which table and what each one reads. `scripts/build.py` renders this file as a web page and as a PDF.
+
+## Summary
+
+This report measures the Leios pipeline on the public testnet and on
+the benchmarking cluster at three parameter sets, named by the
+reference list an endorser block may carry and the bytes of its
+closure. Every transaction measured is a value transfer without
+scripts. The standard of feasibility this report applies is the
+treasury proposal's, "IO: Consensus Initiative" (section [1](#mainnet-baseline-and-targets)): a
+parameter set confirmed feasible, with a credible path upward.
+
+| parameter set | ceiling, kB/s | measured, kB/s | certified of the eligible EBs |
+|---|---:|---:|---:|
+| 40 kB / 260 kB, cluster and testnet | 8.6 and 8.9 | 7.5 and 7.2 | 99 % and 97 % |
+| 100 kB / 1 MB, cluster | 27.9 | 12.2 and 15.5; 26.6 on the latest build | 69 % and 52 %; 99 % on the latest build |
+| 308 kB / 2 MB, testnet | 53.5 | 12.0 and 22.0 | 49 % and 45 % |
+
+Table 0.1. The three sets against their parameter ceiling, the rate
+with every EB full and certified; two windows or runs per set (Tables
+1.4, 4.1, 4.3 and 4.5, the certified shares from each population's
+tally output), and for the 100 kB / 1 MB set a third run on the
+latest build at the time of this report (Table 9.3). An EB is
+eligible when the next RB leaves it the certification gap; on the 2 MB
+set the EBs were at 0.6 of the cap on average.
+
+The twice-Praos set, 40 kB / 260 kB, is confirmed feasible on both
+populations as measured. The six-times set, 100 kB / 1 MB, is
+confirmed on the cluster on the latest build at the time of this
+report. Its testnet run is still to come. The largest set,
+308 kB / 2 MB, is not confirmed as measured, but the path of
+improvements toward it is scheduled for measurement. The ten-times
+line, 45 kB/s, lies under this set's ceiling of 53.5 (Table 1.4), so
+the 2 MB closures measured here are larger than that line needs.
+
+**The confirmed set.** At 40 kB / 260 kB, twice the Praos ceiling, every
+stage of the pipeline is inside its budget on both populations. The
+voting stage fails at most 2.4 % of the full EBs (Table 4.1).
+
+**What bound at the larger sets, and what the latest build changes.**
+On the build of section [4](#results-by-parameter-set), two stages bound certification at the two
+larger sets. Validation bound it on the cluster at 1 MB and in one of
+the testnet's two windows at 2 MB. The closure's arrival bound it in
+the other window.
+
+The latest build removes
+most of validation's cost: the cluster run at 100 kB / 1 MB certifies
+99 % of its eligible EBs where the build of section [4](#results-by-parameter-set) certified 52 %
+(section [9](#a-change-to-the-voting-loop-and-where-it-has-run)). On the testnet the build is measured on one host, which validates
+every EB in time (section [9.2](#one-testnet-host-against-its-control)); its effect at the committee's scale
+is still to be measured.
+
+Section [5](#leios-on-praos) measures a cost to Praos on the build of section [4](#results-by-parameter-set), a slower
+forge path and a higher fork rate: the CIP's reapplication constraint
+holds at 260 kB closures and fails from 555 kB up. The latest build
+restores it at 1 MB where it has run (section [9.3](#the-cluster)).
+
+**What is not yet measured on the latest build.** No cluster run
+exists at the 308 kB / 2 MB set, and the testnet's committee has not
+run the build. Further experiments on both are scheduled, and this
+report makes no claim about the points they would measure.
+
+Section [8](#what-binds-certification-and-what-would-move-it) estimates what the latest build would do where it has not
+run. It reprices the votes measured on the build of section [4](#results-by-parameter-set) at the
+latest build's validation time. The same repricing predicted 97 % for
+the cluster run before that run existed, and the run gave 99 %. On the
+testnet's 2 MB windows the repricing takes validation out of the
+causes of late votes at every host class and EB size (section [8.5](#what-the-measurements-support)).
+
+What remains at 2 MB is the closure's arrival. On the build of
+section [4](#results-by-parameter-set) it keeps 22 % of the votes late on the largest EBs of one
+window (Table 8.2). Changes aim at it, forwarding the closure as it
+arrives and scheduling what a relay sends among them. None is
+measured in this report (section [8.4](#the-levers-the-report-cannot-price)).
+
+**What the measurements do not cover.** No window or run in this
+report exercised mainnet's transaction mix, with scripts. The
+comparison with the targets of section [1](#mainnet-baseline-and-targets) is therefore in bytes
+per second at the measured transactions, not at mainnet's mix. The latest
+build frees validation time that script computation would use. How
+much of it scripts take is a measurement still to make.
+
+## Mainnet baseline and targets
+
+Before any Leios measurement is read, two things have to be fixed: what
+Praos delivers on mainnet today, both on paper and under real congestion,
+and what the targets for Leios are once they are expressed in the same unit.
+The results in the later sections are read against the numbers established
+here.
+
+### Praos on paper and on the chain
+
+A Praos block is limited to 90,112 bytes, and the chain produces one
+every 20 seconds on average, with the active slot coefficient f at
+0.05. The protocol therefore carries at most 4.5 kB/s. Chain density,
+the share of the expected blocks that extend the chain, is 97 to 99 %
+in every period below but one, so this ceiling is nearly the real
+rate. Every Leios parameter set is a multiple of it.
+
+What the chain carries under load is a different quantity. Table 1.1
+lists the six periods of highest load in the chain's history, from
+block headers and epoch parameters, each read against the block limit
+of its own epoch.
+
+| period | event | hours | spacing; chain density | carried, kB/s | fullness, mean / median | bytes per tx |
+|---|---|---|---|---|---|---|
+| 2022-01-21 to 01-23 | SundaeSwap launch, pre-Vasil | 54 | 21.3 s; 93.8 % | 3.25 | 94 % / 96 % | 1,549 |
+| 2023-12-08 to 12-09 | memecoin minting wave | 36 | 20.5 s; 97.4 % | 3.43 | 78 % / 92 % | 2,396 |
+| 2024-09-05 | Snek.fun launch | 12 | 20.6 s; 96.9 % | 2.49 | 57 % / 55 % | 1,011 |
+| 2024-12-02 | bull-run peak, epoch 525 | 6 | 20.3 s; 98.6 % | 2.86 | 64 % / 80 % | 1,344 |
+| 2026-10-08 | Hosky spam campaign | 12 | 20.5 s; 97.6 % | 3.40 | 77 % / 96 % | 461 |
+| 2026-10-11 to 10-16 | normal operation, epoch 661 | 120 | 20.2 s; 99.0 % | 0.51 | 12 % / 6 % | 877 |
+
+Table 1.1. Praos under load on mainnet. Hours is each period's exact
+span; carried is block bytes over wall-clock time; fullness is block
+bytes over the epoch's block limit. The spam campaign's transactions are
+a synthetic mix. The table is regenerated by
+`scripts/mainnet_windows.sh` from the data set listed in DATA.md.
+
+Three observations from this table are used throughout the report.
+
+First, mainnet has been saturated for days only once, at the SundaeSwap
+launch of January 2022. Every congestion since Vasil, the upgrade of
+September 2022, has lasted hours, with full blocks alternating with
+near-empty ones as the mempool drains faster than it refills: the
+median block is full while the mean is 57 to 78 %. The best sustained
+rate since Vasil is 3.4 kB/s. This is why the report measures Leios
+over congested hours rather than days.
+
+Second, transaction size is a range, not a constant: the mean runs
+from 461 B under the spam campaign to 2,396 B in the minting wave. A
+target stated as a count has no meaning without a transaction size, so
+the report states every target in bytes per second and converts it at
+three sizes.
+
+Third, chain density falls under load, from 99 % in normal operation
+to 94 % in the one sustained full-block period. A certifying Leios
+block carries more work at adoption than a Praos block; section
+[5](#leios-on-praos) measures what that does to density.
+
+### The targets
+
+The throughput targets come from the two documents that commissioned
+Leios, the treasury proposal and CIP-164, and are taken as stated.
+
+The treasury proposal, "IO: Consensus Initiative", commits to 27
+million transactions a month by 2030, from about 800,000 today, and
+asks for at least six times the current capacity. Elsewhere it states
+that Leios delivers ten times or more. Its unit is a count, about
+three transactions per second, the Praos ceiling at 1,500 B per
+transaction. The report reads the multipliers at the mainnet size mix,
+where six and ten times are 27 and 45 kB/s.
+
+CIP-164 quotes throughput at 1,500 B per transaction. Its cost-estimate
+document gives 50 transactions per second as the sustainability line.
+Its simulations give 150 to 350 kB/s for the parameter set it
+describes as feasible, with 512 kB endorser blocks and 12 MB closures.
+
+The proposal treats the CIP's parameters as an ideal goal: feasibility
+may be confirmed at a lower parameter set, with the higher targets
+reached through the gradual deployment plan. That is the standard this
+report applies: a parameter set confirmed feasible, with a credible
+path upward to the proposal's multipliers.
+
+Bytes are one of several limits on a Leios block. Plutus steps, Plutus
+memory and reference-script bytes are capped alongside them, and
+section [2](#what-is-assessed-and-what-to-expect) states which of these the measurements exercise. The
+congested periods of Table 1.1 are characterised in bytes only.
+Whether the proposed sets scale the script budgets from the Praos
+limits is not settled here. The validation margin that script
+computation would draw on is discussed in sections [8.5](#what-the-measurements-support) and [9](#a-change-to-the-voting-loop-and-where-it-has-run).
+
+<!-- pagebreak -->
+
+Table 1.2 puts the byte-defined targets and the Praos baseline in one
+unit. Each is converted to transactions per second at three
+transaction sizes: the normal mix, the CIP's figure and the minting
+wave.
+
+| target | kB/s | tx/s at 877 B (normal) | at 1,500 B (CIP) | at 2,396 B (mint wave) |
+|---|---|---|---|---|
+| Praos ceiling | 4.5 | 5.1 | 3.0 | 1.9 |
+| Praos, busiest hours | 3.4 | 3.9 | 2.3 | 1.4 |
+| current load, epoch 661 | 0.5 | 0.6 | 0.3 | 0.2 |
+| proposal, 6x capacity | 27 | 31 | 18 | 11 |
+| proposal, 10x capacity | 45 | 51 | 30 | 19 |
+| CIP-164 simulated set | 150-350 | 171-399 | 100-233 | 63-146 |
+
+Table 1.2. Byte-defined targets and the Praos baseline, in bytes per second
+and in transactions per second at three transaction sizes.
+
+Table 1.3 converts the count-defined targets the other way, to bytes
+per second at the same three sizes.
+
+| target | tx/s | kB/s at 877 B (normal) | at 1,500 B (CIP) | at 2,396 B (mint wave) |
+|---|---|---|---|---|
+| proposal, 27 M transactions a month | 10.4 | 9.1 | 16 | 25 |
+| CIP-164 sustainability line | 50 | 44 | 75 | 120 |
+
+Table 1.3. Count-defined targets, in bytes per second at the same three
+sizes. The proposal's figures are taken from its on-chain metadata (Koios),
+the CIP's from the CIP-164 README and its cost-estimate document.
+
+The proposal's tenfold target and the CIP's 50 transactions per second
+coincide near 45 kB/s at the normal mix, and 75 kB/s at the CIP's own
+transaction size. The CIP's simulated parameter set sits three to
+eight times above that line.
+
+### Where the measured parameter sets sit on paper
+
+The report measures three parameter sets. Each is named by the two
+caps that define it, in the symbols of CIP-164. The first, S_EB, caps
+the bytes of the reference list an endorser block may carry, and so
+its transaction count, at 36 or 37 bytes per reference depending on
+the transaction's size. The second, S_EB-tx, caps the bytes of its
+closure, the transactions it brings into the chain.
+
+Table 1.4 gives each set's parameter ceiling, the rate it would carry
+with every endorser block full and every one certified, beside the
+targets of the previous subsection.
+
+| parameter set | S_EB | S_EB-tx | parameter ceiling, kB/s | tx/s at 877 B |
+|---|---|---|---|---|
+| 40 kB / 260 kB | 40,000 B (1,111 txs) | 260 kB | 8.9 | 10 |
+| 100 kB / 1 MB | 100,000 B (2,777 txs) | 1,000 kB | 27.9 | 32 |
+| 308 kB / 2 MB | 308,000 B (8,555 txs) | 2,000 kB | 53.5 | 61 |
+
+Table 1.4. The parameter ceiling is S_EB-tx times f times p, plus the
+plain Praos block's share at its 90,112 B limit. Here
+p = 0.513 is the probability that the next block arrives 14 slots or
+more later, late enough for the certificate to be included. Section [2](#what-is-assessed-and-what-to-expect)
+defines the ceiling and the corrections that take it down to a
+measurement. Section [4](#results-by-parameter-set) reports both for each set.
+
+The smallest set is twice the Praos ceiling. The middle set reaches
+the proposal's sixfold line. The largest set's ceiling lies above the
+tenfold line, and at the normal mix above the CIP's 50 transactions
+per second as well.
+
+How much of each ceiling the protocol delivers on real nodes, and why it
+falls short where it does, is the question the rest of the report answers.
+
+## What is assessed and what to expect
+
+This section describes the Leios pipeline as deployed on the measured
+networks: its stages, the limits that bound it, and how a parameter
+set's ceiling relates to what the chain carries. It holds no
+measurements. It fixes the vocabulary with which section [4](#results-by-parameter-set) is read.
+
+### The pipeline and its clock
+
+Leios adds to Praos a second kind of block, the endorser block. The
+ranking block (RB) remains the Praos block and the only one that
+extends the chain. The endorser block (EB) is a list of transaction
+references announced inside an RB. Its transactions, called its
+closure, enter the ledger when a later RB carries a certificate from a
+committee of stake pools that validated them. Between announcement and
+certificate the pipeline has six stages, each with a clock of its own.
+
+The first stage is the forger's snapshot. The forger, the pool elected
+for the slot, snapshots its mempool, revalidating its transactions
+against the ledger state at the slot, builds the RB and announces with
+it an EB of the snapshot's transactions that fit the caps. The snapshot has a time
+budget, so the EB is bounded by the mempool's content and by that
+budget, not only by the caps. As deployed, an RB that carries a
+certificate carries no transactions of its own.
+
+The second and third stages are diffusion. Every node fetches the EB
+body, the reference list, and then assembles the closure from its own
+mempool and from its peers.
+
+The fourth stage is validation and voting. The committee, the pools
+with the most stake with each vote weighted by stake, validates the
+closure against the ledger state and votes. The vote is scheduled
+three seconds after the EB's slot and must be cast by seven. A voter
+that receives the closure after the deadline does not vote.
+
+Validation applies every transaction of the closure to the ledger
+state: in full for the ones the node has not seen, and as a cheaper
+reapplication for the ones it validated at mempool admission or in an
+earlier EB. Its cost therefore depends on how much of the EB the voter
+had already validated.
+
+The fifth stage is the tally. The EB is certifiable once the votes
+reach the quorum, three quarters of the committee's weight. The
+certificate can only go in an RB at least fourteen slots after the
+announcing one, the certification gap. On paper the next RB comes that
+late with probability 0.513, so about half of the announced EBs are
+eligible for certification. The rest are superseded by the next
+announcement.
+
+The sixth stage is adoption. A node that receives a certifying RB must
+hold the closure and apply its transactions before adopting the block.
+That is more work than a plain Praos block takes, and if it delays
+propagation the next slot leader may fork the chain. Section [5](#leios-on-praos) is
+about this stage.
+
+Each stage has a deadline or a budget. The tables of section [4](#results-by-parameter-set) have
+one row per stage for that reason.
+
+### The constraint set
+
+A Leios parameter set is more than the two caps that name it. Table
+2.1 lists its parameters, with the names and symbols CIP-164 gives
+them, and the stage of the pipeline each one binds.
+
+| parameter | symbol | what it bounds | stage it binds |
+|---|---|---|---|
+| maximum endorser block size | S_EB | the bytes of the reference list, so the transactions an EB may reference at 36 or 37 B each | snapshot; body diffusion |
+| maximum total transaction size per EB | S_EB-tx | the bytes of the closure, what an EB brings into the chain | closure diffusion; validation; adoption |
+| maximum reference script size per EB | S_EB-ref | the bytes of reference scripts the closure may pull in | validation |
+| maximum Plutus steps and memory per EB | none | the script computation the closure may require | validation |
+| header, voting and diffusion period lengths | L_hdr, L_vote, L_diff | when votes are cast and by when | validation and voting |
+| committee size | N_c | how many pools vote | tally |
+| quorum stake threshold | τ | how much stake must vote | tally |
+
+Table 2.1. The parameters of a Leios set, in CIP-164's names and
+symbols, and the stage each one binds. The two caps that name a set
+are S_EB and S_EB-tx.
+
+Two timings follow from the three periods. The vote window opens
+3 L_hdr after the EB's slot and closes at 3 L_hdr + L_vote. The
+certification gap, the earliest the certificate can be included, is
+3 L_hdr + L_vote + L_diff after the announcing RB, 14 slots at the
+deployed values. Underneath them Praos keeps its own parameters: the
+block limit, maxBlockBodySize at 90,112 B, and the active slot
+coefficient f, which set the plain block's share and the RB rate.
+
+The measurements exercise the two caps, the timings at their deployed
+values, the certification gap at 14 slots and the committee with each
+network's real stake. The Praos block limit and f stay at mainnet's
+values. The script and reference-script budgets are left untouched:
+every transaction measured carries no script.
+
+Three conditions outside the parameter set bound the pipeline as much
+as the parameters do: the hardware of the nodes, which decides how
+fast a closure is validated; the mempool coverage, how much of an EB a
+node already holds when it is announced, which decides how much of it
+is applied in full; and the topology, which decides how fast bodies,
+closures and votes travel. This report measures on the populations of
+section [3](#populations-and-instruments) and states its results against them. It defines no
+reference machine.
+
+The script budgets are not independent of the byte caps. A voter must
+have received and validated the closure by the deadline, so the
+closure's arrival and its validation share the same seconds. Whatever
+validation work a closure carries, script computation or more
+transactions, must be paid for by a closure that arrives earlier, and
+at a given bandwidth an earlier closure is a smaller one. At fixed
+hardware, bandwidth and implementation, a larger script budget
+therefore means a smaller closure. This report treats
+the script budgets as values to be set conservatively alongside the
+caps it measures, not as dimensions it has confirmed.
+
+### The ceiling and the ladder
+
+The rate a parameter set can carry on paper follows from the pipeline above.
+Each RB either certifies the EB announced by the previous one, with
+probability p, and brings its closure of up to S_EB-tx bytes, or does
+not and carries a plain block of up to R bytes, the Praos block limit.
+RBs come at the rate f per slot. The parameter ceiling is therefore
+
+    f × (p × S_EB-tx + (1 − p) × R)
+
+bytes per second, with p = 0.513 under the fourteen-slot gap and
+R = 90,112 B, against which the plain block's fullness is also read in
+the rungs below. It assumes every EB full
+and every eligible EB certified. The chain carries less than this for reasons that can be
+named one at a time, and the report presents them as a ladder of rungs,
+each a correction applied on top of the previous one:
+
+| rung | what it replaces | what the loss means |
+|---|---|---|
+| parameter ceiling | nothing: the caps, f and p on paper | the protocol's rate at this parameter set |
+| workload ceiling | S_EB-tx by the cap that actually binds at the measured transaction size | at small transactions S_EB binds before S_EB-tx, and the EB carries fewer bytes than S_EB-tx allows |
+| observed spacing | f and p by the RB rate and gap share actually observed | the chain's own randomness in the window: more or fewer RBs than expected, more or fewer of them far enough apart |
+| voting-adjusted | p by p times the share of eligible EBs that were certified | EBs that reached no quorum in time: the voting stage's loss; shown for full EBs, and for the actual mix when the two differ |
+| load-adjusted | S_EB-tx and R by the bytes the EBs and plain blocks actually held, and the share of RBs that announced | the load offered to the forgers fell short of the caps: the generator's or the mempools' loss, not the protocol's |
+| measured | all of the above by the bytes counted on the chain | what the chain carried |
+
+Table 2.2. The throughput ladder. Each rung is computed from the chain
+itself (block headers, EB sizes and certificates) over the load windows of
+a period, independently of which nodes report. The transaction count
+of an EB is its reference bytes over the width a reference takes, 36 B
+for a transaction under 256 B and 37 B from there on, measured on each
+window's certified EBs.
+
+The ladder separates what the parameters allow from what the chain
+randomly offered, what the voters lost and what the load did not supply.
+Section [4](#results-by-parameter-set) shows it in full for every parameter set, and the stage table
+next to it says where in the pipeline the voting loss arose.
+
+### Load and mempool coverage
+
+Load, for this report, is what reaches a forger's mempool when its
+slot comes, not what users submitted to the network. The distinction
+matters twice.
+
+For the forger, the EB is bounded by the mempool at the slot. A
+generator that submits in bursts, or to a few nodes, produces EBs
+under the caps whatever the parameters. The load-adjusted rung
+separates that shortfall from the protocol's.
+
+For the voters, validation cost depends on the share of the EB's
+transactions they already hold. A transaction that reached the voter's
+mempool before the announcement is reapplied cheaply. One that did not
+is applied in full. Leios therefore wants the same transaction in many
+mempools, where Praos needs it only in the next leader's.
+
+How transactions are submitted on mainnet is not known from the
+testnet. The report makes no claim that the generators used are an
+optimistic or a pessimistic case for it. It reports the mempool
+coverage of each population beside its results, so that the reader can
+place mainnet against them.
+
+The same distinction is why the report measures in load windows. The
+caps bound the long-run rate, but the mempools of a short burst's
+forgers decide how full that burst's EBs are. A burst of full EBs over
+a few minutes is not evidence of headroom, and a daily average mixes
+loaded hours with idle ones. Every measurement in section [4](#results-by-parameter-set) is taken
+over the hours in which the generators kept the mempools loaded, with
+the windows stated.
+
+### What to expect at each stage
+
+The structure above gives an expectation for each stage before any
+measurement. Section [4](#results-by-parameter-set) states them per parameter set, with the
+numbers the ceiling supplies.
+
+Body and closure diffusion should scale with the bytes to move. They
+are bound by bandwidth on hosts that receive from well-connected
+peers, and by topology on hosts several hops from the forgers. A
+closure that arrives after the vote deadline is lost to the voting
+stage whatever else happens.
+
+Validation should cost a roughly constant time per transaction the
+voter has not validated before. It therefore grows with the EB's
+transaction count and with the share the voter applies in full, and it
+has to fit in the four seconds between the vote mark and the deadline
+once the closure is in hand.
+
+The tally should reach the quorum once three quarters of the
+committee's weight has voted. It arrives close to the deadline when
+the slow voters hold much of the weight. A quorum of 0.75 leaves a
+margin of 0.25, and every seat that is silent for any reason spends
+it.
+
+Certification therefore depends on the network's stake distribution as
+much as on the parameters. A network where most of the weight sits on
+fast, well-connected hosts certifies EBs that a network with the same
+parameters and a wider spread of hosts does not.
+
+Adoption of a certifying RB should cost the closure's reapplication on
+top of a plain block's adoption, growing with the closure. The
+consequence to look for is not a missed slot but a late block: the
+next leader building on the previous block because the certifying one
+had not reached it.
+
+Where a stage falls short of its expectation in section [4](#results-by-parameter-set), the report
+asks which of the three outside conditions, hardware, mempool coverage
+or topology, or which parameter, explains the shortfall, and what
+change would recover it. That is the content of sections [6](#cross-cutting-explanations) and [8](#what-binds-certification-and-what-would-move-it).
+
+## Populations and instruments
+
+The measurements come from three sources: the public Leios testnet,
+the benchmarking cluster, and a ledger benchmark run by stake pool
+operators on their own machines. Each observes a different population
+under different conditions and answers a different part of the
+question. This section describes the three, the instruments that read
+them, and what each can and cannot say, so that the results of section [4](#results-by-parameter-set)
+are read with their population in mind.
+
+### The public testnet
+
+The testnet is a Leios network run by stake pool operators and by IOG, on
+a chain restarted with a new genesis on 2026-10-18. Its parameters are
+those of the sets of section [1](#mainnet-baseline-and-targets): N_c of 900, τ of three quarters,
+L_hdr, L_vote and L_diff of 1, 4 and 7 s, and a certification gap of
+14 slots. S_EB and S_EB-tx were 40 kB and 260 kB from the restart and
+308 kB and 2 MB from the epoch boundary of 2026-10-24 00:00 UTC. With
+100 to 150 pools holding stake, every pool is seated, so an EB draws
+one vote per pool, weighted by its stake.
+
+Table 3.1 lists the three load windows measured on it, named by their
+S_EB / S_EB-tx as in Table 1.4.
+
+| window | loaded hours (UTC) | transaction size (mean over the certified closures) | pools in the committee | weight of the 14 IOG and PIR pools |
+|---|---|---|---|---|
+| 40 kB / 260 kB, 257 B | 2026-10-21 12:00-13:00, 17:00-21:00, 10-22 00:00-01:00 (6 h) | 257 B | 100-108 | 0.45-0.48 |
+| 308 kB / 2 MB, 318 B | 25 even hours from 2026-10-24 12:00 to 10-26 13:00 | 318 B | 145-148 | 0.35-0.36 |
+| 308 kB / 2 MB, 1 kB | 2026-10-28 18:00, 20:00, 22:00, 10-29 00:00 (4 h) | 810 B | 150 | 0.35 |
+
+Table 3.1. The testnet load windows. The loaded hours are those in which
+the generator ran; the odd hours between them carried residual load only
+and are excluded. The 2 MB window's 318 B is the mean of two sizes of
+the same one-input transaction from two generators, 247 B for three
+quarters of the transactions and 506 B for a quarter, which differ in
+their metadata.
+
+The stake is not evenly spread. Fourteen pools are IOG's, IOG1 to
+IOG3 and PIR0 to PIR10, and hold between a third and a half of the
+committee's weight depending on the window, PIR0 alone a tenth or
+more. The 86 to 136 operator pools share the rest at under one percent
+each. Certification, at three quarters of the weight, therefore needs
+the IOG pools and a large number of small pools to vote. The quarter
+of margin is spent by whichever of them do not.
+
+The operator nodes are the population of interest for Leios on
+mainnet, and the least known. Their hardware is not reported: what the
+report knows of it is the validation speed measured on each node and
+the spread the ledger benchmark of section [3.3](#the-ledger-benchmark) found across operator
+machines. Their topology is not known beyond the naming of their
+agents as producers or relays.
+
+Their software is known. In the first two windows nearly every
+operator agent ran one build, the same as the IOG hosts and the
+cluster. In the 1 kB window the fleet was mid-upgrade, two thirds of
+the agents and the IOG and PIR hosts on the next build and one third
+on the previous one. That window is measured on a mixed build, and
+the report treats it as such.
+
+The IOG and PIR hosts are AWS instances whose configuration is known
+(Table 3.2). The node runs an in-memory ledger on every host but IOG3,
+which keeps the UTxO set on disk, with one capability per vCPU, and
+each PIR host is in a different AWS region. PIR0 runs outside the
+monitoring and reports to no source the report reads.
+
+| hosts | instance type | vCPUs | memory |
+|---|---|---:|---:|
+| IOG1, IOG3 | c8id.xlarge | 4 | 8 GiB |
+| IOG2 | r8id.xlarge | 4 | 32 GiB |
+| PIR1, PIR3, PIR4, PIR8, PIR10 | c8id.xlarge | 4 | 8 GiB |
+| PIR2, PIR5, PIR6 | c6id.2xlarge | 8 | 16 GiB |
+| PIR7, PIR9 | c5d.2xlarge | 8 | 16 GiB |
+
+Table 3.2. The IOG and PIR hosts that report through the IOG monitoring,
+as the monitoring's host series record them in every window (the three
+IOG producers were resized to these types on 2026-10-16, before the
+chain's restart). The c8id and r8id instances are the current CPU
+generation, c6id two generations older and c5d three. IOG1 reports
+through both sources; the report uses its monitoring copy.
+
+The IOG producers sit behind IOG relays. The PIR hosts are producers
+in the open, one per region, and PIR7 and PIR9 run the cluster's
+instance type.
+
+The load comes from two generators in every window. One, run by IOG,
+submits value transactions into three IOG relays in different regions
+during the even UTC hours. It reuses each transaction's outputs as
+soon as it has submitted it, so its transactions chain within one
+closure. The other submits elsewhere and spends only outputs already
+on the chain. The sizes of Table 3.1 are the two generators': 247 B
+and 220 to 287 B in the 260 kB window, 247 B and 506 B in the 318 B
+window, about 1 kB and 220 to 256 B in the 1 kB window. In the 1 kB
+window the two sizes make EBs bound by S_EB-tx and EBs bound by S_EB
+coexist in every hour.
+
+Because the injection points are IOG relays, the IOG hosts' mempools
+fill first and hold the most transactions when an EB is announced.
+That places them at the low end of the fleet's validation cost in
+section [4](#results-by-parameter-set). The rate the generator sustained is a measurement, not a
+parameter, and appears there as the load-adjusted rung of each
+window's ladder.
+
+Two instruments read the testnet, the operator telemetry and the IOG
+monitoring, merged into one database per window; the appendix
+describes their records in [its first part](#sources-and-their-records). The chain itself, from the
+explorer and db-sync, gives the ladder, the sizes and the
+certification rate independently of which nodes report.
+
+Table 3.3 gives the coverage of the two instruments. Whenever a section [4](#results-by-parameter-set) table
+is captioned with reporting nodes and weight, these are the figures.
+
+| window | reporting pools | pools in the committee | committee weight observed | largest weight not observed |
+|---|---|---|---|---|
+| 40 kB / 260 kB, 257 B | 83 | 100-108 | 0.73-0.75 | PIR0, 0.13 |
+| 308 kB / 2 MB, 318 B | 89 | 145-148 | 0.63 | PIR0, 0.10 |
+| 308 kB / 2 MB, 1 kB | 85 | 150 | 0.61 | PIR0, 0.10 |
+
+Table 3.3. Reporting coverage of the testnet per window, both sources
+merged. A pool counts as observed when its node's votes are in the data;
+the weight is the share of the committee's weight those pools hold.
+
+### The benchmarking cluster
+
+The cluster is a network of 51 nodes run by the benchmarking team on
+one instance type, c5d.2xlarge (8 vCPUs, 15.2 GiB), each with six
+upstream peers in a fixed topology, an in-memory ledger, two
+capabilities, and tracing at debug level. The two 100 kB / 1 MB runs
+ran the same w42 revision as the testnet's first two windows. The
+40 kB / 260 kB run ran an untagged commit of the same week, three days
+before the tag, which accepted a certificate from 15 slots after the
+announcing RB rather than 14. Every node is a block producer with the
+same stake, so the committee is 51 voters of equal weight and the
+quorum is 39 votes.
+
+A generator feeds every node with value transactions of a fixed shape,
+different transactions to each node, saturating the caps throughout a
+run. The transactions spend outputs created at genesis, which the
+runs reuse almost never.
+
+Table 3.4 lists the three runs the report uses, named by their
+S_EB / S_EB-tx and transaction size.
+
+| run | transactions | certification gap | span (UTC) | RBs on the chain |
+|---|---|---|---|---|
+| 40 kB / 260 kB | 200 B, one input, one output | 15 slots | 2026-10-17 22:01 to 10-18 15:40 (17.6 h) | 3,083 |
+| 100 kB / 1 MB, 200 B | 200 B, one input, one output | 14 slots | 2026-10-20 21:00 to 10-21 14:47 (17.8 h) | 3,079 |
+| 100 kB / 1 MB, 374 B | 374 B, two inputs, two outputs | 14 slots | 2026-10-21 16:39 to 10-22 09:50 (17.2 h) | 2,968 |
+
+Table 3.4. The cluster runs. At 200 B S_EB binds and the
+closures stay well under their cap; at 374 B S_EB-tx binds, the
+first run on any population where it did.
+
+The cluster's instrument is the per-node trace database the team
+delivers with each run, holding the same event families the testnet's
+agents ship. The report reads it with the same instruments and
+reconstructs the chain from the forge events. Every node is observed,
+so the cluster's figures are complete where the testnet's are sampled.
+
+Mempool coverage is decided differently on the two populations. A
+cluster node receives the other nodes' transactions through diffusion,
+so what it already holds of an EB at the announcement is decided by
+the race between the generator's injection and the diffusion among
+peers, in time rather than in place. On the testnet it is decided by
+how far a node sits from the three injection points.
+
+### The ledger benchmark
+
+The third source is a benchmark of block validation that 26 stake
+pool operators ran on their own machines between 7 and 18 October
+2026, with the consensus team's database analyser over one synthetic
+Praos chain. It times, per transaction, the application of a block to the
+ledger in full and its reapplication, with the UTxO set in memory and
+on disk. It exercises the Praos block-application path only, the one
+a node runs when it adopts a block, and nothing of the voting path.
+Section [7.1](#the-ledger-benchmark-1) describes it in full.
+
+What it can say is the one thing neither network can: how far the
+operators' machines are apart. In-memory application spans a factor
+of six across the 26 machines, and storage adds a spread of its own.
+
+The report uses it twice. Section [6](#cross-cutting-explanations) places the validation costs
+measured on the networks against it as the hardware axis. Section [7](#models-against-measurements-deltaq-and-the-cip-cost-model)
+reads the DeltaQ model's constants, which are costs of this kind,
+against the networks' measured costs through it.
+
+### What each source can and cannot say
+
+Table 3.5 puts the three sources side by side.
+
+| | testnet | cluster | ledger benchmark |
+|---|---|---|---|
+| nodes | 83-89 reporting of 100-150 pools; operators and IOG | 51, all observed | 26 operator machines |
+| hardware | unknown for operators; known for 13 IOG and PIR hosts | one instance type | each operator's own |
+| stake | real distribution; a third to a half on 14 pools | uniform | none |
+| topology | unknown for operators | fixed, six peers | none |
+| load | one generator into three relays; not saturating for long | one generator into every node; saturating | one synthetic chain |
+| what it establishes | behaviour on independent nodes with real stake weighting | attribution to a parameter under controlled load | the hardware spread of operators |
+| what it leaves open | hardware and topology; 0.25-0.39 of the weight unobserved | diversity of any kind; its own validation speed | everything about Leios |
+
+Table 3.5. The three sources side by side.
+
+The report's method follows from the table. A stage's behaviour is
+established on the testnet, where it is real, and attributed on the
+cluster, where it is controlled. Where the two populations disagree,
+the disagreement is itself a finding, and section [6](#cross-cutting-explanations) explains it.
+The benchmark places the operator hardware the testnet could not see.
+
+## Results by parameter set
+
+The three parameter sets are presented from the smallest to the
+largest, each on the populations that ran it. Each set has two
+tables: the throughput ladder of section [2.3](#the-ceiling-and-the-ladder), one column per
+population and window, and the stage table, one row per stage from
+the body's diffusion to the certificate. The snapshot stage is read in
+the ladder's load-adjusted rung, and adoption in section [5](#leios-on-praos). The prose
+around the tables states what was expected, what was measured and why
+the two differ.
+
+The ladders are computed from the chain alone. The stage rows come
+from the nodes' events, with each column's reporting population given
+in Table 3.3. No row shows a typical node: where three quarters of
+the weight has to be reached, each row is read at the node on its
+unfavourable quartile, and the arrival rows add the share of the
+committee's weight that clears the deadline. The tables are
+regenerated by `scripts/ladder_table.py` and `scripts/stage_table.py`.
+
+### 40 kB references, 260 kB closures
+
+The smallest set ran on the cluster at 200 B transactions and on the
+testnet during the loaded hours of 2026-10-21 and 22, at 257 B. On the
+cluster S_EB binds (1,111 transactions, 222 kB closures); on
+the testnet S_EB-tx does (about 1,000 transactions at 260 kB).
+Every certified closure on the cluster was 222 kB; on the testnet the
+median certified closure was 260 kB and the tenth percentile 153 kB.
+
+Expected: a parameter ceiling of 8.6 to 8.8 kB/s, and everything
+certified, since a closure of a thousand transactions validates well
+inside the four-second window on any host measured, and 260 kB diffuses
+in a fraction of the time available.
+
+Table 4.1 is the ladder of the two populations.
+
+| rung, kB/s | cluster 40 kB / 260 kB, 200 B | testnet 40 kB / 260 kB, 257 B |
+|---|---|---|
+| parameter ceiling | 8.6 (p = 0.488) | 8.9 (p = 0.513) |
+| workload ceiling | 7.7 (S_EB binds at 200 B/tx) | 8.9 (S_EB-tx binds at 257 B/tx) |
+| observed spacing | 7.6 (1 RB / 20.7 s, p = 0.506) | 8.3 (1 RB / 22.9 s, p = 0.586) |
+| voting-adjusted, full | 7.6 (s_full = 0.995) | 8.2 (s_full = 0.976) |
+| load-adjusted | 7.5 (announcing 1.00, EB 1.00, plain RB 0.98) | 7.2 (announcing 0.99, EB 0.90, plain RB 0.82) |
+| measured | 7.5 | 7.2 |
+
+Table 4.1. The ladder at 40 kB / 260 kB. Cluster: the whole run, 17.6 h,
+1,547 eligible EBs, 15-slot certification gap. Testnet: the three loaded
+windows of 2026-10-21 12:00-13:00, 17:00-21:00 and 10-22 00:00-01:00 UTC,
+548 eligible EBs, 14-slot gap. The gap difference moves only the
+parameter ceiling: closures reached every cluster node by 3.20 s and the
+tally its quorum by 4.17 s, so a 14-slot gap would have left the measured
+rows unchanged. Transactions per second at the measured size: 37.4 and
+28.1.
+
+Table 4.2 is the stage table of the same populations.
+
+| stage | cluster 40 kB / 260 kB, 200 B | testnet 40 kB / 260 kB, 257 B |
+|---|---|---|
+| body arrival: p90; weight under 3 s | 2.34 s; 1.00 | 2.24 s; 0.71 |
+| closure arrival: p90; weight under 3 s / 7 s | 3.20 s; 0.67 / 1.00 | 2.78 s; 0.67 / 0.73 |
+| applied share | 58 % | 30 % |
+| validation: p90 | 0.98 s | 1.11 s |
+| vote rate on eligible EBs, p25 node | 99.5 % | 91 % |
+| tally reaches the quorum: p90 | 4.17 s | 4.08 s |
+| quorums that became certificates | 100 %, 1,539 of 1,539 quorums seen | 99.8 %, 531 of 532 quorums seen |
+
+Table 4.2. The stages at 40 kB / 260 kB. Cluster: all 51 nodes, equal
+weight. Testnet: 83 reporting pools of the 100 to 108 in the
+committee, holding 0.73 to 0.75 of its weight (Table 3.3). Every
+per-node value is read at the node on the unfavourable quartile of
+that row's statistic, one node one count, so that three nodes in four
+are faster than the time shown, apply less than the applied share
+shown, and vote more than the vote rate shown. A time is the p90 over
+the node's EBs. A weight is the
+share of the committee's weight whose p90 is under the deadline, equal
+to the share of nodes on the cluster and bounded by the observed
+weight on the testnet; the two closure shares are cumulative, the
+weight under 7 s including the weight under 3 s.
+
+Measured: the cluster carried its workload ceiling at the observed
+spacing, with every eligible EB but eight certified. The testnet
+carried 81 % of its parameter ceiling.
+
+The testnet's gap to its ceiling is not the pipeline. The chain's own
+spacing in six hours, one RB every 22.9 s instead of 20, and the load
+inside the loaded hours account for all but the 2.4 % the voting rung
+loses.
+
+Every stage is inside its budget on both populations. The closure is
+at three nodes in four by 2.78 to 3.20 s, validation takes about a
+second after it, and the tally reaches the quorum by 4.08 to 4.17 s
+against a deadline of 7 s, a margin of three seconds on both.
+
+The two populations differ where section [3](#populations-and-instruments) said they would. The
+cluster's voters apply more of each closure in full, three nodes in
+four up to 58 % against up to 30 % on the testnet, because the
+cluster's generator feeds every node its own
+transactions while the testnet's nodes have most of each EB in their
+mempools when it is announced. That this costs the cluster nothing
+here is because the count is small.
+
+Reception differs too. The cluster's comes in three tiers half a
+second apart, one hop's cost at this size in its fixed topology. On
+the testnet the IOG and PIR hosts sit in the faster half of the fleet,
+all the observed weight holds the closure within 7 s, and 0.67 of the
+committee's weight within 3 s.
+
+The testnet's seventeen failures are not near misses. Nearly all drew
+votes from almost no reporting voter, the signature of an EB announced
+on a fork the voters had not adopted.
+
+### 100 kB references, 1 MB closures
+
+The middle set ran on the cluster only, twice: at 200 B transactions,
+where S_EB binds (2,777 transactions, 555 kB closures), and at 374 B
+two-input transactions, where for the first time on any population
+S_EB-tx bound, with certified closures of exactly 1 MB from the median
+up (2,673 transactions). No testnet window exists at this set: the
+chain ran it before its restart, on the older build and bound by S_EB
+at 567 kB.
+
+Expected: 27.9 kB/s on paper, 16.5 with S_EB binding at 200 B. From
+the hosts' cost per transaction applied in full, 1.8 ms on this
+cluster, a share of the EBs should fail: validating 2,700 transactions
+from scratch takes longer than the four seconds between the vote mark
+and the deadline, and the two-input transactions cost more each at the
+same count.
+
+Table 4.3 is the ladder of the two runs.
+
+| rung, kB/s | cluster 100 kB / 1 MB, 200 B | cluster 100 kB / 1 MB, 374 B |
+|---|---|---|
+| parameter ceiling | 27.9 (p = 0.513) | 27.9 (p = 0.513) |
+| workload ceiling | 16.5 (S_EB binds at 200 B/tx) | 27.9 (S_EB-tx binds at 374 B/tx) |
+| observed spacing | 16.4 (1 RB / 20.8 s, p = 0.538) | 27.6 (1 RB / 20.8 s, p = 0.533) |
+| voting-adjusted, full | 12.6 (s_full = 0.689) | 16.9 (s_full = 0.540) |
+| load-adjusted | 12.2 (announcing 0.99, EB 0.97, plain RB 0.97) | 15.5 (announcing 0.99, EB 0.94, plain RB 0.98) |
+| measured | 12.2 | 15.5 |
+
+Table 4.3. The ladder at 100 kB / 1 MB, whole runs of 17.8 h and 17.2 h,
+1,637 and 1,570 eligible EBs, 14-slot gap. Transactions per second at the
+measured size: 60.7 and 41.3.
+
+<!-- pagebreak -->
+
+Table 4.4 is the stage table of the same runs.
+
+| stage | cluster 100 kB / 1 MB, 200 B | cluster 100 kB / 1 MB, 374 B |
+|---|---|---|
+| body arrival: p90; weight under 3 s | 2.96 s; 0.98 | 2.83 s; 1.00 |
+| closure arrival: p90; weight under 3 s / 7 s | 3.88 s; 0.00 / 1.00 | 3.61 s; 0.00 / 1.00 |
+| applied share | 45 % | 37 % |
+| validation: p90 | 4.57 s | 6.51 s |
+| vote rate on eligible EBs, p25 node | 75 % | 58 % |
+| tally reaches the quorum: p90 | 6.76 s | 6.76 s |
+| quorums that became certificates | 99.6 %, 1,128 of 1,132 quorums seen | 99.6 %, 820 of 823 quorums seen |
+
+Table 4.4. The stages at 100 kB / 1 MB, all 51 nodes, equal weight,
+read as Table 4.2.
+
+Measured: 12.2 and 15.5 kB/s, with 0.689 and 0.540 of the full EBs
+certified. The step from 260 kB to 555 kB closures paid in
+throughput, 7.5 to 12.2 kB/s, and the step to 1 MB paid again, to
+15.5, but each took certification further from its plateau.
+
+The loss is in one row. Every closure is at every node before 4 s and
+the body before 3, and the applied share is in the range of the
+smaller run. Validation, which took about a second at 1,110
+transactions, takes 4.57 s at 2,777 and 6.51 s at 2,673 two-input
+transactions, past the four seconds available, and the tally reaches
+the quorum at 6.76 s against a deadline of 7.
+
+Three nodes in four vote on at least 75 % and 58 % of the eligible
+EBs, the share they validated in time. Since every node is the same,
+the EBs that cross the deadline on one cross it on most: every quorum
+seen became a certificate, and the failures are EBs for which no
+quorum formed anywhere.
+
+The binding quantity is therefore the validation work of the EB on
+the host, counted in transactions times the cost of each
+transaction's shape, not in bytes. The 374 B run holds fewer
+transactions than the 200 B run and loses more, because each
+transaction costs twice as much to apply.
+
+Section [6](#cross-cutting-explanations) gives the cost per transaction per host, and section [8](#what-binds-certification-and-what-would-move-it)
+prices these runs on current-generation hosts, which the testnet
+measured at a fraction of the cluster's cost. Section [5](#leios-on-praos) takes up the
+other finding of these runs, the certifying RB's cost at adoption,
+which grows with the closure.
+
+### 308 kB references, 2 MB closures
+
+The largest set ran on the testnet only, in two windows: the loaded hours
+of 2026-10-24 to 26, at 247 and 506 B transactions, 318 B on average
+(Table 3.1), called the 318 B window below, where S_EB-tx binds at
+6,284 transactions; and the window of 2026-10-28 at a mix of
+transaction sizes, the 1 kB window. The second window is presented in 4.3.1, where it
+separates the effect of the transaction count from that of the bytes,
+which the first window cannot.
+
+Expected, from 4.2: 53.5 kB/s on paper, and certification falling
+with EB size, on two counts. Six thousand transactions are far beyond
+the 2,000 to 3,300 that the hosts measured so far validate inside the
+window from scratch, and the operator population spans a wider range
+of hosts than the cluster. And 2 MB is eight times the closure that
+reached three nodes in four by 2.78 s on this testnet (Table 4.2), so
+if diffusion scales with the bytes, as 2.5 expects, this set is the
+first to test the closure stage.
+
+Table 4.5 is the ladder of the two windows.
+
+| rung, kB/s | testnet 308 kB / 2 MB, 318 B | testnet 308 kB / 2 MB, 1 kB |
+|---|---|---|
+| parameter ceiling | 53.5 (p = 0.513) | 53.5 (p = 0.513) |
+| workload ceiling | 53.5 (S_EB-tx binds at 318 B/tx) | - |
+| observed spacing | 49.5 (1 RB / 25.5 s, p = 0.613) | 52.0 (1 RB / 22.6 s, p = 0.569) |
+| voting-adjusted, mix | 25.9 (s_all = 0.485) | 25.8 (s_all = 0.454) |
+| voting-adjusted, full | 9.9 (s_full = 0.138) | - |
+| load-adjusted | 15.9 (announcing 0.98, EB 0.59, plain RB 0.90) | - |
+| measured | 12.0 | 22.0 |
+
+Table 4.5. The ladder at 308 kB / 2 MB. 318 B window: the 25 even hours
+from 2026-10-24 12:00 to 10-26 13:00 UTC, 2,128 eligible EBs, 1,033
+certified. 1 kB window: the four even hours from 10-28 18:00 to 10-29
+01:00 UTC, 361 eligible, 164 certified. Both voting-adjusted rungs are
+shown because they differ here: "full" is the survival of EBs at the cap,
+"mix" of all eligible EBs as forged. Both columns carry two transaction
+sizes (Table 3.1). The rungs that read an EB's bytes from its reference
+count at the mean size misread the 318 B window's 506 B EBs by at most a
+quarter of their bytes, and give no reading in the 1 kB window, whose
+rungs are left out and read by EB class in 4.3.1; the appendix's ladder
+entry states the reading. The measured rung is exact. Transactions per
+second at the measured size: 38.0 and 29.6.
+
+Table 4.6 is the stage table of the same windows.
+
+| stage | testnet 308 kB / 2 MB, 318 B | testnet 308 kB / 2 MB, 1 kB |
+|---|---|---|
+| body arrival: p90; weight under 3 s | 4.08 s; 0.39 | 3.28 s; 0.47 |
+| closure arrival: p90; weight under 3 s / 7 s | 7.16 s; 0.14 / 0.51 | 5.12 s; 0.30 / 0.53 |
+| applied share | 38 % | 24 % |
+| validation: p90 | 8.54 s | 3.52 s |
+| vote rate on eligible EBs, p25 node | 44 % | 61 % |
+| tally reaches the quorum: p90 | 7.60 s | 7.10 s |
+| quorums that became certificates | 93 %, 1,033 of 1,107 quorums seen | 90 %, 164 of 182 quorums seen |
+
+Table 4.6. The stages at 308 kB / 2 MB. 318 B window: 89 reporting
+pools of the 145 to 148 in the committee, holding 0.63 of its weight;
+1 kB window: 85 of 150, holding 0.61 (Table 3.3).
+Read as Table 4.2, at the unfavourable-quartile reporting node. The
+weight share is of the whole committee, so its ceiling is the observed
+weight.
+
+Measured, in the 318 B window: 12.0 kB/s, 22 % of the parameter
+ceiling, with 0.485 of the eligible EBs certified as forged and 0.138
+of the full ones. The ladder splits the loss in two: the EBs were at
+0.59 of the cap on average, and of what was forged, half failed. The
+1 kB window carried 22.0 kB/s at the same caps and certified share,
+because its certified closures were larger, 2 MB at the median
+against 765 kB.
+
+The EBs were small because the operator producers forge from thin
+mempools, while the IOG and PIR producers, whose mempools are at the
+injection points, forge full ones.
+
+The half that failed were the large ones. Table 4.7 gives the closure
+stage by EB size.
+
+| EB size | EBs | certified | certified closure, kB | weight holding the closure by 3 s / 7 s | weight voted by 7 s |
+|---|---:|---:|---:|---:|---:|
+| under 2,000 txs | 519 | 75 % | 168 / 313 / 469 | 0.48 / 0.51 | 0.51 |
+| 2,000-4,000 | 492 | 76 % | 708 / 865 / 1,038 | 0.44 / 0.50 | 0.47 |
+| 4,000-6,000 | 739 | 25 % | 1,291 / 1,707 / 2,000 | 0.37 / 0.44 | 0.41 |
+| 6,000 and up | 295 | 17 % | 1,571 / 1,668 / 1,718 | 0.34 / 0.41 | 0.41 |
+
+Table 4.7. Closure and vote by EB size in the 318 B window, sizes by
+reference count. The certified closures' bytes are p25 / p50 / p75
+over the bin's EBs. The two weight cells are, per EB, the share of
+the committee's weight held by the reporting nodes that had the
+closure by 3 s and by 7 s, and by those that voted by 7 s, at the
+median EB of the bin. Both are bounded by the reporting weight, 0.63,
+and come from two instruments whose node sets differ slightly, so a
+difference within a hundredth between them is not read.
+
+The stage rows say where the loss is. In the closure row of Table
+4.6, a quarter of the nodes have a p90 of 7.16 s or more, past the
+deadline, and the nodes whose p90 is under 7 s hold 0.51 of the
+committee's weight.
+
+Table 4.7 places the loss at arrival. As the EBs grow, the weight
+holding the closure by 7 s falls from 0.51 to 0.41, out of about 0.50
+present. The weight that votes is within 0.03 of it in every bin, so
+once the closure has arrived the vote follows: validation loses
+nothing visible in the 318 B window. The closures with more
+transactions are also the ones with more bytes, so this window cannot
+say which of the two costs the arrival; 4.3.1 can.
+
+By Table 4.6, validation after the closure takes 8.54 s or more at a
+quarter of the nodes, and a quarter of the nodes vote on 44 % or fewer
+of the eligible EBs; by Table 4.7 those nodes hold little of the
+committee's weight. Section [6](#cross-cutting-explanations) reads both spreads by host class.
+
+The 7 % of quorums seen that did not become certificates (Table 4.6)
+are lost after the tally, at the next RB's forger.
+
+The operating point of this network at this set is therefore well
+under the cap. Certification is about three quarters up to 4,000
+transactions and a quarter above, so the bytes carried per eligible
+EB, size times survival, peak in the 2,000 to 4,000 bin of Table 4.7,
+where three quarters of 865 kB closures certify against a quarter of
+the 1,707 kB ones in the bin above.
+
+#### The 1 kB-transaction window: transaction count, not bytes
+
+The first window cannot separate the effect of the transaction count
+from that of the bytes: its two transaction sizes are close, 247 and
+506 B, and spread evenly, so a closure's bytes stay in step with its
+count. This one can: its sizes differ fourfold, and its closures are
+at or near 2 MB with counts from under 2,000 to over 6,000. From 2026-10-28 18:00 UTC the
+generator submitted transactions of about 1 kB carrying metadata,
+while a second generator kept submitting transactions of 230 to
+260 B, so EBs of three kinds were eligible in every hour: closures of
+the 1 kB transactions, which reach 2 MB at about 2,000 of them; mixed
+closures; and closures of the small transactions, which fill S_EB at
+8,555 references, 2 MB as well. Table 4.8 gives the composition of
+the certified closures by EB size: the 1 kB closures fill the first
+two bins, the small transactions the top one, and the third is where
+they take over.
+
+| EB size | certified closure, kB | transactions p50 (certified closures) | of which about 1 kB / small, p50 |
+|---|---:|---:|---:|
+| under 2,000 txs | 679 / 1,403 / 1,998 | 1,547 | 1,198 / 22 |
+| 2,000-4,000 | 1,999 / 1,999 / 2,000 | 2,290 | 1,826 / 440 |
+| 4,000-6,000 | 2,000 / 2,000 / 2,000 | 5,973 | 645 / 5,328 |
+| 6,000 and up | 1,528 / 1,528 / 1,528 | 6,471 | 0 / 6,451 |
+
+Table 4.8. The certified closures of the 1 kB window by EB size:
+their bytes, p25 / p50 / p75, and their composition from the
+transactions the certifying RB carries, each with its size (db-sync).
+Regenerated by `scripts/eb_composition.py`.
+
+Table 4.9 reads the closure stage and validation by EB size, in the
+bins of Table 4.7.
+
+| EB size | EBs | certified | weight holding the closure by 3 s / 7 s | weight voted by 7 s |
+|---|---:|---:|---:|---:|
+| under 2,000 txs | 94 | 66 % | 0.49 / 0.54 | 0.55 |
+| 2,000-4,000 | 198 | 51 % | 0.50 / 0.54 | 0.52 |
+| 4,000-6,000 | 26 | 4 % | 0.51 / 0.54 | 0.45 |
+| 6,000 and up | 43 | 2 % | 0.00 / 0.00 | 0.03 |
+
+Table 4.9. Closure and vote by EB size in the 1 kB window, read as
+Table 4.7, with the reporting weight at 0.61. The last row's zeros
+are 32 EBs at the S_EB cap whose body never arrived at any reporting
+node, among 11 EBs of 6,000 to 8,549 references that did.
+
+The 32 EBs of the last row come from 19 forging pools that served the
+body of none of their EBs, while the other 92 pools served every one.
+Those EBs fail at their forgers, before diffusion, and say nothing
+about arrival or validation.
+
+Closures of 2 MB certify at 66 % under 2,000 transactions, 51 % at
+2,000 to 4,000 and 4 % at 4,000 to 6,000. Arrival is the same in the
+three classes: 0.54 of the committee's weight holds the closure by
+7 s. That is more than the 0.41 to 0.44 the smaller closures of
+Table 4.7 reach, so closure bytes alone do not set the arrival
+either: the nodes of this window held more of each closure when it
+was announced, an applied share of 24 against 38 % (Table 4.6), and
+had less to fetch. What moves is the weight that votes in time, 0.55,
+0.52 and 0.45 of the 0.56 present.
+
+The quorum is 0.75 of the committee's weight, and 0.39 of it is
+unobserved. In the first class the reporting nodes vote 0.55 in time,
+so the quorum needs 0.20 from the unobserved pools, about half of
+their weight. In the third class the reporting nodes vote 0.45 and
+the quorum needs 0.30 from them, four fifths of their weight instead
+of half, for closures of the same bytes with more transactions. That
+is the step from 66 % certified to 4 %.
+
+In this window the cost is the transaction count. Across the two
+windows the count alone does not set it: the 318 B window's EBs of
+6,000 transactions validate in time (Table 4.7), while this window's
+EBs of 5,000 do not. Section [6.2](#what-the-node-pays-at-the-vote)
+measures the cost per transaction in both and explains the
+difference.
+
+What binds the pipeline at this set is therefore what the voters
+validate, not the bytes they fetch.
+
+### Across the sets
+
+Read across the three sets, the ladders say that the chain delivers
+its parameter ceiling less its own spacing and the load's shortfall
+as long as the EBs validate inside the window: 7.5 of 8.6 kB/s and
+7.2 of 8.9 at 260 kB (Table 4.1). From 555 kB closures upward the
+voting rung takes a growing share: full-EB survival of 0.689 on the
+cluster at 2,777 transactions and 0.540 at 2,673 two-input ones
+(Table 4.3), and 25 % and 17 % certified on the testnet above 4,000
+(Table 4.7).
+
+The stage tables put the loss at validation on the cluster (Table
+4.4) and in the testnet's 1 kB window (Table 4.9), and at the
+closure's arrival in the testnet's 318 B window at 2 MB (Table 4.7).
+Read together, the two testnet windows separate the two: at a fixed
+2 MB the arrival weight does not move with the count (Table 4.9), and
+the count costs the validation. What sets the arrival is what each
+node has to fetch, the closure less what it holds, which the windows
+differ in (4.3.1).
+
+What moves between the sets is the validation work of an EB on a
+host, its transaction count times the cost of each transaction's
+shape. On the testnet a second quantity enters that the tables do not
+see: 0.39 of the committee's weight reports nothing, so whether those
+pools vote in time, and what stops them when they do not, cannot be
+told.
+
+## Leios on Praos
+
+Leios leaves the Praos block in place. It adds work to the RB that
+carries a certificate: that RB makes a closure of transactions part of
+the ledger, so no node can validate it, or build on it, before it has
+applied the closure to its ledger state.
+
+Section [2.1](#the-pipeline-and-its-clock) put this
+stage last in the pipeline because it is the one stage on Praos's own
+path. This section measures what it cost on the runs of section [3](#populations-and-instruments),
+on the build of section [4](#results-by-parameter-set).
+
+Two comparisons are made. Within each run, the RB that certifies and
+announces an EB is set against the full plain RB that announces one,
+of the same nodes in the same hour. Both pay the mempool snapshot, so
+the difference between them is the certificate's, isolated from the
+hour's load. Across runs, the benchmarking team's Praos control, a
+release node on the same cluster with the same transaction shape, says how much later
+the Leios node forges and adopts its RBs than the release node does
+its blocks, averaged over a run with certifying and plain RBs
+together.
+
+Section 5.1 states
+what to expect, 5.2 picks the RBs compared, 5.3 to 5.5 measure
+adoption, forks and chain density, 5.6 reads the control, and 5.7 says
+what the cost is made of. The tables are regenerated by
+`scripts/praos_table.py`.
+
+### What is expected
+
+A Praos block that arrives late costs no slot: the leader of the next
+slot forges regardless, on whatever chain it holds. If that leader has
+not adopted the previous block within the one second between the two
+slots, it builds on the block before. The two RBs then compete at the
+same height and the tiebreak orphans one of them. A slow block
+therefore costs a fork, not a missed slot. Two measures follow: how
+long the nodes take to adopt each kind of RB, and how often
+consecutive-slot leader pairs fork. Chain density, the RBs on the
+chain per slot, falls by the orphans and by nothing else as long as
+every leader forges.
+
+Under load a full plain RB already takes most of that second to
+adopt. A certifying RB adds two steps to that path. The forger applies
+the certified closure to its ledger state before it can forge, and
+each adopter applies it again inside chain selection. Each step costs
+the closure's transaction count times what the ledger spends per
+transaction this way, and a plain RB pays neither.
+
+CIP-164 calls this step the closure's reapplication, Δ_reapply, and
+defines it as the application with minimal checks and UTxO updates:
+the certificate licenses it, and it is not the voter's reapply of
+section [2.1](#the-pipeline-and-its-clock), which keeps the ledger's
+checks. The CIP's security argument requires that step
+to cost less than a plain block's transaction validation,
+Δ_reapply < Δ_applyTxs, so that a certifying RB is processed within
+the same Δ_RB bound as a Praos block. That inequality, the CIP's
+reapplication constraint, is what this section tests.
+
+The certifying RB has one advantage. Its body is about 1 kB against
+88 kB, and applying a closure without validation costs less per
+transaction than validating a full block's transactions from scratch.
+At small closures it can therefore be adopted earlier than a full
+plain RB. The expectation is a crossover: the certifying RB is adopted
+earlier below some transaction count and later above it, by an amount
+that grows with the closure.
+
+Above the crossover, consecutive-slot
+pairs should fork more often when the first RB certifies. No leader
+slot should be missed, and the chain's density should fall by the
+forks alone.
+
+### The RBs that were compared
+
+An RB can certify the previous EB or not, and announce a new EB or
+not, four kinds in all. Under load nearly every RB announces an EB. A
+certifying RB carries no transactions of its own on either
+population, about 1 kB of header and certificate. Two kinds therefore
+matter: the RB that certifies and announces, and the full plain RB
+that announces. Table 5.1 gives the counts.
+
+| window | certifies, announces | certifies, no EB | plain, announces, full | plain, no EB |
+|---|---:|---:|---:|---:|
+| cluster 40 kB / 260 kB, 200 B | 1,539 | 0 | 1,521 | 23 |
+| testnet 40 kB / 260 kB, 257 B | 527 | 2 | 331 | 7 |
+| cluster 100 kB / 1 MB, 200 B | 1,128 | 0 | 1,916 | 35 |
+| cluster 100 kB / 1 MB, 374 B | 820 | 0 | 2,125 | 23 |
+| testnet 308 kB / 2 MB, 318 B | 1,014 | 17 | 2,275 | 46 |
+| testnet 308 kB / 2 MB, 1 kB | 159 | 2 | 441 | 0 |
+
+Table 5.1. RBs on the chain by kind, from the chain of each window. A
+plain RB is full from 80 kB (the limit is 90,112 B); the plain
+announcing RBs under that size are not shown. A full plain RB that
+announces nothing is as rare as the mempool makes it: with enough
+transactions to fill the RB there are enough to announce an EB. The
+rows that follow compare the first column with the third, the full
+block the CIP's constraint names; the other kinds are left out.
+
+
+### Adoption within a run
+
+The adoption delay is the time from an RB's slot to a node's adoption
+of it, for each reporting node and each RB on the chain. Table 5.2
+gives its median and 90th percentile over all (node, RB) pairs and the
+share adopted within the slot, for the certifying RB at the set's
+closure and for the full plain RB of the same window.
+
+| window | closure bin (RBs in it) | certifying p50 / p90 | within 1 s | full plain p50 / p90 | within 1 s |
+|---|---:|---:|---:|---:|---:|
+| cluster 40 kB / 260 kB, 200 B | 222 kB (1,539) | 0.92 / 1.21 s | 61 % | 1.03 / 1.70 s | 46 % |
+| testnet 40 kB / 260 kB, 257 B | under 0.5 MB (529) | 0.66 / 1.25 s | 78 % | 0.91 / 2.04 s | 58 % |
+| cluster 100 kB / 1 MB, 200 B | 555 kB (1,015) | 1.20 / 1.52 s | 9 % | 1.13 / 1.84 s | 31 % |
+| cluster 100 kB / 1 MB, 374 B | 0.5-1 MB (810) | 1.28 / 1.56 s | 3 % | 1.12 / 1.76 s | 32 % |
+| testnet 308 kB / 2 MB, 318 B | 1.5-2 MB (161) | 1.58 / 2.45 s | 3 % | 1.17 / 2.51 s | 30 % |
+| testnet 308 kB / 2 MB, 1 kB | 1.5-2 MB (124) | 0.62 / 1.55 s | 75 % | 0.62 / 2.14 s | 73 % |
+
+Table 5.2. Adoption delay after the RB's slot, over all (node, RB) pairs
+of the window: the cluster's 51 nodes, the testnet's reporting nodes
+(Table 3.3). A node adopts an RB when it adds it to its chain or
+switches to the fork carrying it. The certifying RB is read at the
+closure bin that holds the set's typical closure, with the RBs in that
+bin in parentheses; the testnet's 2 MB rows take the 1.5-2 MB bin.
+The full plain RBs are those of Table 5.1, less the 66 of the 2 MB
+window that no reporting node adopted other than inside a switch of
+several blocks, which leaves no record.
+
+At 260 kB the certifying RB is adopted earlier than a full plain one on
+either population, for two reasons. Its body is about 1 kB against
+88 kB, so it reaches the nodes sooner, 0.53 against 0.72 s on the
+testnet (the saved adoption-path outputs). And applying its thousand
+transactions without validation costs what validating the full
+block's few hundred costs: 0.06 s for both on the testnet, 0.10
+against 0.11 s on the cluster.
+
+From 555 kB closures upward the closure's application outgrows that
+advantage and the order reverses. On the cluster the certifying RB's
+median moves from 0.92 to 1.20 and 1.28 s while the full plain RB
+stays at 1.03 to 1.13 s, and the share adopted inside the slot falls
+from 61 % to 9 and 3 %. On the testnet at 1.5 to 2 MB the certifying
+RB is adopted at 1.58 s against 1.17 s, 3 % inside the slot against
+30 %.
+
+The 1 kB window puts the cost on the transaction count rather than
+the bytes, at a similar cost per transaction applied. Its closures of
+1.5 to 2 MB hold about 2,000 transactions and are adopted at 0.62 s,
+the same as the window's full plain RB, where closures of the same
+bytes with about 4,900 transactions took 1.58 s in the 318 B window.
+The window ran on a mixed build (section [3.1](#the-public-testnet)): the equality
+inside the window does not depend on it, and the comparison across
+windows could owe part of its difference to the build.
+
+Where the time goes is visible on the IOG and PIR hosts' traces at
+2 MB, which time each step of the forge and adoption paths
+(`scripts/forge_path.py` at the forger, the adoption-path query at the
+adopters). Every forge with a loaded mempool pays 0.50 s to snapshot
+it, plain or certifying, so a full plain RB leaves the forger 0.53 s
+after its slot starts. Applying the closure adds 0.04 to 0.19 s as it
+grows from 0.3 to 1.9 MB, 34 to 41 µs per transaction, so a certifying
+RB at 2 MB leaves at 0.70 s. Each adopter then applies the closure
+inside chain selection, 0.24 s at 2 MB against 0.05 s to validate a
+full plain RB. Those two steps account for most of the difference
+between the two kinds in Table 5.2.
+
+Table 5.2 therefore answers the CIP's reapplication constraint: it
+holds at a thousand transactions and fails from a few thousand up. At 1.5 to
+2 MB, about 4,900 transactions, the certificate costs the median
+adoption 0.41 s more than the fullest plain block.
+
+### Forks
+
+A consecutive-slot leader pair is two leaders in slots s and s + 1. The
+pair stays on the chain if the second leader had adopted the first RB
+within the second and built on it; otherwise the two RBs compete at the
+same height and one is orphaned. Table 5.3 counts the pairs of each
+window, on the chain and forked, by the kind of the pair's first RB,
+the one the second leader had to adopt.
+
+| window | share forked among all consecutive-slot pairs | among the pairs led by a certifying RB | among the pairs led by a plain RB |
+|---|---:|---:|---:|
+| cluster 40 kB / 260 kB, 200 B | 62 of 137 (45 %) | 18 of 64 (28 %) | 44 of 73 (60 %) |
+| testnet 40 kB / 260 kB, 257 B | 5 of 31 (16 %) | 1 of 10 (10 %) | 4 of 21 (19 %) |
+| cluster 100 kB / 1 MB, 200 B | 122 of 173 (71 %) | 56 of 67 (84 %) | 66 of 106 (62 %) |
+| cluster 100 kB / 1 MB, 374 B | 129 of 182 (71 %) | 50 of 53 (94 %) | 79 of 129 (61 %) |
+| testnet 308 kB / 2 MB, 318 B | 46 of 122 (38 %) | 22 of 43 (51 %) | 24 of 79 (30 %) |
+| testnet 308 kB / 2 MB, 1 kB | 5 of 25 (20 %) | 1 of 5 (20 %) | 4 of 20 (20 %) |
+
+Table 5.3. Consecutive-slot leader pairs: the forked pairs over all the
+pairs of that kind, on the chain and forked together. A forked pair is an
+orphan adopted by two or more observed nodes whose competitor on the chain
+sits one slot before or after it; the pair's first RB, the one the second
+leader had to adopt, is read from the chain when it won and from the
+orphan's fetched size when it lost (a certifying RB fetches at about
+1 kB). A plain first RB is of any size here. The share of all RBs
+orphaned is in Table 5.4.
+
+At 260 kB a pair led by a certifying RB forks less often than one led
+by a plain RB on both populations, 28 against 60 % on the cluster and
+10 against 19 % on the testnet, as the certifying RB is adopted
+earlier. From 555 kB closures upward it forks more often: 84 and 94 %
+against 62 and 61 % on the cluster, 51 against 30 % on the testnet at
+2 MB. The 1 kB window has five pairs led by a certifying RB, too few
+to read.
+
+The plain RB's own forked share rises on the testnet from 19 to 30 %
+as its median adoption goes from 0.91 to 1.17 s (Table 5.2), and sits
+at 60 % at every set on the cluster, where that median is 1.03 to
+1.13 s, past the one second between the two slots.
+
+Table 5.3 therefore confirms the second expectation of 5.1: the forked
+share follows the adoption delay for both kinds of RB, and above the
+crossover a pair led by a certifying RB forks more often than one led
+by a plain RB.
+
+### Missed slots and chain density
+
+The slot lottery sets what the chain should hold. In a window of N
+slots each slot elects a leader with probability f. The leader slots
+are therefore a binomial count, with mean f N and standard deviation
+the square root of N f (1 − f).
+
+Table 5.4 gives, per window, the leader slots of the observed hosts
+and how many were forged, the RBs on the chain against the lottery's
+mean and deviation, and the orphans seen by two or more observed
+nodes.
+
+| window | observed hosts: leader slots / forged | RBs on the chain | lottery mean (sd) | chain density | orphans seen by two or more observed hosts |
+|---|---|---:|---:|---:|---:|
+| cluster 40 kB / 260 kB, 200 B | all 51 nodes: 3,233 / 3,233 | 3,083 | 3,198 (55) | 0.96 | 150 |
+| testnet 40 kB / 260 kB, 257 B | 13 reporting hosts: 369 / 369 | 944 | 1,080 (32) | 0.87 | 23 |
+| cluster 100 kB / 1 MB, 200 B | all 51 nodes: 3,291 / 3,291 | 3,079 | 3,203 (55) | 0.96 | 212 |
+| cluster 100 kB / 1 MB, 374 B | all 51 nodes: 3,175 / 3,175 | 2,968 | 3,093 (54) | 0.96 | 207 |
+| testnet 308 kB / 2 MB, 318 B | 13 reporting hosts: 1,185 / 1,185 | 3,536 | 4,500 (65) | 0.79 | 101 |
+| testnet 308 kB / 2 MB, 1 kB | 13 reporting hosts: 168 / 168 | 636 | 720 (26) | 0.88 | 15 |
+
+Table 5.4. Leader slots, RBs and chain density. Chain density is RBs on
+the chain per slot over f; the deviation is in RBs. On the testnet only the
+13 IOG and PIR producers log their leader slots and only the reporting
+nodes' adoptions reveal an orphan. The printer's trickle rows give the
+same periods' densities outside the loaded hours, read below.
+
+No observed host missed a leader slot in any window: every leader slot
+of the cluster's 51 nodes and of the testnet's 13 IOG and PIR producers
+has its forged RB. On the testnet this reading is partial: the
+operators' telemetry does not carry the leadership event, so the 13
+producers are the only hosts whose elected slots are known.
+
+On the cluster, where every node is observed, the orphans are the
+whole difference between the leader slots and the chain: 3,233, 3,291
+and 3,175 slots, all forged, less 150, 212 and 207 orphans, give the
+chain's 3,083, 3,079 and 2,968 RBs. The orphans are 4.6 % of the
+forged RBs at 260 kB and 6.4 to 6.5 % at 1 MB, and the density is 0.96
+on all three runs.
+
+On the testnet the chain holds fewer RBs than the lottery's mean: the
+density is 0.87 at 260 kB and 0.79 in the 318 B window at 2 MB. The
+orphans the reporting nodes saw explain about 2 % of the mean in each
+window. The rest, 113 RBs at 260 kB and 863 in the 318 B window at
+2 MB, is 3.5 and 13 deviations below the mean. By luck alone the
+leader slots differ from the mean by about one deviation, rarely by
+more than two, so the gap is not chance. It comes from what the logs
+do not see: pools outside the 13 observed producers that were offline
+or missed their slots, and orphans no two reporting nodes adopted. The
+same gap is there in the periods' trickle hours, with densities of
+0.87, 0.83 and 0.94 against 0.87, 0.79 and 0.88 in the loaded hours,
+so the load accounts for at most 0.06 of it.
+
+Table 5.4 therefore confirms the last two expectations of 5.1 on the
+cluster, where every node is observed: no leader slot is missed, and
+the density falls by the forks alone. On the testnet the reading is
+partial. The 13 observed producers missed no slot, and the density gap
+is there in the trickle hours too, so it is read as the unobserved
+pools' rather than as a cost of the load. What Leios costs Praos on
+the testnet is the delays of Table 5.2 and the forks of Table 5.3.
+
+### The Praos control
+
+The benchmarking team compared a Praos run of the release node against
+two Leios cluster runs on the same cluster, with transactions of the
+same shape, two inputs and two outputs at 374 B. On the control the
+team's generator submitted 12 transactions per second to 52 machines,
+which fills the Praos block. The Leios runs took their load from the
+generator of section [3.2](#the-benchmarking-cluster). The control ran on node 11.1.1 on
+2026-09-05, the Leios runs on node 11.2.0.164 on 2026-10-21 and 23.
+The 100 kB / 1 MB run is the cluster 100 kB / 1 MB, 374 B run of
+section [4](#results-by-parameter-set). The 40 kB / 260 kB run at 374 B is read nowhere else in
+this report.
+
+Table 5.5 reproduces the figures that bear on this section, from the
+team's report of 2026-10-27.
+
+| | Praos control | Leios 40 kB / 260 kB, 374 B | Leios 100 kB / 1 MB, 374 B |
+|---|---|---|---|
+| node, cluster start | 11.1.1, 2026-09-05 | 11.2.0.164, 2026-10-23 | 11.2.0.164, 2026-10-21 |
+| RB size, mean | 88,956 B | 42,688 B | 65,120 B |
+| RBs certifying the predecessor's EB | 0 | 0.527 | 0.273 |
+| height and slot battles per RB | 0.00091 | 0.00524 | 0.0218 |
+| mempool snapshot, the team's event | 0.042 s | 0.00004 s | 0.00003 s |
+| leadership to forged | 0.0008 s | 0.349 s | 0.586 s |
+| slot start to header announced | 0.063 s | 0.395 s | 0.690 s |
+| adopted by half the cluster | 0.61 s | 0.83 s | 1.28 s |
+| adopted by 90 % of the cluster | 1.07 s | 1.14 s | 1.63 s |
+| adopted by the whole cluster | 1.11 s | 1.21 s | 1.79 s |
+
+Table 5.5. The benchmarking team's Praos control against its two Leios
+runs, values as printed in the team's comparison. Each figure is the
+mean of a per-block sample over the run's analysed blocks, those after
+the warm-up that every other host adopted, which leaves out a block
+any host took through a chain switch. The adoption rows are the time
+since the slot start at which the given share of the cluster had
+adopted the block. The team's snapshot event does not cover the Leios
+build's snapshot, which runs inside its partition step. The control's
+blocks are all full plain blocks; the Leios runs' mean RB size is
+lower because the certifying RBs carry no transactions. The team's
+report carries the resource rows as well.
+
+The Leios node's forge path is slower before any certificate. A Praos
+block is forged 0.0008 s after the leadership check and its header
+announced 0.063 s after the slot starts. The Leios node's RBs, plain
+and certifying together, take 0.35 and 0.59 s from leadership to
+forged. Both nodes snapshot the mempool before forging. The release
+node's snapshot hands back its validated mempool in 0.042 s. The
+Leios build's snapshot revalidates the whole mempool against the
+slot's state, and on a certifying RB against the state after the
+closure. The forge-path traces of section [5.3](#adoption-within-a-run) time it at 0.50 s on
+the testnet's loaded mempools.
+
+Adoption follows. Half the cluster has a block at 0.61 s on the
+control against 0.83 s at 260 kB and 1.28 s at 1 MB. Ninety percent
+of it has the block at 1.07 s against 1.14 and 1.63 s. At 260 kB the
+gap to the control is 0.22 s at the median and 0.07 s at the 90th
+percentile. The certifying RB is the faster kind at this set
+(Table 5.2, the 200 B run), so most of that run's gap is the forge
+path, not the certificate.
+
+Height and slot battles per RB rise from 0.0009 on the control to
+0.005 at 260 kB and 0.022 at 1 MB, a factor of 6 and 24: the forks of
+5.4, seen from the control's side.
+
+Table 5.5 therefore places the Leios build's cost to Praos before any
+certificate: its forge path delays every block by 0.35 to 0.59 s, and
+the certificate adds its closure on top. The control is one run of an
+older release, loaded by a different generator at Praos's own rate,
+so the figures give the order of the cost, not its measure.
+
+### What this says and what would change it
+
+Leios costs Praos nothing in slots and something in forks. The
+something is the time to apply the certified closure at adoption: its
+transaction count times the ledger's cost per transaction applied this
+way, tens of microseconds on these value transactions.
+
+At a thousand transactions the certifying RB is the faster block, and
+the CIP's reapplication constraint holds. At a few thousand it is the
+slower one, by 0.07 to 0.41 s at the median. The consecutive-slot
+pairs it leads then fork accordingly, nearly all of them on the
+cluster at 1 MB. A
+transaction mix with a higher cost per applied transaction moves the
+crossover down in count by the same factor.
+
+Underneath both kinds the Leios build's forge path is 0.35 to 0.59 s
+behind the release node's on every block. That is the larger part of
+the gap at 260 kB, and plain and certifying RBs share it equally.
+
+Both costs are the implementation's. The certificate's is two
+applications of a closure that every voter validated at the vote
+window, 14 slots or more before the certifying RB. An implementation
+that kept the ledger state from vote time for adoption would remove
+most of it. This report has no measurement of such a change. The
+forge path's delay is removed by the build of section [9.3](#the-cluster) where
+that build has run.
+
+## Cross-cutting explanations
+
+Section [4](#results-by-parameter-set) placed the loss of each parameter set: at validation on the
+cluster at 1 MB and in the testnet's 1 kB window, and at the closure's
+arrival in the testnet's 318 B window at 2 MB. The transaction count
+costs the validation, and what each node has to fetch costs the
+arrival. Section [5](#leios-on-praos) placed the certifying RB's cost at adoption.
+
+This section explains those readings with four quantities that cut
+across the sets: what a transaction costs a voter to validate (6.1
+and 6.2), how much of each EB the voters had already seen (6.3), how
+the EB reaches the nodes of each population (6.4), and what the nodes'
+memory and sustained CPU are (6.5). Each is measured on this report's own
+windows and runs. Section [7](#models-against-measurements-deltaq-and-the-cip-cost-model) sets the models' and the ledger
+benchmark's figures against them. Section [8](#what-binds-certification-and-what-would-move-it) says what could change
+them. The tables are regenerated by `scripts/cost_table.py` and
+`scripts/diffusion_table.py`.
+
+### The cost of validating a transaction
+
+A voter validates an EB's closure transaction by transaction. The ones
+it validated before, at admission to its mempool or in an earlier EB,
+are reapplied, the state update without the checks. The rest are
+applied in full. The validation time of an EB is therefore its
+transaction count times a cost that depends on how many of them the
+voter had already validated, on the transactions' shape and on the
+host.
+
+Tables 6.1a to 6.1c read that cost from the validation records: per
+host, on the EBs of one window, the validation time per EB, grouped by
+the share of the EB's transactions the voter applied in full. The
+transaction count is held fixed: each table takes the window's most
+common 500-transaction size class, so the rise along a row is the
+applied share alone. Shape here is the transaction's inputs, outputs
+and bytes.
+
+The IOG and PIR hosts are shown by instance class, the IOG producers
+behind their relays apart from the PIR hosts in the open network. The
+operators are shown as the median and quartile nodes of one node set.
+
+<!-- pagebreak -->
+
+**Table 6.1a.** testnet 308 kB / 2 MB, 318 B (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts): EBs of 4,500 to 5,000 transactions, the window's most common size class, 367 EBs; a cell in which a host has fewer than 30 records is marked t.
+
+| host | applied 0 to 10 % | applied 10 to 30 % | applied 30 to 50 % | applied 50 to 70 % | applied 70 to 100 % |
+|---|----:|----:|----:|----:|----:|
+| IOG producers, c8id | 0.40 - 0.43 | 1.22 - 1.32 | 2.13 - 2.25 | 2.90 - 3.18 t | 3.69 - 3.92 t |
+| IOG producer, r8id | 0.37 | 1.35 | 2.40 t | - | - |
+| PIR hosts, c8id | 0.43 - 0.54 | 1.31 - 1.64 | 2.36 - 2.74 | 3.58 - 3.71 t | 4.60 - 4.98 t |
+| PIR hosts, c5d | 0.86 - 0.92 | 2.05 - 2.54 | 4.05 - 4.09 | 5.57 - 5.68 t | 7.11 - 7.95 |
+| PIR hosts, c6id | 0.66 - 0.81 | 1.87 - 2.08 | 3.16 - 3.44 | 4.52 - 4.72 t | 5.43 - 5.97 t |
+| operator nodes, median of 13 | 1.45 | 3.19 | 6.17 | 8.94 | 10.53 |
+| lower quartile node | 0.95 | 2.06 | 3.69 | 5.14 | 6.57 |
+| upper quartile node | 2.01 | 5.57 | 10.89 | 14.86 | 19.01 |
+
+At 2 MB the applied share decides whether a host makes the four
+seconds. The current-generation hosts stay inside them up to two
+thirds applied, the c6id hosts up to half, the c5d hosts and the
+median operator node up to a third. The median operator node takes
+6.17 s applying half of the common EB and 10.53 s applying more than
+two thirds. The upper-quartile node takes 10.89 and 19.01 s.
+
+**Table 6.1b.** cluster 100 kB / 1 MB, 200 B (200 B, one input, one output): EBs of 2,500 to 3,000 transactions, the window's most common size class, 1478 EBs; a cell in which a host has fewer than 30 records is marked t.
+
+| host | applied 0 to 10 % | applied 10 to 30 % | applied 30 to 50 % | applied 50 to 70 % | applied 70 to 100 % |
+|---|----:|----:|----:|----:|----:|
+| all nodes, median of 51 | 0.48 | 1.30 | 2.29 | 3.26 | 4.36 |
+| lower quartile node | 0.44 | 1.26 | 2.22 | 3.20 | 4.27 |
+| upper quartile node | 0.64 | 1.44 | 2.35 | 3.38 | 4.55 |
+
+**Table 6.1c.** cluster 100 kB / 1 MB, 374 B (374 B, two inputs, two outputs): EBs of 2,500 to 3,000 transactions, the window's most common size class, 1105 EBs; a cell in which a host has fewer than 30 records is marked t.
+
+| host | applied 0 to 10 % | applied 10 to 30 % | applied 30 to 50 % | applied 50 to 70 % | applied 70 to 100 % |
+|---|----:|----:|----:|----:|----:|
+| all nodes, median of 51 | 0.84 | 2.10 | 3.88 | 5.54 | 7.43 |
+| lower quartile node | 0.47 | 2.06 | 3.75 | 5.36 | 7.14 |
+| upper quartile node | 0.94 | 2.22 | 3.98 | 5.70 | 7.60 |
+
+On the cluster, where every node is the same host, the rise is a
+straight line, from 0.48 to 4.36 s per EB at 200 B and from 0.84 to
+7.43 s at 374 B. The last cell of the 200 B run and the last two of
+the 374 B run are past the four seconds. The quartile nodes stay
+within a tenth of the median once the applied share passes a tenth.
+
+The line is the shape dependence as well. The two runs differ only in
+the transaction. Two inputs with two outputs cost 1.6 to 1.8 times one
+input with one output at every applied share.
+
+Tables 6.1a to 6.1c. Validation time per EB in seconds, the median
+over a host's records, by the share of the EB the voter had not
+validated before, per window, on the window's most common EB size
+class. A record is one voter validating one EB, certified or
+not; the applied share is the transactions it applied in full over the
+EB's total. The IOG and PIR hosts' cells are the range of the hosts'
+medians; a cell in which a host has fewer than 30 records is marked t,
+tentative, and one with fewer than 10 on every host is left blank. The
+records behind each cell are in the saved outputs. The operators' rows are the median node and
+the quartile nodes across the nodes with 20 or more records in every
+bin, the same nodes in every column. The cluster rows are the whole
+population, uniform hosts. The instance classes, their vCPUs and
+generations are in Table 3.2: c8id and r8id are the current
+generation, c6id two generations older, c5d three. The same tables
+for the 260 kB and the 1 kB
+windows are in the printer's output, read below.
+
+The two windows not shown have every cell inside the four seconds. At
+260 kB, on the common EB of 1,000 to 1,500 transactions, the hosts
+take 0.09 to 0.88 s and the median operator node 0.32 to 0.65 s. In
+the 1 kB window, on EBs of 1,500 to 2,000 transactions over four
+loaded hours, they take 0.16 to 1.54 s and 0.37 to 1.00 s. Most of
+that window's cells beyond a tenth applied are tentative.
+
+Every row rises with the applied share, on every host and in every
+window. The hosts keep one order in every column. At a tenth
+applied on the 2 MB window's common EB the current generation at four
+vCPUs takes 0.37 to 0.54 s, the c6id hosts at eight vCPUs 0.66 to
+0.81 s, the c5d hosts at eight vCPUs 0.86 to 0.92 s.
+
+Within the current generation the IOG producers have four upstream
+peers and the PIR hosts 150 to 164 in this window (section [6.4](#diffusion-by-population)). The producers sit at the fast end
+of the PIR hosts' range. The slowest PIR host is up to a quarter above
+them. The peer count therefore costs the validator at most that much.
+
+The operators' nodes, whose hardware is unknown, spread from the older
+hosts' level at the lower quartile to 1.4 to 1.8 times the median at
+the upper quartile, in every bin.
+
+Tables 6.1a to 6.1c therefore explain the validation losses of section
+[4](#results-by-parameter-set) by the three factors they separate: the share of the EB the
+voter has to apply, the transaction's shape, and the host. The
+testnet's slow quartile at validation (Table 4.6) is the operators'
+upper quartile here, 10.89 s on the 2 MB window's common EB applying
+half of it. These tables mix one more factor into every cell, the
+origin of the applied transactions' inputs. Section [6.2](#what-the-node-pays-at-the-vote)
+separates it. The
+arrival loss of the 318 B window is 6.4's.
+
+### What the node pays at the vote
+
+Section 6.1 left one factor unseparated, the origin of the applied
+transactions' inputs. This subsection separates it. It reads the
+voter's
+cost per applied and per reapplied transaction by host class, on
+closures whose transactions spend outputs of the same EB and on
+closures whose transactions spend outputs already on the chain.
+
+The voter's cost per transaction is read from the same validation
+records as Tables 6.1a to 6.1c, one host validating one EB, on the EBs
+of one size class. An EB of which the host applied no transaction
+gives the cost per reapplied transaction, the validation time over the
+transaction count. An EB of which it applied half or more gives the
+cost per applied transaction, the time net of the reapplied
+transactions at that rate, over the applied count. Each reading is the
+median over the host's EBs.
+
+The testnet's closures are of two kinds, by what the two generators of
+section [3.1](#the-public-testnet) do with a transaction's outputs. The IOG generator
+reuses them as soon as it has submitted the transaction. Chains of
+dependent transactions therefore build up in its mempool and land in
+one EB together, so most of its transactions spend an output created
+in the same block. The other generator waits until the transaction is
+confirmed two blocks deep and queues its outputs behind the funding
+inputs, so its outputs are spent only once they are on the chain. The
+chain shows closures of both kinds in every window.
+
+The tables split the certified closures by that difference: chained
+closures, in which 80 % or more of the transactions spend an output of
+the same EB, and old-input closures, in which half or fewer do. The
+closures in between are left out. The two lines are where the closures
+fall into two clear groups with enough EBs each.
+
+<!-- pagebreak -->
+
+**Table 6.2a.** testnet 40 kB / 260 kB, 257 B (257 B, one input, no scripts): EBs of 1,000 to 1,499 transactions: chained closures, certified closures in which 80 % or more of the inputs spend an output of the same block, 147 EBs; old-input closures, certified closures in which 50 % or less of the inputs spend an output of the same block, 156 EBs; a host cell resting on fewer than 10 EBs reads too few.
+
+| host | chained closures: apply, ms | reapply, µs | old-input closures: apply, ms | reapply, µs |
+|--|-----:|-----:|-----:|-----:|
+| IOG producers, c8id | 0.16 - 0.17 | 79 - 84 | too few | 88 - 91 |
+| IOG producer, r8id | 0.20 | 92 | too few | 98 |
+| PIR hosts, c8id | 0.18 - 0.24 | 82 - 93 | too few | 91 - 109 |
+| PIR hosts, c6id | 0.27 - 0.34 | 116 - 153 | 0.69 - 0.81 | 126 - 163 |
+| PIR hosts, c5d | 0.33 - 0.37 | 135 - 141 | 0.65 - 1.01 | 147 - 148 |
+| operator nodes, median of 21 | 0.90 | 494 | 1.77 | 508 |
+| lower quartile node | 0.41 | 242 | 0.99 | 226 |
+| upper quartile node | 1.19 | 642 | 2.69 | 669 |
+
+**Table 6.2b.** testnet 308 kB / 2 MB, 318 B (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts): EBs of 2,000 to 4,999 transactions: chained closures, certified closures in which 80 % or more of the inputs spend an output of the same block, 263 EBs; old-input closures, certified closures in which 50 % or less of the inputs spend an output of the same block, 179 EBs; a host cell resting on fewer than 10 EBs reads too few.
+
+| host | chained closures: apply, ms | reapply, µs | old-input closures: apply, ms | reapply, µs |
+|--|-----:|-----:|-----:|-----:|
+| IOG producers, c8id | 0.18 | 79 - 81 | too few | 78 - 79 |
+| IOG producer, r8id | 0.19 | 82 | too few | 78 |
+| PIR hosts, c8id | 0.21 - 0.23 | 80 - 102 | too few | 80 - 98 |
+| PIR hosts, c6id | 0.31 - 0.32 | 118 - 138 | too few | 119 - 133 |
+| PIR hosts, c5d | 0.33 - 0.37 | 142 - 151 | too few | 147 - 151 |
+| operator nodes, median of 8 | 0.45 | 212 | 1.88 | 219 |
+| lower quartile node | 0.26 | 126 | 1.21 | 129 |
+| upper quartile node | 0.68 | 304 | 3.74 | 309 |
+
+Tables 6.2a and 6.2b. The cost per transaction at the vote by host
+class and input origin. A host class's cell is the range of its
+hosts' medians; the hosts of each class are in Table 3.2. The
+operators' rows are the median node and the quartile nodes over one
+node set, the nodes with 10 or more EBs behind the apply reading and
+20 or more behind the reapply reading under both selections, so that
+the two halves compare the same nodes. The EBs behind each reading,
+and the cells that read too few, are in the expanded output of the
+printer (`scripts/cost_table.py shape --full`); every such cell points
+the same way as the cells shown.
+
+The current-generation hosts give no old-input apply reading in either
+window. An old-input closure almost never reaches them with half or
+more of its transactions unvalidated: they had validated those
+transactions through their mempools or an earlier EB, and reapply
+them. The chained closures are the ones these hosts meet unvalidated.
+Why the two kinds reach the hosts differently is open.
+
+The reapply cost does not depend on where the inputs come from; the
+apply cost does. In the 260 kB window (Table 6.2a), where both kinds
+have enough EBs on the older hosts, the c5d hosts reapply at 135 to
+148 µs per transaction under both selections. They apply at 0.33 to
+0.37 ms on chained closures against 0.65 to 1.01 ms on old-input
+ones, two to three times more. The c6id hosts repeat the pattern, and
+so do the operators' nodes at every quartile, 0.99 against 0.41 ms at
+the lower quartile and 2.69 against 1.19 at the upper.
+
+The split holds on larger EBs. In the 2 MB window (Table 6.2b), with
+2,000 to 5,000 transactions per EB, the hosts' chained cost is the
+260 kB window's, and the series output reads the same cost at every
+EB size class up to 7,000 transactions: on chained closures the cost
+per transaction does not grow with the EB. The operators' median node pays
+four times more per applied transaction on old-input closures than on
+chained ones, 1.88 against 0.45 ms. The hosts' old-input cells rest
+on too few EBs and point the same way in the expanded output.
+
+The origin decides the cost within one kind as well. On closures of
+the 247 B transaction alone, the c5d hosts' apply cost falls from
+about 1 ms with almost no same-block inputs to 0.33 to 0.37 ms on
+closures made of them, the upper reading on fewer than 10 EBs (the
+within-kind output), and the reapply cost does not move.
+
+The 1 kB window's transaction reapplies at the same rate as the 247 B
+one, 83 to 91 µs on the IOG hosts; its apply cells rest on too few
+EBs.
+
+Section [4.3.1](#the-1-kb-transaction-window-transaction-count-not-bytes) left one open question that this subsection can
+now answer: why the 318 B window's EBs of 6,000 transactions validate
+in time while the 1 kB window's EBs of 5,000 do not. The 318 B
+window's EBs of 5,500 to 6,999 transactions are chained closures of
+the 247 B transaction, 114 of the 129 certified closures of that
+class. The 1 kB window's EBs of 4,000 to 5,999 are old-input closures
+of the 220 B transaction, 19 of the 20. The counts are in the output
+of `validation_shape.py`. The 1 kB window's large EBs miss the vote
+window because they are the costlier kind.
+
+On the testnet the transaction kind and the path to the voters move
+together: the chaining generator submits to the hosts and the other
+does not, so the two are not separated here. A run with one generator
+spending old outputs and submitting to the hosts would separate them.
+
+A deployment pays the chained cost or the old-input cost according to
+how its transactions are built, which this report does not settle.
+The deployment should plan on the costlier one, old inputs. The
+chained figures are a floor, the cost the voter reaches only when a
+transaction's inputs arrive in the same closure.
+
+### Mempool coverage
+
+Section 6.1 read the voter's cost rising with the share of the EB it
+applied. That share is not a property of the EB: it is the part of the
+producer's EB the voter had not validated before the closure arrived.
+This subsection shows what that coverage does to certification on the
+cluster, where every closure is of the old-input kind, every node is
+the same host and every voter is observed, so the applied share is the
+only factor left.
+
+Table 6.3 gives the EBs of the two 1 MB runs that failed to certify,
+by the mean share of their transactions the voters applied in full.
+
+| run | applied share | EBs | failed |
+|---|---|---|---|
+| cluster 100 kB / 1 MB, 200 B | under 30 % | 607 | 3 % |
+|  | 30 to 40 % | 227 | 5 % |
+|  | 40 to 50 % | 261 | 24 % |
+|  | 50 to 60 % | 220 | 62 % |
+|  | 60 to 70 % | 113 | 80 % |
+|  | 70 % and over | 200 | 96 % |
+| cluster 100 kB / 1 MB, 374 B | under 30 % | 728 | 9 % |
+|  | 30 to 40 % | 271 | 61 % |
+|  | 40 to 50 % | 244 | 86 % |
+|  | 50 to 60 % | 148 | 97 % |
+|  | 60 to 70 % | 93 | 99 % |
+|  | 70 % and over | 82 | 100 % |
+
+Table 6.3. EBs failing to certify by their applied share, the mean
+over the EB's voters of the share of its transactions they applied in
+full; the two cluster runs at 100 kB / 1 MB. An EB fails when fewer
+than 39 of the 51 voters had it validated by 7 s.
+
+An EB whose transactions most voters had already validated certifies
+at either transaction size. One applied by half fails 62 % of the time
+at 200 B and 97 % at 374 B. Each step of coverage lost costs more at
+the costlier shape.
+
+On the testnet coverage is a property of the node, its distance from
+the injection points (section [3.2](#the-benchmarking-cluster)), and both kinds of closure sit
+in every window. The stage tables carry it as the applied share at the
+unfavourable-quartile node, 30 % at 260 kB (Table 4.2) and 24 to 38 %
+at 2 MB (Table 4.6).
+
+Table 6.3 therefore places part of the cluster's validation loss in
+what the voters had not seen rather than in the host: the same host
+certifies an EB it had mostly seen and fails one it had not. How the
+load is submitted sets the certification rate as much as the hosts do,
+which section [8](#what-binds-certification-and-what-would-move-it) takes up.
+
+### Diffusion by population
+
+Section [4](#results-by-parameter-set) placed the 318 B window's loss at the closure's arrival,
+where the committee's weight holding the closure by 7 s falls as the
+EB grows. This subsection shows where that loss sits. It reads how the closure
+reaches the nodes of each population, the cluster's fixed topology
+against the testnet's own, and then groups the testnet's nodes by how
+many peers deliver to them.
+
+Table 6.4 counts the nodes of each population by their own 90th
+percentile of the closure age, the time after the EB's slot at which
+the node held every transaction.
+
+| population | 2 - 3 s | 3 - 4 s | 4 - 7 s | 7 - 15 s | > 15 s | nodes |
+|---|---:|---:|---:|---:|---:|---:|
+| cluster 40 kB / 260 kB, 200 B | 34 | 17 | 0 | 0 | 0 | 51 |
+| testnet 40 kB / 260 kB, 257 B | 71 | 5 | 4 | 3 | 0 | 83 |
+| cluster 100 kB / 1 MB, 200 B | 0 | 51 | 0 | 0 | 0 | 51 |
+| cluster 100 kB / 1 MB, 374 B | 0 | 51 | 0 | 0 | 0 | 51 |
+| testnet 308 kB / 2 MB, 318 B | 14 | 31 | 20 | 13 | 11 | 89 |
+| testnet 308 kB / 2 MB, 1 kB | 35 | 18 | 17 | 11 | 4 | 85 |
+
+Table 6.4. Nodes per bin of their own closure p90, per population,
+over the nodes with 50 or more received EBs. No node's p90 is under
+2 s. The median node's p90 is in each population's `diffusion_bins.csv`.
+
+On the cluster every node's p90 is under 4 s at every set. The
+population moves as one block: three nodes in four hold the closure by
+3.20 s at 222 kB closures (Table 4.2), by 3.88 s at 555 kB and by
+3.61 s at 1 MB (Table 4.4).
+
+On the testnet the body of the population is as fast as the cluster's
+at 260 kB, three nodes in four holding the closure by 2.78 s (Table
+4.2). At 2 MB a tail appears. In the 318 B window 24 of 89 nodes have
+a p90 beyond 7 s, 11 of them beyond 15 s. The 1 kB window has 15 of 85
+and 4. The cluster has none.
+
+Table 6.5 says what the tail is, by the number of peers that delivered
+each node's announcements.
+
+| window | upstream peers | nodes | closure p90, s: median / quartile node | body p90, s: median node | vote rate: median / quartile node | committee weight |
+|---|---|---:|---:|---:|---:|---:|
+| testnet 40 kB / 260 kB, 257 B | 1 | 18 | 3.00 / 4.92 | 2.38 | 92 % / 85 % | 0.10 |
+|  | 2 to 3 | 13 | 2.63 / 2.71 | 2.02 | 93 % / 93 % | 0.07 |
+|  | 4 to 30 | 7 | 2.36 / 2.41 | 1.92 | 93 % / 93 % | 0.29 |
+|  | 31 and more | 45 | 2.37 / 2.62 | 2.00 | 93 % / 91 % | 0.28 |
+| testnet 308 kB / 2 MB, 318 B | 1 | 20 | 9.30 / 16.20 | 5.10 | 51 % / 24 % | 0.10 |
+|  | 2 to 3 | 13 | 4.33 / 4.35 | 3.11 | 84 % / 84 % | 0.06 |
+|  | 4 to 30 | 4 | 3.08 / 3.16 | 2.71 | 90 % / 86 % | 0.21 |
+|  | 31 and more | 52 | 3.38 / 5.52 | 2.90 | 74 % / 46 % | 0.25 |
+| testnet 308 kB / 2 MB, 1 kB | 1 | 23 | 5.87 / 10.51 | 3.44 | 69 % / 48 % | 0.11 |
+|  | 2 to 3 | 13 | 4.68 / 4.74 | 2.34 | 77 % / 77 % | 0.06 |
+|  | 4 to 30 | 7 | 2.88 / 2.98 | 2.21 | 80 % / 79 % | 0.22 |
+|  | 31 and more | 42 | 2.87 / 3.24 | 2.25 | 79 % / 65 % | 0.20 |
+
+Table 6.5. The testnet's nodes grouped by the number of peers that
+delivered their EB announcements in the window: the group's closure
+p90 and vote rate at its median node and at its unfavourable-quartile
+node, the node three in four are faster than for the closure and three
+in four vote more than for the vote rate, as the stage tables of
+section 4 read; its body p90 at the median node; and the share of the
+committee's weight its pools hold. For the IOG and PIR hosts the
+delivering peer is not in the records the table is built from; their
+counts come from the monitoring's per-peer announcement events: each
+IOG producer has four upstream peers, its three relays and one relay
+of the networking team that is a peer of all three producers and
+announces nearly every EB to them; the PIR hosts, in the open network,
+have 55 to 164 across the windows.
+
+The nodes fed by a single relay, a fifth of the nodes and a tenth of
+the committee's weight, are the group the closure size hurts most. At
+260 kB their median node holds the closure half a second after the
+other groups'. At 2 MB the median node holds it at 9.30 s against
+3.08 to 4.33 s for the other groups. The body is late as well, 5.10 s against 2.71 to 3.11. The group votes
+on half the EBs where the other groups vote on three quarters or more.
+The 1 kB window repeats the pattern. Their limit is the one relay that
+is their whole supply. Section [8](#what-binds-certification-and-what-would-move-it)'s two diffusion levers,
+forwarding the closure as it arrives and scheduling what a relay
+sends, are aimed at them.
+
+Beyond a few peers the count does not move the closure. The groups
+with four or more peers hold it at 2.36 to 2.37 s at 260 kB and 3.08
+to 3.38 s at 2 MB at the median node, whether four or over thirty
+peers deliver.
+
+The largest group has a tail of its own. At 2 MB its median node holds
+the closure at 3.38 s and votes on 74 % of the EBs, while one node in
+four holds it after 5.52 s and votes on 46 % or fewer. The peer count
+does not explain it, and this report gives no cause for it.
+
+Tables 6.4 and 6.5 therefore place the 318 B window's arrival loss in
+two tails of the testnet's own topology, absent on the cluster's fixed
+one. One is the single-relay nodes, a tenth of the committee's weight,
+half of them holding the closure after 9.30 s. The other is the slower
+quarter of the nodes with many peers.
+
+### Memory and sustained CPU
+
+Memory and sustained CPU come from the nodes' own metrics, which average
+over a minute (the testnet) or a second (the cluster) and across all
+cores, so they show the sustained load and the memory and not whether a
+core was saturated during a validation; Table 6.6 gives them per
+population.
+
+| population | nodes | resident set at the node's peak, GB: p10 / median / p90 / max | GC live data at the peak, GB, median node | process CPU, cores, median node's median interval |
+|---|---:|---:|---:|---:|
+| cluster 40 kB / 260 kB, 200 B | 51 | 12.5 / 12.9 / 13.3 / 13.5 | 9.0 | 0.10 |
+| testnet 40 kB / 260 kB, 257 B (operator nodes) | 81 | 1.1 / 1.5 / 3.4 / 18.3 | 0.8 | 0.12 |
+| cluster 100 kB / 1 MB, 200 B | 51 | 13.4 / 13.8 / 14.3 / 14.4 | 9.4 | 0.22 |
+| cluster 100 kB / 1 MB, 374 B | 51 | 13.6 / 14.1 / 14.5 / 14.7 | 9.4 | 0.23 |
+| testnet 308 kB / 2 MB, 318 B (operator nodes) | 90 | 1.6 / 2.5 / 6.8 / 20.8 | 1.0 | 0.20 |
+| testnet 308 kB / 2 MB, 1 kB (operator nodes) | 89 | 1.4 / 2.1 / 5.5 / 18.8 | 0.9 | 0.31 |
+
+Table 6.6. Memory and CPU per population: the node's resident set at
+its peak sample, the GC live data at that peak, and the process CPU as
+cores over the sampling interval. The GC share of the process CPU time
+is in the expanded output of the printer (`scripts/cost_table.py
+resources --full`). The IOG and PIR hosts over the 318 B window:
+resident set 1.7 to 2.2 GB at the median and 1.9 to 3.5 at the peak on
+hosts of 8 to 33 GB, 0.08 to 0.18 cores; the nodes above the
+operators' 90th percentile are operator nodes.
+
+Leios's own working set at 2 MB closures is a couple of gigabytes on
+both testnet populations. The operators spread from 1.6 to 6.8 GB
+between the tenth and the ninetieth percentile, with a few nodes far
+above.
+
+The cluster is the figure that bears on a mainnet node. Its synthetic
+ledger holds a million delegations in memory (the benchmarking team's
+control report, DATA.md), and its nodes sit at 13.8 GB resident, 9.4
+GB of live data, on hosts of 15.2 GiB. The testnet's ledger is small
+and says nothing about that.
+
+Sustained CPU is 0.1 to 0.3 of a core at the median node of every
+population, and the host series of the IOG and PIR hosts show them 4
+to 8 % busy.
+
+The saturation that matters, one core for the seconds of a validation,
+is below these series' resolution. The validation times of Tables 6.1a
+to 6.1c measure it instead.
+
+Three things the metrics leave unexplained. A tenth of the operator
+nodes sit above 6 GB resident, up to 21 GB, with nothing in the data
+to account for it. The PIR hosts of the c6id and c8id classes show
+five-minute peaks of the host CPU near full busy that the node's own
+counter does not, so that load is not the node's. The operators' host
+memory is not scraped, so their resident set has no RAM figure to be
+read against.
+
+Table 6.6 therefore shows that memory and sustained CPU bind nothing
+at the measured sizes: the one resource the measurements find short is
+a core for the seconds of a validation, which section [8](#what-binds-certification-and-what-would-move-it) prices.
+
+## Models against measurements: DeltaQ and the CIP cost model
+
+Section [6](#cross-cutting-explanations) measured what a voter pays to validate an EB on the report's
+populations. Two other sources put a figure on the same work: the ledger
+benchmark the operators ran on their own machines, and the two models the
+proposal rests on, the DeltaQ model of certification and the CIP's cost
+model. This section sets the three against each other on one quantity,
+the cost of one transaction.
+
+The node runs a transaction through two paths: the voting path, where
+the voter validates the closure before the vote, and the adoption
+path, where the certified closure is applied to the chain. The
+comparison is made path by path.
+
+None of the three sources exercises a script. Every transaction
+measured here, on the benchmark, the testnet and the cluster, is a
+value transfer without Plutus, and the models' constants are read with
+that in mind.
+
+Section [7.1](#the-ledger-benchmark-1) gives the benchmark, 7.2 sets the cluster's measurements
+against the testnet's, 7.3 sets the two against the benchmark path by
+path, and 7.4 and 7.5 read the CIP's and the DeltaQ model's constants
+against the result. The tables are regenerated by
+`scripts/benchmark_table.py` and `scripts/cost_table.py`.
+
+### The ledger benchmark
+
+The benchmark is the ledger-operations mode of
+[db-analyser](https://ouroboros-consensus.cardano.intersectmbo.org/docs/references/consensus_tools#db-analyser),
+the consensus layer's chain-database tool, run by 26 operators and the
+benchmarking team on their own machines. Every machine replayed one
+chain fragment of 768 kB blocks holding 2,086 transactions each,
+about 368 B per transaction with two inputs and two outputs. Every
+transaction spends outputs of earlier blocks and none chains within
+its block, which the benchmarking team guarantees of the fragment.
+Each machine ran the replay with the UTxO set in memory and again on
+disk.
+
+The tool times the ledger's block application: applying a block in
+full, with every check, and reapplying it, the state update alone.
+Reapplying is the work the node does on the adoption path for a
+certified closure. Applying in full is the ledger's part of the voting
+path. The voting loop around it is not run. Whether the machines were
+idle during the run is not recorded.
+
+Table 7.1 gives the steady-state medians by processor model, every cost
+in microseconds per transaction.
+
+| processor (machines); every cost in microseconds per transaction | apply, on disk | apply, in memory | reapply, in memory | reapply, on disk |
+|---|---|---|---|---|
+| AMD EPYC 4584PX 16-Core (2) | 118 to 130 | 84 to 93 | 23 to 26 | 55 to 68 |
+| 12th Gen Intel Core i7-1260P (1) | 102 | 100 | 24 | 39 |
+| AMD Ryzen 9 5950X 16-Core (1) | 159 | 121 | 32 | 72 |
+| AMD Ryzen 9 5900X 12-Core (1) | 188 | 121 | 32 | 71 |
+| AMD EPYC-Genoa (1) | 187 | 141 | 42 | 75 |
+| AMD Ryzen 7 5700U (1) | 174 | 148 | 49 | 72 |
+| Intel Core i7-6700 @ 3.40GHz (1) | 187 | 154 | 41 | 68 |
+| not stated (the reference host) (1) | 205 | 168 | 47 | 85 |
+| Intel Xeon Gold 6240 @ 2.60GHz (3) | 199 to 205 | 174 to 179 | 47 to 49 | 73 to 76 |
+| AMD EPYC 7T83 64-Core (2) | 220 to 224 | 179 to 180 | 47 to 49 | 85 to 91 |
+| AMD EPYC (with IBPB) (4) | 226 to 412 | 181 to 340 | 60 to 117 | 109 to 176 |
+| Intel Xeon E5-2623 v3 @ 3.00GHz (1) | 327 | 203 | 60 | 196 |
+| Intel Core (Broadwell, no TSX, IBRS) (2) | 542 to 634 | 227 to 300 | 74 to 94 | 289 to 295 |
+| Intel Core i7-3630QM @ 2.40GHz (1) | 302 | 228 | 69 | 131 |
+| AMD EPYC 3251 8-Core (1) | 290 | 265 | 81 | 113 |
+| not stated (2) | 424 to 497 | 316 to 420 | 66 to 99 | 161 to 164 |
+| Intel Xeon E5-2696 v2 @ 2.50GHz (1) | 553 | 346 | 104 | 307 |
+| Intel Xeon Silver 4214 @ 2.20GHz (1) | 1052 | 526 | 120 | 492 |
+
+| over the 27 machines, microseconds per transaction | min | lower quartile | median | upper quartile | max |
+|---|---|---|---|---|---|
+| apply, on disk | 102 | 188 | 224 | 374 | 1052 |
+| apply, in memory | 84 | 151 | 180 | 294 | 526 |
+| reapply, in memory | 23 | 44 | 49 | 84 | 120 |
+| reapply, on disk | 39 | 72 | 91 | 162 | 492 |
+
+Table 7.1. The ledger benchmark by processor model: the survey of
+October 2026, 26 operators' machines and the benchmarking team's
+reference host, db-analyser at one pin over the fragment described above,
+medians of the steady state, in microseconds per transaction for apply
+and reapply alike. A model's row is the range over its machines. The
+columns pair each reading with its neighbour: apply on disk next to
+apply in memory, then reapply in memory next to reapply on disk. The
+machines' logical CPU counts and virtualisation, as they report them,
+are in the expanded output of the printer
+(`scripts/benchmark_table.py --full`).
+
+The ledger's own cost of a two-input transaction spans six times across
+the operators' machines, 84 to 526 µs to apply in memory with the median
+machine at 180. Reapply spans the same way at about a quarter of the
+cost. Keeping the UTxO on disk adds from a few percent to more than
+double.
+
+One processor model of the survey matches hardware the report measures
+directly. The Xeon Gold 6240 is a Cascade Lake processor, Intel's name
+for its 2019 generation of server chips. The c5d.2xlarge instance type
+is built on that generation and on the step before it, which shares
+its core. PIR7 and PIR9 on the testnet and every node of the cluster
+run that instance type. The survey's three Xeon Gold 6240 machines
+apply at 174 to 179 µs. Section [7.3](#two-paths-two-costs) sets that figure against the
+testnet's and the cluster's readings on the same hardware, path by
+path.
+
+The Xeon Gold 6240 matches the c5d hosts by generation, not by cost.
+The Xeon Silver 4214, a processor of the same generation, is the
+slowest machine of the survey, so the generation does not fix the
+cost. No machine of the survey runs a processor of the generations
+the c8id, r8id and c6id hosts run, so those classes have no benchmark
+figure.
+
+The operators who ran the benchmark are part of the population of
+section [3](#populations-and-instruments)'s testnet, 26 of its operators, so Table 7.1 shows on the
+ledger alone the kind of spread the operator rows of section [6](#cross-cutting-explanations) carry.
+
+### The cluster against the testnet
+
+The cluster's nodes are c5d.2xlarge, the instance class of PIR7 and
+PIR9 on the testnet, so its readings compare with those two hosts like
+with like. Table 7.2 gives the cluster's readings of the two costs of
+Tables 6.2a and 6.2b, on every node of each run.
+
+**Table 7.2.** the cluster runs, c5d.2xlarge at two capabilities, every node: the lower quartile, median and upper quartile node of the run's most common EB size class.
+
+| run | EBs | per applied transaction, milliseconds | per reapplied transaction, microseconds |
+|---|---|---|---|
+| cluster 40 kB / 260 kB, 200 B (200 B, one input, one output) | 1,000 to 1,499 transactions, 1,636 EBs | 0.89 / 0.91 / 0.93 | 148 / 152 / 155 |
+| cluster 100 kB / 1 MB, 200 B (200 B, one input, one output) | 2,500 to 2,999 transactions, 1,478 EBs | 1.81 / 1.85 / 1.92 | 140 / 144 / 149 |
+| cluster 100 kB / 1 MB, 374 B (374 B, two inputs, two outputs) | 2,500 to 2,999 transactions, 1,105 EBs | 3.28 / 3.42 / 3.49 | 158 / 163 / 166 |
+
+Table 7.2. The cost per transaction at the vote on the cluster runs,
+read as in Tables 6.2a and 6.2b: the quartile nodes of all 51 on the
+run's most common EB size class. The cluster is not split by input
+origin: every run is an old-input population.
+
+The cluster's inputs are old by construction. Its generator draws on
+outputs created at genesis and reuses almost none of them by the end
+of a run, the benchmarking team states. Nearly every input is
+therefore an entry of the UTxO set that no transaction of the run had
+touched, the testnet's old-input case throughout.
+
+The cluster confirms the testnet's old-input reading on the same
+hardware. On the 40 kB / 260 kB run its nodes apply at 0.91 ms per
+transaction, against PIR7 and PIR9's 0.65 to 1.01 ms on old-input
+closures of the same EB class (Table 6.2a). The two testnet hosts
+differ from each other more than either differs from the cluster. The
+cluster's nodes reapply at 152 µs against the two hosts' 147 to
+148 µs.
+
+The cluster's nodes run with two capabilities, the threads the node
+may use, where PIR7 and PIR9 run with eight. The per-transaction cost
+is the same, so the validation of a closure runs on one core and the
+extra threads do not help it.
+
+The cluster adds a reading the testnet cannot give: on old-input
+closures the apply cost grows with the EB. Table 7.2's two 200 B runs
+show it: the same transaction applies at 0.91 ms on EBs of 1,000 to
+1,500 transactions and at 1.85 ms on EBs of 2,500 to 3,000. The
+testnet's chained closures hold flat across the same classes (section
+[6.2](#what-the-node-pays-at-the-vote)).
+
+The second input costs almost as much as the first: the 374 B
+transaction with two inputs applies at 3.42 ms, 1.8 times the one-input
+one. Section [7.3](#two-paths-two-costs) sets both populations against the ledger benchmark.
+
+Table 7.2 therefore reads the cluster as the testnet's old-input case
+on the same hardware, with a cost that grows with the EB. Section [9](#a-change-to-the-voting-loop-and-where-it-has-run)
+traces that growth to one step of the voting loop and measures a
+change to it.
+
+### Two paths, two costs
+
+This subsection sets the cost a voter pays per transaction at the
+vote, measured on the testnet in section [6.2](#what-the-node-pays-at-the-vote) and on the cluster in
+section [7.2](#the-cluster-against-the-testnet), against the ledger benchmark, path by path, to read how
+much of that cost is the ledger's own and how much is the path around
+it. The voting path is where the voter validates the closure before
+it votes. The adoption path is where the node reapplies the certified
+closure to the chain, the step section [5](#leios-on-praos) timed.
+
+Both paths end in the ledger's two calls per transaction, apply for a
+transaction the node has not validated before and reapply for one it
+has. The benchmark of section [7.1](#the-ledger-benchmark-1) times those two calls and nothing
+else. Around the calls each path does work of its own: it resolves
+the transaction's inputs, builds the state the call runs against and
+keeps the books of the closure as it goes. The voting path does this
+transaction by transaction in a loop. The measurements of sections
+[6.2](#what-the-node-pays-at-the-vote) and [7.2](#the-cluster-against-the-testnet) time the path as the node runs it, that work included.
+
+The benchmark and the measurements therefore time different things,
+and the difference is the point. The benchmark gives the cost of the
+ledger call alone, the lowest a path could reach. The measurement
+gives what the path costs as observed. Their ratio on the same
+hardware is the path's own overhead. The survey's three Xeon Gold
+6240 machines are of the c5d generation (section [7.1](#the-ledger-benchmark-1)), so PIR7, PIR9
+and the cluster's nodes can be read against that row of Table 7.1.
+
+The adoption path adds little. The like-for-like reading is the
+cluster's two-input run, which adopts its certifying RBs at 102 to
+114 µs per closure transaction (the adoption-path output of the run),
+against the benchmark's reapply of 47 to 49 µs on the same
+generation. The adoption path therefore costs about twice the ledger
+call inside it.
+
+The voting path adds much more. The benchmark's transaction has two
+inputs and spends outputs of earlier blocks, so the one reading of the
+same shape is the cluster's two-input run (Table 7.2). There the loop
+applies at nineteen times the ledger's apply and reapplies at three
+times the ledger's reapply.
+
+Everything between one and nineteen is the loop's own work around the
+ledger call. The loop's cost is what a voter pays per transaction
+today. It cannot fall below the ledger call inside it, so the ledger's
+cost is the least the loop could ever cost. The change of section [9](#a-change-to-the-voting-loop-and-where-it-has-run)
+brings the same run's apply cost to about twice the ledger call, the
+adoption path's factor. Section [8](#what-binds-certification-and-what-would-move-it) analyses what
+reducing the voting path's overhead would do for certification.
+
+### The CIP's cost model
+
+The CIP's cost model, the
+[compute cost estimation per node](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/cost-estimate/01-compute-cpu.md),
+has constants fitted on mainnet and charges a node for two things.
+Apply is one full validation per transaction, paid when the
+transaction first reaches the node: 0.6201 ms whatever the size, the
+mean CPU time of a full apply over mainnet's blocks, so the average
+script load is in it. Reapply is one application of an EB's validated
+transactions to the ledger state, paid once per EB: 0.3539 ms per EB
+plus 0.00002151 ms per byte. Scripts are charged separately,
+0.9487 ms per billion Plutus steps, when a budget is modelled
+explicitly. For a transaction of the testnet's size, 318 B, in a
+closure of a few thousand, the two terms come to 0.62 ms and about
+7 µs.
+
+Each term has its counterpart in the node. The full validation is the
+voter's apply of a transaction it has not seen, measured at the vote
+in sections [6.2](#what-the-node-pays-at-the-vote) and [7.2](#the-cluster-against-the-testnet) with the loop's own work inside it (section
+[7.3](#two-paths-two-costs)). The application of validated transactions is the adoption
+path's reapplication of the certified closure (sections [5](#leios-on-praos) and [7.3](#two-paths-two-costs)).
+The voter's reapply at the vote of the transactions it had already
+seen keeps the ledger's checks and is a different operation (section
+[2.1](#the-pipeline-and-its-clock)); the model has no term for it, nor for the loop around the
+ledger calls. Scripts have no measurement in this report.
+
+The measured apply brackets the model's 0.62 ms, with no script run
+at all. On every host class the chained cost sits under it, 0.16 to
+0.37 ms. The old-input cost sits above it, 0.65 ms and up on the
+testnet's older hosts and 0.91 ms and up on the cluster. The change of section [9](#a-change-to-the-voting-loop-and-where-it-has-run) removes
+most of the loop's own work and brings the voter's apply cost in line
+with the model's figure.
+
+The adoption path costs more than the model's reapply term: 34 to
+41 µs per one-input 318 B transaction on the IOG and PIR hosts and
+102 to 114 µs per two-input transaction on the cluster, five to
+fourteen times the term. The ledger's own reapply call inside that
+pass is above the term as well, 23 to 120 µs for the benchmark's
+368 B transaction across the survey's machines (Table 7.1) against
+the term's 8 µs. The operation the model does not represent, the
+voter's reapply at the vote, costs 79 to 163 µs per transaction
+(Tables 6.2a and 6.2b).
+
+The script cost is unmeasured by every source here. The CIP's
+per-step figure is the only number for it.
+
+The model's apply figure is therefore of the order the measurements
+find for transactions without scripts, and the report cannot say
+more, since no source here measures a script. Its reapply term is a
+fifth to a fourteenth of the adoption path's measured cost. The
+voter's reapply at the vote and the loop around the ledger calls are
+not represented. A rerun of the model with this report's constants,
+the apply and reapply costs of Tables 6.2a, 6.2b and 7.2 by host
+class and terms for the voting path, is an experiment this report has
+not made.
+
+### The DeltaQ model's inputs
+
+The DeltaQ model of certification, the
+[improved ΔQ model for Linear Leios EB diffusion](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/deltaq/improved-leios/report.md)
+predicts from the voter's side whether an EB of a given closure size
+certifies within the vote window. Its voter has three inputs. Two are
+the costs of the voter's pass over the closure, 0.507 ms to apply a
+transaction it has not seen and 0.070 ms to reapply one it has,
+transaction-weighted means over a mainnet block set with script costs
+at their mainnet frequency. The third is the share of the closure the
+voter has to fetch and apply because it is not in its mempool: a
+sixth by default, about 0.06 on the model's own mainnet estimate.
+With those inputs the model finds the voter's CPU time under 2 s at
+12 MB, the fetch of the missing share the dominant step, and the
+quorum met at every closure size up to 12 MB.
+
+All three inputs have their counterpart in the measurements. The two
+costs are the voter's apply and reapply at the vote of sections [6.2](#what-the-node-pays-at-the-vote)
+and [7.2](#the-cluster-against-the-testnet), the loop's own work included (section [7.3](#two-paths-two-costs)). The missing
+share is the applied share at the closure, read at the median node in
+the per-node validation output of each testnet window and at the
+unfavourable-quartile node in the stage tables of section [4](#results-by-parameter-set).
+
+Against the testnet's hosts the two costs are placed well enough. The
+reapply figure is within about twice every host class, 79 to 163 µs
+against 70. The apply figure falls between the two measured cases,
+above the chained cost and under the old-input cost on every host
+class with a reading.
+
+On the testnet the missing share is the median voter's, not the
+failing voter's. The median reporting node applies 16 to 22 % of an
+EB (the per-node validation output of each window), the model's
+sixth. The operator nodes past the deadline are the ones applying a
+quarter to half of an EB (Tables 4.6 and 6.1a to 6.1c).
+
+Against the cluster every input is on the optimistic side. The
+model's apply, 0.507 ms, is under the cluster's 0.91 ms on the 260 kB
+run and 1.85 ms on the 1 MB run of the same one-input transaction
+(Table 7.2). Its reapply, 70 µs, is half the cluster's. Its missing
+share, a sixth of the closure, is under the 37 to 45 % the cluster's
+voters apply at the closure (Table 4.4).
+
+Its verdict fares the same way. The model finds the quorum met at
+every closure size up to 12 MB. The cluster certified 69 % of its
+full EBs with 555 kB closures and 54 % with 1 MB closures (Table 4.3,
+the voting-adjusted rung).
+
+The model's verdict therefore holds for a voter that holds most of the
+closure and pays the chained cost. The voters that decide certification
+on these populations pay the old-input cost on a quarter to half of
+the closure, a case the model's inputs do not describe.
+
+This report's inputs to that model are the apply and reapply costs of
+Tables 6.2a, 6.2b and 7.2 by host class and input origin, the applied
+shares of Tables 4.4 and 4.6, and the closure's arrival of Tables 6.4
+and 6.5 in place of the one-hop fetch. A run of the model on them is
+a check of the model against the populations measured: its
+certification verdict per closure size set against the measured rates
+of Tables 4.3 and 4.5. A second run at the chained apply cost, the
+voter's cost with the loop's own work removed (section [9](#a-change-to-the-voting-loop-and-where-it-has-run)), would
+estimate what that change buys. Neither run is made in this report.
+
+## What binds certification, and what would move it
+
+Sections [4](#results-by-parameter-set) to [7](#models-against-measurements-deltaq-and-the-cip-cost-model) measured where the testnet and the cluster stand: at
+260 kB closures nearly every EB certifies, at 1 and 2 MB about half do.
+Two things decide whether a voter makes the deadline. The first is the
+time it spends validating the closure before it votes. That is the
+loss on the cluster at 1 MB and in the testnet's 1 kB window, measured
+per transaction and per host. The second is when the closure reaches
+it. That is where the testnet's 318 B window loses its weight (section
+4.4), and what remains once the validation cost is removed.
+
+This section turns those
+measurements into a statement about the feasibility of the build
+measured in section 4: what
+binds certification at the measured sizes, which of the changes
+available to the implementation and the operators would move it, and by
+how much, in the report's own units.
+
+Section [8.1](#two-budgets-in-one-window) reads the two
+budgets a voter has to meet inside the vote window; 8.2 prices the two
+levers the report can price, the voters' hardware and the voting loop's
+own cost, by repricing the measured records; 8.3 states what the
+measurements rule out as a lever; 8.4 lists the levers the report cannot
+price and the questions they leave; 8.5 reads the result against the
+targets of section [1](#mainnet-baseline-and-targets). The tables are regenerated by
+`scripts/cost_table.py` from the repricing outputs. Section [9](#a-change-to-the-voting-loop-and-where-it-has-run) reports a
+change to the loop that removes its own cost and where it has run.
+
+### Two budgets in one window
+
+A voter has seven seconds from the EB's slot to vote (section [2](#what-is-assessed-and-what-to-expect)).
+Validation starts at the 3 s mark or when the closure arrives,
+whichever is later. The vote must be cast by 7 s, so the closure is
+validated in the last four seconds at most. The window therefore holds two budgets. The
+first is the closure's arrival: every second it takes past the 3 s mark
+is a second less to validate in. The second is the validation itself,
+the cost per transaction of section [6.2](#what-the-node-pays-at-the-vote) times the share of the closure the
+voter has to apply (section [6.3](#mempool-coverage)), plus the reapply of the rest.
+
+Tables 8.1 and 8.2 read the two budgets per vote. One vote is one
+count, over the reporting voters, whatever their weight: the question
+here is what a voter does, and 8.2 reads what the levers do on the
+same voters. Section [4](#results-by-parameter-set) reads the same records in committee
+weight, the unit certification is decided in, and the two readings
+differ where the slow voters are light.
+
+For every EB and
+every node that scheduled a vote on it, the record gives when the node
+held the closure, when it finished validating, and whether the vote was
+in time. The shares are over the voters of each EB, so a voter that
+never validated the EB is counted as lost, not left out. Two sets are
+shown: the testnet's 318 B window, which 8.2 reprices, and the cluster run
+with two-input transactions, which section [9](#a-change-to-the-voting-loop-and-where-it-has-run) compares against the change
+to the loop.
+
+| set | EB size, txs | EBs | closure: by 3 s / by 7 s / later | validation: within 4 s / longer / never |
+|---|---|---:|---:|---:|
+| testnet 308 kB / 2 MB, 318 B | under 2,000 | 907 | 73 / 13 / 13 % | 84 / 0 / 15 % |
+|  | 2,000 to 4,000 | 900 | 68 / 22 / 10 % | 83 / 5 / 12 % |
+|  | 4,000 to 6,000 | 1,190 | 62 / 21 / 17 % | 66 / 16 / 18 % |
+|  | 6,000 and up | 531 | 52 / 26 / 22 % | 71 / 6 / 23 % |
+| cluster 100 kB / 1 MB, 374 B | under 2,000 | 192 | 50 / 49 / 1 % | 83 / 7 / 10 % |
+|  | 2,000 to 4,000 | 2,881 | 81 / 19 / 0 % | 65 / 33 / 2 % |
+
+Table 8.1. Where the voters lost the EB, by EB size. Every cell is a
+share of the set's votes in the bin, and each group adds to 100 % up
+to rounding. The
+voters of an EB are the nodes that scheduled a vote on it, about 70
+reporting voters per EB on the testnet, and on the cluster the 51
+nodes that accepted its announcement, the build having no
+vote-scheduled event. Closure: the time after the EB's slot at which
+the node held the whole closure; "later" is after 7 s or never.
+Validation: the time from the later of the closure and the 3 s mark to
+the validated event, as Table 4.6. EB size in transactions, from the
+body hits on the testnet and the body's bytes over 36 B per reference
+on the cluster.
+
+| set | EB size, txs | EBs | late votes: closure / validation / never | EBs with > 25 % late voters | certified |
+|---|---|---:|---:|---:|---:|
+| testnet 308 kB / 2 MB, 318 B | under 2,000 | 907 | 13 / 1 / 1 % | 19 % | 77 % |
+|  | 2,000 to 4,000 | 900 | 10 / 8 / 1 % | 26 % | 73 % |
+|  | 4,000 to 6,000 | 1,190 | 16 / 20 / 1 % | 72 % | 26 % |
+|  | 6,000 and up | 531 | 22 / 12 / 0 % | 76 % | 17 % |
+| cluster 100 kB / 1 MB, 374 B | under 2,000 | 192 | 1 / 13 / 9 % | 36 % | 68 % |
+|  | 2,000 to 4,000 | 2,881 | 0 / 35 / 2 % | 50 % | 51 % |
+
+Table 8.2. The outcome of the same votes, as shares of the set's votes
+in the bin. A late vote is attributed to one cause: the closure came
+after the 7 s deadline or never; the closure was in hand and the
+validation finished past the deadline; the validation never finished.
+The votes in time are the remainder, less the votes rejected as
+already known and, on the testnet, the EBs the node found invalid, at
+most 2 % in any row. A voter whose chain tip moved to the next RB
+before it voted is not a voter of the EB and is in neither count. On
+the cluster an EB whose late voters exceed a quarter of its voters
+cannot reach the quorum; on the testnet the quorum is in weight, and
+the count only says how many of its reporting voters were late. The
+last column is the certified share of the EBs whose next RB came 14
+slots or more after the announcing one, the ones the chain could
+certify, as section [4](#results-by-parameter-set)'s tallies.
+
+On the testnet's 318 B window the budget a late vote spends depends
+on the EB's size. On the EBs under 2,000 transactions it is the
+closure's arrival: 13 % of the votes are late for it against 1 % for
+validation. On the EBs of 4,000 to 6,000 validation is the first
+cause, 20 against 16 %. There more than a quarter of the voters are
+late on 72 % of the EBs, against 19 % of the small ones. On the
+largest EBs arrival leads again, 22 against 12 %.
+
+The voters late for validation hold little of the committee's weight.
+Section [4.3](#308-kb-references-2-mb-closures) read the same window in weight and found the weight
+voting in time almost equal to the weight holding the closure in
+time, at every EB size. In weight the window's loss is therefore at
+arrival, and its certified share falls with the weight that holds the
+closure, not with the count of late voters. For this section that
+means a lever on validation moves many votes on this window but
+little of its weight. The arrival levers of 8.4 are what would move
+its certification.
+
+On the cluster the votes are lost at validation, not at arrival.
+Every closure arrives before the deadline, and one voter in three is
+late with the closure in hand on the typical EB of 2,000 to 4,000
+transactions. The quorum tolerates a quarter of the voters late, so
+half of those EBs fail, which is the run's 51 % certified.
+
+The four sets not shown add no third pattern. At 260 kB neither budget
+is spent on either population, with 97 to 100 % of the votes in time.
+The 200 B cluster run loses at validation as the 374 B one does, with
+fewer votes late. The 1 kB window loses at validation on its EBs of
+2,000 to 4,000 transactions as the 318 B window does on the same
+size.
+
+When the validation budget is lifted, the arrival budget is what
+remains. Section 8.2 measures how much of the failure it holds once
+the voters' cost is priced.
+
+### The levers the report can price
+
+Two levers act on the validation budget: faster hardware at the voters,
+and the removal of the voting loop's own cost. Both have a measured
+price per transaction. The hardware lever's is the cost per transaction
+by host class of Tables 6.2a and 6.2b. The loop lever's is the gap
+between the chained and the old-input apply cost, which section [9.1](#the-change)
+traces to one step of the loop.
+
+This section prices each lever on the testnet's 2 MB windows and the
+cluster's 1 MB runs, vote by vote. Each vote has a record of its
+validation: how many transactions the voter applied, how many it
+reapplied, and when its closure arrived. The repricing keeps the EB's
+composition and the closure's arrival and replaces only the cost per
+transaction, as if the voter had run on faster hardware or on a
+validation loop without its own cost, at the costs section [6](#cross-cutting-explanations)
+measured per host class and per closure kind. Each voter's validation
+time is then its applied count times the new apply cost plus its
+reapplied count times the new reapply cost, and the vote is in time if
+that validation ends by 7 s. The result reads what each lever would
+have done to the same votes on the same EBs.
+
+On the cluster every node is observed, so the quorum says which EBs
+certify and the throughput follows.
+
+On the testnet 0.37 to 0.39 of the committee's weight sends no logs and
+cannot be repriced, so the reading stops at the votes: how
+many of the reporting voters' votes are in time, and why the rest are
+late. No certification rate is projected from them. The unobserved
+voters run the same software on a similar spread of hardware, so either
+lever moves them in the same direction as the reporting ones. The
+per-vote reading says whether a lever removes validation as a cause of
+late votes or not.
+
+The hardware lever is measured by repricing every vote at one host
+class's costs, from the oldest class the report measured, c5d, to the
+current generation. The apply cost taken is the class's old-input
+cost, the most expensive one measured, which section [6.2](#what-the-node-pays-at-the-vote) says to plan
+on. Each class's row is therefore its pessimistic case. The hardware
+factor of a class is the ratio of its reapply cost to the c5d hosts'
+in Table 6.2b, 0.85 for c6id and 0.6 for the current generation.
+
+The loop lever is measured by repricing the same votes at the class's
+chained apply cost instead, reapply unchanged. Section [9.1](#the-change) traces the
+gap between the two apply costs to the loop's pass over the closure's
+input table, so the chained cost is the apply cost without that pass.
+Section [9](#a-change-to-the-voting-loop-and-where-it-has-run) measures the change where it has run.
+
+Tables 8.3a and 8.3b give the result per window: the votes as
+recorded, then hardware alone, then each lever at each host class.
+
+**Table 8.3a.** testnet 308 kB / 2 MB, 318 B (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts): 223,343 votes on 3,528 EBs from 87 nodes. Left out of every row: 15.0 % of the votes whose closure arrived after the deadline or never, 1.9 % whose validation never finished. In 19.2 % of the votes the closure arrived between the 3 s mark and the deadline.
+
+| row | in time | out of time | closure at, s: p50 / p90 | validation, s: p50 / p90 / max |
+|---|---|---|---|---|
+| as recorded | 72.9 % | 10.2 % | 3.5 / 6.2 | 0.78 / 3.81 / 116.3 |
+| closures as recorded, hosts at least current generation | 80.3 % | 2.8 % | 5.0 / 6.8 | 0.42 / 1.69 / 35.2 |
+| old-input, current generation | 75.7 % | 7.4 % | 3.9 / 6.4 | 0.54 / 3.12 / 8.9 |
+| old-input, c6id | 70.7 % | 12.4 % | 3.4 / 6.0 | 0.78 / 4.43 / 12.5 |
+| old-input, c5d | 68.1 % | 15.0 % | 3.2 / 5.9 | 0.90 / 5.20 / 14.8 |
+| loop's cost removed, current generation | 82.2 % | 0.9 % | 6.6 / 6.9 | 0.40 / 0.76 / 1.9 |
+| loop's cost removed, c6id | 81.7 % | 1.4 % | 6.4 / 6.9 | 0.60 / 1.15 / 2.9 |
+| loop's cost removed, c5d | 81.5 % | 1.6 % | 6.3 / 6.9 | 0.69 / 1.30 / 3.3 |
+
+**Table 8.3b.** testnet 308 kB / 2 MB, 1 kB (about 1 kB with metadata, and 235 to 260 B, mixed): 42,795 votes on 606 EBs from 84 nodes. Left out of every row: 7.1 % of the votes whose closure arrived after the deadline or never, 1.5 % whose validation never finished. In 11.9 % of the votes the closure arrived between the 3 s mark and the deadline.
+
+| row | in time | out of time | closure at, s: p50 / p90 | validation, s: p50 / p90 / max |
+|---|---|---|---|---|
+| as recorded | 83.5 % | 8.0 % | 2.8 / 6.1 | 0.71 / 3.08 / 119.1 |
+| closures as recorded, hosts at least current generation | 88.7 % | 2.7 % | 3.3 / 6.6 | 0.32 / 1.09 / 108.7 |
+| old-input, current generation | 89.2 % | 2.2 % | 5.1 / 6.7 | 0.46 / 1.59 / 9.2 |
+| old-input, c6id | 87.7 % | 3.8 % | 4.0 / 6.5 | 0.67 / 2.25 / 13.0 |
+| old-input, c5d | 86.5 % | 4.9 % | 3.6 / 6.4 | 0.77 / 2.64 / 15.3 |
+| loop's cost removed, current generation | 91.2 % | 0.3 % | 6.8 / 7.0 | 0.26 / 0.44 / 1.7 |
+| loop's cost removed, c6id | 91.0 % | 0.4 % | 6.7 / 6.9 | 0.39 / 0.65 / 2.6 |
+| loop's cost removed, c5d | 90.9 % | 0.5 % | 6.7 / 6.9 | 0.44 / 0.74 / 3.0 |
+
+Tables 8.3a and 8.3b. The testnet votes repriced, one table per
+window. The rows are the lever applied. "As recorded" reads the
+recorded validation times, Table 8.2 pooled over the window.
+"Closures as recorded, hosts at least current generation" keeps each
+voter's recorded time and scales down the voters slower than the
+current generation by their hardware factor. The "old-input" rows
+rebuild every voter's time from its counts at one host class, the
+current generation (c8id, r8id), c6id or c5d: 20 ms per EB, the
+applied transactions at the class's old-input apply cost and the
+reapplied ones at its reapply cost. The "loop's cost removed" rows
+replace the apply cost by the class's chained cost. The costs are
+Table 6.2b's; the 2 MB windows' old-input cost is the cluster's c5d
+reading of Table 7.2 scaled by the hardware factors, 1.85, 1.57 and
+1.11 ms. "In time" is the vote cast by the deadline. "Out of time" is
+the closure in hand by the deadline and the vote past it. "Closure at"
+is when those votes' closures arrived, which says whether they are
+long validations or late arrivals. "Validation" is the time from the
+later of the closure and the 3 s mark; the maximum of the recorded
+rows is one stalled validation. The votes left out of every row are on
+each table's lead line: the lever moves neither share.
+
+Hardware alone removes two thirds of the validation loss. With every
+voter at least at the current generation, the votes out of time fall
+from 10 to 3 % on the 318 B window, and the ones late for the closure's
+arrival do not move. The 1 kB window reads the same.
+
+The loop's cost removed takes validation out of the causes, on every
+host class. On the 318 B window the votes out of time fall from 10 % to
+under 2 % at c5d as at the current generation. No validation runs
+longer than 3.3 s. The votes still out of time had their closure at
+6.3 s at the median, a late arrival and not a long validation. The 1 kB
+window reads the same.
+
+Table 8.3c reads the same levers on the EBs of 4,000 to 6,000
+transactions, where validation is the first cause of a late vote as
+recorded.
+
+**Table 8.3c.** testnet 308 kB / 2 MB, 318 B (247 B and 506 B, the same one-input transaction with two metadata sizes, 318 B on average, no scripts), the EBs of 4,000 to 6,000 transactions: 1,190 EBs. Left out of every row: 16.7 % of the votes whose closure arrived after the deadline or never, 1.9 % whose validation never finished. In 20.2 % of the votes the closure arrived between the 3 s mark and the deadline.
+
+| row | in time | out of time | closure at, s: p50 / p90 | validation, s: p50 / p90 / max |
+|---|---|---|---|---|
+| as recorded | 62.6 % | 18.8 % | 3.2 / 5.9 | 1.42 / 6.68 / 116.3 |
+| closures as recorded, hosts at least current generation | 75.5 % | 5.9 % | 4.5 / 6.6 | 0.71 / 2.81 / 35.2 |
+| old-input, current generation | 71.7 % | 9.7 % | 3.9 / 6.4 | 0.93 / 3.59 / 6.8 |
+| old-input, c6id | 64.0 % | 17.4 % | 3.2 / 6.0 | 1.34 / 5.08 / 9.7 |
+| old-input, c5d | 59.9 % | 21.5 % | 3.1 / 5.7 | 1.56 / 5.98 / 11.4 |
+| loop's cost removed, current generation | 80.2 % | 1.2 % | 6.6 / 6.9 | 0.51 / 0.80 / 1.6 |
+| loop's cost removed, c6id | 79.6 % | 1.8 % | 6.5 / 6.9 | 0.76 / 1.22 / 2.5 |
+| loop's cost removed, c5d | 79.3 % | 2.1 % | 6.4 / 6.9 | 0.87 / 1.38 / 2.8 |
+
+Table 8.3c. Table 8.3a on the EBs of 4,000 to 6,000 transactions, the
+size at which validation becomes the first cause of a reporting
+voter's late vote (Table 8.2). The other size bins are in the saved
+output.
+
+The loop's cost removed keeps validation inside its 4 s at every EB
+size the window carried. On those EBs the longest validation is
+2.8 s on the oldest class, and the votes still out of time are late
+arrivals, their closure at 6.4 s at the median. The largest EBs read
+the same.
+
+At 260 kB neither budget binds: 97 % of the votes are in time in every
+row (the per-vote output of that window).
+
+On the cluster the same two levers read as certification and
+throughput, since every node is observed. Table 8.4 gives the two
+100 kB / 1 MB runs side by side: the hardware lever at two host
+generations, the loop's cost removed on the run's own hosts, and a
+fifth row that starts validation when the closure arrives instead of
+at the 3 s mark, which 8.3 reads.
+
+| voters' speed | cluster 100 kB / 1 MB, 200 B: certification | kB/s | quorum voter validated at, s: p50 / p90 | cluster 100 kB / 1 MB, 374 B: certification | kB/s | quorum voter validated at, s: p50 / p90 |
+|---|---:|---:|---:|---:|---:|---:|
+| as measured | 68.5 % | 12.2 | 6.07 / 8.10 | 51.6 % | 15.5 | 6.80 / 9.96 |
+| hosts two generations newer (c6id) | 81.3 % | 13.7 | 5.65 / 7.40 | 61.0 % | 17.5 | 6.25 / 8.98 |
+| hosts of the current generation | 97.4 % | 15.6 | 4.92 / 6.25 | 83.6 % | 22.5 | 5.36 / 7.31 |
+| the loop's cost removed, on the run hosts | 99.2 % | 15.8 | 3.88 / 4.76 | 96.9 % | 25.5 | 4.09 / 4.80 |
+| validation started at the closure arrival | 72.3 % | 12.6 | 5.74 / 8.02 | 57.2 % | 16.8 | 6.43 / 9.73 |
+
+Table 8.4. The cluster records repriced on the two 100 kB / 1 MB runs, all 51 nodes
+and the run's quorum of 39. Each record's validation time is split
+between the two operations in proportion to the run's measured costs
+(Table 7.2) and each part scaled: the hardware rows scale both by the
+hardware factors (0.85 for c6id, 0.6 for the current generation
+against c5d), the row with the loop's cost removed scales the apply
+part to the c5d hosts' chained cost of Table 6.2b and leaves reapply;
+the last row keeps the costs and starts the validation when the closure
+arrived instead of at the 3 s mark (8.3). "As measured" is the run's
+certification read from the records. The quorum voter is the 39th
+to validate. The 374 B run's row with the loop's cost removed uses the
+one-input chained cost, since the two-input one is not measured.
+
+The cluster says the same with no population spread. On the one-input
+run, hosts of the current generation take certification from 69 to
+97 %, and the loop's cost removed alone, on the run's own c5d hosts,
+takes it to 99 %, with the throughput at 15.8 kB/s against the run's
+16.5 kB/s workload ceiling (Table 4.3). The two-input run repeats the
+pattern.
+
+As measured the quorum voter finishes at the deadline's edge at the
+median and past it at the 90th percentile. With the loop's cost
+removed it has validated by 4.8 s at the 90th percentile, two seconds
+inside the deadline, margin for a closure arriving later.
+
+<!-- pagebreak -->
+
+Table 8.5 puts the two levers together on the one-input run: the
+loop's cost removed on each host generation in turn.
+
+| voters' speed | cluster 100 kB / 1 MB, 200 B: certification | kB/s | quorum voter validated at, s: p50 / p90 |
+|---|---:|---:|---:|
+| as measured | 68.5 % | 12.2 | 6.07 / 8.10 |
+| the loop's cost removed, on the run c5d hosts | 99.2 % | 15.8 | 3.87 / 4.75 |
+| the loop's cost removed, on c6id hosts | 99.3 % | 15.8 | 3.78 / 4.66 |
+| the loop's cost removed, on current-generation hosts | 99.4 % | 15.8 | 3.51 / 4.39 |
+
+Table 8.5. The two levers combined on the one-input run: apply at each
+class's chained cost and reapply at its reapply cost (Table 6.2b: 0.35
+and 147 µs on c5d, 0.31 and 128 on c6id, 0.20 and 85 on the current
+generation), relative to the run's 1.85 ms and 144 µs.
+
+With the loop's cost removed, hardware buys margin rather than
+certification at this EB size: the quorum voter finishes 0.4 s earlier
+on current-generation hosts than on c5d. That margin is what a later
+closure, a larger one, or one carrying script computation would draw
+on. The script budgets of section [2.2](#the-constraint-set) remain unmeasured, and this
+margin is the room they would be set within. Table 8.6 sizes it in
+transactions: what a voter applies in the window's 4 s, or in the 2 or
+3 s a late closure leaves, at each class's apply cost, every
+transaction applied and every input old.
+
+| host class, apply cost per transaction | in 2 s | in 3 s | in 4 s |
+|---|---|---|---|
+| c5d, with the loop's cost (1.85 ms) | 1,100 | 1,600 | 2,200 |
+| c5d, the loop's cost removed (0.35 ms) | 5,700 | 8,600 | 11,400 |
+| c6id, with the loop's cost (1.57 ms) | 1,300 | 1,900 | 2,500 |
+| c6id, the loop's cost removed (0.31 ms) | 6,500 | 9,700 | 12,900 |
+| current generation, with the loop's cost (1.11 ms) | 1,800 | 2,700 | 3,600 |
+| current generation, the loop's cost removed (0.20 ms) | 10,000 | 15,000 | 20,000 |
+
+Table 8.6. Transactions applied per budget at each host class's apply
+cost on old-input closures, the worst case, with the loop's cost (the
+costs the 2 MB windows' repricing takes, Tables 6.2b and 7.2) and with
+it removed (the chained cost of Table 6.2b); the budget over the cost,
+rounded to hundreds. On the oldest class with the loop's cost removed
+the 4 s budget covers 11,400 applied transactions against 2,200 with
+it, more than the largest EB the 2 MB windows carried, and a closure
+arriving at 5 s still leaves room for 5,700.
+
+Tables 8.3a to 8.5 therefore place the validation budget within the
+implementation's reach. The loop's cost removed takes validation out
+of the causes of late votes on every host class, on both populations.
+Hardware alone removes two thirds of it. What remains is the closure's
+arrival, which section [8.4](#the-levers-the-report-cannot-price) leaves open.
+
+### What the measurements rule out
+
+Starting validation when the closure arrives instead of at the 3 s mark
+recovers little: on the cluster it moves certification from 69 to 72 %
+on the one-input run and from 52 to 57 % on the two-input one
+(Table 8.4, last row). The closure arrives close to the 3 s mark at most
+voters, so the time gained is a fraction of a second against validation
+times of three to five.
+
+Memory and sustained CPU bind nothing at the measured sizes. The
+testnet hosts' resident set is 1.7 to 2.2 GB at the median on hosts
+of 8 to 33 GB, with a ledger far smaller than mainnet's. The cluster's
+nodes hold a ledger of a million delegations at 13.8 GB on hosts of
+15.2 GiB. The sustained CPU is 0.1 to 0.3 of a core at the
+median node of every population (Table 6.6). What binds is one core
+for the seconds of a validation, the cost 8.2 reprices.
+
+One measured effect contributes to the voters' cost and is not a
+lever of the implementation: a voter that holds most of the closure
+before the EB arrives reapplies instead of applying (section [6.3](#mempool-coverage)).
+It depends on how the load is built and routed, not on the node, and
+the report plans without it. Where it occurs it is a benefit on top
+of the levers of 8.2, not part of the feasibility argument.
+
+One loss sits outside every lever. The EBs at the S_EB cap whose
+forgers served the body to no reporting node fail before diffusion,
+and no voter speed touches them (section [4.3.1](#the-1-kb-transaction-window-transaction-count-not-bytes)).
+
+What the measurements leave as levers are therefore the two of 8.2 on
+the validation budget and the arrival levers of 8.4.
+
+### The levers the report cannot price
+
+The arrival budget has levers of its own, each with a measured target
+and no measured gain, so none has a row above.
+
+Forwarding the closure as it arrives, before it is complete, and
+scheduling what a relay sends are aimed at the nodes with a single
+upstream relay. Their closure reaches the median such node at 9.30 s
+at the 90th percentile at 2 MB, against 3.08 to 4.33 s for nodes with
+two or more peers (Table 6.5). The gap is measured and the changes are
+not, so whether they recover it is a run to make.
+
+Validating on more than one core is the largest unpriced lever on the
+validation side. Today the validation of a closure runs on one core:
+the cluster's nodes at two capabilities pay the same per transaction
+as the testnet's hosts at eight (section [7.2](#the-cluster-against-the-testnet)). The sustained CPU
+of Table 6.6, a minute's average over all cores, cannot show how busy
+a core is for the seconds of a validation.
+
+Whether the loop can be parallelised is a question about the ledger's
+apply, which runs transactions in sequence. Which of its parts are
+independent, witness and signature checks among them, is not measured
+here, and the report makes no claim.
+
+Section 8.4 therefore leaves two questions open, whether forwarding
+and scheduling recover the single-relay nodes' gap and whether the
+apply path parallelises, and neither has a measurement in this report.
+
+### What the measurements support
+
+As far as the transactions measured here represent, the measurements
+say three things about the feasibility of the build measured in
+section [4](#results-by-parameter-set), at the sizes run.
+
+At 260 kB closures the build certifies 97 % of its EBs on the testnet
+as it is, with every voter class and every closure kind (section [4](#results-by-parameter-set),
+and the repricing of that window). Neither budget binds.
+
+At 1 and 2 MB the validation budget binds: on the cluster at 1 MB, in
+the testnet's 1 kB window, and for the lighter voters of its 318 B
+window. The voting loop's own cost is the larger part of it. Removing
+that cost, to the chained level the report has measured, takes the
+cluster from 69 to 99 % certification at 1 MB on hosts three
+generations old. The quorum voter is then done by the middle of the
+window at the median. On the testnet's 2 MB windows it removes
+validation as a cause of late votes, from 10 and 8 % of the reporting
+voters' votes to under 2 % whatever the hardware. The build of
+section [9](#a-change-to-the-voting-loop-and-where-it-has-run) removes that cost where it has run.
+
+What that buys a network in certification depends on where its weight
+sits (section [2.5](#what-to-expect-at-each-stage)). On the 1 kB window the weight is lost at
+validation, so the change addresses the loss itself, by an amount the
+unobserved weight leaves unprojected. On the 318 B window the voters
+it flips hold 0.03 of the committee's weight, the gap between the
+weight holding the closure and the weight voting in Table 4.7.
+
+What remains at 2 MB is the closure's arrival. The 318 B window loses
+its weight there (Table 4.7). With the loop's cost removed the votes
+still late are late arrivals, 15 of the 17 %. The levers for the
+arrival are the unpriced ones of 8.4.
+
+In section [1](#mainnet-baseline-and-targets)'s units, the cluster's 1 MB runs with the loop's cost
+removed carry 16 and 26 kB/s, against a six-times target of 27 kB/s and
+a ten-times target of 45 (Table 1.2). The testnet's 2 MB windows have
+no repriced figure, since their reading is per vote. They stand at
+their measured 12 and 22 kB/s (Table 4.5).
+
+The comparison is in bytes per second at the measured transactions,
+not at mainnet's mix. The transactions measured are value transfers of
+one or two inputs without scripts. A like-for-like reading against
+mainnet needs a run of mainnet-like transactions, which the report has
+not made.
+
+The measurements therefore find the build measured feasible at 260 kB
+as it is. At 1 MB feasibility depends on the loop's cost being
+removed, measured in section [9](#a-change-to-the-voting-loop-and-where-it-has-run). At 2 MB the same change makes the
+validation time manageable. The arrival levers appear needed on the
+2 MB set, unmeasured in this report.
+
+## A change to the voting loop, and where it has run
+
+The drafting of this report led to a review of the voting loop's code.
+The source of the old-input cost section [7.2](#the-cluster-against-the-testnet) measures was identified,
+patched and measured. The patch reached one testnet host and one
+cluster run when the previous sections were mostly complete, so this
+section gives partial data on what section [8](#what-binds-certification-and-what-would-move-it) claims the loop's cost
+removed would buy: a preview of the patch's effect, not its assessment.
+The change's effect on the testnet as a whole, and the cost a
+deployment can tolerate once it is in, are left to further work.
+
+### The change
+
+The voting loop carried the closure's input table inside the ledger
+state and made a pass over the whole table after every applied
+transaction. On an old-input closure the table holds one entry per
+transaction, on a chained one the heads of the chains, and the
+reapply path never makes the pass. That is why the old-input cost
+grows with the EB in section [7.2](#the-cluster-against-the-testnet) and the other two costs do not. The
+patch keeps the table outside the ledger state and hands each
+transaction its own inputs, which removes the pass. It is local to
+the loop. It is merged in the consensus repository's Leios branch as
+[commit 7b91f3619](https://github.com/IntersectMBO/ouroboros-consensus/commit/7b91f3619).
+
+### One testnet host against its control
+
+The change ran on one testnet host of the oldest class the report
+measured, c5d, from the evening of 2026-11-08. A second host of the
+same class ran the unchanged build as the control. Both are committee
+members and validated the same EBs, so the transactions are identical
+between them. Table 9.1 reads both hosts over the 10,770 EBs
+announced in the 66 hours from the changed host's restart. Each
+validated about 9,500 of them; the next RB superseded the rest before
+the vote.
+
+| host, 2026-11-08 23:45 to 11-11 17:16 UTC | EBs validated | apply cost per transaction | reapply cost per transaction | EBs applying 500 or more with few reapplies: validation per applied transaction, p50 |
+|---|---:|---:|---:|---:|
+| the changed host | 9,492 | 0.34 ms | 0.20 ms | 0.36 ms |
+| the control | 9,472 | 1.41 ms | 0.21 ms | 1.11 ms |
+| c5d, Tables 6.2b and 7.2 | | chained 0.35 / old-input 1.85 | 0.147 | |
+
+Table 9.1. Each host's validation records regressed on the counts of
+applied and reapplied transactions (validation time = apply cost ×
+applied + reapply cost × reapplied + a constant), over the EBs it
+validated in the window. The last column takes the EBs with 500 or more
+applied transactions and fewer reapplied than a third of that, where the
+validation is the apply cost, and divides the time by the applied count.
+
+The changed host applies at the chained level of Table 6.2b, 0.34 to
+0.36 ms per transaction, and the control at the old-input level, 1.1
+to 1.4 ms, on the same transactions. Reapply is unchanged within the
+noise on both.
+
+The lower cost shows in the validation times. Table 9.2 bins each
+host's EBs by the transactions it applied.
+
+| transactions applied in the EB | the changed host: EBs | validation p50 / p90 | per applied transaction, p50 | the control: EBs | validation p50 / p90 | per applied transaction, p50 |
+|---|---:|---:|---:|---:|---:|---:|
+| 100 to 500 | 1,166 | 0.37 / 0.84 s | 1.36 ms | 1,586 | 0.43 / 1.09 s | 1.68 ms |
+| 500 to 1,000 | 667 | 0.55 / 1.02 s | 0.78 ms | 938 | 1.03 / 2.01 s | 1.44 ms |
+| 1,000 to 2,000 | 688 | 0.83 / 1.23 s | 0.58 ms | 693 | 2.22 / 3.70 s | 1.65 ms |
+| 2,000 and up | 607 | 1.32 / 2.13 s | 0.42 ms | 428 | 4.32 / 8.75 s | 1.70 ms |
+
+Table 9.2. Validation time by applied count on the two hosts over the
+window, each host binned by its own count since the two apply different
+shares of the same EBs; the per-transaction figure is the validation
+time over the applied count, so the reapplies are in it. The bins under
+100 applied are left out, where a fixed cost and the reapplies dominate.
+
+On the changed host validation stops being a cause of late votes. It
+validated every EB of the window within 2.9 s, the largest one of
+7,983 transactions in 2.87 s. It missed 184 of its 9,623 votes, 149
+of them for a closure arriving after the deadline and 35 with the
+closure in hand. The control missed 509 of 9,620: 141 for the
+closure, the same EBs as the changed host's within a few, and 368
+with the closure in hand and the validation past the deadline. Its
+largest validation took 19.7 s.
+
+Tables 9.1 and 9.2 therefore show on one host what section [8](#what-binds-certification-and-what-would-move-it) priced
+for the c5d class: the apply cost at the chained level, and
+validation out of the causes of late votes, the late closures left.
+
+### The cluster
+
+The 100 kB / 1 MB run with two-input transactions of section [4.2](#100-kb-references-1-mb-closures)
+certified 52 % of its eligible EBs on the build of section [4](#results-by-parameter-set), called
+the unchanged build here. A new run with the same parameters, nodes
+and workload was made on the changed build on 2026-11-09, over 16
+hours. The changed build carries the patch of 9.1 and three weeks of
+the Leios branch's own work. Tables 9.3 to 9.8 read the new run with
+the instruments of sections [4](#results-by-parameter-set), [5](#leios-on-praos) and [8](#what-binds-certification-and-what-would-move-it). The effects of these changes are
+told apart at the end of this subsection.
+
+Table 9.3 is the rerun's ladder beside the unchanged run's.
+
+| rung, kB/s | cluster 100 kB / 1 MB, 374 B | cluster 100 kB / 1 MB, 374 B, changed build |
+|---|---|---|
+| parameter ceiling | 27.9 (p = 0.513) | 27.9 (p = 0.513) |
+| workload ceiling | 27.9 (S_EB-tx binds at 374 B/tx) | 27.9 (S_EB-tx binds at 374 B/tx) |
+| observed spacing | 27.6 (1 RB / 20.8 s, p = 0.533) | 27.2 (1 RB / 19.9 s, p = 0.494) |
+| voting-adjusted, full | 16.9 (s_full = 0.540) | 27.0 (s_full = 0.992) |
+| load-adjusted | 15.5 (announcing 0.99, EB 0.94, plain RB 0.98) | 26.6 (announcing 0.99, EB 1.00, plain RB 0.97) |
+| measured | 15.5 | 26.6 |
+
+Table 9.3. The ladder of the two-input run on the two builds, as Table
+4.3. Changed build: the whole run, 2026-11-09 16:45 to 11-10 09:03 UTC,
+1,446 eligible EBs, 1,434 certified, 14-slot gap. Transactions per
+second at 374 B: 41.3 and 71.1.
+
+The chain carried 26.6 kB/s against 15.5 on the unchanged build. That
+is 95 % of the parameter ceiling. The voting rung no longer takes a
+share, 0.992 of the full EBs certified. Every certified closure was
+at the 1 MB cap (Table 9.7). What remains between the ceiling and the
+chain is the run's RB spacing.
+
+Table 9.4 reads the stages of the pipeline on the two builds, as
+section [4](#results-by-parameter-set) does for every set.
+
+| stage | cluster 100 kB / 1 MB, 374 B | cluster 100 kB / 1 MB, 374 B, changed build |
+|---|---|---|
+| body arrival: p90; weight under 3 s | 2.83 s; 1.00 | 1.95 s; 1.00 |
+| closure arrival: p90; weight under 3 s / 7 s | 3.61 s; 0.00 / 1.00 | 3.26 s; 0.47 / 1.00 |
+| applied share | 37 % | 50 % |
+| validation: p90 | 6.51 s | 1.25 s |
+| vote rate on eligible EBs, p25 node | 58 % | 99.7 % |
+| tally reaches the quorum: p90 | 6.76 s | 4.57 s |
+| quorums that became certificates | 99.6 %, 820 of 823 quorums seen | 99.6 %, 1,434 of 1,440 quorums seen |
+
+Table 9.4. The stages of the two-input run on the two builds, as Table
+4.2: all 51 nodes, equal weight.
+
+Validation is the row that moved. It falls from 6.51 s to 1.25 s at
+the 75th-percentile node, and the vote rate follows it: three nodes
+in four vote on at least 99.7 % of the eligible EBs against 58 % on
+the unchanged build. Of the 137,053 votes scheduled on the run, 215
+were too late.
+
+The voters applied more of each EB in full on the changed build, 50 %
+against 37 %. They validated five times faster regardless.
+
+The body and the closure also arrive earlier, by 0.88 s and 0.35 s at
+the 75th-percentile node. That is not the patch. The attribution at the end
+of this subsection says what it is.
+
+Behind the validation row is the cost per transaction. Table 9.5 reads
+it on the two builds as section [7](#models-against-measurements-deltaq-and-the-cip-cost-model) does.
+
+| run | EBs | per applied transaction, milliseconds | per reapplied transaction, microseconds |
+|---|---|---|---|
+| cluster 100 kB / 1 MB, 374 B (374 B, two inputs, two outputs) | 2,500 to 2,999 transactions, 1,105 EBs | 3.28 / 3.42 / 3.49 | 158 / 163 / 166 |
+| cluster 100 kB / 1 MB, 374 B, changed build (374 B, two inputs, two outputs) | 2,500 to 2,999 transactions, 1,421 EBs | 0.41 / 0.41 / 0.48 | 188 / 190 / 195 |
+
+Table 9.5. The cost per transaction at the vote on the two builds, as
+Table 7.2: the quartile nodes of all 51 on the run's most common EB
+size class.
+
+The apply cost on two-input transactions falls by a factor of eight,
+from 3.42 to 0.41 ms at the median node.
+
+The reapply cost rises by 17 %, from 163 to 190 µs. The patch touches
+that path too: it hands every transaction its own inputs, reapplied
+ones included. A cost per input would show more on these two-input
+transactions than on the testnet's one-input ones, where 9.2 reads no
+rise. The difference is not attributed here.
+
+The run is also the first test of section [8](#what-binds-certification-and-what-would-move-it)'s repricing. Section [8](#what-binds-certification-and-what-would-move-it)
+priced this run with the loop's cost removed before the run existed
+(Table 8.4). Table 9.6 sets that prediction against the outcome.
+
+| | section [8](#what-binds-certification-and-what-would-move-it)'s repricing | the changed build's run |
+|---|---|---|
+| apply cost per transaction | 0.65 ms | 0.41 ms |
+| reapply cost per transaction | 163 µs | 190 µs |
+| closure arrival, p90 | 3.54 s | 3.00 s |
+| certification | 96.9 % | 99.2 % |
+| measured, kB/s | 25.5 | 26.6 |
+| quorum voter validated at, p50 / p90 | 4.09 / 4.80 s | 3.97 / 4.45 s |
+
+Table 9.6. Section [8](#what-binds-certification-and-what-would-move-it)'s repricing of the two-input run against the
+rerun. The repricing column is Table 8.4's row with the loop's cost
+removed on the run's hosts. The rerun's certification is over its
+eligible EBs, its throughput Table 9.3's measured rung, and its quorum
+voter the 39th voter to validate each EB, read as in Table 8.4.
+
+The prediction sits under the outcome on every line: by two points of
+certification, by one kilobyte per second, and by a few tenths of a
+second at the quorum voter. The first three rows say why. The
+repricing charged apply at 0.65 ms where the run pays 0.41, the
+pessimistic choice section [8](#what-binds-certification-and-what-would-move-it) made. It held reapply where the run
+pays 15 % more. And it kept the closure arrivals of the unchanged
+build. The changed build moved them earlier for a reason outside the
+patch.
+
+That reason is in the Leios branch between the two builds. The
+benchmarking team ran the same workload on the week 45 build without
+the patch on 2026-11-06. Its report reads the forge, slot start to the
+RB forged, at 30 ms at the median. The report of the 2026-11-09 run
+with the patch reads the same 30 ms. On the unchanged build the forge
+took 0.59 s from leadership to forged (Table 5.5).
+
+That half second is the mempool snapshot cited on section [5.3](#adoption-within-a-run). The branch's
+mempool work merged on 2026-10-25 as
+[commit 7ff142d5c](https://github.com/IntersectMBO/ouroboros-consensus/commit/7ff142d5c)
+removes it. The patch does not touch the forge.
+
+Certification did not move with the branch's work. The team's reports
+count the announcements that came to carry a certificate. On the week
+45 build without the patch that share is 26.0 %. With the patch it is
+49.0 %, where the share of EBs eligible at all is 51 %, the p of
+Table 9.3. The
+unchanged build's run read 27.3 % of its RBs certifying (Table 5.5).
+Three weeks of the branch left certification where it was. The patch
+took it to the eligible share.
+
+The two effects act on different stages, and they add through the one
+window of 8.1. The forge change gives every voter half a second more.
+The patch takes five seconds off the validation. Section [8](#what-binds-certification-and-what-would-move-it)'s repricing
+kept the old arrivals, so it measures the patch alone on this run:
+96.9 % certification. The forge change is worth the two points above
+it.
+
+The forge change shows on the Praos side as well. Table 9.7 reads the
+adoption of the certifying RB and of the full plain RB on the two
+builds, as Table 5.2 does.
+
+| window | closure bin (RBs in it) | certifying p50 / p90 | within 1 s | full plain p50 / p90 | within 1 s |
+|---|---:|---:|---:|---:|---:|
+| cluster 100 kB / 1 MB, 374 B | 0.5-1 MB (810) | 1.28 / 1.56 s | 3 % | 1.12 / 1.76 s | 32 % |
+| cluster 100 kB / 1 MB, 374 B, changed build | 1 MB (1,433) | 0.51 / 0.75 s | 99 % | 0.59 / 1.17 s | 75 % |
+
+Table 9.7. Adoption delay after the RB's slot on the two builds, as
+Table 5.2: over all (node, RB) pairs of the run, the certifying RB read
+at the closure bin that holds the run's typical closure.
+
+The certifying RB is adopted at 0.51 s at the median on the changed
+build against 1.28 s on the unchanged one. The full plain RB is
+adopted at 0.59 s against 1.12 s. The team's report of the week 45
+run without the patch reads the adoption of certificate-carrying
+blocks at 0.51 s as well, so this gain is the branch's work too.
+
+Table 9.8 reads the forks on the two builds, as Table 5.3 does.
+
+| window | share forked among all consecutive-slot pairs | among the pairs led by a certifying RB | among the pairs led by a plain RB |
+|---|---:|---:|---:|
+| cluster 100 kB / 1 MB, 374 B | 129 of 182 (71 %) | 50 of 53 (94 %) | 79 of 129 (61 %) |
+| cluster 100 kB / 1 MB, 374 B, changed build | 19 of 142 (13 %) | 1 of 70 (1 %) | 18 of 72 (25 %) |
+
+Table 9.8. Consecutive-slot leader pairs forked on the two builds, as
+Table 5.3, by the kind of the pair's first RB.
+
+The share of consecutive-slot pairs forked falls from 71 % to 13 %.
+Among the pairs led by a certifying RB it falls from 94 % to 1 %. The
+orphans on the chain halve, from 207 to 102 over the same number of
+RBs. The cost to Praos that section [5](#leios-on-praos) measures on the unchanged build,
+the slower forge and the forks it causes, is not there on the changed
+build.
+
+Tables 9.3 to 9.8 therefore read the changed build at 1 MB as section
+[8](#what-binds-certification-and-what-would-move-it) priced it and better. The patch takes certification to the
+eligible share, and the branch's forge change takes away the cost to
+Praos. Both are one run on the cluster's uniform hosts; 9.4 says what
+that leaves unmeasured.
+
+### What is not measured
+
+The change has run on one testnet host and one cluster run. What it
+does at the committee's scale is still section [8](#what-binds-certification-and-what-would-move-it)'s repricing: the cost
+per transaction is confirmed on one host, the votes of the committee
+are not.
+
+It has not run on a whole network at a set larger than 100 kB / 1 MB:
+the cluster run is at that set, and the only host running it at
+308 kB / 2 MB is the one testnet host. It has not run with
+transactions of mainnet's mix, where the script's cost adds to the
+input's.
+
+The host that ran it is of the oldest class measured, so the current
+generation's cost with the change is the repricing's figure and not a
+reading.
+
+Those measurements are further work.
+
+## Appendix: how each quantity was measured
+
+This appendix states, for every quantity the report's tables and
+figures rest on, which records it was read from, what marks its start
+and its end, which records were kept or dropped, and how the result was
+aggregated, so that a reviewer can judge the approach and not only the
+numbers. Its first part describes the sources and the records they
+hold, the second the conventions every entry shares, the third the
+quantities themselves, and the fourth maps each quantity to the script
+or query that implements it.
+
+### Sources and their records
+
+**The testnet chain.** One row per RB on the final chain, from the
+testnet explorer's block API: block number, slot, hash, time,
+transaction count, size in bytes, whether the RB carries a certificate,
+the hash and reference bytes of the EB it announces, the closure bytes
+of the EB it certifies, and the vote share the explorer saw. For a
+certifying RB the transaction count is the certified closure's. The cache
+is refetched from the tip at each sync and a rolled-back tail is
+replaced. Everything the report computes "from the chain alone" reads
+this cache: the ladders, the sizes of EBs and closures, the
+certification rate, the RB kinds and the pairs on the chain.
+
+**The committee.** One seat per pool per epoch, ranked by active stake
+descending with ties broken by the pool id, the seat's weight being the
+pool's share of the total stake, together with the epoch's Leios
+parameters (S_EB, S_EB-tx, N_c, the
+quorum threshold, the period lengths). The stake comes from the
+explorer's stake distribution for the epochs up to 2026-10-27 and from a
+db-sync instance from 2026-10-28, with the newest epoch common to both
+recomputed and matched seat for seat before any later epoch was written.
+
+**The operator telemetry.** An agent on each participating operator
+node ships the node's event log and its metric scrapes to an archive.
+The report reads one record per event: its time, its namespace, its
+payload, and the pool and agent that sent it. The payload fields used are
+named entry by entry in [the quantities](#the-quantities). The metric scrapes give the node's build
+version and revision, resident memory, CPU time and mempool content.
+
+**The IOG monitoring.** The same node events for the 13 IOG and PIR
+producers, in the IOG monitoring's log store, pulled per host and per
+event family: the voting family (vote scheduled, EB validated, closure
+acquired, body hits, not voted), the diffusion family (announcement
+accepted, body acquired), the votes family (votes cast and votes
+received with the running tally), the forge-loop events (leader, forged,
+adopted, not adopted), the chain-selection and block-fetch events, and,
+for the 2 MB period, the call traces of the forge loop and of chain
+selection with each call's name, argument and duration. For each
+testnet window the pulls are merged with the archive into one period
+database in the archive's record layout, the one IOG host that also
+sends to the archive being taken from the monitoring copy only, so that
+every instrument reads both populations with one definition. Two
+further pulls from the monitoring serve section [6](#cross-cutting-explanations) and are not merged
+into the period databases: the per-peer announcement events (one event
+per peer that announced an EB to the host, with the peer's connection
+id), and the per-minute metric series of each host (the node's resident
+memory, GC live data and CPU tick counters, and the host's CPU count,
+total memory and CPU busy fraction). The hosts' instance types, vCPU
+counts and CPU generations (Table 3.2) are held in a small table the
+instruments read.
+
+**The cluster runs.** The benchmarking team's archives hold every
+node's traces in per-namespace tables with the node and the nanosecond
+time of each event. The report rebuilds from them the two inputs the
+testnet instruments take: the event records of the namespaces the
+instruments read, with the node's name as pool and agent, and a chain
+cache in the testnet's layout. The chain is reconstructed by taking the
+highest block that became any node's tip and walking parents back to
+the first block; RB sizes come from the forger's adoption event, EB
+sizes and transaction counts from the EB forged event, the certificate
+from the certified-and-announced event, and the closure bytes as the
+transaction count times the run's transaction size (the mode of the
+mempool's size increments). A plain RB's own transaction count is not
+traced on the cluster and is estimated from its size.
+
+**Mainnet.** Block headers of whole epochs from a public block API
+(height, time, size, transaction count, forging pool) with each epoch's
+protocol parameters, read for the congestion windows of section [1](#mainnet-baseline-and-targets).
+
+**The benchmarking team's comparison.** The figures of Table 5.5 are
+taken as printed from the team's report of 2026-10-27, whose data
+dictionary defines each of them; the report does not recompute them.
+
+**The ledger benchmark survey.** The operators' submissions to the
+ledger-operations survey of October 2026 (db-analyser at one pin over
+one chain fragment, 26 operators' machines and the benchmarking team's
+reference host), copied from the survey's results page with the machine
+names removed: per machine the processor model, logical CPUs and
+physical cores, virtualisation, the disk's write-cache mode, and the
+read latency, apply and reapply costs per transaction with the UTxO set
+in memory and on disk. Held as a small table the printer reads.
+
+**db-sync.** The testnet's db-sync instance, reached through the
+monitoring's data source, gives the certified closures what the chain
+cache cannot: for every certifying RB of a window, the transactions it
+carries with their sizes, and for every input the block in which the
+spent output was created. The report keeps one row per certifying RB
+(transaction count and bytes, the size percentiles and extremes, the
+share of inputs spending an output of the same block and the median age
+in blocks of the outputs spent); the 1 kB window's composition table of
+section [4.3.1](#the-1-kb-transaction-window-transaction-count-not-bytes) is an earlier cut of the same query.
+
+### Conventions
+
+- **Slot clock.** The testnet's slot 0 is 2026-10-18 00:00 UTC and a
+  slot is one second; a cluster run's slot 0 is the system start its
+  nodes logged. "Age after the slot" is the event's time minus the start
+  of the slot of the RB or EB concerned. The chain's block times agree
+  with their slot numbers to the second in every window used (the spread
+  between the two is zero). Node events carry the node's own clock; the
+  diffusion ages are computed by the node itself against the slot start,
+  and the adoption delays of section [5](#leios-on-praos) subtract the slot start from the
+  node's timestamp, so a node with a wrong clock would show as an outlier
+  in both, and none did.
+- **Loaded windows.** Each testnet window is the set of hours in which
+  the load generator ran (Table 3.1), kept as a list of start and end
+  times; an EB or RB belongs to a window by the time of its slot. Cluster
+  runs are read whole. A window's transaction size (Table 3.1) is the
+  bytes of its certified closures over their transaction count, the
+  figure the ladder divides the byte cap by.
+- **A node** is one reporting agent for one pool; one agent name can
+  report for two pools and then counts twice.
+- **Eligible EB.** An announced EB whose next RB on the chain is 14 or
+  more slots later (15 on the cluster run of 2026-10-17, which ran with
+  that gap). Only eligible EBs can be certified, and the certification
+  rate is certified over eligible.
+- **Certified EB.** The RB after the announcing one carries the
+  certificate. **Closure** is the set of transactions the EB references;
+  a node holds the closure when all of them are present.
+- **Per node, then the unfavourable-quartile node.** The stage rows are
+  computed per node first (a percentile or a share over that node's
+  EBs), then read across nodes at the node on the unfavourable
+  quartile of the statistic, one node one count: the 75th-percentile
+  node for a time and for the applied share, the 25th for the vote
+  rate, so that three nodes in four are faster, apply less, vote more.
+  The two arrival rows add the share of the committee's weight, from
+  the voters file, held by the nodes whose p90 is under the deadline;
+  on the cluster every node weighs the same. Nodes with too few records
+  for a percentile are left out, with the threshold given per entry.
+- **Reporting coverage.** A pool is observed in a window when its own
+  votes or vote refusals are in the data; the reporting weight is the
+  share of the committee's weight those pools hold, computed per window
+  against that window's total weight (a window that straddles an epoch
+  holds two committees).
+- **Percentiles** are the 90th and 95th unless stated, interpolated
+  within the sorted values.
+
+### The quantities
+
+**Praos fullness and throughput on mainnet (section [1](#mainnet-baseline-and-targets)).** Fullness is a
+block's size over the maximum block size of its epoch; a block is full
+at 95 % of it. Carried bytes per second over a window is the sum of
+block sizes over the window's seconds, against the Praos expectation of
+the limit times the active slot coefficient. The congested windows are
+found by binning blocks into hours and listing the fullest bins. Chain
+density is RBs over seconds over 0.05.
+
+**The ladder (sections [2](#what-is-assessed-and-what-to-expect) and [4](#results-by-parameter-set)).** All from the chain over the loaded
+windows. The observed RB rate is RBs over the windows' seconds. The
+announced count is RBs with an EB announcement, the eligible count those
+with the gap, p observed = eligible over announced. The survival of the
+mix is certified over eligible; the survival of full EBs is the same
+ratio over EBs whose reference bytes are at least 99 % of the binding
+capacity, which is S_EB when S_EB binds and
+S_EB-tx over the transaction size when S_EB-tx does. The
+transaction size is the certified closures' bytes over their
+transactions. The load factors are the share of RBs announcing an EB,
+the mean reference bytes over the binding capacity, and the mean plain
+RB bytes over the 90,112 B limit. The measured rung is the certified
+closures' bytes plus the plain RBs' bytes over the seconds. A rung's
+transactions per second use the same quantities in transactions.
+
+Three rungs read an EB's bytes from its reference count at the
+window's mean transaction size: the cap that binds, the threshold for
+a full EB and the EBs' load factor. A window with two transaction
+sizes is misread by them. In the 318 B window the sizes are 247
+and 506 B and S_EB-tx binds for both, so the mean reads the 506 B-heavy
+EBs, a quarter of the transactions, at 0.6 to 0.8 of their bytes: the
+full rung then counts the 247 B EBs of 6,200 transactions and up, the
+ones costliest to validate, and the load-adjusted rung is off by at
+most that quarter in a direction the chain does not record. The rungs
+are kept with that reading, and the measured rung, the certified
+closures' bytes, is exact. In the 1 kB window the sizes are 220 and
+1,024 B and bind different caps: a full 1 kB closure reads as 0.8 full
+and a full small-transaction EB as 3.5 times the cap, so the mean gives
+no reading, those rungs are left out, and 4.3.1 reads the window by EB
+class.
+
+**EB and closure sizes (section [4](#results-by-parameter-set)).** From the chain: the eligible EBs'
+reference bytes over the reference width the ladder measures, 36 or
+37 B, as a transaction count, and the certified closures' bytes;
+percentiles over the window's EBs.
+
+**Body and closure diffusion per node (section [4](#results-by-parameter-set), two rows).** Per
+node and EB, the first announcement accepted from a peer with its
+announcement age, the first body acquired with its body age, and the
+first closure acquired with its closure age, all ages as the node
+reports them against the slot start. EBs the node forged itself are left
+out, and so are pairs whose announcement age exceeds 60 s, since a node
+catching up accepts old announcements and the age would then measure its
+lag. Per node, over its EBs: the 90th percentile of the body age and
+of the closure age. Nodes with fewer than 50 EBs are dropped. The row
+gives the 75th-percentile node's p90 and the share of the committee's
+weight held by the nodes whose p90 is under the deadline, 3 s for the
+body, 3 s and 7 s for the closure.
+
+**Applied share (section [4](#results-by-parameter-set)).** Per node and EB, the EB validated event's
+counts of transactions applied in full and reapplied; per node, applied
+over applied plus reapplied over all its EBs, for nodes with 100 or more
+records; the row is the 75th-percentile node.
+
+**Validation after the closure (section [4](#results-by-parameter-set)).** Per node and eligible EB,
+the EB validated event's time minus the later of the closure's arrival
+and the slot start plus 3 s (the vote window's opening), so the duration
+counts only the time validation could have been running. Per node the
+90th percentile over 100 or more records; the row is the
+75th-percentile node.
+
+**Vote tally reaches the quorum (section [4](#results-by-parameter-set)).** Each vote a node receives
+carries the node's running tally for the announcing RB. Per node and
+eligible EB, the age after the slot at which that tally first reached
+0.75 of the committee's weight (39 of 51 equal votes on the cluster).
+Per node the 90th percentile over the EBs where its tally got there,
+for nodes with 50 or more such EBs; the row is the 75th-percentile
+node.
+
+**Vote rate (section [4](#results-by-parameter-set)).** Per node, the EBs it received (as above) on
+which it cast a vote, over the EBs it received less those it refused
+because its chain tip did not announce the EB; the row is the
+25th-percentile node, the one that three nodes in four vote more than.
+
+**Quorums that became certificates (section [4](#results-by-parameter-set)).** Over the window's
+eligible EBs, those whose tally reached 0.75 at some reporting node,
+and among them those the chain shows certified.
+
+**Closure and vote by EB size, in committee weight (sections [4.3](#308-kb-references-2-mb-closures)
+and [4.3.1](#the-1-kb-transaction-window-transaction-count-not-bytes)).** Per eligible EB received by 40 or more reporting nodes
+(announcement age within 60 s), each node's closure age, and each
+node's pool weight from the window's voters file: the share of the
+committee's weight held by the nodes that had the closure by 3 s and
+by 7 s, an EB nobody completed reading zero. The weight that voted by
+7 s comes from the voter-stages records of the same window (below),
+summed over the voters whose vote was in time. Both are over the
+committee's total weight, so their ceiling is the reporting weight,
+and the two instruments' node sets for an EB differ slightly, so the
+vote share can exceed the arrival share by a few thousandths. EBs are
+binned by their reference count; per bin, the median over EBs of each
+share and the quartiles of the certified closures' bytes. The saved
+per-EB rows also keep the ages by which 75, 90 and 95 % of the nodes
+held the closure. Per EB the nodes that received its body and that
+completed its closure
+are counted as well, and the 6,000-and-up bin is split at the reference
+cap, 8,550 references and up, with the median of those counts (4.3.1).
+The forgers of those EBs are read by joining the window's EB
+announcements to their slot leaders, fetched from db-sync, and to the
+per-EB body counts: pools are grouped by whether they served the body of
+every eligible EB they announced, of none, or of some, with the EBs at
+the cap counted in each group.
+
+**Validation by EB size class (section [4.3.1](#the-1-kb-transaction-window-transaction-count-not-bytes)).** The records of the
+validation entry, as for 6.1, every EB validated in the loaded hours,
+binned by the EB's transaction count as the closure-tail sub-table: per
+bin the
+records and EBs, the median age of the closure's arrival and the share
+of records with the closure in hand by the slot plus 3 s, the median
+validation time after the later of the closure and the slot plus 3 s,
+the median age at which the record was validated and the share validated
+within 7 s of the slot. A node that never validated an EB has no record,
+so the shares are of the validations that completed.
+
+**Voter stages (section [8.1](#two-budgets-in-one-window)).** Per EB and per node that scheduled a
+vote on it (on the cluster, per node that accepted its announcement,
+the build having no vote-scheduled event), the record of the closure's
+arrival, the validation and the vote's outcome, taken from the
+vote-scheduled, closure-acquired, EB-validated and not-voted events over
+the loaded hours; a node that refused the EB because its own chain tip
+did not announce it, or found itself off the committee, is not a voter
+of that EB. Each EB's shares are over its voters, so a voter that never
+validated the EB counts as lost; a late vote is attributed to one cause,
+the closure after the deadline or never, the validation past the
+deadline, or the validation never finished. Binned by the EB's
+transaction count from the body hits, or from the body's bytes at 36 B
+per reference where the build has no body-hits event, with the EBs
+whose late voters exceed a quarter of their voters and, from the chain
+cache, the certified share of the EBs the chain could certify (the next
+RB at the certification gap or beyond). With the window's voters file,
+the committee weight of the voters whose vote was in time is summed
+per EB and kept as quartiles over the bin's EBs, the cell of Tables
+4.7 and 4.9; on the cluster every voter weighs one over the EB's
+voters.
+
+**Never-completed closures by fate (section [4](#results-by-parameter-set)).** Per node and EB heard
+announced within 60 s, whether the closure and the body ever arrived,
+split by what the chain did with the EB: certified, eligible but not
+certified, superseded by a next RB inside the gap, or announced by an RB
+that is not on the chain. Shares are of node-EB pairs over the period.
+
+**EB classes and composition of the 1 kB window (section [4.3](#308-kb-references-2-mb-closures)).** Every
+eligible EB of the window classed by its reference count from the
+chain; for the certified closures, the transactions of the certifying
+RB from a db-sync instance with their sizes, counted as the 1 kB kind at
+700 B and above and as the small kind under 400 B.
+
+**Reporting coverage (sections [3](#populations-and-instruments) and [4](#results-by-parameter-set)).** As in the conventions: per window, the
+reporting nodes and the pools they report for, the pools in the
+committee, and the share of the committee's weight held by the pools
+whose votes or refusals are in the data.
+
+**RB kinds (section [5](#leios-on-praos)).** From the chain: certifying or plain by the
+certificate flag, announcing or not by the presence of an announced EB,
+and a plain RB's fullness by its size, full from 80 kB and small under
+20 kB.
+
+**Adoption delay by RB kind (section [5](#leios-on-praos)).** Per node and RB on the final
+chain, the node's first "added to current chain" event for that RB
+minus the RB's slot start. A certifying RB is binned by the closure it
+certifies, read as the closure bytes of its parent's EB; a plain RB by
+its size. The figures are the median, the 90th percentile and the share
+within 1 s over all node-RB pairs of the window. On the cluster the
+switch-to-fork event counts as adoption too.
+
+**Consecutive-slot pairs and forks (section [5](#leios-on-praos)).** On the chain, a pair
+is two RBs at consecutive block heights whose slots are one apart. A
+forked pair is an orphan, an RB that two or more observed nodes adopted
+and that is not on the chain, whose competitor on the chain at the same
+height sits exactly one slot before or after it. The pair's first RB is
+the one in the earlier slot; its kind is read from the chain when it
+won and, when it lost, from the orphan's size in the block-fetch
+completion event, a certifying RB fetching at about 1 kB and a plain one
+under load at 88 kB. Orphans adopted by a single node are left out as a
+node on its own stale chain. On the cluster the orphan's size comes from
+its forger's adoption event.
+
+**Leader slots and chain density (section [5](#leios-on-praos)).** The observed hosts'
+leader-slot and forged-RB events counted per window; on the testnet
+only the 13 IOG and PIR producers log them. Chain density is the RBs on
+the chain over the window's slots over 0.05. The lottery's mean is the
+slots times 0.05 and its standard deviation the square root of the
+slots times 0.05 times 0.95, both in RBs.
+The orphans of the pairs entry are counted per window.
+
+**The forge path (section [5.3](#adoption-within-a-run)).** From the call traces of the three IOG
+producers: for each RB the host forged that is on the chain, the
+durations of the forge call and of its steps (the mempool snapshot, the
+partition of the mempool, the block forging, the EB announcement),
+keyed by the slot the call was made for, and the forged event's time
+minus the slot start. The closure resolution step is read on all 13
+hosts from the call keyed by the EB announcement it resolved, binned by
+that closure's bytes, with the cost per transaction as the median
+duration over the median transaction count of the bin. Medians and 90th
+percentiles are pooled over the hosts' RBs in the loaded windows.
+
+**The adoption path (section [5.3](#adoption-within-a-run)).** Per node and RB on the chain, the
+block-fetch completion (body arrival), the chain-selection start (the
+block popped from the queue) and the adoption, as ages after the slot
+start, and the validation inside chain selection as the valid-candidate
+event's time minus the popped time; on the IOG hosts that duration
+equals the chain-selection call's own duration RB by RB. Medians and
+90th percentiles over node-RB pairs; the cluster reads the same events
+from its chain-database traces.
+
+**Validation time by applied share (section [6.1](#the-cost-of-validating-a-transaction)).** The records of the
+validation entry above, every EB a node validated whether it certified
+or not, with the duration between 0 and 60 s and at least 100
+transactions; the applied share is applied over applied plus reapplied.
+The EBs are classed by their transaction count in steps of 500 and the
+class holding the most distinct EBs is kept, so that every cell compares
+EBs of one size. Records are binned by applied share (0 to 10 %, 10 to
+30, 30 to 50, 50 to 70, 70 to 100). For each IOG and PIR host the
+median duration per bin, printed per instance class as the range of its
+hosts' medians, with the records in brackets; a cell is marked t, tentative,
+when a host in it has fewer than 30 records and left blank when every
+host has fewer than 10. For the operators, the nodes with 20 or more
+records in every bin are kept, the same set in every column; per node
+the median per bin, then the median and the quartiles across nodes. On
+the cluster all 51 nodes form the one population.
+
+**EBs failing by applied share (section [6.3](#mempool-coverage)).** On a cluster run, per
+EB the mean over its voters of the applied share from the same records,
+binned (under 30 %, then steps of 10 to 70 and over); per bin the EBs
+and the share that failed to certify, an EB certifying when 39 or more
+of the 51 voters had it validated by 7 s after the slot.
+
+**Nodes by their closure p90 (section [6.4](#diffusion-by-population)).** The per-node closure
+percentiles of the diffusion entry above (nodes with 50 or more EBs),
+counted in bins of the node's own p90 (under 2 s, 2 to 3, 3 to 4, 4 to
+7, 7 to 15, 15 and over), with the median node's p90 and
+never-completed share in each population's `diffusion_bins.csv`.
+
+**Upstream-peer groups (section [6.4](#diffusion-by-population)).** A node's upstream peers are the
+distinct peers that delivered its EB announcements during the window,
+counted from the peer field of its accepted-announcement events; for
+the IOG and PIR hosts, whose events carry no peer, the same count is
+taken from the monitoring's per-peer announcement events over the same
+period. Nodes are grouped (1, 2 to 3, 4 to 30, 31 and more) and the
+group is described by its closure p90 at its median node and at its
+unfavourable-quartile node, its body p90 at the median node, its vote
+rate at the median and at the unfavourable-quartile node, and the
+committee weight of its pools, the mean over the window's committees
+of the pools' share.
+
+**Memory and CPU (section [6.5](#memory-and-sustained-cpu)).** Operators: from each node's metric
+scrapes (about one per minute) the resident set at the node's median
+and peak sample, the GC live data at its peak, the process CPU as cores
+from the differences of the cumulative tick counter over intervals of
+60 s or more (shorter intervals quantise), taking the node's median and
+90th-percentile interval, with counters that imply more than 32 cores
+dropped as a different unit, and the GC share as the positive
+increments of the GC counter over those of the CPU counter; then the
+distribution across nodes. IOG and PIR hosts: the same from the
+monitoring's per-minute series, plus the host's total memory and its
+five-minute CPU busy fraction. Cluster: the same from the per-second
+resource trace.
+
+**Node versions.** The build information metric of each node's
+scrapes, per day, keeping the revision seen last on a day with an
+upgrade.
+
+**The ledger benchmark by processor (section [7.1](#the-ledger-benchmark-1)).** The survey's rows
+grouped by the processor model as reported; a model's cell is the range
+over its machines, and the summary rows the minimum, quartiles, median
+and maximum over all machines. The machines' logical CPU counts and
+virtualisation are in the printer's expanded output.
+
+**The cost per transaction at the vote (section [6.2](#what-the-node-pays-at-the-vote)).** The records of
+the validation entry, as for 6.1, on the EBs of one size class and, on
+the testnet, on the certified closures the db-sync rows select: by input
+origin, the closures with 80 % or more of their inputs spending an
+output of the same block (chained) and those with 50 % or less
+(old-input), or by transaction size, the closures whose transactions all
+lie in a band. A certifying RB is mapped to its EB through the chain
+cache. Per host, the cost per reapplied transaction is the median over
+the records in which the host applied no transaction of the closure of
+the validation time over the transaction count; the cost per applied
+transaction the median over the records in which it applied half or
+more of the time net of the reapplied transactions at that rate, over
+the applied count. Hosts are printed by instance class as the range of
+their medians, with the number of EBs behind each reading in brackets;
+a cell resting on fewer than 10 EBs on some host of the class reads
+"too few EBs" in the report, its cost kept in the instrument's output
+and the printer's expanded form; the operators' quartiles are
+over one node set under both selections, the nodes with 10 or more EBs
+behind the apply reading and 20 or more behind the reapply reading under
+each, so that the two columns compare the same nodes. The cluster runs
+(section [7.2](#the-cluster-against-the-testnet)) take the most common 500-transaction class and no
+selection, every node in one population. The size series, printed by
+the cost printer's `series` command and read in section 6.2,
+repeats the
+readings per EB size class on the 2 MB window with the chained closures
+of 200 to 260 B transactions and on the cluster runs with the classes
+they populate.
+
+**The repricings (section [8](#what-binds-certification-and-what-would-move-it)).** Both repricings take the per-record validation
+output of 6.1 and re-run the vote rule on altered validation times. On
+the cluster, each record's time after its start (the later of the
+closure's arrival and the 3 s mark) is split between the apply and the
+reapply operations in proportion to the record's counts at the run's
+measured costs (Table 7.2) and each part scaled by a factor: the
+hardware factors of Table 6.2 on both, or the chained-to-old-input ratio
+on the apply part alone (the loop fix); a row may start the validation
+at the closure's arrival instead. A voter votes if its scaled time is
+within 7 s of the EB's slot; an EB certifies with 39 voters, the run's
+quorum. Per row the cluster repricing prints the time at which the
+voter completing the quorum has validated (p50 and p90 over EBs) and
+the EB's transactions scaled by the share of the window that voter
+used, the closure arriving as it did; throughput is the ladder's
+formula of 4.1 with the EB term at the certified bytes per eligible EB
+and the plain-RB term at the certification share, pinned to the run's
+measured figure, at the run's transaction size. On the testnet the
+reporting voters hold 61 to 75 % of the committee weight and the rest
+cannot be repriced, so the repricing reads the votes and projects no
+certification: it takes the per-vote records of the voter stages above,
+one per vote a node scheduled, and gives each a validation time per
+row, the later of the closure's arrival and the 3 s mark plus a
+duration. Rows: the recorded duration; every voter slower than the
+current generation scaled down by the ratio of the class's to the
+node's cost per reapplied transaction (the hardware factor, read on
+reapply because it does not depend on the input origin; a node without
+a reapply reading uses its apply cost, else is not moved); and the
+pessimistic rebuild, the duration rebuilt as 20 ms plus the applied
+transactions at a class's old-input apply cost and the reapplied ones
+at the class's reapply cost, with the loop's cost removed as the same
+rebuild at the class's chained apply cost. A vote whose closure arrived
+after the deadline or never is late in every row; one whose validation
+never finished has no counts and stays so. Per row and per EB size bin
+it prints the votes in time, the votes out of time with the closure in
+hand, when those votes' closures arrived (p50 and p90), and the
+duration's p50, p90 and maximum over the votes.
+
+**The changed host against its control (section [9.2](#one-testnet-host-against-its-control)).** From the
+archived voting events of the two hosts, per host and EB the same
+record as the validation pairs: the closure's arrival, the validated
+time, the validation time after the later of the closure and the 3 s
+mark, the applied and reapplied counts, and the vote's outcome. Per
+host the least-squares fit of the validation time to the two counts
+with a constant gives the apply and reapply cost per transaction, and
+the EBs applying 500 or more with fewer reapplied than a third of that
+give the validation time per applied transaction at the median. The
+validation time by applied count bins each host's EBs by its own count,
+since the two apply different shares of the same EBs. The votes are
+counted over the EBs the host's chain tip still announced at the vote,
+with the missed ones split by whether the closure arrived after the
+deadline or the validation ran past it.
+
+### Where each quantity is computed
+
+The repository draws one boundary. Its inputs are the data sets of
+DATA.md, each cited by source, period and checksum: the chain cache and
+the committee, the period databases of the testnet windows with the IOG
+monitoring merged in, the cluster runs' trace tables and reconstructed
+chains, the archived monitoring pulls of the 2 MB period, and the
+mainnet set. Acquiring and building them, which means reaching the
+explorer, the telemetry archive, the IOG monitoring and the db-sync
+instance, or transforming their raw files into those data sets, is done
+outside the repository and is described in [the sources](#sources-and-their-records), not shipped as code.
+Inside the repository are the instruments, which read a data set and
+write a saved output per window or run, the saved outputs themselves,
+and the printers, which read the outputs and print the report's tables;
+every number in a table is reproducible from the data sets by running
+the instrument and then the printer. In the published copy the per-node
+outputs of the testnet windows and the hosts table carry every node and
+pool as a number (n1, n2, … and p1, p2, …, one number per node across
+the windows) in place of the agent names, hostnames and pool ids, with
+the operators' tickers emptied and the IOG and PIR labels kept; the
+printers read them unchanged, and the mapping is held by the author and
+available to reviewers on request.
+
+| quantity | data set | instrument | printer |
+|---|---|---|---|
+| mainnet fullness, throughput, congested windows | mainnet set | `mainnet_praos.py`, `mainnet_windows.sh` | the same |
+| the ladder, EB and closure sizes | chain cache, committee | the ladder and sizes computation (`ceiling`, `sizes`) | `ladder_table.py` |
+| body and closure diffusion per node, vote rate | period database or cluster run, chain cache | `diffusion_nodes.py` | `stage_table.py` |
+| applied share, validation after the closure | period database or cluster run | `validation_pairs.sql`, `cluster_validation_pairs.sql` | `stage_table.py` |
+| vote tally reaches the quorum, quorums that became certificates | period database or cluster run, chain cache | `tally_quorum.sql`, `cluster_tally_quorum.sql` | `stage_table.py` |
+| closure at 90 and 95 % of the nodes by EB size; the body and closure reach of the EBs at the S_EB cap | period database, chain cache | `closure_fleet.sql` | `stage_table.py`, `--classes` for the reference-cap split |
+| the forgers of the EBs whose body reached no node, by pool | chain cache, the per-EB closure output, the window's slot leaders from db-sync | `eb_forgers.py` | read directly |
+| validation by EB size class | the per-record validation output of a window | `validation_classes.py` | `stage_table.py --classes` |
+| voter stages: where each voter lost the EB, the vote's outcome by cause, by EB size | period database or cluster run, chain cache | `voter_stages.sql`, `voter_stages.py` | `stage_table.py --voters` |
+| never-completed closures by fate | period database, chain cache | `closure_never.sql` | read directly |
+| reporting coverage | period database, committee | the voters table of the causes pass | `stage_table.py` |
+| EB classes and composition of the 1 kB window | chain cache; the db-sync result as a saved output | `eb_composition.py` (chain half) | the same |
+| RB kinds, leader slots and chain density | chain cache, the adoption and pairs outputs | | `praos_table.py` |
+| adoption delay by RB kind | period database or cluster run, chain cache | `adoption_delay.sql`, `cluster_adoption.sql` | `praos_table.py` |
+| consecutive-slot pairs and forks | period database or cluster run, chain cache | `consecutive_pairs.sql`, `cluster_forks.sql` | `praos_table.py` |
+| the forge path | archived monitoring pulls, chain cache | `forge_path.py` | `praos_table.py` |
+| the adoption path | period database or cluster run, chain cache | `adoption_path.sql`, `cluster_adoption_path.sql` | `praos_table.py` |
+| the Praos control | the team's report | | `praos_table.py`, typed constants |
+| validation time by applied share | the per-record validation output of a window or run, the hosts table | `validation_bins.py` | `cost_table.py bins` |
+| EBs failing by applied share; the cluster records repriced on faster hosts and with the loop's cost removed | the per-record validation output of a cluster run, its ladder export | `host_speed.py` | `cost_table.py unseen`, `speed`, `combined` |
+| the testnet votes repriced by host class, the pessimistic rebuild and the loop's cost removed, per vote and per EB size bin | the per-vote records of a window, the hosts table | `voter_reprice.py` | `cost_table.py votes` |
+| the changed host against its control: the costs per transaction, the validation time by applied count, the votes cast and missed | the archived voting events of the two hosts | `loop_hosts.py` | the same |
+| nodes by their closure p90, upstream-peer groups | the per-node diffusion outputs, the voters table; the archived per-peer announcement pulls | `diffusion_bins.py`, `peers_upstream.py` | `diffusion_table.py bins`, `upstream` |
+| memory and CPU | the period database's metrics, the archived monitoring series, the cluster's resource trace; the hosts table | `resources.py` | `cost_table.py resources` |
+| node versions | the period database's metrics | the node-versions query | read directly |
+| the ledger benchmark by processor | the survey table | | `benchmark_table.py` |
+| the cost per transaction at the vote, the size series | the per-record validation output of a window or run, the hosts table; the db-sync composition rows and the chain cache (testnet) | `validation_shape.py` | `cost_table.py shape`, `series` |

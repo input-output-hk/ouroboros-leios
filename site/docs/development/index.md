@@ -8,6 +8,7 @@ Currently, it contains:
 - [**Parameter graduation**](../parameter-graduation), the plans for stepping the Leios protocol parameters up on the network.
 - [**Benchmark reports**](./benchmark-reports) of Leios node release candidates, as run by the Performance & Tracing team on the cardano-node benchmarking cluster.
 - [**Cost estimator**](./cost-estimator), which projects the operating costs of a Leios node from confirmed transaction throughput.
+- [**Feasibility report**](./feasibility-report.md), which measures the Leios transaction pipeline on MusashiNet and the cardano-node benchmarking cluster.
 
 The [Research and development](./overview) section holds historic material from the research phase of the project. It remains a valid reference wherever it has not been superseded by material in this section.
 
