@@ -42,6 +42,7 @@ const sidebars: SidebarsConfig = {
         "parameter-graduation",
         "development/benchmark-reports",
         "development/cost-estimator",
+        "development/feasibility-report",
       ],
     },
   ],
