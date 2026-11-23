@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 """Render the report, README.md, as a web page and as a PDF.
 
-    build.py [--html] [--pdf] [--out BASENAME]
+    build.py [--html] [--pdf] [--pdf-engine ENGINE] [--out BASENAME]
 
-README.md is the report itself: a YAML block with the title and the
-author, then the text, with unnumbered headings and links between
-sections. --html writes the self-contained preview page, --pdf the PDF
-with pandoc and the tectonic XeTeX engine (`brew install pandoc
-tectonic`), after the Leios design document's recipe: the settings are in
-metadata.yaml. Pandoc numbers the sections in the PDF; the summary and
-the appendix stay unnumbered so that the numbers match the text's
-references, and every heading carries the id GitHub gives it, so that
-the links between sections resolve in the PDF too. Every pipe table gets
-column widths in proportion to its longest cells, since LaTeX wraps cells
-instead of scrolling. The outputs are BASENAME.html and BASENAME.pdf,
-by default feasibility-report next to README.md.
+README.md contains the report's numbered headings and section links.
+--html writes the self-contained preview page. --pdf builds the PDF with
+Pandoc and Tectonic (`brew install pandoc tectonic`) using metadata.yaml.
+Use --pdf-engine=xelatex with an installed TeX Live distribution.
+The PDF uses the heading numbers and custom anchors from the Markdown.
+Every pipe table gets column widths in proportion to its longest cells.
+The outputs are BASENAME.html and BASENAME.pdf, by default
+feasibility-report next to README.md.
 """
 import argparse, datetime as dt, os, re, subprocess, sys
 
@@ -22,7 +18,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, ".."))
 README = os.path.join(ROOT, "README.md")
 METADATA = os.path.join(ROOT, "metadata.yaml")
-UNNUMBERED = ("Summary", "Appendix")  # top-level sections pandoc leaves unnumbered, with their subsections
 
 
 def slug(title, seen):
@@ -47,18 +42,19 @@ def split_front_matter(text):
 
 
 def pdf_headings(body):
-    """Give each heading its GitHub id, and the unnumbered class under the summary and the appendix."""
-    out, seen, unnumbered = [], set(), False
-    for line in body.split("\n"):
-        m = re.match(r"^(#{1,3}) (.*)$", line)
-        if m:
-            hashes, title = m.groups()
-            if hashes == "#":
-                unnumbered = title.split(":")[0].split(" ")[0] in UNNUMBERED
-            attrs = "{#%s%s}" % (slug(title, seen), " .unnumbered" if unnumbered else "")
-            line = "%s %s %s" % (hashes, title, attrs)
-        out.append(line)
-    return "\n".join(out)
+    """Use the Markdown's custom anchors as the PDF heading identifiers."""
+    headings = re.compile(r'^(?:<a name="([\w-]+)"></a>\n\n)?(#{1,3}) (.+)$', re.M)
+    seen = set()
+
+    def add_id(match):
+        anchor, hashes, title = match.groups()
+        anchor = anchor or slug(title, seen)
+        seen.add(anchor)
+        # Reserve room before Pandoc inserts the heading's PDF destination.
+        page_space = r"\clearpage" if hashes == "#" else r"\Needspace{6\baselineskip}"
+        return f"{page_space}\n\n{hashes} {title} {{#{anchor}}}"
+
+    return headings.sub(add_id, body)
 
 
 def pdf_tables(md):
@@ -94,7 +90,9 @@ def pdf_tables(md):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--html", action="store_true", help="write the self-contained preview page")
-    ap.add_argument("--pdf", action="store_true", help="write the PDF (pandoc + tectonic)")
+    ap.add_argument("--pdf", action="store_true", help="write the PDF with Pandoc")
+    ap.add_argument("--pdf-engine", choices=("tectonic", "xelatex"), default="tectonic",
+                    help="PDF engine (default: tectonic)")
     ap.add_argument("--out", default=os.path.join(ROOT, "feasibility-report"), help="output basename (default: feasibility-report next to README.md)")
     a = ap.parse_args()
     with open(README) as fh:
@@ -125,7 +123,7 @@ def main():
         pdf_src, pdf_out = a.out + ".pdf.md", a.out + ".pdf"
         with open(pdf_src, "w") as fh:
             fh.write(front + "\n" + pdf_body + "\n")
-        cmd = ["pandoc", pdf_src, "--pdf-engine=tectonic", "--from=markdown", "--to=pdf",
+        cmd = ["pandoc", pdf_src, "--pdf-engine=" + a.pdf_engine, "--from=markdown", "--to=pdf",
                "--metadata-file", METADATA, "--metadata", "date=Build of " + stamp, "--output", pdf_out]
         res = subprocess.run(cmd, capture_output=True, text=True)
         os.remove(pdf_src)
@@ -136,8 +134,7 @@ def main():
 
 
 # The self-contained preview page: the report's Markdown is embedded and rendered in the browser (marked, pinned),
-# with a contents rail, tables in scrolling containers and tabular figures. Headings get GitHub's ids, so the
-# report's links between sections work here as they do on GitHub.
+# with a contents rail, tables in scrolling containers and tabular figures.
 HTML = r"""<title>Leios Feasibility Report</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
@@ -207,7 +204,7 @@ article blockquote p { margin: 0; }
   var art = document.getElementById("report");
   marked.use({ gfm: true, breaks: false });
   art.innerHTML = marked.parse(src);
-  // headings get the ids GitHub gives them, so the report's own links resolve; the first h1 is the title
+  // Give the contents rail GitHub-style heading IDs. The first h1 is the document title.
   var toc = document.getElementById("toc"), seen = {};
   var heads = Array.prototype.slice.call(art.querySelectorAll("h1, h2, h3"));
   heads.forEach(function (hd, i) {
@@ -241,7 +238,11 @@ article blockquote p { margin: 0; }
   try { saved = localStorage.getItem("toc"); } catch (e) {}
   setToc(saved === null ? window.innerWidth >= 1000 : saved === "1");
   btn.addEventListener("click", function () { setToc(!wrap.classList.contains("with-toc")); });
-  if (location.hash) { var tg = document.getElementById(location.hash.slice(1)); if (tg) { tg.scrollIntoView(); } }
+  if (location.hash) {
+    var fragment = location.hash.slice(1);
+    var target = document.getElementById(fragment) || document.getElementsByName(fragment)[0];
+    if (target) { target.scrollIntoView(); }
+  }
 })();
 </script>
 """

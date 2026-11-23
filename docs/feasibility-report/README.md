@@ -5,6 +5,8 @@ author:
 ---
 
 > **How this document is kept up to date.** This file is the report. Its tables are printed by the scripts under `scripts/` from the saved outputs under `outputs/`, which the instruments write from the data sets registered in `DATA.md`. To update a table, rerun its instrument and its printer as `scripts/README.md` describes and replace the table in place; that file lists which script prints which table and what each one reads. `scripts/build.py` renders this file as a web page and as a PDF.
+>
+> [Download the feasibility report (PDF)](feasibility-report.pdf)
 
 # Summary
 
@@ -86,7 +88,9 @@ per second at the measured transactions, not at mainnet's mix. The latest
 build frees validation time that script computation would use. How
 much of it scripts take is a measurement still to make.
 
-# Mainnet baseline and targets
+<a name="mainnet-baseline-and-targets"></a>
+
+# 1 Mainnet baseline and targets
 
 Before any Leios measurement is read, two things have to be fixed: what
 Praos delivers on mainnet today, both on paper and under real congestion,
@@ -94,7 +98,9 @@ and what the targets for Leios are once they are expressed in the same unit.
 The results in the later sections are read against the numbers established
 here.
 
-## Praos on paper and on the chain
+<a name="praos-on-paper-and-on-the-chain"></a>
+
+## 1.1 Praos on paper and on the chain
 
 A Praos block is limited to 90,112 bytes, and the chain produces one
 every 20 seconds on average, with the active slot coefficient f at
@@ -144,7 +150,9 @@ to 94 % in the one sustained full-block period. A certifying Leios
 block carries more work at adoption than a Praos block; section
 [5](#leios-on-praos) measures what that does to density.
 
-## The targets
+<a name="the-targets"></a>
+
+## 1.2 The targets
 
 The throughput targets come from the two documents that commissioned
 Leios, the treasury proposal and CIP-164, and are taken as stated.
@@ -212,7 +220,9 @@ coincide near 45 kB/s at the normal mix, and 75 kB/s at the CIP's own
 transaction size. The CIP's simulated parameter set sits three to
 eight times above that line.
 
-## Where the measured parameter sets sit on paper
+<a name="where-the-measured-parameter-sets-sit-on-paper"></a>
+
+## 1.3 Where the measured parameter sets sit on paper
 
 The report measures three parameter sets. Each is named by the two
 caps that define it, in the symbols of CIP-164. The first, S_EB, caps
@@ -246,14 +256,18 @@ per second as well.
 How much of each ceiling the protocol delivers on real nodes, and why it
 falls short where it does, is the question the rest of the report answers.
 
-# What is assessed and what to expect
+<a name="what-is-assessed-and-what-to-expect"></a>
+
+# 2 What is assessed and what to expect
 
 This section describes the Leios pipeline as deployed on the measured
 networks: its stages, the limits that bound it, and how a parameter
 set's ceiling relates to what the chain carries. It holds no
 measurements. It fixes the vocabulary with which section [4](#results-by-parameter-set) is read.
 
-## The pipeline and its clock
+<a name="the-pipeline-and-its-clock"></a>
+
+## 2.1 The pipeline and its clock
 
 Leios adds to Praos a second kind of block, the endorser block. The
 ranking block (RB) remains the Praos block and the only one that
@@ -304,7 +318,9 @@ about this stage.
 Each stage has a deadline or a budget. The tables of section [4](#results-by-parameter-set) have
 one row per stage for that reason.
 
-## The constraint set
+<a name="the-constraint-set"></a>
+
+## 2.2 The constraint set
 
 A Leios parameter set is more than the two caps that name it. Table
 2.1 lists its parameters, with the names and symbols CIP-164 gives
@@ -358,7 +374,9 @@ therefore means a smaller closure. This report treats
 the script budgets as values to be set conservatively alongside the
 caps it measures, not as dimensions it has confirmed.
 
-## The ceiling and the ladder
+<a name="the-ceiling-and-the-ladder"></a>
+
+## 2.3 The ceiling and the ladder
 
 The rate a parameter set can carry on paper follows from the pipeline above.
 Each RB either certifies the EB announced by the previous one, with
@@ -396,7 +414,9 @@ randomly offered, what the voters lost and what the load did not supply.
 Section [4](#results-by-parameter-set) shows it in full for every parameter set, and the stage table
 next to it says where in the pipeline the voting loss arose.
 
-## Load and mempool coverage
+<a name="load-and-mempool-coverage"></a>
+
+## 2.4 Load and mempool coverage
 
 Load, for this report, is what reaches a forger's mempool when its
 slot comes, not what users submitted to the network. The distinction
@@ -427,7 +447,9 @@ loaded hours with idle ones. Every measurement in section [4](#results-by-parame
 over the hours in which the generators kept the mempools loaded, with
 the windows stated.
 
-## What to expect at each stage
+<a name="what-to-expect-at-each-stage"></a>
+
+## 2.5 What to expect at each stage
 
 The structure above gives an expectation for each stage before any
 measurement. Section [4](#results-by-parameter-set) states them per parameter set, with the
@@ -467,7 +489,9 @@ asks which of the three outside conditions, hardware, mempool coverage
 or topology, or which parameter, explains the shortfall, and what
 change would recover it. That is the content of sections [6](#cross-cutting-explanations) and [8](#what-binds-certification-and-what-would-move-it).
 
-# Populations and instruments
+<a name="populations-and-instruments"></a>
+
+# 3 Populations and instruments
 
 The measurements come from three sources: the public Leios testnet,
 the benchmarking cluster, and a ledger benchmark run by stake pool
@@ -477,7 +501,9 @@ question. This section describes the three, the instruments that read
 them, and what each can and cannot say, so that the results of section [4](#results-by-parameter-set)
 are read with their population in mind.
 
-## The public testnet
+<a name="the-public-testnet"></a>
+
+## 3.1 The public testnet
 
 The testnet is a Leios network run by stake pool operators and by IOG, on
 a chain restarted with a new genesis on 2026-10-18. Its parameters are
@@ -588,7 +614,9 @@ Table 3.3. Reporting coverage of the testnet per window, both sources
 merged. A pool counts as observed when its node's votes are in the data;
 the weight is the share of the committee's weight those pools hold.
 
-## The benchmarking cluster
+<a name="the-benchmarking-cluster"></a>
+
+## 3.2 The benchmarking cluster
 
 The cluster is a network of 51 nodes run by the benchmarking team on
 one instance type, c5d.2xlarge (8 vCPUs, 15.2 GiB), each with six
@@ -632,7 +660,9 @@ the race between the generator's injection and the diffusion among
 peers, in time rather than in place. On the testnet it is decided by
 how far a node sits from the three injection points.
 
-## The ledger benchmark
+<a name="the-ledger-benchmark"></a>
+
+## 3.3 The ledger benchmark
 
 The third source is a benchmark of block validation that 26 stake
 pool operators ran on their own machines between 7 and 18 October
@@ -652,7 +682,9 @@ measured on the networks against it as the hardware axis. Section [7](#models-ag
 reads the DeltaQ model's constants, which are costs of this kind,
 against the networks' measured costs through it.
 
-## What each source can and cannot say
+<a name="what-each-source-can-and-cannot-say"></a>
+
+## 3.4 What each source can and cannot say
 
 Table 3.5 puts the three sources side by side.
 
@@ -674,7 +706,9 @@ cluster, where it is controlled. Where the two populations disagree,
 the disagreement is itself a finding, and section [6](#cross-cutting-explanations) explains it.
 The benchmark places the operator hardware the testnet could not see.
 
-# Results by parameter set
+<a name="results-by-parameter-set"></a>
+
+# 4 Results by parameter set
 
 The three parameter sets are presented from the smallest to the
 largest, each on the populations that ran it. Each set has two
@@ -693,7 +727,9 @@ unfavourable quartile, and the arrival rows add the share of the
 committee's weight that clears the deadline. The tables are
 regenerated by `scripts/ladder_table.py` and `scripts/stage_table.py`.
 
-## 40 kB references, 260 kB closures
+<a name="40-kb-references-260-kb-closures"></a>
+
+## 4.1 40 kB references, 260 kB closures
 
 The smallest set ran on the cluster at 200 B transactions and on the
 testnet during the loaded hours of 2026-10-21 and 22, at 257 B. On the
@@ -784,7 +820,9 @@ The testnet's seventeen failures are not near misses. Nearly all drew
 votes from almost no reporting voter, the signature of an EB announced
 on a fork the voters had not adopted.
 
-## 100 kB references, 1 MB closures
+<a name="100-kb-references-1-mb-closures"></a>
+
+## 4.2 100 kB references, 1 MB closures
 
 The middle set ran on the cluster only, twice: at 200 B transactions,
 where S_EB binds (2,777 transactions, 555 kB closures), and at 374 B
@@ -863,7 +901,9 @@ measured at a fraction of the cluster's cost. Section [5](#leios-on-praos) takes
 other finding of these runs, the certifying RB's cost at adoption,
 which grows with the closure.
 
-## 308 kB references, 2 MB closures
+<a name="308-kb-references-2-mb-closures"></a>
+
+## 4.3 308 kB references, 2 MB closures
 
 The largest set ran on the testnet only, in two windows: the loaded hours
 of 2026-10-24 to 26, at 247 and 506 B transactions, 318 B on average
@@ -985,7 +1025,9 @@ EB, size times survival, peak in the 2,000 to 4,000 bin of Table 4.7,
 where three quarters of 865 kB closures certify against a quarter of
 the 1,707 kB ones in the bin above.
 
-### The 1 kB-transaction window: transaction count, not bytes
+<a name="the-1-kb-transaction-window-transaction-count-not-bytes"></a>
+
+### 4.3.1 The 1 kB-transaction window: transaction count, not bytes
 
 The first window cannot separate the effect of the transaction count
 from that of the bytes: its two transaction sizes are close, 247 and
@@ -1062,7 +1104,9 @@ difference.
 What binds the pipeline at this set is therefore what the voters
 validate, not the bytes they fetch.
 
-## Across the sets
+<a name="across-the-sets"></a>
+
+## 4.4 Across the sets
 
 Read across the three sets, the ladders say that the chain delivers
 its parameter ceiling less its own spacing and the load's shortfall
@@ -1089,7 +1133,9 @@ see: 0.39 of the committee's weight reports nothing, so whether those
 pools vote in time, and what stops them when they do not, cannot be
 told.
 
-# Leios on Praos
+<a name="leios-on-praos"></a>
+
+# 5 Leios on Praos
 
 Leios leaves the Praos block in place. It adds work to the RB that
 carries a certificate: that RB makes a closure of transactions part of
@@ -1117,7 +1163,9 @@ adoption, forks and chain density, 5.6 reads the control, and 5.7 says
 what the cost is made of. The tables are regenerated by
 `scripts/praos_table.py`.
 
-## What is expected
+<a name="what-is-expected"></a>
+
+## 5.1 What is expected
 
 A Praos block that arrives late costs no slot: the leader of the next
 slot forges regardless, on whatever chain it holds. If that leader has
@@ -1160,7 +1208,9 @@ pairs should fork more often when the first RB certifies. No leader
 slot should be missed, and the chain's density should fall by the
 forks alone.
 
-## The RBs that were compared
+<a name="the-rbs-that-were-compared"></a>
+
+## 5.2 The RBs that were compared
 
 An RB can certify the previous EB or not, and announce a new EB or
 not, four kinds in all. Under load nearly every RB announces an EB. A
@@ -1187,7 +1237,9 @@ rows that follow compare the first column with the third, the full
 block the CIP's constraint names; the other kinds are left out.
 
 
-## Adoption within a run
+<a name="adoption-within-a-run"></a>
+
+## 5.3 Adoption within a run
 
 The adoption delay is the time from an RB's slot to a node's adoption
 of it, for each reporting node and each RB on the chain. Table 5.2
@@ -1256,7 +1308,9 @@ holds at a thousand transactions and fails from a few thousand up. At 1.5 to
 2 MB, about 4,900 transactions, the certificate costs the median
 adoption 0.41 s more than the fullest plain block.
 
-## Forks
+<a name="forks"></a>
+
+## 5.4 Forks
 
 A consecutive-slot leader pair is two leaders in slots s and s + 1. The
 pair stays on the chain if the second leader had adopted the first RB
@@ -1301,7 +1355,9 @@ share follows the adoption delay for both kinds of RB, and above the
 crossover a pair led by a certifying RB forks more often than one led
 by a plain RB.
 
-## Missed slots and chain density
+<a name="missed-slots-and-chain-density"></a>
+
+## 5.5 Missed slots and chain density
 
 The slot lottery sets what the chain should hold. In a window of N
 slots each slot elects a leader with probability f. The leader slots
@@ -1362,7 +1418,9 @@ is there in the trickle hours too, so it is read as the unobserved
 pools' rather than as a cost of the load. What Leios costs Praos on
 the testnet is the delays of Table 5.2 and the forks of Table 5.3.
 
-## The Praos control
+<a name="the-praos-control"></a>
+
+## 5.6 The Praos control
 
 The benchmarking team compared a Praos run of the release node against
 two Leios cluster runs on the same cluster, with transactions of the
@@ -1432,7 +1490,9 @@ the certificate adds its closure on top. The control is one run of an
 older release, loaded by a different generator at Praos's own rate,
 so the figures give the order of the cost, not its measure.
 
-## What this says and what would change it
+<a name="what-this-says-and-what-would-change-it"></a>
+
+## 5.7 What this says and what would change it
 
 Leios costs Praos nothing in slots and something in forks. The
 something is the time to apply the certified closure at adoption: its
@@ -1459,7 +1519,9 @@ most of it. This report has no measurement of such a change. The
 forge path's delay is removed by the build of section [9.3](#the-cluster) where
 that build has run.
 
-# Cross-cutting explanations
+<a name="cross-cutting-explanations"></a>
+
+# 6 Cross-cutting explanations
 
 Section [4](#results-by-parameter-set) placed the loss of each parameter set: at validation on the
 cluster at 1 MB and in the testnet's 1 kB window, and at the closure's
@@ -1477,7 +1539,9 @@ benchmark's figures against them. Section [8](#what-binds-certification-and-what
 them. The tables are regenerated by `scripts/cost_table.py` and
 `scripts/diffusion_table.py`.
 
-## The cost of validating a transaction
+<a name="the-cost-of-validating-a-transaction"></a>
+
+## 6.1 The cost of validating a transaction
 
 A voter validates an EB's closure transaction by transaction. The ones
 it validated before, at admission to its mempool or in an earlier EB,
@@ -1596,7 +1660,9 @@ origin of the applied transactions' inputs. Section [6.2](#what-the-node-pays-at
 separates it. The
 arrival loss of the 318 B window is 6.4's.
 
-## What the node pays at the vote
+<a name="what-the-node-pays-at-the-vote"></a>
+
+## 6.2 What the node pays at the vote
 
 Section 6.1 left one factor unseparated, the origin of the applied
 transactions' inputs. This subsection separates it. It reads the
@@ -1725,7 +1791,9 @@ The deployment should plan on the costlier one, old inputs. The
 chained figures are a floor, the cost the voter reaches only when a
 transaction's inputs arrive in the same closure.
 
-## Mempool coverage
+<a name="mempool-coverage"></a>
+
+## 6.3 Mempool coverage
 
 Section 6.1 read the voter's cost rising with the share of the EB it
 applied. That share is not a property of the EB: it is the part of the
@@ -1775,7 +1843,9 @@ certifies an EB it had mostly seen and fails one it had not. How the
 load is submitted sets the certification rate as much as the hosts do,
 which section [8](#what-binds-certification-and-what-would-move-it) takes up.
 
-## Diffusion by population
+<a name="diffusion-by-population"></a>
+
+## 6.4 Diffusion by population
 
 Section [4](#results-by-parameter-set) placed the 318 B window's loss at the closure's arrival,
 where the committee's weight holding the closure by 7 s falls as the
@@ -1871,7 +1941,9 @@ one. One is the single-relay nodes, a tenth of the committee's weight,
 half of them holding the closure after 9.30 s. The other is the slower
 quarter of the nodes with many peers.
 
-## Memory and sustained CPU
+<a name="memory-and-sustained-cpu"></a>
+
+## 6.5 Memory and sustained CPU
 
 Memory and sustained CPU come from the nodes' own metrics, which average
 over a minute (the testnet) or a second (the cluster) and across all
@@ -1928,7 +2000,9 @@ Table 6.6 therefore shows that memory and sustained CPU bind nothing
 at the measured sizes: the one resource the measurements find short is
 a core for the seconds of a validation, which section [8](#what-binds-certification-and-what-would-move-it) prices.
 
-# Models against measurements: DeltaQ and the CIP cost model
+<a name="models-against-measurements-deltaq-and-the-cip-cost-model"></a>
+
+# 7 Models against measurements: DeltaQ and the CIP cost model
 
 Section [6](#cross-cutting-explanations) measured what a voter pays to validate an EB on the report's
 populations. Two other sources put a figure on the same work: the ledger
@@ -1953,7 +2027,9 @@ path, and 7.4 and 7.5 read the CIP's and the DeltaQ model's constants
 against the result. The tables are regenerated by
 `scripts/benchmark_table.py` and `scripts/cost_table.py`.
 
-## The ledger benchmark
+<a name="the-ledger-benchmark-1"></a>
+
+## 7.1 The ledger benchmark
 
 The benchmark is the ledger-operations mode of
 [db-analyser](https://ouroboros-consensus.cardano.intersectmbo.org/docs/references/consensus_tools#db-analyser),
@@ -2042,7 +2118,9 @@ The operators who ran the benchmark are part of the population of
 section [3](#populations-and-instruments)'s testnet, 26 of its operators, so Table 7.1 shows on the
 ledger alone the kind of spread the operator rows of section [6](#cross-cutting-explanations) carry.
 
-## The cluster against the testnet
+<a name="the-cluster-against-the-testnet"></a>
+
+## 7.2 The cluster against the testnet
 
 The cluster's nodes are c5d.2xlarge, the instance class of PIR7 and
 PIR9 on the testnet, so its readings compare with those two hosts like
@@ -2097,7 +2175,9 @@ on the same hardware, with a cost that grows with the EB. Section [9](#a-change-
 traces that growth to one step of the voting loop and measures a
 change to it.
 
-## Two paths, two costs
+<a name="two-paths-two-costs"></a>
+
+## 7.3 Two paths, two costs
 
 This subsection sets the cost a voter pays per transaction at the
 vote, measured on the testnet in section [6.2](#what-the-node-pays-at-the-vote) and on the cluster in
@@ -2145,7 +2225,9 @@ brings the same run's apply cost to about twice the ledger call, the
 adoption path's factor. Section [8](#what-binds-certification-and-what-would-move-it) analyses what
 reducing the voting path's overhead would do for certification.
 
-## The CIP's cost model
+<a name="the-cips-cost-model"></a>
+
+## 7.4 The CIP's cost model
 
 The CIP's cost model, the
 [compute cost estimation per node](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/cost-estimate/01-compute-cpu.md),
@@ -2201,7 +2283,9 @@ the apply and reapply costs of Tables 6.2a, 6.2b and 7.2 by host
 class and terms for the voting path, is an experiment this report has
 not made.
 
-## The DeltaQ model's inputs
+<a name="the-deltaq-models-inputs"></a>
+
+## 7.5 The DeltaQ model's inputs
 
 The DeltaQ model of certification, the
 [improved ΔQ model for Linear Leios EB diffusion](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/deltaq/improved-leios/report.md)
@@ -2263,7 +2347,9 @@ of Tables 4.3 and 4.5. A second run at the chained apply cost, the
 voter's cost with the loop's own work removed (section [9](#a-change-to-the-voting-loop-and-where-it-has-run)), would
 estimate what that change buys. Neither run is made in this report.
 
-# What binds certification, and what would move it
+<a name="what-binds-certification-and-what-would-move-it"></a>
+
+# 8 What binds certification, and what would move it
 
 Sections [4](#results-by-parameter-set) to [7](#models-against-measurements-deltaq-and-the-cip-cost-model) measured where the testnet and the cluster stand: at
 260 kB closures nearly every EB certifies, at 1 and 2 MB about half do.
@@ -2291,7 +2377,9 @@ targets of section [1](#mainnet-baseline-and-targets). The tables are regenerate
 `scripts/cost_table.py` from the repricing outputs. Section [9](#a-change-to-the-voting-loop-and-where-it-has-run) reports a
 change to the loop that removes its own cost and where it has run.
 
-## Two budgets in one window
+<a name="two-budgets-in-one-window"></a>
+
+## 8.1 Two budgets in one window
 
 A voter has seven seconds from the EB's slot to vote (section [2](#what-is-assessed-and-what-to-expect)).
 Validation starts at the 3 s mark or when the closure arrives,
@@ -2399,7 +2487,9 @@ When the validation budget is lifted, the arrival budget is what
 remains. Section 8.2 measures how much of the failure it holds once
 the voters' cost is priced.
 
-## The levers the report can price
+<a name="the-levers-the-report-can-price"></a>
+
+## 8.2 The levers the report can price
 
 Two levers act on the validation budget: faster hardware at the voters,
 and the removal of the voting loop's own cost. Both have a measured
@@ -2631,7 +2721,9 @@ of the causes of late votes on every host class, on both populations.
 Hardware alone removes two thirds of it. What remains is the closure's
 arrival, which section [8.4](#the-levers-the-report-cannot-price) leaves open.
 
-## What the measurements rule out
+<a name="what-the-measurements-rule-out"></a>
+
+## 8.3 What the measurements rule out
 
 Starting validation when the closure arrives instead of at the 3 s mark
 recovers little: on the cluster it moves certification from 69 to 72 %
@@ -2662,7 +2754,9 @@ and no voter speed touches them (section [4.3.1](#the-1-kb-transaction-window-tr
 What the measurements leave as levers are therefore the two of 8.2 on
 the validation budget and the arrival levers of 8.4.
 
-## The levers the report cannot price
+<a name="the-levers-the-report-cannot-price"></a>
+
+## 8.4 The levers the report cannot price
 
 The arrival budget has levers of its own, each with a measured target
 and no measured gain, so none has a row above.
@@ -2690,7 +2784,9 @@ Section 8.4 therefore leaves two questions open, whether forwarding
 and scheduling recover the single-relay nodes' gap and whether the
 apply path parallelises, and neither has a measurement in this report.
 
-## What the measurements support
+<a name="what-the-measurements-support"></a>
+
+## 8.5 What the measurements support
 
 As far as the transactions measured here represent, the measurements
 say three things about the feasibility of the build measured in
@@ -2741,7 +2837,9 @@ removed, measured in section [9](#a-change-to-the-voting-loop-and-where-it-has-r
 validation time manageable. The arrival levers appear needed on the
 2 MB set, unmeasured in this report.
 
-# A change to the voting loop, and where it has run
+<a name="a-change-to-the-voting-loop-and-where-it-has-run"></a>
+
+# 9 A change to the voting loop, and where it has run
 
 The drafting of this report led to a review of the voting loop's code.
 The source of the old-input cost section [7.2](#the-cluster-against-the-testnet) measures was identified,
@@ -2752,7 +2850,9 @@ removed would buy: a preview of the patch's effect, not its assessment.
 The change's effect on the testnet as a whole, and the cost a
 deployment can tolerate once it is in, are left to further work.
 
-## The change
+<a name="the-change"></a>
+
+## 9.1 The change
 
 The voting loop carried the closure's input table inside the ledger
 state and made a pass over the whole table after every applied
@@ -2765,7 +2865,9 @@ transaction its own inputs, which removes the pass. It is local to
 the loop. It is merged in the consensus repository's Leios branch as
 [commit 7b91f3619](https://github.com/IntersectMBO/ouroboros-consensus/commit/7b91f3619).
 
-## One testnet host against its control
+<a name="one-testnet-host-against-its-control"></a>
+
+## 9.2 One testnet host against its control
 
 The change ran on one testnet host of the oldest class the report
 measured, c5d, from the evening of 2026-11-08. A second host of the
@@ -2823,7 +2925,9 @@ Tables 9.1 and 9.2 therefore show on one host what section [8](#what-binds-certi
 for the c5d class: the apply cost at the chained level, and
 validation out of the causes of late votes, the late closures left.
 
-## The cluster
+<a name="the-cluster"></a>
+
+## 9.3 The cluster
 
 The 100 kB / 1 MB run with two-input transactions of section [4.2](#100-kb-references-1-mb-closures)
 certified 52 % of its eligible EBs on the build of section [4](#results-by-parameter-set), called
@@ -3004,7 +3108,9 @@ eligible share, and the branch's forge change takes away the cost to
 Praos. Both are one run on the cluster's uniform hosts; 9.4 says what
 that leaves unmeasured.
 
-## What is not measured
+<a name="what-is-not-measured"></a>
+
+## 9.4 What is not measured
 
 The change has run on one testnet host and one cluster run. What it
 does at the committee's scale is still section [8](#what-binds-certification-and-what-would-move-it)'s repricing: the cost
