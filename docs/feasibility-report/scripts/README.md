@@ -53,7 +53,7 @@ Printers (section, what they print, what they read under `outputs/`):
 
 | printer | section | reads |
 |---|---|---|
-| `scripts/build.py` | not a table: `--html` writes the self-contained preview page of the report, `--pdf` the PDF with pandoc and tectonic (`brew install pandoc tectonic`) on the settings of `metadata.yaml`, both as `feasibility-report.html` and `.pdf` next to `README.md` (or `--out BASENAME`); pandoc numbers the sections in the PDF, the summary and the appendix excepted, and every heading keeps the id GitHub gives it so the report's links resolve there too | `README.md`, `metadata.yaml` and the repository's commit |
+| `scripts/build.py` | `--html` builds the report preview and `--pdf` builds the PDF with Pandoc and Tectonic (or `--pdf-engine=xelatex` with TeX Live). Outputs are `feasibility-report.html` and `feasibility-report.pdf` beside `README.md`, or use `--out BASENAME`. The PDF uses the section numbers and anchors in the Markdown. | `README.md`, `metadata.yaml` and the repository's commit |
 | `scripts/mainnet_blocks.py` | 1, the fetch of the mainnet data set; the one fetcher kept in the repository, because its source (Koios) is public and keyless and a reviewer can repeat it | Koios: block headers and epoch parameters per epoch into the mainnet data set (DATA.md) |
 | `scripts/mainnet_praos.py`, `scripts/mainnet_windows.sh` | 1, the congestion-windows table (Praos under load) | the mainnet data set, `$LEIOS_MAINNET` (instrument and printer in one) |
 | `scripts/ladder_table.py` | 4, table (a), the ladder per parameter set | `<window>/ladder.jsonl` |
