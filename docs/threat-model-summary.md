@@ -2,7 +2,7 @@
 
 **Date:** 29 October 2026
 
-**Updated:** 10 November 2026
+**Updated:** 24 November 2026
 
 **Project:** Ouroboros Leios
 
@@ -49,9 +49,12 @@ The experiments span different environments and prototype revisions:
 - **Musashi testnet:** Adversarial Rust nodes running on hosted servers interacting with real Haskell nodes on the Mushahi test network. As many as 10 nodes, configured both with and without relays, performed coordinated attacks on Haskell nodes (typically the IOG nodes); this focussed primarily on attacks at scale.
 
 Results on prototypes w32, w34, and w38 are historical observations, not an
-assessment of every subsequent release. No new attack or regression experiment
-was run to prepare this document. Where the exact tested revision is unknown,
-release-specific conclusions remain limited. A proposal, a working attack tool,
+assessment of every subsequent release. The November 2026 w43 invalid-EB and
+duplicate-submission campaigns identify their tested revisions and re-test the
+earlier w34 invalid-EB findings on a newer release; they are recorded campaigns,
+not a regression suite. No new experiment was run to prepare this document.
+Where the exact tested revision is unknown, release-specific conclusions remain
+limited. A proposal, a working attack tool,
 a unit test, and a successful end-to-end attack are distinct kinds of evidence.
 
 A certificate being observed is also distinct from its inclusion in a ranking
@@ -61,7 +64,7 @@ Negative findings below are limited to the exercised cases and conditions.
 
 ## Executive summary
 
-T1-T34 comprise final assessments, investigations still in progress, pending analysis or feasibility assessment, and eleven threats outside scope. Assessment status does not imply
+T1-T34 comprise final assessments, investigations still in progress, pending analysis or feasibility assessment, and twelve threats outside scope. Assessment status does not imply
 that every security property or mitigation has been validated.
 
 The strongest completed implementation checks concern **certificate rejection**.
@@ -77,22 +80,37 @@ without establishing that every certificate encoding or context is covered. See
 **Loss of Leios throughput does not necessarily imply loss of Praos liveness.**
 The T10 observation recorded almost no certification during a voting
 misconfiguration while ranking blocks continued. T27 simulations demonstrated
-recoverable certification disruption under network partition. A related valid-transaction
+recoverable certification disruption under complete regional partition, with
+backlogs draining after reconnection at both tested loads. A related valid-transaction
 flood on the w32 testnet coincided with reduced certification; it did not establish
 a permanent stall or independently prove the proposed mempool-fragmentation mechanism.
 See [T10](#t10-decline-to-vote) and
 [T27](#t27-mempool-partitioning-via-network-control).
 
-**Historical implementation defects require fix validation.** T11 and T13
-experiments demonstrated item-count handling faults, connection disruption, and
-malformed-transaction process crashes on older prototypes. An identified fix
-revision and complete regression coverage remain to be established. Separately,
-T12-related tests recorded acceptance and memory retention of correctly signed
-votes for unknown targets. These are version-specific findings requiring closure
-evidence, not grounds to claim that the current release is vulnerable or that
-these risks have been resolved. See [T11](#t11-create-invalid-eb),
+**Historical implementation defects have identified fixes; re-verification is
+partial.** T11 and T13 experiments on w34 demonstrated item-count handling
+faults, connection disruption, and malformed-transaction process crashes. A w43
+campaign re-tested invalid endorser blocks: every delivered attack EB was
+rejected at the announcement, at decode, or at body arrival; none was endorsed;
+and no crash occurred, so the w34 oversized-vector crash does not reproduce on
+w43. The T13 malformed-transaction decoder crash has an identified upstream fix
+that has not been re-verified on the current release. T12-related tests recorded
+acceptance and memory retention of correctly signed votes for unknown targets,
+and fixes remain unvalidated. These are version-specific findings requiring
+closure evidence, not grounds to claim that the current release is vulnerable
+or that these risks have been resolved. See [T11](#t11-create-invalid-eb),
 [T12](#t12-create-invalid-vote), and
 [T13](#t13-reference-invalid-transactions-in-eb).
+
+**Duplicate submission costs are bounded.** On the w43 mixed devnet,
+node-to-node duplicate handling was mitigated: a transaction identifier
+re-announced twenty times on one connection, or offered once on each of three
+concurrent connections, cost the receiver one body fetch and one validation.
+Local resubmission pushed every duplicate through ledger validation before
+rejection, about 0.15 ms each, with no amplification and no downstream
+re-announcement. The tested attackers held a privileged position as the
+receiver's local roots, and remote submission services were not measured. See
+[T24](#t24-submit-duplicate-transactions).
 
 **Within this assessment's scope, priority validation gaps include selective
 data withholding and certified-data availability.** T21 requires validation of
@@ -120,9 +138,9 @@ validation gaps.
 | [T8](#t8-bls-key-compromise) | BLS key compromise | out of scope | — | Key theft and recovery not assessed |
 | [T9](#t9-decline-to-create-eb) | Decline to create EB | final | Negative | Empirical confirmation pending |
 | [T10](#t10-decline-to-vote) | Decline to vote | final | Negative | Praos continued during observed certification loss; incentives unvalidated |
-| [T11](#t11-create-invalid-eb) | Create invalid EB | prelim | Negative | Mixed historical results; fix validation pending |
+| [T11](#t11-create-invalid-eb) | Create invalid EB | prelim | Negative | w43 campaign rejected all tested variants with no crash; w34 crash not reproduced; crypto-stage EB, non-empty size lie, and sustained flood untested |
 | [T12](#t12-create-invalid-vote) | Create invalid vote | TODO | — | Historical unknown-target vote retention; full assessment pending |
-| [T13](#t13-reference-invalid-transactions-in-eb) | Reference invalid transactions in EB | prelim | Negative | Historical crashes; fix validation pending |
+| [T13](#t13-reference-invalid-transactions-in-eb) | Reference invalid transactions in EB | prelim | Positive | w34 committee-node crash via certified EB; upstream fix identified, not re-verified on w43 |
 | [T14](#t14-include-invalid-certificate-in-rb) | Include invalid certificate in RB | in progress | — | Delivered variants rejected; coverage incomplete and resource cost unquantified |
 | [T15](#t15-forge-certificate-without-quorum) | Forge certificate without quorum | final | Negative | Tested one-key/full-committee forgery rejected |
 | [T16](#t16-omit-targeted-transactions-from-rb-and-eb) | Omit targeted transactions from RB and EB | ? | — | Scope and feasibility pending |
@@ -133,10 +151,10 @@ validation gaps.
 | [T21](#t21-selectively-withhold-data-from-voting-committee) | Selectively withhold data from voting committee | TODO | — | Harness and plans; no completed result |
 | [T22](#t22-selectively-withhold-data-from-most-honest-nodes) | Selectively withhold data from most honest nodes | in progress | — | Mechanism described; timing and mitigation validation pending |
 | [T23](#t23-withhold-then-release-large-number-of-ebs) | Withhold then release large number of EBs | prelim | Negative | No measured harm at tested scale; sustained congestion untested |
-| [T24](#t24-submit-duplicate-transactions) | Submit duplicate transactions | prelim | Negative | Duplicate-handling validation pending |
+| [T24](#t24-submit-duplicate-transactions) | Submit duplicate transactions | final | Negative | Node-to-node deduplication mitigated; local resubmission costs one bounded validation per duplicate with no amplification; privileged position and remote services untested |
 | [T25](#t25-submit-invalid-transactions) | Submit invalid transactions | prelim | Negative | No isolated real-node result established |
 | [T26](#t26-submit-conflicting-transactions) | Submit conflicting transactions | in progress | — | Simulator inference; Haskell validation and resource cost pending |
-| [T27](#t27-mempool-partitioning-via-network-control) | Mempool partitioning via network control | final | Positive | Temporary simulated disruption; real-implementation partition validation pending |
+| [T27](#t27-mempool-partitioning-via-network-control) | Mempool partitioning via network control | final | Positive | Recoverable certification disruption and substantial transaction delay in simulation; real-implementation partition validation pending |
 | [T28](#t28-honeypot-contract-creating-transaction-races) | Honeypot contract creating transaction races | out of scope | — | Application economics not assessed |
 | [T29](#t29-exploit-implementation-differences-between-node-versions) | Exploit implementation differences between node versions | out of scope | — | Adversarial mixed-version behavior not assessed |
 | [T30](#t30-coordinate-governance-attacks-to-prevent-hard-fork) | Coordinate governance attacks to prevent hard fork | out of scope | — | Governance mitigations not assessed |
@@ -277,27 +295,62 @@ by missing quorum.
 ### T11: Create invalid EB
 
 **Description.** A producer able to announce and serve adversarial EBs can target
-byte limits, item limits, or declared-size handling at different processing stages.
+byte limits, item limits, declared-size handling, duplicate manifests, or
+malformed encodings at different processing stages.
 
-**Evidence.** Local w34 tests used a roughly 20%-stake adversarial producer and
-three Haskell nodes. A body of approximately 3.8 MB was rejected by the wire-size
-guard before decoding or storage: connections closed, but processes survived and
-the chain advanced. A self-consistent 13,889-entry manifest passed that byte guard
-and was stored, then exceeded a 13,888-entry vector when an honest node served it.
-Bounds exceptions disconnected peers; sustained churn stalled the chain, which
-resumed within one to two minutes after the attack stopped.
+**Evidence.** A w43 mixed-devnet campaign (23 November 2026) ran 13 fresh-devnet
+runs across five variants — three per variant except malformed, which has one:
+duplicate manifests (one valid transaction named twice); huge (100,000-entry,
+roughly 3.8 MB) and oversized (13,889-entry, roughly 514 KB) manifests above
+the devnet's 100,000-byte endorser-block size limit; hollow bodies (an empty
+manifest announced with a false, larger declared size); and malformed CBOR
+bodies. A roughly 20%-stake adversarial producer announced the invalid EBs on
+the ranking blocks it forged against three Haskell nodes holding 80%
+collectively. Every delivered attack EB was stopped before endorsement, at one
+of three stages: at the announcement, where the header check rejected
+above-limit EBs before any body fetch; at decoding, where an empty manifest
+failed an item-count check and corrupted bodies failed CBOR decoding; or at
+body arrival, where a post-decode check rejected duplicate transaction hashes.
+All 36 duplicate-manifest EBs were rejected by every node that received them.
+The one exception to clean rejection is the malformed-truncate corruption,
+which breaks the outer message framing and stalls the fetch; it caused no harm
+in its run and is tracked separately. No attack EB was validated, voted, or
+certified; no crash or fatal error occurred; no link between two honest nodes
+was torn down; and the three honest nodes finished every run on the same tip.
 
-An empty body advertised as 2 MB caused no observed memory growth or disconnection.
-Advertising 2 GB did not drive memory toward that declared size, but triggered a
-size-mismatch exception and peer disconnection after fetching. In the controlled
-repeat, connections recovered between bursts and the chain advanced.
+The single failing verdict, a chain-growth dip to 0.49 of baseline in one
+oversized run, coincided with that run's host-load peak, did not reproduce in
+the other runs, and is recorded as host-load noise rather than attack harm. All
+runs ran under host load 28–76 from unrelated processes, which makes chain
+growth the noisiest measurement in the set.
 
-**Recommendation.** Validate semantic item and byte limits before storage, use
-total error handling, and repeat boundary tests against the target release.
+The w34 results are historical. The w34 oversized-vector crash — a stored
+13,889-entry manifest overflowing a fixed 13,888-entry vector while being
+served, stalling the chain — no longer reproduces on w43: the size and item
+limits now sit in the header check, and the fetch buffers are derived from the
+message limit rather than a fixed vector. The huge body that w34 rejected only
+at the wire-size gate is now rejected at the announcement, before any fetch
+begins, and the w34 size-mismatch disconnect for a declared-size lie is no
+longer reached: a hollow body declared above the limit is rejected at the
+announcement, and one declared below the limit is rejected at decoding because
+an empty manifest is itself invalid. The duplicate-manifest experiment, first
+filed under T24, is reclassified as the T11 duplicate variant, because
+duplicates inside an EB require producer stake and make the EB itself invalid.
 
-**Assessment.** Preliminary, with mixed historical evidence. The byte-size and
-allocation probes have bounded negative results; item-count and size-mismatch
-fixes remain unvalidated.
+**Recommendation.** Exercise the untested stages: a decodable but
+cryptographically invalid EB (bad VRF or body signature) and a declared-size lie
+with a non-empty body below the header limit. Characterize the
+malformed-truncate fetch stall and its cost under a sustained flood. Re-run the
+boundary variants on a quiet host, run the malformed variant to the campaign's
+three-run bar, and measure the reconnect churn that announcement-stage
+rejections cause at higher adversarial stake or EB rates.
+
+**Assessment.** Preliminary. On w43, all tested invalid-EB variants were
+rejected before endorsement, with no crash and no honest-chain divergence, and
+the w34 crash did not reproduce. The cryptographic rejection stage was never
+reached, the truncate case stalls rather than rejects, sustained-flood resource
+cost is unmeasured, and the malformed variant has fewer runs than the
+campaign's own three-run integrity bar requires.
 
 ### T12: Create invalid vote
 
@@ -344,15 +397,19 @@ operation without a genesis reset.
 A separate Musashi run directly observed body delivery to the relay serving the
 committee; the committee crashes were confirmed by its operators. Neither certification
 nor a decoder crash establishes successful application of invalid transactions
-to an honest ledger.
+to an honest ledger. The decoder crash has an identified upstream fix, merged on
+17 September 2026; it has not been re-verified against the w43 release exercised
+by the [T11](#t11-create-invalid-eb) campaign.
 
 **Recommendation.** Use total transaction decoding and validation at the relevant
 trust boundaries. Verify both rejection and process survival with confirmed
 delivery, including restart conditions; separately verify honest ledger
 non-application.
 
-**Assessment.** Preliminary. Historical crashes require an identified fix and
-regression tests confirming rejection, process survival, and recovery.
+**Assessment.** Preliminary. The w34 dummy-transaction decoder crash has an
+identified upstream fix that is not yet re-verified on a current release;
+regression tests confirming rejection, process survival, and recovery remain
+outstanding.
 
 ### T14: Include invalid certificate in RB
 
@@ -559,17 +616,41 @@ remains unverified.
 
 ### T24: Submit duplicate transactions
 
-**Description.** Repeated submission can waste processing and bandwidth.
-Transaction-generation and replay tools can submit the same valid signed
-transaction repeatedly. Haskell duplicate admission, propagation, and rejection
-cost remain to be measured.
+**Description.** A client can submit the same valid signed transaction
+repeatedly through normal submission mechanisms to waste bandwidth and
+processing. The threat model names no submission path, so both client paths to a
+Haskell node were tested: node-to-node TxSubmission, which is pull-based (the
+receiver asks for identifiers, then requests only bodies it does not already
+hold), and local submission, the interface used by wallets and HTTP submission
+services. Duplicates inside an endorser block require producer stake and make
+the EB itself invalid; they are assessed under [T11](#t11-create-invalid-eb).
 
-**Recommendation.** Measure duplicate admission, propagation, and resource use
-using a valid transaction. Rejection of malformed data must not be mistaken for
-successful duplicate handling.
+**Evidence.** Three fresh proto-devnet runs (23 November 2026, w43 Haskell
+nodes) produced identical verdicts, with attacker-side and receiver-side
+evidence recorded for every vector; only repeats made while the transaction was
+in the receiver's mempool were counted. On the node-to-node path, a transaction
+identifier announced 20 times on one connection, or offered once on each of
+three concurrent connections, cost the receiver one body fetch and one
+validation; downstream peers fetched the transaction once each, and no duplicate
+caused a further downstream fetch. On the local path, every resubmission was
+admitted to a full ledger-validation attempt and rejected there because the
+first copy had already spent the inputs: one validation per duplicate, roughly
+0.15 ms and 239 bytes each, so the receiver's work matched the attacker's bytes
+with no amplification. Nothing was re-announced downstream. The attackers were
+trustable local roots of the receiver, a privileged position; the unprivileged
+node-to-node case, repeats within a single reply, remote HTTP submission
+services, and sustained volume were not measured.
 
-**Assessment.** Preliminary. Pull-based diffusion and duplicate detection remain
-proposed mitigations awaiting real-node validation.
+**Recommendation.** Repeat the measurement from an unprivileged network
+position and against remote submission services, and test same-reply repeats and
+sustained volume. A specified follow-on floods duplicate BLS key registrations,
+whose proof-of-possession check spends receiver processor time rather than only
+bandwidth; it has not been run. Rejection of malformed data must not be mistaken
+for successful duplicate handling.
+
+**Assessment.** Final for the tested proto-devnet scope. Node-to-node duplicate
+handling is mitigated; local resubmission causes bounded, non-amplifying
+validation waste.
 
 ### T25: Submit invalid transactions
 
@@ -618,17 +699,40 @@ real-implementation result is pending.
 **Description.** Network control can separate transaction pools and voting
 participants, preventing timely quorum and delaying transaction inclusion.
 
-**Evidence.** The primary simulation used 2,685 nodes, seed 0, a conflict-free
-120 kB/s workload, and a complete partition during slots 300–700 of a 1,500-slot
-run. Neither side held the required 75% voting weight, so certification stalled.
-It resumed after reconnection, but average pending-transaction age peaked at
-427 seconds. Mempool size returned near baseline about 680 slots after
-reconnection; average pending age still ended at 68.5 seconds, versus 16.5 seconds
-without the partition. End-of-run finalization was 97.6%, against 97.7% without
-the partition; those similar endpoints conceal substantial delay. The separate
-conflict-workload limitations are described under [T26](#t26-submit-conflicting-transactions).
-An earlier non-recovery result was invalidated by a simulator fetch bug. These
-findings remain limited to one seed and topology.
+**Evidence.** The final report (19 November 2026) consolidates the simulation
+study; its measurements and qualifications supersede stronger interpretations in
+the earlier per-run reports. The primary simulation used 2,685 nodes, seed 0, a
+conflict-free 120 kB/s workload, and a complete bidirectional partition — 1,052
+European nodes isolated from the other 1,633, cutting 84,746 directed edges —
+during slots 300–700 of a 1,500-slot run. Neither side held the configured 75%
+voting-stake threshold, so endorsements stalled: the count of blocks carrying
+endorsements froze between slots 360 and 720 while the unpartitioned baseline
+added seven, and endorsed transaction references held at 18,402 until counters
+resumed after reconnection. Final results were a 97.58% block-inclusion proxy
+against 97.71% without the partition (the proxy is not an independently verified
+count of unique finalized transactions); 17 of 64 endorser blocks below the vote
+threshold against 6 of 64 at baseline; whole-run mean transaction-to-block time
+of 214.6 seconds against 84.1; and final mean pending-transaction age of 68.5
+seconds against 16.5. Sampled mean pending age peaked at 427.1 seconds, and the
+sampled mempool returned near baseline about 680 seconds after reconnection.
+The similar endpoints conceal substantial delay: the whole-run latency average
+includes partition-delayed transactions and does not isolate post-recovery
+arrivals, so persistent slowdown for new transactions after recovery was not
+established.
+
+A higher-load run at 150 kB/s, isolated during slots 300–500, also drained its
+backlog after reconnection (97.65% block-inclusion proxy), but without a matching
+unpartitioned run at that load, capacity limits cannot be separated from
+partition effects. An earlier partial cut of direct Europe–North America links
+recorded a temporary voting drop and recovery, but no raw log is retained. The
+conflicting-transaction run (10% conflict probability, longer partition) resumed
+endorsements after reconnection; its limitations are described under
+[T26](#t26-submit-conflicting-transactions). Earlier non-recovery observations
+were attributed to an unimplemented simulator transaction-fetch path, not a
+demonstrated protocol failure; the obsolete reports were removed and the
+retained runs use the corrected path. These findings remain limited to one seed
+and topology, partition windows of 200–600 seconds, and a simulator fetch path
+not compared with the live node's implementation.
 
 A related w32 Musashi study submitted valid transactions through two unstaked
 Haskell relays alongside background transaction generation, without physically
@@ -642,13 +746,17 @@ must not be reused uncritically
 for a newer protocol configuration.
 
 **Recommendation.** Validate worst-case diffusion timing and recovery on real
-implementations. Extend simulation across seeds, topologies, and recurrent
-partitions; isolate transaction-load effects with controlled comparisons. Record
-per-input finalized spends to directly check the inferred single-spend behavior.
+implementations. Extend simulation across seeds, topologies, and recurrent or
+selective partitions; isolate transaction-load effects with controlled
+comparisons. Record per-input finalized spends to directly check the inferred
+single-spend behavior.
 
-**Assessment.** The simulation demonstrates recoverable certification disruption
-and prolonged transaction delay under the tested conditions. Real-implementation
-partition validation and mitigation effectiveness remain open.
+**Assessment.** Final report for the simulation phase. Complete regional
+isolation temporarily stalled certification and caused substantial transaction
+delay, with backlog drain after reconnection in the tested conflict-free runs;
+the conflicting-transaction run resumed endorsements without independently
+proving double-spend safety. Real-implementation partition validation, sustained
+or repeated isolation, and mitigation effectiveness remain open.
 
 ### T28: Honeypot contract creating transaction races
 
@@ -710,22 +818,23 @@ following validation gaps.
 |---|---|---|
 | Coverage of agreed inventory | All T1-T34 entries assessed or explicitly marked pending or out of scope | Inventory coverage does not establish threat-model completeness |
 | Certificate verification | All 27 delivered invalid-certificate blocks rejected on w38 | Remaining malformed encodings and contexts; resource cost and throughput under repeated attack; current-release regression evidence |
-| Invalid data handling | Historical rejection, connection-fault, and process-crash observations | Identify fixes and independently reproduce rejection, process survival, and recovery |
+| Invalid data handling | Historical rejection, connection-fault, and process-crash observations; w43 campaign rejected all tested invalid-EB variants and the w34 crash did not reproduce | Re-verify the identified T13 decoder fix on the current release; crypto-stage EBs, non-empty-body size lies, truncate stalls, and sustained-flood costs |
 | Vote admission and retention | Historical unknown-target acceptance and memory growth | Current target/context checks, bounded lifecycle, and recovery evidence |
 | Withholding and diffusion | Rust-cluster retry experiments, burst tests, partition simulations | Realistic bandwidth and topology; certified-data availability to non-voters; validated diffusion allowance |
 | Inaction and incentives | Praos continued during voting loss | Quantified throughput impact and evidence for economic deterrence |
 | Censorship and value extraction | Model discussion and a narrower suppression experiment | Feasibility, application-value scenarios, and mitigation validation |
-| Evidence completeness | Test conditions and outcomes summarized for completed experiments | Establish T9 and T24/T25 results; identify exact tested revisions and complete fix-validation records |
+| Evidence completeness | Test conditions and outcomes summarized for completed experiments | Establish T9 and T25 results; complete fix-re-verification records for historical findings |
 
 **Legend:** T1-T34 = the threat identifiers covered here; w38 = the prototype
-release tested in the certificate experiments; Praos = the underlying Ouroboros
-chain-consensus protocol. "Delivered" means an attack block reached
+release tested in the certificate experiments; w43 = the prototype release tested
+in the invalid-EB and duplicate-submission campaigns; Praos = the underlying
+Ouroboros chain-consensus protocol. "Delivered" means an attack block reached
 honest-ledger validation. "Current-release" refers to the release selected for a
 new validation campaign, not a claim that one was tested for this draft.
 
-The immediate priorities are to reconcile historical invalid-data findings with
-fix evidence, complete the selective-withholding analysis, and validate resource
-bounds and diffusion timing under realistic conditions. Economic and adaptive
+The immediate priorities are to re-verify historical invalid-data fixes on
+current releases, complete the selective-withholding analysis, and validate
+resource bounds and diffusion timing under realistic conditions. Economic and adaptive
 security work needs explicit coordination with the relevant research and
 operational assessments. Each final claim should identify the tested revision,
 prerequisites, actual attack delivery, an honest-node outcome, and any remaining
@@ -739,8 +848,10 @@ where these were recorded. Corrected experiments supersede invalid initial
 attempts; repeated descriptions of the same samples are not independent evidence.
 T14 and T15 share seven delivered blocks, counted once in the combined total.
 
-This assessment combines experiments and mechanism analysis; no new experiment
-or independent reanalysis of all raw logs was performed. Empirical conclusions
+This assessment combines experiments and mechanism analysis; the November 2026
+update incorporates the w43 invalid-EB campaign, the duplicate-submission runs,
+and the final T27 simulation report, without new experiments or independent
+reanalysis of raw logs. Empirical conclusions
 are limited to supported observations. Untested cases and missing measurements
 remain unresolved regardless of the risk classification.
 
