@@ -144,7 +144,7 @@ validation gaps.
 | [T14](#t14-include-invalid-certificate-in-rb) | Include invalid certificate in RB | in progress | — | Delivered variants rejected; coverage incomplete and resource cost unquantified |
 | [T15](#t15-forge-certificate-without-quorum) | Forge certificate without quorum | final | Negative | Tested one-key/full-committee forgery rejected |
 | [T16](#t16-omit-targeted-transactions-from-rb-and-eb) | Omit targeted transactions from RB and EB | ? | — | Scope and feasibility pending |
-| [T17](#t17-reorder-transactions-in-eb) | Reorder transactions in EB | in progress | — | No completed economic or implementation result |
+| [T17](#t17-reorder-transactions-in-eb) | Reorder transactions in EB | final | Negative | Reordering signed txs does not add to MEV|
 | [T18](#t18-insert-or-replace-transactions-in-eb) | Insert or replace transactions in EB | in progress | — | No completed economic or implementation result |
 | [T19](#t19-omit-available-eb-certificate-and-fill-rb-with-own-transactions) | Omit available EB certificate and fill RB with own transactions (extractive or defensive) | in progress | — | Narrow historical mechanism test; economic scenario unvalidated |
 | [T20](#t20-withhold-announced-eb-or-endorsed-transactions) | Withhold announced EB or endorsed transactions | prelim | Negative | Retry mitigation supported in Rust cluster; Haskell validation pending |
