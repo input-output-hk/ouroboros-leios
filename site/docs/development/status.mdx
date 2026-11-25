@@ -20,13 +20,16 @@ Single source of truth for both the diagram badges and the full matrix below.
                             badge into the SVG viewBox (1120.77 × 471.62). Components
                             without an anchor render as cross-cutting cards.
     - [x] Stage: note      second level: one entry per stage (see `stages` above);
-                            the optional note after the `:` replaces the default label.
-    - [ ] Detail          third level: scope details, shown in the tooltip only.
+                            the optional note after the `:` replaces the default label,
+                            an optional trailing URL links it.
+    - [ ] Detail #123     third level: scope details, shown in the tooltip only; the
+                            optional trailing `#123` links the ouroboros-leios roadmap
+                            issue (epic) the detail is tracked in.
 
 Marks: [x] done · [~] ongoing · [?] open question · [-] missing · [ ] not started
 
 Detail names are matched against the scope items of the `plan` below (ignoring
-case, punctuation and "(?)"), which is what fills the per-stage tables. Keep the
+case, punctuation, "(?)" and the issue number), which is what fills the per-stage tables. Keep the
 wording of a detail identical to its scope item, or the two lists drift apart. 
 
 */}
@@ -40,43 +43,43 @@ export const source = `
   - [x] Assurance: Audited
 
 - New protocol parameters
-  - [x] CIP: Per-tx limits unlikely
+  - [x] CIP
   - [x] Prototype
   - [x] Design
   - [~] Implementation
     - [x] Protocol parameters and genesis config
-    - [~] Constitution guard rails
-  - [~] Assurance: working groups
+    - [~] Constitution guard rails #755
+  - [~] Assurance: Working groups
 
 - Serialization
   - [x] CIP
   - [x] Prototype
-  - [x] Design: no dedicated cert
+  - [x] Design: header hash change
   - [x] Implementation
     - [x] Announcements and certifies bit in headers
     - [x] Certificates in body
     - [x] BLS key in pool registration cert in txs
     - [x] Protocol parameter updates in txs
-  - [~] Assurance: CDDL conformance
+  - [~] Assurance: Conformance, audits
 
 - Praos > Leios prioritization
   - [x] CIP
-  - [~] Prototype: egress scheduling
+  - [x] Prototype
   - [x] Design
   - [~] Implementation
     - [x] Socket options
-    - [~] Egress scheduling
+    - [~] Egress scheduling #1174
     - [ ] Incremental decoding
-  - [~] Assurance: load testing
+  - [~] Assurance: Load testing
 
 - Key registration & rotation @130,200
-  - [x] CIP
+  - [x] CIP: consistency https://github.com/cardano-foundation/CIPs/pull/1296
   - [x] Prototype
-  - [x] Design: no owner signatures
+  - [x] Design: epoch+3 delay
   - [x] Implementation
     - [x] Generate BLS keys
     - [x] Create and submit pool registration with BLS keys
-  - [~] Assurance: audits of rc-w41/43
+  - [~] Assurance: Audits on RC
 
 - Committee selection @230,320
   - [x] CIP
@@ -85,7 +88,7 @@ export const source = `
   - [x] Implementation
     - [x] Stake-based committee selection
     - [x] Committee selection at epoch boundaries
-  - [~] Assurance: audits of rc-w41/43
+  - [~] Assurance: Audits on RC
 
 - High-throughput Tx submission @400,25
   - [x] CIP
@@ -93,8 +96,8 @@ export const source = `
   - [x] Design
   - [~] Implementation
     - [x] TxSubmisison V2-undecision
-    - [~] TxSubmission param tuning
-  - [~] Assurance: load testing
+    - [~] TxSubmission param tuning #1091
+  - [~] Assurance: Load testing
 
 - High-throughput mempool @680,25
   - [x] CIP
@@ -103,66 +106,65 @@ export const source = `
   - [~] Implementation
     - [x] Double-buffered mempool
     - [x] Capped forging
-    - [ ] Cheap ticking
-  - [~] Assurance: first audit ok
+  - [x] Assurance: Load tested
 
 - Block production @450,170
   - [x] CIP
   - [x] Prototype
-  - [x] Design: pre-application vs. mempool
+  - [x] Design: pre-flight forging
   - [~] Implementation
-    - [~] Size mempool via pparams
-    - [~] Forge and store EBs
-    - [~] Forge RBs with certificates
-    - [ ] Certifying mempool view
-    - [ ] Governed EB production
-  - [~] Assurance: audits of rc-w41/43
+    - [x] Size mempool via pparams
+    - [x] Forge and store EBs
+    - [~] Forge RBs with certificates #1107
+    - [~] Pre-flight forging #1130
+    - [~] Adaptive endorsements #1152
+  - [~] Assurance: Audits on RC
 
 - EB diffusion @480,280
-  - [x] CIP: update mini-protocols
-  - [~] Prototype: policies
-  - [~] Design: settle policies
+  - [x] CIP: consistency https://github.com/cardano-foundation/CIPs/pull/1296
+  - [x] Prototype
+  - [~] Design: settle/document policies
   - [~] Implementation
     - [x] Announce and detect equivocations of EBs
-    - [~] Diffuse and validate EBs via TxCache
-    - [~] Basic fetching policy (not full hedging)
-    - [~] Efficient serving
+    - [~] Diffuse and validate EBs via TxCache #1074
+    - [x] Basic fetching policy (not full hedging)
+    - [x] Efficient serving
+    - [~] Advanced fetching policy #1105
     - [ ] Incremental offers
-    - [ ] Advanced fetching policy
     - [ ] Catch up on not yet certified Leios EBs
-  - [~] Assurance: audits of rc-w41/43
+  - [~] Assurance: Audits on RC
 
 - Transaction cache & storage
   - [x] CIP
-  - [x] Prototype: schema improvements
+  - [x] Prototype
   - [x] Design
   - [~] Implementation
     - [x] Volatile/Immutable LeiosDB
-    - [~] Disk-backed TxCache
-    - [ ] Fully optimised LeiosDB
-  - [~] Assurance: audits of rc-w41/43
+    - [x] Disk-backed TxCache
+    - [x] Fully optimised LeiosDB
+  - [~] Assurance: Audits on RC
 
 - Voting & certification @580,400
-  - [x] CIP: update mini-protocols
+  - [x] CIP: consistency https://github.com/cardano-foundation/CIPs/pull/1296
   - [x] Prototype
   - [x] Design: keep push-based voting
   - [~] Implementation
     - [x] Diffuse and validate votes
-    - [~] Aggregate votes
-    - [~] Voting logic
+    - [x] Aggregate votes
+    - [~] Voting logic #1073
     - [ ] Pull-based vote diffusion
     - [ ] Partial certification
-  - [~] Assurance: audits of rc-w41/43
+  - [~] Assurance: Audits on RC
 
 - Block validation & adoption @985,70
   - [x] CIP
   - [x] Prototype
-  - [x] Design: consensus/ledger API defined
+  - [x] Design
   - [~] Implementation
-    - [~] Validate EB announcing and certifying blocks
-    - [~] EB fetching on chain selection
+    - [x] EB fetching on chain selection
+    - [~] Validate EB announcing and certifying blocks #1090
     - [ ] Out of order fetch EBs in Genesis
-  - [~] Assurance: audits of rc-w41/43
+  - [~] Assurance: Audits on RC
 
 - Node API & configuration
   - [x] CIP
@@ -171,9 +173,10 @@ export const source = `
   - [~] Implementation
     - [x] Query pool state showing key registration
     - [x] Query committee details
-    - [~] Client APIs inline certified EB txs
-    - [~] Node accepts BLS keys
-  - [~] Assurance: Kleioscan, SPO tools
+    - [~] Client APIs inline certified EB txs #1106
+    - [~] Node accepts BLS keys #1073
+    - [~] Complete CLI tools #1093
+  - [~] Assurance: Kleioscan, SPO tools, dApps
 `;
 
 {/*
@@ -206,10 +209,11 @@ export const plan = `
   - Constitution guard rails
   - Socket options
   - TxSubmisison V2-undecision
+  - TxSubmission param tuning
   - Double-buffered mempool
   - Size mempool via pparams
   - Capped forging
-  - Cheap ticking
+  - Pre-flight forging
   - Forge and store EBs
   - Volatile/Immutable LeiosDB
   - Disk-backed TxCache
@@ -221,23 +225,21 @@ export const plan = `
   - Diffuse and validate votes
   - Aggregate votes
   - Forge RBs with certificates
-  - Certifying mempool view
   - EB fetching on chain selection
   - Validate EB announcing and certifying blocks
   - Node accepts BLS keys
   - Client APIs inline certified EB txs
+  - Complete CLI tools
   - Node integration 11.3
 
 - Stage 2: Higher params (1s, 4s, 7s, 100KB+, 1MB+, ..GSteps, ..GMem, 900 seats, 75%)
-  - Governed EB production
+  - Fully optimised LeiosDB
+  - Adaptive endorsements
   - Egress scheduling
-  - TxSubmission param tuning
   - Incremental offers
   - Pull-based vote diffusion
-  - TxSubmission param tuning
   - Incremental decoding
   - Advanced fetching policy
-  - Fully optimised LeiosDB
   - Catch up on not yet certified Leios EBs
   - Out of order fetch EBs in Genesis
   - Partial certification

@@ -2,8 +2,10 @@
 // protocol status diagram and matrix.
 //
 //   - Component name @x,y          <- level 1: a component, optional diagram anchor
-//     - [x] Stage: note            <- level 2: one entry per stage, optional note
-//       - [~] Some detail          <- level 3: details, shown in the tooltip only
+//     - [x] Stage: note https://…  <- level 2: one entry per stage, optional note
+//                                     and trailing link
+//       - [~] Some detail #123     <- level 3: details, shown in the tooltip only;
+//                                     an optional trailing `#123` links a roadmap issue
 //
 // Marks: [x] done · [~] ongoing · [?] open question · [-] missing · [ ] not started
 
@@ -12,11 +14,14 @@ export type Mark = "done" | "ongoing" | "missing" | "open" | "empty";
 export type Detail = {
   mark: Mark;
   text: string;
+  /** Roadmap issue number in the ouroboros-leios repository. */
+  issue?: number;
 };
 
 export type Cell = {
   mark: Mark;
   note?: string;
+  href?: string;
   details: Detail[];
 };
 
@@ -40,6 +45,8 @@ const MARKS: Record<string, Mark> = {
 const ITEM_RE = /^(\s*)[-*]\s+(.*?)\s*$/;
 const CHECKBOX_RE = /^\[(.?)\]\s*(.*)$/;
 const ANCHOR_RE = /\s*@\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*$/;
+const ISSUE_RE = /\s+#(\d+)$/;
+const URL_RE = /\s+(https?:\/\/\S+)$/;
 
 /** Splits `Design: some note` into its label and optional note. */
 function splitNote(text: string): { label: string; note?: string } {
@@ -66,7 +73,10 @@ function parseCheckbox(
   lineNo: number,
   line: string,
   text: string,
-): { mark: Mark; label: string; note?: string } {
+): { mark: Mark; label: string; note?: string; href?: string } {
+  const url = URL_RE.exec(text);
+  const href = url?.[1];
+  if (url) text = text.slice(0, url.index);
   const m = CHECKBOX_RE.exec(text);
   if (!m) fail(lineNo, line, "expected a checkbox, e.g. `- [x] Design`");
   const mark = MARKS[m[1]];
@@ -77,7 +87,7 @@ function parseCheckbox(
       `unknown mark \`[${m[1]}]\`, expected one of [x] [~] [?] [-] [ ]`,
     );
   }
-  return { mark, ...splitNote(m[2]) };
+  return { mark, href, ...splitNote(m[2]) };
 }
 
 /** Comparison key for correlating plan items with status details by name. */
@@ -134,7 +144,7 @@ export function parseStatus(source: string, stages: string[]): Row[] {
 
     if (indent <= stageIndent) {
       // Stage
-      const { mark, label, note } = parseCheckbox(lineNo, line, text);
+      const { mark, label, note, href } = parseCheckbox(lineNo, line, text);
       const idx = stageIndex.get(label.toLowerCase());
       if (idx === undefined) {
         fail(
@@ -143,7 +153,7 @@ export function parseStatus(source: string, stages: string[]): Row[] {
           `unknown stage \`${label}\`, expected one of ${stages.join(", ")}`,
         );
       }
-      cell = { mark, note, details: [] };
+      cell = { mark, note, href, details: [] };
       row.cells[idx] = cell;
       return;
     }
@@ -151,7 +161,13 @@ export function parseStatus(source: string, stages: string[]): Row[] {
     // Detail
     if (!cell) fail(lineNo, line, "detail item before any stage");
     const { mark, label, note } = parseCheckbox(lineNo, line, text);
-    cell.details.push({ mark, text: note ? `${label}: ${note}` : label });
+    const full = note ? `${label}: ${note}` : label;
+    const issue = ISSUE_RE.exec(full);
+    cell.details.push(
+      issue
+        ? { mark, text: full.slice(0, issue.index), issue: Number(issue[1]) }
+        : { mark, text: full },
+    );
   });
 
   return rows;
@@ -230,6 +246,7 @@ export type ScopeRef = {
   componentId: string;
   componentName: string;
   mark: Mark;
+  issue?: number;
   /** The owning component's mark in the assurance stage. */
   assurance: Mark;
 };
@@ -256,6 +273,7 @@ export function detailIndex(
           componentId: row.id,
           componentName: row.name,
           mark: detail.mark,
+          issue: detail.issue,
           assurance,
         });
         index.set(key, refs);

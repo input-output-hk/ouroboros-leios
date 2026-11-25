@@ -32,6 +32,8 @@ const MARK_SYMBOL: Record<Mark, string> = {
   empty: "",
 };
 
+const ISSUES_URL = "https://github.com/input-output-hk/ouroboros-leios/issues/";
+
 const VIEWBOX_W = 1120.77;
 const VIEWBOX_H = 471.62;
 
@@ -59,6 +61,42 @@ function Pip({ mark }: { mark: Mark }) {
     <span className={`${styles.pip} ${styles[`pip_${mark}`]}`}>
       {MARK_SYMBOL[mark]}
     </span>
+  );
+}
+
+function IssueLink({ issue }: { issue: number }) {
+  return (
+    <a
+      className={styles.issueLink}
+      href={`${ISSUES_URL}${issue}`}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      #{issue}
+    </a>
+  );
+}
+
+/** Done out of all details, e.g. "3/5", or nothing for a cell without details. */
+function DetailCount({ cell }: { cell: Cell }) {
+  if (!cell.details.length) return null;
+  const done = cell.details.filter((d) => d.mark === "done").length;
+  return (
+    <span className={styles.detailCount}>
+      {done}/{cell.details.length}
+    </span>
+  );
+}
+
+/** A cell's note or mark label, linked when the cell carries a link. */
+function CellLabel({ cell, label }: { cell: Cell; label?: string }) {
+  if (!label) return null;
+  return cell.href ? (
+    <a href={cell.href} target="_blank" rel="noopener noreferrer">
+      {label}
+    </a>
+  ) : (
+    <>{label}</>
   );
 }
 
@@ -103,6 +141,7 @@ function CellDetails({
             <span>
               {label && <span className={styles.stageChip}>{label}</span>}
               {d.text}
+              {d.issue && <IssueLink issue={d.issue} />}
             </span>
           </li>
         );
@@ -131,8 +170,12 @@ function StatusTable({
               <td>
                 <Pip mark={cell.mark} />
                 <span className={styles.markText}>
-                  {cell.note ?? MARK_LABEL[cell.mark]}
+                  <CellLabel
+                    cell={cell}
+                    label={cell.note ?? MARK_LABEL[cell.mark]}
+                  />
                 </span>
+                <DetailCount cell={cell} />
                 <CellDetails cell={cell} labels={labels} />
               </td>
             </tr>
@@ -344,6 +387,12 @@ export function ReleaseStages({
                         <span className={styles.markText}>
                           {item.untracked ? "–" : MARK_LABEL[item.mark]}
                         </span>
+                        {item.refs
+                          .flatMap((r) => (r.issue ? [r.issue] : []))
+                          .filter((n, i, all) => all.indexOf(n) === i)
+                          .map((n) => (
+                            <IssueLink key={n} issue={n} />
+                          ))}
                       </td>
                       <td title={MARK_LABEL[item.assurance]}>
                         {!item.untracked && <Pip mark={item.assurance} />}
@@ -391,8 +440,11 @@ export function ProtocolMatrix({
                 <td key={i} title={cell.note ?? MARK_LABEL[cell.mark]}>
                   <Pip mark={cell.mark} />
                   {cell.note && (
-                    <span className={styles.matrixNote}>{cell.note}</span>
+                    <span className={styles.matrixNote}>
+                      <CellLabel cell={cell} label={cell.note} />
+                    </span>
                   )}
+                  <DetailCount cell={cell} />
                 </td>
               ))}
             </tr>

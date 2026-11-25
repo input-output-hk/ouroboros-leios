@@ -379,3 +379,16 @@
     padding: 0.2rem;
   }
 }
+
+.issueLink {
+  margin-left: 0.35rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.detailCount {
+  margin-left: 0.35rem;
+  color: var(--ifm-color-emphasis-600, #6b7280);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
