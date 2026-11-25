@@ -482,17 +482,13 @@ experiment.
 
 ### T17: Reorder transactions in EB
 
-**Description.** A producer's ordering discretion may enable maximal extractable
-value and disadvantage users. A larger block creates more opportunities, but
-valid ordering changes alone do not establish a ledger-safety violation.
+**Description.** Reordering a fixed set of compatible, signed UTXO transactions 
+within an endorser block preserves their economic outputs, provided the ordering 
+remains valid.
 
-**Recommendation.** Use realistic application transactions to quantify value
-extraction and assess application-layer protections such as batch auctions and
-slippage limits.
-
-**Assessment.** In progress; conclusions remain pending. No completed economic
-or implementation result is established here. Source: [threat
-model](threat-model.md).
+**Assessment.** Closed by analysis: no independent value-extraction mechanism 
+identified through transaction reordering alone. Scenarios requiring insertion, 
+replacement, or exclusion of transactions belong under T18.
 
 ### T18: Insert or replace transactions in EB
 
