@@ -46,7 +46,7 @@ The experiments span different environments and prototype revisions:
 - **Mixed proto-devnet:** Adversarial Rust nodes interacting with real Haskell
   nodes on a single machine with traffic shaped network delays. Several experiments
   use one 20% stake adversary and three Haskell pools holding 80% collectively in a test configuration complete with Haskell relays.
-- **Musashi testnet:** Adversarial Rust nodes running on hosted servers interacting with real Haskell nodes on the Mushahi test network. As many as 10 nodes, configured both with and without relays, performed coordinated attacks on Haskell nodes (typically the IOG nodes); this focussed primarily on attacks at scale.
+- **Musashi testnet:** Adversarial Rust nodes running on hosted servers interacting with real Haskell nodes on the Mushahi test network. As many as 10 nodes, configured both with and without relays, performed coordinated attacks on Haskell nodes (typically the IOG nodes); this focused primarily on attacks at scale.
 
 Results on prototypes w32, w34, and w38 are historical observations, not an
 assessment of every subsequent release. The November 2026 w43 invalid-EB and
@@ -277,20 +277,32 @@ quantified.
 **Description.** Missing votes can prevent EBs from reaching quorum even while
 ranking-block production continues.
 
-**Evidence.** On Musashi in August 2026, omitted BLS-key configuration and newly
+**Evidence.** Two observations were made:
+
+1. On Musashi in August 2026, omitted BLS-key configuration and newly
 registered, non-voting stake reduced participating weight below the historical
 75% quorum threshold. Between 12 August 22:45 and 13 August 05:31 UTC, only two
-certified EBs were recorded, while Praos blocks continued. Configuring voting restored sufficient weight
-and certification resumed. This was an operational observation, not a controlled
-abstention experiment; the threshold describes that deployment.
+certified EBs were recorded, while Praos blocks continued. Configuring voting 
+restored sufficient weight and certification resumed. This was an operational 
+observation, not a controlled abstention experiment; the threshold describes 
+that deployment.
+
+2. On Musashi in November 12-13, 2026, BLS-keys for PIR0 server were deliberately
+disabled for 2 hours (making total voting Leios stake smaller than 75%), 
+while a regular Centrifuge transaction generation cycle was active to the network. 
+The outcome was exactly the same as in previous experiment: EB certification 
+stopped, however underlying Praos network remained working. A drop in performance 
+(3 times) was observed during the attack. When keys were enabled again, normal 
+EB certification resumed.
 
 **Recommendation.** Monitor effective voting participation and key configuration.
 Validate incentives separately: continued Praos operation does not demonstrate
 that rewards deter abstention.
 
-**Assessment.** Base-chain operation continued at the observed moderate load
-despite lost certification; it does not show that Leios throughput is unaffected
-by missing quorum.
+**Assessment.** Base-chain operation continued despite lost certification; 
+in case of moderate loads operation continues without visible performance 
+deterioration; in case of heavier loads performance of the network drops, 
+and resumes back when the attack is over.
 
 ### T11: Create invalid EB
 
@@ -336,6 +348,16 @@ announcement, and one declared below the limit is rejected at decoding because
 an empty manifest is itself invalid. The duplicate-manifest experiment, first
 filed under T24, is reclassified as the T11 duplicate variant, because
 duplicates inside an EB require producer stake and make the EB itself invalid.
+
+W34 release was also vulnerable to "Trojan horse" attack: EB validation 
+implementation in w34 was limited, so if an adversarial node produces a properly 
+formed and signed EB, all other nodes will vote for it and certify it without
+validation of individual transactions. So, any transactions (including illegal 
+transfers from non-controlled wallets, or other incorrect transactions) from 
+that EB will be accepted without check. This vulnerability was demonstrated in 
+experiment (1000 ADA were taken by Red Team from IOG account without permission). 
+W35 release fixes the vulnerability and validates all EBs before certification 
+vote, so this attack is no longer possible since that.
 
 **Recommendation.** Exercise the untested stages: a decodable but
 cryptographically invalid EB (bad VRF or body signature) and a declared-size lie
@@ -692,13 +714,25 @@ real-implementation result is pending.
 
 ### T27: Mempool partitioning via network control
 
-**Description.** Network control can separate transaction pools and voting
+**Description.** Two mechanisms of mempool partitioning were tested: 
+1. Physical network connection control: separating transaction pools and voting
 participants, preventing timely quorum and delaying transaction inclusion.
+2. Mempool fragmentation via transaction flood: technically the nodes are
+connected, but mempool full utilizaton with disjoint transaction sets achieves
+fragmentation effect.
 
-**Evidence.** The final report (19 November 2026) consolidates the simulation
-study; its measurements and qualifications supersede stronger interpretations in
-the earlier per-run reports. The primary simulation used 2,685 nodes, seed 0, a
-conflict-free 120 kB/s workload, and a complete bidirectional partition — 1,052
+**Evidence.** The final report (19 November 2026) consolidates the studies;
+its measurements and qualifications supersede stronger interpretations in 
+the earlier preliminary and per-run reports. 
+
+The evidence for the mechanisms was collected using two different experimentation 
+approaches, and they are separately described here.
+
+#### Physical network connection control.
+
+Simulation study was performed to model physical network separation. The primary 
+simulation used 2,685 nodes, seed 0, a conflict-free 120 kB/s workload, 
+and a complete bidirectional partition — 1,052
 European nodes isolated from the other 1,633, cutting 84,746 directed edges —
 during slots 300–700 of a 1,500-slot run. Neither side held the configured 75%
 voting-stake threshold, so endorsements stalled: the count of blocks carrying
@@ -741,18 +775,49 @@ The historical eligibility rule was a next-block gap of at least 14 slots and
 must not be reused uncritically
 for a newer protocol configuration.
 
+#### Mempool fragmentation via transaction flood.
+
+Transaction flood was researched on Musashi testnet in August 2026. The network 
+was flooded with valid transactions from different physically distant 
+computers (4000 txs per computer) in a short period of time (10-20 minutes). 
+The idea behind this experiment was to fill different geographically distributed
+mempools with disjoint sets of transactions, so that verificaton of EB produced
+by other node was as hard as possible (ideally: no locally known transactions 
+and no precomputed knowledge).
+
+Experimentation demonstrated moderate performance reduction:
+* reduction in EB certification rate (skipped EB rate increased from 10% to 20%-25%), 
+* drop in EB voting percentage, if EB was certified (2-3%)
+* (in some cases) moderate reduction in transaction throughput (30 tps to 24 tps).
+Praos protocol was not disrupted, and no other Leios protocol disrutptions were
+found.
+
+In terms of Lovelace, this attack is rather cheap (only transaction fees 
+are spent), but enables network disruption equivalent to 2-3% stake influence. 
+No permanent disruption was achieved; the performance returned back to normal 
+immediately after the attack was over. Also, this attack requires extensive 
+physical resources to be successful (computing power, internet connection).
+
+The attack was specifically modelled to achieve this mempool partition effect,
+and mempool fragmentation explanation seems plausible; however, no direct 
+measurements on nodes' mempools were performed to confirm this hypothesis.
+
 **Recommendation.** Validate worst-case diffusion timing and recovery on real
 implementations. Extend simulation across seeds, topologies, and recurrent or
 selective partitions; isolate transaction-load effects with controlled
 comparisons. Record per-input finalized spends to directly check the inferred
-single-spend behavior.
+single-spend behavior. Repeat transaction flood later, with bigger scale of
+the attack to: (a) make sure that mempool fragmentation and performance disruption 
+remain limited, and (b) to better understand tx throughput reduction.
 
-**Assessment.** Final report for the simulation phase. Complete regional
+**Assessment.** Final report for the experimentation. Complete regional
 isolation temporarily stalled certification and caused substantial transaction
 delay, with backlog drain after reconnection in the tested conflict-free runs;
 the conflicting-transaction run resumed endorsements without independently
-proving double-spend safety. Real-implementation partition validation, sustained
-or repeated isolation, and mitigation effectiveness remain open.
+proving double-spend safety.  Real-implementation partition 
+validation, sustained or repeated isolation, and mitigation effectiveness remain open.
+Direct confirmation for mempool fragmentation via transaction flood hypothesis 
+was not obtained.
 
 ### T28: Honeypot contract creating transaction races
 
