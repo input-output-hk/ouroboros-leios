@@ -82,8 +82,8 @@ The T10 observation recorded almost no certification during a voting
 misconfiguration while ranking blocks continued. T27 simulations demonstrated
 recoverable certification disruption under complete regional partition, with
 backlogs draining after reconnection at both tested loads. A related valid-transaction
-flood on the w32 testnet caused reduced certification; it did not establish
-a permanent stall or independently prove the proposed mempool-fragmentation mechanism.
+flood on the w32 testnet caused temporary reduced certification, but did not establish
+a permanent stall.
 See [T10](#t10-decline-to-vote) and
 [T27](#t27-mempool-partitioning-via-network-control).
 
@@ -799,7 +799,7 @@ No permanent disruption was achieved; the performance returned back to normal
 immediately after the attack was over. Also, this attack requires extensive 
 physical resources to be successful (computing power, internet connection).
 
-The attack was specifically modelled to achieve this mempool partition effect,
+The attack was specifically modelled to achieve mempool partition effect,
 and mempool fragmentation explanation seems plausible; however, no direct 
 measurements on nodes' mempools were performed to confirm this hypothesis.
 
@@ -815,10 +815,10 @@ remain limited, and (b) to better understand tx throughput reduction.
 isolation temporarily stalled certification and caused substantial transaction
 delay, with backlog drain after reconnection in the tested conflict-free runs;
 the conflicting-transaction run resumed endorsements without independently
-proving double-spend safety.  Real-implementation partition 
+proving double-spend safety. Real-implementation partition 
 validation, sustained or repeated isolation, and mitigation effectiveness remain open.
-Direct confirmation for mempool fragmentation via transaction flood hypothesis 
-was not obtained.
+Direct confirmation for mempool fragmentation via transaction flood hypothesis
+was not obtained yet.
 
 ### T28: Honeypot contract creating transaction races
 
