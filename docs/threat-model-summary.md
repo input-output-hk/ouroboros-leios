@@ -82,16 +82,17 @@ The T10 observation recorded almost no certification during a voting
 misconfiguration while ranking blocks continued. T27 simulations demonstrated
 recoverable certification disruption under complete regional partition, with
 backlogs draining after reconnection at both tested loads. A related valid-transaction
-flood on the w32 testnet coincided with reduced certification; it did not establish
+flood on the w32 testnet caused reduced certification; it did not establish
 a permanent stall or independently prove the proposed mempool-fragmentation mechanism.
 See [T10](#t10-decline-to-vote) and
 [T27](#t27-mempool-partitioning-via-network-control).
 
 **Historical implementation defects have identified fixes; re-verification is
 partial.** T11 and T13 experiments on w34 demonstrated item-count handling
-faults, connection disruption, and malformed-transaction process crashes. A w43
-campaign re-tested invalid endorser blocks: every delivered attack EB was
-rejected at the announcement, at decode, or at body arrival; none was endorsed;
+faults, invalid EB certification, connection disruption, and 
+malformed-transaction process crashes. A w43 campaign re-tested invalid endorser 
+blocks: every delivered attack EB was rejected at the announcement, 
+at decode, or at body arrival; none was endorsed;
 and no crash occurred, so the w34 oversized-vector crash does not reproduce on
 w43. The T13 malformed-transaction decoder crash has an identified upstream fix
 that has not been re-verified on the current release. T12-related tests recorded
@@ -154,7 +155,7 @@ validation gaps.
 | [T24](#t24-submit-duplicate-transactions) | Submit duplicate transactions | final | Negative | Node-to-node deduplication mitigated; local resubmission costs one bounded validation per duplicate with no amplification; privileged position and remote services untested |
 | [T25](#t25-submit-invalid-transactions) | Submit invalid transactions | prelim | Negative | No isolated real-node result established |
 | [T26](#t26-submit-conflicting-transactions) | Submit conflicting transactions | in progress | — | Simulator inference; Haskell validation and resource cost pending |
-| [T27](#t27-mempool-partitioning-via-network-control) | Mempool partitioning via network control | final | Positive | Recoverable certification disruption and substantial transaction delay in simulation; real-implementation partition validation pending |
+| [T27](#t27-mempool-partitioning-via-network-control) | Mempool partitioning via network control | final | Positive | Recoverable certification disruption and substantial transaction delay in simulation and Musashi tx-flood experiments; real-implementation partition validation pending |
 | [T28](#t28-honeypot-contract-creating-transaction-races) | Honeypot contract creating transaction races | out of scope | — | Application economics not assessed |
 | [T29](#t29-exploit-implementation-differences-between-node-versions) | Exploit implementation differences between node versions | out of scope | — | Adversarial mixed-version behavior not assessed |
 | [T30](#t30-coordinate-governance-attacks-to-prevent-hard-fork) | Coordinate governance attacks to prevent hard fork | out of scope | — | Governance mitigations not assessed |
