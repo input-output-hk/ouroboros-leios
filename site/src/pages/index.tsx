@@ -88,6 +88,7 @@ let exceptions = {
   "2025-9": UTCDateTime(2025, 9, 1, 14),
   "2025-12": UTCDateTime(2025, 11, 17, 14),
   "2026-6": UTCDateTime(2026, 6, 1, 14),
+  "2026-12": UTCDateTime(2025, 11, 23, 14),
 };
 
 function getNextMeeting(now = new Date()) {
