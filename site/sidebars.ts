@@ -23,17 +23,6 @@ const sidebars: SidebarsConfig = {
   developmentSidebar: [
     {
       type: "category",
-      label: "Research and development",
-      items: [
-        "development/overview",
-        "development/throughput-simulation",
-        "development/simulation-demonstration",
-      ],
-    },
-  ],
-  developmentMaterialSidebar: [
-    {
-      type: "category",
       label: "Development",
       collapsed: false,
       link: { type: "doc", id: "development/index" },
@@ -43,6 +32,15 @@ const sidebars: SidebarsConfig = {
         "development/benchmark-reports",
         "development/cost-estimator",
         "development/feasibility-report",
+      ],
+    },
+    {
+      type: "category",
+      label: "Research",
+      link: { type: "doc", id: "development/research" },
+      items: [
+        "development/throughput-simulation",
+        "development/simulation-demonstration",
       ],
     },
   ],

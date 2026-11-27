@@ -129,12 +129,6 @@ const config: Config = {
           type: "docSidebar",
           sidebarId: "developmentSidebar",
           position: "right",
-          label: "Research and development",
-        },
-        {
-          type: "docSidebar",
-          sidebarId: "developmentMaterialSidebar",
-          position: "right",
           label: "Development",
         },
         {
@@ -162,10 +156,6 @@ const config: Config = {
             {
               to: "https://leios.cardano-scaling.org/mempool-viz/",
               label: "Mempool visualizer",
-            },
-            {
-              href: "https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3",
-              label: "Throughput model",
             },
           ],
         },
@@ -223,23 +213,6 @@ const config: Config = {
           ],
         },
         {
-          title: "Research and development",
-          items: [
-            {
-              label: "Overview",
-              to: "/docs/development/overview",
-            },
-            {
-              label: "Throughput simulation",
-              to: "/docs/development/throughput-simulation",
-            },
-            {
-              label: "Simulation demonstration",
-              to: "/docs/development/simulation-demonstration",
-            },
-          ],
-        },
-        {
           title: "Development",
           items: [
             {
@@ -247,25 +220,33 @@ const config: Config = {
               to: "/docs/development/",
             },
             {
-              label: "Benchmark reports",
-              to: "/docs/development/benchmark-reports",
+              label: "Protocol Status",
+              to: "/docs/development/status",
             },
             {
-              label: "Cost estimator",
-              to: "/docs/development/cost-estimator",
+              label: "Benchmark reports",
+              to: "/docs/development/benchmark-reports",
             },
           ],
         },
         {
-          title: "Updates",
+          title: "Tools",
           items: [
             {
-              label: "Mempool Visualizer",
-              to: "https://leios.cardano-scaling.org/mempool-viz/",
+              to: "/docs/parameter-graduation",
+              label: "Parameter graduation",
             },
             {
-              label: "Throughput simulator",
-              to: "https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3",
+              to: "https://leios.cardano-scaling.org/cost-estimator/",
+              label: "Cost Estimator",
+            },
+            {
+              to: "https://leios.cardano-scaling.org/visualizer",
+              label: "Visualizer",
+            },
+            {
+              to: "https://leios.cardano-scaling.org/mempool-viz/",
+              label: "Mempool visualizer",
             },
           ],
         },
