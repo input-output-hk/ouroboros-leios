@@ -137,17 +137,17 @@ validation gaps.
 | [T6](#t6-vote-equivocation) | Vote equivocation | TODO | — | Feasibility and scope unresolved |
 | [T7](#t7-double-voting) | Double voting | TODO | — | No completed Haskell result |
 | [T8](#t8-bls-key-compromise) | BLS key compromise | out of scope | — | Key theft and recovery not assessed |
-| [T9](#t9-decline-to-create-eb) | Decline to create EB | final | Negative | Empirical confirmation pending |
+| [T9](#t9-decline-to-create-eb) | Decline to create EB | final | Negative | Covered by T23, T11 etc, declining EB means slot is lost |
 | [T10](#t10-decline-to-vote) | Decline to vote | final | Negative | Praos continued during observed certification loss; incentives unvalidated |
 | [T11](#t11-create-invalid-eb) | Create invalid EB | prelim | Negative | w43 campaign rejected all tested variants with no crash; w34 crash not reproduced; crypto-stage EB, non-empty size lie, and sustained flood untested |
 | [T12](#t12-create-invalid-vote) | Create invalid vote | TODO | — | Historical unknown-target vote retention; full assessment pending |
 | [T13](#t13-reference-invalid-transactions-in-eb) | Reference invalid transactions in EB | prelim | Positive | w34 committee-node crash via certified EB; upstream fix identified, not re-verified on w43 |
 | [T14](#t14-include-invalid-certificate-in-rb) | Include invalid certificate in RB | in progress | — | Delivered variants rejected; coverage incomplete and resource cost unquantified |
 | [T15](#t15-forge-certificate-without-quorum) | Forge certificate without quorum | final | Negative | Tested one-key/full-committee forgery rejected |
-| [T16](#t16-omit-targeted-transactions-from-rb-and-eb) | Omit targeted transactions from RB and EB | ? | — | Scope and feasibility pending |
+| [T16](#t16-omit-targeted-transactions-from-rb-and-eb) | Omit targeted transactions from RB and EB | out of scope| — | Lower throughput or invalid block, but only for one given slot won by adversarial node|
 | [T17](#t17-reorder-transactions-in-eb) | Reorder transactions in EB | final | Negative | Reordering signed txs does not add to MEV|
-| [T18](#t18-insert-or-replace-transactions-in-eb) | Insert or replace transactions in EB | in progress | — | No completed economic or implementation result |
-| [T19](#t19-omit-available-eb-certificate-and-fill-rb-with-own-transactions) | Omit available EB certificate and fill RB with own transactions (extractive or defensive) | in progress | — | Narrow historical mechanism test; economic scenario unvalidated |
+| [T18](#t18-insert-or-replace-transactions-in-eb) | Insert or replace transactions in EB | final | Positive | Local proto-devnet demonstrated insertion before a selected transaction in a certified EB; replacement and economic gain/loss untested |
+| [T19](#t19-omit-available-eb-certificate-and-fill-rb-with-own-transactions) | Omit available EB certificate and fill RB with own transactions (extractive or defensive) | final | Positive | Local proto-devnet established certificate omission and chosen attacker-before-victim order on three Haskell chains; financial impact unmeasured |
 | [T20](#t20-withhold-announced-eb-or-endorsed-transactions) | Withhold announced EB or endorsed transactions | prelim | Negative | Retry mitigation supported in Rust cluster; Haskell validation pending |
 | [T21](#t21-selectively-withhold-data-from-voting-committee) | Selectively withhold data from voting committee | TODO | — | Harness and plans; no completed result |
 | [T22](#t22-selectively-withhold-data-from-most-honest-nodes) | Selectively withhold data from most honest nodes | in progress | — | Mechanism described; timing and mitigation validation pending |
@@ -263,15 +263,15 @@ establish resistance to theft of genuine keys. Source: [threat model](threat-mod
 ### T9: Decline to create EB
 
 **Description.** An eligible producer omits an EB, reducing the additional
-throughput available from Leios.
+throughput available from Leios. Repeated omissions can reduce Leios throughput
+under load, but this is limited by the VRF slot leader lottery.
 
-**Recommendation.** Document the tested conditions and observations. Distinguish
-continued ranking-block production from lost EB throughput, and validate any
-claimed economic deterrent separately.
+**Recommendation.** Monitor omitted EB blocks and the frequency of that happening.
 
-**Assessment.** The negative risk assessment awaits empirical confirmation. The
-effect on throughput and the effectiveness of economic deterrents remain to be
-quantified.
+**Assessment.** An isolated omission does not threaten consensus and have little 
+effect at low demand. The throughput cost of sustained omission, and whether 
+rewards discourage it, remain unmeasured. The existing results support a limited 
+safety expectation.
 
 ### T10: Decline to vote
 
@@ -515,46 +515,55 @@ replacement, or exclusion of transactions belong under T18.
 
 ### T18: Insert or replace transactions in EB
 
-**Description.** A producer may insert competing transactions or replace its
-selected contents to capture value. Meaningful impact analysis requires actual
-ledger constraints and application economics.
+**Description.** An EB producer can insert its private transaction before a
+selected user's transaction or replace selected transactions. Such control may
+create MEV when application economics make the transaction order valuable.
 
-**Recommendation.** Construct a ledger-valid application scenario and measure
-user loss and producer gain, including conflicts that prevent both transactions
-from succeeding.
+**Evidence.** In one fresh local proto-devnet run, Piranha changed its ordinary
+EB candidate from victim transaction `V` alone to attacker transaction `A`
+followed by `V`. A Haskell child ranking block certified the EB. Haskell node1
+adopted the announcing and certifying ranking blocks and one later block,
+captured `A` before `V` in the EB, and found both transaction outputs in its
+ledger. The saved evidence establishes insertion and certified EB order for
+this run. The transactions were self-transfers, so it does not establish
+financial gain or loss as this out of scope.
 
-**Assessment.** In progress; conclusions remain pending. The availability of
-transaction-injection tools does not establish an economic or implementation
-result. Source: [threat model](threat-model.md).
+**Recommendation.** Reduce ordering-dependent value at the application layer,
+for example with batch auctions at a uniform clearing price and strict
+slippage limits. These measures limit the value available from inserting an
+attacker transaction ahead of a user transaction.
+
+**Assessment.** Final and positive for the tested insertion mechanism on a
+local proto-devnet. Estimating financial loss is outside the scope of this
+mechanism test; replacement and testnet behavior remain untested. Source:
+[threat model](threat-model.md).
 
 ### T19: Omit available EB certificate and fill RB with own transactions
 
-**Description.** Dropping an available certificate can sacrifice throughput for
-extractive or defensive purposes. In the historical configuration tested, the
-immediate successor of an EB's announcing ranking block was the certificate
-inclusion opportunity. A producer in that position could omit a certificate even
-after the EB reached quorum.
+**Description.** When an eligible ranking-block (RB) producer has an available
+certificate for an honest endorser block (EB), it can omit the certificate and
+put its own transaction directly in the RB. This can place the producer's
+transaction before a transaction in the EB. The EB transaction need not be lost;
+its later application can still create an opportunity for MEV.
 
-**Evidence.** A 50-node Rust-cluster study compared this suppression with periodic,
-untargeted reorganizations, restarting the cluster between configurations. At
-approximately 7.1%, 14.3%, and 21.4% adversarial stake, plain suppression remained
-near the measurement floor of one event per roughly 14-EB window. Reorganizations
-of one to four blocks reduced attributed suppression to zero while causing churn:
-they orphaned the adversary's suppressing blocks, sometimes also the target EB's
-announcing block, instead of reliably installing a suppressing successor.
+**Evidence.** In one fresh four-pool local proto-devnet run, an honest EB
+contained the chosen victim transaction `V`. Piranha, holding 20% of the stake,
+assembled and self-verified a certificate candidate for that EB before forging
+the immediate child RB. It omitted the certificate and put its chosen attacker
+transaction `A` directly in the RB. All three Haskell nodes adopted that RB
+and the next RB, which included the same `V`. Their observed order was `A`
+before `V`, with eleven later RBs after `V` in the saved attack run.
 
-Small samples and a fixed seed limit this result. It neither excludes a targeted
-reorganization nor validates the full economic scenario. The successor rule and
-stake points describe that experiment, not universal protocol bounds.
+**Recommendation.** Allow transactions in certificate-bearing RBs, applied
+after the certified EB. Count certificate inclusion in pool performance, or
+otherwise attach a cost to omission, and publish per-pool omission statistics.
+These measures reduce incentives to drop certificates but do not eliminate all
+front-running opportunities.
 
-**Recommendation.** Evaluate the model's proposals to allow transactions alongside
-certificates, attach incentives to inclusion, and publish omission statistics.
-Test targeted producer choices with realistic application value and timing.
-
-**Assessment.** In progress; conclusions about the broader threat remain
-pending. The negative historical mechanism experiment does not validate
-incentive compatibility or the proposed mitigations. Source: [threat
-model](threat-model.md).
+**Assessment.** Final and positive for the tested local ordering mechanism.
+The self-transfer transactions do not establish financial gain or loss. The
+throughput cost, testnet behavior, and proposed mitigations remain unmeasured.
+Source: [threat model](threat-model.md).
 
 ### T20: Withhold announced EB or endorsed transactions
 
