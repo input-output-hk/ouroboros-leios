@@ -1,5 +1,12 @@
 # Improved ΔQ Model for Linear Leios EB Diffusion
 
+**Cache-model correction:** the current `analysis.py` treats 1/6 as the
+stationary fraction of transactions missing at every node.  Each node fetches
+that fraction; there is no additional 5/6 probability of fetching nothing.
+This report's historical numbers and plots have not been regenerated for that
+correction.  For regenerated closure-completion results, see the
+[numerical report](../../../docs/conditional-certification-diffusion.md).
+
 ## Table of Contents
 
 - [1. Executive Summary](#executive-summary)

@@ -18,19 +18,15 @@ The supporting Python has also been ported into `analysis.py` (functions
 `plot_full_closure_diffusion_given_cert` /
 `print_full_diffusion_adversarial_summary` /
 `plot_full_diffusion_adversarial` reporting helpers), and all numbers and
-plots below are regenerated from that code rather than copied statically.
-`_committee_moments` implements the *canonical CIP-0164 stake-truncated
-committee* (deterministic top-stake truncation to coverage $\sigma_c$),
-matching the notebook branch; this is a more accurate committee model than
-`report.md` §4.6's current `compute_p_certified`, which still uses an
-older Poisson-binomial election calibrated to a fixed committee *size*
-(`committee_size=600`) rather than a stake *coverage* target. The two
-committee models are independent in the code (`_committee_moments` is only
-used by the functions listed above), so porting this section does not
-change any existing §4–§9 numbers in `report.md`; bringing §4.6 onto the
-same stake-truncated committee model is a separate, unported piece of the
-notebook branch's history (its "Stake-based truncation" commit) and is out
-of scope here.
+plots below were generated from that code with the original 99%-coverage
+committee.  They are historical results.  The current `_committee_moments`
+instead selects a fixed number of highest-stake pools (`committee_size=900`
+by default), matching the current ledger implementation and Musashi's seat
+count.  Coverage is derived from the selected pools.  The
+[updated numerical report](../../../docs/conditional-certification-diffusion.md)
+contains regenerated tables and plots, including the 260 kB Musashi limit.
+The older `compute_p_certified` used by `report.md` §4.6 remains a separate
+Poisson-binomial election model; this change does not update that model.
 
 **Regenerating.** These functions are not wired into `analysis.py`'s
 `main()` (which drives the rest of `report.md`'s plots); run them directly,
@@ -47,6 +43,11 @@ for model in ("mathis", "cubic"):
 ---
 
 ## 1. Setup
+
+The current implementation also corrects the cache interpretation: every node
+fetches the stationary missing fraction (1/6) of the closure, rather than
+entering a fetch branch with probability 1/6.  This note's historical tables
+predate that correction; use the updated numerical report linked above.
 
 The security assumptions for Linear Leios require that a *certified EB*
 reaches almost all honest nodes by the end of $L_\text{diff}$. We are therefore
@@ -85,10 +86,13 @@ $$\sum_{v\in\text{votes}}\text{stake}(v)\\;\ge\\;\theta,\qquad
 \theta:=\tau\cdot S_\text{active},$$
 
 where $S_\text{active}$ is the total active stake. The committee is the
-**canonical CIP-0164 voting committee**: a *deterministic* stake-based
-truncation. Order SPOs by active stake (descending) and select until their
-cumulative stake reaches the target $\sigma_c$ (`stake_cover`; equivalently
-the truncation error falls below $\varepsilon_c=1-\sigma_c$). The set is
+**deterministic top-stake voting committee**.  Order SPOs by active stake
+(descending) and take the configured number of pools, or all candidates if
+fewer.  The current default is 900 seats.  Equal-stake ties use ascending
+pool ID in the ledger; the synthetic model has no pool IDs and tied weights
+are interchangeable.  All selected seats are assumed to have usable voting
+keys.  Coverage $\sigma_c$ is the resulting fraction of active stake, rather
+than the 99% target used for this note's historical tables.  The set is
 fixed for the epoch. Each member of the committee votes with weight
 $w_i=s_i$. Because the committee holds only a fraction $\sigma_c$ of the
 total stake, $S_\text{active}=M/\sigma_c$ and the quorum is
