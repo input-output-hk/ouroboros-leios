@@ -74,6 +74,16 @@ chainEvents = do
       parse ["{\"ns\":\"Forge.Loop.ForgedBlock\",\"data\":{\"kind\":\"TraceForgedBlock\",\"slot\":42,\"block\":\"aa11\",\"blockNo\":7}}"]
         `shouldBe` [CRBForged "aa11" 42]
 
+    -- The end of the forge's mempool split, as the devnet logs it at Debug
+    -- (slot 166 of a 2026-11-16 run, forged from an empty snapshot).  Its start
+    -- and any other call carry nothing.
+    it "parses the forge's mempool split (take-rb-eb-txs)" $
+      parse
+        [ "{\"ns\":\"Forge.Loop.Call\",\"data\":{\"argument\":166,\"child_id\":2,\"event\":\"Start\",\"id\":\"165.5.2\",\"kind\":\"Call\",\"name\":\"take-rb-eb-txs\"}}"
+        , "{\"ns\":\"Forge.Loop.Call\",\"data\":{\"allocations\":544,\"argument\":166,\"child_id\":2,\"duration\":7.94e-7,\"event\":\"End\",\"id\":\"165.5.2\",\"kind\":\"Call\",\"name\":\"take-rb-eb-txs\",\"result\":{\"ebBytes\":0,\"ebTxs\":0,\"mempoolBytes\":0,\"mempoolTxs\":0,\"rbBytes\":0,\"rbTxs\":0,\"restBytes\":0,\"restTxs\":0}}}"
+        , "{\"ns\":\"Forge.Loop.Call\",\"data\":{\"argument\":166,\"event\":\"End\",\"kind\":\"Call\",\"name\":\"partition-mempool\",\"result\":{}}}"
+        ]
+        `shouldBe` [CForgePartition 166 0 0]
   describe "pre-w31 combined namespace (TraceLeiosKernel + kind)" $ do
     it "parses LeiosBlockForged" $
       parse ["{\"ns\":\"Consensus.LeiosKernel.TraceLeiosKernel\",\"data\":{\"kind\":\"LeiosBlockForged\",\"hash\":\"eb01\",\"slot\":100}}"]

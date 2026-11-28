@@ -1,0 +1,92 @@
+--- a/src/Ledger/Dijkstra/Specification/Script/Native.lagda.md
++++ b/src/Ledger/Dijkstra/Specification/Script/Native.lagda.md
+@@ -61,7 +61,88 @@
+ 
+ <!--
+ ```agda
+-unquoteDecl DecEq-NativeScript = derive-DecEq ((quote NativeScript , DecEq-NativeScript) ∷ [])
++-- Hand-written in place of `derive-DecEq`, whose reflection exhausts the heap on
++-- this nested type (constructors taking `List NativeScript`) with newer stdlib-meta.
++private
++  mutual
++    _≟ⁿ_ : (s s' : NativeScript) → Dec (s ≡ s')
++    RequireAllOf xs ≟ⁿ RequireAllOf ys with xs ≟ˡ ys
++    ... | yes refl = yes refl
++    ... | no ¬p    = no λ where refl → ¬p refl
++    RequireAllOf _ ≟ⁿ RequireAnyOf _ = no λ ()
++    RequireAllOf _ ≟ⁿ RequireMOf _ _ = no λ ()
++    RequireAllOf _ ≟ⁿ RequireSig _ = no λ ()
++    RequireAllOf _ ≟ⁿ RequireTimeStart _ = no λ ()
++    RequireAllOf _ ≟ⁿ RequireTimeExpire _ = no λ ()
++    RequireAllOf _ ≟ⁿ RequireGuard _ = no λ ()
++    RequireAnyOf xs ≟ⁿ RequireAnyOf ys with xs ≟ˡ ys
++    ... | yes refl = yes refl
++    ... | no ¬p    = no λ where refl → ¬p refl
++    RequireAnyOf _ ≟ⁿ RequireAllOf _ = no λ ()
++    RequireAnyOf _ ≟ⁿ RequireMOf _ _ = no λ ()
++    RequireAnyOf _ ≟ⁿ RequireSig _ = no λ ()
++    RequireAnyOf _ ≟ⁿ RequireTimeStart _ = no λ ()
++    RequireAnyOf _ ≟ⁿ RequireTimeExpire _ = no λ ()
++    RequireAnyOf _ ≟ⁿ RequireGuard _ = no λ ()
++    RequireMOf m xs ≟ⁿ RequireMOf n ys with m ≟ n | xs ≟ˡ ys
++    ... | yes refl | yes refl = yes refl
++    ... | no ¬p    | _        = no λ where refl → ¬p refl
++    ... | _        | no ¬p    = no λ where refl → ¬p refl
++    RequireMOf _ _ ≟ⁿ RequireAllOf _ = no λ ()
++    RequireMOf _ _ ≟ⁿ RequireAnyOf _ = no λ ()
++    RequireMOf _ _ ≟ⁿ RequireSig _ = no λ ()
++    RequireMOf _ _ ≟ⁿ RequireTimeStart _ = no λ ()
++    RequireMOf _ _ ≟ⁿ RequireTimeExpire _ = no λ ()
++    RequireMOf _ _ ≟ⁿ RequireGuard _ = no λ ()
++    RequireSig a ≟ⁿ RequireSig b with a ≟ b
++    ... | yes refl = yes refl
++    ... | no ¬p    = no λ where refl → ¬p refl
++    RequireSig _ ≟ⁿ RequireAllOf _ = no λ ()
++    RequireSig _ ≟ⁿ RequireAnyOf _ = no λ ()
++    RequireSig _ ≟ⁿ RequireMOf _ _ = no λ ()
++    RequireSig _ ≟ⁿ RequireTimeStart _ = no λ ()
++    RequireSig _ ≟ⁿ RequireTimeExpire _ = no λ ()
++    RequireSig _ ≟ⁿ RequireGuard _ = no λ ()
++    RequireTimeStart a ≟ⁿ RequireTimeStart b with a ≟ b
++    ... | yes refl = yes refl
++    ... | no ¬p    = no λ where refl → ¬p refl
++    RequireTimeStart _ ≟ⁿ RequireAllOf _ = no λ ()
++    RequireTimeStart _ ≟ⁿ RequireAnyOf _ = no λ ()
++    RequireTimeStart _ ≟ⁿ RequireMOf _ _ = no λ ()
++    RequireTimeStart _ ≟ⁿ RequireSig _ = no λ ()
++    RequireTimeStart _ ≟ⁿ RequireTimeExpire _ = no λ ()
++    RequireTimeStart _ ≟ⁿ RequireGuard _ = no λ ()
++    RequireTimeExpire a ≟ⁿ RequireTimeExpire b with a ≟ b
++    ... | yes refl = yes refl
++    ... | no ¬p    = no λ where refl → ¬p refl
++    RequireTimeExpire _ ≟ⁿ RequireAllOf _ = no λ ()
++    RequireTimeExpire _ ≟ⁿ RequireAnyOf _ = no λ ()
++    RequireTimeExpire _ ≟ⁿ RequireMOf _ _ = no λ ()
++    RequireTimeExpire _ ≟ⁿ RequireSig _ = no λ ()
++    RequireTimeExpire _ ≟ⁿ RequireTimeStart _ = no λ ()
++    RequireTimeExpire _ ≟ⁿ RequireGuard _ = no λ ()
++    RequireGuard a ≟ⁿ RequireGuard b with a ≟ b
++    ... | yes refl = yes refl
++    ... | no ¬p    = no λ where refl → ¬p refl
++    RequireGuard _ ≟ⁿ RequireAllOf _ = no λ ()
++    RequireGuard _ ≟ⁿ RequireAnyOf _ = no λ ()
++    RequireGuard _ ≟ⁿ RequireMOf _ _ = no λ ()
++    RequireGuard _ ≟ⁿ RequireSig _ = no λ ()
++    RequireGuard _ ≟ⁿ RequireTimeStart _ = no λ ()
++    RequireGuard _ ≟ⁿ RequireTimeExpire _ = no λ ()
++
++    _≟ˡ_ : (ss ss' : List NativeScript) → Dec (ss ≡ ss')
++    []       ≟ˡ []       = yes refl
++    []       ≟ˡ (_ ∷ _)  = no λ ()
++    (_ ∷ _)  ≟ˡ []       = no λ ()
++    (s ∷ ss) ≟ˡ (t ∷ ts) with s ≟ⁿ t | ss ≟ˡ ts
++    ... | yes refl | yes refl = yes refl
++    ... | no ¬p    | _        = no λ where refl → ¬p refl
++    ... | _        | no ¬p    = no λ where refl → ¬p refl
++
++instance
++  DecEq-NativeScript : DecEq NativeScript
++  DecEq-NativeScript = record { _≟_ = _≟ⁿ_ }
+ 
+ private variable
+   s : NativeScript

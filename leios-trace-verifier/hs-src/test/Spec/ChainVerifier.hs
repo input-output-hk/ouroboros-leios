@@ -15,8 +15,9 @@ module Spec.ChainVerifier (
 
 import ChainEvents (ChainEvent (..))
 import Data.Text (Text)
+import qualified Data.Text as T
 import LinearLeiosLib (verifyChainTraceFinalFromSlot)
-import Test.Hspec (Spec, describe, it, shouldBe, shouldNotBe)
+import Test.Hspec (Spec, describe, it, shouldBe, shouldNotBe, shouldSatisfy)
 
 -- | Three equal-stake pools with the SUT last, mirroring the devnet the chain
 --   verifier is exercised against. The figures have to be non-zero: vote
@@ -47,7 +48,12 @@ fitting :: ChainEvent
 fitting = CMempoolRange 50 50
 
 verify :: [Integer] -> Bool -> [ChainEvent] -> Text
-verify slots authoritative evs =
+verify = verifyWith Nothing
+
+-- | Verify with the committee as the chain has it: the parties holding a keyed
+--   seat, or 'Nothing' for a chain without one, where every party is seated.
+verifyWith :: Maybe [Integer] -> [Integer] -> Bool -> [ChainEvent] -> Text
+verifyWith seated slots authoritative evs =
   fst
     ( snd
         ( verifyChainTraceFinalFromSlot
@@ -60,10 +66,15 @@ verify slots authoritative evs =
             slots
             authoritative
             capacity
+            seated
             evs
             0
         )
     )
+
+-- | Whether the vote rule rejected the run for want of a committee seat.
+notInCommittee :: Text -> Bool
+notInCommittee = T.isInfixOf "Not in the voting committee"
 
 -- | Eligibility taken from the log, as happens for any epoch the queried schedule
 --   cannot cover.
@@ -75,7 +86,7 @@ verifyFrom :: Integer -> [ChainEvent] -> Text
 verifyFrom from evs =
   fst
     ( snd
-        (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 [] False capacity evs from)
+        (verifyChainTraceFinalFromSlot 3 2 stakeDist 1 4 7 [] False capacity Nothing evs from)
     )
 
 -- | An EB announced and acquired in slot 1 and voted in slot 4, the first slot of its
@@ -210,6 +221,25 @@ votedNotAdopted =
   , CSlot 5
   ]
 
+-- | 'announcedAndVoted' with the EB's body never acquired: the node votes on an
+--   EB it cannot have validated, since it never submitted it for validation.
+votedNotAcquired :: [ChainEvent]
+votedNotAcquired = filter (/= CEBAcquired "eb" 1) announcedAndVoted
+
+-- | 'adoptedPastAnnouncer', in which no vote is forced, with the node putting its
+--   abstention down to being too late in the given slot.  The EB was acquired in
+--   slot 1, and validation is bounded by the voting window, @3 * Lhdr + Lvote == 7@
+--   slots, so it may still be in progress up to slot 7 but not at slot 8.
+tooLateAt :: Integer -> [ChainEvent]
+tooLateAt n = concatMap at adoptedPastAnnouncer
+ where
+  at ev@(CSlot s) | s == fromInteger n = [ev, CNotVoted "eb" 1 "tooLate"]
+  at ev = [ev]
+
+-- | Whether the validation machine rejected the run.
+rejectedByValidation :: Text -> Bool
+rejectedByValidation = T.isInfixOf "validation of EB"
+
 -- | The node forges a ranking block in a slot it leads, on the tip it selected.
 forgedOnTip :: [ChainEvent]
 forgedOnTip =
@@ -269,6 +299,19 @@ chainVerifier = do
     it "judges a slot with no forge by the low end of the range" $
       verify [0] True [CSlot 0, CMempoolRange 50 200, CSlot 1] `shouldBe` "ok"
 
+    -- The forge's own mempool split decides where the log has it: under load the
+    -- node can forge from a snapshot that lags its mempool and comes back empty,
+    -- whatever the readings show.  The same events as the overflowing forge
+    -- above, which the readings alone reject.
+    it "accepts a forge without an EB when the forge's mempool split was empty" $
+      verify [0] True [CSlot 0, CForgePartition 0 0 0, CRBForged "rb" 0, CMempoolRange 50 200, CSlot 1]
+        `shouldBe` "ok"
+    -- And the split catches what the readings would excuse: transactions put in
+    -- the EB, and no EB announced, with a mempool that fitted.
+    it "rejects a forge without an EB whose mempool split filled the EB" $
+      verify [0] True [CSlot 0, CForgePartition 0 500 300, CRBForged "rb" 0, fitting, CSlot 1]
+        `shouldSatisfy` T.isInfixOf "No-EB-Role"
+
   describe "voting" $ do
     it "accepts a vote cast in the first slot of the window" $
       fromLog announcedAndVoted `shouldBe` "ok"
@@ -302,6 +345,28 @@ chainVerifier = do
       verifyFrom 16 windowOfVotedTwiceFar `shouldBe` "ok"
     it "refuses a vote for an EB whose ranking block the node never adopted" $
       fromLog votedNotAdopted `shouldNotBe` "ok"
+
+  describe "the voting committee" $ do
+    it "accepts a vote by a node the chain's committee seats" $
+      verifyWith (Just [0, 1, 2]) [] False announcedAndVoted `shouldBe` "ok"
+    it "refuses a vote by a node the chain's committee leaves out" $
+      verifyWith (Just [0, 1]) [] False announcedAndVoted `shouldSatisfy` notInCommittee
+    it "refuses every vote when the chain's committee is empty" $
+      verifyWith (Just []) [] False announcedAndVoted `shouldSatisfy` notInCommittee
+    it "seats every pool on a chain without a committee" $
+      verifyWith Nothing [] False announcedAndVoted `shouldBe` "ok"
+  describe "validation" $ do
+    it "refuses a vote for an EB whose body the node never acquired" $
+      fromLog votedNotAcquired `shouldSatisfy` rejectedByValidation
+    it "accepts a too-late abstention while validation may be in progress" $
+      fromLog (tooLateAt 4) `shouldBe` "ok"
+    it "accepts a too-late abstention at the last slot validation may take" $
+      fromLog (tooLateAt 7) `shouldBe` "ok"
+    it "refuses a too-late abstention past the bound on validation" $
+      fromLog (tooLateAt 8) `shouldSatisfy` rejectedByValidation
+    it "ignores an abstention for another reason" $
+      fromLog (map (\e -> if e == CNotVoted "eb" 1 "tooLate" then CNotVoted "eb" 1 "notOnCommittee" else e) (tooLateAt 8))
+        `shouldBe` "ok"
 
   describe "the Praos layer" $ do
     it "accepts a ranking block forged on the selected tip" $

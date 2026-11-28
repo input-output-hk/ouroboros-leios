@@ -1152,6 +1152,23 @@
         "type": "github"
       }
     },
+    "formal-ledger-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794005511,
+        "narHash": "sha256-6LCGb8RWLiiAQQDZ+MZktgVHFgI34v47XjFSIxySNIM=",
+        "owner": "IntersectMBO",
+        "repo": "formal-ledger-specifications",
+        "rev": "ec066122d49631e9846a0218100901aedd2c5cce",
+        "type": "github"
+      },
+      "original": {
+        "owner": "IntersectMBO",
+        "repo": "formal-ledger-specifications",
+        "rev": "ec066122d49631e9846a0218100901aedd2c5cce",
+        "type": "github"
+      }
+    },
     "gentle-introduction": {
       "flake": false,
       "locked": {
@@ -3320,17 +3337,17 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1793697113,
-        "narHash": "sha256-Y1vxegueJ0cERn+MxTDsYABRrgcMR7ZpjAl9nSOicek=",
+        "lastModified": 1794846065,
+        "narHash": "sha256-i2qTR0fIdUs8KkU051G4bp8NQPllDgjLZGWu665syds=",
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "426f3756655d8b6b562d49b33243f796c5ab39b3",
+        "rev": "e13c3547dbc1d5a6706faa0c8d289837fa636345",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "426f3756655d8b6b562d49b33243f796c5ab39b3",
+        "rev": "e13c3547dbc1d5a6706faa0c8d289837fa636345",
         "type": "github"
       }
     },
@@ -4724,6 +4741,7 @@
         "cardano-node-leios": "cardano-node-leios",
         "deltaq-src": "deltaq-src",
         "flake-parts": "flake-parts_2",
+        "formal-ledger-src": "formal-ledger-src",
         "haskell-nix-tv": "haskell-nix-tv",
         "iogx": "iogx",
         "jupyenv": "jupyenv",

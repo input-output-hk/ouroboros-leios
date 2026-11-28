@@ -66,11 +66,15 @@ executable linear-leios-trace-verifier-chain
       , base
       , bytestring
       , cardano-api
+      , cardano-crypto-leios
+      , cardano-ledger-api
+      , cardano-ledger-core
       , containers
       , leios-trace-hs
       , optparse-applicative
       , text
       , trace-parser
+      , vector
       , yaml
 
     default-language: Haskell2010

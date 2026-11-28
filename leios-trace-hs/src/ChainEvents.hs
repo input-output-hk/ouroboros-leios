@@ -94,6 +94,13 @@ data ChainEvent
     --   single reading would be a guess at what it saw. Emitted immediately before
     --   the slot tick that closes the slot it describes.
     CMempoolRange !Word64 !Word64
+  | -- | How the SUT split its mempool when it forged (slot, mempool txs, EB txs),
+    --   from the end of @Forge.Loop.Call@ @take-rb-eb-txs@ (a Debug trace).  This
+    --   is the mempool the forge actually used: under load the node can forge from
+    --   a snapshot that lags its parent, comes back empty and is unlike anything
+    --   the 'CMempoolRange' readings show.  An EB is owed exactly when the split
+    --   puts transactions in it.
+    CForgePartition !Word64 !Word64 !Word64
   | -- | A selection event without its headers: the node logs ChainDB at a
     --   detail below @DDetailed@, which the Praos layer cannot work from.
     CUndetailed
@@ -231,6 +238,7 @@ pRaw = withObject "logline" $ \o -> do
       RawNotVoted <$> d .: "ebHash" <*> d .: "ebSlot" <*> d .: "reason"
     "Mempool.AddedTx" -> mempoolBytes d
     "Mempool.RemoveTxs" -> mempoolBytes d
+    "Forge.Loop.Call" -> forgePartition d
     -- Extending the current chain and switching to a fork are the two ways
     -- ChainDB reports adopting a new tip, and both matter twice over: the tip
     -- advance retires any EB the superseded announcer carried, and the adopted
@@ -252,6 +260,19 @@ pRaw = withObject "logline" $ \o -> do
           RawEvent <$> (CVoteAcquired <$> v .: "ebHash" <*> v .: "slot")
         _ -> fail "unhandled LeiosKernel kind"
     _ -> fail "unhandled ns"
+
+-- | The end of the forge's mempool split, @take-rb-eb-txs@: the slot it was
+--   called for and the split's mempool and EB transaction counts.  Any other
+--   call, and its start, are unhandled.
+forgePartition :: Object -> Parser Raw
+forgePartition d = do
+  name <- d .: "name"
+  event <- d .: "event"
+  if name == ("take-rb-eb-txs" :: Text) && event == ("End" :: Text)
+    then do
+      r <- d .: "result"
+      RawEvent <$> (CForgePartition <$> d .: "argument" <*> r .: "mempoolTxs" <*> r .: "ebTxs")
+    else fail "unhandled Forge.Loop.Call"
 
 -- | The mempool size after a change, shared by the two Mempool traces.
 mempoolBytes :: Object -> Parser Raw
