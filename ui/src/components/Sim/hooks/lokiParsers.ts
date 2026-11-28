@@ -8,6 +8,8 @@
 import {
   EServerMessageType,
   IAnnouncementReceived,
+  IOfferSent,
+  IOfferReceived,
   IAnnouncementSent,
   IEndorserBlockGenerated,
   IEndorserBlockReceived,
@@ -491,8 +493,7 @@ const parseAnnouncementReceived = (
 };
 
 // An EB's txs, keyed so a Send and its matching Recv agree. `MsgLeiosBlockTxs`
-// carries bitmaps naming which txs of the EB the message covers;
-// `MsgLeiosBlockTxsOffer` carries none, and offers the closure whole.
+// carries bitmaps naming which txs of the EB the message covers.
 const txsId = (msg: any): string => {
   const bitmaps = msg.bitmaps || [];
   return bitmaps.length
@@ -500,14 +501,80 @@ const txsId = (msg: any): string => {
     : `txs-${msg.ebHash}`;
 };
 
-// The EB-txs traffic this devnet actually emits is the LeiosNotify offer; the
-// LeiosFetch payload message only appears when a node has to pull a closure it
-// does not already hold, which never happened across an 80MB window here (4998
-// offers, zero payloads -- every node already had the txs from its mempool).
-// Both kinds are accepted so the row populates either way, but note an offer
-// names the EB without carrying tx counts or bytes.
-const isBlockTxsMsg = (kind?: string): boolean =>
-  kind === "MsgLeiosBlockTxs" || kind === "MsgLeiosBlockTxsOffer";
+// Only the LeiosFetch payload: a LeiosNotify offer of the closure is an offer,
+// not txs.
+const isBlockTxsMsg = (kind?: string): boolean => kind === "MsgLeiosBlockTxs";
+
+// What a LeiosNotify offer offers, or null for any other message.
+const offerOf = (kind?: string): "block" | "txs" | null =>
+  kind === "MsgLeiosBlockOffer"
+    ? "block"
+    : kind === "MsgLeiosBlockTxsOffer"
+      ? "txs"
+      : null;
+
+const parseOfferSent = (
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // {"kind":"Send","msg":{"kind":"MsgLeiosBlockOffer","ebSlot":...,"ebHash":"...","ebBytesSize":...},"peer":{"connectionId":"..."}}
+    const offers = log.msg && offerOf(log.msg.kind);
+    if ((log.direction || log.kind) === "Send" && offers) {
+      const [sender, recipient] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
+
+      const message: IOfferSent = {
+        type: EServerMessageType.OfferSent,
+        slot: log.msg.ebSlot ?? 0,
+        id: `offer-${offers}-${log.msg.ebHash}`,
+        sender,
+        recipient,
+        offers,
+      };
+
+      return { time_s: timestamp, message };
+    }
+  } catch (error) {
+    console.error("Failed to parse OfferSent log line:", logLine, error);
+  }
+
+  return null;
+};
+
+const parseOfferReceived = (
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    const offers = log.msg && offerOf(log.msg.kind);
+    if (log.kind === "Recv" && offers) {
+      const [recipient, sender] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
+
+      const message: IOfferReceived = {
+        type: EServerMessageType.OfferReceived,
+        slot: log.msg.ebSlot ?? 0,
+        id: `offer-${offers}-${log.msg.ebHash}`,
+        sender,
+        recipient,
+        offers,
+      };
+
+      return { time_s: timestamp, message };
+    }
+  } catch (error) {
+    console.warn("Failed to parse OfferReceived log line:", logLine, error);
+  }
+
+  return null;
+};
 
 const parseTxsSent = (
   timestamp: number,
@@ -712,6 +779,8 @@ export const parseStreamValue = (
   parseEndorserBlockReceived(timestamp, logLine) ||
   parseAnnouncementSent(timestamp, logLine) ||
   parseAnnouncementReceived(timestamp, logLine) ||
+  parseOfferSent(timestamp, logLine) ||
+  parseOfferReceived(timestamp, logLine) ||
   parseTxsSent(timestamp, logLine) ||
   parseTxsReceived(timestamp, logLine) ||
   parseVotesGenerated(streamLabels, timestamp, logLine) ||

@@ -4,6 +4,7 @@ is_strict: true
 processes:
   Node1:
     command: |
+      NODE_BIN="${CARDANO_NODE_1}" \
       NODE_DIR="${WORKING_DIR}/node1" \
       IP="${IP_NODE1}" \
       PORT="${PORT_NODE1}" \
@@ -18,6 +19,7 @@ processes:
 
   Node2:
     command: |
+      NODE_BIN="${CARDANO_NODE_2}" \
       NODE_DIR="${WORKING_DIR}/node2" \
       IP="${IP_NODE2}" \
       PORT="${PORT_NODE2}" \
@@ -32,6 +34,7 @@ processes:
 
   Node3:
     command: |
+      NODE_BIN="${CARDANO_NODE_3}" \
       NODE_DIR="${WORKING_DIR}/node3" \
       IP="${IP_NODE3}" \
       PORT="${PORT_NODE3}" \

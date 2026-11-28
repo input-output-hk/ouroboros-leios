@@ -6,8 +6,8 @@ import { EMessageType } from "@/contexts/SimContext/types";
 import { EMessageColor } from "@/utils/colors";
 
 // One row per message type: the created/sent/received triple for each, rather
-// than a flat list of every event kind. `created` is left off announcements and
-// EB txs, whose cells stay blank -- neither has an origin event on the wire, so
+// than a flat list of every event kind. `created` is left off announcements,
+// offers and EB txs, whose cells stay blank -- neither has an origin event on the wire, so
 // a zero there would claim none were seen when nothing is being counted.
 type MessageGroup = {
   type: EMessageType;
@@ -31,6 +31,13 @@ const MESSAGE_GROUPS: MessageGroup[] = [
     received: EServerMessageType.AnnouncementReceived,
   },
   {
+    type: EMessageType.Offer,
+    label: "Offers",
+    color: EMessageColor.OFFER,
+    sent: EServerMessageType.OfferSent,
+    received: EServerMessageType.OfferReceived,
+  },
+  {
     type: EMessageType.EB,
     label: "Endorser Blocks",
     color: EMessageColor.EB,
@@ -42,7 +49,7 @@ const MESSAGE_GROUPS: MessageGroup[] = [
     type: EMessageType.Txs,
     // "Missing" because this row is the Leios closure-fetch path, which only
     // engages on a tx-cache miss: an EB names txs the node does not hold, so it
-    // offers/fetches them. It is not how txs normally reach a mempool -- that
+    // fetches them. It is not how txs normally reach a mempool -- that
     // is TxSubmission, whose per-message traces the node currently silences
     // (TxSubmission.Remote is at Notice, the messages are Debug).
     label: "Missing Txs",
